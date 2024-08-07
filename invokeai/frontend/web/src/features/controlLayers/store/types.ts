@@ -43,7 +43,7 @@ import { z } from 'zod';
 export const zId = z.string().min(1);
 
 export const zImageWithDims = z.object({
-  name: z.string(),
+  image_name: z.string(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
 });
@@ -248,7 +248,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     buildNode: (image, config) => ({
       ...config,
       type: 'canny_image_processor',
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -265,7 +265,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     buildNode: (image, config) => ({
       ...config,
       type: 'color_map_image_processor',
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
     }),
   },
   content_shuffle_image_processor: {
@@ -281,7 +281,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -297,7 +297,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       resolution: minDim(image),
     }),
   },
@@ -312,7 +312,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -327,7 +327,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -343,7 +343,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -360,7 +360,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -377,7 +377,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -394,7 +394,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -409,7 +409,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -427,7 +427,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       image_resolution: minDim(image),
     }),
   },
@@ -443,7 +443,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
       detect_resolution: minDim(image),
       image_resolution: minDim(image),
     }),
@@ -458,7 +458,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     }),
     buildNode: (image, config) => ({
       ...config,
-      image: { image_name: image.name },
+      image: { image_name: image.image_name },
     }),
   },
 };
@@ -548,10 +548,7 @@ export type CanvasEraserLineState = z.infer<typeof zCanvasEraserLineState>;
 const zCanvasRectState = z.object({
   id: zId,
   type: z.literal('rect'),
-  x: z.number(),
-  y: z.number(),
-  width: z.number().min(1),
-  height: z.number().min(1),
+  rect: zRect,
   color: zRgbaColor,
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
@@ -563,10 +560,6 @@ const zCanvasImageState = z.object({
   id: zId,
   type: z.literal('image'),
   image: zImageWithDims,
-  x: z.number(),
-  y: z.number(),
-  width: z.number().min(1),
-  height: z.number().min(1),
   filters: z.array(zFilter),
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
@@ -589,6 +582,7 @@ export const zCanvasLayerState = z.object({
   position: zCoordinate,
   opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
+  imageCache: z.string().min(1).nullable(),
 });
 export type CanvasLayerState = z.infer<typeof zCanvasLayerState>;
 
@@ -661,7 +655,7 @@ export const zCanvasRegionalGuidanceState = z.object({
   negativePrompt: zParameterNegativePrompt.nullable(),
   ipAdapters: z.array(zCanvasIPAdapterState),
   autoNegative: zAutoNegative,
-  imageCache: zImageWithDims.nullable(),
+  imageCache: z.string().min(1).nullable(),
 });
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
 
@@ -681,7 +675,7 @@ const zCanvasInpaintMaskState = z.object({
   position: zCoordinate,
   fill: zRgbColor,
   objects: z.array(zCanvasObjectState),
-  imageCache: zImageWithDims.nullable(),
+  imageCache: z.string().min(1).nullable(),
 });
 export type CanvasInpaintMaskState = z.infer<typeof zCanvasInpaintMaskState>;
 
@@ -773,7 +767,7 @@ export const buildControlAdapterProcessorV2 = (
 };
 
 export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO): ImageWithDims => ({
-  name: image_name,
+  image_name,
   width,
   height,
 });
@@ -783,13 +777,9 @@ export const imageDTOToImageObject = (imageDTO: ImageDTO, overrides?: Partial<Ca
   return {
     id: getObjectId('image'),
     type: 'image',
-    x: 0,
-    y: 0,
-    width,
-    height,
     filters: [],
     image: {
-      name: image_name,
+      image_name,
       width,
       height,
     },

@@ -129,12 +129,12 @@ const buildControlImage = (
   if (processedImage && processorConfig) {
     // We've processed the image in the app - use it for the control image.
     return {
-      image_name: processedImage.name,
+      image_name: processedImage.image_name,
     };
   } else if (image) {
     // No processor selected, and we have an image - the user provided a processed image, use it for the control image.
     return {
-      image_name: image.name,
+      image_name: image.image_name,
     };
   }
   assert(false, 'Attempted to add unprocessed control image');
