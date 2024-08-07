@@ -1,12 +1,18 @@
-import { useDisclosure } from '@invoke-ai/ui-library';
+import { Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import IAIDroppable from 'common/components/IAIDroppable';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
-import { LayerHeader } from 'features/controlLayers/components/Layer/LayerHeader';
+import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
+import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
+import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
+import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
+import { LayerActionsMenu } from 'features/controlLayers/components/Layer/LayerActionsMenu';
 import { LayerSettings } from 'features/controlLayers/components/Layer/LayerSettings';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { LayerImageDropData } from 'features/dnd/types';
 import { memo, useMemo } from 'react';
+
+import { LayerOpacity } from './LayerOpacity';
 
 type Props = {
   id: string;
@@ -23,7 +29,14 @@ export const Layer = memo(({ id }: Props) => {
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <CanvasEntityContainer>
-        <LayerHeader onToggleVisibility={onToggle} />
+        <CanvasEntityHeader onDoubleClick={onToggle}>
+          <CanvasEntityEnabledToggle />
+          <CanvasEntityTitle />
+          <Spacer />
+          <LayerOpacity />
+          <LayerActionsMenu />
+          <CanvasEntityDeleteButton />
+        </CanvasEntityHeader>
         {isOpen && <LayerSettings />}
         <IAIDroppable data={droppableData} />
       </CanvasEntityContainer>

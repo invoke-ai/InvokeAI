@@ -20,7 +20,7 @@ export const IPA = memo(({ id }: Props) => {
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <CanvasEntityContainer>
-        <CanvasEntityHeader onToggle={onToggle}>
+        <CanvasEntityHeader onDoubleClick={onToggle}>
           <CanvasEntityEnabledToggle />
           <CanvasEntityTitle />
           <Spacer />

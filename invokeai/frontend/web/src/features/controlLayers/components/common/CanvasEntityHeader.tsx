@@ -1,12 +1,10 @@
+import type { FlexProps } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
-import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 
-type Props = PropsWithChildren<{ onToggle: () => void }>;
-
-export const CanvasEntityHeader = memo(({ children, onToggle }: Props) => {
+export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
   return (
-    <Flex gap={3} alignItems="center" p={3} cursor="pointer" onDoubleClick={onToggle}>
+    <Flex gap={3} alignItems="center" p={3} cursor="pointer" {...rest}>
       {children}
     </Flex>
   );
