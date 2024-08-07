@@ -22,7 +22,7 @@ const selectDisabledProcessors = createMemoizedSelector(
   (config) => config.sd.disabledControlNetProcessors
 );
 
-export const CAProcessorTypeSelect = memo(({ config, onChange }: Props) => {
+export const ControlAdapterProcessorTypeSelect = memo(({ config, onChange }: Props) => {
   const { t } = useTranslation();
   const disabledProcessors = useAppSelector(selectDisabledProcessors);
   const options = useMemo(() => {
@@ -67,4 +67,4 @@ export const CAProcessorTypeSelect = memo(({ config, onChange }: Props) => {
   );
 });
 
-CAProcessorTypeSelect.displayName = 'CAProcessorTypeSelect';
+ControlAdapterProcessorTypeSelect.displayName = 'ControlAdapterProcessorTypeSelect';

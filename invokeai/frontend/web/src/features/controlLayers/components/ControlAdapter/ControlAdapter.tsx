@@ -4,9 +4,9 @@ import { CanvasEntityDeleteButton } from 'features/controlLayers/components/comm
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
-import { CAActionsMenu } from 'features/controlLayers/components/ControlAdapter/CAActionsMenu';
-import { CAOpacityAndFilter } from 'features/controlLayers/components/ControlAdapter/CAOpacityAndFilter';
-import { CASettings } from 'features/controlLayers/components/ControlAdapter/CASettings';
+import { ControlAdapterActionsMenu } from 'features/controlLayers/components/ControlAdapter/ControlAdapterActionsMenu';
+import { ControlAdapterOpacityAndFilter } from 'features/controlLayers/components/ControlAdapter/ControlAdapterOpacityAndFilter';
+import { ControlAdapterSettings } from 'features/controlLayers/components/ControlAdapter/ControlAdapterSettings';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
@@ -15,7 +15,7 @@ type Props = {
   id: string;
 };
 
-export const CA = memo(({ id }: Props) => {
+export const ControlAdapter = memo(({ id }: Props) => {
   const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'control_adapter' }), [id]);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
 
@@ -26,14 +26,14 @@ export const CA = memo(({ id }: Props) => {
           <CanvasEntityEnabledToggle />
           <CanvasEntityTitle />
           <Spacer />
-          <CAOpacityAndFilter />
-          <CAActionsMenu />
+          <ControlAdapterOpacityAndFilter />
+          <ControlAdapterActionsMenu />
           <CanvasEntityDeleteButton />
         </CanvasEntityHeader>
-        {isOpen && <CASettings />}
+        {isOpen && <ControlAdapterSettings />}
       </CanvasEntityContainer>
     </EntityIdentifierContext.Provider>
   );
 });
 
-CA.displayName = 'CA';
+ControlAdapter.displayName = 'ControlAdapter';
