@@ -1,37 +1,21 @@
 import { Spacer } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
-import { ipaDeleted, ipaIsEnabledToggled } from 'features/controlLayers/store/canvasV2Slice';
-import { selectIPAOrThrow } from 'features/controlLayers/store/ipAdaptersReducers';
-import { memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { memo } from 'react';
 
 type Props = {
-  id: string;
-  isSelected: boolean;
   onToggleVisibility: () => void;
 };
 
-export const IPAHeader = memo(({ id, isSelected, onToggleVisibility }: Props) => {
-  const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const isEnabled = useAppSelector((s) => selectIPAOrThrow(s.canvasV2, id).isEnabled);
-  const onToggleIsEnabled = useCallback(() => {
-    dispatch(ipaIsEnabledToggled({ id }));
-  }, [dispatch, id]);
-  const onDelete = useCallback(() => {
-    dispatch(ipaDeleted({ id }));
-  }, [dispatch, id]);
-
+export const IPAHeader = memo(({ onToggleVisibility }: Props) => {
   return (
     <CanvasEntityHeader onToggle={onToggleVisibility}>
-      <CanvasEntityEnabledToggle isEnabled={isEnabled} onToggle={onToggleIsEnabled} />
-      <CanvasEntityTitle title={t('controlLayers.ipAdapter')} isSelected={isSelected} />
+      <CanvasEntityEnabledToggle />
+      <CanvasEntityTitle />
       <Spacer />
-      <CanvasEntityDeleteButton onDelete={onDelete} />
+      <CanvasEntityDeleteButton />
     </CanvasEntityHeader>
   );
 });
