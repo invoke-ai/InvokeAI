@@ -22,7 +22,7 @@ type Props = {
   postUploadAction: PostUploadAction;
 };
 
-export const IPAImagePreview = memo(({ image, onChangeImage, ipAdapterId, droppableData, postUploadAction }: Props) => {
+export const IPAdapterImagePreview = memo(({ image, onChangeImage, ipAdapterId, droppableData, postUploadAction }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isConnected = useAppSelector((s) => s.system.isConnected);
@@ -97,4 +97,4 @@ export const IPAImagePreview = memo(({ image, onChangeImage, ipAdapterId, droppa
   );
 });
 
-IPAImagePreview.displayName = 'IPAImagePreview';
+IPAdapterImagePreview.displayName = 'IPAdapterImagePreview';

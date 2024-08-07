@@ -22,7 +22,7 @@ type Props = {
   onChangeCLIPVisionModel: (clipVisionModel: CLIPVisionModelV2) => void;
 };
 
-export const IPAModelCombobox = memo(({ modelKey, onChangeModel, clipVisionModel, onChangeCLIPVisionModel }: Props) => {
+export const IPAdapterModel = memo(({ modelKey, onChangeModel, clipVisionModel, onChangeCLIPVisionModel }: Props) => {
   const { t } = useTranslation();
   const currentBaseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
   const [modelConfigs, { isLoading }] = useIPAdapterModels();
@@ -95,4 +95,4 @@ export const IPAModelCombobox = memo(({ modelKey, onChangeModel, clipVisionModel
   );
 });
 
-IPAModelCombobox.displayName = 'IPAModelCombobox';
+IPAdapterModel.displayName = 'IPAdapterModel';
