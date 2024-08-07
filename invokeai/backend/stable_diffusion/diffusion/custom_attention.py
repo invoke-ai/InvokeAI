@@ -321,7 +321,7 @@ class CustomAttnProcessor:
         attention_mask: Optional[torch.Tensor],
     ) -> torch.Tensor:
         query = attn.head_to_batch_dim(query).contiguous()
-        key   = attn.head_to_batch_dim(key).contiguous()
+        key = attn.head_to_batch_dim(key).contiguous()
         value = attn.head_to_batch_dim(value).contiguous()
 
         if attention_mask is not None:
@@ -406,6 +406,9 @@ class CustomAttnProcessor:
                 torch.bmm(attn_slice, value_slice, out=hidden_states[start_idx:end_idx])
                 del attn_slice
             elif self.attention_type == "xformers":
+                if attn_mask_slice is not None:
+                    attn_mask_slice = attn_mask_slice.expand(-1, query.shape[1], -1)
+
                 hidden_states[start_idx:end_idx] = xformers.ops.memory_efficient_attention(
                     query_slice, key_slice, value_slice, attn_bias=attn_mask_slice, op=None, scale=attn.scale
                 )
