@@ -3,7 +3,7 @@ import { CanvasEntityActionMenuItems } from 'features/controlLayers/components/c
 import { CanvasEntityMenuButton } from 'features/controlLayers/components/common/CanvasEntityMenuButton';
 import { memo } from 'react';
 
-export const CAActionsMenu = memo(() => {
+export const ControlAdapterActionsMenu = memo(() => {
   return (
     <Menu>
       <CanvasEntityMenuButton />
@@ -14,4 +14,4 @@ export const CAActionsMenu = memo(() => {
   );
 });
 
-CAActionsMenu.displayName = 'CAActionsMenu';
+ControlAdapterActionsMenu.displayName = 'ControlAdapterActionsMenu';
