@@ -1,4 +1,3 @@
-import { getImageDataTransparency } from 'common/util/arrayBuffer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type {
   CanvasObjectState,
@@ -329,7 +328,7 @@ export const previewBlob = async (blob: Blob, label?: string) => {
 export function getInpaintMaskLayerClone(arg: { manager: CanvasManager }): Konva.Layer {
   const { manager } = arg;
   const layerClone = manager.inpaintMask.konva.layer.clone();
-  const objectGroupClone = manager.inpaintMask.konva.group.clone();
+  const objectGroupClone = manager.inpaintMask.renderer.konva.objectGroup.clone();
 
   layerClone.destroyChildren();
   layerClone.add(objectGroupClone);
@@ -347,7 +346,7 @@ export function getRegionMaskLayerClone(arg: { manager: CanvasManager; id: strin
   assert(canvasRegion, `Canvas region with id ${id} not found`);
 
   const layerClone = canvasRegion.konva.layer.clone();
-  const objectGroupClone = canvasRegion.konva.group.clone();
+  const objectGroupClone = canvasRegion.renderer.konva.objectGroup.clone();
 
   layerClone.destroyChildren();
   layerClone.add(objectGroupClone);
@@ -407,25 +406,40 @@ export function getCompositeLayerStageClone(arg: { manager: CanvasManager }): Ko
 
   const validLayers = layersState.entities.filter(isValidLayer);
   console.log(validLayers);
-  // Konva bug (?) - when iterating over the array returned from `stage.getLayers()`, if you destroy a layer, the array
-  // is mutated in-place and the next iteration will skip the next layer. To avoid this, we first collect the layers
-  // to delete in a separate array and then destroy them.
-  // TODO(psyche): Maybe report this?
-  const toDelete: Konva.Layer[] = [];
-
-  for (const konvaLayer of stageClone.getLayers()) {
-    const layer = validLayers.find((l) => l.id === konvaLayer.id());
-    if (!layer) {
-      console.log('deleting', konvaLayer);
-      toDelete.push(konvaLayer);
+  // getLayers() returns the internal `children` array of the stage directly - calling destroy on a layer will
+  // mutate that array. We need to clone the array to avoid mutating the original.
+  for (const konvaLayer of stageClone.getLayers().slice()) {
+    if (!validLayers.find((l) => l.id === konvaLayer.id())) {
+      console.log('destroying', konvaLayer.id());
+      konvaLayer.destroy();
     }
   }
 
-  for (const konvaLayer of toDelete) {
-    konvaLayer.destroy();
-  }
-
   return stageClone;
+}
+
+export type Transparency = 'FULLY_TRANSPARENT' | 'PARTIALLY_TRANSPARENT' | 'OPAQUE';
+export function getImageDataTransparency(imageData: ImageData): Transparency {
+  let isFullyTransparent = true;
+  let isPartiallyTransparent = false;
+  const len = imageData.data.length;
+  for (let i = 3; i < len; i += 4) {
+    if (imageData.data[i] !== 0) {
+      isFullyTransparent = false;
+    } else {
+      isPartiallyTransparent = true;
+    }
+    if (!isFullyTransparent && isPartiallyTransparent) {
+      return 'PARTIALLY_TRANSPARENT';
+    }
+  }
+  if (isFullyTransparent) {
+    return 'FULLY_TRANSPARENT';
+  }
+  if (isPartiallyTransparent) {
+    return 'PARTIALLY_TRANSPARENT';
+  }
+  return 'OPAQUE';
 }
 
 export function getGenerationMode(arg: { manager: CanvasManager }): GenerationMode {

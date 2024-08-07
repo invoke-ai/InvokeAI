@@ -1,6 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { CanvasIPAdapterState, Rect, CanvasRegionalGuidanceState } from 'features/controlLayers/store/types';
+import type { CanvasIPAdapterState, CanvasRegionalGuidanceState, Rect } from 'features/controlLayers/store/types';
 import {
   PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,
   PROMPT_REGION_MASK_TO_TENSOR_PREFIX,
@@ -44,7 +44,7 @@ export const addRegions = async (
 
   for (const region of validRegions) {
     // Upload the mask image, or get the cached image if it exists
-    const { image_name } = await manager.getRegionMaskImage({ id: region.id, bbox });
+    const { image_name } = await manager.getRegionMaskImageDTO(region.id, bbox);
 
     // The main mask-to-tensor node
     const maskToTensor = g.addNode({
