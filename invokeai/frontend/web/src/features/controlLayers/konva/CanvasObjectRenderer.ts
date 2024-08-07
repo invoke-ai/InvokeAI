@@ -8,18 +8,20 @@ import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLaye
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
-import { getPrefixedId, konvaNodeToBlob, previewBlob } from 'features/controlLayers/konva/util';
+import { getPrefixedId, konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
 import {
   type CanvasBrushLineState,
   type CanvasEraserLineState,
   type CanvasImageState,
   type CanvasRectState,
   imageDTOToImageObject,
+  type Rect,
   type RgbColor,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 import { uploadImage } from 'services/api/endpoints/images';
+import type { ImageCategory, ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
 /**
@@ -348,10 +350,8 @@ export class CanvasObjectRenderer {
   rasterize = async () => {
     this.log.debug('Rasterizing entity');
 
-    const objectGroupClone = this.konva.objectGroup.clone();
-    const interactionRectClone = this.parent.transformer.konva.proxyRect.clone();
-    const rect = interactionRectClone.getClientRect();
-    const blob = await konvaNodeToBlob(objectGroupClone, rect);
+    const rect = this.parent.transformer.getRelativeRect();
+    const blob = await this.getBlob({ rect });
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Rasterized entity');
     }
@@ -363,6 +363,33 @@ export class CanvasObjectRenderer {
       imageObject,
       position: { x: Math.round(rect.x), y: Math.round(rect.y) },
     });
+  };
+
+  getBlob = ({ rect }: { rect?: Rect }): Promise<Blob> => {
+    return konvaNodeToBlob(this.konva.objectGroup.clone(), rect);
+  };
+
+  getImageData = ({ rect }: { rect?: Rect }): ImageData => {
+    return konvaNodeToImageData(this.konva.objectGroup.clone(), rect);
+  };
+
+  getImageDTO = async ({
+    rect,
+    category,
+    is_intermediate,
+    onUploaded,
+  }: {
+    rect?: Rect;
+    category: ImageCategory;
+    is_intermediate: boolean;
+    onUploaded?: (imageDTO: ImageDTO) => void;
+  }): Promise<ImageDTO> => {
+    const blob = await this.getBlob({ rect });
+    const imageDTO = await uploadImage(blob, `${this.id}.png`, category, is_intermediate);
+    if (onUploaded) {
+      onUploaded(imageDTO);
+    }
+    return imageDTO;
   };
 
   /**
