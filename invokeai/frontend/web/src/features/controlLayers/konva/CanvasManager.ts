@@ -11,12 +11,8 @@ import { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgre
 import type { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import type { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import {
-  getCompositeLayerImage,
-  getControlAdapterImage,
   getImageDataTransparency,
-  getInpaintMaskImage,
   getPrefixedId,
-  getRegionMaskImage,
   konvaNodeToBlob,
   konvaNodeToImageData,
   nanoid,
@@ -720,22 +716,6 @@ export class CanvasManager {
       // Else at least some of the inpaint mask is opaque, so we are inpainting
       return 'inpaint';
     }
-  }
-
-  getControlAdapterImage(arg: Omit<Parameters<typeof getControlAdapterImage>[0], 'manager'>) {
-    return getControlAdapterImage({ ...arg, manager: this });
-  }
-
-  getRegionMaskImage(arg: Omit<Parameters<typeof getRegionMaskImage>[0], 'manager'>) {
-    return getRegionMaskImage({ ...arg, manager: this });
-  }
-
-  getInpaintMaskImage(arg: Omit<Parameters<typeof getInpaintMaskImage>[0], 'manager'>) {
-    return getInpaintMaskImage({ ...arg, manager: this });
-  }
-
-  getInitialImage(arg: Omit<Parameters<typeof getCompositeLayerImage>[0], 'manager'>) {
-    return getCompositeLayerImage({ ...arg, manager: this });
   }
 
   getLoggingContext() {
