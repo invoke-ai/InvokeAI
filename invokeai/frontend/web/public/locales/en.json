@@ -1657,6 +1657,8 @@
         "moveForward": "Move Forward",
         "moveBackward": "Move Backward",
         "brushSize": "Brush Size",
+        "width": "Width",
+        "zoom": "Zoom",
         "controlLayers": "Control Layers",
         "globalMaskOpacity": "Global Mask Opacity",
         "autoNegative": "Auto Negative",
