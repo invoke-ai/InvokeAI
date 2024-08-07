@@ -8,6 +8,7 @@ import { CAImagePreview } from 'features/controlLayers/components/ControlAdapter
 import { CAModelCombobox } from 'features/controlLayers/components/ControlAdapter/CAModelCombobox';
 import { CAProcessorConfig } from 'features/controlLayers/components/ControlAdapter/CAProcessorConfig';
 import { CAProcessorTypeSelect } from 'features/controlLayers/components/ControlAdapter/CAProcessorTypeSelect';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   caBeginEndStepPctChanged,
   caControlModeChanged,
@@ -31,11 +32,8 @@ import type {
   T2IAdapterModelConfig,
 } from 'services/api/types';
 
-type Props = {
-  id: string;
-};
-
-export const CASettings = memo(({ id }: Props) => {
+export const CASettings = memo(() => {
+  const { id } = useEntityIdentifierContext();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const [isExpanded, toggleIsExpanded] = useToggle(false);
