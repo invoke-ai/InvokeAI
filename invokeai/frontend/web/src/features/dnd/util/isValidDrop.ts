@@ -21,7 +21,7 @@ export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?
       return payloadType === 'IMAGE_DTO';
     case 'SET_RG_IP_ADAPTER_IMAGE':
       return payloadType === 'IMAGE_DTO';
-    case 'ADD_LAYER_IMAGE':
+    case 'ADD_LAYER_FROM_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SET_UPSCALE_INITIAL_IMAGE':
       return payloadType === 'IMAGE_DTO';
