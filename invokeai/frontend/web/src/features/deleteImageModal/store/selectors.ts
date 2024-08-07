@@ -12,7 +12,7 @@ import type { ImageUsage } from './types';
 
 export const getImageUsage = (nodes: NodesState, canvasV2: CanvasV2State, image_name: string) => {
   const isLayerImage = canvasV2.layers.entities.some((layer) =>
-    layer.objects.some((obj) => obj.type === 'image' && obj.image.name === image_name)
+    layer.objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
   );
 
   const isNodesImage = nodes.nodes
@@ -22,10 +22,10 @@ export const getImageUsage = (nodes: NodesState, canvasV2: CanvasV2State, image_
     );
 
   const isControlAdapterImage = canvasV2.controlAdapters.entities.some(
-    (ca) => ca.imageObject?.image.name === image_name || ca.processedImageObject?.image.name === image_name
+    (ca) => ca.imageObject?.image.image_name === image_name || ca.processedImageObject?.image.image_name === image_name
   );
 
-  const isIPAdapterImage = canvasV2.ipAdapters.entities.some((ipa) => ipa.imageObject?.image.name === image_name);
+  const isIPAdapterImage = canvasV2.ipAdapters.entities.some((ipa) => ipa.imageObject?.image.image_name === image_name);
 
   const imageUsage: ImageUsage = {
     isLayerImage,
