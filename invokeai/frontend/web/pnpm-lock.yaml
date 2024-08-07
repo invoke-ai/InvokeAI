@@ -38,6 +38,9 @@ dependencies:
   '@roarr/browser-log-writer':
     specifier: ^1.3.0
     version: 1.3.0
+  async-mutex:
+    specifier: ^0.5.0
+    version: 0.5.0
   chakra-react-select:
     specifier: ^4.9.1
     version: 4.9.1(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/layout@2.3.1)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@emotion/react@11.13.0)(@types/react@18.3.3)(react-dom@18.3.1)(react@18.3.1)
@@ -5893,6 +5896,12 @@ packages:
     dependencies:
       tslib: 2.6.3
     dev: true
+
+  /async-mutex@0.5.0:
+    resolution: {integrity: sha512-1A94B18jkJ3DYq284ohPxoXbfTA5HsQ7/Mf4DEhcyLx3Bz27Rh59iScbB6EPiP+B+joue6YCxcMXSbFC1tZKwA==}
+    dependencies:
+      tslib: 2.6.3
+    dev: false
 
   /attr-accept@2.2.2:
     resolution: {integrity: sha512-7prDjvt9HmqiZ0cl5CRjtS84sEyhsHP2coDkaZKRKVfCDo9s7iw7ChVmar78Gu9pC4SoR/28wFu/G5JJhTnqEg==}
