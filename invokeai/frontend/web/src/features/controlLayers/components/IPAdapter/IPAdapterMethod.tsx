@@ -12,7 +12,7 @@ type Props = {
   onChange: (method: IPMethodV2) => void;
 };
 
-export const IPAMethod = memo(({ method, onChange }: Props) => {
+export const IPAdapterMethod = memo(({ method, onChange }: Props) => {
   const { t } = useTranslation();
   const options: { label: string; value: IPMethodV2 }[] = useMemo(
     () => [
@@ -41,4 +41,4 @@ export const IPAMethod = memo(({ method, onChange }: Props) => {
   );
 });
 
-IPAMethod.displayName = 'IPAMethod';
+IPAdapterMethod.displayName = 'IPAdapterMethod';
