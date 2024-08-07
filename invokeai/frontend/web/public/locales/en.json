@@ -374,7 +374,6 @@
         "dropToUpload": "$t(gallery.drop) to Upload",
         "deleteImage_one": "Delete Image",
         "deleteImage_other": "Delete {{count}} Images",
-        "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
         "displayBoardSearch": "Display Board Search",
         "displaySearch": "Display Search",
@@ -1054,11 +1053,7 @@
         "remixImage": "Remix Image",
         "usePrompt": "Use Prompt",
         "useSeed": "Use Seed",
-        "width": "Width",
-        "isAllowedToUpscale": {
-            "useX2Model": "Image is too large to upscale with x4 model, use x2 model",
-            "tooLarge": "Image is too large to upscale, select smaller image"
-        }
+        "width": "Width"
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Show Dynamic Prompts",
@@ -1679,6 +1674,8 @@
     },
     "upscaling": {
         "creativity": "Creativity",
+        "exceedsMaxSize": "Upscale settings exceed max size limit",
+        "exceedsMaxSizeDetails": "Max upscale limit is {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixels. Please try a smaller image or decrease your scale selection.",
         "structure": "Structure",
         "upscaleModel": "Upscale Model",
         "postProcessingModel": "Post-Processing Model",

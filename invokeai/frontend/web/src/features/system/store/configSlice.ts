@@ -24,7 +24,6 @@ const initialConfigState: AppConfig = {
   disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'],
   nodesAllowlist: undefined,
   nodesDenylist: undefined,
-  canRestoreDeletedImagesFromBin: true,
   sd: {
     disabledControlNetModels: [],
     disabledControlNetProcessors: [],
