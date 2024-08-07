@@ -1,6 +1,6 @@
 import { Divider, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { RGIPAdapterSettings } from 'features/controlLayers/components/RegionalGuidance/RGIPAdapterSettings';
+import { RegionalGuidanceIPAdapterSettings } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceIPAdapterSettings';
 import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo } from 'react';
 
@@ -8,7 +8,7 @@ type Props = {
   id: string;
 };
 
-export const RGIPAdapters = memo(({ id }: Props) => {
+export const RegionalGuidanceIPAdapters = memo(({ id }: Props) => {
   const ipAdapterIds = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).ipAdapters.map(({ id }) => id));
 
   if (ipAdapterIds.length === 0) {
@@ -24,11 +24,11 @@ export const RGIPAdapters = memo(({ id }: Props) => {
               <Divider />
             </Flex>
           )}
-          <RGIPAdapterSettings id={id} ipAdapterId={id} ipAdapterNumber={index + 1} />
+          <RegionalGuidanceIPAdapterSettings id={id} ipAdapterId={id} ipAdapterNumber={index + 1} />
         </Flex>
       ))}
     </>
   );
 });
 
-RGIPAdapters.displayName = 'RGLayerIPAdapterList';
+RegionalGuidanceIPAdapters.displayName = 'RegionalGuidanceLayerIPAdapterList';

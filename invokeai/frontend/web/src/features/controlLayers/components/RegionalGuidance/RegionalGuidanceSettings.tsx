@@ -5,11 +5,11 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo } from 'react';
 
-import { RGIPAdapters } from './RGIPAdapters';
-import { RGNegativePrompt } from './RGNegativePrompt';
-import { RGPositivePrompt } from './RGPositivePrompt';
+import { RegionalGuidanceIPAdapters } from './RegionalGuidanceIPAdapters';
+import { RegionalGuidanceNegativePrompt } from './RegionalGuidanceNegativePrompt';
+import { RegionalGuidancePositivePrompt } from './RegionalGuidancePositivePrompt';
 
-export const RGSettings = memo(() => {
+export const RegionalGuidanceSettings = memo(() => {
   const { id } = useEntityIdentifierContext();
   const hasPositivePrompt = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).positivePrompt !== null);
   const hasNegativePrompt = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).negativePrompt !== null);
@@ -18,11 +18,11 @@ export const RGSettings = memo(() => {
   return (
     <CanvasEntitySettings>
       {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons id={id} />}
-      {hasPositivePrompt && <RGPositivePrompt id={id} />}
-      {hasNegativePrompt && <RGNegativePrompt id={id} />}
-      {hasIPAdapters && <RGIPAdapters id={id} />}
+      {hasPositivePrompt && <RegionalGuidancePositivePrompt id={id} />}
+      {hasNegativePrompt && <RegionalGuidanceNegativePrompt id={id} />}
+      {hasIPAdapters && <RegionalGuidanceIPAdapters id={id} />}
     </CanvasEntitySettings>
   );
 });
 
-RGSettings.displayName = 'RGSettings';
+RegionalGuidanceSettings.displayName = 'RegionalGuidanceSettings';

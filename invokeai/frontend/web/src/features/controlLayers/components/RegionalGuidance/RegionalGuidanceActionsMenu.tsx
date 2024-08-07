@@ -15,7 +15,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 
-export const RGActionsMenu = memo(() => {
+export const RegionalGuidanceActionsMenu = memo(() => {
   const { id } = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -59,4 +59,4 @@ export const RGActionsMenu = memo(() => {
   );
 });
 
-RGActionsMenu.displayName = 'RGActionsMenu';
+RegionalGuidanceActionsMenu.displayName = 'RegionalGuidanceActionsMenu';

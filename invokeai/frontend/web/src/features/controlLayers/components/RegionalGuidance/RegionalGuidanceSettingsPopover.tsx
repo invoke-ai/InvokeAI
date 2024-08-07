@@ -20,7 +20,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixBold } from 'react-icons/pi';
 
-export const RGSettingsPopover = memo(() => {
+export const RegionalGuidanceSettingsPopover = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -60,4 +60,4 @@ export const RGSettingsPopover = memo(() => {
   );
 });
 
-RGSettingsPopover.displayName = 'RGSettingsPopover';
+RegionalGuidanceSettingsPopover.displayName = 'RegionalGuidanceSettingsPopover';

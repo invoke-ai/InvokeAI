@@ -1,7 +1,7 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { RGDeletePromptButton } from 'features/controlLayers/components/RegionalGuidance/RGDeletePromptButton';
-import { rgPositivePromptChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { RegionalGuidanceDeletePromptButton } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceDeletePromptButton';
+import { rgNegativePromptChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
@@ -14,19 +14,19 @@ type Props = {
   id: string;
 };
 
-export const RGPositivePrompt = memo(({ id }: Props) => {
-  const prompt = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).positivePrompt ?? '');
+export const RegionalGuidanceNegativePrompt = memo(({ id }: Props) => {
+  const prompt = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).negativePrompt ?? '');
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatch(rgPositivePromptChanged({ id, prompt: v }));
+      dispatch(rgNegativePromptChanged({ id, prompt: v }));
     },
     [dispatch, id]
   );
   const onDeletePrompt = useCallback(() => {
-    dispatch(rgPositivePromptChanged({ id, prompt: null }));
+    dispatch(rgNegativePromptChanged({ id, prompt: null }));
   }, [dispatch, id]);
   const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown } = usePrompt({
     prompt,
@@ -42,15 +42,15 @@ export const RGPositivePrompt = memo(({ id }: Props) => {
           name="prompt"
           ref={textareaRef}
           value={prompt}
-          placeholder={t('parameters.positivePromptPlaceholder')}
+          placeholder={t('parameters.negativePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}
           variant="darkFilled"
           paddingRight={30}
-          minH={28}
+          fontSize="sm"
         />
         <PromptOverlayButtonWrapper>
-          <RGDeletePromptButton onDelete={onDeletePrompt} />
+          <RegionalGuidanceDeletePromptButton onDelete={onDeletePrompt} />
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
       </Box>
@@ -58,4 +58,4 @@ export const RGPositivePrompt = memo(({ id }: Props) => {
   );
 });
 
-RGPositivePrompt.displayName = 'RGPositivePrompt';
+RegionalGuidanceNegativePrompt.displayName = 'RegionalGuidanceNegativePrompt';

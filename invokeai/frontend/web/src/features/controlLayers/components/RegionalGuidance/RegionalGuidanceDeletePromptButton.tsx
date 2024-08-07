@@ -7,7 +7,7 @@ type Props = {
   onDelete: () => void;
 };
 
-export const RGDeletePromptButton = memo(({ onDelete }: Props) => {
+export const RegionalGuidanceDeletePromptButton = memo(({ onDelete }: Props) => {
   const { t } = useTranslation();
   return (
     <Tooltip label={t('controlLayers.deletePrompt')}>
@@ -21,4 +21,4 @@ export const RGDeletePromptButton = memo(({ onDelete }: Props) => {
   );
 });
 
-RGDeletePromptButton.displayName = 'RGDeletePromptButton';
+RegionalGuidanceDeletePromptButton.displayName = 'RegionalGuidanceDeletePromptButton';
