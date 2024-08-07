@@ -605,6 +605,16 @@ export class CanvasManager {
 
     return () => {
       this.log.debug('Cleaning up konva renderer');
+      this.inpaintMask.destroy();
+      for (const region of this.regions.values()) {
+        region.destroy();
+      }
+      for (const layer of this.layers.values()) {
+        layer.destroy();
+      }
+      for (const controlAdapter of this.controlAdapters.values()) {
+        controlAdapter.destroy();
+      }
       unsubscribeRenderer();
       unsubscribeListeners();
       unsubscribeShouldShowStagedImage();
