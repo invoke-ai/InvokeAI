@@ -270,7 +270,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   });
 
   //#region mouseup
-  stage.on('mouseup', async () => {
+  stage.on('mouseup', () => {
     $isMouseDown.set(false);
     const pos = $lastCursorPos.get();
     const selectedEntity = getSelectedEntity();
@@ -283,7 +283,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         if (drawingBuffer?.type === 'brush_line') {
           selectedEntity.adapter.renderer.commitBuffer();
         } else {
-          await selectedEntity.adapter.renderer.clearBuffer();
+          selectedEntity.adapter.renderer.clearBuffer();
         }
       }
 
@@ -292,7 +292,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         if (drawingBuffer?.type === 'eraser_line') {
           selectedEntity.adapter.renderer.commitBuffer();
         } else {
-          await selectedEntity.adapter.renderer.clearBuffer();
+          selectedEntity.adapter.renderer.clearBuffer();
         }
       }
 
@@ -301,7 +301,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         if (drawingBuffer?.type === 'rect') {
           selectedEntity.adapter.renderer.commitBuffer();
         } else {
-          await selectedEntity.adapter.renderer.clearBuffer();
+          selectedEntity.adapter.renderer.clearBuffer();
         }
       }
 
@@ -343,7 +343,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
               }
             }
           } else {
-            await selectedEntity.adapter.renderer.clearBuffer();
+            selectedEntity.adapter.renderer.clearBuffer();
           }
         } else {
           if (selectedEntity.adapter.renderer.buffer) {
@@ -380,7 +380,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
               }
             }
           } else {
-            await selectedEntity.adapter.renderer.clearBuffer();
+            selectedEntity.adapter.renderer.clearBuffer();
           }
         } else {
           if (selectedEntity.adapter.renderer.buffer) {
@@ -408,7 +408,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             drawingBuffer.rect.height = Math.round(normalizedPoint.y - drawingBuffer.rect.y);
             await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
           } else {
-            await selectedEntity.adapter.renderer.clearBuffer();
+            selectedEntity.adapter.renderer.clearBuffer();
           }
         }
       }
