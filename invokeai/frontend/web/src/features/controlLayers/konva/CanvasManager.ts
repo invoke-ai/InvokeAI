@@ -10,6 +10,7 @@ import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectR
 import { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgressPreview';
 import type { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import type { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
+import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva/constants';
 import {
   getImageDataTransparency,
   getPrefixedId,
@@ -27,6 +28,7 @@ import type {
   CanvasRegionalGuidanceState,
   CanvasV2State,
   Coordinate,
+  Dimensions,
   GenerationMode,
   GetLoggingContext,
   Rect,
@@ -35,6 +37,7 @@ import type {
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
+import { clamp } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import {
@@ -623,15 +626,90 @@ export class CanvasManager {
     };
   };
 
+  /**
+   * Gets the center of the stage in either absolute or relative coordinates
+   * @param absolute Whether to return the center in absolute coordinates
+   */
+  getStageCenter(absolute = false): Coordinate {
+    const scale = this.getStageScale();
+    const { x, y } = this.getStagePosition();
+    const { width, height } = this.getStageSize();
+
+    const center = {
+      x: (width / 2 - x) / scale,
+      y: (height / 2 - y) / scale,
+    };
+
+    if (!absolute) {
+      return center;
+    }
+
+    return this.stage.getAbsoluteTransform().point(center);
+  }
+
+  /**
+   * Sets the scale of the stage. If center is provided, the stage will zoom in/out on that point.
+   * @param scale The new scale to set
+   * @param center The center of the stage to zoom in/out on
+   */
+  setStageScale(scale: number, center: Coordinate = this.getStageCenter(true)) {
+    const newScale = clamp(Math.round(scale * 100) / 100, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
+
+    const { x, y } = this.getStagePosition();
+    const oldScale = this.getStageScale();
+
+    const deltaX = (center.x - x) / oldScale;
+    const deltaY = (center.y - y) / oldScale;
+
+    const newX = center.x - deltaX * newScale;
+    const newY = center.y - deltaY * newScale;
+
+    this.stage.setAttrs({
+      x: newX,
+      y: newY,
+      scaleX: newScale,
+      scaleY: newScale,
+    });
+
+    this.stateApi.$stageAttrs.set({
+      x: Math.floor(this.stage.x()),
+      y: Math.floor(this.stage.y()),
+      width: this.stage.width(),
+      height: this.stage.height(),
+      scale: this.stage.scaleX(),
+    });
+    this.background.render();
+    this.preview.tool.render();
+  }
+
+  /**
+   * Gets the scale of the stage. The stage is always scaled uniformly in x and y.
+   */
   getStageScale(): number {
     // The stage is never scaled differently in x and y
     return this.stage.scaleX();
   }
 
+  /**
+   * Gets the position of the stage.
+   */
   getStagePosition(): Coordinate {
     return this.stage.position();
   }
 
+  /**
+   * Gets the size of the stage.
+   */
+  getStageSize(): Dimensions {
+    return this.stage.size();
+  }
+
+  /**
+   * Scales a number of pixels by the current stage scale. For example, if the stage is scaled by 5, then 10 pixels
+   * would be scaled to 10px / 5 = 2 pixels.
+   * @param pixels The number of pixels to scale
+   * @returns The number of pixels scaled by the current stage scale
+   */
   getScaledPixels(pixels: number): number {
     return pixels / this.getStageScale();
   }

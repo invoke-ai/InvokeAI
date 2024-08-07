@@ -4,6 +4,7 @@ import { Flex, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { BrushWidth } from 'features/controlLayers/components/BrushWidth';
+import { CanvasScale } from 'features/controlLayers/components/CanvasScale';
 import ControlLayersSettingsPopover from 'features/controlLayers/components/ControlLayersSettingsPopover';
 import { EraserWidth } from 'features/controlLayers/components/EraserWidth';
 import { FillColorPicker } from 'features/controlLayers/components/FillColorPicker';
@@ -52,6 +53,7 @@ export const ControlLayersToolbar = memo(() => {
         {tool === 'brush' && <BrushWidth />}
         {tool === 'eraser' && <EraserWidth />}
       </Flex>
+      <CanvasScale />
       <Button onClick={bbox}>bbox</Button>
       <Switch onChange={onChangeDebugging}>debug</Switch>
       <Flex flex={1} justifyContent="center">
