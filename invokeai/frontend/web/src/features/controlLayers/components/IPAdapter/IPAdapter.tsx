@@ -4,7 +4,7 @@ import { CanvasEntityDeleteButton } from 'features/controlLayers/components/comm
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
-import { IPASettings } from 'features/controlLayers/components/IPAdapter/IPASettings';
+import { IPAdapterSettings } from 'features/controlLayers/components/IPAdapter/IPAdapterSettings';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
@@ -13,7 +13,7 @@ type Props = {
   id: string;
 };
 
-export const IPA = memo(({ id }: Props) => {
+export const IPAdapter = memo(({ id }: Props) => {
   const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'ip_adapter' }), [id]);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
 
@@ -26,10 +26,10 @@ export const IPA = memo(({ id }: Props) => {
           <Spacer />
           <CanvasEntityDeleteButton />
         </CanvasEntityHeader>
-        {isOpen && <IPASettings />}
+        {isOpen && <IPAdapterSettings />}
       </CanvasEntityContainer>
     </EntityIdentifierContext.Provider>
   );
 });
 
-IPA.displayName = 'IPA';
+IPAdapter.displayName = 'IPAdapter';

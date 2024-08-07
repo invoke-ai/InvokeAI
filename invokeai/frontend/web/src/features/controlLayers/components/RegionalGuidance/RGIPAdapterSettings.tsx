@@ -2,9 +2,9 @@ import { Box, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { Weight } from 'features/controlLayers/components/common/Weight';
-import { IPAImagePreview } from 'features/controlLayers/components/IPAdapter/IPAImagePreview';
-import { IPAMethod } from 'features/controlLayers/components/IPAdapter/IPAMethod';
-import { IPAModelCombobox } from 'features/controlLayers/components/IPAdapter/IPAModelCombobox';
+import { IPAdapterImagePreview } from 'features/controlLayers/components/IPAdapter/IPAdapterImagePreview';
+import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
+import { IPAdapterModel } from 'features/controlLayers/components/IPAdapter/IPAdapterModel';
 import {
   rgIPAdapterBeginEndStepPctChanged,
   rgIPAdapterCLIPVisionModelChanged,
@@ -107,7 +107,7 @@ export const RGIPAdapterSettings = memo(({ id, ipAdapterId, ipAdapterNumber }: P
       <Flex flexDir="column" gap={4} position="relative" w="full">
         <Flex gap={3} alignItems="center" w="full">
           <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
-            <IPAModelCombobox
+            <IPAdapterModel
               modelKey={ipAdapter.model?.key ?? null}
               onChangeModel={onChangeModel}
               clipVisionModel={ipAdapter.clipVisionModel}
@@ -117,12 +117,12 @@ export const RGIPAdapterSettings = memo(({ id, ipAdapterId, ipAdapterNumber }: P
         </Flex>
         <Flex gap={4} w="full" alignItems="center">
           <Flex flexDir="column" gap={3} w="full">
-            <IPAMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
+            <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
             <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
             <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
-            <IPAImagePreview
+            <IPAdapterImagePreview
               image={ipAdapter.imageObject?.image ?? null}
               onChangeImage={onChangeImage}
               ipAdapterId={ipAdapter.id}
