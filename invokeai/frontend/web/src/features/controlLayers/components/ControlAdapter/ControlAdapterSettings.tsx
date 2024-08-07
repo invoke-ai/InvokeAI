@@ -3,11 +3,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { CanvasEntitySettings } from 'features/controlLayers/components/common/CanvasEntitySettings';
 import { Weight } from 'features/controlLayers/components/common/Weight';
-import { CAControlModeSelect } from 'features/controlLayers/components/ControlAdapter/CAControlModeSelect';
-import { CAImagePreview } from 'features/controlLayers/components/ControlAdapter/CAImagePreview';
-import { CAModelCombobox } from 'features/controlLayers/components/ControlAdapter/CAModelCombobox';
-import { CAProcessorConfig } from 'features/controlLayers/components/ControlAdapter/CAProcessorConfig';
-import { CAProcessorTypeSelect } from 'features/controlLayers/components/ControlAdapter/CAProcessorTypeSelect';
+import { ControlAdapterControlModeSelect } from 'features/controlLayers/components/ControlAdapter/ControlAdapterControlModeSelect';
+import { ControlAdapterImagePreview } from 'features/controlLayers/components/ControlAdapter/ControlAdapterImagePreview';
+import { ControlAdapterModel } from 'features/controlLayers/components/ControlAdapter/ControlAdapterModel';
+import { ControlAdapterProcessorConfig } from 'features/controlLayers/components/ControlAdapter/ControlAdapterProcessorConfig';
+import { ControlAdapterProcessorTypeSelect } from 'features/controlLayers/components/ControlAdapter/ControlAdapterProcessorTypeSelect';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   caBeginEndStepPctChanged,
@@ -32,7 +32,7 @@ import type {
   T2IAdapterModelConfig,
 } from 'services/api/types';
 
-export const CASettings = memo(() => {
+export const ControlAdapterSettings = memo(() => {
   const { id } = useEntityIdentifierContext();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -98,7 +98,7 @@ export const CASettings = memo(() => {
       <Flex flexDir="column" gap={3} position="relative" w="full">
         <Flex gap={3} alignItems="center" w="full">
           <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
-            <CAModelCombobox modelKey={controlAdapter.model?.key ?? null} onChange={onChangeModel} />
+            <ControlAdapterModel modelKey={controlAdapter.model?.key ?? null} onChange={onChangeModel} />
           </Box>
 
           <IconButton
@@ -121,13 +121,13 @@ export const CASettings = memo(() => {
         <Flex gap={3} w="full">
           <Flex flexDir="column" gap={3} w="full" h="full">
             {controlAdapter.adapterType === 'controlnet' && (
-              <CAControlModeSelect controlMode={controlAdapter.controlMode} onChange={onChangeControlMode} />
+              <ControlAdapterControlModeSelect controlMode={controlAdapter.controlMode} onChange={onChangeControlMode} />
             )}
             <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
             <BeginEndStepPct beginEndStepPct={controlAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
-            <CAImagePreview
+            <ControlAdapterImagePreview
               controlAdapter={controlAdapter}
               onChangeImage={onChangeImage}
               droppableData={droppableData}
@@ -141,8 +141,8 @@ export const CASettings = memo(() => {
           <>
             <Divider />
             <Flex flexDir="column" gap={3} w="full">
-              <CAProcessorTypeSelect config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
-              <CAProcessorConfig config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
+              <ControlAdapterProcessorTypeSelect config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
+              <ControlAdapterProcessorConfig config={controlAdapter.processorConfig} onChange={onChangeProcessorConfig} />
             </Flex>
           </>
         )}
@@ -151,4 +151,4 @@ export const CASettings = memo(() => {
   );
 });
 
-CASettings.displayName = 'CASettings';
+ControlAdapterSettings.displayName = 'ControlAdapterSettings';
