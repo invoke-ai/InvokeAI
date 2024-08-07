@@ -53,7 +53,7 @@ export class CanvasStagingArea {
             height,
             filters: [],
             image: {
-              name: image_name,
+              image_name: image_name,
               width,
               height,
             },

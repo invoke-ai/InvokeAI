@@ -1,3 +1,4 @@
+import { Mutex } from 'async-mutex';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
@@ -29,12 +30,15 @@ export class CanvasImageRenderer {
     placeholder: { group: Konva.Group; rect: Konva.Rect; text: Konva.Text };
     image: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
   };
-  imageName: string | null;
-  isLoading: boolean;
-  isError: boolean;
+  thumbnailElement: HTMLImageElement | null = null;
+  imageElement: HTMLImageElement | null = null;
+  isLoading: boolean = false;
+  isError: boolean = false;
+  mutex = new Mutex();
 
   constructor(state: CanvasImageState, parent: CanvasObjectRenderer) {
-    const { id, width, height, x, y } = state;
+    const { id, image } = state;
+    const { width, height } = image;
     this.id = id;
     this.parent = parent;
     this.manager = parent.manager;
@@ -44,7 +48,7 @@ export class CanvasImageRenderer {
     this.log.trace({ state }, 'Creating image');
 
     this.konva = {
-      group: new Konva.Group({ name: CanvasImageRenderer.GROUP_NAME, listening: false, x, y }),
+      group: new Konva.Group({ name: CanvasImageRenderer.GROUP_NAME, listening: false }),
       placeholder: {
         group: new Konva.Group({ name: CanvasImageRenderer.PLACEHOLDER_GROUP_NAME, listening: false }),
         rect: new Konva.Rect({
@@ -73,10 +77,6 @@ export class CanvasImageRenderer {
     this.konva.placeholder.group.add(this.konva.placeholder.rect);
     this.konva.placeholder.group.add(this.konva.placeholder.text);
     this.konva.group.add(this.konva.placeholder.group);
-
-    this.imageName = null;
-    this.isLoading = false;
-    this.isError = false;
     this.state = state;
   }
 
@@ -94,22 +94,50 @@ export class CanvasImageRenderer {
 
       const imageDTO = await getImageDTO(imageName);
       if (imageDTO === null) {
-        this.log.error({ imageName }, 'Image not found');
+        this.onFailedToLoadImage();
         return;
       }
-      const imageEl = await loadImage(imageDTO.image_url);
+      loadImage(imageDTO.thumbnail_url)
+        .then((thumbnailElement) => {
+          this.thumbnailElement = thumbnailElement;
+          this.mutex.runExclusive(this.updateImageElement);
+        })
+        .catch(this.onFailedToLoadImage);
+      loadImage(imageDTO.image_url)
+        .then((imageElement) => {
+          this.imageElement = imageElement;
+          this.mutex.runExclusive(this.updateImageElement);
+        })
+        .catch(this.onFailedToLoadImage);
+    } catch {
+      this.onFailedToLoadImage();
+    }
+  };
 
-      if (this.konva.image) {
+  onFailedToLoadImage = () => {
+    this.log({ image: this.state.image }, 'Failed to load image');
+    this.konva.image?.visible(false);
+    this.isLoading = false;
+    this.isError = true;
+    this.konva.placeholder.text.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
+    this.konva.placeholder.group.visible(true);
+  };
+
+  updateImageElement = () => {
+    const element = this.imageElement ?? this.thumbnailElement;
+
+    if (element) {
+      if (this.konva.image && this.konva.image.image() !== element) {
         this.konva.image.setAttrs({
-          image: imageEl,
+          image: element,
         });
       } else {
         this.konva.image = new Konva.Image({
           name: CanvasImageRenderer.IMAGE_NAME,
           listening: false,
-          image: imageEl,
-          width: this.state.width,
-          height: this.state.height,
+          image: element,
+          width: this.state.image.width,
+          height: this.state.image.height,
         });
         this.konva.group.add(this.konva.image);
       }
@@ -122,18 +150,9 @@ export class CanvasImageRenderer {
         this.konva.image.filters([]);
       }
 
-      this.imageName = imageName;
       this.isLoading = false;
       this.isError = false;
       this.konva.placeholder.group.visible(false);
-    } catch {
-      this.log({ imageName }, 'Failed to load image');
-      this.konva.image?.visible(false);
-      this.imageName = null;
-      this.isLoading = false;
-      this.isError = true;
-      this.konva.placeholder.text.text(t('common.imageFailedToLoad', 'Image Failed to Load'));
-      this.konva.placeholder.group.visible(true);
     }
   };
 
@@ -141,11 +160,12 @@ export class CanvasImageRenderer {
     if (force || this.state !== state) {
       this.log.trace({ state }, 'Updating image');
 
-      const { width, height, x, y, image, filters } = state;
-      if (force || (this.state.image.name !== image.name && !this.isLoading)) {
-        await this.updateImageSource(image.name);
+      const { image, filters } = state;
+      const { width, height, image_name } = image;
+      if (force || (this.state.image.image_name !== image_name && !this.isLoading)) {
+        await this.updateImageSource(image_name);
       }
-      this.konva.image?.setAttrs({ x, y, width, height });
+      this.konva.image?.setAttrs({ width, height });
       if (filters.length > 0) {
         this.konva.image?.cache();
         this.konva.image?.filters(filters.map((f) => FILTER_MAP[f]));
@@ -177,7 +197,6 @@ export class CanvasImageRenderer {
       id: this.id,
       type: CanvasImageRenderer.TYPE,
       parent: this.parent.id,
-      imageName: this.imageName,
       isLoading: this.isLoading,
       isError: this.isError,
       state: deepClone(this.state),

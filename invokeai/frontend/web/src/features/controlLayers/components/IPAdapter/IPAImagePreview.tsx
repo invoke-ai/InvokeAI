@@ -29,7 +29,7 @@ export const IPAImagePreview = memo(({ image, onChangeImage, ipAdapterId, droppa
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const shift = useShiftModifier();
 
-  const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(image?.name ?? skipToken);
+  const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(image?.image_name ?? skipToken);
   const handleResetControlImage = useCallback(() => {
     onChangeImage(null);
   }, [onChangeImage]);

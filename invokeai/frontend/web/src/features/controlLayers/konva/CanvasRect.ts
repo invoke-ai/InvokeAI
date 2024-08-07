@@ -25,7 +25,7 @@ export class CanvasRectRenderer {
   isFirstRender: boolean = false;
 
   constructor(state: CanvasRectState, parent: CanvasObjectRenderer) {
-    const { id, x, y, width, height, color } = state;
+    const { id, rect, color } = state;
     this.id = id;
     this.parent = parent;
     this.manager = parent.manager;
@@ -37,10 +37,7 @@ export class CanvasRectRenderer {
       group: new Konva.Group({ name: CanvasRectRenderer.GROUP_NAME, listening: false }),
       rect: new Konva.Rect({
         name: CanvasRectRenderer.RECT_NAME,
-        x,
-        y,
-        width,
-        height,
+        ...rect,
         listening: false,
         fill: rgbaColorToString(color),
       }),
@@ -54,12 +51,9 @@ export class CanvasRectRenderer {
       this.isFirstRender = false;
 
       this.log.trace({ state }, 'Updating rect');
-      const { x, y, width, height, color } = state;
+      const { rect, color } = state;
       this.konva.rect.setAttrs({
-        x,
-        y,
-        width,
-        height,
+        ...rect,
         fill: rgbaColorToString(color),
       });
       this.state = state;
