@@ -28,7 +28,7 @@ type Props = {
   ipAdapterNumber: number;
 };
 
-export const RGIPAdapterSettings = memo(({ id, ipAdapterId, ipAdapterNumber }: Props) => {
+export const RegionalGuidanceIPAdapterSettings = memo(({ id, ipAdapterId, ipAdapterNumber }: Props) => {
   const dispatch = useAppDispatch();
   const onDeleteIPAdapter = useCallback(() => {
     dispatch(rgIPAdapterDeleted({ id, ipAdapterId }));
@@ -136,4 +136,4 @@ export const RGIPAdapterSettings = memo(({ id, ipAdapterId, ipAdapterNumber }: P
   );
 });
 
-RGIPAdapterSettings.displayName = 'RGIPAdapterSettings';
+RegionalGuidanceIPAdapterSettings.displayName = 'RegionalGuidanceIPAdapterSettings';

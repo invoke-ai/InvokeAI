@@ -10,7 +10,7 @@ import { memo, useCallback } from 'react';
 import type { RgbColor } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
 
-export const RGMaskFillColorPicker = memo(() => {
+export const RegionalGuidanceMaskFillColorPicker = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -46,4 +46,4 @@ export const RGMaskFillColorPicker = memo(() => {
   );
 });
 
-RGMaskFillColorPicker.displayName = 'RGMaskFillColorPicker';
+RegionalGuidanceMaskFillColorPicker.displayName = 'RegionalGuidanceMaskFillColorPicker';
