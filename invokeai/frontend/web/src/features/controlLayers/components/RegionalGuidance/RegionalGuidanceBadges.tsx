@@ -5,7 +5,7 @@ import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const RGBadges = memo(() => {
+export const RegionalGuidanceBadges = memo(() => {
   const { id } = useEntityIdentifierContext();
   const { t } = useTranslation();
   const autoNegative = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).autoNegative);
@@ -21,4 +21,4 @@ export const RGBadges = memo(() => {
   );
 });
 
-RGBadges.displayName = 'RGBadges';
+RegionalGuidanceBadges.displayName = 'RegionalGuidanceBadges';
