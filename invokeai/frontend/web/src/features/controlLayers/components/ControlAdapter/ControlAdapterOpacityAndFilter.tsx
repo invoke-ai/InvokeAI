@@ -25,7 +25,7 @@ import { PiDropHalfFill } from 'react-icons/pi';
 const marks = [0, 25, 50, 75, 100];
 const formatPct = (v: number | string) => `${v} %`;
 
-export const CAOpacityAndFilter = memo(() => {
+export const ControlAdapterOpacityAndFilter = memo(() => {
   const { id } = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -96,4 +96,4 @@ export const CAOpacityAndFilter = memo(() => {
   );
 });
 
-CAOpacityAndFilter.displayName = 'CAOpacityAndFilter';
+ControlAdapterOpacityAndFilter.displayName = 'ControlAdapterOpacityAndFilter';
