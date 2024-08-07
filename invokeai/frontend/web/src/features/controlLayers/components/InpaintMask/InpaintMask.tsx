@@ -3,15 +3,15 @@ import { CanvasEntityContainer } from 'features/controlLayers/components/common/
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
-import { IMActionsMenu } from 'features/controlLayers/components/InpaintMask/IMActionsMenu';
-import { IMSettings } from 'features/controlLayers/components/InpaintMask/IMSettings';
+import { InpaintMaskActionsMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskActionsMenu';
+import { InpaintMaskSettings } from 'features/controlLayers/components/InpaintMask/InpaintMaskSettings';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
-import { IMMaskFillColorPicker } from './IMMaskFillColorPicker';
+import { InpaintMaskMaskFillColorPicker } from './InpaintMaskMaskFillColorPicker';
 
-export const IM = memo(() => {
+export const InpaintMask = memo(() => {
   const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id: 'inpaint_mask', type: 'inpaint_mask' }), []);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: false });
   return (
@@ -21,13 +21,13 @@ export const IM = memo(() => {
           <CanvasEntityEnabledToggle />
           <CanvasEntityTitle />
           <Spacer />
-          <IMMaskFillColorPicker />
-          <IMActionsMenu />
+          <InpaintMaskMaskFillColorPicker />
+          <InpaintMaskActionsMenu />
         </CanvasEntityHeader>
-        {isOpen && <IMSettings />}
+        {isOpen && <InpaintMaskSettings />}
       </CanvasEntityContainer>
     </EntityIdentifierContext.Provider>
   );
 });
 
-IM.displayName = 'IM';
+InpaintMask.displayName = 'InpaintMask';
