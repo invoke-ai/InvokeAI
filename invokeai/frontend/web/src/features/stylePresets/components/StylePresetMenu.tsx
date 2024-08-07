@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { useCallback } from 'react';
 import { PiPlusBold } from 'react-icons/pi';
-import type { StylePresetRecordDTO} from 'services/api/endpoints/stylePresets';
+import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 import { StylePresetList } from './StylePresetList';
@@ -18,7 +18,7 @@ export const StylePresetMenu = () => {
         data?.filter((preset) => preset.name.toLowerCase().includes(searchTerm.toLowerCase())) || EMPTY_ARRAY;
 
       const groupedData = filteredData.reduce(
-        (acc: { defaultPresets: StylePresetRecordDTO[]; presets: StylePresetRecordDTO[] }, preset) => {
+        (acc: { defaultPresets: StylePresetRecordWithImage[]; presets: StylePresetRecordWithImage[] }, preset) => {
           if (preset.is_default) {
             acc.defaultPresets.push(preset);
           } else {

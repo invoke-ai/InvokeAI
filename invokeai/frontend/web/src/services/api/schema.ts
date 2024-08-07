@@ -561,6 +561,13 @@ export type paths = {
      */
     post: operations["create_style_preset"];
   };
+  "/api/v1/style_presets/i/{style_preset_id}/image": {
+    /**
+     * Get Style Preset Image
+     * @description Gets an image file that previews the model
+     */
+    get: operations["get_style_preset_image"];
+  };
 };
 
 export type webhooks = Record<string, never>;
@@ -1146,8 +1153,26 @@ export type components = {
     };
     /** Body_create_style_preset */
     Body_create_style_preset: {
-      /** @description The style preset to create */
-      style_preset: components["schemas"]["StylePresetWithoutId"];
+      /**
+       * Name
+       * @description The name of the style preset to create
+       */
+      name: string;
+      /**
+       * Positive Prompt
+       * @description The positive prompt of the style preset
+       */
+      positive_prompt: string;
+      /**
+       * Negative Prompt
+       * @description The negative prompt of the style preset
+       */
+      negative_prompt: string;
+      /**
+       * Image
+       * @description The image file to upload
+       */
+      image?: Blob | null;
     };
     /** Body_create_workflow */
     Body_create_workflow: {
@@ -1273,8 +1298,26 @@ export type components = {
     };
     /** Body_update_style_preset */
     Body_update_style_preset: {
-      /** @description The updated style preset */
-      changes: components["schemas"]["StylePresetChanges"];
+      /**
+       * Name
+       * @description The name of the style preset to create
+       */
+      name: string;
+      /**
+       * Positive Prompt
+       * @description The positive prompt of the style preset
+       */
+      positive_prompt: string;
+      /**
+       * Negative Prompt
+       * @description The negative prompt of the style preset
+       */
+      negative_prompt: string;
+      /**
+       * Image
+       * @description The image file to upload
+       */
+      image?: Blob | null;
     };
     /** Body_update_workflow */
     Body_update_workflow: {
@@ -7345,147 +7388,147 @@ export type components = {
       project_id: string | null;
     };
     InvocationOutputMap: {
-      esrgan: components["schemas"]["ImageOutput"];
-      tiled_multi_diffusion_denoise_latents: components["schemas"]["LatentsOutput"];
-      conditioning_collection: components["schemas"]["ConditioningCollectionOutput"];
-      merge_metadata: components["schemas"]["MetadataOutput"];
-      lresize: components["schemas"]["LatentsOutput"];
-      string_split_neg: components["schemas"]["StringPosNegOutput"];
-      img_channel_multiply: components["schemas"]["ImageOutput"];
-      add: components["schemas"]["IntegerOutput"];
-      lscale: components["schemas"]["LatentsOutput"];
-      string_replace: components["schemas"]["StringOutput"];
-      sdxl_model_loader: components["schemas"]["SDXLModelLoaderOutput"];
-      collect: components["schemas"]["CollectInvocationOutput"];
-      face_off: components["schemas"]["FaceOffOutput"];
-      ideal_size: components["schemas"]["IdealSizeOutput"];
-      float_to_int: components["schemas"]["IntegerOutput"];
-      mlsd_image_processor: components["schemas"]["ImageOutput"];
-      sub: components["schemas"]["IntegerOutput"];
-      midas_depth_image_processor: components["schemas"]["ImageOutput"];
-      rectangle_mask: components["schemas"]["MaskOutput"];
-      img_watermark: components["schemas"]["ImageOutput"];
-      img_ilerp: components["schemas"]["ImageOutput"];
-      pidi_image_processor: components["schemas"]["ImageOutput"];
-      vae_loader: components["schemas"]["VAEOutput"];
-      dynamic_prompt: components["schemas"]["StringCollectionOutput"];
-      float_range: components["schemas"]["FloatCollectionOutput"];
-      spandrel_image_to_image_autoscale: components["schemas"]["ImageOutput"];
-      create_denoise_mask: components["schemas"]["DenoiseMaskOutput"];
-      denoise_latents: components["schemas"]["LatentsOutput"];
-      image_collection: components["schemas"]["ImageCollectionOutput"];
-      t2i_adapter: components["schemas"]["T2IAdapterOutput"];
-      normalbae_image_processor: components["schemas"]["ImageOutput"];
-      calculate_image_tiles_even_split: components["schemas"]["CalculateImageTilesOutput"];
-      mul: components["schemas"]["IntegerOutput"];
-      image_mask_to_tensor: components["schemas"]["MaskOutput"];
-      face_mask_detection: components["schemas"]["FaceMaskOutput"];
-      save_image: components["schemas"]["ImageOutput"];
-      blank_image: components["schemas"]["ImageOutput"];
-      conditioning: components["schemas"]["ConditioningOutput"];
-      img_chan: components["schemas"]["ImageOutput"];
-      string_split: components["schemas"]["String2Output"];
-      segment_anything_processor: components["schemas"]["ImageOutput"];
-      unsharp_mask: components["schemas"]["ImageOutput"];
-      boolean_collection: components["schemas"]["BooleanCollectionOutput"];
-      color: components["schemas"]["ColorOutput"];
-      range_of_size: components["schemas"]["IntegerCollectionOutput"];
-      face_identifier: components["schemas"]["ImageOutput"];
-      div: components["schemas"]["IntegerOutput"];
-      invert_tensor_mask: components["schemas"]["MaskOutput"];
-      step_param_easing: components["schemas"]["FloatCollectionOutput"];
-      merge_tiles_to_image: components["schemas"]["ImageOutput"];
-      latents: components["schemas"]["LatentsOutput"];
-      lineart_anime_image_processor: components["schemas"]["ImageOutput"];
-      mediapipe_face_processor: components["schemas"]["ImageOutput"];
-      infill_lama: components["schemas"]["ImageOutput"];
-      compel: components["schemas"]["ConditioningOutput"];
-      round_float: components["schemas"]["FloatOutput"];
-      string_join: components["schemas"]["StringOutput"];
-      dw_openpose_image_processor: components["schemas"]["ImageOutput"];
-      content_shuffle_image_processor: components["schemas"]["ImageOutput"];
-      metadata: components["schemas"]["MetadataOutput"];
-      lineart_image_processor: components["schemas"]["ImageOutput"];
-      zoe_depth_image_processor: components["schemas"]["ImageOutput"];
-      controlnet: components["schemas"]["ControlOutput"];
-      sdxl_lora_collection_loader: components["schemas"]["SDXLLoRALoaderOutput"];
-      img_lerp: components["schemas"]["ImageOutput"];
-      scheduler: components["schemas"]["SchedulerOutput"];
-      l2i: components["schemas"]["ImageOutput"];
-      img_paste: components["schemas"]["ImageOutput"];
-      tile_to_properties: components["schemas"]["TileToPropertiesOutput"];
-      sdxl_refiner_compel_prompt: components["schemas"]["ConditioningOutput"];
-      calculate_image_tiles: components["schemas"]["CalculateImageTilesOutput"];
-      depth_anything_image_processor: components["schemas"]["ImageOutput"];
-      prompt_from_file: components["schemas"]["StringCollectionOutput"];
       integer: components["schemas"]["IntegerOutput"];
-      img_mul: components["schemas"]["ImageOutput"];
+      color_map_image_processor: components["schemas"]["ImageOutput"];
       rand_int: components["schemas"]["IntegerOutput"];
-      string_join_three: components["schemas"]["StringOutput"];
-      img_blur: components["schemas"]["ImageOutput"];
-      float: components["schemas"]["FloatOutput"];
-      sdxl_lora_loader: components["schemas"]["SDXLLoRALoaderOutput"];
-      crop_latents: components["schemas"]["LatentsOutput"];
-      model_identifier: components["schemas"]["ModelIdentifierOutput"];
-      show_image: components["schemas"]["ImageOutput"];
-      img_channel_offset: components["schemas"]["ImageOutput"];
-      i2l: components["schemas"]["LatentsOutput"];
-      core_metadata: components["schemas"]["MetadataOutput"];
       infill_cv2: components["schemas"]["ImageOutput"];
-      lora_selector: components["schemas"]["LoRASelectorOutput"];
-      rand_float: components["schemas"]["FloatOutput"];
-      float_math: components["schemas"]["FloatOutput"];
-      main_model_loader: components["schemas"]["ModelLoaderOutput"];
-      image: components["schemas"]["ImageOutput"];
-      infill_patchmatch: components["schemas"]["ImageOutput"];
-      noise: components["schemas"]["NoiseOutput"];
-      tile_image_processor: components["schemas"]["ImageOutput"];
-      spandrel_image_to_image: components["schemas"]["ImageOutput"];
-      hed_image_processor: components["schemas"]["ImageOutput"];
-      heuristic_resize: components["schemas"]["ImageOutput"];
-      img_hue_adjust: components["schemas"]["ImageOutput"];
-      create_gradient_mask: components["schemas"]["GradientMaskOutput"];
+      img_scale: components["schemas"]["ImageOutput"];
+      random_range: components["schemas"]["IntegerCollectionOutput"];
+      latents: components["schemas"]["LatentsOutput"];
+      cv_inpaint: components["schemas"]["ImageOutput"];
+      float_range: components["schemas"]["FloatCollectionOutput"];
+      img_pad_crop: components["schemas"]["ImageOutput"];
+      range_of_size: components["schemas"]["IntegerCollectionOutput"];
+      vae_loader: components["schemas"]["VAEOutput"];
+      lora_collection_loader: components["schemas"]["LoRALoaderOutput"];
+      freeu: components["schemas"]["UNetOutput"];
+      float_collection: components["schemas"]["FloatCollectionOutput"];
+      sdxl_compel_prompt: components["schemas"]["ConditioningOutput"];
       calculate_image_tiles_min_overlap: components["schemas"]["CalculateImageTilesOutput"];
-      canvas_paste_back: components["schemas"]["ImageOutput"];
-      ip_adapter: components["schemas"]["IPAdapterOutput"];
-      img_nsfw: components["schemas"]["ImageOutput"];
       range: components["schemas"]["IntegerCollectionOutput"];
+      string_replace: components["schemas"]["StringOutput"];
+      boolean: components["schemas"]["BooleanOutput"];
+      show_image: components["schemas"]["ImageOutput"];
+      img_hue_adjust: components["schemas"]["ImageOutput"];
+      metadata: components["schemas"]["MetadataOutput"];
+      img_conv: components["schemas"]["ImageOutput"];
+      sub: components["schemas"]["IntegerOutput"];
+      pair_tile_image: components["schemas"]["PairTileImageOutput"];
+      save_image: components["schemas"]["ImageOutput"];
+      rectangle_mask: components["schemas"]["MaskOutput"];
+      ideal_size: components["schemas"]["IdealSizeOutput"];
+      lresize: components["schemas"]["LatentsOutput"];
+      lblend: components["schemas"]["LatentsOutput"];
+      conditioning_collection: components["schemas"]["ConditioningCollectionOutput"];
+      rand_float: components["schemas"]["FloatOutput"];
+      prompt_from_file: components["schemas"]["StringCollectionOutput"];
+      tomask: components["schemas"]["ImageOutput"];
+      boolean_collection: components["schemas"]["BooleanCollectionOutput"];
+      color_correct: components["schemas"]["ImageOutput"];
+      img_channel_offset: components["schemas"]["ImageOutput"];
+      compel: components["schemas"]["ConditioningOutput"];
+      infill_tile: components["schemas"]["ImageOutput"];
+      img_resize: components["schemas"]["ImageOutput"];
+      create_denoise_mask: components["schemas"]["DenoiseMaskOutput"];
+      sdxl_refiner_model_loader: components["schemas"]["SDXLRefinerModelLoaderOutput"];
+      mlsd_image_processor: components["schemas"]["ImageOutput"];
+      img_channel_multiply: components["schemas"]["ImageOutput"];
+      latents_collection: components["schemas"]["LatentsCollectionOutput"];
+      midas_depth_image_processor: components["schemas"]["ImageOutput"];
+      string_collection: components["schemas"]["StringCollectionOutput"];
+      mask_from_id: components["schemas"]["ImageOutput"];
       string: components["schemas"]["StringOutput"];
+      float: components["schemas"]["FloatOutput"];
+      model_identifier: components["schemas"]["ModelIdentifierOutput"];
+      pidi_image_processor: components["schemas"]["ImageOutput"];
+      string_join: components["schemas"]["StringOutput"];
+      spandrel_image_to_image_autoscale: components["schemas"]["ImageOutput"];
+      lora_selector: components["schemas"]["LoRASelectorOutput"];
+      clip_skip: components["schemas"]["CLIPSkipInvocationOutput"];
+      image_mask_to_tensor: components["schemas"]["MaskOutput"];
+      normalbae_image_processor: components["schemas"]["ImageOutput"];
+      face_off: components["schemas"]["FaceOffOutput"];
+      mul: components["schemas"]["IntegerOutput"];
+      segment_anything_processor: components["schemas"]["ImageOutput"];
+      round_float: components["schemas"]["FloatOutput"];
+      sdxl_model_loader: components["schemas"]["SDXLModelLoaderOutput"];
+      denoise_latents: components["schemas"]["LatentsOutput"];
+      string_split_neg: components["schemas"]["StringPosNegOutput"];
+      string_split: components["schemas"]["String2Output"];
+      invert_tensor_mask: components["schemas"]["MaskOutput"];
+      main_model_loader: components["schemas"]["ModelLoaderOutput"];
+      img_crop: components["schemas"]["ImageOutput"];
+      img_watermark: components["schemas"]["ImageOutput"];
+      dw_openpose_image_processor: components["schemas"]["ImageOutput"];
+      add: components["schemas"]["IntegerOutput"];
+      conditioning: components["schemas"]["ConditioningOutput"];
+      esrgan: components["schemas"]["ImageOutput"];
+      t2i_adapter: components["schemas"]["T2IAdapterOutput"];
+      sdxl_refiner_compel_prompt: components["schemas"]["ConditioningOutput"];
+      mediapipe_face_processor: components["schemas"]["ImageOutput"];
+      img_chan: components["schemas"]["ImageOutput"];
+      face_mask_detection: components["schemas"]["FaceMaskOutput"];
+      lineart_image_processor: components["schemas"]["ImageOutput"];
+      blank_image: components["schemas"]["ImageOutput"];
+      image_collection: components["schemas"]["ImageCollectionOutput"];
+      img_nsfw: components["schemas"]["ImageOutput"];
+      unsharp_mask: components["schemas"]["ImageOutput"];
+      scheduler: components["schemas"]["SchedulerOutput"];
+      metadata_item: components["schemas"]["MetadataItemOutput"];
+      crop_latents: components["schemas"]["LatentsOutput"];
+      string_join_three: components["schemas"]["StringOutput"];
+      content_shuffle_image_processor: components["schemas"]["ImageOutput"];
+      zoe_depth_image_processor: components["schemas"]["ImageOutput"];
+      depth_anything_image_processor: components["schemas"]["ImageOutput"];
+      controlnet: components["schemas"]["ControlOutput"];
+      mask_edge: components["schemas"]["ImageOutput"];
+      img_ilerp: components["schemas"]["ImageOutput"];
+      lora_loader: components["schemas"]["LoRALoaderOutput"];
+      calculate_image_tiles_even_split: components["schemas"]["CalculateImageTilesOutput"];
+      face_identifier: components["schemas"]["ImageOutput"];
+      i2l: components["schemas"]["LatentsOutput"];
+      infill_lama: components["schemas"]["ImageOutput"];
+      sdxl_lora_collection_loader: components["schemas"]["SDXLLoRALoaderOutput"];
+      mask_combine: components["schemas"]["ImageOutput"];
+      noise: components["schemas"]["NoiseOutput"];
+      div: components["schemas"]["IntegerOutput"];
+      img_paste: components["schemas"]["ImageOutput"];
+      create_gradient_mask: components["schemas"]["GradientMaskOutput"];
+      iterate: components["schemas"]["IterateInvocationOutput"];
+      merge_tiles_to_image: components["schemas"]["ImageOutput"];
+      l2i: components["schemas"]["ImageOutput"];
+      float_math: components["schemas"]["FloatOutput"];
+      img_lerp: components["schemas"]["ImageOutput"];
+      spandrel_image_to_image: components["schemas"]["ImageOutput"];
+      tiled_multi_diffusion_denoise_latents: components["schemas"]["LatentsOutput"];
+      ip_adapter: components["schemas"]["IPAdapterOutput"];
+      step_param_easing: components["schemas"]["FloatCollectionOutput"];
+      heuristic_resize: components["schemas"]["ImageOutput"];
+      canny_image_processor: components["schemas"]["ImageOutput"];
+      hed_image_processor: components["schemas"]["ImageOutput"];
+      img_mul: components["schemas"]["ImageOutput"];
+      merge_metadata: components["schemas"]["MetadataOutput"];
+      color: components["schemas"]["ColorOutput"];
+      lscale: components["schemas"]["LatentsOutput"];
+      integer_math: components["schemas"]["IntegerOutput"];
+      infill_rgba: components["schemas"]["ImageOutput"];
+      lineart_anime_image_processor: components["schemas"]["ImageOutput"];
+      tile_image_processor: components["schemas"]["ImageOutput"];
+      img_blur: components["schemas"]["ImageOutput"];
+      float_to_int: components["schemas"]["IntegerOutput"];
+      alpha_mask_to_tensor: components["schemas"]["MaskOutput"];
+      collect: components["schemas"]["CollectInvocationOutput"];
+      tile_to_properties: components["schemas"]["TileToPropertiesOutput"];
+      infill_patchmatch: components["schemas"]["ImageOutput"];
+      image: components["schemas"]["ImageOutput"];
+      leres_image_processor: components["schemas"]["ImageOutput"];
       seamless: components["schemas"]["SeamlessModeOutput"];
       integer_collection: components["schemas"]["IntegerCollectionOutput"];
-      iterate: components["schemas"]["IterateInvocationOutput"];
-      img_scale: components["schemas"]["ImageOutput"];
-      pair_tile_image: components["schemas"]["PairTileImageOutput"];
-      canny_image_processor: components["schemas"]["ImageOutput"];
-      integer_math: components["schemas"]["IntegerOutput"];
-      leres_image_processor: components["schemas"]["ImageOutput"];
-      clip_skip: components["schemas"]["CLIPSkipInvocationOutput"];
-      float_collection: components["schemas"]["FloatCollectionOutput"];
-      string_collection: components["schemas"]["StringCollectionOutput"];
-      lora_collection_loader: components["schemas"]["LoRALoaderOutput"];
-      mask_combine: components["schemas"]["ImageOutput"];
-      latents_collection: components["schemas"]["LatentsCollectionOutput"];
-      mask_edge: components["schemas"]["ImageOutput"];
-      alpha_mask_to_tensor: components["schemas"]["MaskOutput"];
-      img_conv: components["schemas"]["ImageOutput"];
-      color_correct: components["schemas"]["ImageOutput"];
-      lblend: components["schemas"]["LatentsOutput"];
-      mask_from_id: components["schemas"]["ImageOutput"];
-      img_pad_crop: components["schemas"]["ImageOutput"];
-      metadata_item: components["schemas"]["MetadataItemOutput"];
-      lora_loader: components["schemas"]["LoRALoaderOutput"];
-      cv_inpaint: components["schemas"]["ImageOutput"];
-      color_map_image_processor: components["schemas"]["ImageOutput"];
-      img_resize: components["schemas"]["ImageOutput"];
-      random_range: components["schemas"]["IntegerCollectionOutput"];
-      img_crop: components["schemas"]["ImageOutput"];
-      freeu: components["schemas"]["UNetOutput"];
-      infill_tile: components["schemas"]["ImageOutput"];
-      infill_rgba: components["schemas"]["ImageOutput"];
-      tomask: components["schemas"]["ImageOutput"];
-      sdxl_compel_prompt: components["schemas"]["ConditioningOutput"];
-      sdxl_refiner_model_loader: components["schemas"]["SDXLRefinerModelLoaderOutput"];
-      boolean: components["schemas"]["BooleanOutput"];
+      core_metadata: components["schemas"]["MetadataOutput"];
+      dynamic_prompt: components["schemas"]["StringCollectionOutput"];
+      calculate_image_tiles: components["schemas"]["CalculateImageTilesOutput"];
+      sdxl_lora_loader: components["schemas"]["SDXLLoRALoaderOutput"];
+      canvas_paste_back: components["schemas"]["ImageOutput"];
     };
     /**
      * InvocationStartedEvent
@@ -12642,18 +12685,8 @@ export type components = {
        */
       type: "string_split_neg";
     };
-    /** StylePresetChanges */
-    StylePresetChanges: {
-      /**
-       * Name
-       * @description The style preset's new name.
-       */
-      name?: string | null;
-      /** @description The updated data for style preset. */
-      preset_data?: components["schemas"]["PresetData"] | null;
-    };
-    /** StylePresetRecordDTO */
-    StylePresetRecordDTO: {
+    /** StylePresetRecordWithImage */
+    StylePresetRecordWithImage: {
       /**
        * Name
        * @description The name of the style preset.
@@ -12671,16 +12704,11 @@ export type components = {
        * @description Whether or not the style preset is default
        */
       is_default: boolean;
-    };
-    /** StylePresetWithoutId */
-    StylePresetWithoutId: {
       /**
-       * Name
-       * @description The name of the style preset.
+       * Image
+       * @description The path for image
        */
-      name: string;
-      /** @description The preset data */
-      preset_data: components["schemas"]["PresetData"];
+      image: string | null;
     };
     /**
      * SubModelType
@@ -16224,7 +16252,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["StylePresetRecordDTO"];
+          "application/json": components["schemas"]["StylePresetRecordWithImage"];
         };
       };
       /** @description Validation Error */
@@ -16274,14 +16302,14 @@ export type operations = {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_update_style_preset"];
+        "multipart/form-data": components["schemas"]["Body_update_style_preset"];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["StylePresetRecordDTO"];
+          "application/json": components["schemas"]["StylePresetRecordWithImage"];
         };
       };
       /** @description Validation Error */
@@ -16301,7 +16329,7 @@ export type operations = {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["StylePresetRecordDTO"][];
+          "application/json": components["schemas"]["StylePresetRecordWithImage"][];
         };
       };
     };
@@ -16313,15 +16341,49 @@ export type operations = {
   create_style_preset: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["Body_create_style_preset"];
+        "multipart/form-data": components["schemas"]["Body_create_style_preset"];
       };
     };
     responses: {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["StylePresetRecordDTO"];
+          "application/json": components["schemas"]["StylePresetRecordWithImage"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Style Preset Image
+   * @description Gets an image file that previews the model
+   */
+  get_style_preset_image: {
+    parameters: {
+      path: {
+        /** @description The id of the style preset image to get */
+        style_preset_id: string;
+      };
+    };
+    responses: {
+      /** @description The style preset image was fetched successfully */
+      200: {
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Bad request */
+      400: {
+        content: never;
+      };
+      /** @description The style preset image could not be found */
+      404: {
+        content: never;
       };
       /** @description Validation Error */
       422: {

@@ -31,6 +31,8 @@ from invokeai.app.services.session_processor.session_processor_default import (
 )
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.style_preset_images.style_preset_images_base import StylePresetImageFileStorageBase
+from invokeai.app.services.style_preset_images.style_preset_images_default import StylePresetImageFileStorageDisk
 from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
@@ -75,6 +77,7 @@ class ApiDependencies:
         image_files = DiskImageFileStorage(f"{output_folder}/images")
 
         model_images_folder = config.models_path
+        style_preset_images_folder = config.style_preset_images_path
 
         db = init_db(config=config, logger=logger, image_files=image_files)
 
@@ -111,6 +114,9 @@ class ApiDependencies:
         urls = LocalUrlService()
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
         style_preset_records = SqliteStylePresetRecordsStorage(db=db)
+        style_preset_images_service = StylePresetImageFileStorageDisk(
+            style_preset_images_folder / "style_preset_images"
+        )
 
         services = InvocationServices(
             board_image_records=board_image_records,
@@ -137,6 +143,7 @@ class ApiDependencies:
             tensors=tensors,
             conditioning=conditioning,
             style_preset_records=style_preset_records,
+            style_preset_images_service=style_preset_images_service,
         )
 
         ApiDependencies.invoker = Invoker(services)

@@ -1,13 +1,13 @@
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
-import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { activeStylePresetChanged } from 'features/stylePresets/store/stylePresetSlice';
-import type { MouseEventHandler} from 'react';
+import type { MouseEventHandler } from 'react';
 import { useCallback } from 'react';
 import { CgPushDown } from 'react-icons/cg';
 import { PiXBold } from 'react-icons/pi';
+import StylePresetImage from './StylePresetImage';
 
 export const ActiveStylePreset = () => {
   const { activeStylePreset } = useAppSelector((s) => s.stylePreset);
@@ -40,7 +40,7 @@ export const ActiveStylePreset = () => {
     <>
       <Flex justifyContent="space-between" w="full" alignItems="center">
         <Flex gap="2">
-          <ModelImage image_url={null} />
+          <StylePresetImage presetImageUrl={activeStylePreset.image} />
           <Flex flexDir="column">
             <Text variant="subtext" fontSize="xs">
               Prompt Style

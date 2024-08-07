@@ -24,7 +24,7 @@ export const StylePresetPromptField = (props: Props) => {
   );
 
   const value = useMemo(() => {
-    return field.value;
+    return field.value as string;
   }, [field.value]);
 
   const insertPromptPlaceholder = useCallback(() => {
@@ -40,7 +40,7 @@ export const StylePresetPromptField = (props: Props) => {
     }
   }, [value, field, textareaRef]);
 
-  const isPromptPresent = useMemo(() => value.includes(PRESET_PLACEHOLDER), [value]);
+  const isPromptPresent = useMemo(() => value?.includes(PRESET_PLACEHOLDER), [value]);
 
   return (
     <FormControl orientation="vertical">

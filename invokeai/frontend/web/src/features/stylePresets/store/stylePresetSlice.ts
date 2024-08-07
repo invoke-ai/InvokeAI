@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { StylePresetRecordDTO } from 'services/api/endpoints/stylePresets';
+import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 
 import type { StylePresetState } from './types';
 
@@ -20,7 +20,7 @@ export const stylePresetSlice = createSlice({
         isMenuOpenChanged: (state, action: PayloadAction<boolean>) => {
             state.isMenuOpen = action.payload;
         },
-        activeStylePresetChanged: (state, action: PayloadAction<StylePresetRecordDTO | null>) => {
+        activeStylePresetChanged: (state, action: PayloadAction<StylePresetRecordWithImage | null>) => {
             state.activeStylePreset = action.payload;
         },
         searchTermChanged: (state, action: PayloadAction<string>) => {

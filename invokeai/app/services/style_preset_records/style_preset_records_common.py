@@ -39,3 +39,7 @@ class StylePresetRecordDTO(StylePresetWithoutId):
 
 
 StylePresetRecordDTOValidator = TypeAdapter(StylePresetRecordDTO)
+
+
+class StylePresetRecordWithImage(StylePresetRecordDTO):
+    image: Optional[str] = Field(description="The path for image")

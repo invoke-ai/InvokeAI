@@ -1,10 +1,10 @@
 import { Button, Collapse, Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { PiCaretDownBold } from 'react-icons/pi';
-import type { StylePresetRecordDTO } from 'services/api/endpoints/stylePresets';
+import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 
 import { StylePresetListItem } from './StylePresetListItem';
 
-export const StylePresetList = ({ title, data }: { title: string; data: StylePresetRecordDTO[] }) => {
+export const StylePresetList = ({ title, data }: { title: string; data: StylePresetRecordWithImage[] }) => {
   const { onToggle, isOpen } = useDisclosure({ defaultIsOpen: true });
 
   if (!data.length) {

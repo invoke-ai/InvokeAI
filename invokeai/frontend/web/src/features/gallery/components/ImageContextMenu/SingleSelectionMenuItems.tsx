@@ -30,6 +30,7 @@ import {
   PiFlowArrowBold,
   PiFoldersBold,
   PiImagesBold,
+  PiPaintBrushBold,
   PiPlantBold,
   PiQuotesBold,
   PiShareFatBold,
@@ -39,6 +40,8 @@ import {
 } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import { isMenuOpenChanged } from '../../../stylePresets/store/stylePresetSlice';
+import { createPresetFromImageChanged } from '../../../stylePresets/store/stylePresetModalSlice';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -130,6 +133,11 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     dispatch(setActiveTab('upscaling'));
   }, [dispatch, imageDTO]);
 
+  const handleCreatePreset = useCallback(() => {
+    dispatch(createPresetFromImageChanged(imageDTO));
+    dispatch(isMenuOpenChanged(true));
+  }, [dispatch, imageDTO]);
+
   return (
     <>
       <MenuItem as="a" href={imageDTO.image_url} target="_blank" icon={<PiShareFatBold />}>
@@ -181,6 +189,13 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         isDisabled={isLoadingMetadata || !hasMetadata}
       >
         {t('parameters.useAll')}
+      </MenuItem>
+      <MenuItem
+        icon={isLoadingMetadata ? <SpinnerIcon /> : <PiPaintBrushBold />}
+        onClickCapture={handleCreatePreset}
+        isDisabled={isLoadingMetadata || !hasPrompts}
+      >
+        Create Preset
       </MenuItem>
       <MenuDivider />
       <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToImageToImage} id="send-to-img2img">

@@ -153,6 +153,7 @@ class InvokeAIAppConfig(BaseSettings):
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
+    style_preset_images_path:      Path = Field(default=Path("style_preset_images"),      description="Path to directory for style preset images.")
 
     # LOGGING
     log_handlers:             list[str] = Field(default=["console"],        description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".')

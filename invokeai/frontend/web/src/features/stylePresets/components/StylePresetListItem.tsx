@@ -1,33 +1,43 @@
 import { Badge, Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import type { MouseEvent } from 'react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ModelImage from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelImage';
 import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { activeStylePresetChanged, isMenuOpenChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { useCallback } from 'react';
 import { PiPencilBold, PiTrashBold } from 'react-icons/pi';
-import type { StylePresetRecordDTO } from 'services/api/endpoints/stylePresets';
+import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useDeleteStylePresetMutation } from 'services/api/endpoints/stylePresets';
+import StylePresetImage from './StylePresetImage';
 
-export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordDTO }) => {
+export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithImage }) => {
   const dispatch = useAppDispatch();
   const [deleteStylePreset] = useDeleteStylePresetMutation();
   const activeStylePreset = useAppSelector((s) => s.stylePreset.activeStylePreset);
 
-  const handleClickEdit = useCallback(() => {
-    dispatch(updatingStylePresetChanged(preset));
-    dispatch(isModalOpenChanged(true));
-  }, [dispatch, preset]);
+  const handleClickEdit = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      dispatch(updatingStylePresetChanged(preset));
+      dispatch(isModalOpenChanged(true));
+    },
+    [dispatch, preset]
+  );
 
   const handleClickApply = useCallback(() => {
     dispatch(activeStylePresetChanged(preset));
     dispatch(isMenuOpenChanged(false));
   }, [dispatch, preset]);
 
-  const handleDeletePreset = useCallback(async () => {
-    try {
-      await deleteStylePreset(preset.id);
-    } catch (error) {}
-  }, [preset]);
+  const handleDeletePreset = useCallback(
+    async (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      try {
+        await deleteStylePreset(preset.id);
+      } catch (error) {}
+    },
+    [preset]
+  );
 
   return (
     <Flex
@@ -40,7 +50,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordDTO }
       alignItems="center"
       w="full"
     >
-      <ModelImage image_url={null} />
+      <StylePresetImage presetImageUrl={preset.image} />
       <Flex flexDir="column" w="full">
         <Flex w="full" justifyContent="space-between">
           <Flex alignItems="center" gap="2">

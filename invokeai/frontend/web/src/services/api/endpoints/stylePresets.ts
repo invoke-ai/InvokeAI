@@ -2,7 +2,7 @@ import type { paths } from 'services/api/schema';
 
 import { api, buildV1Url, LIST_TAG } from '..';
 
-export type StylePresetRecordDTO = paths['/api/v1/style_presets/i/{style_preset_id}']['get']['responses']['200']['content']['application/json']
+export type StylePresetRecordWithImage = paths['/api/v1/style_presets/i/{style_preset_id}']['get']['responses']['200']['content']['application/json']
 
 /**
  * Builds an endpoint URL for the style_presets router
@@ -36,13 +36,23 @@ export const stylePresetsApi = api.injectEndpoints({
     }),
     createStylePreset: build.mutation<
       paths['/api/v1/style_presets/']['post']['responses']['200']['content']['application/json'],
-      paths['/api/v1/style_presets/']['post']['requestBody']['content']['application/json']['style_preset']
+      paths['/api/v1/style_presets/']['post']['requestBody']['content']['multipart/form-data']
     >({
-      query: (style_preset) => ({
-        url: buildStylePresetsUrl(),
-        method: 'POST',
-        body: { style_preset },
-      }),
+      query: ({ name, positive_prompt, negative_prompt, image }) => {
+        const formData = new FormData();
+        if (image) {
+          formData.append('image', image);
+        }
+        formData.append('name', name);
+        formData.append('positive_prompt', positive_prompt);
+        formData.append('negative_prompt', negative_prompt);
+
+        return {
+          url: buildStylePresetsUrl(),
+          method: 'POST',
+          body: formData,
+        };
+      },
       invalidatesTags: [
         { type: 'StylePreset', id: LIST_TAG },
         { type: 'StylePreset', id: LIST_TAG },
@@ -50,16 +60,25 @@ export const stylePresetsApi = api.injectEndpoints({
     }),
     updateStylePreset: build.mutation<
       paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['responses']['200']['content']['application/json'],
-      {
-        id: string;
-        changes: paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['requestBody']['content']['application/json']['changes'];
-      }
+      paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['requestBody']['content']['multipart/form-data'] & { id: string }
     >({
-      query: ({ id, changes }) => ({
-        url: buildStylePresetsUrl(`i/${id}`),
-        method: 'PATCH',
-        body: { changes },
-      }),
+      query: ({ id, name, positive_prompt, negative_prompt, image }) => {
+        const formData = new FormData();
+        if (image) {
+          formData.append('image', image);
+        }
+
+        formData.append('name', name);
+        formData.append('positive_prompt', positive_prompt);
+        formData.append('negative_prompt', negative_prompt);
+
+
+        return {
+          url: buildStylePresetsUrl(`i/${id}`),
+          method: 'PATCH',
+          body: formData
+        }
+      },
       invalidatesTags: (response, error, { id }) => [
         { type: 'StylePreset', id: LIST_TAG },
         { type: 'StylePreset', id: id },
