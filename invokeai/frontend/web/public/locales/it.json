@@ -1735,7 +1735,9 @@
         "missingUpscaleModel": "Modello per l’ampliamento mancante",
         "missingTileControlNetModel": "Nessun modello ControlNet Tile valido installato",
         "postProcessingModel": "Modello di post-elaborazione",
-        "postProcessingMissingModelWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare un modello di post-elaborazione (da immagine a immagine)."
+        "postProcessingMissingModelWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare un modello di post-elaborazione (da immagine a immagine).",
+        "exceedsMaxSize": "Le impostazioni di ampliamento superano il limite massimo delle dimensioni",
+        "exceedsMaxSizeDetails": "Il limite massimo di ampliamento è {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixel. Prova un'immagine più piccola o diminuisci la scala selezionata."
     },
     "upsell": {
         "inviteTeammates": "Invita collaboratori",
