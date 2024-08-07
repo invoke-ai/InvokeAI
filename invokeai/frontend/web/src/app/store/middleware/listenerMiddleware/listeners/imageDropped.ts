@@ -5,9 +5,10 @@ import { parseify } from 'common/util/serialize';
 import {
   caImageChanged,
   ipaImageChanged,
-  layerImageAdded,
+  layerAddedFromImage,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
+import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import {
@@ -28,7 +29,7 @@ export const dndDropped = createAction<{
 export const addImageDroppedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: dndDropped,
-    effect: async (action, { dispatch, getState }) => {
+    effect: (action, { dispatch, getState }) => {
       const log = logger('dnd');
       const { activeData, overData } = action.payload;
       if (!isValidDrop(overData, activeData)) {
@@ -101,12 +102,11 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
        * Image dropped on Raster layer
        */
       if (
-        overData.actionType === 'ADD_LAYER_IMAGE' &&
+        overData.actionType === 'ADD_LAYER_FROM_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        const { id } = overData.context;
-        dispatch(layerImageAdded({ id, imageDTO: activeData.payload.imageDTO }));
+        dispatch(layerAddedFromImage({ imageObject: imageDTOToImageObject(activeData.payload.imageDTO) }));
         return;
       }
 

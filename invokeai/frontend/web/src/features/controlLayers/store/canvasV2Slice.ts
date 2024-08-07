@@ -411,9 +411,9 @@ export const {
   bboxSizeOptimized,
   // layers
   layerAdded,
+  layerAddedFromImage,
   layerRecalled,
   layerOpacityChanged,
-  layerImageAdded,
   layerAllDeleted,
   layerImageCacheChanged,
   // IP Adapters

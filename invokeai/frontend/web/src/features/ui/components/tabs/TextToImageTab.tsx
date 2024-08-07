@@ -10,8 +10,12 @@ const TextToImageTab = () => {
   return (
     <Box layerStyle="first" position="relative" w="full" h="full" p={2} borderRadius="base">
       <ControlLayersEditor />
-      {imageViewer.isOpen && <ImageViewer />}
-      <ImageComparisonDroppable />
+      {imageViewer.isOpen && (
+        <>
+          <ImageViewer />
+          <ImageComparisonDroppable />
+        </>
+      )}
     </Box>
   );
 };
