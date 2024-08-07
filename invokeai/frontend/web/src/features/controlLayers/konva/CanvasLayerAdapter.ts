@@ -28,7 +28,6 @@ export class CanvasLayerAdapter {
   renderer: CanvasObjectRenderer;
 
   isFirstRender: boolean = true;
-  bboxNeedsUpdate: boolean = true;
 
   constructor(state: CanvasLayerAdapter['state'], manager: CanvasLayerAdapter['manager']) {
     this.id = state.id;
@@ -40,6 +39,8 @@ export class CanvasLayerAdapter {
 
     this.konva = {
       layer: new Konva.Layer({
+        // We need the ID on the layer to help with building the composite initial image
+        // See `getCompositeLayerStageClone()`
         id: this.id,
         name: `${this.type}:layer`,
         listening: false,
@@ -134,7 +135,6 @@ export class CanvasLayerAdapter {
       id: this.id,
       type: this.type,
       state: deepClone(this.state),
-      bboxNeedsUpdate: this.bboxNeedsUpdate,
       transformer: this.transformer.repr(),
       renderer: this.renderer.repr(),
     };
