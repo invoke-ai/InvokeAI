@@ -1,6 +1,11 @@
-import { useDisclosure } from '@invoke-ai/ui-library';
+import { Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
-import { CAHeader } from 'features/controlLayers/components/ControlAdapter/CAEntityHeader';
+import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
+import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
+import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
+import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
+import { CAActionsMenu } from 'features/controlLayers/components/ControlAdapter/CAActionsMenu';
+import { CAOpacityAndFilter } from 'features/controlLayers/components/ControlAdapter/CAOpacityAndFilter';
 import { CASettings } from 'features/controlLayers/components/ControlAdapter/CASettings';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
@@ -17,8 +22,15 @@ export const CA = memo(({ id }: Props) => {
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <CanvasEntityContainer>
-        <CAHeader onToggleVisibility={onToggle} />
-        {isOpen && <CASettings id={id} />}
+        <CanvasEntityHeader onDoubleClick={onToggle}>
+          <CanvasEntityEnabledToggle />
+          <CanvasEntityTitle />
+          <Spacer />
+          <CAOpacityAndFilter />
+          <CAActionsMenu />
+          <CanvasEntityDeleteButton />
+        </CanvasEntityHeader>
+        {isOpen && <CASettings />}
       </CanvasEntityContainer>
     </EntityIdentifierContext.Provider>
   );
