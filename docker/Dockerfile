@@ -43,7 +43,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu121"; \
     fi &&\
 
-    pip install $extra_index_url_arg -e ".";
+    # xformers + triton fails to install on arm64
+    if [ "$GPU_DRIVER" = "cuda" ] && [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+        pip install $extra_index_url_arg -e ".[xformers]"; \
+    else \
+        pip install $extra_index_url_arg -e "."; \
+    fi
 
 # #### Build the Web UI ------------------------------------
 

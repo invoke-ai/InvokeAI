@@ -6,12 +6,19 @@ import psutil
 import torch
 import torch.nn.functional as F
 from diffusers.models.attention_processor import Attention
+from diffusers.utils.import_utils import is_xformers_available
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
 from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
 from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
 from invokeai.backend.util.devices import TorchDevice
+
+if is_xformers_available():
+    import xformers
+    import xformers.ops
+else:
+    xformers = None
 
 
 @dataclass
@@ -23,7 +30,9 @@ class IPAdapterAttentionWeights:
 class CustomAttnProcessor:
     """A custom implementation of attention processor that supports additional Invoke features.
     This implementation is based on
+    AttnProcessor (https://github.com/huggingface/diffusers/blob/fcfa270fbd1dc294e2f3a505bae6bcb791d721c3/src/diffusers/models/attention_processor.py#L732)
     SlicedAttnProcessor (https://github.com/huggingface/diffusers/blob/fcfa270fbd1dc294e2f3a505bae6bcb791d721c3/src/diffusers/models/attention_processor.py#L1616)
+    XFormersAttnProcessor (https://github.com/huggingface/diffusers/blob/fcfa270fbd1dc294e2f3a505bae6bcb791d721c3/src/diffusers/models/attention_processor.py#L1113)
     AttnProcessor2_0 (https://github.com/huggingface/diffusers/blob/fcfa270fbd1dc294e2f3a505bae6bcb791d721c3/src/diffusers/models/attention_processor.py#L1204)
     Supported custom features:
     - IP-Adapter
@@ -53,6 +62,9 @@ class CustomAttnProcessor:
         if self.slice_size == "auto":
             self.slice_size = self._select_slice_size()
 
+        if self.attention_type == "xformers" and xformers is None:
+            raise ImportError("xformers attention requires xformers module to be installed.")
+
     def _select_attention_type(self) -> str:
         device = TorchDevice.choose_torch_device()
         # On some mps system normal attention still faster than torch-sdp, on others - on par
@@ -61,7 +73,14 @@ class CustomAttnProcessor:
         # Adreitz: 260.868s vs 226.638s
         if device.type == "mps":
             return "normal"
-        else:  # cuda, cpu
+        elif device.type == "cuda":
+            # Flash Attention is supported from sm80 compute capability onwards in PyTorch
+            # https://pytorch.org/blog/accelerated-pytorch-2/
+            if torch.cuda.get_device_capability("cuda")[0] < 8 and xformers is not None:
+                return "xformers"
+            else:
+                return "torch-sdp"
+        else:  # cpu
             return "torch-sdp"
 
     def _select_slice_size(self) -> str:
@@ -262,6 +281,8 @@ class CustomAttnProcessor:
             attn_call = self.run_attention_sdp
         elif self.attention_type == "normal":
             attn_call = self.run_attention_normal
+        elif self.attention_type == "xformers":
+            attn_call = self.run_attention_xformers
         else:
             raise Exception(f"Unknown attention type: {self.attention_type}")
 
@@ -287,6 +308,35 @@ class CustomAttnProcessor:
 
         attention_probs = attn.get_attention_scores(query, key, attention_mask)
         hidden_states = torch.bmm(attention_probs, value)
+        hidden_states = attn.batch_to_head_dim(hidden_states)
+
+        return hidden_states
+
+    def run_attention_xformers(
+        self,
+        attn: Attention,
+        query: torch.Tensor,
+        key: torch.Tensor,
+        value: torch.Tensor,
+        attention_mask: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        query = attn.head_to_batch_dim(query).contiguous()
+        key   = attn.head_to_batch_dim(key).contiguous()
+        value = attn.head_to_batch_dim(value).contiguous()
+
+        if attention_mask is not None:
+            # expand our mask's singleton query_length dimension:
+            #   [batch*heads,            1, key_length] ->
+            #   [batch*heads, query_length, key_length]
+            # so that it can be added as a bias onto the attention scores that xformers computes:
+            #   [batch*heads, query_length, key_length]
+            # we do this explicitly because xformers doesn't broadcast the singleton dimension for us.
+            attention_mask = attention_mask.expand(-1, query.shape[1], -1)
+
+        hidden_states = xformers.ops.memory_efficient_attention(
+            query, key, value, attn_bias=attention_mask, op=None, scale=attn.scale
+        )
+        hidden_states = hidden_states.to(query.dtype)
         hidden_states = attn.batch_to_head_dim(hidden_states)
 
         return hidden_states
@@ -355,6 +405,10 @@ class CustomAttnProcessor:
                 attn_slice = attn.get_attention_scores(query_slice, key_slice, attn_mask_slice)
                 torch.bmm(attn_slice, value_slice, out=hidden_states[start_idx:end_idx])
                 del attn_slice
+            elif self.attention_type == "xformers":
+                hidden_states[start_idx:end_idx] = xformers.ops.memory_efficient_attention(
+                    query_slice, key_slice, value_slice, attn_bias=attn_mask_slice, op=None, scale=attn.scale
+                )
             elif self.attention_type == "torch-sdp":
                 if attn_mask_slice is not None:
                     attn_mask_slice = attn_mask_slice.unsqueeze(0)

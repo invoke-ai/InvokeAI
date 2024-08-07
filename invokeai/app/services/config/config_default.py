@@ -28,7 +28,7 @@ DEFAULT_RAM_CACHE = 10.0
 DEFAULT_VRAM_CACHE = 0.25
 DEVICE = Literal["auto", "cpu", "cuda", "cuda:1", "mps"]
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
-ATTENTION_TYPE = Literal["auto", "normal", "torch-sdp"]
+ATTENTION_TYPE = Literal["auto", "normal", "xformers", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "none", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
@@ -449,8 +449,8 @@ def migrate_v4_0_2_to_4_0_3_config_dict(config_dict: dict[str, Any]) -> dict[str
     if attention_type != "sliced" and "attention_slice_size" in parsed_config_dict:
         del parsed_config_dict["attention_slice_size"]
 
-    # xformers attention removed, sliced moved to attention_slice_size
-    if attention_type in ["sliced", "xformers"]:
+    # sliced moved to attention_slice_size
+    if attention_type == "sliced":
         parsed_config_dict["attention_type"] = "auto"
 
     parsed_config_dict["schema_version"] = "4.0.3"

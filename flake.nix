@@ -84,7 +84,7 @@
     in
     {
       devShells.${system} = rec {
-        develop = mkShell { dir = "venv"; install = "-e '.' --extra-index-url https://download.pytorch.org/whl/cu118"; };
+        develop = mkShell { dir = "venv"; install = "-e '.[xformers]' --extra-index-url https://download.pytorch.org/whl/cu118"; };
         default = develop;
       };
     };
