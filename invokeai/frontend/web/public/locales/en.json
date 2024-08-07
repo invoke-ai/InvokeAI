@@ -200,6 +200,7 @@
         "delete": "Delete",
         "depthAnything": "Depth Anything",
         "depthAnythingDescription": "Depth map generation using the Depth Anything technique",
+        "depthAnythingSmallV2": "Small V2",
         "depthMidas": "Depth (Midas)",
         "depthMidasDescription": "Depth map generation using Midas",
         "depthZoe": "Depth (Zoe)",

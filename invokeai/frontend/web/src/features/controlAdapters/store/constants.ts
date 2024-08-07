@@ -94,7 +94,7 @@ export const CONTROLNET_PROCESSORS: ControlNetProcessorsDict = {
     buildDefaults: (baseModel?: BaseModelType) => ({
       id: 'depth_anything_image_processor',
       type: 'depth_anything_image_processor',
-      model_size: 'small',
+      model_size: 'small_v2',
       resolution: baseModel === 'sdxl' ? 1024 : 512,
     }),
   },

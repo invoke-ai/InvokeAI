@@ -21,6 +21,8 @@ from controlnet_aux import (
 from controlnet_aux.util import HWC3, ade_palette
 from PIL import Image
 from pydantic import BaseModel, Field, field_validator, model_validator
+from transformers import pipeline
+from transformers.pipelines import DepthEstimationPipeline
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -44,13 +46,12 @@ from invokeai.app.invocations.util import validate_begin_end_step, validate_weig
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES, heuristic_resize
 from invokeai.backend.image_util.canny import get_canny_edges
-from invokeai.backend.image_util.depth_anything import DEPTH_ANYTHING_MODELS, DepthAnythingDetector
+from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.dw_openpose import DWPOSE_MODELS, DWOpenposeDetector
 from invokeai.backend.image_util.hed import HEDProcessor
 from invokeai.backend.image_util.lineart import LineartProcessor
 from invokeai.backend.image_util.lineart_anime import LineartAnimeProcessor
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
-from invokeai.backend.util.devices import TorchDevice
 
 
 class ControlField(BaseModel):
@@ -592,7 +593,14 @@ class ColorMapImageProcessorInvocation(ImageProcessorInvocation):
         return color_map
 
 
-DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small"]
+DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small", "small_v2"]
+# DepthAnything V2 Small model is licensed under Apache 2.0 but not the base and large models.
+DEPTH_ANYTHING_MODELS = {
+    "large": "LiheYoung/depth-anything-large-hf",
+    "base": "LiheYoung/depth-anything-base-hf",
+    "small": "LiheYoung/depth-anything-small-hf",
+    "small_v2": "depth-anything/Depth-Anything-V2-Small-hf",
+}
 
 
 @invocation(
@@ -600,28 +608,33 @@ DEPTH_ANYTHING_MODEL_SIZES = Literal["large", "base", "small"]
     title="Depth Anything Processor",
     tags=["controlnet", "depth", "depth anything"],
     category="controlnet",
-    version="1.1.2",
+    version="1.1.3",
 )
 class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
     """Generates a depth map based on the Depth Anything algorithm"""
 
     model_size: DEPTH_ANYTHING_MODEL_SIZES = InputField(
-        default="small", description="The size of the depth model to use"
+        default="small_v2", description="The size of the depth model to use"
     )
     resolution: int = InputField(default=512, ge=1, description=FieldDescriptions.image_res)
 
     def run_processor(self, image: Image.Image) -> Image.Image:
-        def loader(model_path: Path):
-            return DepthAnythingDetector.load_model(
-                model_path, model_size=self.model_size, device=TorchDevice.choose_torch_device()
-            )
+        def load_depth_anything(model_path: Path):
+            depth_anything_pipeline = pipeline(model=str(model_path), task="depth-estimation", local_files_only=True)
+            assert isinstance(depth_anything_pipeline, DepthEstimationPipeline)
+            return DepthAnythingPipeline(depth_anything_pipeline)
 
         with self._context.models.load_remote_model(
-            source=DEPTH_ANYTHING_MODELS[self.model_size], loader=loader
-        ) as model:
-            depth_anything_detector = DepthAnythingDetector(model, TorchDevice.choose_torch_device())
-            processed_image = depth_anything_detector(image=image, resolution=self.resolution)
-            return processed_image
+            source=DEPTH_ANYTHING_MODELS[self.model_size], loader=load_depth_anything
+        ) as depth_anything_detector:
+            assert isinstance(depth_anything_detector, DepthAnythingPipeline)
+            depth_map = depth_anything_detector.generate_depth(image)
+
+            # Resizing to user target specified size
+            new_height = int(image.size[1] * (self.resolution / image.size[0]))
+            depth_map = depth_map.resize((self.resolution, new_height))
+
+            return depth_map
 
 
 @invocation(

@@ -11,6 +11,7 @@ from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from transformers import CLIPTokenizer
 
+from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
 from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
@@ -45,6 +46,7 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
             SpandrelImageToImageModel,
             GroundingDinoPipeline,
             SegmentAnythingPipeline,
+            DepthAnythingPipeline,
         ),
     ):
         return model.calc_size()
