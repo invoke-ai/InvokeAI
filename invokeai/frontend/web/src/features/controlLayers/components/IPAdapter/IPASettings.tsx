@@ -4,6 +4,7 @@ import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginE
 import { CanvasEntitySettings } from 'features/controlLayers/components/common/CanvasEntitySettings';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAMethod } from 'features/controlLayers/components/IPAdapter/IPAMethod';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   ipaBeginEndStepPctChanged,
   ipaCLIPVisionModelChanged,
@@ -21,12 +22,9 @@ import type { ImageDTO, IPAdapterModelConfig, IPALayerImagePostUploadAction } fr
 import { IPAImagePreview } from './IPAImagePreview';
 import { IPAModelCombobox } from './IPAModelCombobox';
 
-type Props = {
-  id: string;
-};
-
-export const IPASettings = memo(({ id }: Props) => {
+export const IPASettings = memo(() => {
   const dispatch = useAppDispatch();
+  const { id } = useEntityIdentifierContext();
   const ipAdapter = useAppSelector((s) => selectIPAOrThrow(s.canvasV2, id));
 
   const onChangeBeginEndStepPct = useCallback(
