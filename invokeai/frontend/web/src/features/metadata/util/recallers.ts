@@ -334,7 +334,7 @@ const recallLayer: MetadataRecallFunc<CanvasLayerState> = async (layer) => {
   const invalidObjects: string[] = [];
   for (const obj of clone.objects) {
     if (obj.type === 'image') {
-      const imageDTO = await getImageDTO(obj.image.name);
+      const imageDTO = await getImageDTO(obj.image.image_name);
       if (!imageDTO) {
         invalidObjects.push(obj.id);
       }

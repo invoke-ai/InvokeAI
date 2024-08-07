@@ -685,7 +685,7 @@ export class CanvasManager {
     const region = this.getEntity({ id, type: 'regional_guidance' });
     assert(region?.type === 'regional_guidance');
     if (region.state.imageCache) {
-      const imageDTO = await getImageDTO(region.state.imageCache.name);
+      const imageDTO = await getImageDTO(region.state.imageCache);
       if (imageDTO) {
         return imageDTO;
       }

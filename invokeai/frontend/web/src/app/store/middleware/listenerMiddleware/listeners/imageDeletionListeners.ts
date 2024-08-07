@@ -41,7 +41,7 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
 
 const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   state.canvasV2.controlAdapters.entities.forEach(({ id, imageObject, processedImageObject }) => {
-    if (imageObject?.image.name === imageDTO.image_name || processedImageObject?.image.name === imageDTO.image_name) {
+    if (imageObject?.image.image_name === imageDTO.image_name || processedImageObject?.image.image_name === imageDTO.image_name) {
       dispatch(caImageChanged({ id, imageDTO: null }));
       dispatch(caProcessedImageChanged({ id, imageDTO: null }));
     }
@@ -50,7 +50,7 @@ const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, ima
 
 const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   state.canvasV2.ipAdapters.entities.forEach(({ id, imageObject }) => {
-    if (imageObject?.image.name === imageDTO.image_name) {
+    if (imageObject?.image.image_name === imageDTO.image_name) {
       dispatch(ipaImageChanged({ id, imageDTO: null }));
     }
   });
@@ -60,7 +60,7 @@ const deleteLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
   state.canvasV2.layers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
-      if (obj.type === 'image' && obj.image.name === imageDTO.image_name) {
+      if (obj.type === 'image' && obj.image.image_name === imageDTO.image_name) {
         shouldDelete = true;
         break;
       }

@@ -72,7 +72,7 @@ export class CanvasControlAdapter extends CanvasEntity {
       this.image = new CanvasImageRenderer(imageObject, this);
       this.updateGroup(true);
       this.konva.objectGroup.add(this.image.konva.group);
-      await this.image.updateImageSource(imageObject.image.name);
+      await this.image.updateImageSource(imageObject.image.image_name);
     } else if (!this.image.isLoading && !this.image.isError) {
       if (await this.image.update(imageObject)) {
         didDraw = true;
