@@ -12,7 +12,7 @@ type Props = {
   onChange: (controlMode: ControlModeV2) => void;
 };
 
-export const CAControlModeSelect = memo(({ controlMode, onChange }: Props) => {
+export const ControlAdapterControlModeSelect = memo(({ controlMode, onChange }: Props) => {
   const { t } = useTranslation();
   const CONTROL_MODE_DATA = useMemo(
     () => [
@@ -57,4 +57,4 @@ export const CAControlModeSelect = memo(({ controlMode, onChange }: Props) => {
   );
 });
 
-CAControlModeSelect.displayName = 'CAControlModeSelect';
+ControlAdapterControlModeSelect.displayName = 'ControlAdapterControlModeSelect';

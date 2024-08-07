@@ -28,7 +28,7 @@ type Props = {
   onErrorLoadingProcessedImage: () => void;
 };
 
-export const CAImagePreview = memo(
+export const ControlAdapterImagePreview = memo(
   ({
     controlAdapter,
     onChangeImage,
@@ -226,4 +226,4 @@ export const CAImagePreview = memo(
   }
 );
 
-CAImagePreview.displayName = 'CAImagePreview';
+ControlAdapterImagePreview.displayName = 'ControlAdapterImagePreview';
