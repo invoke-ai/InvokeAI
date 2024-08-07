@@ -97,12 +97,12 @@ type EntityStateAndAdapter =
       state: CanvasInpaintMaskState;
       adapter: CanvasMaskAdapter;
     }
-  | {
-      id: string;
-      type: CanvasControlAdapterState['type'];
-      state: CanvasControlAdapterState;
-      adapter: CanvasControlAdapter;
-    }
+  // | {
+  //     id: string;
+  //     type: CanvasControlAdapterState['type'];
+  //     state: CanvasControlAdapterState;
+  //     adapter: CanvasControlAdapter;
+  //   }
   | {
       id: string;
       type: CanvasRegionalGuidanceState['type'];

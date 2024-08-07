@@ -1,5 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 import { Flex } from '@invoke-ai/ui-library';
+import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea';
 import { ControlLayersToolbar } from 'features/controlLayers/components/ControlLayersToolbar';
 import { StageComponent } from 'features/controlLayers/components/StageComponent';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
@@ -24,6 +25,7 @@ export const ControlLayersEditor = memo(() => {
       {/* <Flex position="absolute" top={0} right={0} bottom={0} left={0} align="center" justify="center">
         <CanvasResizer />
       </Flex> */}
+      <CanvasDropArea />
     </Flex>
   );
 });
