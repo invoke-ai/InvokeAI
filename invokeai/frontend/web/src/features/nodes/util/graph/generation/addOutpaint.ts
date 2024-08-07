@@ -3,7 +3,7 @@ import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/typ
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getInfill } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ParameterPrecision } from 'features/parameters/types/parameterSchemas';
-import { isEqual, pick } from 'lodash-es';
+import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
 export const addOutpaint = async (
@@ -22,9 +22,8 @@ export const addOutpaint = async (
 ): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
   denoise.denoising_start = denoising_start;
 
-  const cropBbox = pick(bbox.rect, ['x', 'y', 'width', 'height']);
-  const initialImage = await manager.getInitialImage({ bbox: cropBbox });
-  const maskImage = await manager.getInpaintMaskImage({ bbox: cropBbox });
+  const initialImage = await manager.getCompositeLayerImageDTO(bbox.rect);
+  const maskImage = await manager.getInpaintMaskImageDTO(bbox.rect);
   const infill = getInfill(g, compositing);
 
   if (!isEqual(scaledSize, originalSize)) {

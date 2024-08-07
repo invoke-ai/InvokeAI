@@ -1,3 +1,4 @@
+import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
@@ -41,6 +42,8 @@ export class CanvasMaskAdapter {
 
     this.konva = {
       layer: new Konva.Layer({
+        // We need the ID on the layer to help with building the composite initial image
+        // See `getCompositeLayerStageClone()`
         id: this.id,
         name: `${this.type}:layer`,
         listening: false,
@@ -134,5 +137,13 @@ export class CanvasMaskAdapter {
     this.log.trace('Updating visibility');
     const isEnabled = get(arg, 'isEnabled', this.state.isEnabled);
     this.konva.layer.visible(isEnabled);
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      state: deepClone(this.state),
+    };
   };
 }

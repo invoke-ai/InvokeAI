@@ -685,6 +685,10 @@ export class CanvasTransformer {
     this.calculateRect();
   };
 
+  getRelativeRect = (): Rect => {
+    return this.konva.proxyRect.getClientRect({ relativeTo: this.parent.konva.layer });
+  };
+
   _enableTransform = () => {
     this.isTransformEnabled = true;
     this.konva.transformer.visible(true);

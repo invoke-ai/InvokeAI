@@ -13,32 +13,41 @@ import type { CanvasTransformer } from 'features/controlLayers/konva/CanvasTrans
 import {
   getCompositeLayerImage,
   getControlAdapterImage,
-  getGenerationMode,
+  getImageDataTransparency,
   getInpaintMaskImage,
   getPrefixedId,
   getRegionMaskImage,
+  konvaNodeToBlob,
+  konvaNodeToImageData,
   nanoid,
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
-import {
-  type CanvasControlAdapterState,
-  type CanvasEntityIdentifier,
-  type CanvasInpaintMaskState,
-  type CanvasLayerState,
-  type CanvasRegionalGuidanceState,
-  type CanvasV2State,
-  type Coordinate,
-  type GenerationMode,
-  type GetLoggingContext,
-  RGBA_WHITE,
-  type RgbaColor,
+import type {
+  CanvasControlAdapterState,
+  CanvasEntityIdentifier,
+  CanvasInpaintMaskState,
+  CanvasLayerState,
+  CanvasRegionalGuidanceState,
+  CanvasV2State,
+  Coordinate,
+  GenerationMode,
+  GetLoggingContext,
+  Rect,
+  RgbaColor,
 } from 'features/controlLayers/store/types';
+import { RGBA_RED } from 'features/controlLayers/store/types';
+import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
-import { getImageDTO as defaultGetImageDTO, uploadImage as defaultUploadImage } from 'services/api/endpoints/images';
+import {
+  getImageDTO as defaultGetImageDTO,
+  getImageDTO,
+  uploadImage as defaultUploadImage,
+} from 'services/api/endpoints/images';
 import type { ImageCategory, ImageDTO } from 'services/api/types';
+import { assert } from 'tsafe';
 
 import { CanvasBackground } from './CanvasBackground';
 import { CanvasBbox } from './CanvasBbox';
@@ -350,7 +359,8 @@ export class CanvasManager {
     if (selectedEntity) {
       // These two entity types use a compositing rect for opacity. Their fill is always white.
       if (selectedEntity.state.type === 'regional_guidance' || selectedEntity.state.type === 'inpaint_mask') {
-        currentFill = RGBA_WHITE;
+        currentFill = RGBA_RED;
+        // currentFill = RGBA_WHITE;
       }
     }
     return currentFill;
@@ -620,8 +630,96 @@ export class CanvasManager {
     return pixels / this.getStageScale();
   }
 
+  getCompositeLayerStageClone = (): Konva.Stage => {
+    const layersState = this.stateApi.getLayersState();
+    const stageClone = this.stage.clone();
+
+    stageClone.scaleX(1);
+    stageClone.scaleY(1);
+    stageClone.x(0);
+    stageClone.y(0);
+
+    const validLayers = layersState.entities.filter(isValidLayer);
+    // getLayers() returns the internal `children` array of the stage directly - calling destroy on a layer will
+    // mutate that array. We need to clone the array to avoid mutating the original.
+    for (const konvaLayer of stageClone.getLayers().slice()) {
+      if (!validLayers.find((l) => l.id === konvaLayer.id())) {
+        konvaLayer.destroy();
+      }
+    }
+
+    return stageClone;
+  };
+
+  getCompositeLayerBlob = (rect?: Rect): Promise<Blob> => {
+    return konvaNodeToBlob(this.getCompositeLayerStageClone(), rect);
+  };
+
+  getCompositeLayerImageData = (rect?: Rect): ImageData => {
+    return konvaNodeToImageData(this.getCompositeLayerStageClone(), rect);
+  };
+
+  getCompositeLayerImageDTO = async (rect?: Rect): Promise<ImageDTO> => {
+    const blob = await this.getCompositeLayerBlob(rect);
+    const imageDTO = await this.util.uploadImage(blob, 'composite-layer.png', 'general', true);
+    this.stateApi.setLayerImageCache(imageDTO);
+    return imageDTO;
+  };
+
+  getInpaintMaskBlob = (rect?: Rect): Promise<Blob> => {
+    return this.inpaintMask.renderer.getBlob({ rect });
+  };
+
+  getInpaintMaskImageData = (rect?: Rect): ImageData => {
+    return this.inpaintMask.renderer.getImageData({ rect });
+  };
+
+  getInpaintMaskImageDTO = async (rect?: Rect): Promise<ImageDTO> => {
+    const blob = await this.inpaintMask.renderer.getBlob({ rect });
+    const imageDTO = await this.util.uploadImage(blob, 'inpaint-mask.png', 'mask', true);
+    this.stateApi.setInpaintMaskImageCache(imageDTO);
+    return imageDTO;
+  };
+
+  getRegionMaskImageDTO = async (id: string, rect?: Rect): Promise<ImageDTO> => {
+    const region = this.getEntity({ id, type: 'regional_guidance' });
+    assert(region?.type === 'regional_guidance');
+    if (region.state.imageCache) {
+      const imageDTO = await getImageDTO(region.state.imageCache.name);
+      if (imageDTO) {
+        return imageDTO;
+      }
+    }
+    return region.adapter.renderer.getImageDTO({
+      rect,
+      category: 'other',
+      is_intermediate: true,
+      onUploaded: (imageDTO) => {
+        this.stateApi.setRegionMaskImageCache(region.state.id, imageDTO);
+      },
+    });
+  };
+
   getGenerationMode(): GenerationMode {
-    return getGenerationMode({ manager: this });
+    const { rect } = this.stateApi.getBbox();
+    const inpaintMaskImageData = this.getInpaintMaskImageData(rect);
+    const inpaintMaskTransparency = getImageDataTransparency(inpaintMaskImageData);
+    const compositeLayerImageData = this.getCompositeLayerImageData(rect);
+    const compositeLayerTransparency = getImageDataTransparency(compositeLayerImageData);
+    if (compositeLayerTransparency === 'FULLY_TRANSPARENT') {
+      // When the initial image is fully transparent, we are always doing txt2img
+      return 'txt2img';
+    } else if (compositeLayerTransparency === 'PARTIALLY_TRANSPARENT') {
+      // When the initial image is partially transparent, we are always outpainting
+      return 'outpaint';
+    } else if (inpaintMaskTransparency === 'FULLY_TRANSPARENT') {
+      // compositeLayerTransparency === 'OPAQUE'
+      // When the inpaint mask is fully transparent, we are doing img2img
+      return 'img2img';
+    } else {
+      // Else at least some of the inpaint mask is opaque, so we are inpainting
+      return 'inpaint';
+    }
   }
 
   getControlAdapterImage(arg: Omit<Parameters<typeof getControlAdapterImage>[0], 'manager'>) {
