@@ -185,7 +185,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
           if (selectedEntity.adapter.renderer.buffer) {
-            await selectedEntity.adapter.renderer.commitBuffer();
+            selectedEntity.adapter.renderer.commitBuffer();
           }
 
           await selectedEntity.adapter.renderer.setBuffer({
@@ -204,7 +204,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           });
         } else {
           if (selectedEntity.adapter.renderer.buffer) {
-            await selectedEntity.adapter.renderer.commitBuffer();
+            selectedEntity.adapter.renderer.commitBuffer();
           }
           await selectedEntity.adapter.renderer.setBuffer({
             id: getObjectId('brush_line', true),
@@ -224,7 +224,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
           if (selectedEntity.adapter.renderer.buffer) {
-            await selectedEntity.adapter.renderer.commitBuffer();
+            selectedEntity.adapter.renderer.commitBuffer();
           }
           await selectedEntity.adapter.renderer.setBuffer({
             id: getObjectId('eraser_line', true),
@@ -241,7 +241,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           });
         } else {
           if (selectedEntity.adapter.renderer.buffer) {
-            await selectedEntity.adapter.renderer.commitBuffer();
+            selectedEntity.adapter.renderer.commitBuffer();
           }
           await selectedEntity.adapter.renderer.setBuffer({
             id: getObjectId('eraser_line', true),
@@ -256,7 +256,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
 
       if (toolState.selected === 'rect') {
         if (selectedEntity.adapter.renderer.buffer) {
-          await selectedEntity.adapter.renderer.commitBuffer();
+          selectedEntity.adapter.renderer.commitBuffer();
         }
         await selectedEntity.adapter.renderer.setBuffer({
           id: getObjectId('rect', true),
@@ -281,7 +281,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (toolState.selected === 'brush') {
         const drawingBuffer = selectedEntity.adapter.renderer.buffer;
         if (drawingBuffer?.type === 'brush_line') {
-          await selectedEntity.adapter.renderer.commitBuffer();
+          selectedEntity.adapter.renderer.commitBuffer();
         } else {
           await selectedEntity.adapter.renderer.clearBuffer();
         }
@@ -290,7 +290,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (toolState.selected === 'eraser') {
         const drawingBuffer = selectedEntity.adapter.renderer.buffer;
         if (drawingBuffer?.type === 'eraser_line') {
-          await selectedEntity.adapter.renderer.commitBuffer();
+          selectedEntity.adapter.renderer.commitBuffer();
         } else {
           await selectedEntity.adapter.renderer.clearBuffer();
         }
@@ -299,7 +299,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (toolState.selected === 'rect') {
         const drawingBuffer = selectedEntity.adapter.renderer.buffer;
         if (drawingBuffer?.type === 'rect') {
-          await selectedEntity.adapter.renderer.commitBuffer();
+          selectedEntity.adapter.renderer.commitBuffer();
         } else {
           await selectedEntity.adapter.renderer.clearBuffer();
         }
@@ -347,7 +347,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           }
         } else {
           if (selectedEntity.adapter.renderer.buffer) {
-            await selectedEntity.adapter.renderer.commitBuffer();
+            selectedEntity.adapter.renderer.commitBuffer();
           }
           const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
           const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
@@ -384,7 +384,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
           }
         } else {
           if (selectedEntity.adapter.renderer.buffer) {
-            await selectedEntity.adapter.renderer.commitBuffer();
+            selectedEntity.adapter.renderer.commitBuffer();
           }
           const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
           const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
@@ -437,17 +437,17 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
         drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
         await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
-        await selectedEntity.adapter.renderer.commitBuffer();
+        selectedEntity.adapter.renderer.commitBuffer();
       } else if (toolState.selected === 'eraser' && drawingBuffer?.type === 'eraser_line') {
         const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
         drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
         await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
-        await selectedEntity.adapter.renderer.commitBuffer();
+        selectedEntity.adapter.renderer.commitBuffer();
       } else if (toolState.selected === 'rect' && drawingBuffer?.type === 'rect') {
         drawingBuffer.rect.width = Math.round(normalizedPoint.x - drawingBuffer.rect.x);
         drawingBuffer.rect.height = Math.round(normalizedPoint.y - drawingBuffer.rect.y);
         await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
-        await selectedEntity.adapter.renderer.commitBuffer();
+        selectedEntity.adapter.renderer.commitBuffer();
       }
     }
 
