@@ -20,9 +20,9 @@ import type { Invocation } from 'services/api/types';
  * Adjusts the width and height to maintain the aspect ratio and constrains them by the model's dimension limits,
  * rounding down to the nearest multiple of 8.
  *
- * @param {number} optimalDimension The optimal dimension for the base model.
- * @param {number} width The current width to be adjusted for HRF.
- * @param {number} height The current height to be adjusted for HRF.
+ * @param optimalDimension The optimal dimension for the base model.
+ * @param width The current width to be adjusted for HRF.
+ * @param height The current height to be adjusted for HRF.
  * @return {{newWidth: number, newHeight: number}} The new width and height, adjusted and rounded as needed.
  */
 function calculateHrfRes(
@@ -62,7 +62,7 @@ function calculateHrfRes(
  * @param denoise The denoise node
  * @param noise The noise node
  * @param l2i The l2i node
- * @param vaeSource The VAE source node (may be a model loader, VAE loader, or seamless node)
+ * @param vaeSource The VAE source node (may be a 1.5/xl model loader, VAE loader, or seamless node)
  * @returns The HRF image output node.
  */
 export const addHRF = (
@@ -71,7 +71,11 @@ export const addHRF = (
   denoise: Invocation<'denoise_latents'>,
   noise: Invocation<'noise'>,
   l2i: Invocation<'l2i'>,
-  vaeSource: Invocation<'vae_loader'> | Invocation<'main_model_loader'> | Invocation<'seamless'>
+  vaeSource:
+    | Invocation<'vae_loader'>
+    | Invocation<'main_model_loader'>
+    | Invocation<'sdxl_model_loader'>
+    | Invocation<'seamless'>
 ): Invocation<'l2i'> => {
   const { hrfStrength, hrfEnabled, hrfMethod } = state.hrf;
   const { width, height } = state.controlLayers.present.size;
@@ -117,7 +121,7 @@ export const addHRF = (
   g.addEdge(resizeHrf, 'height', noiseHrf, 'height');
   g.addEdge(resizeHrf, 'width', noiseHrf, 'width');
 
-  const i2lHrf = g.addNode({ type: 'i2l', id: IMAGE_TO_LATENTS_HRF });
+  const i2lHrf = g.addNode({ type: 'i2l', id: IMAGE_TO_LATENTS_HRF, fp32: l2i.fp32 });
   g.addEdge(vaeSource, 'vae', i2lHrf, 'vae');
   g.addEdge(resizeHrf, 'image', i2lHrf, 'image');
 

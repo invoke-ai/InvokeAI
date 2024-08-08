@@ -67,7 +67,7 @@ const scalingLabelProps: FormLabelProps = {
 
 export const ImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
-  const { badges, activeTabName, isSDXL } = useAppSelector(selector);
+  const { badges, activeTabName } = useAppSelector(selector);
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
     id: 'image-settings',
     defaultIsOpen: true,
@@ -96,7 +96,7 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedShuffle />
               <ParamSeedRandomize />
             </Flex>
-            {activeTabName === 'generation' && !isSDXL && <HrfSettings />}
+            {activeTabName === 'generation' && <HrfSettings />}
             {activeTabName === 'canvas' && (
               <>
                 <ParamScaleBeforeProcessing />
