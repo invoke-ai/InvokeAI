@@ -32,4 +32,9 @@ export class CanvasPreview {
     this.progressPreview = progressPreview;
     this.layer.add(this.progressPreview.konva.group);
   }
+
+  destroy() {
+    this.tool.destroy();
+    this.layer.destroy();
+  }
 }
