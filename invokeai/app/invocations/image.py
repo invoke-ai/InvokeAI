@@ -1048,14 +1048,30 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
         image = context.images.get_pil(self.image.image_name)
         mask = self._prepare_mask(context.images.get_pil(self.mask.image_name))
         image.putalpha(mask)
-        bbox = image.getbbox()
-        image = image.crop(bbox)
+        # bbox = image.getbbox()
+        # image = image.crop(bbox)
         image_dto = context.images.save(image=image)
 
         return CanvasV2MaskAndCropOutput(
             image=ImageField(image_name=image_dto.image_name),
-            offset_x=bbox[0],
-            offset_y=bbox[1],
+            offset_x=0,
+            offset_y=0,
             width=image.width,
             height=image.height,
         )
+
+    # def invoke(self, context: InvocationContext) -> CanvasV2MaskAndCropOutput:
+    #     image = context.images.get_pil(self.image.image_name)
+    #     mask = self._prepare_mask(context.images.get_pil(self.mask.image_name))
+    #     image.putalpha(mask)
+    #     bbox = image.getbbox()
+    #     image = image.crop(bbox)
+    #     image_dto = context.images.save(image=image)
+
+    #     return CanvasV2MaskAndCropOutput(
+    #         image=ImageField(image_name=image_dto.image_name),
+    #         offset_x=bbox[0],
+    #         offset_y=bbox[1],
+    #         width=image.width,
+    #         height=image.height,
+    #     )
