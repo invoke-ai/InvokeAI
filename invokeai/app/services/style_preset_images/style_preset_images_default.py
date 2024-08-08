@@ -2,7 +2,6 @@ from pathlib import Path
 
 from PIL import Image
 from PIL.Image import Image as PILImageType
-from send2trash import send2trash
 
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.style_preset_images.style_preset_images_base import StylePresetImageFileStorageBase
@@ -70,7 +69,7 @@ class StylePresetImageFileStorageDisk(StylePresetImageFileStorageBase):
             if not self._validate_path(path):
                 raise StylePresetImageFileNotFoundException
 
-            send2trash(path)
+            path.unlink()
 
         except StylePresetImageFileNotFoundException as e:
             raise StylePresetImageFileNotFoundException from e
