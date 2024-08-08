@@ -1,4 +1,3 @@
-
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
