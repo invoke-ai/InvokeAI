@@ -118,7 +118,7 @@ export class CanvasTool {
     );
 
     this.subscriptions.add(
-      this.manager.toolState.subscribe(() => {
+      this.manager.$toolState.listen(() => {
         this.render();
       })
     );
@@ -175,7 +175,7 @@ export class CanvasTool {
     } else if (!isDrawableEntity) {
       // Non-drawable layers don't have tools
       stage.container().style.cursor = 'not-allowed';
-    } else if (tool === 'move' || Boolean(this.manager.transformingEntity.getValue())) {
+    } else if (tool === 'move' || Boolean(this.manager.$transformingEntity.get())) {
       // Move tool gets a pointer
       stage.container().style.cursor = 'default';
     } else if (tool === 'rect') {
