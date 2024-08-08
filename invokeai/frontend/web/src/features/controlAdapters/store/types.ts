@@ -84,7 +84,7 @@ export type RequiredDepthAnythingImageProcessorInvocation = O.Required<
   'type' | 'model_size' | 'resolution' | 'offload'
 >;
 
-const zDepthAnythingModelSize = z.enum(['large', 'base', 'small']);
+const zDepthAnythingModelSize = z.enum(['large', 'base', 'small', 'small_v2']);
 export type DepthAnythingModelSize = z.infer<typeof zDepthAnythingModelSize>;
 export const isDepthAnythingModelSize = (v: unknown): v is DepthAnythingModelSize =>
   zDepthAnythingModelSize.safeParse(v).success;

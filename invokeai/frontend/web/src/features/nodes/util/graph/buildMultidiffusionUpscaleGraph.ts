@@ -125,19 +125,11 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     g.addEdge(modelNode, 'unet', tiledMultidiffusionNode, 'unet');
     addSDXLLoRas(state, g, tiledMultidiffusionNode, modelNode, null, posCondNode, negCondNode);
 
-    const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
-
     g.upsertMetadata({
-      cfg_scale,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       positive_style_prompt: positiveStylePrompt,
       negative_style_prompt: negativeStylePrompt,
-      model: Graph.getModelMetadataField(modelConfig),
-      seed,
-      steps,
-      scheduler,
-      vae: vae ?? undefined,
     });
   } else {
     const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
@@ -168,23 +160,32 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     g.addEdge(modelNode, 'unet', tiledMultidiffusionNode, 'unet');
     addLoRAs(state, g, tiledMultidiffusionNode, modelNode, null, clipSkipNode, posCondNode, negCondNode);
 
-    const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
-    const upscaleModelConfig = await fetchModelConfigWithTypeGuard(upscaleModel.key, isSpandrelImageToImageModelConfig);
-
     g.upsertMetadata({
-      cfg_scale,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
-      model: Graph.getModelMetadataField(modelConfig),
-      seed,
-      steps,
-      scheduler,
-      vae: vae ?? undefined,
-      upscale_model: Graph.getModelMetadataField(upscaleModelConfig),
-      creativity,
-      structure,
     });
   }
+
+  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+  const upscaleModelConfig = await fetchModelConfigWithTypeGuard(upscaleModel.key, isSpandrelImageToImageModelConfig);
+
+  g.upsertMetadata({
+    cfg_scale,
+    model: Graph.getModelMetadataField(modelConfig),
+    seed,
+    steps,
+    scheduler,
+    vae: vae ?? undefined,
+    upscale_model: Graph.getModelMetadataField(upscaleModelConfig),
+    creativity,
+    structure,
+    upscale_initial_image: {
+      image_name: upscaleInitialImage.image_name,
+      width: upscaleInitialImage.width,
+      height: upscaleInitialImage.height,
+    },
+    upscale_scale: scale,
+  });
 
   g.setMetadataReceivingNode(l2iNode);
   g.addEdgeToMetadata(upscaleNode, 'width', 'width');

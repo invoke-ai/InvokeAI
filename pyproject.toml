@@ -74,7 +74,8 @@ dependencies = [
   "easing-functions",
   "einops",
   "facexlib",
-  "matplotlib",       # needed for plotting of Penner easing functions
+  # Exclude 3.9.1 which has a problem on windows, see https://github.com/matplotlib/matplotlib/issues/28551
+  "matplotlib!=3.9.1",
   "npyscreen",
   "omegaconf",
   "picklescan",
@@ -89,7 +90,6 @@ dependencies = [
   "rich~=13.3",
   "scikit-image~=0.21.0",
   "semver~=3.0.1",
-  "send2trash",
   "test-tube~=0.7.5",
   "windows-curses; sys_platform=='win32'",
 ]

@@ -62,6 +62,7 @@ from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetEx
 from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
 from invokeai.backend.stable_diffusion.extensions.inpaint import InpaintExt
 from invokeai.backend.stable_diffusion.extensions.inpaint_model import InpaintModelExt
+from invokeai.backend.stable_diffusion.extensions.lora import LoRAExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
@@ -845,6 +846,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
         if self.unet.freeu_config:
             ext_manager.add_extension(FreeUExt(self.unet.freeu_config))
 
+        ### lora
+        if self.unet.loras:
+            for lora_field in self.unet.loras:
+                ext_manager.add_extension(
+                    LoRAExt(
+                        node_context=context,
+                        model_id=lora_field.lora,
+                        weight=lora_field.weight,
+                    )
+                )
         ### seamless
         if self.unet.seamless_axes:
             ext_manager.add_extension(SeamlessExt(self.unet.seamless_axes))
@@ -964,14 +975,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
         assert isinstance(unet_info.model, UNet2DConditionModel)
         with (
             ExitStack() as exit_stack,
-            unet_info.model_on_device() as (model_state_dict, unet),
+            unet_info.model_on_device() as (cached_weights, unet),
             ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
             SeamlessExt.static_patch_model(unet, self.unet.seamless_axes),  # FIXME
             # Apply the LoRA after unet has been moved to its target device for faster patching.
             ModelPatcher.apply_lora_unet(
                 unet,
                 loras=_lora_loader(),
-                model_state_dict=model_state_dict,
+                cached_weights=cached_weights,
             ),
         ):
             assert isinstance(unet, UNet2DConditionModel)
