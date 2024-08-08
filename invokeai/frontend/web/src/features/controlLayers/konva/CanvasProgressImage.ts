@@ -77,7 +77,6 @@ export class CanvasProgressImage {
     try {
       this.imageElement = await loadImage(dataURL);
       if (this.konva.image) {
-        console.log('UPDATING PROGRESS IMAGE')
         this.konva.image.setAttrs({
           image: this.imageElement,
           x,
@@ -86,7 +85,6 @@ export class CanvasProgressImage {
           height,
         });
       } else {
-        console.log('CREATING NEW PROGRESS IMAGE')
         this.konva.image = new Konva.Image({
           name: CanvasProgressImage.IMAGE_NAME,
           listening: false,
