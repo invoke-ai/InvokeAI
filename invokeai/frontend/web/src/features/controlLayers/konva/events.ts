@@ -115,7 +115,7 @@ const getLastPointOfLastLineOfEntity = (
 };
 
 export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
-  const { stage, stateApi, getCurrentFill, getSelectedEntity } = manager;
+  const { stage, stateApi } = manager;
   const {
     getToolState,
     setTool,
@@ -130,6 +130,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     getSettings,
     setBrushWidth,
     setEraserWidth,
+    getCurrentFill,
+    getSelectedEntity,
   } = stateApi;
 
   function getIsPrimaryMouseDown(e: KonvaEventObject<MouseEvent>) {
