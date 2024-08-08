@@ -1,16 +1,16 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import QueueControls from 'features/queue/components/QueueControls';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { UpscaleSettingsAccordion } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleSettingsAccordion';
+import { StylePresetMenu } from 'features/stylePresets/components/StylePresetMenu';
+import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePresetMenuTrigger';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
-import { useAppSelector } from '../../../../app/store/storeHooks';
-import { StylePresetMenu } from '../../../stylePresets/components/StylePresetMenu';
-import { StylePresetMenuTrigger } from '../../../stylePresets/components/StylePresetMenuTrigger';
 
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',

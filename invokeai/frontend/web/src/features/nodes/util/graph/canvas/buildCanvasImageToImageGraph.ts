@@ -16,7 +16,11 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from 'features/nodes/util/graph/constants';
-import { getBoardField, getIsIntermediate, getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getBoardField,
+  getIsIntermediate,
+  getPresetModifiedPrompts,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ImageDTO, Invocation, NonNullableGraph } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 

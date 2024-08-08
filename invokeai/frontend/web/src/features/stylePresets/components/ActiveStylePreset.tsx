@@ -1,17 +1,20 @@
-import { Flex, IconButton, Text, Box, ButtonGroup } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { activeStylePresetChanged, viewModeChanged } from 'features/stylePresets/store/stylePresetSlice';
 import type { MouseEventHandler } from 'react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiEyeBold, PiStackSimpleBold, PiXBold } from 'react-icons/pi';
+
 import StylePresetImage from './StylePresetImage';
 
 export const ActiveStylePreset = () => {
   const { activeStylePreset, viewMode } = useAppSelector((s) => s.stylePreset);
 
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const { presetModifiedPositivePrompt, presetModifiedNegativePrompt } = usePresetModifiedPrompts();
 
@@ -47,7 +50,7 @@ export const ActiveStylePreset = () => {
     return (
       <Flex h="25px" alignItems="center">
         <Text fontSize="sm" fontWeight="semibold" color="base.300">
-          Choose Preset
+          {t('stylePresets.choosePromptTemplate')}
         </Text>
       </Flex>
     );

@@ -1,9 +1,9 @@
-import { Flex, Icon, Text, Tooltip, Box } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from '../../../../app/store/storeHooks';
+import { Box, Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { viewModeChanged } from 'features/stylePresets/store/stylePresetSlice';
+import { getViewModeChunks } from 'features/stylePresets/util/getViewModeChunks';
 import { useCallback, useMemo } from 'react';
-import { PiEyeBold, PiQuestionBold } from 'react-icons/pi';
-import { viewModeChanged } from '../../../stylePresets/store/stylePresetSlice';
-import { getViewModeChunks } from '../../../stylePresets/util/getViewModeChunks';
+import { PiEyeBold } from 'react-icons/pi';
 
 export const ViewModePrompt = ({
   presetPrompt,
@@ -51,11 +51,7 @@ export const ViewModePrompt = ({
 
       <Box position="absolute" top={0} right={0} backgroundColor="rgba(0,0,0,0.75)" padding="2px 5px">
         <Flex alignItems="center" gap="1">
-          <Tooltip
-            label={
-              'This is how your prompt will look with your currently selected preset. To edit your prompt, click anywhere in the text box.'
-            }
-          >
+          <Tooltip label="This is how your prompt will look with your currently selected preset. To edit your prompt, click anywhere in the text box.">
             <Flex>
               <Icon as={PiEyeBold} color="base.500" boxSize="12px" />
             </Flex>

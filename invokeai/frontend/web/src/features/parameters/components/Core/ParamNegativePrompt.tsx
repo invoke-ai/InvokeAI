@@ -2,12 +2,12 @@ import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { negativePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
+import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ViewModePrompt } from '../Prompts/ViewModePrompt';
 
 const DEFAULT_HEIGHT = 20;
 
@@ -42,7 +42,7 @@ export const ParamNegativePrompt = memo(() => {
 
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
-      <Box pos="relative">
+      <Box pos="relative" w="full">
         <Textarea
           id="negativePrompt"
           name="negativePrompt"

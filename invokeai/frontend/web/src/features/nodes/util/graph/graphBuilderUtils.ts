@@ -17,22 +17,29 @@ export const getBoardField = (state: RootState): BoardField | undefined => {
 /**
  * Gets the prompts, modified for the active style preset.
  */
-export const getPresetModifiedPrompts = (state: RootState): { positivePrompt: string; negativePrompt: string, positiveStylePrompt?: string; negativeStylePrompt?: string } => {
+export const getPresetModifiedPrompts = (
+  state: RootState
+): { positivePrompt: string; negativePrompt: string; positiveStylePrompt?: string; negativeStylePrompt?: string } => {
   const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } =
     state.controlLayers.present;
-  const { activeStylePreset } = state.stylePreset
+  const { activeStylePreset } = state.stylePreset;
 
   if (activeStylePreset) {
-    const presetModifiedPositivePrompt = buildPresetModifiedPrompt(activeStylePreset.preset_data.positive_prompt, positivePrompt)
+    const presetModifiedPositivePrompt = buildPresetModifiedPrompt(
+      activeStylePreset.preset_data.positive_prompt,
+      positivePrompt
+    );
 
-    const presetModifiedNegativePrompt = buildPresetModifiedPrompt(activeStylePreset.preset_data.negative_prompt, negativePrompt)
+    const presetModifiedNegativePrompt = buildPresetModifiedPrompt(
+      activeStylePreset.preset_data.negative_prompt,
+      negativePrompt
+    );
 
     return {
       positivePrompt: presetModifiedPositivePrompt,
       negativePrompt: presetModifiedNegativePrompt,
       positiveStylePrompt: shouldConcatPrompts ? presetModifiedPositivePrompt : positivePrompt2,
       negativeStylePrompt: shouldConcatPrompts ? presetModifiedNegativePrompt : negativePrompt2,
-
     };
   }
 

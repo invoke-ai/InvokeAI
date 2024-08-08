@@ -93,10 +93,10 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
   const vaeLoader =
     vae?.base === model.base
       ? g.addNode({
-        type: 'vae_loader',
-        id: VAE_LOADER,
-        vae_model: vae,
-      })
+          type: 'vae_loader',
+          id: VAE_LOADER,
+          vae_model: vae,
+        })
       : null;
 
   let imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'> = l2i;

@@ -7,6 +7,7 @@ import {
   updatingStylePresetIdChanged,
 } from 'features/stylePresets/store/stylePresetModalSlice';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
@@ -42,6 +43,7 @@ export const StylePresetMenu = () => {
   });
 
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleClickAddNew = useCallback(() => {
     dispatch(prefilledFormDataChanged(null));
@@ -67,13 +69,13 @@ export const StylePresetMenu = () => {
 
       {data.presets.length === 0 && data.defaultPresets.length === 0 && (
         <Text m="20px" textAlign="center">
-          No matching presets
+          {t('stylePrests.noMatchingTemplates')}
         </Text>
       )}
 
-      <StylePresetList title="My Presets" data={data.presets} />
+      <StylePresetList title={t('stylePresets.myTemplates')} data={data.presets} />
 
-      <StylePresetList title="Default Presets" data={data.defaultPresets} />
+      <StylePresetList title={t('stylePresets.defaultTemplates')} data={data.defaultPresets} />
     </Flex>
   );
 };

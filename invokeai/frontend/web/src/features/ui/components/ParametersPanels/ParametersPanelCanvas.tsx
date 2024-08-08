@@ -9,11 +9,11 @@ import { ControlSettingsAccordion } from 'features/settingsAccordions/components
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
+import { StylePresetMenu } from 'features/stylePresets/components/StylePresetMenu';
+import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePresetMenuTrigger';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
-import { StylePresetMenu } from '../../../stylePresets/components/StylePresetMenu';
-import { StylePresetMenuTrigger } from '../../../stylePresets/components/StylePresetMenuTrigger';
 
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',

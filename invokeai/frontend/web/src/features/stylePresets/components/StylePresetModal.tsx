@@ -10,17 +10,19 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { isModalOpenChanged, updatingStylePresetIdChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { StylePresetForm } from './StylePresetForm';
 
 export const StylePresetModal = () => {
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const isModalOpen = useAppSelector((s) => s.stylePresetModal.isModalOpen);
   const updatingStylePresetId = useAppSelector((s) => s.stylePresetModal.updatingStylePresetId);
 
   const modalTitle = useMemo(() => {
-    return updatingStylePresetId ? `Update Style Preset` : `Create Style Preset`;
-  }, [updatingStylePresetId]);
+    return updatingStylePresetId ? t('stylePresets.updatePromptTemplate') : t('stylePresets.createPromptTemplate');
+  }, [updatingStylePresetId, t]);
 
   const handleCloseModal = useCallback(() => {
     dispatch(updatingStylePresetIdChanged(null));

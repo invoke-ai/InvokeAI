@@ -1,4 +1,5 @@
 import { Flex, FormControl, FormLabel, IconButton, Textarea } from '@invoke-ai/ui-library';
+import { PRESET_PLACEHOLDER } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useRef } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
@@ -6,7 +7,6 @@ import { useController } from 'react-hook-form';
 import { PiBracketsCurlyBold } from 'react-icons/pi';
 
 import type { StylePresetFormData } from './StylePresetForm';
-import { PRESET_PLACEHOLDER } from '../hooks/usePresetModifiedPrompts';
 
 interface Props extends UseControllerProps<StylePresetFormData> {
   label: string;

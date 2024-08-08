@@ -2,7 +2,8 @@ import type { paths } from 'services/api/schema';
 
 import { api, buildV1Url, LIST_TAG } from '..';
 
-export type StylePresetRecordWithImage = paths['/api/v1/style_presets/i/{style_preset_id}']['get']['responses']['200']['content']['application/json']
+export type StylePresetRecordWithImage =
+  paths['/api/v1/style_presets/i/{style_preset_id}']['get']['responses']['200']['content']['application/json'];
 
 /**
  * Builds an endpoint URL for the style_presets router
@@ -60,7 +61,9 @@ export const stylePresetsApi = api.injectEndpoints({
     }),
     updateStylePreset: build.mutation<
       paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['responses']['200']['content']['application/json'],
-      paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['requestBody']['content']['multipart/form-data'] & { id: string }
+      paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['requestBody']['content']['multipart/form-data'] & {
+        id: string;
+      }
     >({
       query: ({ id, name, positive_prompt, negative_prompt, image }) => {
         const formData = new FormData();
@@ -72,12 +75,11 @@ export const stylePresetsApi = api.injectEndpoints({
         formData.append('positive_prompt', positive_prompt);
         formData.append('negative_prompt', negative_prompt);
 
-
         return {
           url: buildStylePresetsUrl(`i/${id}`),
           method: 'PATCH',
-          body: formData
-        }
+          body: formData,
+        };
       },
       invalidatesTags: (response, error, { id }) => [
         { type: 'StylePreset', id: LIST_TAG },

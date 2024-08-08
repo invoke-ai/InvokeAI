@@ -6,7 +6,6 @@ import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { useDownloadImage } from 'common/hooks/useDownloadImage';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
-import { isModalOpenChanged as isStylePresetModalOpenChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
@@ -41,8 +40,6 @@ import {
 } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { isMenuOpenChanged } from '../../../stylePresets/store/stylePresetSlice';
-import { createPresetFromImageChanged } from '../../../stylePresets/store/stylePresetModalSlice';
 
 type SingleSelectionMenuItemsProps = {
   imageDTO: ImageDTO;
@@ -200,7 +197,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         onClickCapture={createAsPreset}
         isDisabled={isLoadingMetadata || !hasPrompts}
       >
-        Create Preset
+        {t('stylePresets.useForTemplate')}
       </MenuItem>
       <MenuDivider />
       <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToImageToImage} id="send-to-img2img">

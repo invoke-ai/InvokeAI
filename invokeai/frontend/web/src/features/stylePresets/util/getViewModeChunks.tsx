@@ -1,4 +1,4 @@
-import { PRESET_PLACEHOLDER } from '../hooks/usePresetModifiedPrompts';
+import { PRESET_PLACEHOLDER } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 
 export const getViewModeChunks = (currentPrompt: string, presetPrompt?: string) => {
   if (!presetPrompt || !presetPrompt.length) {

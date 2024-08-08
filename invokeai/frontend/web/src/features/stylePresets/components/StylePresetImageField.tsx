@@ -1,13 +1,16 @@
-import { Tooltip, Flex, Button, Icon, Box, Image, IconButton } from '@invoke-ai/ui-library';
-import { t } from 'i18next';
-import { useCallback, useState } from 'react';
+import { Box, Button, Flex, Icon, IconButton, Image, Tooltip } from '@invoke-ai/ui-library';
+import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
+import type { UseControllerProps } from 'react-hook-form';
+import { useController } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi';
-import { useController, UseControllerProps } from 'react-hook-form';
-import { StylePresetFormData } from './StylePresetForm';
+
+import type { StylePresetFormData } from './StylePresetForm';
 
 export const StylePresetImageField = (props: UseControllerProps<StylePresetFormData>) => {
   const { field } = useController(props);
+  const { t } = useTranslation();
   const onDropAccepted = useCallback(
     (files: File[]) => {
       const file = files[0];
@@ -15,12 +18,12 @@ export const StylePresetImageField = (props: UseControllerProps<StylePresetFormD
         field.onChange(file);
       }
     },
-    [field, t]
+    [field]
   );
 
   const handleResetImage = useCallback(() => {
     field.onChange(null);
-  }, []);
+  }, [field]);
 
   const { getInputProps, getRootProps } = useDropzone({
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },
@@ -46,8 +49,8 @@ export const StylePresetImageField = (props: UseControllerProps<StylePresetFormD
           insetInlineEnd={0}
           insetBlockStart={0}
           onClick={handleResetImage}
-          aria-label={t('modelManager.deleteModelImage')}
-          tooltip={t('modelManager.deleteModelImage')}
+          aria-label={t('stylePresets.deleteImage')}
+          tooltip={t('stylePresets.deleteImage')}
           icon={<PiArrowCounterClockwiseBold />}
           size="md"
           variant="ghost"
@@ -58,7 +61,7 @@ export const StylePresetImageField = (props: UseControllerProps<StylePresetFormD
 
   return (
     <>
-      <Tooltip label={t('modelManager.uploadImage')}>
+      <Tooltip label={t('stylePresets.uploadImage')}>
         <Flex
           as={Button}
           w={65}

@@ -72,7 +72,7 @@ const allReducers = {
   [api.reducerPath]: api.reducer,
   [upscaleSlice.name]: upscaleSlice.reducer,
   [stylePresetModalSlice.name]: stylePresetModalSlice.reducer,
-  [stylePresetSlice.name]: stylePresetSlice.reducer
+  [stylePresetSlice.name]: stylePresetSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);

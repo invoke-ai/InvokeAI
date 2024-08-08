@@ -98,7 +98,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   let modelNode;
 
   if (model.base === 'sdxl') {
-    const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
+    const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } =
+      getPresetModifiedPrompts(state);
 
     posCondNode = g.addNode({
       type: 'sdxl_compel_prompt',

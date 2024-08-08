@@ -1,18 +1,21 @@
 import { Badge, ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
-import type { MouseEvent } from 'react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useImageUrlToBlob } from 'common/hooks/useImageUrlToBlob';
 import {
   isModalOpenChanged,
   prefilledFormDataChanged,
   updatingStylePresetIdChanged,
 } from 'features/stylePresets/store/stylePresetModalSlice';
 import { activeStylePresetChanged, isMenuOpenChanged } from 'features/stylePresets/store/stylePresetSlice';
+import { toast } from 'features/toast/toast';
+import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiPencilBold, PiTrashBold } from 'react-icons/pi';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useDeleteStylePresetMutation } from 'services/api/endpoints/stylePresets';
+
 import StylePresetImage from './StylePresetImage';
-import { useImageUrlToBlob } from 'common/hooks/useImageUrlToBlob';
 
 export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithImage }) => {
   const dispatch = useAppDispatch();
@@ -20,6 +23,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
   const activeStylePreset = useAppSelector((s) => s.stylePreset.activeStylePreset);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const imageUrlToBlob = useImageUrlToBlob();
+  const { t } = useTranslation();
 
   const handleClickEdit = useCallback(
     async (e: MouseEvent<HTMLButtonElement>) => {
@@ -43,7 +47,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
       dispatch(updatingStylePresetIdChanged(preset.id));
       dispatch(isModalOpenChanged(true));
     },
-    [dispatch, preset]
+    [dispatch, preset, imageUrlToBlob]
   );
 
   const handleClickApply = useCallback(async () => {
@@ -56,14 +60,23 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
       e.stopPropagation();
       onOpen();
     },
-    [dispatch, preset]
+    [onOpen]
   );
 
   const handleDeletePreset = useCallback(async () => {
     try {
       await deleteStylePreset(preset.id);
-    } catch (error) {}
-  }, [preset]);
+      toast({
+        status: 'success',
+        title: t('stylePresets.templateDeleted'),
+      });
+    } catch (error) {
+      toast({
+        status: 'error',
+        title: t('stylePresets.unableToDeleteTemplate'),
+      });
+    }
+  }, [preset, t, deleteStylePreset]);
 
   return (
     <>
@@ -92,7 +105,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
                   bg="transparent"
                   flexShrink={0}
                 >
-                  Active
+                  {t('stylePresets.active')}
                 </Badge>
               )}
             </Flex>
@@ -101,14 +114,14 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
               <IconButton
                 size="sm"
                 variant="ghost"
-                aria-label="Edit"
+                aria-label={t('stylePresets.editTemplate')}
                 onClick={handleClickEdit}
                 icon={<PiPencilBold />}
               />
               <IconButton
                 size="sm"
                 variant="ghost"
-                aria-label="Delete"
+                aria-label={t('stylePresets.deleteTemplate')}
                 onClick={handleClickDelete}
                 colorScheme="error"
                 icon={<PiTrashBold />}
@@ -116,16 +129,16 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
             </Flex>
           </Flex>
 
-          <Flex flexDir="column">
+          <Flex flexDir="column" gap="1">
             <Text fontSize="xs">
               <Text as="span" fontWeight="semibold">
-                Positive prompt:
+                {t('stylePresets.positivePrompt')}:
               </Text>{' '}
               {preset.preset_data.positive_prompt}
             </Text>
             <Text fontSize="xs">
               <Text as="span" fontWeight="semibold">
-                Negative prompt:
+                {t('stylePresets.negativePrompt')}:
               </Text>{' '}
               {preset.preset_data.negative_prompt}
             </Text>
@@ -135,12 +148,11 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
       <ConfirmationAlertDialog
         isOpen={isOpen}
         onClose={onClose}
-        title={'Delete preset'}
+        title={t('stylePresets.deleteTemplate')}
         acceptCallback={handleDeletePreset}
-        acceptButtonText={'Delete'}
+        acceptButtonText="Delete"
       >
-        <p>{'Delete Preset?'}</p>
-        <br />
+        <p>{t('stylePresets.deleteTemplate2')}</p>
       </ConfirmationAlertDialog>
     </>
   );

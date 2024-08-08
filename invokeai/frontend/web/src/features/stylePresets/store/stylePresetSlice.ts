@@ -5,34 +5,33 @@ import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePre
 
 import type { StylePresetState } from './types';
 
-
 export const initialState: StylePresetState = {
-    isMenuOpen: false,
-    activeStylePreset: null,
-    searchTerm: "",
-    viewMode: false
+  isMenuOpen: false,
+  activeStylePreset: null,
+  searchTerm: '',
+  viewMode: false,
 };
 
-
 export const stylePresetSlice = createSlice({
-    name: 'stylePreset',
-    initialState: initialState,
-    reducers: {
-        isMenuOpenChanged: (state, action: PayloadAction<boolean>) => {
-            state.isMenuOpen = action.payload;
-        },
-        activeStylePresetChanged: (state, action: PayloadAction<StylePresetRecordWithImage | null>) => {
-            state.activeStylePreset = action.payload;
-        },
-        searchTermChanged: (state, action: PayloadAction<string>) => {
-            state.searchTerm = action.payload;
-        },
-        viewModeChanged: (state, action: PayloadAction<boolean>) => {
-            state.viewMode = action.payload;
-        },
+  name: 'stylePreset',
+  initialState: initialState,
+  reducers: {
+    isMenuOpenChanged: (state, action: PayloadAction<boolean>) => {
+      state.isMenuOpen = action.payload;
     },
+    activeStylePresetChanged: (state, action: PayloadAction<StylePresetRecordWithImage | null>) => {
+      state.activeStylePreset = action.payload;
+    },
+    searchTermChanged: (state, action: PayloadAction<string>) => {
+      state.searchTerm = action.payload;
+    },
+    viewModeChanged: (state, action: PayloadAction<boolean>) => {
+      state.viewMode = action.payload;
+    },
+  },
 });
 
-export const { isMenuOpenChanged, activeStylePresetChanged, searchTermChanged, viewModeChanged } = stylePresetSlice.actions;
+export const { isMenuOpenChanged, activeStylePresetChanged, searchTermChanged, viewModeChanged } =
+  stylePresetSlice.actions;
 
 export const selectStylePresetSlice = (state: RootState) => state.stylePreset;

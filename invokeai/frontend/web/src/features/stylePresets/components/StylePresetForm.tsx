@@ -1,15 +1,15 @@
-import { Button, Flex, FormControl, FormLabel, Icon, Input, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, FormControl, FormLabel, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { isModalOpenChanged, updatingStylePresetIdChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
-import { PiBracketsCurlyBold } from 'react-icons/pi';
+import { useTranslation } from 'react-i18next';
 import { useCreateStylePresetMutation, useUpdateStylePresetMutation } from 'services/api/endpoints/stylePresets';
 
-import { StylePresetPromptField } from './StylePresetPromptField';
 import { StylePresetImageField } from './StylePresetImageField';
+import { StylePresetPromptField } from './StylePresetPromptField';
 
 export type StylePresetFormData = {
   name: string;
@@ -22,10 +22,11 @@ export const StylePresetForm = ({ updatingStylePresetId }: { updatingStylePreset
   const [createStylePreset] = useCreateStylePresetMutation();
   const [updateStylePreset] = useUpdateStylePresetMutation();
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const defaultValues = useAppSelector((s) => s.stylePresetModal.prefilledFormData);
 
-  const { handleSubmit, control, formState, reset, register } = useForm<StylePresetFormData>({
+  const { handleSubmit, control, register } = useForm<StylePresetFormData>({
     defaultValues: defaultValues || {
       name: '',
       positivePrompt: '',
@@ -70,19 +71,18 @@ export const StylePresetForm = ({ updatingStylePresetId }: { updatingStylePreset
       <Flex alignItems="center" gap="4">
         <StylePresetImageField control={control} name="image" />
         <FormControl orientation="vertical">
-          <FormLabel>Name</FormLabel>
+          <FormLabel>{t('stylePresets.name')}</FormLabel>
           <Input size="md" {...register('name')} />
         </FormControl>
       </Flex>
 
       <StylePresetPromptField label="Positive Prompt" control={control} name="positivePrompt" />
       <StylePresetPromptField label="Negative Prompt" control={control} name="negativePrompt" />
-      <Text variant="subtext">
-        Use the <Icon as={PiBracketsCurlyBold} /> button to specify where your manual prompt should be included in the
-        template. If you do not provide one, the template will be appended to your prompt.
-      </Text>
+      <Text variant="subtext">{t('stylePresets.placeholderDirections')}</Text>
 
-      <Button onClick={handleSubmit(handleClickSave)}>Save</Button>
+      <Flex justifyContent="flex-end">
+        <Button onClick={handleSubmit(handleClickSave)}>{t('common.save')}</Button>
+      </Flex>
     </Flex>
   );
 };
