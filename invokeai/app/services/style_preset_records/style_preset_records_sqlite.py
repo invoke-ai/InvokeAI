@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
@@ -160,7 +161,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
                     for preset in presets:
                         style_preset = StylePresetWithoutId(is_default=True, **preset)
                         self.create(style_preset)
-            except Exception as e:
+            except Exception:
                 raise Exception()
 
             self._conn.commit()
