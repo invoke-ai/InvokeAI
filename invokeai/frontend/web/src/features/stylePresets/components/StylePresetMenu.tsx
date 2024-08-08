@@ -69,7 +69,7 @@ export const StylePresetMenu = () => {
 
       {data.presets.length === 0 && data.defaultPresets.length === 0 && (
         <Text m="20px" textAlign="center">
-          {t('stylePrests.noMatchingTemplates')}
+          {t('stylePresets.noMatchingTemplates')}
         </Text>
       )}
 

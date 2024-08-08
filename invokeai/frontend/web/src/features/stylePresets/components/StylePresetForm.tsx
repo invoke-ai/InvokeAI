@@ -26,13 +26,14 @@ export const StylePresetForm = ({ updatingStylePresetId }: { updatingStylePreset
 
   const defaultValues = useAppSelector((s) => s.stylePresetModal.prefilledFormData);
 
-  const { handleSubmit, control, register } = useForm<StylePresetFormData>({
+  const { handleSubmit, control, register, formState } = useForm<StylePresetFormData>({
     defaultValues: defaultValues || {
       name: '',
       positivePrompt: '',
       negativePrompt: '',
       image: null,
     },
+    mode: 'onChange',
   });
 
   const handleClickSave = useCallback<SubmitHandler<StylePresetFormData>>(
@@ -72,7 +73,7 @@ export const StylePresetForm = ({ updatingStylePresetId }: { updatingStylePreset
         <StylePresetImageField control={control} name="image" />
         <FormControl orientation="vertical">
           <FormLabel>{t('stylePresets.name')}</FormLabel>
-          <Input size="md" {...register('name')} />
+          <Input size="md" {...register('name', { required: true, minLength: 1 })} required={true} />
         </FormControl>
       </Flex>
 
@@ -81,7 +82,9 @@ export const StylePresetForm = ({ updatingStylePresetId }: { updatingStylePreset
       <Text variant="subtext">{t('stylePresets.placeholderDirections')}</Text>
 
       <Flex justifyContent="flex-end">
-        <Button onClick={handleSubmit(handleClickSave)}>{t('common.save')}</Button>
+        <Button onClick={handleSubmit(handleClickSave)} isDisabled={!formState.isValid}>
+          {t('common.save')}
+        </Button>
       </Flex>
     </Flex>
   );
