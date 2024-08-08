@@ -5,9 +5,10 @@ import { parseify } from 'common/util/serialize';
 import {
   caImageChanged,
   ipaImageChanged,
-  layerAddedFromImage,
+  layerAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
+import type { CanvasLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
@@ -106,7 +107,13 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        dispatch(layerAddedFromImage({ imageObject: imageDTOToImageObject(activeData.payload.imageDTO) }));
+        const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
+        const { x, y } = getState().canvasV2.bbox.rect;
+        const overrides: Partial<CanvasLayerState> = {
+          objects: [imageObject],
+          position: { x, y },
+        };
+        dispatch(layerAdded({ overrides, isSelected: true }));
         return;
       }
 
