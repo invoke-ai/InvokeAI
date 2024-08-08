@@ -72,8 +72,8 @@ export class CanvasProgressImage {
 
     this.isLoading = true;
 
-    const { x, y } = this.manager.stateApi.getBbox().rect;
-    const { dataURL, width, height } = this.lastProgressEvent.progress_image;
+    const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
+    const { dataURL } = this.lastProgressEvent.progress_image;
     try {
       this.imageElement = await loadImage(dataURL);
       if (this.konva.image) {
