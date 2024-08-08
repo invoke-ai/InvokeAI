@@ -112,8 +112,6 @@ class ControlNetExt(ExtensionBase):
             ctx.unet_kwargs.mid_block_additional_residual += mid_sample
 
     def _run(self, ctx: DenoiseContext, soft_injection: bool, conditioning_mode: ConditioningMode):
-        total_steps = len(ctx.inputs.timesteps)
-
         model_input = ctx.latent_model_input
         image_tensor = self._image_tensor
         if conditioning_mode == ConditioningMode.Both:
@@ -124,9 +122,6 @@ class ControlNetExt(ExtensionBase):
             sample=model_input,
             timestep=ctx.timestep,
             encoder_hidden_states=None,  # set later by conditioning
-            cross_attention_kwargs=dict(  # noqa: C408
-                percent_through=ctx.step_index / total_steps,
-            ),
         )
 
         ctx.inputs.conditioning_data.to_unet_kwargs(cn_unet_kwargs, conditioning_mode=conditioning_mode)

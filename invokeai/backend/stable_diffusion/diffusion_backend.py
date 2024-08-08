@@ -114,9 +114,6 @@ class StableDiffusionBackend:
             sample=sample,
             timestep=ctx.timestep,
             encoder_hidden_states=None,  # set later by conditoning
-            cross_attention_kwargs=dict(  # noqa: C408
-                percent_through=ctx.step_index / len(ctx.inputs.timesteps),
-            ),
         )
 
         ctx.conditioning_mode = conditioning_mode

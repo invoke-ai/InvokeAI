@@ -335,7 +335,6 @@ class InvokeAIDiffuserComponent:
             cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(
                 regions=regions, device=x.device, dtype=x.dtype
             )
-            cross_attention_kwargs["percent_through"] = step_index / total_step_count
 
         both_conditionings, encoder_attention_mask = self._concat_conditionings_for_batch(
             conditioning_data.uncond_text.embeds, conditioning_data.cond_text.embeds
@@ -426,7 +425,6 @@ class InvokeAIDiffuserComponent:
             cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(
                 regions=[conditioning_data.uncond_regions], device=x.device, dtype=x.dtype
             )
-            cross_attention_kwargs["percent_through"] = step_index / total_step_count
 
         # Run unconditioned UNet denoising (i.e. negative prompt).
         unconditioned_next_x = self.model_forward_callback(
@@ -474,7 +472,6 @@ class InvokeAIDiffuserComponent:
             cross_attention_kwargs["regional_prompt_data"] = RegionalPromptData(
                 regions=[conditioning_data.cond_regions], device=x.device, dtype=x.dtype
             )
-            cross_attention_kwargs["percent_through"] = step_index / total_step_count
 
         # Run conditioned UNet denoising (i.e. positive prompt).
         conditioned_next_x = self.model_forward_callback(
