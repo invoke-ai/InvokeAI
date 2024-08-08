@@ -2,7 +2,7 @@ import io
 import traceback
 from typing import Optional
 
-from fastapi import APIRouter, Body, File, Form, HTTPException, Path, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Path, UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image
 

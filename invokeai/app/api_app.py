@@ -30,9 +30,9 @@ from invokeai.app.api.routers import (
     images,
     model_manager,
     session_queue,
+    style_presets,
     utilities,
     workflows,
-    style_presets,
 )
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.config.config_default import get_config

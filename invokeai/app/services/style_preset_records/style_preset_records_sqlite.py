@@ -1,9 +1,5 @@
-from pathlib import Path
-from typing import Optional
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_common import (

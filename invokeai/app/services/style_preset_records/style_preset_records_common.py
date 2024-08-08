@@ -1,9 +1,6 @@
-from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, field_validator
-
-from invokeai.app.util.metaenum import MetaEnum
+from pydantic import BaseModel, Field, TypeAdapter
 
 
 class StylePresetNotFoundError(Exception):
