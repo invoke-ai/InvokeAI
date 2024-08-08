@@ -411,7 +411,6 @@ export const {
   bboxSizeOptimized,
   // layers
   layerAdded,
-  layerAddedFromImage,
   layerRecalled,
   layerOpacityChanged,
   layerAllDeleted,
