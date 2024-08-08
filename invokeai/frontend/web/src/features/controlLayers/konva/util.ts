@@ -374,3 +374,17 @@ export function getObjectId(type: CanvasObjectState['type'], isBuffer?: boolean)
 export const getEmptyRect = (): Rect => {
   return { x: 0, y: 0, width: 0, height: 0 };
 };
+export function snapToNearest(value: number, candidateValues: number[], threshold: number): number {
+  let closest = value;
+  let minDiff = Number.MAX_VALUE;
+
+  for (const candidate of candidateValues) {
+    const diff = Math.abs(value - candidate);
+    if (diff < minDiff && diff <= threshold) {
+      minDiff = diff;
+      closest = candidate;
+    }
+  }
+
+  return closest;
+}

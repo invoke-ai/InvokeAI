@@ -42,6 +42,11 @@ export class CanvasTool {
     };
   };
 
+  /**
+   * A set of subscriptions that should be cleaned up when the transformer is destroyed.
+   */
+  subscriptions: Set<() => void> = new Set();
+
   constructor(manager: CanvasManager) {
     this.manager = manager;
     this.konva = {
@@ -102,7 +107,26 @@ export class CanvasTool {
     this.konva.eraser.group.add(this.konva.eraser.innerBorderCircle);
     this.konva.eraser.group.add(this.konva.eraser.outerBorderCircle);
     this.konva.group.add(this.konva.eraser.group);
+
+    this.subscriptions.add(
+      this.manager.stateApi.$stageAttrs.listen(() => {
+        this.render();
+      })
+    );
+
+    this.subscriptions.add(
+      this.manager.toolState.subscribe(() => {
+        this.render();
+      })
+    );
   }
+
+  destroy = () => {
+    for (const cleanup of this.subscriptions) {
+      cleanup();
+    }
+    this.konva.group.destroy();
+  };
 
   scaleTool = () => {
     const toolState = this.manager.stateApi.getToolState();

@@ -14,9 +14,19 @@ export class CanvasBackground {
     layer: Konva.Layer;
   };
 
+  /**
+   * A set of subscriptions that should be cleaned up when the transformer is destroyed.
+   */
+  subscriptions: Set<() => void> = new Set();
+
   constructor(manager: CanvasManager) {
     this.manager = manager;
     this.konva = { layer: new Konva.Layer({ name: CanvasBackground.LAYER_NAME, listening: false }) };
+    this.subscriptions.add(
+      this.manager.stateApi.$stageAttrs.listen(() => {
+        this.render();
+      })
+    );
   }
 
   render() {
@@ -93,6 +103,13 @@ export class CanvasBackground {
       );
     }
   }
+
+  destroy = () => {
+    for (const cleanup of this.subscriptions) {
+      cleanup();
+    }
+    this.konva.layer.destroy();
+  };
 
   /**
    * Gets the grid spacing. The value depends on the stage scale - at higher scales, the grid spacing is smaller.
