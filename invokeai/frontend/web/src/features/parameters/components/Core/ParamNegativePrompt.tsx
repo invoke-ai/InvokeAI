@@ -7,10 +7,15 @@ import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ViewModePrompt } from '../Prompts/ViewModePrompt';
+
+const DEFAULT_HEIGHT = 20;
 
 export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
   const prompt = useAppSelector((s) => s.controlLayers.present.negativePrompt);
+  const viewMode = useAppSelector((s) => s.stylePreset.viewMode);
+  const activeStylePreset = useAppSelector((s) => s.stylePreset.activeStylePreset);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
@@ -24,6 +29,16 @@ export const ParamNegativePrompt = memo(() => {
     textareaRef,
     onChange: _onChange,
   });
+
+  if (viewMode) {
+    return (
+      <ViewModePrompt
+        prompt={prompt}
+        presetPrompt={activeStylePreset?.preset_data.negative_prompt || ''}
+        height={DEFAULT_HEIGHT}
+      />
+    );
+  }
 
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
@@ -39,6 +54,7 @@ export const ParamNegativePrompt = memo(() => {
           fontSize="sm"
           variant="darkFilled"
           paddingRight={30}
+          minH={DEFAULT_HEIGHT}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />

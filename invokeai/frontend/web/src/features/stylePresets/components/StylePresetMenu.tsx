@@ -1,7 +1,11 @@
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/stylePresetModalSlice';
+import {
+  isModalOpenChanged,
+  prefilledFormDataChanged,
+  updatingStylePresetIdChanged,
+} from 'features/stylePresets/store/stylePresetModalSlice';
 import { useCallback } from 'react';
 import { PiPlusBold } from 'react-icons/pi';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
@@ -40,12 +44,13 @@ export const StylePresetMenu = () => {
   const dispatch = useAppDispatch();
 
   const handleClickAddNew = useCallback(() => {
-    dispatch(updatingStylePresetChanged(null));
+    dispatch(prefilledFormDataChanged(null));
+    dispatch(updatingStylePresetIdChanged(null));
     dispatch(isModalOpenChanged(true));
   }, [dispatch]);
 
   return (
-    <Flex flexDir="column" gap="2" padding="10px">
+    <Flex flexDir="column" gap="2" padding="10px" layerStyle="second">
       <Flex alignItems="center" gap="10" w="full" justifyContent="space-between">
         <StylePresetSearch />
         <IconButton

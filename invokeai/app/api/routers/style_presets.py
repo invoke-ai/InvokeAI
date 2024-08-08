@@ -47,11 +47,11 @@ async def get_style_preset(
     },
 )
 async def update_style_preset(
+    image: Optional[UploadFile] = File(description="The image file to upload", default=None),
     style_preset_id: str = Path(description="The id of the style preset to update"),
     name: str = Form(description="The name of the style preset to create"),
     positive_prompt: str = Form(description="The positive prompt of the style preset"),
     negative_prompt: str = Form(description="The negative prompt of the style preset"),
-    image: Optional[UploadFile] = File(description="The image file to upload", default=None),
 ) -> StylePresetRecordWithImage:
     """Updates a style preset"""
     if image is not None:
@@ -73,8 +73,8 @@ async def update_style_preset(
     else:
         try:
             ApiDependencies.invoker.services.style_preset_images_service.delete(style_preset_id)
-        except ValueError as e:
-            raise HTTPException(status_code=409, detail=str(e))
+        except StylePresetImageFileNotFoundException:
+            pass
 
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
     changes = StylePresetChanges(name=name, preset_data=preset_data)

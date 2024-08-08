@@ -1,13 +1,11 @@
 import { Button, Flex, FormControl, FormLabel, Icon, Input, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { useStylePresetFields } from 'features/stylePresets/hooks/useStylePresetFields';
-import { isModalOpenChanged, updatingStylePresetChanged } from 'features/stylePresets/store/stylePresetModalSlice';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { isModalOpenChanged, updatingStylePresetIdChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { PiBracketsCurlyBold } from 'react-icons/pi';
-import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useCreateStylePresetMutation, useUpdateStylePresetMutation } from 'services/api/endpoints/stylePresets';
 
 import { StylePresetPromptField } from './StylePresetPromptField';
@@ -20,15 +18,20 @@ export type StylePresetFormData = {
   image: File | null;
 };
 
-export const StylePresetForm = ({ updatingPreset }: { updatingPreset: StylePresetRecordWithImage | null }) => {
+export const StylePresetForm = ({ updatingStylePresetId }: { updatingStylePresetId: string | null }) => {
   const [createStylePreset] = useCreateStylePresetMutation();
   const [updateStylePreset] = useUpdateStylePresetMutation();
   const dispatch = useAppDispatch();
 
-  const stylePresetFieldDefaults = useStylePresetFields(updatingPreset);
+  const defaultValues = useAppSelector((s) => s.stylePresetModal.prefilledFormData);
 
   const { handleSubmit, control, formState, reset, register } = useForm<StylePresetFormData>({
-    defaultValues: stylePresetFieldDefaults,
+    defaultValues: defaultValues || {
+      name: '',
+      positivePrompt: '',
+      negativePrompt: '',
+      image: null,
+    },
   });
 
   const handleClickSave = useCallback<SubmitHandler<StylePresetFormData>>(
@@ -41,9 +44,9 @@ export const StylePresetForm = ({ updatingPreset }: { updatingPreset: StylePrese
       };
 
       try {
-        if (updatingPreset) {
+        if (updatingStylePresetId) {
           await updateStylePreset({
-            id: updatingPreset.id,
+            id: updatingStylePresetId,
             ...payload,
           }).unwrap();
         } else {
@@ -56,10 +59,10 @@ export const StylePresetForm = ({ updatingPreset }: { updatingPreset: StylePrese
         });
       }
 
-      dispatch(updatingStylePresetChanged(null));
+      dispatch(updatingStylePresetIdChanged(null));
       dispatch(isModalOpenChanged(false));
     },
-    [dispatch, updatingPreset, updateStylePreset, createStylePreset]
+    [dispatch, updatingStylePresetId, updateStylePreset, createStylePreset]
   );
 
   return (

@@ -9,7 +9,8 @@ import type { StylePresetState } from './types';
 export const initialState: StylePresetState = {
     isMenuOpen: false,
     activeStylePreset: null,
-    searchTerm: ""
+    searchTerm: "",
+    viewMode: false
 };
 
 
@@ -26,9 +27,12 @@ export const stylePresetSlice = createSlice({
         searchTermChanged: (state, action: PayloadAction<string>) => {
             state.searchTerm = action.payload;
         },
+        viewModeChanged: (state, action: PayloadAction<boolean>) => {
+            state.viewMode = action.payload;
+        },
     },
 });
 
-export const { isMenuOpenChanged, activeStylePresetChanged, searchTermChanged } = stylePresetSlice.actions;
+export const { isMenuOpenChanged, activeStylePresetChanged, searchTermChanged, viewModeChanged } = stylePresetSlice.actions;
 
 export const selectStylePresetSlice = (state: RootState) => state.stylePreset;

@@ -1,5 +1,5 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Box, Flex, Portal, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
@@ -69,22 +69,13 @@ const ParametersPanelTextToImage = () => {
       <StylePresetMenuTrigger />
       <Flex w="full" h="full" position="relative">
         <Box position="absolute" top={0} left={0} right={0} bottom={0} ref={ref}>
-          <Portal containerRef={ref}>
-            {isMenuOpen && (
-              <Box position="absolute" top={0} left={0} right={0} bottom={0} layerStyle="second">
-                <OverlayScrollbarsComponent
-                  defer
-                  style={overlayScrollbarsStyles}
-                  options={overlayScrollbarsParams.options}
-                >
-                  <Flex gap={2} flexDirection="column" h="full" w="full">
-                    <StylePresetMenu />
-                  </Flex>
-                </OverlayScrollbarsComponent>
-              </Box>
-            )}
-          </Portal>
-          {!isMenuOpen && (
+          {isMenuOpen ? (
+            <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
+              <Flex gap={2} flexDirection="column" h="full" w="full">
+                <StylePresetMenu />
+              </Flex>
+            </OverlayScrollbarsComponent>
+          ) : (
             <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
               <Flex gap={2} flexDirection="column" h="full" w="full">
                 <Prompts />

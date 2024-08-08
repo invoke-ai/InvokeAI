@@ -1,16 +1,15 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 
-import type { StylePresetModalState, StylePresetPrefillOptions } from './types';
-import { ImageDTO } from '../../../services/api/types';
+import type { StylePresetModalState } from './types';
+import { StylePresetFormData } from '../components/StylePresetForm';
 
 
 export const initialState: StylePresetModalState = {
     isModalOpen: false,
-    updatingStylePreset: null,
-    createPresetFromImage: null
+    updatingStylePresetId: null,
+    prefilledFormData: null
 };
 
 
@@ -21,15 +20,15 @@ export const stylePresetModalSlice = createSlice({
         isModalOpenChanged: (state, action: PayloadAction<boolean>) => {
             state.isModalOpen = action.payload;
         },
-        updatingStylePresetChanged: (state, action: PayloadAction<StylePresetRecordWithImage | null>) => {
-            state.updatingStylePreset = action.payload;
+        updatingStylePresetIdChanged: (state, action: PayloadAction<string | null>) => {
+            state.updatingStylePresetId = action.payload;
         },
-        createPresetFromImageChanged: (state, action: PayloadAction<ImageDTO | null>) => {
-            state.createPresetFromImage = action.payload;
+        prefilledFormDataChanged: (state, action: PayloadAction<StylePresetFormData | null>) => {
+            state.prefilledFormData = action.payload;
         },
     },
 });
 
-export const { isModalOpenChanged, updatingStylePresetChanged, createPresetFromImageChanged } = stylePresetModalSlice.actions;
+export const { isModalOpenChanged, updatingStylePresetIdChanged, prefilledFormDataChanged } = stylePresetModalSlice.actions;
 
 export const selectStylePresetModalSlice = (state: RootState) => state.stylePresetModal;

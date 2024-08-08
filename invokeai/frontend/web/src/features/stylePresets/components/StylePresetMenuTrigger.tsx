@@ -8,6 +8,7 @@ import { ActiveStylePreset } from './ActiveStylePreset';
 
 export const StylePresetMenuTrigger = () => {
   const isMenuOpen = useAppSelector((s) => s.stylePreset.isMenuOpen);
+  const activeStylePreset = useAppSelector((s) => s.stylePreset.activeStylePreset);
   const dispatch = useAppDispatch();
 
   const handleToggle = useCallback(() => {
@@ -16,7 +17,7 @@ export const StylePresetMenuTrigger = () => {
 
   return (
     <Flex
-      as="button"
+      // as="button"
       onClick={handleToggle}
       backgroundColor="base.800"
       justifyContent="space-between"
@@ -24,6 +25,8 @@ export const StylePresetMenuTrigger = () => {
       padding="5px 10px"
       borderRadius="base"
       gap="2"
+      borderTop="2px solid transparent"
+      borderColor={activeStylePreset ? 'invokeBlue.200' : 'transparent'}
     >
       <ActiveStylePreset />
 

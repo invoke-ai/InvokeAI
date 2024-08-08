@@ -8,6 +8,9 @@ import { UpscaleSettingsAccordion } from 'features/settingsAccordions/components
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
+import { useAppSelector } from '../../../../app/store/storeHooks';
+import { StylePresetMenu } from '../../../stylePresets/components/StylePresetMenu';
+import { StylePresetMenuTrigger } from '../../../stylePresets/components/StylePresetMenuTrigger';
 
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',
@@ -15,19 +18,29 @@ const overlayScrollbarsStyles: CSSProperties = {
 };
 
 const ParametersPanelUpscale = () => {
+  const isMenuOpen = useAppSelector((s) => s.stylePreset.isMenuOpen);
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
       <QueueControls />
+      <StylePresetMenuTrigger />
       <Flex w="full" h="full" position="relative">
         <Box position="absolute" top={0} left={0} right={0} bottom={0}>
-          <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
-            <Flex gap={2} flexDirection="column" h="full" w="full">
-              <Prompts />
-              <UpscaleSettingsAccordion />
-              <GenerationSettingsAccordion />
-              <AdvancedSettingsAccordion />
-            </Flex>
-          </OverlayScrollbarsComponent>
+          {isMenuOpen ? (
+            <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
+              <Flex gap={2} flexDirection="column" h="full" w="full">
+                <StylePresetMenu />
+              </Flex>
+            </OverlayScrollbarsComponent>
+          ) : (
+            <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
+              <Flex gap={2} flexDirection="column" h="full" w="full">
+                <Prompts />
+                <UpscaleSettingsAccordion />
+                <GenerationSettingsAccordion />
+                <AdvancedSettingsAccordion />
+              </Flex>
+            </OverlayScrollbarsComponent>
+          )}
         </Box>
       </Flex>
     </Flex>

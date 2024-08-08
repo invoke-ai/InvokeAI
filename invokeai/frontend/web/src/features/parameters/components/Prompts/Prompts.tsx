@@ -7,7 +7,6 @@ import { ParamPositivePrompt } from 'features/parameters/components/Core/ParamPo
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { ParamSDXLNegativeStylePrompt } from 'features/sdxl/components/SDXLPrompts/ParamSDXLNegativeStylePrompt';
 import { ParamSDXLPositiveStylePrompt } from 'features/sdxl/components/SDXLPrompts/ParamSDXLPositiveStylePrompt';
-import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { memo } from 'react';
 
 const concatPromptsSelector = createSelector(
@@ -19,14 +18,11 @@ const concatPromptsSelector = createSelector(
 
 export const Prompts = memo(() => {
   const shouldConcatPrompts = useAppSelector(concatPromptsSelector);
-  const { presetModifiedPositivePrompt, presetModifiedNegativePrompt } = usePresetModifiedPrompts();
   return (
     <Flex flexDir="column" gap={2}>
       <ParamPositivePrompt />
-      <Flex>{presetModifiedPositivePrompt}</Flex>
       {!shouldConcatPrompts && <ParamSDXLPositiveStylePrompt />}
       <ParamNegativePrompt />
-      <Flex>{presetModifiedNegativePrompt}</Flex>
       {!shouldConcatPrompts && <ParamSDXLNegativeStylePrompt />}
     </Flex>
   );

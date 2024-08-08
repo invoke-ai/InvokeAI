@@ -6,6 +6,7 @@ import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { useDownloadImage } from 'common/hooks/useDownloadImage';
 import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoardModal/store/slice';
+import { isModalOpenChanged as isStylePresetModalOpenChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
@@ -58,8 +59,17 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { downloadImage } = useDownloadImage();
   const templates = useStore($templates);
 
-  const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =
-    useImageActions(imageDTO?.image_name);
+  const {
+    recallAll,
+    remix,
+    recallSeed,
+    recallPrompts,
+    hasMetadata,
+    hasSeed,
+    hasPrompts,
+    isLoadingMetadata,
+    createAsPreset,
+  } = useImageActions(imageDTO?.image_name);
 
   const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
 
@@ -133,11 +143,6 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
     dispatch(setActiveTab('upscaling'));
   }, [dispatch, imageDTO]);
 
-  const handleCreatePreset = useCallback(() => {
-    dispatch(createPresetFromImageChanged(imageDTO));
-    dispatch(isMenuOpenChanged(true));
-  }, [dispatch, imageDTO]);
-
   return (
     <>
       <MenuItem as="a" href={imageDTO.image_url} target="_blank" icon={<PiShareFatBold />}>
@@ -192,7 +197,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       </MenuItem>
       <MenuItem
         icon={isLoadingMetadata ? <SpinnerIcon /> : <PiPaintBrushBold />}
-        onClickCapture={handleCreatePreset}
+        onClickCapture={createAsPreset}
         isDisabled={isLoadingMetadata || !hasPrompts}
       >
         Create Preset

@@ -13,12 +13,14 @@ export const useImageUrlToBlob = () => {
       new Promise<Blob | null>((resolve) => {
         const img = new Image();
         img.onload = () => {
+          console.log("on load")
           const canvas = document.createElement('canvas');
           canvas.width = img.width;
           canvas.height = img.height;
 
           const context = canvas.getContext('2d');
           if (!context) {
+            console.log("no context")
             return;
           }
           context.drawImage(img, 0, 0);

@@ -1,8 +1,12 @@
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { handlers, parseAndRecallAllMetadata, parseAndRecallPrompts } from 'features/metadata/util/handlers';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
+import { useImageUrlToBlob } from '../../../common/hooks/useImageUrlToBlob';
+import { prefilledFormDataChanged, isModalOpenChanged } from '../../stylePresets/store/stylePresetModalSlice';
+import { useGetImageDTOQuery } from '../../../services/api/endpoints/images';
+import { skipToken } from '@reduxjs/toolkit/query';
 
 export const useImageActions = (image_name?: string) => {
   const activeTabName = useAppSelector(activeTabNameSelector);
@@ -10,6 +14,9 @@ export const useImageActions = (image_name?: string) => {
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasSeed, setHasSeed] = useState(false);
   const [hasPrompts, setHasPrompts] = useState(false);
+  const imageUrlToBlob = useImageUrlToBlob();
+  const dispatch = useAppDispatch()
+  const { data: imageDTO } = useGetImageDTOQuery(image_name ?? skipToken)
 
   useEffect(() => {
     const parseMetadata = async () => {
@@ -61,5 +68,17 @@ export const useImageActions = (image_name?: string) => {
     parseAndRecallPrompts(metadata);
   }, [metadata]);
 
-  return { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata };
+  const createAsPreset = useCallback(async () => {
+    if (image_name && metadata && imageDTO) {
+      const positivePrompt = await handlers.positivePrompt.parse(metadata)
+      const negativePrompt = await handlers.negativePrompt.parse(metadata)
+      const imageBlob = await imageUrlToBlob(imageDTO.image_url)
+
+      dispatch(prefilledFormDataChanged({ name: "", positivePrompt, negativePrompt, image: imageBlob ? new File([imageBlob], "stylePreset.png", { type: 'image/png', }) : null }))
+      dispatch(isModalOpenChanged(true))
+    }
+
+  }, [image_name, metadata, dispatch, imageDTO])
+
+  return { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata, createAsPreset };
 };
