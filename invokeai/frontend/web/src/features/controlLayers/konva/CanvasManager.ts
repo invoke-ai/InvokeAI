@@ -315,7 +315,7 @@ export class CanvasManager {
     const availableWidth = width - padding * 2;
     const availableHeight = height - padding * 2;
 
-    const scale = Math.min(availableWidth / rect.width, availableHeight / rect.height);
+    const scale = Math.min(Math.min(availableWidth / rect.width, availableHeight / rect.height), 1);
     const x = -rect.x * scale + padding + (availableWidth - rect.width * scale) / 2;
     const y = -rect.y * scale + padding + (availableHeight - rect.height * scale) / 2;
 
