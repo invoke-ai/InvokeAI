@@ -1659,6 +1659,7 @@
         "brushSize": "Brush Size",
         "width": "Width",
         "zoom": "Zoom",
+        "resetView": "Reset View",
         "controlLayers": "Control Layers",
         "globalMaskOpacity": "Global Mask Opacity",
         "autoNegative": "Auto Negative",
