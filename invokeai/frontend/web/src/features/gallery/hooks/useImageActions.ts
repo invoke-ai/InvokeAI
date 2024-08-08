@@ -72,7 +72,7 @@ export const useImageActions = (image_name?: string) => {
     if (image_name && metadata && imageDTO) {
       const positivePrompt = await handlers.positivePrompt.parse(metadata)
       const negativePrompt = await handlers.negativePrompt.parse(metadata)
-      const imageBlob = await imageUrlToBlob(imageDTO.image_url)
+      const imageBlob = await imageUrlToBlob(imageDTO.image_url, 100)
 
       dispatch(prefilledFormDataChanged({ name: "", positivePrompt, negativePrompt, image: imageBlob ? new File([imageBlob], "stylePreset.png", { type: 'image/png', }) : null }))
       dispatch(isModalOpenChanged(true))

@@ -28,7 +28,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
       const { positive_prompt, negative_prompt } = preset_data;
       let imageBlob = null;
       if (preset.image) {
-        imageBlob = await imageUrlToBlob(preset.image);
+        imageBlob = await imageUrlToBlob(preset.image, 100);
       }
 
       dispatch(

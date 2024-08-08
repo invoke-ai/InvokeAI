@@ -9,21 +9,33 @@ import { useCallback } from 'react';
  */
 export const useImageUrlToBlob = () => {
   const imageUrlToBlob = useCallback(
-    async (url: string) =>
+    async (url: string, dimension?: number) =>
       new Promise<Blob | null>((resolve) => {
         const img = new Image();
         img.onload = () => {
-          console.log("on load")
           const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
+          let width = img.width;
+          let height = img.height;
+
+          if (dimension) {
+            const aspectRatio = img.width / img.height;
+            if (img.width > img.height) {
+              width = dimension;
+              height = dimension / aspectRatio;
+            } else {
+              height = dimension;
+              width = dimension * aspectRatio;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
 
           const context = canvas.getContext('2d');
           if (!context) {
-            console.log("no context")
             return;
           }
-          context.drawImage(img, 0, 0);
+          context.drawImage(img, 0, 0, width, height);
           resolve(
             new Promise<Blob | null>((resolve) => {
               canvas.toBlob(function (blob) {
