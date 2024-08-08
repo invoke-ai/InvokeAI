@@ -7,7 +7,6 @@ import type { CanvasBrushLineRenderer } from 'features/controlLayers/konva/Canva
 import type { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
 import type { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
-import { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgressPreview';
 import type { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import type { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva/constants';
@@ -19,7 +18,6 @@ import {
   nanoid,
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
-import { $lastProgressEvent, $shouldShowStagedImage } from 'features/controlLayers/store/canvasV2Slice';
 import type {
   CanvasControlAdapterState,
   CanvasEntityIdentifier,
@@ -49,14 +47,12 @@ import type { ImageCategory, ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import { CanvasBackground } from './CanvasBackground';
-import { CanvasBbox } from './CanvasBbox';
 import { CanvasControlAdapter } from './CanvasControlAdapter';
 import { CanvasLayerAdapter } from './CanvasLayerAdapter';
 import { CanvasMaskAdapter } from './CanvasMaskAdapter';
 import { CanvasPreview } from './CanvasPreview';
 import { CanvasStagingArea } from './CanvasStagingArea';
 import { CanvasStateApi } from './CanvasStateApi';
-import { CanvasTool } from './CanvasTool';
 import { setStageEventHandlers } from './events';
 
 // type Extents = {
@@ -159,15 +155,6 @@ export class CanvasManager {
 
     this.transformingEntity = new PubSub<CanvasEntityIdentifier | null>(null);
     this.toolState = new PubSub(this.stateApi.getToolState());
-    this.currentFill = new PubSub(this.getCurrentFill());
-    this.selectedEntityIdentifier = new PubSub(
-      this.stateApi.getState().selectedEntityIdentifier,
-      (a, b) => a?.id === b?.id
-    );
-    this.selectedEntity = new PubSub(
-      this.getSelectedEntity(),
-      (a, b) => a?.state === b?.state && a?.adapter === b?.adapter
-    );
 
     this._prevState = this.stateApi.getState();
 
@@ -187,13 +174,8 @@ export class CanvasManager {
       uploadImage,
     };
 
-    this.preview = new CanvasPreview(
-      new CanvasBbox(this),
-      new CanvasTool(this),
-      new CanvasStagingArea(this),
-      new CanvasProgressPreview(this)
-    );
-    this.stage.add(this.preview.layer);
+    this.preview = new CanvasPreview(this);
+    this.stage.add(this.preview.getLayer());
 
     this.background = new CanvasBackground(this);
     this.stage.add(this.background.konva.layer);
@@ -226,6 +208,16 @@ export class CanvasManager {
       this.log.error('Worker message error');
     };
 
+    this.currentFill = new PubSub(this.getCurrentFill());
+    this.selectedEntityIdentifier = new PubSub(
+      this.stateApi.getState().selectedEntityIdentifier,
+      (a, b) => a?.id === b?.id
+    );
+    this.selectedEntity = new PubSub(
+      this.getSelectedEntity(),
+      (a, b) => a?.state === b?.state && a?.adapter === b?.adapter
+    );
+
     this.inpaintMask = new CanvasMaskAdapter(this.stateApi.getInpaintMaskState(), this);
     this.stage.add(this.inpaintMask.konva.layer);
   }
@@ -247,10 +239,6 @@ export class CanvasManager {
     };
     this._tasks.set(id, { task, onComplete });
     this._worker.postMessage(task, [data.buffer]);
-  }
-
-  async renderProgressPreview() {
-    await this.preview.progressPreview.render(this.stateApi.$lastProgressEvent.get());
   }
 
   async renderControlAdapters() {
@@ -291,7 +279,7 @@ export class CanvasManager {
       this.regions.get(rg.id)?.konva.layer.zIndex(++zIndex);
     }
     this.inpaintMask.konva.layer.zIndex(++zIndex);
-    this.preview.layer.zIndex(++zIndex);
+    this.preview.getLayer().zIndex(++zIndex);
   }
 
   fitStageToContainer() {
@@ -611,25 +599,6 @@ export class CanvasManager {
 
     const unsubscribeRenderer = this._store.subscribe(this.render);
 
-    // When we this flag, we need to render the staging area
-    const unsubscribeShouldShowStagedImage = $shouldShowStagedImage.subscribe(
-      async (shouldShowStagedImage, prevShouldShowStagedImage) => {
-        if (shouldShowStagedImage !== prevShouldShowStagedImage) {
-          this.log.debug('Rendering staging area');
-          await this.preview.stagingArea.render();
-        }
-      }
-    );
-
-    const unsubscribeLastProgressEvent = $lastProgressEvent.subscribe(
-      async (lastProgressEvent, prevLastProgressEvent) => {
-        if (lastProgressEvent !== prevLastProgressEvent) {
-          this.log.debug('Rendering progress image');
-          await this.preview.progressPreview.render(lastProgressEvent);
-        }
-      }
-    );
-
     this.log.debug('First render of konva stage');
     this.preview.tool.render();
     this.render();
@@ -650,8 +619,6 @@ export class CanvasManager {
       this.preview.destroy();
       unsubscribeRenderer();
       unsubscribeListeners();
-      unsubscribeShouldShowStagedImage();
-      unsubscribeLastProgressEvent();
       resizeObserver.disconnect();
     };
   };

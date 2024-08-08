@@ -2,6 +2,7 @@ import { Mutex } from 'async-mutex';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
+import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
 import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import { loadImage } from 'features/controlLayers/konva/util';
 import type { CanvasImageState, GetLoggingContext } from 'features/controlLayers/store/types';
@@ -19,7 +20,7 @@ export class CanvasImageRenderer {
   static PLACEHOLDER_TEXT_NAME = `${CanvasImageRenderer.TYPE}_placeholder-text`;
 
   id: string;
-  parent: CanvasObjectRenderer;
+  parent: CanvasObjectRenderer | CanvasStagingArea;
   manager: CanvasManager;
   log: Logger;
   getLoggingContext: GetLoggingContext;
@@ -36,7 +37,7 @@ export class CanvasImageRenderer {
   isError: boolean = false;
   mutex = new Mutex();
 
-  constructor(state: CanvasImageState, parent: CanvasObjectRenderer) {
+  constructor(state: CanvasImageState, parent: CanvasObjectRenderer | CanvasStagingArea) {
     const { id, image } = state;
     const { width, height } = image;
     this.id = id;
@@ -97,18 +98,16 @@ export class CanvasImageRenderer {
         this.onFailedToLoadImage();
         return;
       }
+      // Load the thumbnail first, but let the image load in parallel
       loadImage(imageDTO.thumbnail_url)
         .then((thumbnailElement) => {
           this.thumbnailElement = thumbnailElement;
-          this.mutex.runExclusive(this.updateImageElement);
+          this.updateImageElement();
         })
         .catch(this.onFailedToLoadImage);
-      loadImage(imageDTO.image_url)
-        .then((imageElement) => {
-          this.imageElement = imageElement;
-          this.mutex.runExclusive(this.updateImageElement);
-        })
-        .catch(this.onFailedToLoadImage);
+
+      this.imageElement = await loadImage(imageDTO.image_url);
+      await this.updateImageElement();
     } catch {
       this.onFailedToLoadImage();
     }
@@ -123,36 +122,50 @@ export class CanvasImageRenderer {
     this.konva.placeholder.group.visible(true);
   };
 
-  updateImageElement = () => {
-    const element = this.imageElement ?? this.thumbnailElement;
+  updateImageElement = async () => {
+    const release = await this.mutex.acquire();
 
-    if (element) {
-      if (this.konva.image && this.konva.image.image() !== element) {
-        this.konva.image.setAttrs({
-          image: element,
-        });
-      } else {
-        this.konva.image = new Konva.Image({
-          name: CanvasImageRenderer.IMAGE_NAME,
-          listening: false,
-          image: element,
-          width: this.state.image.width,
-          height: this.state.image.height,
-        });
-        this.konva.group.add(this.konva.image);
+    try {
+      const element = this.imageElement ?? this.thumbnailElement;
+      const { width, height } = this.state.image;
+
+      if (element) {
+        if (this.konva.image) {
+          this.log.trace('Updating Konva image attrs');
+          this.konva.image.setAttrs({
+            image: element,
+            width,
+            height,
+          });
+        } else {
+          this.log.trace('Creating new Konva image');
+          this.konva.image = new Konva.Image({
+            name: CanvasImageRenderer.IMAGE_NAME,
+            listening: false,
+            image: element,
+            width,
+            height,
+          });
+          this.konva.group.add(this.konva.image);
+        }
+
+        if (this.state.filters.length > 0) {
+          this.konva.image.cache();
+          this.konva.image.filters(this.state.filters.map((f) => FILTER_MAP[f]));
+        } else {
+          this.konva.image.clearCache();
+          this.konva.image.filters([]);
+        }
+
+        this.konva.placeholder.rect.setAttrs({ width, height });
+        this.konva.placeholder.text.setAttrs({ width, height, fontSize: width / 16 });
+
+        this.isLoading = false;
+        this.isError = false;
+        this.konva.placeholder.group.visible(false);
       }
-
-      if (this.state.filters.length > 0) {
-        this.konva.image.cache();
-        this.konva.image.filters(this.state.filters.map((f) => FILTER_MAP[f]));
-      } else {
-        this.konva.image.clearCache();
-        this.konva.image.filters([]);
-      }
-
-      this.isLoading = false;
-      this.isError = false;
-      this.konva.placeholder.group.visible(false);
+    } finally {
+      release();
     }
   };
 
@@ -173,8 +186,6 @@ export class CanvasImageRenderer {
         this.konva.image?.clearCache();
         this.konva.image?.filters([]);
       }
-      this.konva.placeholder.rect.setAttrs({ width, height });
-      this.konva.placeholder.text.setAttrs({ width, height, fontSize: width / 16 });
       this.state = state;
       return true;
     }

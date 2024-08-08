@@ -4,7 +4,7 @@ import { merge } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
-import type { CanvasImageState, CanvasLayerState, CanvasV2State } from './types';
+import type { CanvasLayerState, CanvasV2State } from './types';
 import { imageDTOToImageWithDims } from './types';
 
 export const selectLayer = (state: CanvasV2State, id: string) => state.layers.entities.find((layer) => layer.id === id);
@@ -16,8 +16,11 @@ export const selectLayerOrThrow = (state: CanvasV2State, id: string) => {
 
 export const layersReducers = {
   layerAdded: {
-    reducer: (state, action: PayloadAction<{ id: string; overrides?: Partial<CanvasLayerState> }>) => {
-      const { id } = action.payload;
+    reducer: (
+      state,
+      action: PayloadAction<{ id: string; overrides?: Partial<CanvasLayerState>; isSelected?: boolean }>
+    ) => {
+      const { id, overrides, isSelected } = action.payload;
       const layer: CanvasLayerState = {
         id,
         type: 'layer',
@@ -27,12 +30,14 @@ export const layersReducers = {
         position: { x: 0, y: 0 },
         imageCache: null,
       };
-      merge(layer, action.payload.overrides);
+      merge(layer, overrides);
       state.layers.entities.push(layer);
-      state.selectedEntityIdentifier = { type: 'layer', id };
+      if (isSelected) {
+        state.selectedEntityIdentifier = { type: 'layer', id };
+      }
       state.layers.imageCache = null;
     },
-    prepare: (payload: { overrides?: Partial<CanvasLayerState> }) => ({
+    prepare: (payload: { overrides?: Partial<CanvasLayerState>; isSelected?: boolean }) => ({
       payload: { ...payload, id: getPrefixedId('layer') },
     }),
   },
@@ -41,26 +46,6 @@ export const layersReducers = {
     state.layers.entities.push(data);
     state.selectedEntityIdentifier = { type: 'layer', id: data.id };
     state.layers.imageCache = null;
-  },
-  layerAddedFromImage: {
-    reducer: (state, action: PayloadAction<{ id: string; imageObject: CanvasImageState }>) => {
-      const { id, imageObject } = action.payload;
-      const layer: CanvasLayerState = {
-        id,
-        type: 'layer',
-        isEnabled: true,
-        objects: [imageObject],
-        opacity: 1,
-        position: { x: 0, y: 0 },
-        imageCache: null,
-      };
-      state.layers.entities.push(layer);
-      state.selectedEntityIdentifier = { type: 'layer', id };
-      state.layers.imageCache = null;
-    },
-    prepare: (payload: { imageObject: CanvasImageState }) => ({
-      payload: { ...payload, id: getPrefixedId('layer') },
-    }),
   },
   layerAllDeleted: (state) => {
     state.layers.entities = [];

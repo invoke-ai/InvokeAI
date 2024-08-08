@@ -1,40 +1,51 @@
-import type { CanvasProgressPreview } from 'features/controlLayers/konva/CanvasProgressPreview';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasProgressImage } from 'features/controlLayers/konva/CanvasProgressImage';
 import Konva from 'konva';
 
-import type { CanvasBbox } from './CanvasBbox';
-import type { CanvasStagingArea } from './CanvasStagingArea';
-import type { CanvasTool } from './CanvasTool';
+import { CanvasBbox } from './CanvasBbox';
+import { CanvasStagingArea } from './CanvasStagingArea';
+import { CanvasTool } from './CanvasTool';
 
 export class CanvasPreview {
-  layer: Konva.Layer;
+  manager: CanvasManager;
+
+  konva: {
+    layer: Konva.Layer;
+  };
+
   tool: CanvasTool;
   bbox: CanvasBbox;
   stagingArea: CanvasStagingArea;
-  progressPreview: CanvasProgressPreview;
+  progressImage: CanvasProgressImage;
 
-  constructor(
-    bbox: CanvasBbox,
-    tool: CanvasTool,
-    stagingArea: CanvasStagingArea,
-    progressPreview: CanvasProgressPreview
-  ) {
-    this.layer = new Konva.Layer({ listening: true, imageSmoothingEnabled: false });
+  constructor(manager: CanvasManager) {
+    this.manager = manager;
+    this.konva = {
+      layer: new Konva.Layer({ listening: true, imageSmoothingEnabled: false }),
+    };
 
-    this.stagingArea = stagingArea;
-    this.layer.add(this.stagingArea.konva.group);
+    this.stagingArea = new CanvasStagingArea(this);
+    this.konva.layer.add(...this.stagingArea.getNodes());
 
-    this.bbox = bbox;
-    this.layer.add(this.bbox.konva.group);
+    this.progressImage = new CanvasProgressImage(this);
+    this.konva.layer.add(...this.progressImage.getNodes());
 
-    this.tool = tool;
-    this.layer.add(this.tool.konva.group);
+    this.bbox = new CanvasBbox(this);
+    this.konva.layer.add(this.bbox.konva.group);
 
-    this.progressPreview = progressPreview;
-    this.layer.add(this.progressPreview.konva.group);
+    this.tool = new CanvasTool(this);
+    this.konva.layer.add(this.tool.konva.group);
   }
 
+  getLayer = () => {
+    return this.konva.layer;
+  };
+
   destroy() {
+    // this.stagingArea.destroy(); // TODO(psyche): implement destroy
+    this.progressImage.destroy();
+    // this.bbox.destroy(); // TODO(psyche): implement destroy
     this.tool.destroy();
-    this.layer.destroy();
+    this.konva.layer.destroy();
   }
 }

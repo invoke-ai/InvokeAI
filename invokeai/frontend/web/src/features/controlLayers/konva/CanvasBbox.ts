@@ -1,5 +1,6 @@
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { CanvasPreview } from 'features/controlLayers/konva/CanvasPreview';
 import type { Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
@@ -23,6 +24,7 @@ export class CanvasBbox {
   static CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
   static NO_ANCHORS: string[] = [];
 
+  parent: CanvasPreview;
   manager: CanvasManager;
 
   konva: {
@@ -31,8 +33,9 @@ export class CanvasBbox {
     transformer: Konva.Transformer;
   };
 
-  constructor(manager: CanvasManager) {
-    this.manager = manager;
+  constructor(parent: CanvasPreview) {
+    this.parent = parent;
+    this.manager = this.parent.manager;
     // Create a stash to hold onto the last aspect ratio of the bbox - this allows for locking the aspect ratio when
     // transforming the bbox.
     const bbox = this.manager.stateApi.getBbox();
