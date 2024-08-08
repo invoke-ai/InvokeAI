@@ -1,0 +1,2862 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="mauwii">
+      
+      
+        <link rel="canonical" href="https://invoke-ai.github.io/InvokeAI/features/UNIFIED_CANVAS/">
+      
+      
+        <link rel="prev" href="../TRAINING/">
+      
+      
+        <link rel="next" href="../WEB/">
+      
+      
+      <link rel="icon" href="../../img/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.31">
+    
+    
+      
+        <title>Unified Canvas - InvokeAI Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.3cba04c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+  
+
+
+  
+  
+
+<script id="__analytics">function __md_analytics(){function n(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],n("js",new Date),n("config","G-2X4JR4S4FB"),document.addEventListener("DOMContentLoaded",function(){document.forms.search&&document.forms.search.query.addEventListener("blur",function(){this.value&&n("event","search",{search_term:this.value})}),document$.subscribe(function(){var a=document.forms.feedback;if(void 0!==a)for(var e of a.querySelectorAll("[type=submit]"))e.addEventListener("click",function(e){e.preventDefault();var t=document.location.pathname,e=this.getAttribute("data-md-value");n("event","feedback",{page:t,data:e}),a.firstElementChild.disabled=!0;e=a.querySelector(".md-feedback__note [data-md-value='"+e+"']");e&&(e.hidden=!1)}),a.hidden=!1}),location$.subscribe(function(e){n("config","G-2X4JR4S4FB",{page_path:e.pathname})})});var e=document.createElement("script");e.async=!0,e.src="https://www.googletagmanager.com/gtag/js?id=G-2X4JR4S4FB",document.getElementById("__analytics").insertAdjacentElement("afterEnd",e)}</script>
+  
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+  
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#basics" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvokeAI Documentation" class="md-header__button md-logo" aria-label="InvokeAI Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvokeAI Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Unified Canvas
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../installation/INSTALLATION/" class="md-tabs__link">
+          
+  
+    
+  
+  Installation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../nodes/overview/" class="md-tabs__link">
+          
+  
+    
+  
+  Workflows & Nodes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../nodes/communityNodes/" class="md-tabs__link">
+        
+  
+    
+  
+  Community Nodes
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+    
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../contributing/CONTRIBUTING/" class="md-tabs__link">
+          
+  
+    
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../help/gettingStartedWithAI/" class="md-tabs__link">
+          
+  
+    
+  
+  Help
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../other/CONTRIBUTORS/" class="md-tabs__link">
+          
+  
+    
+  
+  Other
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvokeAI Documentation" class="md-nav__button md-logo" aria-label="InvokeAI Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    InvokeAI Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Installation
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Installation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/INSTALLATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/INSTALL_REQUIREMENTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Requirements
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/010_INSTALL_AUTOMATED/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Automatic Install
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/020_INSTALL_MANUAL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Manual Install
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/INSTALL_DEVELOPMENT/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Developer Install
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/040_INSTALL_DOCKER/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Docker
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/050_INSTALLING_MODELS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installing Models
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/060_INSTALL_PATCHMATCH/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installing PyPatchMatch
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Workflows & Nodes
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Workflows & Nodes
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/overview/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Nodes Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/NODES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Workflow Editor Basics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/defaultNodes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    List of Default Nodes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/exampleWorkflows/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Example Workflows
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/comfyToInvoke/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ComfyUI to InvokeAI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/detailedNodes/faceTools/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Facetool Node
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/contributingNodes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributing Nodes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/NODES_MIGRATION_V3_V4/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migrating from v3 to v4
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/INVOCATION_API/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Invocation API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/communityNodes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Community Nodes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Features
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    New to InvokeAI?
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DATABASE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Database
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTROLNET/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Control Adapters
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IMG2IMG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Image-to-Image
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Controlling Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../LORAS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    LoRAs & LCM-LoRAs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../MODEL_MERGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Model Merging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/overview" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Workflows &  Nodes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../WATERMARK%2BNSFW/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    NSFW Checker
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../POSTPROCESS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Postprocessing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PROMPTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prompting Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_14" id="__nav_5_14_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Textual Inversions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_14">
+            <span class="md-nav__icon md-icon"></span>
+            Textual Inversions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TEXTUAL_INVERSIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Textual Inversions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../TRAINING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Textual Inversion Training
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Unified Canvas
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Unified Canvas
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#basics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Basics
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Basics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#base-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      Base Layer
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#staging-area" class="md-nav__link">
+    <span class="md-ellipsis">
+      Staging Area
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mask-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mask Layer
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bounding-box" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bounding Box
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inpainting-outpainting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inpainting &amp; Outpainting
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      Getting Started
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generation-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Generation Methods
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generation Methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#text-to-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      Text to Image
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-to-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      Image to Image
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inpainting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inpainting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#outpainting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Outpainting
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advanced-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Features
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#toolbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      Toolbar
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Toolbar">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mask-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mask Options
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#creative-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creative Tools
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#canvas-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      Canvas Tools
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compositing-seam-correction" class="md-nav__link">
+    <span class="md-ellipsis">
+      Compositing / Seam Correction
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#infill-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Infill &amp; Scaling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hot-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      Hot Keys
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../WEB/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    InvokeAI Web Server
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../WEBUIHOTKEYS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    WebUI Hotkeys
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UTILITIES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Maintenance Utilities
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OTHER/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Other
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/CONTRIBUTING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How to Contribute
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CODE_OF_CONDUCT/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    InvokeAI Code of Conduct
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Development
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_3">
+            <span class="md-nav__icon md-icon"></span>
+            Development
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/development/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/newContributorChecklist/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    New Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/MODEL_MANAGER/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/contributingToFrontend.md" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Frontend Documentation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/LOCAL_DEVELOPMENT/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Local Development
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/TESTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_3_7" id="__nav_6_3_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Frontend
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            Frontend
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/frontend/OVERVIEW/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/frontend/STATE_MGMT/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    State Management
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/frontend/WORKFLOWS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Workflows
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/documentation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/INVOCATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Nodes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/MODEL_MANAGER/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/DOWNLOAD_QUEUE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Download Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/translation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Translation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/tutorials/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Tutorials
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Help
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Help
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    New to InvokeAI?
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/diffusion/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Diffusion Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/SAMPLER_CONVERGENCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sampler Convergence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Other
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Other
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../other/CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../other/README-CompViz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CompViz-README
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+  <h1>Unified Canvas</h1>
+
+<p>The Unified Canvas is a tool designed to streamline and simplify the process of
+composing an image using Stable Diffusion. It offers artists all of the
+available Stable Diffusion generation modes (Text To Image, Image To Image,
+Inpainting, and Outpainting) as a single unified workflow. The flexibility of
+the tool allows you to tweak and edit image generations, extend images beyond
+their initial size, and to create new content in a freeform way both inside and
+outside of existing images.</p>
+<p>This document explains the basics of using the Unified Canvas, introducing you
+to its features and tools one by one. It also describes some of the more
+advanced tools available to power users of the Canvas.</p>
+<h2 id="basics">Basics<a class="headerlink" href="#basics" title="Permanent link">#</a></h2>
+<p>The Unified Canvas consists of two layers: the <strong>Base Layer</strong> and the <strong>Mask
+Layer</strong>. You can swap from one layer to the other by selecting the layer you
+want in the drop-down menu on the top left corner of the Unified Canvas, or by
+pressing the (Q) hotkey.</p>
+<h3 id="base-layer">Base Layer<a class="headerlink" href="#base-layer" title="Permanent link">#</a></h3>
+<p>The <strong>Base Layer</strong> is the image content currently managed by the Canvas, and can
+be exported at any time to the gallery by using the <strong>Save to Gallery</strong> option.
+When the Base Layer is selected, the Brush (B) and Eraser (E) tools will
+directly manipulate the base layer. Any images uploaded to the Canvas, or sent
+to the Unified Canvas from the gallery, will clear out all existing content and
+set the Base layer to the new image.</p>
+<h3 id="staging-area">Staging Area<a class="headerlink" href="#staging-area" title="Permanent link">#</a></h3>
+<p>When you generate images, they will display in the Canvas's <strong>Staging Area</strong>,
+alongside the Staging Area toolbar buttons. While the Staging Area is active,
+you cannot interact with the Canvas itself.</p>
+<figure>
+<p><img alt="staging area" src="../../assets/canvas/staging_area.png" /></p>
+</figure>
+<p>Accepting generations will commit the new generation to the <strong>Base Layer</strong>. You
+can review all generated images using the Prev/Next arrows, save any individual
+generations to your gallery (without committing to the Base layer) or discard
+generations. While you can Undo a discard in an individual Canvas session, any
+generations that are not saved will be lost when the Canvas resets.</p>
+<h3 id="mask-layer">Mask Layer<a class="headerlink" href="#mask-layer" title="Permanent link">#</a></h3>
+<p>The <strong>Mask Layer</strong> consists of any masked sections that have been created to
+inform Inpainting generations. You can paint a new mask, or edit an existing
+mask, using the Brush tool and the Eraser with the Mask layer set as your Active
+layer. Any masked areas will only affect generation inside of the current
+bounding box.</p>
+<h3 id="bounding-box">Bounding Box<a class="headerlink" href="#bounding-box" title="Permanent link">#</a></h3>
+<p>When generating a new image, Invoke will process and apply new images within the
+area denoted by the <strong>Bounding Box</strong>. The Width &amp; Height settings of the
+Bounding Box, as well as its location within the Unified Canvas and pixels or
+empty space that it encloses, determine how new invocations are generated - see
+<a href="#inpainting-and-outpainting">Inpainting &amp; Outpainting</a> below. The Bounding Box
+can be moved and resized using the Move (V) tool. It can also be resized using
+the Bounding Box options in the Options Panel. By using these controls you can
+generate larger or smaller images, control which sections of the image are being
+processed, as well as control Bounding Box tools like the Bounding Box
+fill/erase.</p>
+<h3 id="inpainting-outpainting"><a name="inpainting-and-outpainting"></a> Inpainting &amp; Outpainting<a class="headerlink" href="#inpainting-outpainting" title="Permanent link">#</a></h3>
+<p>"Inpainting" means asking the AI to refine part of an image while leaving the
+rest alone. For example, updating a portrait of your grandmother to have her
+wear a biker's jacket.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">masked original</th>
+<th style="text-align: center;">inpaint result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><img alt="granny with a mask applied" src="../../assets/canvas/mask_granny.png" /></td>
+<td style="text-align: center;"><img alt="just like magic, granny with a biker's jacket" src="../../assets/canvas/biker_jacket_granny.png" /></td>
+</tr>
+</tbody>
+</table>
+<p>"Outpainting" means asking the AI to expand the original image beyond its
+original borders, making a bigger image that's still based on the original. For
+example, extending the above image of your Grandmother in a biker's jacket to
+include her wearing jeans (and while we're at it, a motorcycle!)</p>
+<figure>
+<p><img alt="more magic - granny with a tattooed arm, denim pants, and an obscured motorcycle" src="../../assets/canvas/biker_granny.png" /></p>
+</figure>
+<p>When you are using the Unified Canvas, Invoke decides automatically whether to
+do Inpainting, Outpainting, ImageToImage, or TextToImage by looking inside the
+area enclosed by the Bounding Box. It chooses the appropriate type of generation
+based on whether the Bounding Box contains empty (transparent) areas on the Base
+layer, or whether it contains colored areas from previous generations (or from
+painted brushstrokes) on the Base layer, and/or whether the Mask layer contains
+any brushstrokes. See <a href="#generation-methods">Generation Methods</a> below for more
+information.</p>
+<h2 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">#</a></h2>
+<p>To get started with the Unified Canvas, you will want to generate a new base
+layer using Txt2Img or importing an initial image. We'll refer to either of
+these methods as the "initial image" in the below guide.</p>
+<p>From there, you can consider the following techniques to augment your image:</p>
+<ul>
+<li><strong>New Images</strong>: Move the bounding box to an empty area of the Canvas, type in
+  your prompt, and Invoke, to generate a new image using the Text to Image
+  function.</li>
+<li><strong>Image Correction</strong>: Use the color picker and brush tool to paint corrections
+  on the image, switch to the Mask layer, and brush a mask over your painted
+  area to use <strong>Inpainting</strong>. You can also use the <strong>ImageToImage</strong> generation
+  method to invoke new interpretations of the image.</li>
+<li><strong>Image Expansion</strong>: Move the bounding box to include a portion of your
+  initial image, and a portion of transparent/empty pixels, then Invoke using a
+  prompt that describes what you'd like to see in that area. This will Outpaint
+  the image. You'll typically find more coherent results if you keep about
+  50-60% of the original image in the bounding box. Make sure that the Image To
+  Image Strength slider is set to a high value - you may need to set it higher
+  than you are used to.</li>
+<li><strong>New Content on Existing Images</strong>: If you want to add new details or objects
+  into your image, use the brush tool to paint a sketch of what you'd like to
+  see on the image, switch to the Mask layer, and brush a mask over your painted
+  area to use <strong>Inpainting</strong>. If the masked area is small, consider using a
+  smaller bounding box to take advantage of Invoke's automatic Scaling features,
+  which can help to produce better details.</li>
+<li><strong>And more</strong>: There are a number of creative ways to use the Canvas, and the
+  above are just starting points. We're excited to see what you come up with!</li>
+</ul>
+<h2 id="generation-methods"><a name="generation-methods"></a> Generation Methods<a class="headerlink" href="#generation-methods" title="Permanent link">#</a></h2>
+<p>The Canvas can use all generation methods available (Txt2Img, Img2Img,
+Inpainting, and Outpainting), and these will be automatically selected and used
+based on the current selection area within the Bounding Box.</p>
+<h3 id="text-to-image">Text to Image<a class="headerlink" href="#text-to-image" title="Permanent link">#</a></h3>
+<p>If the Bounding Box is placed over an area of Canvas with an <strong>empty Base
+Layer</strong>, invoking a new image will use <strong>TextToImage</strong>. This generates an
+entirely new image based on your prompt.</p>
+<h3 id="image-to-image">Image to Image<a class="headerlink" href="#image-to-image" title="Permanent link">#</a></h3>
+<p>If the Bounding Box is placed over an area of Canvas with an <strong>existing Base
+Layer area with no transparent pixels or masks</strong>, invoking a new image will use
+<strong>ImageToImage</strong>. This uses the image within the bounding box and your prompt to
+interpret a new image. The image will be closer to your original image at lower
+Image to Image strengths.</p>
+<h3 id="inpainting">Inpainting<a class="headerlink" href="#inpainting" title="Permanent link">#</a></h3>
+<p>If the Bounding Box is placed over an area of Canvas with an <strong>existing Base
+Layer and any pixels selected using the Mask layer</strong>, invoking a new image will
+use <strong>Inpainting</strong>. Inpainting uses the existing colors/forms in the masked area
+in order to generate a new image for the masked area only. The unmasked portion
+of the image will remain the same. Image to Image strength applies to the
+inpainted area.</p>
+<p>If you desire something completely different from the original image in your new
+generation (i.e., if you want Invoke to ignore existing colors/forms), consider
+toggling the Inpaint Replace setting on, and use high values for both Inpaint
+Replace and Image To Image Strength.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>By default, the <strong>Scale Before Processing</strong> option &mdash; which
+inpaints more coherent details by generating at a larger resolution and then
+scaling &mdash; is only activated when the Bounding Box is relatively small.
+To get the best inpainting results you should therefore resize your Bounding
+Box to the smallest area that contains your mask and enough surrounding detail
+to help Stable Diffusion understand the context of what you want it to draw.
+You should also update your prompt so that it describes <em>just</em> the area within
+the Bounding Box.</p>
+</div>
+<h3 id="outpainting">Outpainting<a class="headerlink" href="#outpainting" title="Permanent link">#</a></h3>
+<p>If the Bounding Box is placed over an area of Canvas partially filled by an
+existing Base Layer area and partially by transparent pixels or masks, invoking
+a new image will use <strong>Outpainting</strong>, as well as <strong>Inpainting</strong> any masked
+areas.</p>
+<hr />
+<h2 id="advanced-features">Advanced Features<a class="headerlink" href="#advanced-features" title="Permanent link">#</a></h2>
+<p>Features with non-obvious behavior are detailed below, in order to provide
+clarity on the intent and common use cases we expect for utilizing them.</p>
+<h3 id="toolbar">Toolbar<a class="headerlink" href="#toolbar" title="Permanent link">#</a></h3>
+<h4 id="mask-options">Mask Options<a class="headerlink" href="#mask-options" title="Permanent link">#</a></h4>
+<ul>
+<li><strong>Enable Mask</strong> - This flag can be used to Enable or Disable the currently
+  painted mask. If you have painted a mask, but you don't want it affect the
+  next invocation, but you <em>also</em> don't want to delete it, then you can set this
+  option to Disable. When you want the mask back, set this back to Enable.</li>
+<li><strong>Preserve Masked Area</strong> - When enabled, Preserve Masked Area inverts the
+  effect of the Mask on the Inpainting process. Pixels in masked areas will be
+  kept unchanged, and unmasked areas will be regenerated.</li>
+</ul>
+<h4 id="creative-tools">Creative Tools<a class="headerlink" href="#creative-tools" title="Permanent link">#</a></h4>
+<ul>
+<li><strong>Brush - Base/Mask Modes</strong> - The Brush tool switches automatically between
+  different modes of operation for the Base and Mask layers respectively.<ul>
+<li>On the Base layer, the brush will directly paint on the Canvas using the
+  color selected on the Brush Options menu.</li>
+<li>On the Mask layer, the brush will create a new mask. If you're finding the
+  mask difficult to see over the existing content of the Unified Canvas, you
+  can change the color it is drawn with using the color selector on the Mask
+  Options dropdown.</li>
+</ul>
+</li>
+<li><strong>Erase Bounding Box</strong> - On the Base layer, erases all pixels within the
+  Bounding Box.</li>
+<li><strong>Fill Bounding Box</strong> - On the Base layer, fills all pixels within the
+  Bounding Box with the currently selected color.</li>
+</ul>
+<h4 id="canvas-tools">Canvas Tools<a class="headerlink" href="#canvas-tools" title="Permanent link">#</a></h4>
+<ul>
+<li><strong>Move Tool</strong> - Allows for manipulation of the Canvas view (by dragging on the
+  Canvas, outside the bounding box), the Bounding Box (by dragging the edges of
+  the box), or the Width/Height of the Bounding Box (by dragging one of the 9
+  directional handles).</li>
+<li><strong>Reset View</strong> - Click to re-orients the view to the center of the Bounding
+  Box.</li>
+<li><strong>Merge Visible</strong> - If your browser is having performance problems drawing the
+  image in the Unified Canvas, click this to consolidate all of the information
+  currently being rendered by your browser into a merged copy of the image. This
+  lowers the resource requirements and should improve performance.</li>
+</ul>
+<h3 id="compositing-seam-correction">Compositing / Seam Correction<a class="headerlink" href="#compositing-seam-correction" title="Permanent link">#</a></h3>
+<p>When doing Inpainting or Outpainting, Invoke needs to merge the pixels generated
+by Stable Diffusion into your existing image. This is achieved through compositing - the area around the the boundary between your image and the new generation is
+automatically blended to produce a seamless output. In a fully automatic
+process, a mask is generated to cover the boundary, and then the area of the boundary is
+Inpainted.</p>
+<p>Although the default options should work well most of the time, sometimes it can
+help to alter the parameters that control the Compositing. A larger blur and
+a blur setting  have been noted as producing
+consistently strong results . Strength of 0.7 is best for reducing hard seams.</p>
+<ul>
+<li><strong>Mode</strong> - What part of the image will have the the Compositing applied to it.</li>
+<li><strong>Mask edge</strong> will apply Compositing to the edge of the masked area</li>
+<li><strong>Mask</strong> will apply Compositing to the entire masked area</li>
+<li><strong>Unmasked</strong> will apply Compositing to the entire image</li>
+<li><strong>Steps</strong> - Number of generation steps that will occur during the Coherence Pass, similar to Denoising Steps. Higher step counts will generally have better results.</li>
+<li><strong>Strength</strong> - How much noise is added for the Coherence Pass, similar to Denoising Strength. A strength of 0 will result in an unchanged image, while a strength of 1 will result in an image with a completely new area as defined by the Mode setting.</li>
+<li><strong>Blur</strong> - Adjusts the pixel radius of the the mask. A larger blur radius will cause the mask to extend past the visibly masked area, while too small of a blur radius will result in a mask that is smaller than the visibly masked area.</li>
+<li><strong>Blur Method</strong> - The method of blur applied to the masked area. </li>
+</ul>
+<h3 id="infill-scaling">Infill &amp; Scaling<a class="headerlink" href="#infill-scaling" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Scale Before Processing &amp; W/H</strong>: When generating images with a bounding box
+  smaller than the optimized W/H of the model (e.g., 512x512 for SD1.5), this
+  feature first generates at a larger size with the same aspect ratio, and then
+  scales that image down to fill the selected area. This is particularly useful
+  when inpainting very small details. Scaling is optional but is enabled by
+  default.</li>
+<li><strong>Inpaint Replace</strong>: When Inpainting, the default method is to utilize the
+  existing RGB values of the Base layer to inform the generation process. If
+  Inpaint Replace is enabled, noise is generated and blended with the existing
+  pixels (completely replacing the original RGB values at an Inpaint Replace
+  value of 1). This can help generate more variation from the pixels on the Base
+  layers.<ul>
+<li>When using Inpaint Replace you should use a higher Image To Image Strength
+  value, especially at higher Inpaint Replace values</li>
+</ul>
+</li>
+<li><strong>Infill Method</strong>: Invoke currently supports two methods for producing RGB
+  values for use in the Outpainting process: Patchmatch and Tile. We believe
+  that Patchmatch is the superior method, however we provide support for Tile in
+  case Patchmatch cannot be installed or is unavailable on your computer.</li>
+<li><strong>Tile Size</strong>: The Tile method for Outpainting sources small portions of the
+  original image and randomly place these into the areas being Outpainted. This
+  value sets the size of those tiles.</li>
+</ul>
+<h2 id="hot-keys">Hot Keys<a class="headerlink" href="#hot-keys" title="Permanent link">#</a></h2>
+<p>The Unified Canvas is a tool that excels when you use hotkeys. You can view the
+full list of keyboard shortcuts, updated with all new features, by clicking the
+Keyboard Shortcuts icon at the top right of the InvokeAI WebUI.</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1-2.1-2M12.5 7v5.2l4 2.4-1 1L11 13V7h1.5M11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2v1.8Z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">August 6, 2024</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3h-2Z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">August 6, 2024</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+  
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 InvokeAI Team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.tabs.sticky", "navigation.tracking", "navigation.indexes", "navigation.path", "search.highlight", "search.suggest", "toc.integrate"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.fe8b6f2b.min.js"></script>
+      
+        <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
+      
+        <script src="../../javascripts/tablesort.js"></script>
+      
+        <script src="../../javascript/init_kapa_widget.js"></script>
+      
+    
+  </body>
+</html>

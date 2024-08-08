@@ -1,0 +1,3053 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="mauwii">
+      
+      
+        <link rel="canonical" href="https://invoke-ai.github.io/InvokeAI/CHANGELOG/">
+      
+      
+      
+      
+      <link rel="icon" href="../img/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.0, mkdocs-material-9.5.31">
+    
+    
+      
+        <title>Changelog - InvokeAI Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.3cba04c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+  
+
+
+  
+  
+
+<script id="__analytics">function __md_analytics(){function n(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],n("js",new Date),n("config","G-2X4JR4S4FB"),document.addEventListener("DOMContentLoaded",function(){document.forms.search&&document.forms.search.query.addEventListener("blur",function(){this.value&&n("event","search",{search_term:this.value})}),document$.subscribe(function(){var a=document.forms.feedback;if(void 0!==a)for(var e of a.querySelectorAll("[type=submit]"))e.addEventListener("click",function(e){e.preventDefault();var t=document.location.pathname,e=this.getAttribute("data-md-value");n("event","feedback",{page:t,data:e}),a.firstElementChild.disabled=!0;e=a.querySelector(".md-feedback__note [data-md-value='"+e+"']");e&&(e.hidden=!1)}),a.hidden=!1}),location$.subscribe(function(e){n("config","G-2X4JR4S4FB",{page_path:e.pathname})})});var e=document.createElement("script");e.async=!0,e.src="https://www.googletagmanager.com/gtag/js?id=G-2X4JR4S4FB",document.getElementById("__analytics").insertAdjacentElement("afterEnd",e)}</script>
+  
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+  
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="InvokeAI Documentation" class="md-header__button md-logo" aria-label="InvokeAI Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvokeAI Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../installation/INSTALLATION/" class="md-tabs__link">
+          
+  
+    
+  
+  Installation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../nodes/overview/" class="md-tabs__link">
+          
+  
+    
+  
+  Workflows & Nodes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../nodes/communityNodes/" class="md-tabs__link">
+        
+  
+    
+  
+  Community Nodes
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../features/" class="md-tabs__link">
+          
+  
+    
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/CONTRIBUTING/" class="md-tabs__link">
+          
+  
+    
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../help/gettingStartedWithAI/" class="md-tabs__link">
+          
+  
+    
+  
+  Help
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../other/CONTRIBUTORS/" class="md-tabs__link">
+          
+  
+    
+  
+  Other
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="InvokeAI Documentation" class="md-nav__button md-logo" aria-label="InvokeAI Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    InvokeAI Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Installation
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Installation
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/INSTALLATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/INSTALL_REQUIREMENTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Requirements
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/010_INSTALL_AUTOMATED/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Automatic Install
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/020_INSTALL_MANUAL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Manual Install
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/INSTALL_DEVELOPMENT/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Developer Install
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/040_INSTALL_DOCKER/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Docker
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/050_INSTALLING_MODELS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installing Models
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/060_INSTALL_PATCHMATCH/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installing PyPatchMatch
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Workflows & Nodes
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Workflows & Nodes
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/overview/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Nodes Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/NODES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Workflow Editor Basics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/defaultNodes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    List of Default Nodes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/exampleWorkflows/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Example Workflows
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/comfyToInvoke/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ComfyUI to InvokeAI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/detailedNodes/faceTools/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Facetool Node
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/contributingNodes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributing Nodes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/NODES_MIGRATION_V3_V4/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migrating from v3 to v4
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/INVOCATION_API/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Invocation API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/communityNodes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Community Nodes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../features/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Features
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    New to InvokeAI?
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/DATABASE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Database
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/CONTROLNET/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Control Adapters
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/IMG2IMG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Image-to-Image
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Controlling Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/LORAS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    LoRAs & LCM-LoRAs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/MODEL_MERGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Model Merging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/overview" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Workflows &  Nodes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/WATERMARK%2BNSFW/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    NSFW Checker
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/POSTPROCESS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Postprocessing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/PROMPTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prompting Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_14" id="__nav_5_14_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Textual Inversions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_14">
+            <span class="md-nav__icon md-icon"></span>
+            Textual Inversions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/TEXTUAL_INVERSIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Textual Inversions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/TRAINING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Textual Inversion Training
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/UNIFIED_CANVAS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Unified Canvas
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/WEB/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    InvokeAI Web Server
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/WEBUIHOTKEYS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    WebUI Hotkeys
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/UTILITIES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Maintenance Utilities
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/OTHER/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Other
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Contributing
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/CONTRIBUTING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How to Contribute
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CODE_OF_CONDUCT/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    InvokeAI Code of Conduct
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Development
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_3">
+            <span class="md-nav__icon md-icon"></span>
+            Development
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/contribution_guides/development/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/contribution_guides/newContributorChecklist/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    New Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/MODEL_MANAGER/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/contribution_guides/contributingToFrontend.md" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Frontend Documentation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/LOCAL_DEVELOPMENT/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Local Development
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/TESTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_3_7" id="__nav_6_3_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Frontend
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            Frontend
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/frontend/OVERVIEW/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/frontend/STATE_MGMT/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    State Management
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/frontend/WORKFLOWS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Workflows
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/contribution_guides/documentation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Documentation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/INVOCATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Nodes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/MODEL_MANAGER/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Model Manager v2
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/DOWNLOAD_QUEUE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Download Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/contribution_guides/translation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Translation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/contribution_guides/tutorials/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Tutorials
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Help
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Help
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    New to InvokeAI?
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../help/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../help/diffusion/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Diffusion Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../help/SAMPLER_CONVERGENCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sampler Convergence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Other
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            Other
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../other/CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../other/README-CompViz/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CompViz-README
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="changelog"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5 8.25a.75.75 0 0 1 .75-.75h4a.75.75 0 0 1 0 1.5h-4A.75.75 0 0 1 5 8.25ZM4 10.5A.75.75 0 0 0 4 12h4a.75.75 0 0 0 0-1.5H4Z"/><path d="M13-.005c1.654 0 3 1.328 3 3 0 .982-.338 1.933-.783 2.818-.443.879-1.028 1.758-1.582 2.588l-.011.017c-.568.853-1.104 1.659-1.501 2.446-.398.789-.623 1.494-.623 2.136a1.5 1.5 0 1 0 2.333-1.248.75.75 0 0 1 .834-1.246A3 3 0 0 1 13 16H3a3 3 0 0 1-3-3c0-1.582.891-3.135 1.777-4.506.209-.322.418-.637.623-.946.473-.709.923-1.386 1.287-2.048H2.51c-.576 0-1.381-.133-1.907-.783A2.68 2.68 0 0 1 0 2.995a3 3 0 0 1 3-3Zm0 1.5a1.5 1.5 0 0 0-1.5 1.5c0 .476.223.834.667 1.132A.75.75 0 0 1 11.75 5.5H5.368c-.467 1.003-1.141 2.015-1.773 2.963-.192.289-.381.571-.558.845C2.13 10.711 1.5 11.916 1.5 13A1.5 1.5 0 0 0 3 14.5h7.401A2.989 2.989 0 0 1 10 13c0-.979.338-1.928.784-2.812.441-.874 1.023-1.748 1.575-2.576l.017-.026c.568-.853 1.103-1.658 1.501-2.448.398-.79.623-1.497.623-2.143 0-.838-.669-1.5-1.5-1.5Zm-10 0a1.5 1.5 0 0 0-1.5 1.5c0 .321.1.569.27.778.097.12.325.227.74.227h7.674A2.737 2.737 0 0 1 10 2.995c0-.546.146-1.059.401-1.5Z"/></svg></span> <strong>Changelog</strong><a class="headerlink" href="#changelog" title="Permanent link">#</a></h1>
+<h2 id="v235-22-may-2023">v2.3.5 <small>(22 May 2023)</small><a class="headerlink" href="#v235-22-may-2023" title="Permanent link">#</a></h2>
+<p>This release (along with the post1 and post2 follow-on releases) expands support for additional LoRA and LyCORIS models, upgrades diffusers versions, and fixes a few bugs.</p>
+<h3 id="lora-and-lycoris-support-improvement">LoRA and LyCORIS Support Improvement<a class="headerlink" href="#lora-and-lycoris-support-improvement" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>A number of LoRA/LyCORIS fine-tune files (those which alter the text encoder as well as the unet model) were not having the desired effect in InvokeAI. This bug has now been fixed. Full documentation of LoRA support is available at InvokeAI LoRA Support.
+Previously, InvokeAI did not distinguish between LoRA/LyCORIS models based on Stable Diffusion v1.5 vs those based on v2.0 and 2.1, leading to a crash when an incompatible model was loaded. This has now been fixed. In addition, the web pulldown menus for LoRA and Textual Inversion selection have been enhanced to show only those files that are compatible with the currently-selected Stable Diffusion model.
+Support for the newer LoKR LyCORIS files has been added.
+</code></pre></div>
+<h3 id="library-updates-and-speedreproducibility-advancements">Library Updates and Speed/Reproducibility Advancements<a class="headerlink" href="#library-updates-and-speedreproducibility-advancements" title="Permanent link">#</a></h3>
+<p>The major enhancement in this version is that NVIDIA users no longer need to decide between speed and reproducibility. Previously, if you activated the Xformers library, you would see improvements in speed and memory usage, but multiple images generated with the same seed and other parameters would be slightly different from each other. This is no longer the case. Relative to 2.3.5 you will see improved performance when running without Xformers, and even better performance when Xformers is activated. In both cases, images generated with the same settings will be identical.</p>
+<p>Here are the new library versions:
+Library     Version
+Torch   2.0.0
+Diffusers   0.16.1
+Xformers    0.0.19
+Compel  1.1.5
+Other Improvements</p>
+<h3 id="performance-improvements">Performance Improvements<a class="headerlink" href="#performance-improvements" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>When a model is loaded for the first time, InvokeAI calculates its checksum for incorporation into the PNG metadata. This process could take up to a minute on network-mounted disks and WSL mounts. This release noticeably speeds up the process.
+</code></pre></div>
+<h3 id="bug-fixes">Bug Fixes<a class="headerlink" href="#bug-fixes" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code>The &quot;import models from directory&quot; and &quot;import from URL&quot; functionality in the console-based model installer has now been fixed.
+When running the WebUI, we have reduced the number of times that InvokeAI reaches out to HuggingFace to fetch the list of embeddable Textual Inversion models. We have also caught and fixed a problem with the updater not correctly detecting when another instance of the updater is running
+</code></pre></div>
+<h2 id="v234-7-april-2023">v2.3.4 <small>(7 April 2023)</small><a class="headerlink" href="#v234-7-april-2023" title="Permanent link">#</a></h2>
+<p>What's New in 2.3.4</p>
+<p>This features release adds support for LoRA (Low-Rank Adaptation) and LyCORIS (Lora beYond Conventional) models, as well as some minor bug fixes.</p>
+<h3 id="lora-and-lycoris-support">LoRA and LyCORIS Support<a class="headerlink" href="#lora-and-lycoris-support" title="Permanent link">#</a></h3>
+<p>LoRA files contain fine-tuning weights that enable particular styles, subjects or concepts to be applied to generated images. LyCORIS files are an extended variant of LoRA. InvokeAI supports the most common LoRA/LyCORIS format, which ends in the suffix .safetensors. You will find numerous LoRA and LyCORIS models for download at Civitai, and a small but growing number at Hugging Face. Full documentation of LoRA support is available at InvokeAI LoRA Support.( Pre-release note: this page will only be available after release)</p>
+<p>To use LoRA/LyCORIS models in InvokeAI:</p>
+<div class="highlight"><pre><span></span><code>Download the .safetensors files of your choice and place in /path/to/invokeai/loras. This directory was not present in earlier version of InvokeAI but will be created for you the first time you run the command-line or web client. You can also create the directory manually.
+
+Add withLora(lora-file,weight) to your prompts. The weight is optional and will default to 1.0. A few examples, assuming that a LoRA file named loras/sushi.safetensors is present:
+</code></pre></div>
+<p>family sitting at dinner table eating sushi withLora(sushi,0.9)
+family sitting at dinner table eating sushi withLora(sushi, 0.75)
+family sitting at dinner table eating sushi withLora(sushi)</p>
+<p>Multiple withLora() prompt fragments are allowed. The weight can be arbitrarily large, but the useful range is roughly 0.5 to 1.0. Higher weights make the LoRA's influence stronger. Negative weights are also allowed, which can lead to some interesting effects.</p>
+<div class="highlight"><pre><span></span><code>Generate as you usually would! If you find that the image is too &quot;crisp&quot; try reducing the overall CFG value or reducing individual LoRA weights. As is the case with all fine-tunes, you&#39;ll get the best results when running the LoRA on top of the model similar to, or identical with, the one that was used during the LoRA&#39;s training. Don&#39;t try to load a SD 1.x-trained LoRA into a SD 2.x model, and vice versa. This will trigger a non-fatal error message and generation will not proceed.
+
+You can change the location of the loras directory by passing the --lora_directory option to `invokeai.
+</code></pre></div>
+<h3 id="new-webui-lora-and-textual-inversion-buttons">New WebUI LoRA and Textual Inversion Buttons<a class="headerlink" href="#new-webui-lora-and-textual-inversion-buttons" title="Permanent link">#</a></h3>
+<p>This version adds two new web interface buttons for inserting LoRA and Textual Inversion triggers into the prompt as shown in the screenshot below.</p>
+<p>Clicking on one or the other of the buttons will bring up a menu of available LoRA/LyCORIS or Textual Inversion trigger terms. Select a menu item to insert the properly-formatted withLora() or <textual-inversion> prompt fragment into the positive prompt. The number in parentheses indicates the number of trigger terms currently in the prompt. You may click the button again and deselect the LoRA or trigger to remove it from the prompt, or simply edit the prompt directly.</p>
+<p>Currently terms are inserted into the positive prompt textbox only. However, some textual inversion embeddings are designed to be used with negative prompts. To move a textual inversion trigger into the negative prompt, simply cut and paste it.</p>
+<p>By default the Textual Inversion menu only shows locally installed models found at startup time in /path/to/invokeai/embeddings. However, InvokeAI has the ability to dynamically download and install additional Textual Inversion embeddings from the HuggingFace Concepts Library. You may choose to display the most popular of these (with five or more likes) in the Textual Inversion menu by going to Settings and turning on "Show Textual Inversions from HF Concepts Library." When this option is activated, the locally-installed TI embeddings will be shown first, followed by uninstalled terms from Hugging Face. See The Hugging Face Concepts Library and Importing Textual Inversion files for more information.</p>
+<h3 id="minor-features-and-fixes">Minor features and fixes<a class="headerlink" href="#minor-features-and-fixes" title="Permanent link">#</a></h3>
+<p>This release changes model switching behavior so that the command-line and Web UIs save the last model used and restore it the next time they are launched. It also improves the behavior of the installer so that the pip utility is kept up to date.</p>
+<h3 id="known-bugs-in-234">Known Bugs in 2.3.4<a class="headerlink" href="#known-bugs-in-234" title="Permanent link">#</a></h3>
+<p>These are known bugs in the release.</p>
+<div class="highlight"><pre><span></span><code>The Ancestral DPMSolverMultistepScheduler (k_dpmpp_2a) sampler is not yet implemented for diffusers models and will disappear from the WebUI Sampler menu when a diffusers model is selected.
+Windows Defender will sometimes raise Trojan or backdoor alerts for the codeformer.pth face restoration model, as well as the CIDAS/clipseg and runwayml/stable-diffusion-v1.5 models. These are false positives and can be safely ignored. InvokeAI performs a malware scan on all models as they are loaded. For additional security, you should use safetensors models whenever they are available.
+</code></pre></div>
+<h2 id="v233-28-march-2023">v2.3.3 <small>(28 March 2023)</small><a class="headerlink" href="#v233-28-march-2023" title="Permanent link">#</a></h2>
+<p>This is a bugfix and minor feature release.</p>
+<h3 id="bugfixes">Bugfixes<a class="headerlink" href="#bugfixes" title="Permanent link">#</a></h3>
+<p>Since version 2.3.2 the following bugs have been fixed:
+Bugs</p>
+<div class="highlight"><pre><span></span><code>When using legacy checkpoints with an external VAE, the VAE file is now scanned for malware prior to loading. Previously only the main model weights file was scanned.
+Textual inversion will select an appropriate batchsize based on whether xformers is active, and will default to xformers enabled if the library is detected.
+The batch script log file names have been fixed to be compatible with Windows.
+Occasional corruption of the .next_prefix file (which stores the next output file name in sequence) on Windows systems is now detected and corrected.
+Support loading of legacy config files that have no personalization (textual inversion) section.
+An infinite loop when opening the developer&#39;s console from within the invoke.sh script has been corrected.
+Documentation fixes, including a recipe for detecting and fixing problems with the AMD GPU ROCm driver.
+</code></pre></div>
+<p>Enhancements</p>
+<div class="highlight"><pre><span></span><code>It is now possible to load and run several community-contributed SD-2.0 based models, including the often-requested &quot;Illuminati&quot; model.
+The &quot;NegativePrompts&quot; embedding file, and others like it, can now be loaded by placing it in the InvokeAI embeddings directory.
+If no --model is specified at launch time, InvokeAI will remember the last model used and restore it the next time it is launched.
+On Linux systems, the invoke.sh launcher now uses a prettier console-based interface. To take advantage of it, install the dialog package using your package manager (e.g. sudo apt install dialog).
+When loading legacy models (safetensors/ckpt) you can specify a custom config file and/or a VAE by placing like-named files in the same directory as the model following this example:
+</code></pre></div>
+<p>my-favorite-model.ckpt
+my-favorite-model.yaml
+my-favorite-model.vae.pt      # or my-favorite-model.vae.safetensors</p>
+<h3 id="known-bugs-in-233">Known Bugs in 2.3.3<a class="headerlink" href="#known-bugs-in-233" title="Permanent link">#</a></h3>
+<p>These are known bugs in the release.</p>
+<div class="highlight"><pre><span></span><code>The Ancestral DPMSolverMultistepScheduler (k_dpmpp_2a) sampler is not yet implemented for diffusers models and will disappear from the WebUI Sampler menu when a diffusers model is selected.
+Windows Defender will sometimes raise Trojan or backdoor alerts for the codeformer.pth face restoration model, as well as the CIDAS/clipseg and runwayml/stable-diffusion-v1.5 models. These are false positives and can be safely ignored. InvokeAI performs a malware scan on all models as they are loaded. For additional security, you should use safetensors models whenever they are available.
+</code></pre></div>
+<h2 id="v232-11-march-2023">v2.3.2 <small>(11 March 2023)</small><a class="headerlink" href="#v232-11-march-2023" title="Permanent link">#</a></h2>
+<p>This is a bugfix and minor feature release.</p>
+<h3 id="bugfixes_1">Bugfixes<a class="headerlink" href="#bugfixes_1" title="Permanent link">#</a></h3>
+<p>Since version 2.3.1 the following bugs have been fixed:</p>
+<div class="highlight"><pre><span></span><code>Black images appearing for potential NSFW images when generating with legacy checkpoint models and both --no-nsfw_checker and --ckpt_convert turned on.
+Black images appearing when generating from models fine-tuned on Stable-Diffusion-2-1-base. When importing V2-derived models, you may be asked to select whether the model was derived from a &quot;base&quot; model (512 pixels) or the 768-pixel SD-2.1 model.
+The &quot;Use All&quot; button was not restoring the Hi-Res Fix setting on the WebUI
+When using the model installer console app, models failed to import correctly when importing from directories with spaces in their names. A similar issue with the output directory was also fixed.
+Crashes that occurred during model merging.
+Restore previous naming of Stable Diffusion base and 768 models.
+Upgraded to latest versions of diffusers, transformers, safetensors and accelerate libraries upstream. We hope that this will fix the assertion NDArray &gt; 2**32 issue that MacOS users have had when generating images larger than 768x768 pixels. Please report back.
+</code></pre></div>
+<p>As part of the upgrade to diffusers, the location of the diffusers-based models has changed from models/diffusers to models/hub. When you launch InvokeAI for the first time, it will prompt you to OK a one-time move. This should be quick and harmless, but if you have modified your models/diffusers directory in some way, for example using symlinks, you may wish to cancel the migration and make appropriate adjustments.
+New "Invokeai-batch" script</p>
+<h3 id="invoke-ai-batch">Invoke AI Batch<a class="headerlink" href="#invoke-ai-batch" title="Permanent link">#</a></h3>
+<p>2.3.2 introduces a new command-line only script called invokeai-batch that can be used to generate hundreds of images from prompts and settings that vary systematically. This can be used to try the same prompt across multiple combinations of models, steps, CFG settings and so forth. It also allows you to template prompts and generate a combinatorial list like:</p>
+<p>a shack in the mountains, photograph
+a shack in the mountains, watercolor
+a shack in the mountains, oil painting
+a chalet in the mountains, photograph
+a chalet in the mountains, watercolor
+a chalet in the mountains, oil painting
+a shack in the desert, photograph
+...</p>
+<p>If you have a system with multiple GPUs, or a single GPU with lots of VRAM, you can parallelize generation across the combinatorial set, reducing wait times and using your system's resources efficiently (make sure you have good GPU cooling).</p>
+<p>To try invokeai-batch out. Launch the "developer's console" using the invoke launcher script, or activate the invokeai virtual environment manually. From the console, give the command invokeai-batch --help in order to learn how the script works and create your first template file for dynamic prompt generation.</p>
+<h3 id="known-bugs-in-232">Known Bugs in 2.3.2<a class="headerlink" href="#known-bugs-in-232" title="Permanent link">#</a></h3>
+<p>These are known bugs in the release.</p>
+<div class="highlight"><pre><span></span><code>The Ancestral DPMSolverMultistepScheduler (k_dpmpp_2a) sampler is not yet implemented for diffusers models and will disappear from the WebUI Sampler menu when a diffusers model is selected.
+Windows Defender will sometimes raise a Trojan alert for the codeformer.pth face restoration model. As far as we have been able to determine, this is a false positive and can be safely whitelisted.
+</code></pre></div>
+<h2 id="v231-22-february-2023">v2.3.1 <small>(22 February 2023)</small><a class="headerlink" href="#v231-22-february-2023" title="Permanent link">#</a></h2>
+<p>This is primarily a bugfix release, but it does provide several new features that will improve the user experience.</p>
+<h3 id="enhanced-support-for-model-management">Enhanced support for model management<a class="headerlink" href="#enhanced-support-for-model-management" title="Permanent link">#</a></h3>
+<p>InvokeAI now makes it convenient to add, remove and modify models. You can individually import models that are stored on your local system, scan an entire folder and its subfolders for models and import them automatically, and even directly import models from the internet by providing their download URLs. You also have the option of designating a local folder to scan for new models each time InvokeAI is restarted.</p>
+<p>There are three ways of accessing the model management features:</p>
+<div class="highlight"><pre><span></span><code>From the WebUI, click on the cube to the right of the model selection menu. This will bring up a form that allows you to import models individually from your local disk or scan a directory for models to import.
+
+Using the Model Installer App
+</code></pre></div>
+<p>Choose option (5) download and install models from the invoke launcher script to start a new console-based application for model management. You can use this to select from a curated set of starter models, or import checkpoint, safetensors, and diffusers models from a local disk or the internet. The example below shows importing two checkpoint URLs from popular SD sites and a HuggingFace diffusers model using its Repository ID. It also shows how to designate a folder to be scanned at startup time for new models to import.</p>
+<p>Command-line users can start this app using the command invokeai-model-install.</p>
+<div class="highlight"><pre><span></span><code>Using the Command Line Client (CLI)
+</code></pre></div>
+<p>The !install_model and !convert_model commands have been enhanced to allow entering of URLs and local directories to scan and import. The first command installs .ckpt and .safetensors files as-is. The second one converts them into the faster diffusers format before installation.</p>
+<p>Internally InvokeAI is able to probe the contents of a .ckpt or .safetensors file to distinguish among v1.x, v2.x and inpainting models. This means that you do not need to include "inpaint" in your model names to use an inpainting model. Note that Stable Diffusion v2.x models will be autoconverted into a diffusers model the first time you use it.</p>
+<p>Please see INSTALLING MODELS for more information on model management.</p>
+<h3 id="an-improved-installer-experience">An Improved Installer Experience<a class="headerlink" href="#an-improved-installer-experience" title="Permanent link">#</a></h3>
+<p>The installer now launches a console-based UI for setting and changing commonly-used startup options:</p>
+<p>After selecting the desired options, the installer installs several support models needed by InvokeAI's face reconstruction and upscaling features and then launches the interface for selecting and installing models shown earlier. At any time, you can edit the startup options by launching invoke.sh/invoke.bat and entering option (6) change InvokeAI startup options</p>
+<p>Command-line users can launch the new configure app using invokeai-configure.</p>
+<p>This release also comes with a renewed updater. To do an update without going through a whole reinstallation, launch invoke.sh or invoke.bat and choose option (9) update InvokeAI . This will bring you to a screen that prompts you to update to the latest released version, to the most current development version, or any released or unreleased version you choose by selecting the tag or branch of the desired version.</p>
+<p>Command-line users can run this interface by typing invokeai-configure</p>
+<h3 id="image-symmetry-options">Image Symmetry Options<a class="headerlink" href="#image-symmetry-options" title="Permanent link">#</a></h3>
+<p>There are now features to generate horizontal and vertical symmetry during generation. The way these work is to wait until a selected step in the generation process and then to turn on a mirror image effect. In addition to generating some cool images, you can also use this to make side-by-side comparisons of how an image will look with more or fewer steps. Access this option from the WebUI by selecting Symmetry from the image generation settings, or within the CLI by using the options --h_symmetry_time_pct and --v_symmetry_time_pct (these can be abbreviated to --h_sym and --v_sym like all other options).</p>
+<h3 id="a-new-unified-canvas-look">A New Unified Canvas Look<a class="headerlink" href="#a-new-unified-canvas-look" title="Permanent link">#</a></h3>
+<p>This release introduces a beta version of the WebUI Unified Canvas. To try it out, open up the settings dialogue in the WebUI (gear icon) and select Use Canvas Beta Layout:</p>
+<p>Refresh the screen and go to to Unified Canvas (left side of screen, third icon from the top). The new layout is designed to provide more space to work in and to keep the image controls close to the image itself:</p>
+<p>Model conversion and merging within the WebUI</p>
+<p>The WebUI now has an intuitive interface for model merging, as well as for permanent conversion of models from legacy .ckpt/.safetensors formats into diffusers format. These options are also available directly from the invoke.sh/invoke.bat scripts.
+An easier way to contribute translations to the WebUI</p>
+<p>We have migrated our translation efforts to Weblate, a FOSS translation product. Maintaining the growing project's translations is now far simpler for the maintainers and community. Please review our brief translation guide for more information on how to contribute.
+Numerous internal bugfixes and performance issues</p>
+<h3 id="bug-fixes_1">Bug Fixes<a class="headerlink" href="#bug-fixes_1" title="Permanent link">#</a></h3>
+<p>This releases quashes multiple bugs that were reported in 2.3.0. Major internal changes include upgrading to diffusers 0.13.0, and using the compel library for prompt parsing. See Detailed Change Log for a detailed list of bugs caught and squished.
+Summary of InvokeAI command line scripts (all accessible via the launcher menu)
+Command     Description
+invokeai    Command line interface
+invokeai --web  Web interface
+invokeai-model-install  Model installer with console forms-based front end
+invokeai-ti --gui   Textual inversion, with a console forms-based front end
+invokeai-merge --gui    Model merging, with a console forms-based front end
+invokeai-configure  Startup configuration; can also be used to reinstall support models
+invokeai-update     InvokeAI software updater</p>
+<h3 id="known-bugs-in-231">Known Bugs in 2.3.1<a class="headerlink" href="#known-bugs-in-231" title="Permanent link">#</a></h3>
+<p>These are known bugs in the release.
+    MacOS users generating 768x768 pixel images or greater using diffusers models may experience a hard crash with assertion NDArray &gt; 2**32 This appears to be an issu...</p>
+<h2 id="v230-15-january-2023">v2.3.0 <small>(15 January 2023)</small><a class="headerlink" href="#v230-15-january-2023" title="Permanent link">#</a></h2>
+<p>**Transition to diffusers</p>
+<p>Version 2.3 provides support for both the traditional <code>.ckpt</code> weight
+checkpoint files as well as the HuggingFace <code>diffusers</code> format. This
+introduces several changes you should know about.</p>
+<ol>
+<li>The models.yaml format has been updated. There are now two
+   different type of configuration stanza. The traditional ckpt
+   one will look like this, with a <code>format</code> of <code>ckpt</code> and a
+   <code>weights</code> field that points to the absolute or ROOTDIR-relative
+   location of the ckpt file.</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>inpainting-1.5:
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>   description: RunwayML SD 1.5 model optimized for inpainting (4.27 GB)
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>   repo_id: runwayml/stable-diffusion-inpainting
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>   format: ckpt
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>   width: 512
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>   height: 512
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>   weights: models/ldm/stable-diffusion-v1/sd-v1-5-inpainting.ckpt
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>   config: configs/stable-diffusion/v1-inpainting-inference.yaml
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>   vae: models/ldm/stable-diffusion-v1/vae-ft-mse-840000-ema-pruned.ckpt
+</code></pre></div>
+<p>A configuration stanza for a diffusers model hosted at HuggingFace will look like this,
+  with a <code>format</code> of <code>diffusers</code> and a <code>repo_id</code> that points to the
+  repository ID of the model on HuggingFace:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>stable-diffusion-2.1:
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>description: Stable Diffusion version 2.1 diffusers model (5.21 GB)
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>repo_id: stabilityai/stable-diffusion-2-1
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>format: diffusers
+</code></pre></div>
+<p>A configuration stanza for a diffuers model stored locally should
+  look like this, with a <code>format</code> of <code>diffusers</code>, but a <code>path</code> field
+  that points at the directory that contains <code>model_index.json</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>waifu-diffusion:
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>description: Latest waifu diffusion 1.4
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>format: diffusers
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>path: models/diffusers/hakurei-haifu-diffusion-1.4
+</code></pre></div>
+<ol>
+<li>In order of precedence, InvokeAI will now use HF_HOME, then
+   XDG_CACHE_HOME, then finally default to <code>ROOTDIR/models</code> to
+   store HuggingFace diffusers models.</li>
+</ol>
+<p>Consequently, the format of the models directory has changed to
+   mimic the HuggingFace cache directory. When HF_HOME and XDG_HOME
+   are not set, diffusers models are now automatically downloaded
+   and retrieved from the directory <code>ROOTDIR/models/diffusers</code>,
+   while other models are stored in the directory
+   <code>ROOTDIR/models/hub</code>. This organization is the same as that used
+   by HuggingFace for its cache management.</p>
+<p>This allows you to share diffusers and ckpt model files easily with
+   other machine learning applications that use the HuggingFace
+   libraries. To do this, set the environment variable HF_HOME
+   before starting up InvokeAI to tell it what directory to
+   cache models in. To tell InvokeAI to use the standard HuggingFace
+   cache directory, you would set HF_HOME like this (Linux/Mac):</p>
+<p><code>export HF_HOME=~/.cache/huggingface</code></p>
+<p>Both HuggingFace and InvokeAI will fall back to the XDG_CACHE_HOME
+   environment variable if HF_HOME is not set; this path
+   takes precedence over <code>ROOTDIR/models</code> to allow for the same sharing
+   with other machine learning applications that use HuggingFace
+   libraries.</p>
+<ol>
+<li>
+<p>If you upgrade to InvokeAI 2.3.* from an earlier version, there
+   will be a one-time migration from the old models directory format
+   to the new one. You will see a message about this the first time
+   you start <code>invoke.py</code>.</p>
+</li>
+<li>
+<p>Both the front end back ends of the model manager have been
+   rewritten to accommodate diffusers. You can import models using
+   their local file path, using their URLs, or their HuggingFace
+   repo_ids. On the command line, all these syntaxes work:</p>
+</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>!import_model stabilityai/stable-diffusion-2-1-base
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>!import_model /opt/sd-models/sd-1.4.ckpt
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>!import_model https://huggingface.co/Fictiverse/Stable_Diffusion_PaperCut_Model/blob/main/PaperCut_v1.ckpt
+</code></pre></div>
+<p>**KNOWN BUGS (15 January 2023)</p>
+<ol>
+<li>
+<p>On CUDA systems, the 768 pixel stable-diffusion-2.0 and
+   stable-diffusion-2.1 models can only be run as <code>diffusers</code> models
+   when the <code>xformer</code> library is installed and configured. Without
+   <code>xformers</code>, InvokeAI returns black images.</p>
+</li>
+<li>
+<p>Inpainting and outpainting have regressed in quality.</p>
+</li>
+</ol>
+<p>Both these issues are being actively worked on.</p>
+<h2 id="v224-11-december-2022">v2.2.4 <small>(11 December 2022)</small><a class="headerlink" href="#v224-11-december-2022" title="Permanent link">#</a></h2>
+<p><strong>the <code>invokeai</code> directory</strong></p>
+<p>Previously there were two directories to worry about, the directory that
+contained the InvokeAI source code and the launcher scripts, and the <code>invokeai</code>
+directory that contained the models files, embeddings, configuration and
+outputs. With the 2.2.4 release, this dual system is done away with, and
+everything, including the <code>invoke.bat</code> and <code>invoke.sh</code> launcher scripts, now
+live in a directory named <code>invokeai</code>. By default this directory is located in
+your home directory (e.g. <code>\Users\yourname</code> on Windows), but you can select
+where it goes at install time.</p>
+<p>After installation, you can delete the install directory (the one that the zip
+file creates when it unpacks). Do <strong>not</strong> delete or move the <code>invokeai</code>
+directory!</p>
+<p><strong>Initialization file <code>invokeai/invokeai.init</code></strong></p>
+<p>You can place frequently-used startup options in this file, such as the default
+number of steps or your preferred sampler. To keep everything in one place, this
+file has now been moved into the <code>invokeai</code> directory and is named
+<code>invokeai.init</code>.</p>
+<p><strong>To update from Version 2.2.3</strong></p>
+<p>The easiest route is to download and unpack one of the 2.2.4 installer files.
+When it asks you for the location of the <code>invokeai</code> runtime directory, respond
+with the path to the directory that contains your 2.2.3 <code>invokeai</code>. That is, if
+<code>invokeai</code> lives at <code>C:\Users\fred\invokeai</code>, then answer with <code>C:\Users\fred</code>
+and answer "Y" when asked if you want to reuse the directory.</p>
+<p>The <code>update.sh</code> (<code>update.bat</code>) script that came with the 2.2.3 source installer
+does not know about the new directory layout and won't be fully functional.</p>
+<p><strong>To update to 2.2.5 (and beyond) there's now an update path</strong></p>
+<p>As they become available, you can update to more recent versions of InvokeAI
+using an <code>update.sh</code> (<code>update.bat</code>) script located in the <code>invokeai</code> directory.
+Running it without any arguments will install the most recent version of
+InvokeAI. Alternatively, you can get set releases by running the <code>update.sh</code>
+script with an argument in the command shell. This syntax accepts the path to
+the desired release's zip file, which you can find by clicking on the green
+"Code" button on this repository's home page.</p>
+<p><strong>Other 2.2.4 Improvements</strong></p>
+<ul>
+<li>Fix InvokeAI GUI initialization by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/addianto" title="GitHub User: addianto">@addianto</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1687" title="GitHub Issue: invoke-ai/InvokeAI #1687">#1687</a></li>
+<li>fix link in documentation by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1728" title="GitHub Issue: invoke-ai/InvokeAI #1728">#1728</a></li>
+<li>Fix broken link by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/ShawnZhong" title="GitHub User: ShawnZhong">@ShawnZhong</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1736" title="GitHub Issue: invoke-ai/InvokeAI #1736">#1736</a></li>
+<li>Remove reference to binary installer by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1731" title="GitHub Issue: invoke-ai/InvokeAI #1731">#1731</a></li>
+<li>documentation fixes for 2.2.3 by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1740" title="GitHub Issue: invoke-ai/InvokeAI #1740">#1740</a></li>
+<li>Modify installer links to point closer to the source installer by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/ebr" title="GitHub User: ebr">@ebr</a> in
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1745" title="GitHub Issue: invoke-ai/InvokeAI #1745">#1745</a></li>
+<li>add documentation warning about 1650/60 cards by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1753" title="GitHub Issue: invoke-ai/InvokeAI #1753">#1753</a></li>
+<li>Fix Linux source URL in installation docs by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/andybearman" title="GitHub User: andybearman">@andybearman</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1756" title="GitHub Issue: invoke-ai/InvokeAI #1756">#1756</a></li>
+<li>Make install instructions discoverable in readme by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/damian0815" title="GitHub User: damian0815">@damian0815</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1752" title="GitHub Issue: invoke-ai/InvokeAI #1752">#1752</a></li>
+<li>typo fix by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/ofirkris" title="GitHub User: ofirkris">@ofirkris</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1755" title="GitHub Issue: invoke-ai/InvokeAI #1755">#1755</a></li>
+<li>Non-interactive model download (support HUGGINGFACE_TOKEN) by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/ebr" title="GitHub User: ebr">@ebr</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1578" title="GitHub Issue: invoke-ai/InvokeAI #1578">#1578</a></li>
+<li>fix(srcinstall): shell installer - cp scripts instead of linking by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/tildebyte" title="GitHub User: tildebyte">@tildebyte</a>
+  in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1765" title="GitHub Issue: invoke-ai/InvokeAI #1765">#1765</a></li>
+<li>stability and usage improvements to binary &amp; source installers by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1760" title="GitHub Issue: invoke-ai/InvokeAI #1760">#1760</a></li>
+<li>fix off-by-one bug in cross-attention-control by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/damian0815" title="GitHub User: damian0815">@damian0815</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1774" title="GitHub Issue: invoke-ai/InvokeAI #1774">#1774</a></li>
+<li>Eventually update APP_VERSION to 2.2.3 by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/spezialspezial" title="GitHub User: spezialspezial">@spezialspezial</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1768" title="GitHub Issue: invoke-ai/InvokeAI #1768">#1768</a></li>
+<li>invoke script cds to its location before running by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1805" title="GitHub Issue: invoke-ai/InvokeAI #1805">#1805</a></li>
+<li>Make PaperCut and VoxelArt models load again by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1730" title="GitHub Issue: invoke-ai/InvokeAI #1730">#1730</a></li>
+<li>Fix --embedding_directory / --embedding_path not working by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/blessedcoolant" title="GitHub User: blessedcoolant">@blessedcoolant</a> in
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1817" title="GitHub Issue: invoke-ai/InvokeAI #1817">#1817</a></li>
+<li>Clean up readme by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/hipsterusername" title="GitHub User: hipsterusername">@hipsterusername</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1820" title="GitHub Issue: invoke-ai/InvokeAI #1820">#1820</a></li>
+<li>Optimized Docker build with support for external working directory by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/ebr" title="GitHub User: ebr">@ebr</a> in
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1544" title="GitHub Issue: invoke-ai/InvokeAI #1544">#1544</a></li>
+<li>disable pushing the cloud container by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1831" title="GitHub Issue: invoke-ai/InvokeAI #1831">#1831</a></li>
+<li>Fix docker push github action and expand with additional metadata by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/ebr" title="GitHub User: ebr">@ebr</a> in
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1837" title="GitHub Issue: invoke-ai/InvokeAI #1837">#1837</a></li>
+<li>Fix Broken Link To Notebook by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/VedantMadane" title="GitHub User: VedantMadane">@VedantMadane</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1821" title="GitHub Issue: invoke-ai/InvokeAI #1821">#1821</a></li>
+<li>Account for flat models by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/spezialspezial" title="GitHub User: spezialspezial">@spezialspezial</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1766" title="GitHub Issue: invoke-ai/InvokeAI #1766">#1766</a></li>
+<li>Update invoke.bat.in isolate environment variables by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lynnewu" title="GitHub User: lynnewu">@lynnewu</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1833" title="GitHub Issue: invoke-ai/InvokeAI #1833">#1833</a></li>
+<li>Arch Linux Specific PatchMatch Instructions &amp; fixing conda install on linux by
+  <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/SammCheese" title="GitHub User: SammCheese">@SammCheese</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1848" title="GitHub Issue: invoke-ai/InvokeAI #1848">#1848</a></li>
+<li>Make force free GPU memory work in img2img by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/addianto" title="GitHub User: addianto">@addianto</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1844" title="GitHub Issue: invoke-ai/InvokeAI #1844">#1844</a></li>
+<li>New installer by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a></li>
+</ul>
+<h2 id="v223-2-december-2022">v2.2.3 <small>(2 December 2022)</small><a class="headerlink" href="#v223-2-december-2022" title="Permanent link">#</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This point release removes references to the binary installer from the
+installation guide. The binary installer is not stable at the current
+time. First time users are encouraged to use the "source" installer as
+described in <a href="installation/deprecated_documentation/INSTALL_SOURCE.md">Installing InvokeAI with the Source Installer</a></p>
+</div>
+<p>With InvokeAI 2.2, this project now provides enthusiasts and professionals a
+robust workflow solution for creating AI-generated and human facilitated
+compositions. Additional enhancements have been made as well, improving safety,
+ease of use, and installation.</p>
+<p>Optimized for efficiency, InvokeAI needs only ~3.5GB of VRAM to generate a
+512x768 image (and less for smaller images), and is compatible with
+Windows/Linux/Mac (M1 &amp; M2).</p>
+<p>You can see the <a href="https://youtu.be/hIYBfDtKaus">release video</a> here, which
+introduces the main WebUI enhancement for version 2.2 -
+<a href="../features/UNIFIED_CANVAS/">The Unified Canvas</a>. This new workflow is the
+biggest enhancement added to the WebUI to date, and unlocks a stunning amount of
+potential for users to create and iterate on their creations. The following
+sections describe what's new for InvokeAI.</p>
+<h2 id="v222-30-november-2022">v2.2.2 <small>(30 November 2022)</small><a class="headerlink" href="#v222-30-november-2022" title="Permanent link">#</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The binary installer is not ready for prime time. First time users are recommended to install via the "source" installer accessible through the links at the bottom of this page.****</p>
+</div>
+<p>With InvokeAI 2.2, this project now provides enthusiasts and professionals a
+robust workflow solution for creating AI-generated and human facilitated
+compositions. Additional enhancements have been made as well, improving safety,
+ease of use, and installation.</p>
+<p>Optimized for efficiency, InvokeAI needs only ~3.5GB of VRAM to generate a
+512x768 image (and less for smaller images), and is compatible with
+Windows/Linux/Mac (M1 &amp; M2).</p>
+<p>You can see the <a href="https://youtu.be/hIYBfDtKaus">release video</a> here, which
+introduces the main WebUI enhancement for version 2.2 -
+<a href="https://invoke-ai.github.io/InvokeAI/features/UNIFIED_CANVAS/">The Unified Canvas</a>.
+This new workflow is the biggest enhancement added to the WebUI to date, and
+unlocks a stunning amount of potential for users to create and iterate on their
+creations. The following sections describe what's new for InvokeAI.</p>
+<h2 id="v220-2-december-2022">v2.2.0 <small>(2 December 2022)</small><a class="headerlink" href="#v220-2-december-2022" title="Permanent link">#</a></h2>
+<p>With InvokeAI 2.2, this project now provides enthusiasts and professionals a
+robust workflow solution for creating AI-generated and human facilitated
+compositions. Additional enhancements have been made as well, improving safety,
+ease of use, and installation.</p>
+<p>Optimized for efficiency, InvokeAI needs only ~3.5GB of VRAM to generate a
+512x768 image (and less for smaller images), and is compatible with
+Windows/Linux/Mac (M1 &amp; M2).</p>
+<p>You can see the <a href="https://youtu.be/hIYBfDtKaus">release video</a> here, which
+introduces the main WebUI enhancement for version 2.2 -
+<a href="../features/UNIFIED_CANVAS/">The Unified Canvas</a>. This new workflow is the
+biggest enhancement added to the WebUI to date, and unlocks a stunning amount of
+potential for users to create and iterate on their creations. The following
+sections describe what's new for InvokeAI.</p>
+<h2 id="v213-13-november-2022">v2.1.3 <small>(13 November 2022)</small><a class="headerlink" href="#v213-13-november-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>A choice of installer scripts that automate installation and configuration.
+  See
+  <a href="../installation/INSTALLATION/">Installation</a>.</li>
+<li>A streamlined manual installation process that works for both Conda and
+  PIP-only installs. See
+  <a href="../installation/020_INSTALL_MANUAL/">Manual Installation</a>.</li>
+<li>The ability to save frequently-used startup options (model to load, steps,
+  sampler, etc) in a <code>.invokeai</code> file. See
+  <a href="deprecated/CLI.md">Client</a></li>
+<li>Support for AMD GPU cards (non-CUDA) on Linux machines.</li>
+<li>Multiple bugs and edge cases squashed.</li>
+</ul>
+<h2 id="v210-2-november-2022">v2.1.0 <small>(2 November 2022)</small><a class="headerlink" href="#v210-2-november-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>update mac instructions to use invokeai for env name by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/willwillems" title="GitHub User: willwillems">@willwillems</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1030" title="GitHub Issue: invoke-ai/InvokeAI #1030">#1030</a></li>
+<li>Update .gitignore by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/blessedcoolant" title="GitHub User: blessedcoolant">@blessedcoolant</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1040" title="GitHub Issue: invoke-ai/InvokeAI #1040">#1040</a></li>
+<li>reintroduce fix for m1 from <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/579" title="GitHub Issue: invoke-ai/InvokeAI #579">#579</a> missing after merge by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/skurovec" title="GitHub User: skurovec">@skurovec</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1056" title="GitHub Issue: invoke-ai/InvokeAI #1056">#1056</a></li>
+<li>Update Stable_Diffusion_AI_Notebook.ipynb (Take 2) by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/ChloeL19" title="GitHub User: ChloeL19">@ChloeL19</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1060" title="GitHub Issue: invoke-ai/InvokeAI #1060">#1060</a></li>
+<li>Print out the device type which is used by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/manzke" title="GitHub User: manzke">@manzke</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1073" title="GitHub Issue: invoke-ai/InvokeAI #1073">#1073</a></li>
+<li>Hires Addition by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/hipsterusername" title="GitHub User: hipsterusername">@hipsterusername</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1063" title="GitHub Issue: invoke-ai/InvokeAI #1063">#1063</a></li>
+<li>fix for "1 leaked semaphore objects to clean up at shutdown" on M1 by
+  <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/skurovec" title="GitHub User: skurovec">@skurovec</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1081" title="GitHub Issue: invoke-ai/InvokeAI #1081">#1081</a></li>
+<li>Forward dream.py to invoke.py using the same interpreter, add deprecation
+  warning by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/db3000" title="GitHub User: db3000">@db3000</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1077" title="GitHub Issue: invoke-ai/InvokeAI #1077">#1077</a></li>
+<li>fix noisy images at high step counts by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1086" title="GitHub Issue: invoke-ai/InvokeAI #1086">#1086</a></li>
+<li>Generalize facetool strength argument by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/db3000" title="GitHub User: db3000">@db3000</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1078" title="GitHub Issue: invoke-ai/InvokeAI #1078">#1078</a></li>
+<li>Enable fast switching among models at the invoke&gt; command line by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1066" title="GitHub Issue: invoke-ai/InvokeAI #1066">#1066</a></li>
+<li>Fix Typo, committed changing ldm environment to invokeai by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/jdries3" title="GitHub User: jdries3">@jdries3</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1095" title="GitHub Issue: invoke-ai/InvokeAI #1095">#1095</a></li>
+<li>Update generate.py by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/unreleased" title="GitHub User: unreleased">@unreleased</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1109" title="GitHub Issue: invoke-ai/InvokeAI #1109">#1109</a></li>
+<li>Update 'ldm' env to 'invokeai' in troubleshooting steps by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/19wolf" title="GitHub User: 19wolf">@19wolf</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1125" title="GitHub Issue: invoke-ai/InvokeAI #1125">#1125</a></li>
+<li>Fixed documentation typos and resolved merge conflicts by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/rupeshs" title="GitHub User: rupeshs">@rupeshs</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1123" title="GitHub Issue: invoke-ai/InvokeAI #1123">#1123</a></li>
+<li>Fix broken doc links, fix malaprop in the project subtitle by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/majick" title="GitHub User: majick">@majick</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1131" title="GitHub Issue: invoke-ai/InvokeAI #1131">#1131</a></li>
+<li>Only output facetool parameters if enhancing faces by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/db3000" title="GitHub User: db3000">@db3000</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1119" title="GitHub Issue: invoke-ai/InvokeAI #1119">#1119</a></li>
+<li>Update gitignore to ignore codeformer weights at new location by
+  <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/spezialspezial" title="GitHub User: spezialspezial">@spezialspezial</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1136" title="GitHub Issue: invoke-ai/InvokeAI #1136">#1136</a></li>
+<li>fix links to point to invoke-ai.github.io <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1117" title="GitHub Issue: invoke-ai/InvokeAI #1117">#1117</a> by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1143" title="GitHub Issue: invoke-ai/InvokeAI #1143">#1143</a></li>
+<li>Rework-mkdocs by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1144" title="GitHub Issue: invoke-ai/InvokeAI #1144">#1144</a></li>
+<li>add option to CLI and pngwriter that allows user to set PNG compression level
+  by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1127" title="GitHub Issue: invoke-ai/InvokeAI #1127">#1127</a></li>
+<li>Fix img2img DDIM index out of bound by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/wfng92" title="GitHub User: wfng92">@wfng92</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1137" title="GitHub Issue: invoke-ai/InvokeAI #1137">#1137</a></li>
+<li>Fix gh actions by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1128" title="GitHub Issue: invoke-ai/InvokeAI #1128">#1128</a></li>
+<li>update mac instructions to use invokeai for env name by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/willwillems" title="GitHub User: willwillems">@willwillems</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1030" title="GitHub Issue: invoke-ai/InvokeAI #1030">#1030</a></li>
+<li>Update .gitignore by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/blessedcoolant" title="GitHub User: blessedcoolant">@blessedcoolant</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1040" title="GitHub Issue: invoke-ai/InvokeAI #1040">#1040</a></li>
+<li>reintroduce fix for m1 from <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/579" title="GitHub Issue: invoke-ai/InvokeAI #579">#579</a> missing after merge by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/skurovec" title="GitHub User: skurovec">@skurovec</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1056" title="GitHub Issue: invoke-ai/InvokeAI #1056">#1056</a></li>
+<li>Update Stable_Diffusion_AI_Notebook.ipynb (Take 2) by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/ChloeL19" title="GitHub User: ChloeL19">@ChloeL19</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1060" title="GitHub Issue: invoke-ai/InvokeAI #1060">#1060</a></li>
+<li>Print out the device type which is used by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/manzke" title="GitHub User: manzke">@manzke</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1073" title="GitHub Issue: invoke-ai/InvokeAI #1073">#1073</a></li>
+<li>Hires Addition by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/hipsterusername" title="GitHub User: hipsterusername">@hipsterusername</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1063" title="GitHub Issue: invoke-ai/InvokeAI #1063">#1063</a></li>
+<li>fix for "1 leaked semaphore objects to clean up at shutdown" on M1 by
+  <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/skurovec" title="GitHub User: skurovec">@skurovec</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1081" title="GitHub Issue: invoke-ai/InvokeAI #1081">#1081</a></li>
+<li>Forward dream.py to invoke.py using the same interpreter, add deprecation
+  warning by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/db3000" title="GitHub User: db3000">@db3000</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1077" title="GitHub Issue: invoke-ai/InvokeAI #1077">#1077</a></li>
+<li>fix noisy images at high step counts by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1086" title="GitHub Issue: invoke-ai/InvokeAI #1086">#1086</a></li>
+<li>Generalize facetool strength argument by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/db3000" title="GitHub User: db3000">@db3000</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1078" title="GitHub Issue: invoke-ai/InvokeAI #1078">#1078</a></li>
+<li>Enable fast switching among models at the invoke&gt; command line by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1066" title="GitHub Issue: invoke-ai/InvokeAI #1066">#1066</a></li>
+<li>Fix Typo, committed changing ldm environment to invokeai by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/jdries3" title="GitHub User: jdries3">@jdries3</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1095" title="GitHub Issue: invoke-ai/InvokeAI #1095">#1095</a></li>
+<li>Fixed documentation typos and resolved merge conflicts by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/rupeshs" title="GitHub User: rupeshs">@rupeshs</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1123" title="GitHub Issue: invoke-ai/InvokeAI #1123">#1123</a></li>
+<li>Only output facetool parameters if enhancing faces by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/db3000" title="GitHub User: db3000">@db3000</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1119" title="GitHub Issue: invoke-ai/InvokeAI #1119">#1119</a></li>
+<li>add option to CLI and pngwriter that allows user to set PNG compression level
+  by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1127" title="GitHub Issue: invoke-ai/InvokeAI #1127">#1127</a></li>
+<li>Fix img2img DDIM index out of bound by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/wfng92" title="GitHub User: wfng92">@wfng92</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1137" title="GitHub Issue: invoke-ai/InvokeAI #1137">#1137</a></li>
+<li>Add text prompt to inpaint mask support by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1133" title="GitHub Issue: invoke-ai/InvokeAI #1133">#1133</a></li>
+<li>Respect http[s] protocol when making socket.io middleware by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/damian0815" title="GitHub User: damian0815">@damian0815</a> in
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/976" title="GitHub Issue: invoke-ai/InvokeAI #976">#976</a></li>
+<li>WebUI: Adds Codeformer support by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1151" title="GitHub Issue: invoke-ai/InvokeAI #1151">#1151</a></li>
+<li>Skips normalizing prompts for web UI metadata by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1165" title="GitHub Issue: invoke-ai/InvokeAI #1165">#1165</a></li>
+<li>Add Asymmetric Tiling by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/carson-katri" title="GitHub User: carson-katri">@carson-katri</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1132" title="GitHub Issue: invoke-ai/InvokeAI #1132">#1132</a></li>
+<li>Web UI: Increases max CFG Scale to 200 by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1172" title="GitHub Issue: invoke-ai/InvokeAI #1172">#1172</a></li>
+<li>Corrects color channels in face restoration; Fixes <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1167" title="GitHub Issue: invoke-ai/InvokeAI #1167">#1167</a> by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a>
+  in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1175" title="GitHub Issue: invoke-ai/InvokeAI #1175">#1175</a></li>
+<li>Flips channels using array slicing instead of using OpenCV by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a>
+  in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1178" title="GitHub Issue: invoke-ai/InvokeAI #1178">#1178</a></li>
+<li>Fix typo in docs: s/Formally/Formerly by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/noodlebox" title="GitHub User: noodlebox">@noodlebox</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1176" title="GitHub Issue: invoke-ai/InvokeAI #1176">#1176</a></li>
+<li>fix clipseg loading problems by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1177" title="GitHub Issue: invoke-ai/InvokeAI #1177">#1177</a></li>
+<li>Correct color channels in upscale using array slicing by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/wfng92" title="GitHub User: wfng92">@wfng92</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1181" title="GitHub Issue: invoke-ai/InvokeAI #1181">#1181</a></li>
+<li>Web UI: Filters existing images when adding new images; Fixes <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1085" title="GitHub Issue: invoke-ai/InvokeAI #1085">#1085</a> by
+  <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1171" title="GitHub Issue: invoke-ai/InvokeAI #1171">#1171</a></li>
+<li>fix a number of bugs in textual inversion by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1190" title="GitHub Issue: invoke-ai/InvokeAI #1190">#1190</a></li>
+<li>Improve !fetch, add !replay command by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/ArDiouscuros" title="GitHub User: ArDiouscuros">@ArDiouscuros</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/882" title="GitHub Issue: invoke-ai/InvokeAI #882">#882</a></li>
+<li>Fix generation of image with s&gt;1000 by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/holstvoogd" title="GitHub User: holstvoogd">@holstvoogd</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/951" title="GitHub Issue: invoke-ai/InvokeAI #951">#951</a></li>
+<li>Web UI: Gallery improvements by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1198" title="GitHub Issue: invoke-ai/InvokeAI #1198">#1198</a></li>
+<li>Update CLI.md by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/krummrey" title="GitHub User: krummrey">@krummrey</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1211" title="GitHub Issue: invoke-ai/InvokeAI #1211">#1211</a></li>
+<li>outcropping improvements by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1207" title="GitHub Issue: invoke-ai/InvokeAI #1207">#1207</a></li>
+<li>add support for loading VAE autoencoders by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1216" title="GitHub Issue: invoke-ai/InvokeAI #1216">#1216</a></li>
+<li>remove duplicate fix_func for MPS by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/wfng92" title="GitHub User: wfng92">@wfng92</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1210" title="GitHub Issue: invoke-ai/InvokeAI #1210">#1210</a></li>
+<li>Metadata storage and retrieval fixes by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1204" title="GitHub Issue: invoke-ai/InvokeAI #1204">#1204</a></li>
+<li>nix: add shell.nix file by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/Cloudef" title="GitHub User: Cloudef">@Cloudef</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1170" title="GitHub Issue: invoke-ai/InvokeAI #1170">#1170</a></li>
+<li>Web UI: Changes vite dist asset paths to relative by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1185" title="GitHub Issue: invoke-ai/InvokeAI #1185">#1185</a></li>
+<li>Web UI: Removes isDisabled from PromptInput by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1187" title="GitHub Issue: invoke-ai/InvokeAI #1187">#1187</a></li>
+<li>Allow user to generate images with initial noise as on M1 / mps system by
+  <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/ArDiouscuros" title="GitHub User: ArDiouscuros">@ArDiouscuros</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/981" title="GitHub Issue: invoke-ai/InvokeAI #981">#981</a></li>
+<li>feat: adding filename format template by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/plucked" title="GitHub User: plucked">@plucked</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/968" title="GitHub Issue: invoke-ai/InvokeAI #968">#968</a></li>
+<li>Web UI: Fixes broken bundle by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1242" title="GitHub Issue: invoke-ai/InvokeAI #1242">#1242</a></li>
+<li>Support runwayML custom inpainting model by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1243" title="GitHub Issue: invoke-ai/InvokeAI #1243">#1243</a></li>
+<li>Update IMG2IMG.md by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/talitore" title="GitHub User: talitore">@talitore</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1262" title="GitHub Issue: invoke-ai/InvokeAI #1262">#1262</a></li>
+<li>New dockerfile - including a build- and a run- script as well as a GH-Action
+  by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1233" title="GitHub Issue: invoke-ai/InvokeAI #1233">#1233</a></li>
+<li>cut over from karras to model noise schedule for higher steps by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1222" title="GitHub Issue: invoke-ai/InvokeAI #1222">#1222</a></li>
+<li>Prompt tweaks by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1268" title="GitHub Issue: invoke-ai/InvokeAI #1268">#1268</a></li>
+<li>Outpainting implementation by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/Kyle0654" title="GitHub User: Kyle0654">@Kyle0654</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1251" title="GitHub Issue: invoke-ai/InvokeAI #1251">#1251</a></li>
+<li>fixing aspect ratio on hires by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/tjennings" title="GitHub User: tjennings">@tjennings</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1249" title="GitHub Issue: invoke-ai/InvokeAI #1249">#1249</a></li>
+<li>Fix-build-container-action by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1274" title="GitHub Issue: invoke-ai/InvokeAI #1274">#1274</a></li>
+<li>handle all unicode characters by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/damian0815" title="GitHub User: damian0815">@damian0815</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1276" title="GitHub Issue: invoke-ai/InvokeAI #1276">#1276</a></li>
+<li>adds models.user.yml to .gitignore by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/JakeHL" title="GitHub User: JakeHL">@JakeHL</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1281" title="GitHub Issue: invoke-ai/InvokeAI #1281">#1281</a></li>
+<li>remove debug branch, set fail-fast to false by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1284" title="GitHub Issue: invoke-ai/InvokeAI #1284">#1284</a></li>
+<li>Protect-secrets-on-pr by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1285" title="GitHub Issue: invoke-ai/InvokeAI #1285">#1285</a></li>
+<li>Web UI: Adds initial inpainting implementation by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/psychedelicious" title="GitHub User: psychedelicious">@psychedelicious</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1225" title="GitHub Issue: invoke-ai/InvokeAI #1225">#1225</a></li>
+<li>fix environment-mac.yml - tested on x64 and arm64 by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1289" title="GitHub Issue: invoke-ai/InvokeAI #1289">#1289</a></li>
+<li>Use proper authentication to download model by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1287" title="GitHub Issue: invoke-ai/InvokeAI #1287">#1287</a></li>
+<li>Prevent indexing error for mode RGB by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/spezialspezial" title="GitHub User: spezialspezial">@spezialspezial</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1294" title="GitHub Issue: invoke-ai/InvokeAI #1294">#1294</a></li>
+<li>Integrate sd-v1-5 model into test matrix (easily expandable), remove
+  unecesarry caches by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1293" title="GitHub Issue: invoke-ai/InvokeAI #1293">#1293</a></li>
+<li>add --no-interactive to configure_invokeai step by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/mauwii" title="GitHub User: mauwii">@mauwii</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1302" title="GitHub Issue: invoke-ai/InvokeAI #1302">#1302</a></li>
+<li>1-click installer and updater. Uses micromamba to install git and conda into a
+  contained environment (if necessary) before running the normal installation
+  script by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/cmdr2" title="GitHub User: cmdr2">@cmdr2</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1253" title="GitHub Issue: invoke-ai/InvokeAI #1253">#1253</a></li>
+<li>configure_invokeai.py script downloads the weight files by <a class="magiclink magiclink-github magiclink-mention" href="https://github.com/lstein" title="GitHub User: lstein">@lstein</a> in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/InvokeAI/issues/1290" title="GitHub Issue: invoke-ai/InvokeAI #1290">#1290</a></li>
+</ul>
+<h2 id="v201-13-october-2022">v2.0.1 <small>(13 October 2022)</small><a class="headerlink" href="#v201-13-october-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>fix noisy images at high step count when using k* samplers</li>
+<li>dream.py script now calls invoke.py module directly rather than via a new
+  python process (which could break the environment)</li>
+</ul>
+<h2 id="v200-9-october-2022">v2.0.0 <small>(9 October 2022)</small><a class="headerlink" href="#v200-9-october-2022" title="Permanent link">#</a></h2>
+<ul>
+<li><code>dream.py</code> script renamed <code>invoke.py</code>. A <code>dream.py</code> script wrapper remains for
+  backward compatibility.</li>
+<li>Completely new WebGUI - launch with <code>python3 scripts/invoke.py --web</code></li>
+<li>img2img runs on all k* samplers</li>
+<li>Support for
+  <a href="../features/PROMPTS/#negative-and-unconditioned-prompts">negative prompts</a></li>
+<li>Support for CodeFormer face reconstruction</li>
+<li>Support for Textual Inversion on Macintoshes</li>
+<li>Support in both WebGUI and CLI for
+  <a href="../features/POSTPROCESS/">post-processing of previously-generated images</a>
+  using facial reconstruction, ESRGAN upscaling, outcropping (similar to DALL-E
+  infinite canvas), and "embiggen" upscaling. See the <code>!fix</code> command.</li>
+<li>New <code>--hires</code> option on <code>invoke&gt;</code> line allows
+  <a href="deprecated/CLI.md#this-is-an-example-of-txt2img">larger images to be created without duplicating elements</a>,
+  at the cost of some performance.</li>
+<li>New <code>--perlin</code> and <code>--threshold</code> options allow you to add and control
+  variation during image generation (see
+  <a href="../features/OTHER/#thresholding-and-perlin-noise-initialization-options">Thresholding and Perlin Noise Initialization</a>)</li>
+<li>Extensive metadata now written into PNG files, allowing reliable regeneration
+  of images and tweaking of previous settings.</li>
+<li>Command-line completion in <code>invoke.py</code> now works on Windows, Linux and Mac
+  platforms.</li>
+<li>Improved <a href="deprecated/CLI.md">command-line completion behavior</a> New commands
+  added:</li>
+<li>List command-line history with <code>!history</code></li>
+<li>Search command-line history with <code>!search</code></li>
+<li>Clear history with <code>!clear</code></li>
+<li>Deprecated <code>--full_precision</code> / <code>-F</code>. Simply omit it and <code>invoke.py</code> will auto
+  configure. To switch away from auto use the new flag like
+  <code>--precision=float32</code>.</li>
+</ul>
+<h2 id="v114-11-september-2022">v1.14 <small>(11 September 2022)</small><a class="headerlink" href="#v114-11-september-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>Memory optimizations for small-RAM cards. 512x512 now possible on 4 GB GPUs.</li>
+<li>Full support for Apple hardware with M1 or M2 chips.</li>
+<li>Add "seamless mode" for circular tiling of image. Generates beautiful effects.
+  (<a href="https://github.com/prixt">prixt</a>).</li>
+<li>Inpainting support.</li>
+<li>Improved web server GUI.</li>
+<li>Lots of code and documentation cleanups.</li>
+</ul>
+<h2 id="v113-3-september-2022">v1.13 <small>(3 September 2022)</small><a class="headerlink" href="#v113-3-september-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>Support image variations (see <a href="deprecated/VARIATIONS.md">VARIATIONS</a>
+  (<a href="https://github.com/bakkot">Kevin Gibbons</a> and many contributors and
+  reviewers)</li>
+<li>Supports a Google Colab notebook for a standalone server running on Google
+  hardware <a href="https://github.com/artmen1516">Arturo Mendivil</a></li>
+<li>WebUI supports GFPGAN/ESRGAN facial reconstruction and upscaling
+  <a href="https://github.com/bakkot">Kevin Gibbons</a></li>
+<li>WebUI supports incremental display of in-progress images during generation
+  <a href="https://github.com/bakkot">Kevin Gibbons</a></li>
+<li>A new configuration file scheme that allows new models (including upcoming
+  stable-diffusion-v1.5) to be added without altering the code.
+  (<a href="https://github.com/maddavid12">David Wager</a>)</li>
+<li>Can specify --grid on invoke.py command line as the default.</li>
+<li>Miscellaneous internal bug and stability fixes.</li>
+<li>Works on M1 Apple hardware.</li>
+<li>Multiple bug fixes.</li>
+</ul>
+<hr />
+<h2 id="v112-28-august-2022">v1.12 <small>(28 August 2022)</small><a class="headerlink" href="#v112-28-august-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>Improved file handling, including ability to read prompts from standard input.
+  (kudos to <a href="https://github.com/yunsaki">Yunsaki</a></li>
+<li>The web server is now integrated with the invoke.py script. Invoke by adding
+  --web to the invoke.py command arguments.</li>
+<li>Face restoration and upscaling via GFPGAN and Real-ESGAN are now automatically
+  enabled if the GFPGAN directory is located as a sibling to Stable Diffusion.
+  VRAM requirements are modestly reduced. Thanks to both
+  <a href="https://github.com/blessedcoolant">Blessedcoolant</a> and
+  <a href="https://github.com/oceanswave">Oceanswave</a> for their work on this.</li>
+<li>You can now swap samplers on the invoke&gt; command line.
+  <a href="https://github.com/blessedcoolant">Blessedcoolant</a></li>
+</ul>
+<hr />
+<h2 id="v111-26-august-2022">v1.11 <small>(26 August 2022)</small><a class="headerlink" href="#v111-26-august-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>NEW FEATURE: Support upscaling and face enhancement using the GFPGAN module.
+  (kudos to <a href="https://github.com/Oceanswave">Oceanswave</a></li>
+<li>You now can specify a seed of -1 to use the previous image's seed, -2 to use
+  the seed for the image generated before that, etc. Seed memory only extends
+  back to the previous command, but will work on all images generated with the
+  -n# switch.</li>
+<li>Variant generation support temporarily disabled pending more general solution.</li>
+<li>Created a feature branch named <strong>yunsaki-morphing-invoke</strong> which adds
+  experimental support for iteratively modifying the prompt and its parameters.
+  Please
+  see<a href="https://github.com/lstein/stable-diffusion/pull/86">Pull Request #86</a> for
+  a synopsis of how this works. Note that when this feature is eventually added
+  to the main branch, it will may be modified significantly.</li>
+</ul>
+<hr />
+<h2 id="v110-25-august-2022">v1.10 <small>(25 August 2022)</small><a class="headerlink" href="#v110-25-august-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>A barebones but fully functional interactive web server for online generation
+  of txt2img and img2img.</li>
+</ul>
+<hr />
+<h2 id="v109-24-august-2022">v1.09 <small>(24 August 2022)</small><a class="headerlink" href="#v109-24-august-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>A new -v option allows you to generate multiple variants of an initial image
+  in img2img mode. (kudos to <a href="https://github.com/Oceanswave">Oceanswave</a>.
+  <a href="https://github.com/lstein/stable-diffusion/pull/71#issuecomment-1226700810"> See this discussion in the PR for examples and details on use</a>)</li>
+<li>Added ability to personalize text to image generation (kudos to
+  <a href="https://github.com/Oceanswave">Oceanswave</a> and
+  <a href="https://github.com/nicolai256">nicolai256</a>)</li>
+<li>Enabled all of the samplers from k_diffusion</li>
+</ul>
+<hr />
+<h2 id="v108-24-august-2022">v1.08 <small>(24 August 2022)</small><a class="headerlink" href="#v108-24-august-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>Escape single quotes on the invoke&gt; command before trying to parse. This
+  avoids parse errors.</li>
+<li>Removed instruction to get Python3.8 as first step in Windows install.
+  Anaconda3 does it for you.</li>
+<li>Added bounds checks for numeric arguments that could cause crashes.</li>
+<li>Cleaned up the copyright and license agreement files.</li>
+</ul>
+<hr />
+<h2 id="v107-23-august-2022">v1.07 <small>(23 August 2022)</small><a class="headerlink" href="#v107-23-august-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>Image filenames will now never fill gaps in the sequence, but will be assigned
+  the next higher name in the chosen directory. This ensures that the alphabetic
+  and chronological sort orders are the same.</li>
+</ul>
+<hr />
+<h2 id="v106-23-august-2022">v1.06 <small>(23 August 2022)</small><a class="headerlink" href="#v106-23-august-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>Added weighted prompt support contributed by
+  <a href="https://github.com/xraxra">xraxra</a></li>
+<li>Example of using weighted prompts to tweak a demonic figure contributed by
+  <a href="https://github.com/bmaltais">bmaltais</a></li>
+</ul>
+<hr />
+<h2 id="v105-22-august-2022-after-the-drop">v1.05 <small>(22 August 2022 - after the drop)</small><a class="headerlink" href="#v105-22-august-2022-after-the-drop" title="Permanent link">#</a></h2>
+<ul>
+<li>Filenames now use the following formats: 000010.95183149.png -- Two files
+  produced by the same command (e.g. -n2), 000010.26742632.png -- distinguished
+  by a different seed.</li>
+</ul>
+<p>000011.455191342.01.png -- Two files produced by the same command using
+  000011.455191342.02.png -- a batch size&gt;1 (e.g. -b2). They have the same seed.</p>
+<p><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/invoke-ai/000011.4160627868.grid/issues/1" title="GitHub Issue: invoke-ai/000011.4160627868.grid #1">000011.4160627868.grid#1</a>-4.png -- a grid of four images (-g); the whole grid
+  can be regenerated with the indicated key</p>
+<ul>
+<li>It should no longer be possible for one image to overwrite another</li>
+<li>You can use the "cd" and "pwd" commands at the invoke&gt; prompt to set and
+  retrieve the path of the output directory.</li>
+</ul>
+<hr />
+<h2 id="v104-22-august-2022-after-the-drop">v1.04 <small>(22 August 2022 - after the drop)</small><a class="headerlink" href="#v104-22-august-2022-after-the-drop" title="Permanent link">#</a></h2>
+<ul>
+<li>Updated README to reflect installation of the released weights.</li>
+<li>Suppressed very noisy and inconsequential warning when loading the frozen CLIP
+  tokenizer.</li>
+</ul>
+<hr />
+<h2 id="v103-22-august-2022">v1.03 <small>(22 August 2022)</small><a class="headerlink" href="#v103-22-august-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>The original txt2img and img2img scripts from the CompViz repository have been
+  moved into a subfolder named "orig_scripts", to reduce confusion.</li>
+</ul>
+<hr />
+<h2 id="v102-21-august-2022">v1.02 <small>(21 August 2022)</small><a class="headerlink" href="#v102-21-august-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>A copy of the prompt and all of its switches and options is now stored in the
+  corresponding image in a tEXt metadata field named "Dream". You can read the
+  prompt using scripts/images2prompt.py, or an image editor that allows you to
+  explore the full metadata. <strong>Please run "conda env update" to load the k_lms
+  dependencies!!</strong></li>
+</ul>
+<hr />
+<h2 id="v101-21-august-2022">v1.01 <small>(21 August 2022)</small><a class="headerlink" href="#v101-21-august-2022" title="Permanent link">#</a></h2>
+<ul>
+<li>added k_lms sampling. <strong>Please run "conda env update" to load the k_lms
+  dependencies!!</strong></li>
+<li>use half precision arithmetic by default, resulting in faster execution and
+  lower memory requirements Pass argument --full_precision to invoke.py to get
+  slower but more accurate image generation</li>
+</ul>
+<hr />
+<h2 id="links">Links<a class="headerlink" href="#links" title="Permanent link">#</a></h2>
+<ul>
+<li><strong><a href="../">Read Me</a></strong></li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1-2.1-2M12.5 7v5.2l4 2.4-1 1L11 13V7h1.5M11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2v1.8Z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">August 6, 2024</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3h-2Z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date">August 6, 2024</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+  
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 InvokeAI Team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.instant", "navigation.tabs", "navigation.tabs.sticky", "navigation.tracking", "navigation.indexes", "navigation.path", "search.highlight", "search.suggest", "toc.integrate"], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.fe8b6f2b.min.js"></script>
+      
+        <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
+      
+        <script src="../javascripts/tablesort.js"></script>
+      
+        <script src="../javascript/init_kapa_widget.js"></script>
+      
+    
+  </body>
+</html>
