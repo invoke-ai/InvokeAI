@@ -43,17 +43,21 @@ export class CanvasStagingArea {
 
   render = async () => {
     const session = this.manager.stateApi.getSession();
-    const { rect } = this.manager.stateApi.getBbox();
+    const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
     const shouldShowStagedImage = this.manager.stateApi.$shouldShowStagedImage.get();
 
     this.selectedImage = session.stagedImages[session.selectedStagedImageIndex] ?? null;
-    this.konva.group.position({ x: rect.x, y: rect.y });
+    this.konva.group.position({ x, y });
 
     if (this.selectedImage) {
-      const { imageDTO, offsetX, offsetY } = this.selectedImage;
+      const {
+        imageDTO,
+        // offsetX, // TODO(psyche): restore the crop in the node?
+        // offsetY // TODO(psyche): restore the crop in the node?
+      } = this.selectedImage;
 
       if (!this.image) {
-        const { image_name, width, height } = imageDTO;
+        const { image_name } = imageDTO;
         this.image = new CanvasImageRenderer(
           {
             id: 'staging-area-image',
