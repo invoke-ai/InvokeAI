@@ -24,11 +24,17 @@ export const ParamNegativePrompt = memo(() => {
     },
     [dispatch]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown } = usePrompt({
+  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocusCursorAtEnd } = usePrompt({
     prompt,
     textareaRef,
     onChange: _onChange,
   });
+
+  const handleFocus = useCallback(() => {
+    setTimeout(() => {
+      onFocusCursorAtEnd();
+    }, 500);
+  }, [onFocusCursorAtEnd]);
 
   if (viewMode) {
     return (
@@ -36,6 +42,7 @@ export const ParamNegativePrompt = memo(() => {
         prompt={prompt}
         presetPrompt={activeStylePreset?.preset_data.negative_prompt || ''}
         height={DEFAULT_HEIGHT}
+        onExit={handleFocus}
       />
     );
   }

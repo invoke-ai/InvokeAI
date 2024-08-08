@@ -30,11 +30,17 @@ export const ParamPositivePrompt = memo(() => {
     },
     [dispatch]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
+  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus, onFocusCursorAtEnd } = usePrompt({
     prompt,
     textareaRef: textareaRef,
     onChange: handleChange,
   });
+
+  const handleFocus = useCallback(() => {
+    setTimeout(() => {
+      onFocusCursorAtEnd();
+    }, 500);
+  }, [onFocusCursorAtEnd]);
 
   const focus: HotkeyCallback = useCallback(
     (e) => {
@@ -52,6 +58,7 @@ export const ParamPositivePrompt = memo(() => {
         prompt={prompt}
         presetPrompt={activeStylePreset?.preset_data.positive_prompt || ''}
         height={DEFAULT_HEIGHT}
+        onExit={handleFocus}
       />
     );
   }

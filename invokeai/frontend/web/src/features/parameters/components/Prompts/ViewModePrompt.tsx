@@ -10,10 +10,12 @@ export const ViewModePrompt = ({
   presetPrompt,
   prompt,
   height,
+  onExit,
 }: {
   presetPrompt: string;
   prompt: string;
   height: number;
+  onExit: () => void;
 }) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -24,7 +26,8 @@ export const ViewModePrompt = ({
 
   const handleExitViewMode = useCallback(() => {
     dispatch(viewModeChanged(false));
-  }, [dispatch]);
+    onExit();
+  }, [dispatch, onExit]);
 
   return (
     <Flex
@@ -42,7 +45,7 @@ export const ViewModePrompt = ({
           {presetChunks.map((chunk, index) => {
             return (
               chunk && (
-                <Text as="span" color={index === 1 ? 'white' : 'base.300'}>
+                <Text as="span" color={index === 1 ? 'white' : 'base.300'} key={index}>
                   {chunk.trim()}{' '}
                 </Text>
               )
