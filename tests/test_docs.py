@@ -3,7 +3,7 @@ from scripts.update_config_docstring import generate_config_docstrings
 
 
 def test_app_config_docstrings_are_current():
-    # If this test fails, run `python scripts/generate_config_docstring.py`. See the comments in that script for
+    # If this test fails, run `python scripts/update_config_docstring.py`. See the comments in that script for
     # an explanation of why this is necessary.
     #
     # A make target is provided to run the script: `make update-config-docstring`.

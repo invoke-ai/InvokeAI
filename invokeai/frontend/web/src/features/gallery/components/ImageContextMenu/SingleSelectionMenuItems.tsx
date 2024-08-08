@@ -30,6 +30,7 @@ import {
   PiFlowArrowBold,
   PiFoldersBold,
   PiImagesBold,
+  PiPaintBrushBold,
   PiPlantBold,
   PiQuotesBold,
   PiShareFatBold,
@@ -55,8 +56,17 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { downloadImage } = useDownloadImage();
   const templates = useStore($templates);
 
-  const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =
-    useImageActions(imageDTO?.image_name);
+  const {
+    recallAll,
+    remix,
+    recallSeed,
+    recallPrompts,
+    hasMetadata,
+    hasSeed,
+    hasPrompts,
+    isLoadingMetadata,
+    createAsPreset,
+  } = useImageActions(imageDTO?.image_name);
 
   const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
 
@@ -181,6 +191,13 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
         isDisabled={isLoadingMetadata || !hasMetadata}
       >
         {t('parameters.useAll')}
+      </MenuItem>
+      <MenuItem
+        icon={isLoadingMetadata ? <SpinnerIcon /> : <PiPaintBrushBold />}
+        onClickCapture={createAsPreset}
+        isDisabled={isLoadingMetadata || !hasPrompts}
+      >
+        {t('stylePresets.useForTemplate')}
       </MenuItem>
       <MenuDivider />
       <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToImageToImage} id="send-to-img2img">

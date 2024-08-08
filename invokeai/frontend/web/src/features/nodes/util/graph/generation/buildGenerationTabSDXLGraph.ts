@@ -19,7 +19,7 @@ import { addSDXLRefiner } from 'features/nodes/util/graph/generation/addSDXLRefi
 import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { getBoardField, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getBoardField, getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation, NonNullableGraph } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -36,14 +36,13 @@ export const buildGenerationTabSDXLGraph = async (state: RootState): Promise<Non
     vaePrecision,
     vae,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
   const { width, height } = state.controlLayers.present.size;
 
   const { refinerModel, refinerStart } = state.sdxl;
 
   assert(model, 'No model found in state');
 
-  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
+  const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
 
   const g = new Graph(SDXL_CONTROL_LAYERS_GRAPH);
   const modelLoader = g.addNode({
