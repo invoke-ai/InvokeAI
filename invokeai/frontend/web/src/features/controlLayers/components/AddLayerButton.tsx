@@ -15,7 +15,7 @@ export const AddLayerButton = memo(() => {
     dispatch(rgAdded());
   }, [dispatch]);
   const addRasterLayer = useCallback(() => {
-    dispatch(layerAdded());
+    dispatch(layerAdded({ isSelected: true }));
   }, [dispatch]);
 
   return (

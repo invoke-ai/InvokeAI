@@ -48,13 +48,6 @@ export const bboxReducers = {
       state.bbox.aspectRatio.id = 'Free';
       state.bbox.aspectRatio.isLocked = false;
     }
-
-    if (!state.session.isActive) {
-      if (state.initialImage.imageObject) {
-        state.initialImage.imageObject.width = state.bbox.rect.width;
-        state.initialImage.imageObject.height = state.bbox.rect.height;
-      }
-    }
   },
   bboxHeightChanged: (
     state,
@@ -72,13 +65,6 @@ export const bboxReducers = {
       state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
       state.bbox.aspectRatio.id = 'Free';
       state.bbox.aspectRatio.isLocked = false;
-    }
-
-    if (!state.session.isActive) {
-      if (state.initialImage.imageObject) {
-        state.initialImage.imageObject.width = state.bbox.rect.width;
-        state.initialImage.imageObject.height = state.bbox.rect.height;
-      }
     }
   },
   bboxAspectRatioLockToggled: (state) => {
@@ -99,12 +85,6 @@ export const bboxReducers = {
       state.bbox.rect.width = width;
       state.bbox.rect.height = height;
     }
-    if (!state.session.isActive) {
-      if (state.initialImage.imageObject) {
-        state.initialImage.imageObject.width = state.bbox.rect.width;
-        state.initialImage.imageObject.height = state.bbox.rect.height;
-      }
-    }
   },
   bboxDimensionsSwapped: (state) => {
     state.bbox.aspectRatio.value = 1 / state.bbox.aspectRatio.value;
@@ -122,12 +102,6 @@ export const bboxReducers = {
       state.bbox.rect.height = height;
       state.bbox.aspectRatio.id = ASPECT_RATIO_MAP[state.bbox.aspectRatio.id].inverseID;
     }
-    if (!state.session.isActive) {
-      if (state.initialImage.imageObject) {
-        state.initialImage.imageObject.width = state.bbox.rect.width;
-        state.initialImage.imageObject.height = state.bbox.rect.height;
-      }
-    }
   },
   bboxSizeOptimized: (state) => {
     const optimalDimension = getOptimalDimension(state.params.model);
@@ -139,12 +113,6 @@ export const bboxReducers = {
       state.bbox.aspectRatio = deepClone(initialAspectRatioState);
       state.bbox.rect.width = optimalDimension;
       state.bbox.rect.height = optimalDimension;
-    }
-    if (!state.session.isActive) {
-      if (state.initialImage.imageObject) {
-        state.initialImage.imageObject.width = state.bbox.rect.width;
-        state.initialImage.imageObject.height = state.bbox.rect.height;
-      }
     }
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
