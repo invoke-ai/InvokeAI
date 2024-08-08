@@ -13,7 +13,7 @@ export type StylePresetRecordWithImage =
  */
 const buildStylePresetsUrl = (path: string = '') => buildV1Url(`style_presets/${path}`);
 
-export const stylePresetsApi = api.injectEndpoints({
+const stylePresetsApi = api.injectEndpoints({
   endpoints: (build) => ({
     getStylePreset: build.query<
       paths['/api/v1/style_presets/i/{style_preset_id}']['get']['responses']['200']['content']['application/json'],
@@ -99,7 +99,6 @@ export const stylePresetsApi = api.injectEndpoints({
 });
 
 export const {
-  useGetStylePresetQuery,
   useCreateStylePresetMutation,
   useDeleteStylePresetMutation,
   useUpdateStylePresetMutation,

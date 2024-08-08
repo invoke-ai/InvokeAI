@@ -1,11 +1,10 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { RootState } from 'app/store/store';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 
 import type { StylePresetState } from './types';
 
-export const initialState: StylePresetState = {
+const initialState: StylePresetState = {
   isMenuOpen: false,
   activeStylePreset: null,
   searchTerm: '',
@@ -34,4 +33,3 @@ export const stylePresetSlice = createSlice({
 export const { isMenuOpenChanged, activeStylePresetChanged, searchTermChanged, viewModeChanged } =
   stylePresetSlice.actions;
 
-export const selectStylePresetSlice = (state: RootState) => state.stylePreset;

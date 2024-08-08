@@ -125,7 +125,7 @@ const parseCreatedBy: MetadataParseFunc<string> = (metadata) => getProperty(meta
 
 const parseGenerationMode: MetadataParseFunc<string> = (metadata) => getProperty(metadata, 'generation_mode', isString);
 
-export const parsePositivePrompt: MetadataParseFunc<ParameterPositivePrompt> = (metadata) =>
+const parsePositivePrompt: MetadataParseFunc<ParameterPositivePrompt> = (metadata) =>
   getProperty(metadata, 'positive_prompt', isParameterPositivePrompt);
 
 const parseNegativePrompt: MetadataParseFunc<ParameterNegativePrompt> = (metadata) =>
