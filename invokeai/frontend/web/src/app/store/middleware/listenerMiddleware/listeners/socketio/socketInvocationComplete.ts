@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
-import { $lastProgressEvent, sessionImageStaged } from 'features/controlLayers/store/canvasV2Slice';
+import { sessionImageStaged } from 'features/controlLayers/store/canvasV2Slice';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
@@ -64,14 +64,10 @@ export const addInvocationCompleteEventListener = (startAppListening: AppStartLi
             const { offset_x, offset_y } = data.result;
             if (canvasV2.session.isStaging) {
               dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
-            } else if (!canvasV2.session.isActive) {
-              $lastProgressEvent.set(null);
             }
           } else if (data.result.type === 'image_output') {
             if (canvasV2.session.isStaging) {
               dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
-            } else if (!canvasV2.session.isActive) {
-              $lastProgressEvent.set(null);
             }
           }
         }
