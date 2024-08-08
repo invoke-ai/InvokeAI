@@ -1,5 +1,6 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { CanvasPreview } from 'features/controlLayers/konva/CanvasPreview';
 import {
   BRUSH_BORDER_INNER_COLOR,
   BRUSH_BORDER_OUTER_COLOR,
@@ -25,6 +26,7 @@ export class CanvasTool {
   static ERASER_INNER_BORDER_CIRCLE_NAME = `${CanvasTool.ERASER_NAME_PREFIX}_inner-border-circle`;
   static ERASER_OUTER_BORDER_CIRCLE_NAME = `${CanvasTool.ERASER_NAME_PREFIX}_outer-border-circle`;
 
+  parent: CanvasPreview;
   manager: CanvasManager;
   konva: {
     group: Konva.Group;
@@ -47,8 +49,9 @@ export class CanvasTool {
    */
   subscriptions: Set<() => void> = new Set();
 
-  constructor(manager: CanvasManager) {
-    this.manager = manager;
+  constructor(parent: CanvasPreview) {
+    this.parent = parent;
+    this.manager = this.parent.manager;
     this.konva = {
       group: new Konva.Group({ name: CanvasTool.GROUP_NAME }),
       brush: {
