@@ -384,7 +384,7 @@ export class CanvasTransformer {
 
     // When the selected tool changes, we need to update the transformer's interaction state.
     this.subscriptions.add(
-      this.manager.toolState.subscribe((newVal, oldVal) => {
+      this.manager.$toolState.listen((newVal, oldVal) => {
         if (newVal.selected !== oldVal.selected) {
           this.syncInteractionState();
         }
@@ -393,7 +393,7 @@ export class CanvasTransformer {
 
     // When the selected entity changes, we need to update the transformer's interaction state.
     this.subscriptions.add(
-      this.manager.selectedEntityIdentifier.subscribe(() => {
+      this.manager.$selectedEntityIdentifier.listen(() => {
         this.syncInteractionState();
       })
     );
