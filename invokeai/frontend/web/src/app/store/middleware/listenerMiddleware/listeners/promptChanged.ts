@@ -13,13 +13,16 @@ import {
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { socketConnected } from 'services/events/actions';
+import { getPresetModifiedPrompts } from '../../../../../features/nodes/util/graph/graphBuilderUtils';
+import { activeStylePresetChanged } from '../../../../../features/stylePresets/store/stylePresetSlice';
 
 const matcher = isAnyOf(
   positivePromptChanged,
   combinatorialToggled,
   maxPromptsChanged,
   maxPromptsReset,
-  socketConnected
+  socketConnected,
+  activeStylePresetChanged
 );
 
 export const addDynamicPromptsListener = (startAppListening: AppStartListening) => {
@@ -28,7 +31,7 @@ export const addDynamicPromptsListener = (startAppListening: AppStartListening) 
     effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
       cancelActiveListeners();
       const state = getState();
-      const { positivePrompt } = state.controlLayers.present;
+      const { positivePrompt } = getPresetModifiedPrompts(state)
       const { maxPrompts } = state.dynamicPrompts;
 
       if (state.config.disabledFeatures.includes('dynamicPrompting')) {
