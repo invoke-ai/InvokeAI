@@ -19,7 +19,7 @@ export const TransformToolButton = memo(() => {
     if (!canvasManager) {
       return;
     }
-    return canvasManager.$transformingEntity.listen((newValue) => {
+    return canvasManager.stateApi.$transformingEntity.listen((newValue) => {
       setIsTransforming(Boolean(newValue));
     });
   }, [canvasManager]);

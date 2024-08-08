@@ -118,7 +118,7 @@ export class CanvasTool {
     );
 
     this.subscriptions.add(
-      this.manager.$toolState.listen(() => {
+      this.manager.stateApi.$toolState.listen(() => {
         this.render();
       })
     );
@@ -154,7 +154,7 @@ export class CanvasTool {
     const stage = this.manager.stage;
     const renderedEntityCount: number = 1; // TODO(psyche): this.manager should be renderable entity count
     const toolState = this.manager.stateApi.getToolState();
-    const selectedEntity = this.manager.getSelectedEntity();
+    const selectedEntity = this.manager.stateApi.getSelectedEntity();
     const cursorPos = this.manager.stateApi.$lastCursorPos.get();
     const isDrawing = this.manager.stateApi.$isDrawing.get();
     const isMouseDown = this.manager.stateApi.$isMouseDown.get();
@@ -175,7 +175,7 @@ export class CanvasTool {
     } else if (!isDrawableEntity) {
       // Non-drawable layers don't have tools
       stage.container().style.cursor = 'not-allowed';
-    } else if (tool === 'move' || Boolean(this.manager.$transformingEntity.get())) {
+    } else if (tool === 'move' || Boolean(this.manager.stateApi.$transformingEntity.get())) {
       // Move tool gets a pointer
       stage.container().style.cursor = 'default';
     } else if (tool === 'rect') {
@@ -198,7 +198,7 @@ export class CanvasTool {
 
       // No need to render the brush preview if the cursor position or color is missing
       if (cursorPos && tool === 'brush') {
-        const brushPreviewFill = this.manager.getBrushPreviewFill();
+        const brushPreviewFill = this.manager.stateApi.getBrushPreviewFill();
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.brush.width);
         const scale = stage.scaleX();
         // Update the fill circle
