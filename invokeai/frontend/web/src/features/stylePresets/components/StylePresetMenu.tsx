@@ -57,8 +57,8 @@ export const StylePresetMenu = () => {
         <StylePresetSearch />
         <IconButton
           icon={<PiPlusBold />}
-          tooltip="Create Preset"
-          aria-label="Create Preset"
+          tooltip={t('stylePresets.createPromptTemplate')}
+          aria-label={t('stylePresets.createPromptTemplate')}
           onClick={handleClickAddNew}
           size="md"
           variant="link"
