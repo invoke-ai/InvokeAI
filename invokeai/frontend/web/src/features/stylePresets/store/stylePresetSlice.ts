@@ -32,4 +32,3 @@ export const stylePresetSlice = createSlice({
 
 export const { isMenuOpenChanged, activeStylePresetChanged, searchTermChanged, viewModeChanged } =
   stylePresetSlice.actions;
-

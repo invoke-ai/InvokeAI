@@ -28,4 +28,3 @@ export const stylePresetModalSlice = createSlice({
 
 export const { isModalOpenChanged, updatingStylePresetIdChanged, prefilledFormDataChanged } =
   stylePresetModalSlice.actions;
-

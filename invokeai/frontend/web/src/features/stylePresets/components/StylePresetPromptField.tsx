@@ -4,10 +4,10 @@ import type { ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useRef } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { PiBracketsCurlyBold } from 'react-icons/pi';
 
 import type { StylePresetFormData } from './StylePresetForm';
-import { useTranslation } from 'react-i18next';
 
 interface Props extends UseControllerProps<StylePresetFormData> {
   label: string;
