@@ -18,24 +18,16 @@ import {
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import type {
-  CanvasControlAdapterState,
-  CanvasEntityIdentifier,
-  CanvasInpaintMaskState,
-  CanvasLayerState,
-  CanvasRegionalGuidanceState,
   CanvasV2State,
   Coordinate,
   Dimensions,
   GenerationMode,
   GetLoggingContext,
   Rect,
-  RgbaColor,
 } from 'features/controlLayers/store/types';
-import { RGBA_RED } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
 import { clamp } from 'lodash-es';
-import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
@@ -50,32 +42,6 @@ import { CanvasPreview } from './CanvasPreview';
 import { CanvasStagingArea } from './CanvasStagingArea';
 import { CanvasStateApi } from './CanvasStateApi';
 import { setStageEventHandlers } from './events';
-
-type EntityStateAndAdapter =
-  | {
-      id: string;
-      type: CanvasLayerState['type'];
-      state: CanvasLayerState;
-      adapter: CanvasLayerAdapter;
-    }
-  | {
-      id: string;
-      type: CanvasInpaintMaskState['type'];
-      state: CanvasInpaintMaskState;
-      adapter: CanvasMaskAdapter;
-    }
-  // | {
-  //     id: string;
-  //     type: CanvasControlAdapterState['type'];
-  //     state: CanvasControlAdapterState;
-  //     adapter: CanvasControlAdapter;
-  //   }
-  | {
-      id: string;
-      type: CanvasRegionalGuidanceState['type'];
-      state: CanvasRegionalGuidanceState;
-      adapter: CanvasMaskAdapter;
-    };
 
 export const $canvasManager = atom<CanvasManager | null>(null);
 
@@ -100,12 +66,6 @@ export class CanvasManager {
 
   _worker: Worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
   _tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }> = new Map();
-
-  $transformingEntity: WritableAtom<CanvasEntityIdentifier | null> = atom();
-  $toolState: WritableAtom<CanvasV2State['tool']> = atom();
-  $currentFill: WritableAtom<RgbaColor> = atom();
-  $selectedEntity: WritableAtom<EntityStateAndAdapter | null> = atom();
-  $selectedEntityIdentifier: WritableAtom<CanvasEntityIdentifier | null> = atom();
 
   constructor(stage: Konva.Stage, container: HTMLDivElement, store: Store<RootState>) {
     this.stage = stage;
@@ -160,11 +120,11 @@ export class CanvasManager {
       this.log.error('Worker message error');
     };
 
-    this.$transformingEntity.set(null);
-    this.$toolState.set(this.stateApi.getToolState());
-    this.$selectedEntityIdentifier.set(this.stateApi.getState().selectedEntityIdentifier);
-    this.$currentFill.set(this.getCurrentFill());
-    this.$selectedEntity.set(this.getSelectedEntity());
+    this.stateApi.$transformingEntity.set(null);
+    this.stateApi.$toolState.set(this.stateApi.getToolState());
+    this.stateApi.$selectedEntityIdentifier.set(this.stateApi.getState().selectedEntityIdentifier);
+    this.stateApi.$currentFill.set(this.stateApi.getCurrentFill());
+    this.stateApi.$selectedEntity.set(this.stateApi.getSelectedEntity());
 
     this.inpaintMask = new CanvasMaskAdapter(this.stateApi.getInpaintMaskState(), this);
     this.stage.add(this.inpaintMask.konva.layer);
@@ -270,80 +230,8 @@ export class CanvasManager {
     });
   }
 
-  getEntity(identifier: CanvasEntityIdentifier): EntityStateAndAdapter | null {
-    const state = this.stateApi.getState();
-
-    let entityState:
-      | CanvasLayerState
-      | CanvasControlAdapterState
-      | CanvasRegionalGuidanceState
-      | CanvasInpaintMaskState
-      | null = null;
-    let entityAdapter: CanvasLayerAdapter | CanvasControlAdapter | CanvasMaskAdapter | null = null;
-
-    if (identifier.type === 'layer') {
-      entityState = state.layers.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.layers.get(identifier.id) ?? null;
-    } else if (identifier.type === 'control_adapter') {
-      entityState = state.controlAdapters.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.controlAdapters.get(identifier.id) ?? null;
-    } else if (identifier.type === 'regional_guidance') {
-      entityState = state.regions.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.regions.get(identifier.id) ?? null;
-    } else if (identifier.type === 'inpaint_mask') {
-      entityState = state.inpaintMask;
-      entityAdapter = this.inpaintMask;
-    }
-
-    if (entityState && entityAdapter && entityState.type === entityAdapter.type) {
-      return {
-        id: entityState.id,
-        type: entityState.type,
-        state: entityState,
-        adapter: entityAdapter,
-      } as EntityStateAndAdapter; // TODO(psyche): make TS happy w/o this cast
-    }
-
-    return null;
-  }
-
-  getSelectedEntity = () => {
-    const state = this.stateApi.getState();
-    if (state.selectedEntityIdentifier) {
-      return this.getEntity(state.selectedEntityIdentifier);
-    }
-    return null;
-  };
-
-  getCurrentFill = () => {
-    const state = this.stateApi.getState();
-    let currentFill: RgbaColor = state.tool.fill;
-    const selectedEntity = this.getSelectedEntity();
-    if (selectedEntity) {
-      // These two entity types use a compositing rect for opacity. Their fill is always white.
-      if (selectedEntity.state.type === 'regional_guidance' || selectedEntity.state.type === 'inpaint_mask') {
-        currentFill = RGBA_RED;
-        // currentFill = RGBA_WHITE;
-      }
-    }
-    return currentFill;
-  };
-
-  getBrushPreviewFill = () => {
-    const state = this.stateApi.getState();
-    let currentFill: RgbaColor = state.tool.fill;
-    const selectedEntity = this.getSelectedEntity();
-    if (selectedEntity) {
-      // The brush should use the mask opacity for these entity types
-      if (selectedEntity.state.type === 'regional_guidance' || selectedEntity.state.type === 'inpaint_mask') {
-        currentFill = { ...selectedEntity.state.fill, a: this.stateApi.getSettings().maskOpacity };
-      }
-    }
-    return currentFill;
-  };
-
   getTransformingLayer() {
-    const transformingEntity = this.$transformingEntity.get();
+    const transformingEntity = this.stateApi.$transformingEntity.get();
     if (!transformingEntity) {
       return null;
     }
@@ -362,21 +250,21 @@ export class CanvasManager {
   }
 
   getIsTransforming() {
-    return Boolean(this.$transformingEntity.get());
+    return Boolean(this.stateApi.$transformingEntity.get());
   }
 
   startTransform() {
     if (this.getIsTransforming()) {
       return;
     }
-    const entity = this.getSelectedEntity();
+    const entity = this.stateApi.getSelectedEntity();
     if (!entity) {
       this.log.warn('No entity selected to transform');
       return;
     }
     // TODO(psyche): Support other entity types
     entity.adapter.transformer.startTransform();
-    this.$transformingEntity.set({ id: entity.id, type: entity.type });
+    this.stateApi.$transformingEntity.set({ id: entity.id, type: entity.type });
   }
 
   async applyTransform() {
@@ -384,7 +272,7 @@ export class CanvasManager {
     if (layer) {
       await layer.transformer.applyTransform();
     }
-    this.$transformingEntity.set(null);
+    this.stateApi.$transformingEntity.set(null);
   }
 
   cancelTransform() {
@@ -392,7 +280,7 @@ export class CanvasManager {
     if (layer) {
       layer.transformer.stopTransform();
     }
-    this.$transformingEntity.set(null);
+    this.stateApi.$transformingEntity.set(null);
   }
 
   render = async () => {
@@ -485,10 +373,10 @@ export class CanvasManager {
       await this.renderControlAdapters();
     }
 
-    this.$toolState.set(state.tool);
-    this.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
-    this.$selectedEntity.set(this.getSelectedEntity());
-    this.$currentFill.set(this.getCurrentFill());
+    this.stateApi.$toolState.set(state.tool);
+    this.stateApi.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
+    this.stateApi.$selectedEntity.set(this.stateApi.getSelectedEntity());
+    this.stateApi.$currentFill.set(this.stateApi.getCurrentFill());
 
     if (
       this._isFirstRender ||
@@ -709,7 +597,7 @@ export class CanvasManager {
   };
 
   getRegionMaskImageDTO = async (id: string, rect?: Rect): Promise<ImageDTO> => {
-    const region = this.getEntity({ id, type: 'regional_guidance' });
+    const region = this.stateApi.getEntity({ id, type: 'regional_guidance' });
     assert(region?.type === 'regional_guidance');
     if (region.state.imageCache) {
       const imageDTO = await getImageDTO(region.state.imageCache);
