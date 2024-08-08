@@ -492,8 +492,6 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       height: stage.height(),
       scale: stage.scaleX(),
     });
-    manager.background.render();
-    manager.preview.tool.render();
   });
 
   //#region dragend
@@ -531,13 +529,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       $spaceKey.set(true);
       $lastCursorPos.set(null);
       $lastMouseDownPos.set(null);
-    } else if (e.key === 'r') {
-      $lastCursorPos.set(null);
-      $lastMouseDownPos.set(null);
-      manager.background.render();
-      // TODO(psyche): restore some kind of fit
     }
-    manager.preview.tool.render();
   };
   window.addEventListener('keydown', onKeyDown);
 
