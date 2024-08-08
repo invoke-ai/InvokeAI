@@ -2,7 +2,6 @@ import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { JSONObject } from 'common/types';
-import { PubSub } from 'common/util/PubSub/PubSub';
 import type { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
 import type { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
 import type { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
@@ -36,14 +35,11 @@ import { RGBA_RED } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
 import { clamp } from 'lodash-es';
+import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
-import {
-  getImageDTO as defaultGetImageDTO,
-  getImageDTO,
-  uploadImage as defaultUploadImage,
-} from 'services/api/endpoints/images';
-import type { ImageCategory, ImageDTO } from 'services/api/types';
+import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import { CanvasBackground } from './CanvasBackground';
@@ -54,34 +50,6 @@ import { CanvasPreview } from './CanvasPreview';
 import { CanvasStagingArea } from './CanvasStagingArea';
 import { CanvasStateApi } from './CanvasStateApi';
 import { setStageEventHandlers } from './events';
-
-// type Extents = {
-//   minX: number;
-//   minY: number;
-//   maxX: number;
-//   maxY: number;
-// };
-// type GetBboxTask = {
-//   id: string;
-//   type: 'get_bbox';
-//   data: { imageData: ImageData };
-// };
-
-// type GetBboxResult = {
-//   id: string;
-//   type: 'get_bbox';
-//   data: { extents: Extents | null };
-// };
-
-type Util = {
-  getImageDTO: (imageName: string) => Promise<ImageDTO | null>;
-  uploadImage: (
-    blob: Blob,
-    fileName: string,
-    image_category: ImageCategory,
-    is_intermediate: boolean
-  ) => Promise<ImageDTO>;
-};
 
 type EntityStateAndAdapter =
   | {
@@ -118,15 +86,12 @@ export class CanvasManager {
   layers: Map<string, CanvasLayerAdapter>;
   regions: Map<string, CanvasMaskAdapter>;
   inpaintMask: CanvasMaskAdapter;
-  util: Util;
   stateApi: CanvasStateApi;
   preview: CanvasPreview;
   background: CanvasBackground;
 
   log: Logger;
   workerLog: Logger;
-
-  transformingEntity: PubSub<CanvasEntityIdentifier | null>;
 
   _store: Store<RootState>;
   _prevState: CanvasV2State;
@@ -136,25 +101,17 @@ export class CanvasManager {
   _worker: Worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
   _tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }> = new Map();
 
-  toolState: PubSub<CanvasV2State['tool']>;
-  currentFill: PubSub<RgbaColor>;
-  selectedEntity: PubSub<EntityStateAndAdapter | null>;
-  selectedEntityIdentifier: PubSub<CanvasEntityIdentifier | null>;
+  $transformingEntity: WritableAtom<CanvasEntityIdentifier | null> = atom();
+  $toolState: WritableAtom<CanvasV2State['tool']> = atom();
+  $currentFill: WritableAtom<RgbaColor> = atom();
+  $selectedEntity: WritableAtom<EntityStateAndAdapter | null> = atom();
+  $selectedEntityIdentifier: WritableAtom<CanvasEntityIdentifier | null> = atom();
 
-  constructor(
-    stage: Konva.Stage,
-    container: HTMLDivElement,
-    store: Store<RootState>,
-    getImageDTO: Util['getImageDTO'] = defaultGetImageDTO,
-    uploadImage: Util['uploadImage'] = defaultUploadImage
-  ) {
+  constructor(stage: Konva.Stage, container: HTMLDivElement, store: Store<RootState>) {
     this.stage = stage;
     this.container = container;
     this._store = store;
     this.stateApi = new CanvasStateApi(this._store, this);
-
-    this.transformingEntity = new PubSub<CanvasEntityIdentifier | null>(null);
-    this.toolState = new PubSub(this.stateApi.getToolState());
 
     this._prevState = this.stateApi.getState();
 
@@ -168,11 +125,6 @@ export class CanvasManager {
       };
     });
     this.workerLog = logger('worker');
-
-    this.util = {
-      getImageDTO,
-      uploadImage,
-    };
 
     this.preview = new CanvasPreview(this);
     this.stage.add(this.preview.getLayer());
@@ -208,15 +160,11 @@ export class CanvasManager {
       this.log.error('Worker message error');
     };
 
-    this.currentFill = new PubSub(this.getCurrentFill());
-    this.selectedEntityIdentifier = new PubSub(
-      this.stateApi.getState().selectedEntityIdentifier,
-      (a, b) => a?.id === b?.id
-    );
-    this.selectedEntity = new PubSub(
-      this.getSelectedEntity(),
-      (a, b) => a?.state === b?.state && a?.adapter === b?.adapter
-    );
+    this.$transformingEntity.set(null);
+    this.$toolState.set(this.stateApi.getToolState());
+    this.$selectedEntityIdentifier.set(this.stateApi.getState().selectedEntityIdentifier);
+    this.$currentFill.set(this.getCurrentFill());
+    this.$selectedEntity.set(this.getSelectedEntity());
 
     this.inpaintMask = new CanvasMaskAdapter(this.stateApi.getInpaintMaskState(), this);
     this.stage.add(this.inpaintMask.konva.layer);
@@ -395,7 +343,7 @@ export class CanvasManager {
   };
 
   getTransformingLayer() {
-    const transformingEntity = this.transformingEntity.getValue();
+    const transformingEntity = this.$transformingEntity.get();
     if (!transformingEntity) {
       return null;
     }
@@ -414,7 +362,7 @@ export class CanvasManager {
   }
 
   getIsTransforming() {
-    return Boolean(this.transformingEntity.getValue());
+    return Boolean(this.$transformingEntity.get());
   }
 
   startTransform() {
@@ -428,7 +376,7 @@ export class CanvasManager {
     }
     // TODO(psyche): Support other entity types
     entity.adapter.transformer.startTransform();
-    this.transformingEntity.publish({ id: entity.id, type: entity.type });
+    this.$transformingEntity.set({ id: entity.id, type: entity.type });
   }
 
   async applyTransform() {
@@ -436,7 +384,7 @@ export class CanvasManager {
     if (layer) {
       await layer.transformer.applyTransform();
     }
-    this.transformingEntity.publish(null);
+    this.$transformingEntity.set(null);
   }
 
   cancelTransform() {
@@ -444,7 +392,7 @@ export class CanvasManager {
     if (layer) {
       layer.transformer.stopTransform();
     }
-    this.transformingEntity.publish(null);
+    this.$transformingEntity.set(null);
   }
 
   render = async () => {
@@ -537,10 +485,10 @@ export class CanvasManager {
       await this.renderControlAdapters();
     }
 
-    this.toolState.publish(state.tool);
-    this.selectedEntityIdentifier.publish(state.selectedEntityIdentifier);
-    this.selectedEntity.publish(this.getSelectedEntity());
-    this.currentFill.publish(this.getCurrentFill());
+    this.$toolState.set(state.tool);
+    this.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
+    this.$selectedEntity.set(this.getSelectedEntity());
+    this.$currentFill.set(this.getCurrentFill());
 
     if (
       this._isFirstRender ||
@@ -740,7 +688,7 @@ export class CanvasManager {
 
   getCompositeLayerImageDTO = async (rect?: Rect): Promise<ImageDTO> => {
     const blob = await this.getCompositeLayerBlob(rect);
-    const imageDTO = await this.util.uploadImage(blob, 'composite-layer.png', 'general', true);
+    const imageDTO = await uploadImage(blob, 'composite-layer.png', 'general', true);
     this.stateApi.setLayerImageCache(imageDTO);
     return imageDTO;
   };
@@ -755,7 +703,7 @@ export class CanvasManager {
 
   getInpaintMaskImageDTO = async (rect?: Rect): Promise<ImageDTO> => {
     const blob = await this.inpaintMask.renderer.getBlob({ rect });
-    const imageDTO = await this.util.uploadImage(blob, 'inpaint-mask.png', 'mask', true);
+    const imageDTO = await uploadImage(blob, 'inpaint-mask.png', 'mask', true);
     this.stateApi.setInpaintMaskImageCache(imageDTO);
     return imageDTO;
   };
