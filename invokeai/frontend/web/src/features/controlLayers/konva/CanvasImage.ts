@@ -31,7 +31,6 @@ export class CanvasImageRenderer {
     placeholder: { group: Konva.Group; rect: Konva.Rect; text: Konva.Text };
     image: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately
   };
-  thumbnailElement: HTMLImageElement | null = null;
   imageElement: HTMLImageElement | null = null;
   isLoading: boolean = false;
   isError: boolean = false;
@@ -98,13 +97,6 @@ export class CanvasImageRenderer {
         this.onFailedToLoadImage();
         return;
       }
-      // Load the thumbnail first, but let the image load in parallel
-      loadImage(imageDTO.thumbnail_url)
-        .then((thumbnailElement) => {
-          this.thumbnailElement = thumbnailElement;
-          this.updateImageElement();
-        })
-        .catch(this.onFailedToLoadImage);
 
       this.imageElement = await loadImage(imageDTO.image_url);
       await this.updateImageElement();
@@ -126,14 +118,13 @@ export class CanvasImageRenderer {
     const release = await this.mutex.acquire();
 
     try {
-      const element = this.imageElement ?? this.thumbnailElement;
-      const { width, height } = this.state.image;
+      if (this.imageElement) {
+        const { width, height } = this.state.image;
 
-      if (element) {
         if (this.konva.image) {
           this.log.trace('Updating Konva image attrs');
           this.konva.image.setAttrs({
-            image: element,
+            image: this.imageElement,
             width,
             height,
           });
@@ -142,7 +133,7 @@ export class CanvasImageRenderer {
           this.konva.image = new Konva.Image({
             name: CanvasImageRenderer.IMAGE_NAME,
             listening: false,
-            image: element,
+            image: this.imageElement,
             width,
             height,
           });
