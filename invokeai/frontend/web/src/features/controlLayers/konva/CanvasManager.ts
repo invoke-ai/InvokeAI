@@ -156,6 +156,19 @@ export class CanvasManager {
     this.container = container;
     this._store = store;
     this.stateApi = new CanvasStateApi(this._store, this);
+
+    this.transformingEntity = new PubSub<CanvasEntityIdentifier | null>(null);
+    this.toolState = new PubSub(this.stateApi.getToolState());
+    this.currentFill = new PubSub(this.getCurrentFill());
+    this.selectedEntityIdentifier = new PubSub(
+      this.stateApi.getState().selectedEntityIdentifier,
+      (a, b) => a?.id === b?.id
+    );
+    this.selectedEntity = new PubSub(
+      this.getSelectedEntity(),
+      (a, b) => a?.state === b?.state && a?.adapter === b?.adapter
+    );
+
     this._prevState = this.stateApi.getState();
 
     this.log = logger('canvas').child((message) => {
@@ -212,18 +225,6 @@ export class CanvasManager {
     this._worker.onmessageerror = () => {
       this.log.error('Worker message error');
     };
-
-    this.transformingEntity = new PubSub<CanvasEntityIdentifier | null>(null);
-    this.toolState = new PubSub(this.stateApi.getToolState());
-    this.currentFill = new PubSub(this.getCurrentFill());
-    this.selectedEntityIdentifier = new PubSub(
-      this.stateApi.getState().selectedEntityIdentifier,
-      (a, b) => a?.id === b?.id
-    );
-    this.selectedEntity = new PubSub(
-      this.getSelectedEntity(),
-      (a, b) => a?.state === b?.state && a?.adapter === b?.adapter
-    );
 
     this.inpaintMask = new CanvasMaskAdapter(this.stateApi.getInpaintMaskState(), this);
     this.stage.add(this.inpaintMask.konva.layer);
@@ -303,7 +304,34 @@ export class CanvasManager {
       height: this.stage.height(),
       scale: this.stage.scaleX(),
     });
-    this.background.render();
+  }
+
+  resetView() {
+    const { width, height } = this.getStageSize();
+    const { rect } = this.stateApi.getBbox();
+
+    const padding = 20; // Padding in absolute pixels
+
+    const availableWidth = width - padding * 2;
+    const availableHeight = height - padding * 2;
+
+    const scale = Math.min(availableWidth / rect.width, availableHeight / rect.height);
+    const x = -rect.x * scale + padding + (availableWidth - rect.width * scale) / 2;
+    const y = -rect.y * scale + padding + (availableHeight - rect.height * scale) / 2;
+
+    this.stage.setAttrs({
+      x,
+      y,
+      scaleX: scale,
+      scaleY: scale,
+    });
+
+    this.stateApi.$stageAttrs.set({
+      ...this.stateApi.$stageAttrs.get(),
+      x,
+      y,
+      scale,
+    });
   }
 
   getEntity(identifier: CanvasEntityIdentifier): EntityStateAndAdapter | null {
@@ -618,6 +646,8 @@ export class CanvasManager {
       for (const controlAdapter of this.controlAdapters.values()) {
         controlAdapter.destroy();
       }
+      this.background.destroy();
+      this.preview.destroy();
       unsubscribeRenderer();
       unsubscribeListeners();
       unsubscribeShouldShowStagedImage();
@@ -678,8 +708,6 @@ export class CanvasManager {
       height: this.stage.height(),
       scale: this.stage.scaleX(),
     });
-    this.background.render();
-    this.preview.tool.render();
   }
 
   /**
