@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
@@ -19,6 +21,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
+        self._sync_default_style_presets()
 
     def get(self, id: str) -> StylePresetRecordDTO:
         """Gets a style preset by ID."""
@@ -51,15 +54,12 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
                 INSERT OR IGNORE INTO style_presets (
                     id,
                     name,
-                    preset_data
+                    preset_data,
+                    is_default
                 )
-                VALUES (?, ?, ?);
+                VALUES (?, ?, ?, ?);
                 """,
-                (
-                    id,
-                    style_preset.name,
-                    style_preset.preset_data.model_dump_json(),
-                ),
+                (id, style_preset.name, style_preset.preset_data.model_dump_json(), style_preset.is_default),
             )
             self._conn.commit()
         except Exception:
@@ -137,6 +137,33 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
             style_presets = [StylePresetRecordDTO.from_dict(dict(row)) for row in rows]
 
             return style_presets
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            self._lock.release()
+
+    def _sync_default_style_presets(self) -> None:
+        """Syncs default style presets to the database. Internal use only."""
+
+        try:
+            self._lock.acquire()
+            self._cursor.execute(
+                """--sql
+                DELETE FROM style_presets
+                WHERE is_default = True;
+                """
+            )
+            try:
+                with open(Path(__file__).parent / Path("default_style_presets.json"), "r") as file:
+                    presets: list[StylePresetWithoutId] = json.load(file)
+                    for preset in presets:
+                        style_preset = StylePresetWithoutId(is_default=True, **preset)
+                        self.create(style_preset)
+            except Exception as e:
+                raise Exception()
+
+            self._conn.commit()
         except Exception:
             self._conn.rollback()
             raise

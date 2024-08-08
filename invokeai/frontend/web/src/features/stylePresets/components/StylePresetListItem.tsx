@@ -110,23 +110,25 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
               )}
             </Flex>
 
-            <Flex alignItems="center" gap="1">
-              <IconButton
-                size="sm"
-                variant="ghost"
-                aria-label={t('stylePresets.editTemplate')}
-                onClick={handleClickEdit}
-                icon={<PiPencilBold />}
-              />
-              <IconButton
-                size="sm"
-                variant="ghost"
-                aria-label={t('stylePresets.deleteTemplate')}
-                onClick={handleClickDelete}
-                colorScheme="error"
-                icon={<PiTrashBold />}
-              />
-            </Flex>
+            {!preset.is_default && (
+              <Flex alignItems="center" gap="1">
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t('stylePresets.editTemplate')}
+                  onClick={handleClickEdit}
+                  icon={<PiPencilBold />}
+                />
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t('stylePresets.deleteTemplate')}
+                  onClick={handleClickDelete}
+                  colorScheme="error"
+                  icon={<PiTrashBold />}
+                />
+              </Flex>
+            )}
           </Flex>
 
           <Flex flexDir="column" gap="1">

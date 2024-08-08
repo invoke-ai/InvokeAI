@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Concept Art (Painterly)",
+    "preset_data": {
+      "positive_prompt": "{prompt} (digital painting)++, (textured 2d media)+++, depth and (painterly artwork)+++, intricate linework and brushwork, brush collection, highlights and shading, detail",
+      "negative_prompt": "photo++++ negative, faded, distorted, sketch, , flat+. anime, smooth+++"
+    }
+  },
+  {
+    "name": "Photography (Black and White)",
+    "preset_data": {
+      "positive_prompt": "(minimalist black and white photo)+++, (strong contrast)++, (clean textures)++, natural light, sharp focus, high detail, stark, dramatic, serene, simple composition, atmospheric, moody, refined, shadow play, 50mm lens, f/4",
+      "negative_prompt": "negative, blurry, faded, distorted, sketch, flat+. anime"
+    }
+  }
+]

@@ -23,11 +23,11 @@ class StylePresetChanges(BaseModel, extra="forbid"):
 class StylePresetWithoutId(BaseModel):
     name: str = Field(description="The name of the style preset.")
     preset_data: PresetData = Field(description="The preset data")
+    is_default: Optional[bool] = Field(description="Whether or not the style preset is default", default=False)
 
 
 class StylePresetRecordDTO(StylePresetWithoutId):
     id: str = Field(description="The style preset ID.")
-    is_default: bool = Field(description="Whether or not the style preset is default")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "StylePresetRecordDTO":
