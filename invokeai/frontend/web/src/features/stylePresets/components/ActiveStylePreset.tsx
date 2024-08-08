@@ -1,4 +1,4 @@
-import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
@@ -67,28 +67,34 @@ export const ActiveStylePreset = () => {
           </Flex>
         </Flex>
         <Flex gap="1">
-          <IconButton
-            onClick={handleToggleViewMode}
-            variant="outline"
-            size="sm"
-            aria-label="View"
-            colorScheme={viewMode ? 'invokeBlue' : 'base'}
-            icon={<PiEyeBold />}
-          />
-          <IconButton
-            onClick={handleFlattenPrompts}
-            variant="outline"
-            size="sm"
-            aria-label="Flatten"
-            icon={<PiStackSimpleBold />}
-          />
-          <IconButton
-            onClick={handleClearActiveStylePreset}
-            variant="outline"
-            size="sm"
-            aria-label="Clear"
-            icon={<PiXBold />}
-          />
+          <Tooltip label={t('stylePresets.toggleViewMode')}>
+            <IconButton
+              onClick={handleToggleViewMode}
+              variant="outline"
+              size="sm"
+              aria-label={t('stylePresets.toggleViewMode')}
+              colorScheme={viewMode ? 'invokeBlue' : 'base'}
+              icon={<PiEyeBold />}
+            />
+          </Tooltip>
+          <Tooltip label={t('stylePresets.flatten')}>
+            <IconButton
+              onClick={handleFlattenPrompts}
+              variant="outline"
+              size="sm"
+              aria-label={t('stylePresets.flatten')}
+              icon={<PiStackSimpleBold />}
+            />
+          </Tooltip>
+          <Tooltip label={t('stylePresets.clearTemplateSelection')}>
+            <IconButton
+              onClick={handleClearActiveStylePreset}
+              variant="outline"
+              size="sm"
+              aria-label={t('stylePresets.clearTemplateSelection')}
+              icon={<PiXBold />}
+            />
+          </Tooltip>
         </Flex>
       </Flex>
     </>

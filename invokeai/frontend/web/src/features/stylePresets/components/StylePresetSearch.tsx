@@ -41,7 +41,12 @@ const StylePresetSearch = () => {
 
   return (
     <InputGroup>
-      <Input placeholder="Search by name" value={searchTerm} onKeyDown={handleKeydown} onChange={handleChange} />
+      <Input
+        placeholder={t('stylePresets.searchByName')}
+        value={searchTerm}
+        onKeyDown={handleKeydown}
+        onChange={handleChange}
+      />
       {searchTerm && searchTerm.length && (
         <InputRightElement h="full" pe={2}>
           <IconButton

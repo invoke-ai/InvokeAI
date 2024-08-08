@@ -17,7 +17,7 @@ export const StylePresetMenuTrigger = () => {
 
   return (
     <Flex
-      // as="button"
+      as="button"
       onClick={handleToggle}
       backgroundColor="base.800"
       justifyContent="space-between"

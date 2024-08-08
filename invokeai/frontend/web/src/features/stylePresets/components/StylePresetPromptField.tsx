@@ -7,6 +7,7 @@ import { useController } from 'react-hook-form';
 import { PiBracketsCurlyBold } from 'react-icons/pi';
 
 import type { StylePresetFormData } from './StylePresetForm';
+import { useTranslation } from 'react-i18next';
 
 interface Props extends UseControllerProps<StylePresetFormData> {
   label: string;
@@ -15,6 +16,7 @@ interface Props extends UseControllerProps<StylePresetFormData> {
 export const StylePresetPromptField = (props: Props) => {
   const { field } = useController(props);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { t } = useTranslation();
 
   const onChange = useCallback<ChangeEventHandler<HTMLTextAreaElement>>(
     (v) => {
@@ -50,7 +52,7 @@ export const StylePresetPromptField = (props: Props) => {
           onClick={insertPromptPlaceholder}
           size="sm"
           icon={<PiBracketsCurlyBold />}
-          aria-label="Insert placeholder"
+          aria-label={t('stylePresets.insertPlaceholder')}
           isDisabled={isPromptPresent}
         />
       </Flex>
