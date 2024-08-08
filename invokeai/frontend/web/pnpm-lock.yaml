@@ -72,8 +72,8 @@ dependencies:
     specifier: ^0.6.0
     version: 0.6.0
   konva:
-    specifier: ^9.3.11
-    version: 9.3.11
+    specifier: ^9.3.14
+    version: 9.3.14
   lodash-es:
     specifier: ^4.17.21
     version: 4.17.21
@@ -10119,8 +10119,8 @@ packages:
     resolution: {integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==}
     dev: true
 
-  /konva@9.3.11:
-    resolution: {integrity: sha512-ZkFF4CXKZCDd2+6sBPA0y3hQ+X4uTqIS6JxTl3BEOFJzKr1tId+rxxJgtsk1FQIH3auuvnMj/rkbatUcf9C2Wg==}
+  /konva@9.3.14:
+    resolution: {integrity: sha512-Gmm5lyikGYJyogKQA7Fy6dKkfNh350V6DwfZkid0RVrGYP2cfCsxuMxgF5etKeCv7NjXYpJxKqi1dYkIkX/dcA==}
     dev: false
 
   /lazy-universal-dotenv@4.0.0:
