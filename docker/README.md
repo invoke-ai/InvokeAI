@@ -1,20 +1,22 @@
 # Invoke in Docker
 
-- Ensure that Docker can use the GPU on your system
-- This documentation assumes Linux, but should work similarly under Windows with WSL2
+First things first:
+
+- Ensure that Docker can use your [NVIDIA][nvidia docker docs] or [AMD][amd docker docs] GPU.
+- This document assumes a Linux system, but should work similarly under Windows with WSL2.
 - We don't recommend running Invoke in Docker on macOS at this time. It works, but very slowly.
 
-## Quickstart :lightning:
+## Quickstart
 
-No `docker compose`, no persistence, just a simple one-liner using the official images:
+No `docker compose`, no persistence, single command, using the official images:
 
-**CUDA:**
+**CUDA (NVIDIA GPU):**
 
 ```bash
 docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai
 ```
 
-**ROCm:**
+**ROCm (AMD GPU):**
 
 ```bash
 docker run --device /dev/kfd --device /dev/dri --publish 9090:9090 ghcr.io/invoke-ai/invokeai:main-rocm
@@ -22,12 +24,20 @@ docker run --device /dev/kfd --device /dev/dri --publish 9090:9090 ghcr.io/invok
 
 Open `http://localhost:9090` in your browser once the container finishes booting, install some models, and generate away!
 
-> [!TIP]
-> To persist your data (including downloaded models) outside of the container, add a `--volume/-v` flag to the above command, e.g.: `docker run --volume /some/local/path:/invokeai <...the rest of the command>`
+### Data persistence
+
+To persist your generated images and downloaded models outside of the container, add a `--volume/-v` flag to the above command, e.g.:
+
+```bash
+docker run --volume /some/local/path:/invokeai {...etc...}
+```
+
+`/some/local/path/invokeai` will contain all your data.
+It can *usually* be reused between different installs of Invoke. Tread with caution and read the release notes!
 
 ## Customize the container
 
-We ship the `run.sh` script, which is a convenient wrapper around `docker compose` for cases where custom image build args are needed. Alternatively, the familiar `docker compose` commands work just as well.
+The included `run.sh` script is a convenience wrapper around `docker compose`. It can be helpful for passing additional build arguments to `docker compose`. Alternatively, the familiar `docker compose` commands work just as well.
 
 ```bash
 cd docker
@@ -38,11 +48,14 @@ cp .env.sample .env
 
 It will take a few minutes to build the image the first time. Once the application starts up, open `http://localhost:9090` in your browser to invoke!
 
+>[!TIP]
+>When using the `run.sh` script, the container will continue running after Ctrl+C. To shut it down, use the `docker compose down` command.
+
 ## Docker setup in detail
 
 #### Linux
 
-1. Ensure builkit is enabled in the Docker daemon settings (`/etc/docker/daemon.json`)
+1. Ensure buildkit is enabled in the Docker daemon settings (`/etc/docker/daemon.json`)
 2. Install the `docker compose` plugin using your package manager, or follow a [tutorial](https://docs.docker.com/compose/install/linux/#install-using-the-repository).
     - The deprecated `docker-compose` (hyphenated) CLI probably won't work. Update to a recent version.
 3. Ensure docker daemon is able to access the GPU.
@@ -98,25 +111,7 @@ GPU_DRIVER=cuda
 
 Any environment variables supported by InvokeAI can be set here. See the [Configuration docs](https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/) for further detail.
 
-## Even More Customizing!
+---
 
-See the `docker-compose.yml` file. The `command` instruction can be uncommented and used to run arbitrary startup commands. Some examples below.
-
-### Reconfigure the runtime directory
-
-Can be used to download additional models from the supported model list
-
-In conjunction with `INVOKEAI_ROOT` can be also used to initialize a runtime directory
-
-```yaml
-command:
-  - invokeai-configure
-  - --yes
-```
-
-Or install models:
-
-```yaml
-command:
-  - invokeai-model-install
-```
+[nvidia docker docs]: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+[amd docker docs]: https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html
