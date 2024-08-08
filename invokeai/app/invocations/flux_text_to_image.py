@@ -147,6 +147,9 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 transformer=transformer,
             )
 
+            t5_embeddings = t5_embeddings.to(dtype=transformer.dtype)
+            clip_embeddings = clip_embeddings.to(dtype=transformer.dtype)
+
             latents = flux_pipeline_with_transformer(
                 height=self.height,
                 width=self.width,
