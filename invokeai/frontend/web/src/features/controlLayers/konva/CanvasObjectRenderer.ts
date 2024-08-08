@@ -116,7 +116,7 @@ export class CanvasObjectRenderer {
     }
 
     this.subscriptions.add(
-      this.manager.$toolState.listen((newVal, oldVal) => {
+      this.manager.stateApi.$toolState.listen((newVal, oldVal) => {
         if (newVal.selected !== oldVal.selected) {
           this.commitBuffer();
         }
