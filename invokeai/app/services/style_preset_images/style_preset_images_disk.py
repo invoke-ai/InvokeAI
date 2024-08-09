@@ -28,14 +28,11 @@ class StylePresetImageFileStorageDisk(StylePresetImageFileStorageBase):
         try:
             path = self.get_path(style_preset_id)
 
-            if not self._validate_path(path):
-                raise StylePresetImageFileNotFoundException
-
             return Image.open(path)
         except FileNotFoundError as e:
             raise StylePresetImageFileNotFoundException from e
 
-    def save(self, image: PILImageType, style_preset_id: str) -> None:
+    def save(self, style_preset_id: str, image: PILImageType) -> None:
         try:
             self._validate_storage_folders()
             image_path = self._style_preset_images_folder / (style_preset_id + ".webp")

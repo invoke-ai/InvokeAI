@@ -24,7 +24,7 @@ export const StylePresetMenu = () => {
 
       const groupedData = filteredData.reduce(
         (acc: { defaultPresets: StylePresetRecordWithImage[]; presets: StylePresetRecordWithImage[] }, preset) => {
-          if (preset.is_default) {
+          if (preset.type === 'default') {
             acc.defaultPresets.push(preset);
           } else {
             acc.presets.push(preset);

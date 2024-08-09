@@ -32,8 +32,8 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
       dispatch(
         prefilledFormDataChanged({
           name,
-          positivePrompt: positive_prompt,
-          negativePrompt: negative_prompt,
+          positivePrompt: positive_prompt || '',
+          negativePrompt: negative_prompt || '',
           imageUrl: preset.image,
         })
       );
@@ -105,7 +105,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
               )}
             </Flex>
 
-            {!preset.is_default && (
+            {preset.type !== 'default' && (
               <Flex alignItems="center" gap={1}>
                 <IconButton
                   size="sm"

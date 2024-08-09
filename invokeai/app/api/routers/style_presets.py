@@ -32,7 +32,7 @@ async def get_style_preset(
 ) -> StylePresetRecordWithImage:
     """Gets a style preset"""
     try:
-        image = ApiDependencies.invoker.services.style_preset_images_service.get_url(style_preset_id)
+        image = ApiDependencies.invoker.services.style_preset_image_files.get_url(style_preset_id)
         style_preset = ApiDependencies.invoker.services.style_preset_records.get(style_preset_id)
         return StylePresetRecordWithImage(image=image, **style_preset.model_dump())
     except StylePresetNotFoundError:
@@ -67,20 +67,22 @@ async def update_style_preset(
             raise HTTPException(status_code=415, detail="Failed to read image")
 
         try:
-            ApiDependencies.invoker.services.style_preset_images_service.save(pil_image, style_preset_id)
+            ApiDependencies.invoker.services.style_preset_image_files.save(style_preset_id, pil_image)
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
     else:
         try:
-            ApiDependencies.invoker.services.style_preset_images_service.delete(style_preset_id)
+            ApiDependencies.invoker.services.style_preset_image_files.delete(style_preset_id)
         except StylePresetImageFileNotFoundException:
             pass
 
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
     changes = StylePresetChanges(name=name, preset_data=preset_data)
 
-    style_preset_image = ApiDependencies.invoker.services.style_preset_images_service.get_url(style_preset_id)
-    style_preset = ApiDependencies.invoker.services.style_preset_records.update(id=style_preset_id, changes=changes)
+    style_preset_image = ApiDependencies.invoker.services.style_preset_image_files.get_url(style_preset_id)
+    style_preset = ApiDependencies.invoker.services.style_preset_records.update(
+        style_preset_id=style_preset_id, changes=changes
+    )
     return StylePresetRecordWithImage(image=style_preset_image, **style_preset.model_dump())
 
 
@@ -93,7 +95,7 @@ async def delete_style_preset(
 ) -> None:
     """Deletes a style preset"""
     try:
-        ApiDependencies.invoker.services.style_preset_images_service.delete(style_preset_id)
+        ApiDependencies.invoker.services.style_preset_image_files.delete(style_preset_id)
     except StylePresetImageFileNotFoundException:
         pass
 
@@ -131,11 +133,11 @@ async def create_style_preset(
             raise HTTPException(status_code=415, detail="Failed to read image")
 
         try:
-            ApiDependencies.invoker.services.style_preset_images_service.save(pil_image, new_style_preset.id)
+            ApiDependencies.invoker.services.style_preset_image_files.save(new_style_preset.id, pil_image)
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
-    preset_image = ApiDependencies.invoker.services.style_preset_images_service.get_url(new_style_preset.id)
+    preset_image = ApiDependencies.invoker.services.style_preset_image_files.get_url(new_style_preset.id)
     return StylePresetRecordWithImage(image=preset_image, **new_style_preset.model_dump())
 
 
@@ -151,7 +153,7 @@ async def list_style_presets() -> list[StylePresetRecordWithImage]:
     style_presets_with_image: list[StylePresetRecordWithImage] = []
     style_presets = ApiDependencies.invoker.services.style_preset_records.get_many()
     for preset in style_presets:
-        image = ApiDependencies.invoker.services.style_preset_images_service.get_url(preset.id)
+        image = ApiDependencies.invoker.services.style_preset_image_files.get_url(preset.id)
         style_preset_with_image = StylePresetRecordWithImage(image=image, **preset.model_dump())
         style_presets_with_image.append(style_preset_with_image)
 
@@ -176,7 +178,7 @@ async def get_style_preset_image(
     """Gets an image file that previews the model"""
 
     try:
-        path = ApiDependencies.invoker.services.style_preset_images_service.get_path(style_preset_id)
+        path = ApiDependencies.invoker.services.style_preset_image_files.get_path(style_preset_id)
 
         response = FileResponse(
             path,

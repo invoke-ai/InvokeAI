@@ -23,7 +23,7 @@ class StylePresetImageFileStorageBase(ABC):
         pass
 
     @abstractmethod
-    def save(self, image: PILImageType, style_preset_id: str) -> None:
+    def save(self, style_preset_id: str, image: PILImageType) -> None:
         """Saves a style preset image."""
         pass
 

@@ -8,14 +8,14 @@ class Migration14Callback:
         self._create_style_presets(cursor)
 
     def _create_style_presets(self, cursor: sqlite3.Cursor) -> None:
-        """Create the table used to store model metadata downloaded from remote sources."""
+        """Create the table used to store style presets."""
         tables = [
             """--sql
             CREATE TABLE IF NOT EXISTS style_presets (
                 id TEXT NOT NULL PRIMARY KEY,
                 name TEXT NOT NULL,
                 preset_data TEXT NOT NULL,
-                is_default BOOLEAN DEFAULT FALSE,
+                type TEXT NOT NULL DEFAULT "user",
                 created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
                 -- Updated via trigger
                 updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
@@ -47,10 +47,10 @@ class Migration14Callback:
 
 def build_migration_14() -> Migration:
     """
-    Build the migration from database version 12 to 14..
+    Build the migration from database version 13 to 14..
 
     This migration does the following:
-    - Adds `archived` columns to the board table.
+    - Create the table used to store style presets.
     """
     migration_14 = Migration(
         from_version=13,

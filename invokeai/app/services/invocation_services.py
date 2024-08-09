@@ -64,7 +64,7 @@ class InvocationServices:
         tensors: "ObjectSerializerBase[torch.Tensor]",
         conditioning: "ObjectSerializerBase[ConditioningFieldData]",
         style_preset_records: "StylePresetRecordsStorageBase",
-        style_preset_images_service: "StylePresetImageFileStorageBase",
+        style_preset_image_files: "StylePresetImageFileStorageBase",
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -90,4 +90,4 @@ class InvocationServices:
         self.tensors = tensors
         self.conditioning = conditioning
         self.style_preset_records = style_preset_records
-        self.style_preset_images_service = style_preset_images_service
+        self.style_preset_image_files = style_preset_image_files

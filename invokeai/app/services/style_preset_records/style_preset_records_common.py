@@ -1,6 +1,9 @@
+from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, TypeAdapter
+
+from invokeai.app.util.metaenum import MetaEnum
 
 
 class StylePresetNotFoundError(Exception):
@@ -15,6 +18,12 @@ class PresetData(BaseModel, extra="forbid"):
 PresetDataValidator = TypeAdapter(PresetData)
 
 
+class PresetType(str, Enum, metaclass=MetaEnum):
+    User = "user"
+    Default = "default"
+    Project = "project"
+
+
 class StylePresetChanges(BaseModel, extra="forbid"):
     name: Optional[str] = Field(default=None, description="The style preset's new name.")
     preset_data: Optional[PresetData] = Field(default=None, description="The updated data for style preset.")
@@ -23,7 +32,7 @@ class StylePresetChanges(BaseModel, extra="forbid"):
 class StylePresetWithoutId(BaseModel):
     name: str = Field(description="The name of the style preset.")
     preset_data: PresetData = Field(description="The preset data")
-    is_default: Optional[bool] = Field(description="Whether or not the style preset is default", default=False)
+    type: PresetType = Field(description="The type of style preset", default=PresetType.User)
 
 
 class StylePresetRecordDTO(StylePresetWithoutId):
