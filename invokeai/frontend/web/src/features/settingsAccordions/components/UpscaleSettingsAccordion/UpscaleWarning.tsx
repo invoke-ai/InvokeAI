@@ -57,7 +57,11 @@ export const UpscaleWarning = () => {
     $installModelsTab.set(3);
   }, [dispatch]);
 
-  if ((!modelWarnings.length && !otherWarnings.length) || isLoading || !shouldShowButton) {
+  if (modelWarnings.length && !shouldShowButton) {
+    return null;
+  }
+
+  if ((!modelWarnings.length && !otherWarnings.length) || isLoading) {
     return null;
   }
 
