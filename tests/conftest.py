@@ -57,7 +57,7 @@ def mock_services() -> InvocationServices:
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
-        style_preset_images_service=None,  # type: ignore
+        style_preset_image_files=None,  # type: ignore
     )
 
 
