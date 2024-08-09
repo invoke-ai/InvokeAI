@@ -6,7 +6,6 @@ from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler
 from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from optimum.quanto import qfloat8
-from optimum.quanto.models import QuantizedDiffusersModel, QuantizedTransformersModel
 from PIL import Image
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
 from transformers.models.auto import AutoModelForTextEncoding
@@ -15,17 +14,19 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import InputField, WithBoard, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.quantization.fast_quantized_diffusion_model import FastQuantizedDiffusersModel
+from invokeai.backend.quantization.fast_quantized_transformers_model import FastQuantizedTransformersModel
 from invokeai.backend.util.devices import TorchDevice
 
 TFluxModelKeys = Literal["flux-schnell"]
 FLUX_MODELS: dict[TFluxModelKeys, str] = {"flux-schnell": "black-forest-labs/FLUX.1-schnell"}
 
 
-class QuantizedFluxTransformer2DModel(QuantizedDiffusersModel):
+class QuantizedFluxTransformer2DModel(FastQuantizedDiffusersModel):
     base_class = FluxTransformer2DModel
 
 
-class QuantizedModelForTextEncoding(QuantizedTransformersModel):
+class QuantizedModelForTextEncoding(FastQuantizedTransformersModel):
     auto_class = AutoModelForTextEncoding
 
 
