@@ -58,13 +58,6 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
     textareaRef.current?.focus();
   }, [textareaRef]);
 
-  const onFocusCursorAtEnd = useCallback(() => {
-    onFocus();
-    if (textareaRef.current) {
-      textareaRef.current.setSelectionRange(prompt.length, prompt.length);
-    }
-  }, [onFocus, textareaRef, prompt]);
-
   const handleClosePopover = useCallback(() => {
     onClose();
     onFocus();
@@ -96,6 +89,5 @@ export const usePrompt = ({ prompt, textareaRef, onChange: _onChange }: UseInser
     onSelect,
     onKeyDown,
     onFocus,
-    onFocusCursorAtEnd,
   };
 };

@@ -1,15 +1,19 @@
-import type { StylePresetFormData } from 'features/stylePresets/components/StylePresetForm';
-import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
-
 export type StylePresetModalState = {
   isModalOpen: boolean;
   updatingStylePresetId: string | null;
-  prefilledFormData: StylePresetFormData | null;
+  prefilledFormData: PrefilledFormData | null;
+};
+
+export type PrefilledFormData = {
+  name: string;
+  positivePrompt: string;
+  negativePrompt: string;
+  imageUrl: string | null;
 };
 
 export type StylePresetState = {
   isMenuOpen: boolean;
-  activeStylePreset: StylePresetRecordWithImage | null;
+  activeStylePresetId: string | null;
   searchTerm: string;
   viewMode: boolean;
 };

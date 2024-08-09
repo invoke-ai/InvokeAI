@@ -1,15 +1,16 @@
-import { Flex, Icon } from '@invoke-ai/ui-library';
+import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { isMenuOpenChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
 import { ActiveStylePreset } from './ActiveStylePreset';
 
 export const StylePresetMenuTrigger = () => {
   const isMenuOpen = useAppSelector((s) => s.stylePreset.isMenuOpen);
-  const activeStylePreset = useAppSelector((s) => s.stylePreset.activeStylePreset);
   const dispatch = useAppDispatch();
+  const { t } = useTranslation();
 
   const handleToggle = useCallback(() => {
     dispatch(isMenuOpenChanged(!isMenuOpen));
@@ -17,20 +18,19 @@ export const StylePresetMenuTrigger = () => {
 
   return (
     <Flex
-      as="button"
       onClick={handleToggle}
       backgroundColor="base.800"
       justifyContent="space-between"
       alignItems="center"
-      padding="5px 10px"
+      py={2}
+      px={3}
       borderRadius="base"
-      gap="2"
-      borderTop="2px solid transparent"
-      borderColor={activeStylePreset ? 'invokeBlue.200' : 'transparent'}
+      gap={1}
+      role="button"
     >
       <ActiveStylePreset />
 
-      <Icon boxSize="15px" as={PiCaretDownBold} color="base.300" />
+      <IconButton aria-label={t('stylePresets.viewList')} variant="ghost" icon={<PiCaretDownBold />} size="sm" />
     </Flex>
   );
 };

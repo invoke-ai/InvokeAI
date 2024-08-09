@@ -1,12 +1,12 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
+import type { PersistConfig } from 'app/store/store';
 
 import type { StylePresetState } from './types';
 
 const initialState: StylePresetState = {
   isMenuOpen: false,
-  activeStylePreset: null,
+  activeStylePresetId: null,
   searchTerm: '',
   viewMode: false,
 };
@@ -18,8 +18,8 @@ export const stylePresetSlice = createSlice({
     isMenuOpenChanged: (state, action: PayloadAction<boolean>) => {
       state.isMenuOpen = action.payload;
     },
-    activeStylePresetChanged: (state, action: PayloadAction<StylePresetRecordWithImage | null>) => {
-      state.activeStylePreset = action.payload;
+    activeStylePresetIdChanged: (state, action: PayloadAction<string | null>) => {
+      state.activeStylePresetId = action.payload;
     },
     searchTermChanged: (state, action: PayloadAction<string>) => {
       state.searchTerm = action.payload;
@@ -30,5 +30,20 @@ export const stylePresetSlice = createSlice({
   },
 });
 
-export const { isMenuOpenChanged, activeStylePresetChanged, searchTermChanged, viewModeChanged } =
+export const { isMenuOpenChanged, activeStylePresetIdChanged, searchTermChanged, viewModeChanged } =
   stylePresetSlice.actions;
+
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+const migrateStylePresetState = (state: any): any => {
+  if (!('_version' in state)) {
+    state._version = 1;
+  }
+  return state;
+};
+
+export const stylePresetPersistConfig: PersistConfig<StylePresetState> = {
+  name: stylePresetSlice.name,
+  initialState,
+  migrate: migrateStylePresetState,
+  persistDenylist: [],
+};

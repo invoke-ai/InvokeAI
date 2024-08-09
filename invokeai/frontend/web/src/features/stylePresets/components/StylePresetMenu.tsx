@@ -18,7 +18,7 @@ import StylePresetSearch from './StylePresetSearch';
 export const StylePresetMenu = () => {
   const searchTerm = useAppSelector((s) => s.stylePreset.searchTerm);
   const { data } = useListStylePresetsQuery(undefined, {
-    selectFromResult: ({ data, error, isLoading }) => {
+    selectFromResult: ({ data }) => {
       const filteredData =
         data?.filter((preset) => preset.name.toLowerCase().includes(searchTerm.toLowerCase())) || EMPTY_ARRAY;
 
@@ -36,8 +36,6 @@ export const StylePresetMenu = () => {
 
       return {
         data: groupedData,
-        error,
-        isLoading,
       };
     },
   });
@@ -52,8 +50,8 @@ export const StylePresetMenu = () => {
   }, [dispatch]);
 
   return (
-    <Flex flexDir="column" gap="2" padding="10px" layerStyle="second">
-      <Flex alignItems="center" gap="10" w="full" justifyContent="space-between">
+    <Flex flexDir="column" gap={2} padding={3} layerStyle="second" borderRadius="base">
+      <Flex alignItems="center" gap={2} w="full" justifyContent="space-between">
         <StylePresetSearch />
         <IconButton
           icon={<PiPlusBold />}
@@ -68,7 +66,7 @@ export const StylePresetMenu = () => {
       </Flex>
 
       {data.presets.length === 0 && data.defaultPresets.length === 0 && (
-        <Text m="20px" textAlign="center">
+        <Text p={10} textAlign="center">
           {t('stylePresets.noMatchingTemplates')}
         </Text>
       )}

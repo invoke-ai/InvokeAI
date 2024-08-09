@@ -2,6 +2,7 @@ import type { RootState } from 'app/store/store';
 import type { BoardField } from 'features/nodes/types/common';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 
 /**
  * Gets the board field, based on the autoAddBoardId setting.
@@ -22,25 +23,31 @@ export const getPresetModifiedPrompts = (
 ): { positivePrompt: string; negativePrompt: string; positiveStylePrompt?: string; negativeStylePrompt?: string } => {
   const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } =
     state.controlLayers.present;
-  const { activeStylePreset } = state.stylePreset;
+  const { activeStylePresetId } = state.stylePreset;
 
-  if (activeStylePreset) {
-    const presetModifiedPositivePrompt = buildPresetModifiedPrompt(
-      activeStylePreset.preset_data.positive_prompt,
-      positivePrompt
-    );
+  if (activeStylePresetId) {
+    const { data } = stylePresetsApi.endpoints.listStylePresets.select()(state);
 
-    const presetModifiedNegativePrompt = buildPresetModifiedPrompt(
-      activeStylePreset.preset_data.negative_prompt,
-      negativePrompt
-    );
+    const activeStylePreset = data?.find((item) => item.id === activeStylePresetId);
 
-    return {
-      positivePrompt: presetModifiedPositivePrompt,
-      negativePrompt: presetModifiedNegativePrompt,
-      positiveStylePrompt: shouldConcatPrompts ? presetModifiedPositivePrompt : positivePrompt2,
-      negativeStylePrompt: shouldConcatPrompts ? presetModifiedNegativePrompt : negativePrompt2,
-    };
+    if (activeStylePreset) {
+      const presetModifiedPositivePrompt = buildPresetModifiedPrompt(
+        activeStylePreset.preset_data.positive_prompt,
+        positivePrompt
+      );
+
+      const presetModifiedNegativePrompt = buildPresetModifiedPrompt(
+        activeStylePreset.preset_data.negative_prompt,
+        negativePrompt
+      );
+
+      return {
+        positivePrompt: presetModifiedPositivePrompt,
+        negativePrompt: presetModifiedNegativePrompt,
+        positiveStylePrompt: shouldConcatPrompts ? presetModifiedPositivePrompt : positivePrompt2,
+        negativeStylePrompt: shouldConcatPrompts ? presetModifiedNegativePrompt : negativePrompt2,
+      };
+    }
   }
 
   return {

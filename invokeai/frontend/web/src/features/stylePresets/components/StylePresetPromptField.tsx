@@ -1,15 +1,14 @@
-import { Flex, FormControl, FormLabel, IconButton, Textarea } from '@invoke-ai/ui-library';
+import { Button, Flex, FormControl, FormLabel, Textarea } from '@invoke-ai/ui-library';
 import { PRESET_PLACEHOLDER } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import type { ChangeEventHandler } from 'react';
 import { useCallback, useMemo, useRef } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { PiBracketsCurlyBold } from 'react-icons/pi';
 
 import type { StylePresetFormData } from './StylePresetForm';
 
-interface Props extends UseControllerProps<StylePresetFormData> {
+interface Props extends UseControllerProps<StylePresetFormData, 'negativePrompt' | 'positivePrompt'> {
   label: string;
 }
 
@@ -26,7 +25,7 @@ export const StylePresetPromptField = (props: Props) => {
   );
 
   const value = useMemo(() => {
-    return field.value as string;
+    return field.value;
   }, [field.value]);
 
   const insertPromptPlaceholder = useCallback(() => {
@@ -45,16 +44,17 @@ export const StylePresetPromptField = (props: Props) => {
   const isPromptPresent = useMemo(() => value?.includes(PRESET_PLACEHOLDER), [value]);
 
   return (
-    <FormControl orientation="vertical">
-      <Flex alignItems="center" gap="1">
+    <FormControl orientation="vertical" gap={3}>
+      <Flex alignItems="center" gap={2}>
         <FormLabel>{props.label}</FormLabel>
-        <IconButton
+        <Button
           onClick={insertPromptPlaceholder}
-          size="sm"
-          icon={<PiBracketsCurlyBold />}
+          size="xs"
           aria-label={t('stylePresets.insertPlaceholder')}
           isDisabled={isPromptPresent}
-        />
+        >
+          {t('stylePresets.insertPlaceholder')}
+        </Button>
       </Flex>
 
       <Textarea size="sm" ref={textareaRef} value={value} onChange={onChange} />

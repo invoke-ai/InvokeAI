@@ -8,7 +8,7 @@ import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi'
 
 import type { StylePresetFormData } from './StylePresetForm';
 
-export const StylePresetImageField = (props: UseControllerProps<StylePresetFormData>) => {
+export const StylePresetImageField = (props: UseControllerProps<StylePresetFormData, 'image'>) => {
   const { field } = useController(props);
   const { t } = useTranslation();
   const onDropAccepted = useCallback(
@@ -36,7 +36,7 @@ export const StylePresetImageField = (props: UseControllerProps<StylePresetFormD
     return (
       <Box position="relative" flexShrink={0}>
         <Image
-          src={URL.createObjectURL(field.value as File)}
+          src={URL.createObjectURL(field.value)}
           objectFit="cover"
           objectPosition="50% 50%"
           w={65}

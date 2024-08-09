@@ -1,17 +1,30 @@
-import { Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Badge, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
-import { activeStylePresetChanged, viewModeChanged } from 'features/stylePresets/store/stylePresetSlice';
+import { activeStylePresetIdChanged, viewModeChanged } from 'features/stylePresets/store/stylePresetSlice';
 import type { MouseEventHandler } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold, PiStackSimpleBold, PiXBold } from 'react-icons/pi';
+import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 import StylePresetImage from './StylePresetImage';
 
 export const ActiveStylePreset = () => {
-  const { activeStylePreset, viewMode } = useAppSelector((s) => s.stylePreset);
+  const viewMode = useAppSelector((s) => s.stylePreset.viewMode);
+
+  const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
+
+  const { activeStylePreset } = useListStylePresetsQuery(undefined, {
+    selectFromResult: ({ data }) => {
+      let activeStylePreset = null;
+      if (data) {
+        activeStylePreset = data.find((sp) => sp.id === activeStylePresetId);
+      }
+      return { activeStylePreset };
+    },
+  });
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -22,7 +35,7 @@ export const ActiveStylePreset = () => {
     (e) => {
       e.stopPropagation();
       dispatch(viewModeChanged(false));
-      dispatch(activeStylePresetChanged(null));
+      dispatch(activeStylePresetIdChanged(null));
     },
     [dispatch]
   );
@@ -33,7 +46,7 @@ export const ActiveStylePreset = () => {
       dispatch(positivePromptChanged(presetModifiedPositivePrompt));
       dispatch(negativePromptChanged(presetModifiedNegativePrompt));
       dispatch(viewModeChanged(false));
-      dispatch(activeStylePresetChanged(null));
+      dispatch(activeStylePresetIdChanged(null));
     },
     [dispatch, presetModifiedPositivePrompt, presetModifiedNegativePrompt]
   );
@@ -48,7 +61,7 @@ export const ActiveStylePreset = () => {
 
   if (!activeStylePreset) {
     return (
-      <Flex h="25px" alignItems="center">
+      <Flex h={25} alignItems="center">
         <Text fontSize="sm" fontWeight="semibold" color="base.300">
           {t('stylePresets.choosePromptTemplate')}
         </Text>
@@ -56,47 +69,45 @@ export const ActiveStylePreset = () => {
     );
   }
   return (
-    <>
-      <Flex justifyContent="space-between" w="full" alignItems="center">
-        <Flex gap="2" alignItems="center">
-          <StylePresetImage imageWidth={25} presetImageUrl={activeStylePreset.image} />
-          <Flex flexDir="column">
-            <Text fontSize="sm" fontWeight="semibold" color="base.300" noOfLines={1}>
-              {activeStylePreset.name}
-            </Text>
-          </Flex>
-        </Flex>
-        <Flex gap="1">
-          <Tooltip label={t('stylePresets.toggleViewMode')}>
-            <IconButton
-              onClick={handleToggleViewMode}
-              variant="outline"
-              size="sm"
-              aria-label={t('stylePresets.toggleViewMode')}
-              colorScheme={viewMode ? 'invokeBlue' : 'base'}
-              icon={<PiEyeBold />}
-            />
-          </Tooltip>
-          <Tooltip label={t('stylePresets.flatten')}>
-            <IconButton
-              onClick={handleFlattenPrompts}
-              variant="outline"
-              size="sm"
-              aria-label={t('stylePresets.flatten')}
-              icon={<PiStackSimpleBold />}
-            />
-          </Tooltip>
-          <Tooltip label={t('stylePresets.clearTemplateSelection')}>
-            <IconButton
-              onClick={handleClearActiveStylePreset}
-              variant="outline"
-              size="sm"
-              aria-label={t('stylePresets.clearTemplateSelection')}
-              icon={<PiXBold />}
-            />
-          </Tooltip>
+    <Flex justifyContent="space-between" w="full" alignItems="center">
+      <Flex gap={2} alignItems="center">
+        <StylePresetImage imageWidth={25} presetImageUrl={activeStylePreset.image} />
+        <Flex flexDir="column">
+          <Badge colorScheme="invokeBlue" variant="subtle">
+            {activeStylePreset.name}
+          </Badge>
         </Flex>
       </Flex>
-    </>
+      <Flex gap={1}>
+        <Tooltip label={t('stylePresets.toggleViewMode')}>
+          <IconButton
+            onClick={handleToggleViewMode}
+            variant="outline"
+            size="sm"
+            aria-label={t('stylePresets.toggleViewMode')}
+            colorScheme={viewMode ? 'invokeBlue' : 'base'}
+            icon={<PiEyeBold />}
+          />
+        </Tooltip>
+        <Tooltip label={t('stylePresets.flatten')}>
+          <IconButton
+            onClick={handleFlattenPrompts}
+            variant="outline"
+            size="sm"
+            aria-label={t('stylePresets.flatten')}
+            icon={<PiStackSimpleBold />}
+          />
+        </Tooltip>
+        <Tooltip label={t('stylePresets.clearTemplateSelection')}>
+          <IconButton
+            onClick={handleClearActiveStylePreset}
+            variant="outline"
+            size="sm"
+            aria-label={t('stylePresets.clearTemplateSelection')}
+            icon={<PiXBold />}
+          />
+        </Tooltip>
+      </Flex>
+    </Flex>
   );
 };

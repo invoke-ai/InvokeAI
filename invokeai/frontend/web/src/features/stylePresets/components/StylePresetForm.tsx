@@ -1,5 +1,5 @@
 import { Button, Flex, FormControl, FormLabel, Input, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { isModalOpenChanged, updatingStylePresetIdChanged } from 'features/stylePresets/store/stylePresetModalSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
@@ -18,16 +18,20 @@ export type StylePresetFormData = {
   image: File | null;
 };
 
-export const StylePresetForm = ({ updatingStylePresetId }: { updatingStylePresetId: string | null }) => {
+export const StylePresetForm = ({
+  updatingStylePresetId,
+  formData,
+}: {
+  updatingStylePresetId: string | null;
+  formData: StylePresetFormData | null;
+}) => {
   const [createStylePreset] = useCreateStylePresetMutation();
   const [updateStylePreset] = useUpdateStylePresetMutation();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const defaultValues = useAppSelector((s) => s.stylePresetModal.prefilledFormData);
-
   const { handleSubmit, control, register, formState } = useForm<StylePresetFormData>({
-    defaultValues: defaultValues || {
+    defaultValues: formData || {
       name: '',
       positivePrompt: '',
       negativePrompt: '',
@@ -68,12 +72,12 @@ export const StylePresetForm = ({ updatingStylePresetId }: { updatingStylePreset
   );
 
   return (
-    <Flex flexDir="column" gap="4">
-      <Flex alignItems="center" gap="4">
+    <Flex flexDir="column" gap={4}>
+      <Flex alignItems="center" gap={4}>
         <StylePresetImageField control={control} name="image" />
         <FormControl orientation="vertical">
           <FormLabel>{t('stylePresets.name')}</FormLabel>
-          <Input size="md" {...register('name', { required: true, minLength: 1 })} required={true} />
+          <Input size="md" {...register('name', { required: true, minLength: 1 })} />
         </FormControl>
       </Flex>
 

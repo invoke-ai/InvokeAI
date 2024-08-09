@@ -12,7 +12,7 @@ import {
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
-import { activeStylePresetChanged } from 'features/stylePresets/store/stylePresetSlice';
+import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { socketConnected } from 'services/events/actions';
 
@@ -22,7 +22,7 @@ const matcher = isAnyOf(
   maxPromptsChanged,
   maxPromptsReset,
   socketConnected,
-  activeStylePresetChanged
+  activeStylePresetIdChanged
 );
 
 export const addDynamicPromptsListener = (startAppListening: AppStartListening) => {

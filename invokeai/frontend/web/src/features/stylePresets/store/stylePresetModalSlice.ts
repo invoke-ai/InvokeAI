@@ -1,8 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { StylePresetFormData } from 'features/stylePresets/components/StylePresetForm';
 
-import type { StylePresetModalState } from './types';
+import type { PrefilledFormData, StylePresetModalState } from './types';
 
 const initialState: StylePresetModalState = {
   isModalOpen: false,
@@ -20,7 +19,7 @@ export const stylePresetModalSlice = createSlice({
     updatingStylePresetIdChanged: (state, action: PayloadAction<string | null>) => {
       state.updatingStylePresetId = action.payload;
     },
-    prefilledFormDataChanged: (state, action: PayloadAction<StylePresetFormData | null>) => {
+    prefilledFormDataChanged: (state, action: PayloadAction<PrefilledFormData | null>) => {
       state.prefilledFormData = action.payload;
     },
   },

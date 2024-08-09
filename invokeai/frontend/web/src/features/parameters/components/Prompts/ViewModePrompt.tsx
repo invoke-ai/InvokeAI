@@ -6,17 +6,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold } from 'react-icons/pi';
 
-export const ViewModePrompt = ({
-  presetPrompt,
-  prompt,
-  height,
-  onExit,
-}: {
-  presetPrompt: string;
-  prompt: string;
-  height: number;
-  onExit: () => void;
-}) => {
+export const ViewModePrompt = ({ presetPrompt, prompt }: { presetPrompt: string; prompt: string }) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -26,43 +16,43 @@ export const ViewModePrompt = ({
 
   const handleExitViewMode = useCallback(() => {
     dispatch(viewModeChanged(false));
-    onExit();
-  }, [dispatch, onExit]);
+  }, [dispatch]);
 
   return (
-    <Flex
-      flexDir="column"
-      layerStyle="second"
-      padding="8px 10px"
-      borderRadius="base"
-      height={height}
-      onClick={handleExitViewMode}
-      justifyContent="space-between"
-      position="relative"
-    >
-      <Flex overflow="scroll">
-        <Text fontSize="sm" lineHeight="1rem">
-          {presetChunks.map((chunk, index) => {
-            return (
-              chunk && (
-                <Text as="span" color={index === 1 ? 'white' : 'base.300'} key={index}>
-                  {chunk.trim()}{' '}
-                </Text>
-              )
-            );
-          })}
-        </Text>
-      </Flex>
-
-      <Box position="absolute" top={0} right={0} backgroundColor="rgba(0,0,0,0.75)" padding="2px 5px">
-        <Flex alignItems="center" gap="1">
-          <Tooltip label={t('stylePresets.viewModeTooltip')}>
-            <Flex>
-              <Icon as={PiEyeBold} color="base.500" boxSize="12px" />
-            </Flex>
-          </Tooltip>
+    <Box position="absolute" top={0} bottom={0} left={0} right={0} zIndex={1} layerStyle="second" borderRadius="base">
+      <Flex flexDir="column" onClick={handleExitViewMode} justifyContent="space-between" h="full" padding="8px 10px">
+        <Flex overflow="scroll">
+          <Text fontSize="sm" lineHeight="1rem" w="full">
+            {presetChunks.map((chunk, index) => (
+              <Text
+                as="span"
+                color={index === 1 ? 'white' : 'base.300'}
+                fontWeight={index === 1 ? 'semibold' : 'normal'}
+                key={index}
+              >
+                {chunk}
+              </Text>
+            ))}
+          </Text>
         </Flex>
-      </Box>
-    </Flex>
+
+        <Tooltip label={t('stylePresets.viewModeTooltip')}>
+          <Flex
+            position="absolute"
+            insetInlineEnd={0}
+            insetBlockStart={0}
+            alignItems="center"
+            justifyContent="center"
+            p={2}
+            bg="base.900"
+            opacity={0.8}
+            backgroundClip="border-box"
+            borderBottomStartRadius="base"
+          >
+            <Icon as={PiEyeBold} color="base.500" boxSize={4} />
+          </Flex>
+        </Tooltip>
+      </Flex>
+    </Box>
   );
 };
