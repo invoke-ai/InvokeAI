@@ -1,14 +1,13 @@
 from typing import Any, Dict
 
 import torch
-from optimum.quanto.nn import QModuleMixin
-from optimum.quanto.quantize import _quantize_submodule, freeze
+from optimum.quanto.quantize import _quantize_submodule
 
-
-def custom_freeze(model: torch.nn.Module):
-    for name, m in model.named_modules():
-        if isinstance(m, QModuleMixin):
-            m.freeze()
+# def custom_freeze(model: torch.nn.Module):
+#     for name, m in model.named_modules():
+#         if isinstance(m, QModuleMixin):
+#             m.weight =
+#             m.freeze()
 
 
 def requantize(
@@ -47,8 +46,8 @@ def requantize(
         for name, param in m.named_buffers(recurse=False):
             setattr(m, name, move_tensor(param, "cpu"))
     # Freeze model and move to target device
-    freeze(model)
-    model.to(device)
+    # freeze(model)
+    # model.to(device)
 
     # Load the quantized model weights
     model.load_state_dict(state_dict, strict=False)
