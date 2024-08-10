@@ -4,7 +4,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,7 @@ import type { MainModelDefaultSettingsFormData } from './MainModelDefaultSetting
 
 type DefaultVaeType = MainModelDefaultSettingsFormData['vae'];
 
-export function DefaultVae(props: UseControllerProps<MainModelDefaultSettingsFormData>) {
+export const DefaultVae = memo((props: UseControllerProps<MainModelDefaultSettingsFormData>) => {
   const { t } = useTranslation();
   const { field } = useController(props);
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
@@ -64,4 +64,6 @@ export function DefaultVae(props: UseControllerProps<MainModelDefaultSettingsFor
       <Combobox isDisabled={isDisabled} value={value} options={compatibleOptions} onChange={onChange} />
     </FormControl>
   );
-}
+});
+
+DefaultVae.displayName = 'DefaultVae';

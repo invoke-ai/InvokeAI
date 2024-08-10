@@ -9,11 +9,8 @@ import torch
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.invocations.baseinvocation import BaseInvocation
-from invokeai.app.services.invoker import Invoker
-from invokeai.backend.model_manager.load.model_cache import CacheStats
-
-from .invocation_stats_base import InvocationStatsServiceBase
-from .invocation_stats_common import (
+from invokeai.app.services.invocation_stats.invocation_stats_base import InvocationStatsServiceBase
+from invokeai.app.services.invocation_stats.invocation_stats_common import (
     GESStatsNotFoundError,
     GraphExecutionStats,
     GraphExecutionStatsSummary,
@@ -22,6 +19,8 @@ from .invocation_stats_common import (
     NodeExecutionStats,
     NodeExecutionStatsSummary,
 )
+from invokeai.app.services.invoker import Invoker
+from invokeai.backend.model_manager.load.model_cache import CacheStats
 
 # Size of 1GB in bytes.
 GB = 2**30

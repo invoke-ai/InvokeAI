@@ -53,7 +53,11 @@ export type Feature =
   | 'refinerCfgScale'
   | 'scaleBeforeProcessing'
   | 'seamlessTilingXAxis'
-  | 'seamlessTilingYAxis';
+  | 'seamlessTilingYAxis'
+  | 'upscaleModel'
+  | 'scale'
+  | 'creativity'
+  | 'structure';
 
 export type PopoverData = PopoverProps & {
   image?: string;

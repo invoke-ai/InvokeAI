@@ -18,12 +18,12 @@ const initialConfigState: AppConfig = {
   isLocal: true,
   shouldUpdateImagesOnConnect: false,
   shouldFetchMetadataFromApi: false,
+  allowPrivateBoards: false,
   disabledTabs: [],
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
   disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'],
   nodesAllowlist: undefined,
   nodesDenylist: undefined,
-  canRestoreDeletedImagesFromBin: true,
   sd: {
     disabledControlNetModels: [],
     disabledControlNetProcessors: [],

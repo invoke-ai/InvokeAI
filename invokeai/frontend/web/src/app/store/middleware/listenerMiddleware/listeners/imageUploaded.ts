@@ -11,8 +11,10 @@ import {
   ipaLayerImageChanged,
   rgLayerIPAdapterImageChanged,
 } from 'features/controlLayers/store/controlLayersSlice';
+import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { omit } from 'lodash-es';
@@ -62,7 +64,8 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
           );
 
           // Attempt to get the board's name for the toast
-          const { data } = boardsApi.endpoints.listAllBoards.select()(state);
+          const queryArgs = selectListBoardsQueryArgs(state);
+          const { data } = boardsApi.endpoints.listAllBoards.select(queryArgs)(state);
 
           // Fall back to just the board id if we can't find the board for some reason
           const board = data?.find((b) => b.board_id === autoAddBoardId);
@@ -83,6 +86,15 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         toast({
           ...DEFAULT_UPLOADED_TOAST,
           description: t('toast.setAsCanvasInitialImage'),
+        });
+        return;
+      }
+
+      if (postUploadAction?.type === 'SET_UPSCALE_INITIAL_IMAGE') {
+        dispatch(upscaleInitialImageChanged(imageDTO));
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          description: 'set as upscale initial image',
         });
         return;
       }

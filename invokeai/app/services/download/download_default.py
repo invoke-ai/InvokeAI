@@ -16,12 +16,7 @@ from requests import HTTPError
 from tqdm import tqdm
 
 from invokeai.app.services.config import InvokeAIAppConfig, get_config
-from invokeai.app.services.events.events_base import EventServiceBase
-from invokeai.app.util.misc import get_iso_timestamp
-from invokeai.backend.model_manager.metadata import RemoteModelFile
-from invokeai.backend.util.logging import InvokeAILogger
-
-from .download_base import (
+from invokeai.app.services.download.download_base import (
     DownloadEventHandler,
     DownloadExceptionHandler,
     DownloadJob,
@@ -33,6 +28,10 @@ from .download_base import (
     ServiceInactiveException,
     UnknownJobIDException,
 )
+from invokeai.app.services.events.events_base import EventServiceBase
+from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.backend.model_manager.metadata import RemoteModelFile
+from invokeai.backend.util.logging import InvokeAILogger
 
 # Maximum number of bytes to download during each call to requests.iter_content()
 DOWNLOAD_CHUNK_SIZE = 100000
@@ -185,7 +184,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             job = DownloadJob(
                 source=url,
                 dest=path,
-                access_token=access_token,
+                access_token=access_token or self._lookup_access_token(url),
             )
             mfdj.download_parts.add(job)
             self._download_part2parent[job.source] = mfdj

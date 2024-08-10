@@ -8,12 +8,16 @@ from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, JsonValue
 
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.invocations.fields import MetadataField
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import (
+    ImageCategory,
+    ImageRecordChanges,
+    ResourceOrigin,
+)
 from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-
-from ..dependencies import ApiDependencies
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
@@ -214,10 +218,21 @@ async def get_image_workflow(
         raise HTTPException(status_code=404)
 
 
-@images_router.api_route(
+@images_router.get(
     "/i/{image_name}/full",
-    methods=["GET", "HEAD"],
     operation_id="get_image_full",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Return the full-resolution image",
+            "content": {"image/png": {}},
+        },
+        404: {"description": "Image not found"},
+    },
+)
+@images_router.head(
+    "/i/{image_name}/full",
+    operation_id="get_image_full_head",
     response_class=Response,
     responses={
         200: {
@@ -229,22 +244,16 @@ async def get_image_workflow(
 )
 async def get_image_full(
     image_name: str = Path(description="The name of full-resolution image file to get"),
-) -> FileResponse:
+) -> Response:
     """Gets a full-resolution image file"""
 
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name)
-
-        if not ApiDependencies.invoker.services.images.validate_path(path):
-            raise HTTPException(status_code=404)
-
-        response = FileResponse(
-            path,
-            media_type="image/png",
-            filename=image_name,
-            content_disposition_type="inline",
-        )
+        with open(path, "rb") as f:
+            content = f.read()
+        response = Response(content, media_type="image/png")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        response.headers["Content-Disposition"] = f'inline; filename="{image_name}"'
         return response
     except Exception:
         raise HTTPException(status_code=404)
@@ -264,15 +273,14 @@ async def get_image_full(
 )
 async def get_image_thumbnail(
     image_name: str = Path(description="The name of thumbnail image file to get"),
-) -> FileResponse:
+) -> Response:
     """Gets a thumbnail image file"""
 
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name, thumbnail=True)
-        if not ApiDependencies.invoker.services.images.validate_path(path):
-            raise HTTPException(status_code=404)
-
-        response = FileResponse(path, media_type="image/webp", content_disposition_type="inline")
+        with open(path, "rb") as f:
+            content = f.read()
+        response = Response(content, media_type="image/webp")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         return response
     except Exception:
@@ -316,16 +324,14 @@ async def list_image_dtos(
     ),
     offset: int = Query(default=0, description="The page offset"),
     limit: int = Query(default=10, description="The number of images per page"),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+    starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
+    search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs"""
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
-        offset,
-        limit,
-        image_origin,
-        categories,
-        is_intermediate,
-        board_id,
+        offset, limit, starred_first, order_dir, image_origin, categories, is_intermediate, board_id, search_term
     )
 
     return image_dtos

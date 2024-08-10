@@ -3,15 +3,15 @@
 
 import bisect
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 import torch
 from safetensors.torch import load_file
 from typing_extensions import Self
 
+import invokeai.backend.util.logging as logger
 from invokeai.backend.model_manager import BaseModelType
-
-from .raw_model import RawModel
+from invokeai.backend.raw_model import RawModel
 
 
 class LoRALayerBase:
@@ -47,8 +47,18 @@ class LoRALayerBase:
         self.rank = None  # set in layer implementation
         self.layer_key = layer_key
 
-    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
+    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError()
+
+    def get_bias(self, orig_bias: torch.Tensor) -> Optional[torch.Tensor]:
+        return self.bias
+
+    def get_parameters(self, orig_module: torch.nn.Module) -> Dict[str, torch.Tensor]:
+        params = {"weight": self.get_weight(orig_module.weight)}
+        bias = self.get_bias(orig_module.bias)
+        if bias is not None:
+            params["bias"] = bias
+        return params
 
     def calc_size(self) -> int:
         model_size = 0
@@ -57,14 +67,20 @@ class LoRALayerBase:
                 model_size += val.nelement() * val.element_size()
         return model_size
 
-    def to(
-        self,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-        non_blocking: bool = False,
-    ) -> None:
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         if self.bias is not None:
-            self.bias = self.bias.to(device=device, dtype=dtype, non_blocking=non_blocking)
+            self.bias = self.bias.to(device=device, dtype=dtype)
+
+    def check_keys(self, values: Dict[str, torch.Tensor], known_keys: Set[str]):
+        """Log a warning if values contains unhandled keys."""
+        # {"alpha", "bias_indices", "bias_values", "bias_size"} are hard-coded, because they are handled by
+        # `LoRALayerBase`. Sub-classes should provide the known_keys that they handled.
+        all_known_keys = known_keys | {"alpha", "bias_indices", "bias_values", "bias_size"}
+        unknown_keys = set(values.keys()) - all_known_keys
+        if unknown_keys:
+            logger.warning(
+                f"Unexpected keys found in LoRA/LyCORIS layer, model might work incorrectly! Keys: {unknown_keys}"
+            )
 
 
 # TODO: find and debug lora/locon with bias
@@ -82,14 +98,19 @@ class LoRALayer(LoRALayerBase):
 
         self.up = values["lora_up.weight"]
         self.down = values["lora_down.weight"]
-        if "lora_mid.weight" in values:
-            self.mid: Optional[torch.Tensor] = values["lora_mid.weight"]
-        else:
-            self.mid = None
+        self.mid = values.get("lora_mid.weight", None)
 
         self.rank = self.down.shape[0]
+        self.check_keys(
+            values,
+            {
+                "lora_up.weight",
+                "lora_down.weight",
+                "lora_mid.weight",
+            },
+        )
 
-    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
+    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         if self.mid is not None:
             up = self.up.reshape(self.up.shape[0], self.up.shape[1])
             down = self.down.reshape(self.down.shape[0], self.down.shape[1])
@@ -106,19 +127,14 @@ class LoRALayer(LoRALayerBase):
                 model_size += val.nelement() * val.element_size()
         return model_size
 
-    def to(
-        self,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-        non_blocking: bool = False,
-    ) -> None:
-        super().to(device=device, dtype=dtype, non_blocking=non_blocking)
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
+        super().to(device=device, dtype=dtype)
 
-        self.up = self.up.to(device=device, dtype=dtype, non_blocking=non_blocking)
-        self.down = self.down.to(device=device, dtype=dtype, non_blocking=non_blocking)
+        self.up = self.up.to(device=device, dtype=dtype)
+        self.down = self.down.to(device=device, dtype=dtype)
 
         if self.mid is not None:
-            self.mid = self.mid.to(device=device, dtype=dtype, non_blocking=non_blocking)
+            self.mid = self.mid.to(device=device, dtype=dtype)
 
 
 class LoHALayer(LoRALayerBase):
@@ -136,20 +152,23 @@ class LoHALayer(LoRALayerBase):
         self.w1_b = values["hada_w1_b"]
         self.w2_a = values["hada_w2_a"]
         self.w2_b = values["hada_w2_b"]
-
-        if "hada_t1" in values:
-            self.t1: Optional[torch.Tensor] = values["hada_t1"]
-        else:
-            self.t1 = None
-
-        if "hada_t2" in values:
-            self.t2: Optional[torch.Tensor] = values["hada_t2"]
-        else:
-            self.t2 = None
+        self.t1 = values.get("hada_t1", None)
+        self.t2 = values.get("hada_t2", None)
 
         self.rank = self.w1_b.shape[0]
+        self.check_keys(
+            values,
+            {
+                "hada_w1_a",
+                "hada_w1_b",
+                "hada_w2_a",
+                "hada_w2_b",
+                "hada_t1",
+                "hada_t2",
+            },
+        )
 
-    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
+    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         if self.t1 is None:
             weight: torch.Tensor = (self.w1_a @ self.w1_b) * (self.w2_a @ self.w2_b)
 
@@ -167,23 +186,18 @@ class LoHALayer(LoRALayerBase):
                 model_size += val.nelement() * val.element_size()
         return model_size
 
-    def to(
-        self,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-        non_blocking: bool = False,
-    ) -> None:
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         super().to(device=device, dtype=dtype)
 
-        self.w1_a = self.w1_a.to(device=device, dtype=dtype, non_blocking=non_blocking)
-        self.w1_b = self.w1_b.to(device=device, dtype=dtype, non_blocking=non_blocking)
+        self.w1_a = self.w1_a.to(device=device, dtype=dtype)
+        self.w1_b = self.w1_b.to(device=device, dtype=dtype)
         if self.t1 is not None:
-            self.t1 = self.t1.to(device=device, dtype=dtype, non_blocking=non_blocking)
+            self.t1 = self.t1.to(device=device, dtype=dtype)
 
-        self.w2_a = self.w2_a.to(device=device, dtype=dtype, non_blocking=non_blocking)
-        self.w2_b = self.w2_b.to(device=device, dtype=dtype, non_blocking=non_blocking)
+        self.w2_a = self.w2_a.to(device=device, dtype=dtype)
+        self.w2_b = self.w2_b.to(device=device, dtype=dtype)
         if self.t2 is not None:
-            self.t2 = self.t2.to(device=device, dtype=dtype, non_blocking=non_blocking)
+            self.t2 = self.t2.to(device=device, dtype=dtype)
 
 
 class LoKRLayer(LoRALayerBase):
@@ -202,37 +216,45 @@ class LoKRLayer(LoRALayerBase):
     ):
         super().__init__(layer_key, values)
 
-        if "lokr_w1" in values:
-            self.w1: Optional[torch.Tensor] = values["lokr_w1"]
-            self.w1_a = None
-            self.w1_b = None
-        else:
-            self.w1 = None
+        self.w1 = values.get("lokr_w1", None)
+        if self.w1 is None:
             self.w1_a = values["lokr_w1_a"]
             self.w1_b = values["lokr_w1_b"]
-
-        if "lokr_w2" in values:
-            self.w2: Optional[torch.Tensor] = values["lokr_w2"]
-            self.w2_a = None
-            self.w2_b = None
         else:
-            self.w2 = None
+            self.w1_b = None
+            self.w1_a = None
+
+        self.w2 = values.get("lokr_w2", None)
+        if self.w2 is None:
             self.w2_a = values["lokr_w2_a"]
             self.w2_b = values["lokr_w2_b"]
-
-        if "lokr_t2" in values:
-            self.t2: Optional[torch.Tensor] = values["lokr_t2"]
         else:
-            self.t2 = None
+            self.w2_a = None
+            self.w2_b = None
 
-        if "lokr_w1_b" in values:
-            self.rank = values["lokr_w1_b"].shape[0]
-        elif "lokr_w2_b" in values:
-            self.rank = values["lokr_w2_b"].shape[0]
+        self.t2 = values.get("lokr_t2", None)
+
+        if self.w1_b is not None:
+            self.rank = self.w1_b.shape[0]
+        elif self.w2_b is not None:
+            self.rank = self.w2_b.shape[0]
         else:
             self.rank = None  # unscaled
 
-    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
+        self.check_keys(
+            values,
+            {
+                "lokr_w1",
+                "lokr_w1_a",
+                "lokr_w1_b",
+                "lokr_w2",
+                "lokr_w2_a",
+                "lokr_w2_b",
+                "lokr_t2",
+            },
+        )
+
+    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         w1: Optional[torch.Tensor] = self.w1
         if w1 is None:
             assert self.w1_a is not None
@@ -264,12 +286,7 @@ class LoKRLayer(LoRALayerBase):
                 model_size += val.nelement() * val.element_size()
         return model_size
 
-    def to(
-        self,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-        non_blocking: bool = False,
-    ) -> None:
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         super().to(device=device, dtype=dtype)
 
         if self.w1 is not None:
@@ -277,23 +294,25 @@ class LoKRLayer(LoRALayerBase):
         else:
             assert self.w1_a is not None
             assert self.w1_b is not None
-            self.w1_a = self.w1_a.to(device=device, dtype=dtype, non_blocking=non_blocking)
-            self.w1_b = self.w1_b.to(device=device, dtype=dtype, non_blocking=non_blocking)
+            self.w1_a = self.w1_a.to(device=device, dtype=dtype)
+            self.w1_b = self.w1_b.to(device=device, dtype=dtype)
 
         if self.w2 is not None:
-            self.w2 = self.w2.to(device=device, dtype=dtype, non_blocking=non_blocking)
+            self.w2 = self.w2.to(device=device, dtype=dtype)
         else:
             assert self.w2_a is not None
             assert self.w2_b is not None
-            self.w2_a = self.w2_a.to(device=device, dtype=dtype, non_blocking=non_blocking)
-            self.w2_b = self.w2_b.to(device=device, dtype=dtype, non_blocking=non_blocking)
+            self.w2_a = self.w2_a.to(device=device, dtype=dtype)
+            self.w2_b = self.w2_b.to(device=device, dtype=dtype)
 
         if self.t2 is not None:
-            self.t2 = self.t2.to(device=device, dtype=dtype, non_blocking=non_blocking)
+            self.t2 = self.t2.to(device=device, dtype=dtype)
 
 
 class FullLayer(LoRALayerBase):
+    # bias handled in LoRALayerBase(calc_size, to)
     # weight: torch.Tensor
+    # bias: Optional[torch.Tensor]
 
     def __init__(
         self,
@@ -303,15 +322,12 @@ class FullLayer(LoRALayerBase):
         super().__init__(layer_key, values)
 
         self.weight = values["diff"]
-
-        if len(values.keys()) > 1:
-            _keys = list(values.keys())
-            _keys.remove("diff")
-            raise NotImplementedError(f"Unexpected keys in lora diff layer: {_keys}")
+        self.bias = values.get("diff_b", None)
 
         self.rank = None  # unscaled
+        self.check_keys(values, {"diff", "diff_b"})
 
-    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
+    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         return self.weight
 
     def calc_size(self) -> int:
@@ -319,15 +335,10 @@ class FullLayer(LoRALayerBase):
         model_size += self.weight.nelement() * self.weight.element_size()
         return model_size
 
-    def to(
-        self,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-        non_blocking: bool = False,
-    ) -> None:
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         super().to(device=device, dtype=dtype)
 
-        self.weight = self.weight.to(device=device, dtype=dtype, non_blocking=non_blocking)
+        self.weight = self.weight.to(device=device, dtype=dtype)
 
 
 class IA3Layer(LoRALayerBase):
@@ -345,8 +356,9 @@ class IA3Layer(LoRALayerBase):
         self.on_input = values["on_input"]
 
         self.rank = None  # unscaled
+        self.check_keys(values, {"weight", "on_input"})
 
-    def get_weight(self, orig_weight: Optional[torch.Tensor]) -> torch.Tensor:
+    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         weight = self.weight
         if not self.on_input:
             weight = weight.reshape(-1, 1)
@@ -359,19 +371,46 @@ class IA3Layer(LoRALayerBase):
         model_size += self.on_input.nelement() * self.on_input.element_size()
         return model_size
 
-    def to(
-        self,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-        non_blocking: bool = False,
-    ):
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None):
         super().to(device=device, dtype=dtype)
 
-        self.weight = self.weight.to(device=device, dtype=dtype, non_blocking=non_blocking)
-        self.on_input = self.on_input.to(device=device, dtype=dtype, non_blocking=non_blocking)
+        self.weight = self.weight.to(device=device, dtype=dtype)
+        self.on_input = self.on_input.to(device=device, dtype=dtype)
 
 
-AnyLoRALayer = Union[LoRALayer, LoHALayer, LoKRLayer, FullLayer, IA3Layer]
+class NormLayer(LoRALayerBase):
+    # bias handled in LoRALayerBase(calc_size, to)
+    # weight: torch.Tensor
+    # bias: Optional[torch.Tensor]
+
+    def __init__(
+        self,
+        layer_key: str,
+        values: Dict[str, torch.Tensor],
+    ):
+        super().__init__(layer_key, values)
+
+        self.weight = values["w_norm"]
+        self.bias = values.get("b_norm", None)
+
+        self.rank = None  # unscaled
+        self.check_keys(values, {"w_norm", "b_norm"})
+
+    def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
+        return self.weight
+
+    def calc_size(self) -> int:
+        model_size = super().calc_size()
+        model_size += self.weight.nelement() * self.weight.element_size()
+        return model_size
+
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
+        super().to(device=device, dtype=dtype)
+
+        self.weight = self.weight.to(device=device, dtype=dtype)
+
+
+AnyLoRALayer = Union[LoRALayer, LoHALayer, LoKRLayer, FullLayer, IA3Layer, NormLayer]
 
 
 class LoRAModelRaw(RawModel):  # (torch.nn.Module):
@@ -390,15 +429,10 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
     def name(self) -> str:
         return self._name
 
-    def to(
-        self,
-        device: Optional[torch.device] = None,
-        dtype: Optional[torch.dtype] = None,
-        non_blocking: bool = False,
-    ) -> None:
+    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         # TODO: try revert if exception?
         for _key, layer in self.layers.items():
-            layer.to(device=device, dtype=dtype, non_blocking=non_blocking)
+            layer.to(device=device, dtype=dtype)
 
     def calc_size(self) -> int:
         model_size = 0
@@ -494,16 +528,19 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
             state_dict = cls._convert_sdxl_keys_to_diffusers_format(state_dict)
 
         for layer_key, values in state_dict.items():
+            # Detect layers according to LyCORIS detection logic(`weight_list_det`)
+            # https://github.com/KohakuBlueleaf/LyCORIS/tree/8ad8000efb79e2b879054da8c9356e6143591bad/lycoris/modules
+
             # lora and locon
-            if "lora_down.weight" in values:
+            if "lora_up.weight" in values:
                 layer: AnyLoRALayer = LoRALayer(layer_key, values)
 
             # loha
-            elif "hada_w1_b" in values:
+            elif "hada_w1_a" in values:
                 layer = LoHALayer(layer_key, values)
 
             # lokr
-            elif "lokr_w1_b" in values or "lokr_w1" in values:
+            elif "lokr_w1" in values or "lokr_w1_a" in values:
                 layer = LoKRLayer(layer_key, values)
 
             # diff
@@ -511,8 +548,12 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
                 layer = FullLayer(layer_key, values)
 
             # ia3
-            elif "weight" in values and "on_input" in values:
+            elif "on_input" in values:
                 layer = IA3Layer(layer_key, values)
+
+            # norms
+            elif "w_norm" in values:
+                layer = NormLayer(layer_key, values)
 
             else:
                 print(f">> Encountered unknown lora layer module in {model.name}: {layer_key} - {list(values.keys())}")
@@ -521,7 +562,7 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
             # lower memory consumption by removing already parsed layer values
             state_dict[layer_key].clear()
 
-            layer.to(device=device, dtype=dtype, non_blocking=True)
+            layer.to(device=device, dtype=dtype)
             model.layers[layer_key] = layer
 
         return model

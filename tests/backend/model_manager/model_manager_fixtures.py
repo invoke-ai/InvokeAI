@@ -25,7 +25,7 @@ from invokeai.backend.model_manager.config import (
     ModelVariantType,
     VAEDiffusersConfig,
 )
-from invokeai.backend.model_manager.load import ModelCache, ModelConvertCache
+from invokeai.backend.model_manager.load import ModelCache
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_metadata.metadata_examples import (
     HFTestLoraMetadata,
@@ -89,17 +89,15 @@ def mm2_download_queue(mm2_session: Session) -> DownloadQueueServiceBase:
 
 
 @pytest.fixture
-def mm2_loader(mm2_app_config: InvokeAIAppConfig, mm2_record_store: ModelRecordServiceBase) -> ModelLoadServiceBase:
+def mm2_loader(mm2_app_config: InvokeAIAppConfig) -> ModelLoadServiceBase:
     ram_cache = ModelCache(
         logger=InvokeAILogger.get_logger(),
         max_cache_size=mm2_app_config.ram,
         max_vram_cache_size=mm2_app_config.vram,
     )
-    convert_cache = ModelConvertCache(mm2_app_config.convert_cache_path)
     return ModelLoadService(
         app_config=mm2_app_config,
         ram_cache=ram_cache,
-        convert_cache=convert_cache,
     )
 
 
@@ -112,7 +110,7 @@ def mm2_installer(
     logger = InvokeAILogger.get_logger()
     db = create_mock_sqlite_database(mm2_app_config, logger)
     events = TestEventService()
-    store = ModelRecordServiceSQL(db)
+    store = ModelRecordServiceSQL(db, logger)
 
     installer = ModelInstallService(
         app_config=mm2_app_config,
@@ -130,7 +128,7 @@ def mm2_installer(
 def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
     logger = InvokeAILogger.get_logger(config=mm2_app_config)
     db = create_mock_sqlite_database(mm2_app_config, logger)
-    store = ModelRecordServiceSQL(db)
+    store = ModelRecordServiceSQL(db, logger)
     # add five simple config records to the database
     config1 = VAEDiffusersConfig(
         key="test_config_1",

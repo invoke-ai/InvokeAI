@@ -4,8 +4,10 @@ from typing import Optional
 
 import torch
 
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
+    BoundingBoxField,
     ColorField,
     ConditioningField,
     DenoiseMaskField,
@@ -20,13 +22,6 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.invocation_context import InvocationContext
-
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    invocation,
-    invocation_output,
-)
 
 """
 Primitives: Boolean, Integer, Float, String, Image, Latents, Conditioning, Color
@@ -472,6 +467,45 @@ class ConditioningCollectionInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ConditioningCollectionOutput:
         return ConditioningCollectionOutput(collection=self.collection)
+
+
+# endregion
+
+# region BoundingBox
+
+
+@invocation_output("bounding_box_output")
+class BoundingBoxOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single bounding box"""
+
+    bounding_box: BoundingBoxField = OutputField(description="The output bounding box.")
+
+
+@invocation_output("bounding_box_collection_output")
+class BoundingBoxCollectionOutput(BaseInvocationOutput):
+    """Base class for nodes that output a collection of bounding boxes"""
+
+    collection: list[BoundingBoxField] = OutputField(description="The output bounding boxes.", title="Bounding Boxes")
+
+
+@invocation(
+    "bounding_box",
+    title="Bounding Box",
+    tags=["primitives", "segmentation", "collection", "bounding box"],
+    category="primitives",
+    version="1.0.0",
+)
+class BoundingBoxInvocation(BaseInvocation):
+    """Create a bounding box manually by supplying box coordinates"""
+
+    x_min: int = InputField(default=0, description="x-coordinate of the bounding box's top left vertex")
+    y_min: int = InputField(default=0, description="y-coordinate of the bounding box's top left vertex")
+    x_max: int = InputField(default=0, description="x-coordinate of the bounding box's bottom right vertex")
+    y_max: int = InputField(default=0, description="y-coordinate of the bounding box's bottom right vertex")
+
+    def invoke(self, context: InvocationContext) -> BoundingBoxOutput:
+        bounding_box = BoundingBoxField(x_min=self.x_min, y_min=self.y_min, x_max=self.x_max, y_max=self.y_max)
+        return BoundingBoxOutput(bounding_box=bounding_box)
 
 
 # endregion

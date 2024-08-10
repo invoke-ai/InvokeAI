@@ -3,9 +3,14 @@ from datetime import datetime
 from typing import Optional
 
 from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.services.image_records.image_records_common import (
+    ImageCategory,
+    ImageRecord,
+    ImageRecordChanges,
+    ResourceOrigin,
+)
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-
-from .image_records_common import ImageCategory, ImageRecord, ImageRecordChanges, ResourceOrigin
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 
 class ImageRecordStorageBase(ABC):
@@ -37,10 +42,13 @@ class ImageRecordStorageBase(ABC):
         self,
         offset: int = 0,
         limit: int = 10,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
         image_origin: Optional[ResourceOrigin] = None,
         categories: Optional[list[ImageCategory]] = None,
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
     ) -> OffsetPaginatedResults[ImageRecord]:
         """Gets a page of image records."""
         pass

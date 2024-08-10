@@ -7,10 +7,14 @@ import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/P
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
+import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
+import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
+import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
@@ -26,6 +30,8 @@ const formLabelProps2: FormLabelProps = {
 export const AdvancedSettingsAccordion = memo(() => {
   const vaeKey = useAppSelector((state) => state.generation.vae?.key);
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
+  const activeTabName = useAppSelector(activeTabNameSelector);
+
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(selectGenerationSlice, (generation) => {
@@ -48,14 +54,17 @@ export const AdvancedSettingsAccordion = memo(() => {
         if (generation.seamlessXAxis || generation.seamlessYAxis) {
           badges.push('seamless');
         }
+        if (activeTabName === 'upscaling' && !generation.shouldRandomizeSeed) {
+          badges.push('Manual Seed');
+        }
         return badges;
       }),
-    [vaeConfig]
+    [vaeConfig, activeTabName]
   );
   const badges = useAppSelector(selectBadges);
   const { t } = useTranslation();
   const { isOpen, onToggle } = useStandaloneAccordionToggle({
-    id: 'advanced-settings',
+    id: `'advanced-settings-${activeTabName}`,
     defaultIsOpen: false,
   });
 
@@ -66,16 +75,27 @@ export const AdvancedSettingsAccordion = memo(() => {
           <ParamVAEModelSelect />
           <ParamVAEPrecision />
         </Flex>
-        <FormControlGroup formLabelProps={formLabelProps}>
-          <ParamClipSkip />
-          <ParamCFGRescaleMultiplier />
-        </FormControlGroup>
-        <Flex gap={4} w="full">
-          <FormControlGroup formLabelProps={formLabelProps2}>
-            <ParamSeamlessXAxis />
-            <ParamSeamlessYAxis />
-          </FormControlGroup>
-        </Flex>
+        {activeTabName === 'upscaling' && (
+          <Flex gap={4} alignItems="center">
+            <ParamSeedNumberInput />
+            <ParamSeedShuffle />
+            <ParamSeedRandomize />
+          </Flex>
+        )}
+        {activeTabName !== 'upscaling' && (
+          <>
+            <FormControlGroup formLabelProps={formLabelProps}>
+              <ParamClipSkip />
+              <ParamCFGRescaleMultiplier />
+            </FormControlGroup>
+            <Flex gap={4} w="full">
+              <FormControlGroup formLabelProps={formLabelProps2}>
+                <ParamSeamlessXAxis />
+                <ParamSeamlessYAxis />
+              </FormControlGroup>
+            </Flex>
+          </>
+        )}
       </Flex>
     </StandaloneAccordion>
   );

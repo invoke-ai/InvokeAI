@@ -89,7 +89,8 @@
         "enabled": "Abilitato",
         "disabled": "Disabilitato",
         "comparingDesc": "Confronta due immagini",
-        "comparing": "Confronta"
+        "comparing": "Confronta",
+        "dontShowMeThese": "Non mostrarmi questi"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -101,7 +102,6 @@
         "deleteImage_many": "Elimina {{count}} immagini",
         "deleteImage_other": "Elimina {{count}} immagini",
         "deleteImagePermanent": "Le immagini eliminate non possono essere ripristinate.",
-        "deleteImageBin": "Le immagini eliminate verranno spostate nel cestino del tuo sistema operativo.",
         "assets": "Risorse",
         "autoAssignBoardOnClick": "Assegna automaticamente la bacheca al clic",
         "featuresWillReset": "Se elimini questa immagine, quelle funzionalità verranno immediatamente ripristinate.",
@@ -116,9 +116,9 @@
         "deleteSelection": "Elimina la selezione",
         "image": "immagine",
         "drop": "Rilascia",
-        "unstarImage": "Rimuovi preferenza immagine",
+        "unstarImage": "Rimuovi contrassegno immagine",
         "dropOrUpload": "$t(gallery.drop) o carica",
-        "starImage": "Immagine preferita",
+        "starImage": "Contrassegna l'immagine",
         "dropToUpload": "$t(gallery.drop) per aggiornare",
         "problemDeletingImagesDesc": "Impossibile eliminare una o più immagini",
         "problemDeletingImages": "Problema durante l'eliminazione delle immagini",
@@ -142,7 +142,21 @@
         "compareHelp1": "Tieni premuto <Kbd>Alt</Kbd> mentre fai clic su un'immagine della galleria o usi i tasti freccia per cambiare l'immagine di confronto.",
         "compareHelp2": "Premi <Kbd>M</Kbd> per scorrere le modalità di confronto.",
         "compareHelp3": "Premi <Kbd>C</Kbd> per scambiare le immagini confrontate.",
-        "compareHelp4": "Premi <Kbd>Z</Kbd> o <Kbd>Esc</Kbd> per uscire."
+        "compareHelp4": "Premi <Kbd>Z</Kbd> o <Kbd>Esc</Kbd> per uscire.",
+        "newestFirst": "Prima i più nuovi",
+        "oldestFirst": "Prima i più vecchi",
+        "sortDirection": "Direzione dell'ordinamento",
+        "showStarredImagesFirst": "Mostra prima le immagini contrassegnate",
+        "showArchivedBoards": "Mostra le bacheche archiviate",
+        "searchImages": "Ricerca per metadati",
+        "displayBoardSearch": "Mostra la ricerca nelle Bacheche",
+        "displaySearch": "Mostra la ricerca",
+        "selectAllOnPage": "Seleziona tutto nella pagina",
+        "selectAllOnBoard": "Seleziona tutto nella bacheca",
+        "exitBoardSearch": "Esci da Ricerca bacheca",
+        "exitSearch": "Esci dalla ricerca",
+        "go": "Vai",
+        "jump": "Salta"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tasti di scelta rapida",
@@ -201,10 +215,6 @@
         "restoreFaces": {
             "title": "Restaura volti",
             "desc": "Restaura l'immagine corrente"
-        },
-        "upscale": {
-            "title": "Amplia",
-            "desc": "Amplia l'immagine corrente"
         },
         "showInfo": {
             "title": "Mostra informazioni",
@@ -369,6 +379,10 @@
         "toggleViewer": {
             "title": "Attiva/disattiva il visualizzatore di immagini",
             "desc": "Passa dal visualizzatore immagini all'area di lavoro per la scheda corrente."
+        },
+        "postProcess": {
+            "desc": "Elabora l'immagine corrente utilizzando il modello di post-elaborazione selezionato",
+            "title": "Elabora immagine"
         }
     },
     "modelManager": {
@@ -497,8 +511,6 @@
         "type": "Tipo",
         "strength": "Forza",
         "upscaling": "Ampliamento",
-        "upscale": "Amplia (Shift + U)",
-        "upscaleImage": "Amplia Immagine",
         "scale": "Scala",
         "imageFit": "Adatta l'immagine iniziale alle dimensioni di output",
         "scaleBeforeProcessing": "Scala prima dell'elaborazione",
@@ -561,10 +573,6 @@
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
-        "isAllowedToUpscale": {
-            "useX2Model": "L'immagine è troppo grande per l'ampliamento con il modello x4, utilizza il modello x2",
-            "tooLarge": "L'immagine è troppo grande per l'ampliamento, seleziona un'immagine più piccola"
-        },
         "imageActions": "Azioni Immagine",
         "cfgRescaleMultiplier": "Moltiplicatore riscala CFG",
         "useSize": "Usa Dimensioni",
@@ -583,7 +591,10 @@
         "infillColorValue": "Colore di riempimento",
         "globalSettings": "Impostazioni globali",
         "globalPositivePromptPlaceholder": "Prompt positivo globale",
-        "globalNegativePromptPlaceholder": "Prompt negativo globale"
+        "globalNegativePromptPlaceholder": "Prompt negativo globale",
+        "processImage": "Elabora Immagine",
+        "sendToUpscale": "Invia a Ampliare",
+        "postProcessing": "Post-elaborazione (Shift + U)"
     },
     "settings": {
         "models": "Modelli",
@@ -617,7 +628,9 @@
         "enableNSFWChecker": "Abilita controllo NSFW",
         "enableInvisibleWatermark": "Abilita filigrana invisibile",
         "enableInformationalPopovers": "Abilita testo informativo a comparsa",
-        "reloadingIn": "Ricaricando in"
+        "reloadingIn": "Ricaricando in",
+        "informationalPopoversDisabled": "Testo informativo a comparsa disabilitato",
+        "informationalPopoversDisabledDesc": "I testi informativi a comparsa sono disabilitati. Attivali nelle impostazioni."
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -938,10 +951,29 @@
         "deleteBoardOnly": "solo la Bacheca",
         "deleteBoard": "Elimina Bacheca",
         "deleteBoardAndImages": "Bacheca e Immagini",
-        "deletedBoardsCannotbeRestored": "Le bacheche eliminate non possono essere ripristinate",
+        "deletedBoardsCannotbeRestored": "Le bacheche eliminate non possono essere ripristinate. Selezionando \"Elimina solo bacheca\" le immagini verranno spostate nella bacheca \"Non categorizzato\".",
         "movingImagesToBoard_one": "Spostare {{count}} immagine nella bacheca:",
         "movingImagesToBoard_many": "Spostare {{count}} immagini nella bacheca:",
-        "movingImagesToBoard_other": "Spostare {{count}} immagini nella bacheca:"
+        "movingImagesToBoard_other": "Spostare {{count}} immagini nella bacheca:",
+        "imagesWithCount_one": "{{count}} immagine",
+        "imagesWithCount_many": "{{count}} immagini",
+        "imagesWithCount_other": "{{count}} immagini",
+        "assetsWithCount_one": "{{count}} risorsa",
+        "assetsWithCount_many": "{{count}} risorse",
+        "assetsWithCount_other": "{{count}} risorse",
+        "archiveBoard": "Archivia la bacheca",
+        "archived": "Archiviato",
+        "unarchiveBoard": "Annulla l'archiviazione della bacheca",
+        "selectedForAutoAdd": "Selezionato per l'aggiunta automatica",
+        "addSharedBoard": "Aggiungi una Bacheca Condivisa",
+        "boards": "Bacheche",
+        "private": "Bacheche private",
+        "shared": "Bacheche condivise",
+        "addPrivateBoard": "Aggiungi una Bacheca Privata",
+        "noBoards": "Nessuna bacheca {{boardType}}",
+        "hideBoards": "Nascondi bacheche",
+        "viewBoards": "Visualizza bacheche",
+        "deletedPrivateBoardsCannotbeRestored": "Le bacheche cancellate non possono essere ripristinate. Selezionando 'Cancella solo bacheca', le immagini verranno spostate nella bacheca \"Non categorizzato\" privata dell'autore dell'immagine."
     },
     "controlnet": {
         "contentShuffleDescription": "Rimescola il contenuto di un'immagine",
@@ -1005,7 +1037,7 @@
         "minConfidence": "Confidenza minima",
         "scribble": "Scarabocchio",
         "amult": "Angolo di illuminazione",
-        "coarse": "Approssimativo",
+        "coarse": "Grossolano",
         "resizeSimple": "Ridimensiona (semplice)",
         "large": "Grande",
         "small": "Piccolo",
@@ -1330,7 +1362,7 @@
         "lora": {
             "heading": "LoRA",
             "paragraphs": [
-                "Modelli leggeri utilizzati insieme ai modelli base."
+                "Modelli concettuali utilizzati insieme ai modelli di base."
             ]
         },
         "controlNet": {
@@ -1484,6 +1516,30 @@
             "heading": "Metodo",
             "paragraphs": [
                 "Metodo con cui applicare l'adattatore IP corrente."
+            ]
+        },
+        "scale": {
+            "heading": "Scala",
+            "paragraphs": [
+                "La scala controlla la dimensione dell'immagine di uscita e si basa su un multiplo della risoluzione dell'immagine di ingresso. Ad esempio, un ampliamento 2x su un'immagine 1024x1024 produrrebbe in uscita a 2048x2048."
+            ]
+        },
+        "upscaleModel": {
+            "paragraphs": [
+                "Il modello di ampliamento ridimensiona l'immagine alle dimensioni di uscita prima che vengano aggiunti i dettagli. È possibile utilizzare qualsiasi modello di ampliamento supportato, ma alcuni sono specializzati per diversi tipi di immagini, come foto o disegni al tratto."
+            ],
+            "heading": "Modello di ampliamento"
+        },
+        "creativity": {
+            "heading": "Creatività",
+            "paragraphs": [
+                "La creatività controlla quanta libertà è concessa al modello quando si aggiungono dettagli. Una creatività bassa rimane vicina all'immagine originale, mentre una creatività alta consente più cambiamenti. Quando si usa un prompt, una creatività alta aumenta l'influenza del prompt."
+            ]
+        },
+        "structure": {
+            "heading": "Struttura",
+            "paragraphs": [
+                "La struttura determina quanto l'immagine finale rispecchierà il layout dell'originale. Una struttura bassa permette cambiamenti significativi, mentre una struttura alta conserva la composizione e il layout originali."
             ]
         }
     },
@@ -1661,7 +1717,30 @@
             "models": "Modelli",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
             "queue": "Coda",
-            "queueTab": "$t(ui.tabs.queue) $t(common.tab)"
+            "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
+            "upscaling": "Ampliamento",
+            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
         }
+    },
+    "upscaling": {
+        "creativity": "Creatività",
+        "structure": "Struttura",
+        "upscaleModel": "Modello di Ampliamento",
+        "scale": "Scala",
+        "missingModelsWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare i modelli richiesti:",
+        "mainModelDesc": "Modello principale (architettura SD1.5 o SDXL)",
+        "tileControlNetModelDesc": "Modello Tile ControlNet per l'architettura del modello principale scelto",
+        "upscaleModelDesc": "Modello per l'ampliamento (da immagine a immagine)",
+        "missingUpscaleInitialImage": "Immagine iniziale mancante per l'ampliamento",
+        "missingUpscaleModel": "Modello per l’ampliamento mancante",
+        "missingTileControlNetModel": "Nessun modello ControlNet Tile valido installato",
+        "postProcessingModel": "Modello di post-elaborazione",
+        "postProcessingMissingModelWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare un modello di post-elaborazione (da immagine a immagine)."
+    },
+    "upsell": {
+        "inviteTeammates": "Invita collaboratori",
+        "shareAccess": "Condividi l'accesso",
+        "professional": "Professionale",
+        "professionalUpsell": "Disponibile nell'edizione Professional di Invoke. Fai clic qui o visita invoke.com/pricing per ulteriori dettagli."
     }
 }

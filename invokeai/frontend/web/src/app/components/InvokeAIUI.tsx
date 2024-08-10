@@ -7,11 +7,10 @@ import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
 import type { CustomStarUi } from 'app/store/nanostores/customStarUI';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { $logo } from 'app/store/nanostores/logo';
 import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
-import { $projectId } from 'app/store/nanostores/projectId';
+import { $projectId, $projectName, $projectUrl } from 'app/store/nanostores/projectId';
 import { $queueId, DEFAULT_QUEUE_ID } from 'app/store/nanostores/queueId';
 import { $store } from 'app/store/nanostores/store';
 import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
@@ -20,6 +19,7 @@ import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
 import AppDndContext from 'features/dnd/components/AppDndContext';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
+import type { InvokeTabName } from 'features/ui/store/tabMap';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
@@ -37,12 +37,14 @@ interface Props extends PropsWithChildren {
   customNavComponent?: ReactNode;
   middleware?: Middleware[];
   projectId?: string;
-  galleryHeader?: ReactNode;
+  projectName?: string;
+  projectUrl?: string;
   queueId?: string;
   selectedImage?: {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
+  destination?: InvokeTabName;
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
@@ -58,9 +60,11 @@ const InvokeAIUI = ({
   customNavComponent,
   middleware,
   projectId,
-  galleryHeader,
+  projectName,
+  projectUrl,
   queueId,
   selectedImage,
+  destination,
   customStarUi,
   socketOptions,
   isDebugging = false,
@@ -108,7 +112,7 @@ const InvokeAIUI = ({
       $projectId.set(undefined);
       $queueId.set(DEFAULT_QUEUE_ID);
     };
-  }, [apiUrl, token, middleware, projectId, queueId]);
+  }, [apiUrl, token, middleware, projectId, queueId, projectName, projectUrl]);
 
   useEffect(() => {
     if (customStarUi) {
@@ -141,14 +145,20 @@ const InvokeAIUI = ({
   }, [openAPISchemaUrl]);
 
   useEffect(() => {
-    if (galleryHeader) {
-      $galleryHeader.set(galleryHeader);
-    }
+    $projectName.set(projectName);
 
     return () => {
-      $galleryHeader.set(undefined);
+      $projectName.set(undefined);
     };
-  }, [galleryHeader]);
+  }, [projectName]);
+
+  useEffect(() => {
+    $projectUrl.set(projectUrl);
+
+    return () => {
+      $projectUrl.set(undefined);
+    };
+  }, [projectUrl]);
 
   useEffect(() => {
     if (logo) {
@@ -211,7 +221,7 @@ const InvokeAIUI = ({
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
-              <App config={config} selectedImage={selectedImage} />
+              <App config={config} selectedImage={selectedImage} destination={destination} />
             </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>

@@ -15,9 +15,15 @@ import {
 } from 'features/controlLayers/store/controlLayersSlice';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
-import { imageSelected, imageToCompareChanged, isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
+import {
+  imageSelected,
+  imageToCompareChanged,
+  isImageViewerOpenChanged,
+  selectionChanged,
+} from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
+import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { imagesApi } from 'services/api/endpoints/images';
 
 export const dndDropped = createAction<{
@@ -216,6 +222,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
             board_id: boardId,
           })
         );
+        dispatch(selectionChanged([]));
         return;
       }
 
@@ -233,6 +240,21 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
             imageDTO,
           })
         );
+        dispatch(selectionChanged([]));
+        return;
+      }
+
+      /**
+       * Image dropped on upscale initial image
+       */
+      if (
+        overData.actionType === 'SET_UPSCALE_INITIAL_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const { imageDTO } = activeData.payload;
+
+        dispatch(upscaleInitialImageChanged(imageDTO));
         return;
       }
 
@@ -248,6 +270,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
             board_id: boardId,
           })
         );
+        dispatch(selectionChanged([]));
         return;
       }
 
@@ -261,6 +284,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
             imageDTOs,
           })
         );
+        dispatch(selectionChanged([]));
         return;
       }
     },
