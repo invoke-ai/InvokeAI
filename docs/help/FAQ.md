@@ -196,6 +196,22 @@ tips to reduce the problem:
     === "12GB VRAM GPU"
 
         This should be sufficient to generate larger images up to about 1280x1280.
+		
+## Checkpoint Models Load Slowly or Use Too Much RAM
+
+The difference between diffusers models (a folder containing multiple
+subfolders) and checkpoint models (a file ending with .safetensors or
+.ckpt) is that InvokeAI is able to load diffusers models into memory
+incrementally, while checkpoint models must be loaded all at
+once. With very large models, or systems with limited RAM, you may
+experience slowdowns and other memory-related issues when loading
+checkpoint models.
+
+To solve this, go to the Model Manager tab (the cube), select the
+checkpoint model that's giving you trouble, and press the "Convert"
+button in the upper right of your browser window. This will conver the
+checkpoint into a diffusers model, after which loading should be
+faster and less memory-intensive.
 
 ## Memory Leak (Linux)
 
