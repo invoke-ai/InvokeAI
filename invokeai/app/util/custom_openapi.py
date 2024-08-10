@@ -81,7 +81,7 @@ def get_openapi_func(
         # Add the output map to the schema
         openapi_schema["components"]["schemas"]["InvocationOutputMap"] = {
             "type": "object",
-            "properties": invocation_output_map_properties,
+            "properties": dict(sorted(invocation_output_map_properties.items())),
             "required": invocation_output_map_required,
         }
 
