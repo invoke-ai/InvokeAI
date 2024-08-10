@@ -253,6 +253,7 @@ async def get_image_full(
             content = f.read()
         response = Response(content, media_type="image/png")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        response.headers["Content-Disposition"] = f'inline; filename="{image_name}"'
         return response
     except Exception:
         raise HTTPException(status_code=404)
