@@ -299,7 +299,7 @@ Migration logic is in [migrations.ts].
 [pydantic]: https://github.com/pydantic/pydantic 'pydantic'
 [zod]: https://github.com/colinhacks/zod 'zod'
 [openapi-types]: https://github.com/kogosoftwarellc/open-api/tree/main/packages/openapi-types 'openapi-types'
-[reactflow]: https://github.com/xyflow/xyflow 'reactflow'
+[reactflow]: https://github.com/xyflow/xyflow '@xyflow/react'
 [reactflow-concepts]: https://reactflow.dev/learn/concepts/terms-and-definitions
 [reactflow-events]: https://reactflow.dev/api-reference/react-flow#event-handlers
 [buildWorkflow.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/features/nodes/util/workflow/buildWorkflow.ts

@@ -1,4 +1,5 @@
 import { Flex, Image, Text } from '@invoke-ai/ui-library';
+import type { NodeProps } from '@xyflow/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
@@ -13,7 +14,6 @@ import { motion } from 'framer-motion';
 import type { CSSProperties, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { NodeProps } from 'reactflow';
 
 const selector = createMemoizedSelector(selectSystemSlice, selectGallerySlice, (system, gallery) => {
   const imageDTO = gallery.selection[gallery.selection.length - 1];

@@ -1,9 +1,9 @@
+import { Handle, Position } from '@xyflow/react';
 import { useChakraThemeTokens } from 'common/hooks/useChakraThemeTokens';
 import { useNodeTemplate } from 'features/nodes/hooks/useNodeTemplate';
 import { map } from 'lodash-es';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
-import { Handle, Position } from 'reactflow';
 
 interface Props {
   nodeId: string;

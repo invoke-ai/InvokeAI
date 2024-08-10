@@ -1,4 +1,4 @@
-import type { Edge, Node } from 'reactflow';
+import type { Edge, Node } from '@xyflow/react';
 import { z } from 'zod';
 
 import { zClassification, zProgressImage } from './common';
@@ -59,11 +59,11 @@ type AnyNodeData = z.infer<typeof zAnyNodeData>;
 export type InvocationNode = Node<InvocationNodeData, 'invocation'>;
 export type NotesNode = Node<NotesNodeData, 'notes'>;
 export type CurrentImageNode = Node<CurrentImageNodeData, 'current_image'>;
-export type AnyNode = Node<AnyNodeData>;
+export type AppNode = Node<AnyNodeData>;
 
-export const isInvocationNode = (node?: AnyNode | null): node is InvocationNode =>
+export const isInvocationNode = (node?: AppNode | null): node is InvocationNode =>
   Boolean(node && node.type === 'invocation');
-export const isNotesNode = (node?: AnyNode | null): node is NotesNode => Boolean(node && node.type === 'notes');
+export const isNotesNode = (node?: AppNode | null): node is NotesNode => Boolean(node && node.type === 'notes');
 export const isInvocationNodeData = (node?: AnyNodeData | null): node is InvocationNodeData =>
   Boolean(node && !['notes', 'current_image'].includes(node.type)); // node.type may be 'notes', 'current_image', or any invocation type
 // #endregion

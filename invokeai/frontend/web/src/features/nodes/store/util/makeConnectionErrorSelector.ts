@@ -1,9 +1,9 @@
+import type { Edge, HandleType } from '@xyflow/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { RootState } from 'app/store/store';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
 import type { NodesState, PendingConnection, Templates } from 'features/nodes/store/types';
 import { buildRejectResult, validateConnection } from 'features/nodes/store/util/validateConnection';
-import type { Edge, HandleType } from 'reactflow';
 
 /**
  * Creates a selector that validates a pending connection.

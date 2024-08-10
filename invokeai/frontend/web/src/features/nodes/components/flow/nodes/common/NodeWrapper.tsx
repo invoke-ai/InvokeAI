@@ -1,5 +1,6 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
+import type { NodeChange } from '@xyflow/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useExecutionState } from 'features/nodes/hooks/useExecutionState';
@@ -9,16 +10,15 @@ import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from 'features/nodes/types/constant
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import type { MouseEvent, PropsWithChildren } from 'react';
 import { memo, useCallback } from 'react';
-import type { NodeChange } from 'reactflow';
 
 type NodeWrapperProps = PropsWithChildren & {
   nodeId: string;
-  selected: boolean;
+  selected?: boolean;
   width?: ChakraProps['w'];
 };
 
 const NodeWrapper = (props: NodeWrapperProps) => {
-  const { nodeId, width, children, selected } = props;
+  const { nodeId, width, children, selected = false } = props;
   const store = useAppStore();
   const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
 

@@ -1,10 +1,10 @@
 import { Box } from '@invoke-ai/ui-library';
+import { ReactFlowProvider } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ImageComparisonDroppable } from 'features/gallery/components/ImageViewer/ImageComparisonDroppable';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import NodeEditor from 'features/nodes/components/NodeEditor';
 import { memo } from 'react';
-import { ReactFlowProvider } from 'reactflow';
 
 const NodesTab = () => {
   const mode = useAppSelector((s) => s.workflow.mode);

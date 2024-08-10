@@ -1,10 +1,10 @@
 // TODO: enable this at some point
 import { useStore } from '@nanostores/react';
+import type { IsValidConnection } from '@xyflow/react';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { $edgePendingUpdate, $templates } from 'features/nodes/store/nodesSlice';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import { useCallback } from 'react';
-import type { Connection } from 'reactflow';
 
 /**
  * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/store/util/makeIsConnectionValidSelector.ts`
@@ -15,8 +15,8 @@ export const useIsValidConnection = () => {
   const store = useAppStore();
   const templates = useStore($templates);
   const shouldValidateGraph = useAppSelector((s) => s.workflowSettings.shouldValidateGraph);
-  const isValidConnection = useCallback(
-    ({ source, sourceHandle, target, targetHandle }: Connection): boolean => {
+  const isValidConnection = useCallback<IsValidConnection>(
+    ({ source, sourceHandle, target, targetHandle }) => {
       // Connection must have valid targets
       if (!(source && sourceHandle && target && targetHandle)) {
         return false;

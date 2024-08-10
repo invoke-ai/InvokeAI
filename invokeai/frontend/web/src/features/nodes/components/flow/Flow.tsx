@@ -1,5 +1,20 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import type {
+  EdgeChange,
+  EdgeTypes,
+  NodeChange,
+  NodeTypes,
+  OnEdgesChange,
+  OnInit,
+  OnMoveEnd,
+  OnNodesChange,
+  OnReconnect,
+  ProOptions,
+  ReactFlowProps,
+  ReactFlowState,
+} from '@xyflow/react';
+import { Background, ReactFlow, useStore as useReactFlowStore, useUpdateNodeInternals } from '@xyflow/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
@@ -24,36 +39,23 @@ import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import type {
-  EdgeChange,
-  NodeChange,
-  OnEdgesChange,
-  OnEdgeUpdateFunc,
-  OnInit,
-  OnMoveEnd,
-  OnNodesChange,
-  ProOptions,
-  ReactFlowProps,
-  ReactFlowState,
-} from 'reactflow';
-import { Background, ReactFlow, useStore as useReactFlowStore, useUpdateNodeInternals } from 'reactflow';
 
 import CustomConnectionLine from './connectionLines/CustomConnectionLine';
 import InvocationCollapsedEdge from './edges/InvocationCollapsedEdge';
 import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
 import CurrentImageNode from './nodes/CurrentImage/CurrentImageNode';
 import InvocationNodeWrapper from './nodes/Invocation/InvocationNodeWrapper';
-import NotesNode from './nodes/Notes/NotesNode';
+import { NotesNodeComponent } from './nodes/Notes/NotesNode';
 
-const edgeTypes = {
+const edgeTypes: EdgeTypes = {
   collapsed: InvocationCollapsedEdge,
   default: InvocationDefaultEdge,
 };
 
-const nodeTypes = {
+const nodeTypes: NodeTypes = {
   invocation: InvocationNodeWrapper,
   current_image: CurrentImageNode,
-  notes: NotesNode,
+  notes: NotesNodeComponent,
 };
 
 // TODO: can we support reactflow? if not, we could style the attribution so it matches the app
@@ -151,13 +153,13 @@ export const Flow = memo(() => {
    *   where the edge is deleted if you click it accidentally).
    */
 
-  const onEdgeUpdateStart: NonNullable<ReactFlowProps['onEdgeUpdateStart']> = useCallback((e, edge, _handleType) => {
+  const onReconnectStart: NonNullable<ReactFlowProps['onReconnectStart']> = useCallback((e, edge, _handleType) => {
     $edgePendingUpdate.set(edge);
     $didUpdateEdge.set(false);
     $lastEdgeUpdateMouseEvent.set(e);
   }, []);
 
-  const onEdgeUpdate: OnEdgeUpdateFunc = useCallback(
+  const onReconnect: OnReconnect = useCallback(
     (oldEdge, newConnection) => {
       // This event is fired when an edge update is successful
       $didUpdateEdge.set(true);
@@ -176,7 +178,7 @@ export const Flow = memo(() => {
     [dispatch, updateNodeInternals]
   );
 
-  const onEdgeUpdateEnd: NonNullable<ReactFlowProps['onEdgeUpdateEnd']> = useCallback(
+  const onReconnectEnd: NonNullable<ReactFlowProps['onReconnectEnd']> = useCallback(
     (e, edge, _handleType) => {
       const didUpdateEdge = $didUpdateEdge.get();
       // Fall back to a reasonable default event
@@ -316,9 +318,9 @@ export const Flow = memo(() => {
       onMouseMove={onMouseMove}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      onEdgeUpdate={onEdgeUpdate}
-      onEdgeUpdateStart={onEdgeUpdateStart}
-      onEdgeUpdateEnd={onEdgeUpdateEnd}
+      onReconnect={onReconnect}
+      onReconnectStart={onReconnectStart}
+      onReconnectEnd={onReconnectEnd}
       onConnectStart={onConnectStart}
       onConnect={onConnect}
       onConnectEnd={onConnectEnd}

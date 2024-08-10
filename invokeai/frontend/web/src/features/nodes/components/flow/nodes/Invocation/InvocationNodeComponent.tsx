@@ -16,10 +16,10 @@ type Props = {
   isOpen: boolean;
   label: string;
   type: string;
-  selected: boolean;
+  selected?: boolean;
 };
 
-const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
+export const InvocationNodeComponent = memo(({ nodeId, isOpen, label, type, selected = false }: Props) => {
   const fieldNames = useFieldNames(nodeId);
   const withFooter = useWithFooter(nodeId);
   const outputFieldNames = useOutputFieldNames(nodeId);
@@ -78,6 +78,6 @@ const InvocationNode = ({ nodeId, isOpen, label, type, selected }: Props) => {
       )}
     </NodeWrapper>
   );
-};
+});
 
-export default memo(InvocationNode);
+InvocationNodeComponent.displayName = 'InvocationNodeComponent';

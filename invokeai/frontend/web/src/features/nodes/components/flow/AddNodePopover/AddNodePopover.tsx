@@ -1,8 +1,7 @@
-import 'reactflow/dist/style.css';
-
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, Flex, Popover, PopoverAnchor, PopoverBody, PopoverContent } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import type { EdgeChange, NodeChange } from '@xyflow/react';
 import { useAppDispatch, useAppStore } from 'app/store/storeHooks';
 import type { SelectInstance } from 'chakra-react-select';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
@@ -21,7 +20,7 @@ import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupied
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
-import type { AnyNode } from 'features/nodes/types/invocation';
+import type { AppNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { toast } from 'features/toast/toast';
 import { filter, map, memoize, some } from 'lodash-es';
@@ -31,7 +30,6 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import type { HotkeyCallback } from 'react-hotkeys-hook/dist/types';
 import { useTranslation } from 'react-i18next';
 import type { FilterOptionOption } from 'react-select/dist/declarations/src/filters';
-import type { EdgeChange, NodeChange } from 'reactflow';
 
 const createRegex = memoize(
   (inputValue: string) =>
@@ -120,7 +118,7 @@ const AddNodePopover = () => {
   }, [filteredTemplates, pendingConnection, t]);
 
   const addNode = useCallback(
-    (nodeType: string): AnyNode | null => {
+    (nodeType: string): AppNode | null => {
       const node = buildInvocation(nodeType);
       if (!node) {
         const errorMessage = t('nodes.unknownNode', {

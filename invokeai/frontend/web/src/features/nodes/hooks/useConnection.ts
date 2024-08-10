@@ -1,4 +1,6 @@
 import { useStore } from '@nanostores/react';
+import type { EdgeChange, OnConnect, OnConnectEnd, OnConnectStart } from '@xyflow/react';
+import { useUpdateNodeInternals } from '@xyflow/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import {
@@ -12,8 +14,6 @@ import {
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { useCallback, useMemo } from 'react';
-import type { EdgeChange, OnConnect, OnConnectEnd, OnConnectStart } from 'reactflow';
-import { useUpdateNodeInternals } from 'reactflow';
 import { assert } from 'tsafe';
 
 export const useConnection = () => {

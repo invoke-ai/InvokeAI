@@ -1,5 +1,3 @@
-import 'reactflow/dist/style.css';
-
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import QueueControls from 'features/queue/components/QueueControls';

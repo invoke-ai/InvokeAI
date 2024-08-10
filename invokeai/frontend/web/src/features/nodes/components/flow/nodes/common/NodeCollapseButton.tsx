@@ -1,9 +1,9 @@
 import { Icon, IconButton } from '@invoke-ai/ui-library';
+import { useUpdateNodeInternals } from '@xyflow/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { nodeIsOpenChanged } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
 import { PiCaretUpBold } from 'react-icons/pi';
-import { useUpdateNodeInternals } from 'reactflow';
 
 interface Props {
   nodeId: string;

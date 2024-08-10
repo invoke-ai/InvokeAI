@@ -1,4 +1,5 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
+import { useReactFlow } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { shouldShowMinimapPanelChanged } from 'features/nodes/store/workflowSettingsSlice';
 import { memo, useCallback } from 'react';
@@ -9,7 +10,6 @@ import {
   PiMagnifyingGlassPlusBold,
   PiMapPinBold,
 } from 'react-icons/pi';
-import { useReactFlow } from 'reactflow';
 
 const ViewportControls = () => {
   const { t } = useTranslation();

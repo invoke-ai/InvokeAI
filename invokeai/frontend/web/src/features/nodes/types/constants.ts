@@ -1,4 +1,4 @@
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 
 /**
  * How long to wait before showing a tooltip when hovering a field handle.

@@ -1,3 +1,5 @@
+import type { HandleType } from '@xyflow/react';
+import type { CollapsedEdge } from 'features/nodes/components/flow/edges/InvocationCollapsedEdge';
 import type {
   FieldIdentifier,
   FieldInputTemplate,
@@ -5,13 +7,12 @@ import type {
   StatefulFieldValue,
 } from 'features/nodes/types/field';
 import type {
-  AnyNode,
+  AppNode,
   InvocationNodeEdge,
   InvocationTemplate,
   NodeExecutionState,
 } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import type { HandleType } from 'reactflow';
 
 export type Templates = Record<string, InvocationTemplate>;
 export type NodeExecutionStates = Record<string, NodeExecutionState | undefined>;
@@ -25,8 +26,8 @@ export type PendingConnection = {
 
 export type NodesState = {
   _version: 1;
-  nodes: AnyNode[];
-  edges: InvocationNodeEdge[];
+  nodes: AppNode[];
+  edges: (InvocationNodeEdge | CollapsedEdge)[];
 };
 
 export type WorkflowMode = 'edit' | 'view';

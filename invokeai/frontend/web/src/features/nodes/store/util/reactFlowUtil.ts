@@ -1,4 +1,4 @@
-import type { Connection, Edge } from 'reactflow';
+import type { Connection, Edge } from '@xyflow/react';
 import { assert } from 'tsafe';
 
 /**

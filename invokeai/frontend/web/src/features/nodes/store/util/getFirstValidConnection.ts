@@ -1,9 +1,9 @@
+import type { Connection, Edge } from '@xyflow/react';
 import type { Templates } from 'features/nodes/store/types';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
-import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
+import type { AppNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
 import { map } from 'lodash-es';
-import type { Connection, Edge } from 'reactflow';
 
 /**
  *
@@ -22,7 +22,7 @@ export const getFirstValidConnection = (
   sourceHandle: string | null,
   target: string,
   targetHandle: string | null,
-  nodes: AnyNode[],
+  nodes: AppNode[],
   edges: InvocationNodeEdge[],
   templates: Templates,
   edgePendingUpdate: Edge | null
@@ -80,7 +80,7 @@ export const getTargetCandidateFields = (
   source: string,
   sourceHandle: string,
   target: string,
-  nodes: AnyNode[],
+  nodes: AppNode[],
   edges: Edge[],
   templates: Templates,
   edgePendingUpdate: Edge | null
@@ -116,7 +116,7 @@ export const getSourceCandidateFields = (
   target: string,
   targetHandle: string,
   source: string,
-  nodes: AnyNode[],
+  nodes: AppNode[],
   edges: Edge[],
   templates: Templates,
   edgePendingUpdate: Edge | null

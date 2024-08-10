@@ -1,4 +1,6 @@
 import { Tooltip } from '@invoke-ai/ui-library';
+import type { HandleType } from '@xyflow/react';
+import { Handle, Position } from '@xyflow/react';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
@@ -8,8 +10,6 @@ import { type FieldInputTemplate, type FieldOutputTemplate, isSingle } from 'fea
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { HandleType } from 'reactflow';
-import { Handle, Position } from 'reactflow';
 
 type FieldHandleProps = {
   fieldTemplate: FieldInputTemplate | FieldOutputTemplate;

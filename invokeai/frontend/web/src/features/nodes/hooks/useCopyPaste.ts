@@ -1,3 +1,4 @@
+import type { EdgeChange, NodeChange } from '@xyflow/react';
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import {
@@ -11,7 +12,6 @@ import {
 } from 'features/nodes/store/nodesSlice';
 import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
 import { isEqual, uniqWith } from 'lodash-es';
-import type { EdgeChange, NodeChange } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
 
 const copySelection = () => {

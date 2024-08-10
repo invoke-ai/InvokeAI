@@ -1,11 +1,11 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import type { EdgeProps } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { getEdgeStyles } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { memo, useMemo } from 'react';
-import type { EdgeProps } from 'reactflow';
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow';
 
 import { makeEdgeSelector } from './util/makeEdgeSelector';
 

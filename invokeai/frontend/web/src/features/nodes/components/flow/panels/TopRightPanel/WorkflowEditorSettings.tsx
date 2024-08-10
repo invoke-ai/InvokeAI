@@ -16,6 +16,7 @@ import {
   Switch,
   useDisclosure,
 } from '@invoke-ai/ui-library';
+import { SelectionMode } from '@xyflow/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopRightPanel/ReloadSchemaButton';
@@ -31,7 +32,6 @@ import {
 import type { ChangeEvent, ReactNode } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SelectionMode } from 'reactflow';
 
 const formLabelProps: FormLabelProps = { flexGrow: 1 };
 

@@ -1,5 +1,5 @@
+import type * as ReactFlow from '@xyflow/react';
 import type { WorkflowCategory, WorkflowV3, XYPosition } from 'features/nodes/types/workflow';
-import type * as ReactFlow from 'reactflow';
 import type { S } from 'services/api/types';
 import type { Equals, Extends } from 'tsafe';
 import { assert } from 'tsafe';

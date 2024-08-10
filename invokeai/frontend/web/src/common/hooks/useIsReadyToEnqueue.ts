@@ -1,4 +1,5 @@
 import { useStore } from '@nanostores/react';
+import { getConnectedEdges } from '@xyflow/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
@@ -22,7 +23,6 @@ import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
-import { getConnectedEdges } from 'reactflow';
 
 const LAYER_TYPE_TO_TKEY: Record<Layer['type'], string> = {
   initial_image_layer: 'controlLayers.globalInitialImage',

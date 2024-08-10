@@ -1,10 +1,10 @@
+import type { Connection as NullableConnection, Edge } from '@xyflow/react';
 import type { Templates } from 'features/nodes/store/types';
 import { areTypesEqual } from 'features/nodes/store/util/areTypesEqual';
 import { getCollectItemType } from 'features/nodes/store/util/getCollectItemType';
 import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
-import type { AnyNode } from 'features/nodes/types/invocation';
-import type { Connection as NullableConnection, Edge } from 'reactflow';
+import type { AppNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
 import type { O } from 'ts-toolbelt';
 
 type Connection = O.NonNullable<NullableConnection>;
@@ -21,8 +21,8 @@ export type ValidationResult =
 
 type ValidateConnectionFunc = (
   connection: Connection,
-  nodes: AnyNode[],
-  edges: Edge[],
+  nodes: AppNode[],
+  edges: InvocationNodeEdge[],
   templates: Templates,
   ignoreEdge: Edge | null,
   strict?: boolean

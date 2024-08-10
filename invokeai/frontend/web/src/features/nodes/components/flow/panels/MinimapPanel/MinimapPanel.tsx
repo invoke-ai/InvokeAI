@@ -1,8 +1,8 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { chakra, Flex } from '@invoke-ai/ui-library';
+import { MiniMap } from '@xyflow/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { memo } from 'react';
-import { MiniMap } from 'reactflow';
 
 const ChakraMiniMap = chakra(MiniMap);
 
