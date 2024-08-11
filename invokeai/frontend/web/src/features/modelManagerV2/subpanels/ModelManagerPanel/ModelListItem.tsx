@@ -20,8 +20,8 @@ type ModelListItemProps = {
 };
 
 const sx: SystemStyleObject = {
-  _hover: { bg: 'base.700' },
-  "&[aria-selected='true']": { bg: 'base.700' },
+  _hover: { bg: 'baseAlpha.100' },
+  "&[aria-selected='true']": { bg: 'baseAlpha.100' },
 };
 
 const ModelListItem = ({ model }: ModelListItemProps) => {
@@ -82,8 +82,8 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
       w="full"
       alignItems="center"
       gap={2}
-      cursor="pointer"
       onClick={handleSelectModel}
+      role="button"
     >
       <Flex gap={2} w="full" h="full" minW={0}>
         <ModelImage image_url={model.cover_image} />

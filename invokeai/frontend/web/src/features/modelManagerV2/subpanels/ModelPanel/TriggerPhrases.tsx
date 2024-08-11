@@ -99,16 +99,39 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
         </FormControl>
       </form>
 
-      <Flex gap="4" flexWrap="wrap">
-        {triggerPhrases.map((phrase, index) => (
-          <Tag size="md" key={index} py={2} px={4} bg="base.700">
-            <TagLabel>{phrase}</TagLabel>
-            <TagCloseButton onClick={removeTriggerPhrase.bind(null, phrase)} isDisabled={isLoading} />
-          </Tag>
-        ))}
-      </Flex>
+      {triggerPhrases.length > 0 && (
+        <Flex gap="4" flexWrap="wrap">
+          {triggerPhrases.map((phrase, index) => (
+            <TriggerPhrasesTag
+              key={`${phrase}_${index}`}
+              phrase={phrase}
+              onRemoveTriggerPhrase={removeTriggerPhrase}
+              isLoading={isLoading}
+            />
+          ))}
+        </Flex>
+      )}
     </Flex>
   );
 });
 
 TriggerPhrases.displayName = 'TriggerPhrases';
+
+type TriggerPhrasesTagProps = {
+  phrase: string;
+  onRemoveTriggerPhrase: (phrase: string) => void;
+  isLoading: boolean;
+};
+const TriggerPhrasesTag = memo(({ phrase, onRemoveTriggerPhrase, isLoading }: TriggerPhrasesTagProps) => {
+  const onClick = useCallback(() => {
+    onRemoveTriggerPhrase(phrase);
+  }, [onRemoveTriggerPhrase, phrase]);
+
+  return (
+    <Tag size="md" py={2} px={4} bg="base.700">
+      <TagLabel>{phrase}</TagLabel>
+      <TagCloseButton onClick={onClick} isDisabled={isLoading} />
+    </Tag>
+  );
+});
+TriggerPhrasesTag.displayName = 'TriggerPhrasesTag';

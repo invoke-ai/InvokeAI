@@ -30,12 +30,12 @@ export const ModelListNavigation = memo(() => {
       <InputGroup maxW="400px">
         <Input
           placeholder={t('modelManager.search')}
-          value={searchTerm || ''}
+          value={searchTerm}
           data-testid="board-search-input"
           onChange={handleSearch}
         />
 
-        {!!searchTerm?.length && (
+        {Boolean(searchTerm) && (
           <InputRightElement h="full" pe={2}>
             <IconButton
               size="sm"

@@ -106,7 +106,7 @@ const ModelList = () => {
 
   return (
     <ScrollableContent>
-      <Flex flexDirection="column" w="full" h="full" gap={4}>
+      <Flex flexDirection="column" w="full" h="full" gap={2}>
         {/* Main Model List */}
         {isLoadingMainModels && <FetchingModelsLoader loadingMessage="Loading Main Models..." />}
         {!isLoadingMainModels && filteredMainModels.length > 0 && (

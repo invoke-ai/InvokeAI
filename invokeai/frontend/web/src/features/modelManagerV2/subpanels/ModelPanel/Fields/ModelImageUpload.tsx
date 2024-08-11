@@ -6,14 +6,15 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi';
 import { useDeleteModelImageMutation, useUpdateModelImageMutation } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
 
 type Props = {
-  model_key: string | null;
-  model_image?: string | null;
+  modelConfig: AnyModelConfig;
 };
 
-const ModelImageUpload = ({ model_key, model_image }: Props) => {
-  const [image, setImage] = useState<string | null>(model_image || null);
+const ModelImageUpload = ({ modelConfig }: Props) => {
+  const { key, cover_image } = modelConfig;
+  const [image, setImage] = useState<string | null>(cover_image || null);
   const { t } = useTranslation();
 
   const [updateModelImage] = useUpdateModelImageMutation();
@@ -23,11 +24,11 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
     (files: File[]) => {
       const file = files[0];
 
-      if (!file || !model_key) {
+      if (!file) {
         return;
       }
 
-      updateModelImage({ key: model_key, image: file })
+      updateModelImage({ key, image: file })
         .unwrap()
         .then(() => {
           setImage(URL.createObjectURL(file));
@@ -45,15 +46,12 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
           });
         });
     },
-    [model_key, t, updateModelImage]
+    [key, t, updateModelImage]
   );
 
   const handleResetImage = useCallback(() => {
-    if (!model_key) {
-      return;
-    }
     setImage(null);
-    deleteModelImage(model_key)
+    deleteModelImage(key)
       .unwrap()
       .then(() => {
         toast({
@@ -69,7 +67,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
           status: 'error',
         });
       });
-  }, [model_key, t, deleteModelImage]);
+  }, [deleteModelImage, key, t]);
 
   const { getInputProps, getRootProps } = useDropzone({
     accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg', '.png'] },

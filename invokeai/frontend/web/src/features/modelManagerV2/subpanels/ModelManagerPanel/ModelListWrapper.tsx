@@ -1,4 +1,4 @@
-import { StickyScrollable } from 'features/system/components/StickyScrollable';
+import { Box, Flex, Heading } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import type { AnyModelConfig } from 'services/api/types';
 
@@ -12,11 +12,16 @@ type ModelListWrapperProps = {
 export const ModelListWrapper = memo((props: ModelListWrapperProps) => {
   const { title, modelList } = props;
   return (
-    <StickyScrollable title={title} contentSx={{ gap: 1, p: 2 }}>
-      {modelList.map((model) => (
-        <ModelListItem key={model.key} model={model} />
-      ))}
-    </StickyScrollable>
+    <Box>
+      <Box pb={2} position="sticky" zIndex={1} top={0} bg="base.900">
+        <Heading size="sm">{title}</Heading>
+      </Box>
+      <Flex flexDir="column" gap={1}>
+        {modelList.map((model) => (
+          <ModelListItem key={model.key} model={model} />
+        ))}
+      </Flex>
+    </Box>
   );
 });
 

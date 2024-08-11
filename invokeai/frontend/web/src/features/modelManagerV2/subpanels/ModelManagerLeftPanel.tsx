@@ -8,7 +8,7 @@ import { PiPlusBold } from 'react-icons/pi';
 import ModelList from './ModelManagerPanel/ModelList';
 import { ModelListNavigation } from './ModelManagerPanel/ModelListNavigation';
 
-export const ModelManager = memo(() => {
+export const ModelManagerLeftPanel = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const handleClickAddModel = useCallback(() => {
@@ -16,19 +16,17 @@ export const ModelManager = memo(() => {
   }, [dispatch]);
 
   return (
-    <Flex flexDir="column" layerStyle="first" p={4} gap={4} borderRadius="base" w="50%" h="full">
+    <Flex flexDir="column" gap={2} w="full" h="full">
       <Flex w="full" gap={4} justifyContent="space-between" alignItems="center">
         <Heading fontSize="xl">{t('common.modelManager')}</Heading>
         <Button size="sm" colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
           {t('modelManager.addModels')}
         </Button>
       </Flex>
-      <Flex flexDir="column" layerStyle="second" p={4} gap={4} borderRadius="base" w="full" h="full">
-        <ModelListNavigation />
-        <ModelList />
-      </Flex>
+      <ModelListNavigation />
+      <ModelList />
     </Flex>
   );
 });
 
-ModelManager.displayName = 'ModelManager';
+ModelManagerLeftPanel.displayName = 'ModelManagerLeftPanel';

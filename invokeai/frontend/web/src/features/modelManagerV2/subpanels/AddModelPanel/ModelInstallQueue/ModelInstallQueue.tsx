@@ -40,7 +40,7 @@ export const ModelInstallQueue = memo(() => {
   }, [data]);
 
   return (
-    <Flex flexDir="column" p={3} h="full" gap={3}>
+    <Flex flexDir="column" h="full" gap={2}>
       <Flex justifyContent="space-between" alignItems="center">
         <Heading size="sm">{t('modelManager.installQueue')}</Heading>
         <Button
@@ -52,7 +52,7 @@ export const ModelInstallQueue = memo(() => {
           {t('modelManager.prune')}
         </Button>
       </Flex>
-      <Box layerStyle="first" p={3} borderRadius="base" w="full" h="full">
+      <Box layerStyle="first" borderRadius="base" w="full" h="full">
         <ScrollableContent>
           <Flex flexDir="column-reverse" gap="2" w="full">
             {data?.map((model) => <ModelInstallQueueItem key={model.id} installJob={model} />)}

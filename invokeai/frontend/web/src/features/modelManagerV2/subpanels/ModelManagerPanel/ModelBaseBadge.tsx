@@ -16,6 +16,10 @@ const BASE_COLOR_MAP: Record<BaseModelType, string> = {
 };
 
 const ModelBaseBadge = ({ base }: Props) => {
+  if (base === 'any') {
+    return null;
+  }
+
   return (
     <Badge flexGrow={0} colorScheme={BASE_COLOR_MAP[base]} variant="subtle" h="min-content">
       {MODEL_TYPE_SHORT_MAP[base]}

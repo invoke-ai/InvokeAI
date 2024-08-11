@@ -50,15 +50,17 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             )}
           </SimpleGrid>
         </Box>
-        <Box layerStyle="second" borderRadius="base" p={4}>
+        <Flex flexDir="column" layerStyle="second" borderRadius="base" p={4} gap={4}>
           {modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner' && (
             <MainModelDefaultSettings modelConfig={modelConfig} />
           )}
           {(modelConfig.type === 'controlnet' || modelConfig.type === 't2i_adapter') && (
             <ControlNetOrT2IAdapterDefaultSettings modelConfig={modelConfig} />
           )}
+        </Flex>
+        <Flex flexDir="column" layerStyle="second" borderRadius="base" p={4} gap={4}>
           {(modelConfig.type === 'main' || modelConfig.type === 'lora') && <TriggerPhrases modelConfig={modelConfig} />}
-        </Box>
+        </Flex>
       </Flex>
     </Flex>
   );

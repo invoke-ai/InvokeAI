@@ -13,10 +13,10 @@ export const ModelHeader = memo(({ modelConfig, children }: Props) => {
   const { t } = useTranslation();
   return (
     <Flex alignItems="flex-start" gap={4}>
-      <ModelImageUpload model_key={modelConfig.key} model_image={modelConfig.cover_image} />
+      <ModelImageUpload modelConfig={modelConfig} />
       <Flex flexDir="column" gap={1} flexGrow={1} minW={0}>
         <Flex gap={2}>
-          <Heading as="h2" fontSize="lg" noOfLines={1} wordBreak="break-all">
+          <Heading size="md" noOfLines={1} wordBreak="break-all">
             {modelConfig.name}
           </Heading>
           <Spacer />
