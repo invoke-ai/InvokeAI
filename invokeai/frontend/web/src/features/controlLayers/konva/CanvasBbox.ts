@@ -1,31 +1,35 @@
+import type { JSONObject } from 'common/types';
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasPreview } from 'features/controlLayers/konva/CanvasPreview';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
+import type { Logger } from 'roarr';
 import { assert } from 'tsafe';
 
-export class CanvasBbox {
-  static BASE_NAME = 'bbox';
-  static GROUP_NAME = `${CanvasBbox.BASE_NAME}_group`;
-  static RECT_NAME = `${CanvasBbox.BASE_NAME}_rect`;
-  static TRANSFORMER_NAME = `${CanvasBbox.BASE_NAME}_transformer`;
-  static ALL_ANCHORS: string[] = [
-    'top-left',
-    'top-center',
-    'top-right',
-    'middle-right',
-    'middle-left',
-    'bottom-left',
-    'bottom-center',
-    'bottom-right',
-  ];
-  static CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
-  static NO_ANCHORS: string[] = [];
+const ALL_ANCHORS: string[] = [
+  'top-left',
+  'top-center',
+  'top-right',
+  'middle-right',
+  'middle-left',
+  'bottom-left',
+  'bottom-center',
+  'bottom-right',
+];
+const CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+const NO_ANCHORS: string[] = [];
 
+export class CanvasBbox {
+  readonly type = 'generation_bbox';
+
+  id: string;
+  path: string[];
   parent: CanvasPreview;
   manager: CanvasManager;
+  log: Logger;
 
   konva: {
     group: Konva.Group;
@@ -34,19 +38,25 @@ export class CanvasBbox {
   };
 
   constructor(parent: CanvasPreview) {
+    this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = this.parent.manager;
+    this.path = this.manager.path.concat(this.id);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
+
+    this.log.trace('Creating bbox');
+
     // Create a stash to hold onto the last aspect ratio of the bbox - this allows for locking the aspect ratio when
     // transforming the bbox.
     const bbox = this.manager.stateApi.getBbox();
     const $aspectRatioBuffer = atom(bbox.rect.width / bbox.rect.height);
 
     this.konva = {
-      group: new Konva.Group({ name: CanvasBbox.GROUP_NAME, listening: false }),
+      group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
       // Use a transformer for the generation bbox. Transformers need some shape to transform, we will use a fully
       // transparent rect for this purpose.
       rect: new Konva.Rect({
-        name: CanvasBbox.RECT_NAME,
+        name: `${this.type}:rect`,
         listening: false,
         strokeEnabled: false,
         draggable: true,
@@ -56,7 +66,7 @@ export class CanvasBbox {
         height: bbox.rect.height,
       }),
       transformer: new Konva.Transformer({
-        name: CanvasBbox.TRANSFORMER_NAME,
+        name: `${this.type}:transformer`,
         borderDash: [5, 5],
         borderStroke: 'rgba(212,216,234,1)',
         borderEnabled: true,
@@ -160,7 +170,7 @@ export class CanvasBbox {
 
       // If shift is held and we are resizing from a corner, retain aspect ratio - needs special handling. We skip this
       // if alt/opt is held - this requires math too big for my brain.
-      if (shift && CanvasBbox.CORNER_ANCHORS.includes(anchor) && !alt) {
+      if (shift && CORNER_ANCHORS.includes(anchor) && !alt) {
         // Fit the bbox to the last aspect ratio
         let fittedWidth = Math.sqrt(width * height * $aspectRatioBuffer.get());
         let fittedHeight = fittedWidth / $aspectRatioBuffer.get();
@@ -237,7 +247,11 @@ export class CanvasBbox {
     });
     this.konva.transformer.setAttrs({
       listening: toolState.selected === 'bbox',
-      enabledAnchors: toolState.selected === 'bbox' ? CanvasBbox.ALL_ANCHORS : CanvasBbox.NO_ANCHORS,
+      enabledAnchors: toolState.selected === 'bbox' ? ALL_ANCHORS : NO_ANCHORS,
     });
   }
+
+  getLoggingContext = (): JSONObject => {
+    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
+  };
 }

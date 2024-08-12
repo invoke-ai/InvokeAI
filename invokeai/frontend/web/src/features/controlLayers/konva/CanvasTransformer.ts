@@ -17,10 +17,7 @@ import type { Logger } from 'roarr';
  * It renders an outline when dragging and resizing the entity, with transform anchors for resizing and rotation.
  */
 export class CanvasTransformer {
-  static TYPE = 'entity_transformer';
-  static KONVA_TRANSFORMER_NAME = `${CanvasTransformer.TYPE}:transformer`;
-  static KONVA_PROXY_RECT_NAME = `${CanvasTransformer.TYPE}:proxy_rect`;
-  static KONVA_OUTLINE_RECT_NAME = `${CanvasTransformer.TYPE}:outline_rect`;
+  readonly type = 'entity_transformer';
 
   static RECT_CALC_DEBOUNCE_MS = 300;
   static OUTLINE_PADDING = 0;
@@ -37,8 +34,6 @@ export class CanvasTransformer {
   static ROTATE_ANCHOR_FILL_COLOR = 'hsl(200 76% 95% / 1)'; // invokeBlue.50
   static ROTATE_ANCHOR_STROKE_COLOR = 'hsl(200 76% 40% / 1)'; // invokeBlue.700
   static ROTATE_ANCHOR_SIZE = 12;
-
-  readonly type = CanvasTransformer.TYPE;
 
   id: string;
   path: string[];
@@ -100,7 +95,7 @@ export class CanvasTransformer {
   };
 
   constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
-    this.id = getPrefixedId(CanvasTransformer.TYPE);
+    this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = parent.manager;
     this.path = this.parent.path.concat(this.id);
@@ -110,13 +105,13 @@ export class CanvasTransformer {
       outlineRect: new Konva.Rect({
         listening: false,
         draggable: false,
-        name: CanvasTransformer.KONVA_OUTLINE_RECT_NAME,
+        name: `${this.type}:outline_rect`,
         stroke: CanvasTransformer.OUTLINE_COLOR,
         perfectDrawEnabled: false,
         strokeHitEnabled: false,
       }),
       transformer: new Konva.Transformer({
-        name: CanvasTransformer.KONVA_TRANSFORMER_NAME,
+        name: `${this.type}:transformer`,
         // Visibility and listening are managed via activate() and deactivate()
         visible: false,
         listening: false,
@@ -235,7 +230,7 @@ export class CanvasTransformer {
         },
       }),
       proxyRect: new Konva.Rect({
-        name: CanvasTransformer.KONVA_PROXY_RECT_NAME,
+        name: `${this.type}:proxy_rect`,
         listening: false,
         draggable: true,
       }),

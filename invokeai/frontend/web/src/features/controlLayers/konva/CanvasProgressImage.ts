@@ -1,18 +1,20 @@
 import { Mutex } from 'async-mutex';
+import type { JSONObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasPreview } from 'features/controlLayers/konva/CanvasPreview';
 import { getPrefixedId, loadImage } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
+import type { Logger } from 'roarr';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 
 export class CanvasProgressImage {
-  static NAME_PREFIX = 'progress-image';
-  static GROUP_NAME = `${CanvasProgressImage.NAME_PREFIX}_group`;
-  static IMAGE_NAME = `${CanvasProgressImage.NAME_PREFIX}_image`;
+  readonly type = 'progress_image';
 
   id: string;
+  path: string[];
   parent: CanvasPreview;
   manager: CanvasManager;
+  log: Logger;
 
   /**
    * A set of subscriptions that should be cleaned up when the transformer is destroyed.
@@ -33,11 +35,16 @@ export class CanvasProgressImage {
   mutex: Mutex = new Mutex();
 
   constructor(parent: CanvasPreview) {
-    this.id = getPrefixedId(CanvasProgressImage.NAME_PREFIX);
+    this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = parent.manager;
+    this.path = this.manager.path.concat(this.id);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
+
+    this.log.trace('Creating progress image');
+
     this.konva = {
-      group: new Konva.Group({ name: CanvasProgressImage.GROUP_NAME, listening: false }),
+      group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
       image: null,
     };
 
@@ -86,7 +93,7 @@ export class CanvasProgressImage {
         });
       } else {
         this.konva.image = new Konva.Image({
-          name: CanvasProgressImage.IMAGE_NAME,
+          name: `${this.type}:image`,
           listening: false,
           image: this.imageElement,
           x,
@@ -106,9 +113,14 @@ export class CanvasProgressImage {
   };
 
   destroy = () => {
+    this.log.trace('Destroying progress image');
     for (const unsubscribe of this.subscriptions) {
       unsubscribe();
     }
     this.konva.group.destroy();
+  };
+
+  getLoggingContext = (): JSONObject => {
+    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }
