@@ -2,12 +2,6 @@ import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { JSONObject } from 'common/types';
-import type { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
-import type { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
-import type { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
-import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
-import type { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
-import type { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva/constants';
 import {
   getImageDataTransparency,
@@ -17,14 +11,7 @@ import {
   nanoid,
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
-import type {
-  CanvasV2State,
-  Coordinate,
-  Dimensions,
-  GenerationMode,
-  GetLoggingContext,
-  Rect,
-} from 'features/controlLayers/store/types';
+import type { CanvasV2State, Coordinate, Dimensions, GenerationMode, Rect } from 'features/controlLayers/store/types';
 import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
 import { clamp } from 'lodash-es';
@@ -39,13 +26,17 @@ import { CanvasControlAdapter } from './CanvasControlAdapter';
 import { CanvasLayerAdapter } from './CanvasLayerAdapter';
 import { CanvasMaskAdapter } from './CanvasMaskAdapter';
 import { CanvasPreview } from './CanvasPreview';
-import { CanvasStagingArea } from './CanvasStagingArea';
 import { CanvasStateApi } from './CanvasStateApi';
 import { setStageEventHandlers } from './events';
 
 export const $canvasManager = atom<CanvasManager | null>(null);
+const TYPE = 'manager';
 
 export class CanvasManager {
+  readonly type = TYPE;
+
+  id: string;
+  path: string[];
   stage: Konva.Stage;
   container: HTMLDivElement;
   controlAdapters: Map<string, CanvasControlAdapter>;
@@ -68,6 +59,8 @@ export class CanvasManager {
   _tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }> = new Map();
 
   constructor(stage: Konva.Stage, container: HTMLDivElement, store: Store<RootState>) {
+    this.id = getPrefixedId(this.type);
+    this.path = [this.id];
     this.stage = stage;
     this.container = container;
     this._store = store;
@@ -79,8 +72,8 @@ export class CanvasManager {
       return {
         ...message,
         context: {
-          ...message.context,
           ...this.getLoggingContext(),
+          ...message.context,
         },
       };
     });
@@ -637,13 +630,13 @@ export class CanvasManager {
     }
   }
 
-  getLoggingContext() {
+  getLoggingContext = (): JSONObject => {
     return {
-      // timestamp: new Date().toISOString(),
+      path: this.path.join('.'),
     };
-  }
+  };
 
-  buildLogger(getContext: () => JSONObject): Logger {
+  buildLogger = (getContext: () => JSONObject): Logger => {
     return this.log.child((message) => {
       return {
         ...message,
@@ -653,49 +646,6 @@ export class CanvasManager {
         },
       };
     });
-  }
-
-  buildGetLoggingContext = (
-    instance:
-      | CanvasBrushLineRenderer
-      | CanvasEraserLineRenderer
-      | CanvasRectRenderer
-      | CanvasImageRenderer
-      | CanvasTransformer
-      | CanvasObjectRenderer
-      | CanvasLayerAdapter
-      | CanvasMaskAdapter
-      | CanvasStagingArea
-  ): GetLoggingContext => {
-    if (
-      instance instanceof CanvasLayerAdapter ||
-      instance instanceof CanvasStagingArea ||
-      instance instanceof CanvasMaskAdapter
-    ) {
-      return (extra?: JSONObject): JSONObject => {
-        return {
-          ...instance.manager.getLoggingContext(),
-          entityId: instance.id,
-          ...extra,
-        };
-      };
-    } else if (instance instanceof CanvasObjectRenderer) {
-      return (extra?: JSONObject): JSONObject => {
-        return {
-          ...instance.parent.getLoggingContext(),
-          rendererId: instance.id,
-          ...extra,
-        };
-      };
-    } else {
-      return (extra?: JSONObject): JSONObject => {
-        return {
-          ...instance.parent.getLoggingContext(),
-          objectId: instance.id,
-          ...extra,
-        };
-      };
-    }
   };
 
   logDebugInfo() {

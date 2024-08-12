@@ -1,22 +1,26 @@
+import type { JSONObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
-import type { CanvasEraserLineState, GetLoggingContext } from 'features/controlLayers/store/types';
+import type { CanvasEraserLineState } from 'features/controlLayers/store/types';
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
+const TYPE = 'eraser_line';
+
 export class CanvasEraserLineRenderer {
-  static TYPE = 'eraser_line';
-  static GROUP_NAME = `${CanvasEraserLineRenderer.TYPE}_group`;
-  static LINE_NAME = `${CanvasEraserLineRenderer.TYPE}_line`;
+  static GROUP_NAME = `${TYPE}_group`;
+  static LINE_NAME = `${TYPE}_line`;
+
+  readonly type = TYPE;
 
   id: string;
+  path: string[];
   parent: CanvasObjectRenderer;
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: GetLoggingContext;
 
   state: CanvasEraserLineState;
   konva: {
@@ -29,7 +33,7 @@ export class CanvasEraserLineRenderer {
     this.id = id;
     this.parent = parent;
     this.manager = parent.manager;
-    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
+    this.path = this.parent.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
     this.log.trace({ state }, 'Creating eraser line');
@@ -88,9 +92,13 @@ export class CanvasEraserLineRenderer {
   repr() {
     return {
       id: this.id,
-      type: CanvasEraserLineRenderer.TYPE,
+      type: this.type,
       parent: this.parent.id,
       state: deepClone(this.state),
     };
   }
+
+  getLoggingContext = (): JSONObject => {
+    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
+  };
 }

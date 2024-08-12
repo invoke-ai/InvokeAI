@@ -9,15 +9,15 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import { getPrefixedId, konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
-import {
-  type CanvasBrushLineState,
-  type CanvasEraserLineState,
-  type CanvasImageState,
-  type CanvasRectState,
-  imageDTOToImageObject,
-  type Rect,
-  type RgbColor,
+import type {
+  CanvasBrushLineState,
+  CanvasEraserLineState,
+  CanvasImageState,
+  CanvasRectState,
+  Rect,
+  RgbColor,
 } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 import { uploadImage } from 'services/api/endpoints/images';
@@ -33,19 +33,22 @@ type AnyObjectRenderer = CanvasBrushLineRenderer | CanvasEraserLineRenderer | Ca
  */
 type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImageState | CanvasRectState;
 
+const TYPE = 'object_renderer';
+
 /**
  * Handles rendering of objects for a canvas entity.
  */
 export class CanvasObjectRenderer {
-  static TYPE = 'object_renderer';
-  static KONVA_OBJECT_GROUP_NAME = `${CanvasObjectRenderer.TYPE}:object_group`;
-  static KONVA_COMPOSITING_RECT_NAME = `${CanvasObjectRenderer.TYPE}:compositing_rect`;
+  static KONVA_OBJECT_GROUP_NAME = `${TYPE}:object_group`;
+  static KONVA_COMPOSITING_RECT_NAME = `${TYPE}:compositing_rect`;
+
+  readonly type = TYPE;
 
   id: string;
+  path: string[];
   parent: CanvasLayerAdapter | CanvasMaskAdapter;
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: (extra?: JSONObject) => JSONObject;
 
   /**
    * A set of subscriptions that should be cleaned up when the transformer is destroyed.
@@ -90,10 +93,10 @@ export class CanvasObjectRenderer {
   };
 
   constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
-    this.id = getPrefixedId(CanvasObjectRenderer.TYPE);
+    this.id = getPrefixedId(TYPE);
     this.parent = parent;
+    this.path = this.parent.path.concat(this.id);
     this.manager = parent.manager;
-    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.trace('Creating object renderer');
 
@@ -414,10 +417,14 @@ export class CanvasObjectRenderer {
   repr = () => {
     return {
       id: this.id,
-      type: CanvasObjectRenderer.TYPE,
+      type: this.type,
       parent: this.parent.id,
       renderers: Array.from(this.renderers.values()).map((renderer) => renderer.repr()),
       buffer: deepClone(this.buffer),
     };
+  };
+
+  getLoggingContext = (): JSONObject => {
+    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

@@ -1,8 +1,9 @@
+import type { JSONObject } from 'common/types';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
-import type { Coordinate, GetLoggingContext, Rect } from 'features/controlLayers/store/types';
+import type { Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { debounce, get } from 'lodash-es';
 import type { Logger } from 'roarr';
@@ -37,11 +38,13 @@ export class CanvasTransformer {
   static ROTATE_ANCHOR_STROKE_COLOR = 'hsl(200 76% 40% / 1)'; // invokeBlue.700
   static ROTATE_ANCHOR_SIZE = 12;
 
+  readonly type = CanvasTransformer.TYPE;
+
   id: string;
+  path: string[];
   parent: CanvasLayerAdapter | CanvasMaskAdapter;
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: GetLoggingContext;
 
   /**
    * The rect of the parent, _including_ transparent regions.
@@ -100,8 +103,7 @@ export class CanvasTransformer {
     this.id = getPrefixedId(CanvasTransformer.TYPE);
     this.parent = parent;
     this.manager = parent.manager;
-
-    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
+    this.path = this.parent.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
     this.konva = {
@@ -729,7 +731,7 @@ export class CanvasTransformer {
   repr = () => {
     return {
       id: this.id,
-      type: CanvasTransformer.TYPE,
+      type: this.type,
       mode: this.interactionMode,
       isTransformEnabled: this.isTransformEnabled,
       isDragEnabled: this.isDragEnabled,
@@ -748,5 +750,9 @@ export class CanvasTransformer {
     this.konva.outlineRect.destroy();
     this.konva.transformer.destroy();
     this.konva.proxyRect.destroy();
+  };
+
+  getLoggingContext = (): JSONObject => {
+    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

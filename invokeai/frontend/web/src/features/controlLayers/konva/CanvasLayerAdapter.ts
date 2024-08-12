@@ -1,23 +1,22 @@
+import type { JSONObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import type {
-  CanvasEntityIdentifier,
-  CanvasLayerState,
-  CanvasV2State,
-  GetLoggingContext,
-} from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CanvasLayerState, CanvasV2State } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
 
+const TYPE = 'layer';
+
 export class CanvasLayerAdapter {
+  readonly type = TYPE;
+
   id: string;
-  type: CanvasLayerState['type'];
+  path: string[];
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: GetLoggingContext;
 
   state: CanvasLayerState;
 
@@ -31,9 +30,8 @@ export class CanvasLayerAdapter {
 
   constructor(state: CanvasLayerAdapter['state'], manager: CanvasLayerAdapter['manager']) {
     this.id = state.id;
-    this.type = state.type;
     this.manager = manager;
-    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
+    this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.debug({ state }, 'Creating layer');
 
@@ -138,6 +136,10 @@ export class CanvasLayerAdapter {
       transformer: this.transformer.repr(),
       renderer: this.renderer.repr(),
     };
+  };
+
+  getLoggingContext = (): JSONObject => {
+    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 
   logDebugInfo(msg = 'Debug info') {
