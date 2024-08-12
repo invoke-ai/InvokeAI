@@ -1,6 +1,7 @@
 import { Mutex } from 'async-mutex';
 import type { JSONObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
+import type { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
@@ -12,20 +13,12 @@ import Konva from 'konva';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
 
-const TYPE = 'image';
-
 export class CanvasImageRenderer {
-  static GROUP_NAME = `${TYPE}_group`;
-  static IMAGE_NAME = `${TYPE}_image`;
-  static PLACEHOLDER_GROUP_NAME = `${TYPE}_placeholder-group`;
-  static PLACEHOLDER_RECT_NAME = `${TYPE}_placeholder-rect`;
-  static PLACEHOLDER_TEXT_NAME = `${TYPE}_placeholder-text`;
-
-  readonly type = TYPE;
+  readonly type = 'image_renderer';
 
   id: string;
   path: string[];
-  parent: CanvasObjectRenderer | CanvasStagingArea;
+  parent: CanvasObjectRenderer | CanvasStagingArea | CanvasFilter;
   manager: CanvasManager;
   log: Logger;
 
@@ -40,7 +33,7 @@ export class CanvasImageRenderer {
   isError: boolean = false;
   mutex = new Mutex();
 
-  constructor(state: CanvasImageState, parent: CanvasObjectRenderer | CanvasStagingArea) {
+  constructor(state: CanvasImageState, parent: CanvasObjectRenderer | CanvasStagingArea | CanvasFilter) {
     const { id, image } = state;
     const { width, height } = image;
     this.id = id;
@@ -52,18 +45,18 @@ export class CanvasImageRenderer {
     this.log.trace({ state }, 'Creating image');
 
     this.konva = {
-      group: new Konva.Group({ name: CanvasImageRenderer.GROUP_NAME, listening: false }),
+      group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
       placeholder: {
-        group: new Konva.Group({ name: CanvasImageRenderer.PLACEHOLDER_GROUP_NAME, listening: false }),
+        group: new Konva.Group({ name: `${this.type}:placeholder_group`, listening: false }),
         rect: new Konva.Rect({
-          name: CanvasImageRenderer.PLACEHOLDER_RECT_NAME,
+          name: `${this.type}:placeholder_rect`,
           fill: 'hsl(220 12% 45% / 1)', // 'base.500'
           width,
           height,
           listening: false,
         }),
         text: new Konva.Text({
-          name: CanvasImageRenderer.PLACEHOLDER_TEXT_NAME,
+          name: `${this.type}:placeholder_text`,
           fill: 'hsl(220 12% 10% / 1)', // 'base.900'
           width,
           height,
@@ -135,7 +128,7 @@ export class CanvasImageRenderer {
         } else {
           this.log.trace('Creating new Konva image');
           this.konva.image = new Konva.Image({
-            name: CanvasImageRenderer.IMAGE_NAME,
+            name: `${this.type}:image`,
             listening: false,
             image: this.imageElement,
             width,

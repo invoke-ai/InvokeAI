@@ -7,13 +7,8 @@ import type { CanvasBrushLineState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-const TYPE = 'brush_line';
-
 export class CanvasBrushLineRenderer {
-  static GROUP_NAME = `${TYPE}_group`;
-  static LINE_NAME = `${TYPE}_line`;
-
-  readonly type = TYPE;
+  readonly type = 'brush_line_renderer';
 
   id: string;
   path: string[];
@@ -33,19 +28,18 @@ export class CanvasBrushLineRenderer {
     this.parent = parent;
     this.manager = parent.manager;
     this.path = this.parent.path.concat(this.id);
-
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
     this.log.trace({ state }, 'Creating brush line');
 
     this.konva = {
       group: new Konva.Group({
-        name: CanvasBrushLineRenderer.GROUP_NAME,
+        name: `${this.type}:group`,
         clip,
         listening: false,
       }),
       line: new Konva.Line({
-        name: CanvasBrushLineRenderer.LINE_NAME,
+        name: `${this.type}:line`,
         listening: false,
         shadowForStrokeEnabled: false,
         strokeWidth,
