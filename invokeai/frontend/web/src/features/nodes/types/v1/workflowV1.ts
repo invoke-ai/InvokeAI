@@ -27,7 +27,7 @@ const zScheduler = z.enum([
   'kdpm_2_a',
   'lcm',
 ]);
-const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner', 'flux']);
+const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
 const zMainModel = z.object({
   model_name: z.string().min(1),
   base_model: zBaseModel,
@@ -89,7 +89,6 @@ const zFieldTypeV1 = z.enum([
   'ONNXModelField',
   'Scheduler',
   'SDXLMainModelField',
-  'FluxMainModelField',
   'SDXLRefinerModelField',
   'string',
   'StringCollection',
@@ -418,11 +417,6 @@ const zSDXLMainModelInputFieldValue = zInputFieldValueBase.extend({
   value: zMainOrOnnxModel.optional(),
 });
 
-const zFluxMainModelInputFieldValue = zInputFieldValueBase.extend({
-  type: z.literal('FluxMainModelField'),
-  value: zMainModel.optional(),
-});
-
 const zSDXLRefinerModelInputFieldValue = zInputFieldValueBase.extend({
   type: z.literal('SDXLRefinerModelField'),
   value: zMainOrOnnxModel.optional(), // TODO: should narrow this down to a refiner model
@@ -578,7 +572,6 @@ const zInputFieldValue = z.discriminatedUnion('type', [
   zMainModelInputFieldValue,
   zSchedulerInputFieldValue,
   zSDXLMainModelInputFieldValue,
-  zFluxMainModelInputFieldValue,
   zSDXLRefinerModelInputFieldValue,
   zStringCollectionInputFieldValue,
   zStringPolymorphicInputFieldValue,
