@@ -1,5 +1,6 @@
 import json
 import os
+import torch
 from typing import Union
 
 from optimum.quanto.models import QuantizedTransformersModel
@@ -7,15 +8,17 @@ from optimum.quanto.models.shared_dict import ShardedStateDict
 from transformers import AutoConfig
 from transformers.modeling_utils import get_checkpoint_shard_files, load_state_dict
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME, is_accelerate_available
+from transformers.models.auto import AutoModelForTextEncoding
 
 from invokeai.backend.requantize import requantize
 
 
 class FastQuantizedTransformersModel(QuantizedTransformersModel):
     @classmethod
-    def from_pretrained(cls, model_name_or_path: Union[str, os.PathLike]):
+    def from_pretrained(cls, model_name_or_path: Union[str, os.PathLike], auto_class = AutoModelForTextEncoding, **kwargs):
         """We override the `from_pretrained()` method in order to use our custom `requantize()` implementation."""
-        if cls.auto_class is None:
+        auto_class = auto_class or cls.auto_class
+        if auto_class is None:
             raise ValueError(
                 "Quantized models cannot be reloaded using {cls}: use a specialized quantized class such as QuantizedModelForCausalLM instead."
             )
@@ -33,7 +36,7 @@ class FastQuantizedTransformersModel(QuantizedTransformersModel):
             # Create an empty model
             config = AutoConfig.from_pretrained(model_name_or_path)
             with init_empty_weights():
-                model = cls.auto_class.from_config(config)
+                model = auto_class.from_config(config)
             # Look for the index of a sharded checkpoint
             checkpoint_file = os.path.join(model_name_or_path, SAFE_WEIGHTS_INDEX_NAME)
             if os.path.exists(checkpoint_file):
@@ -56,6 +59,6 @@ class FastQuantizedTransformersModel(QuantizedTransformersModel):
                 model.tie_weights()
             # Set model in evaluation mode as it is done in transformers
             model.eval()
-            return cls(model)
+            return cls(model)._wrapped
         else:
             raise NotImplementedError("Reloading quantized models directly from the hub is not supported yet.")

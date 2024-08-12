@@ -12,15 +12,17 @@ from diffusers.utils import (
 )
 from optimum.quanto.models import QuantizedDiffusersModel
 from optimum.quanto.models.shared_dict import ShardedStateDict
+from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
 
 from invokeai.backend.requantize import requantize
 
 
 class FastQuantizedDiffusersModel(QuantizedDiffusersModel):
     @classmethod
-    def from_pretrained(cls, model_name_or_path: Union[str, os.PathLike]):
+    def from_pretrained(cls, model_name_or_path: Union[str, os.PathLike], base_class = FluxTransformer2DModel, **kwargs):
         """We override the `from_pretrained()` method in order to use our custom `requantize()` implementation."""
-        if cls.base_class is None:
+        base_class = base_class or cls.base_class
+        if base_class is None:
             raise ValueError("The `base_class` attribute needs to be configured.")
 
         if not is_accelerate_available():
@@ -43,16 +45,16 @@ class FastQuantizedDiffusersModel(QuantizedDiffusersModel):
 
             with open(model_config_path, "r", encoding="utf-8") as f:
                 original_model_cls_name = json.load(f)["_class_name"]
-            configured_cls_name = cls.base_class.__name__
+            configured_cls_name = base_class.__name__
             if configured_cls_name != original_model_cls_name:
                 raise ValueError(
                     f"Configured base class ({configured_cls_name}) differs from what was derived from the provided configuration ({original_model_cls_name})."
                 )
 
             # Create an empty model
-            config = cls.base_class.load_config(model_name_or_path)
+            config = base_class.load_config(model_name_or_path)
             with init_empty_weights():
-                model = cls.base_class.from_config(config)
+                model = base_class.from_config(config)
 
             # Look for the index of a sharded checkpoint
             checkpoint_file = os.path.join(model_name_or_path, SAFE_WEIGHTS_INDEX_NAME)
@@ -72,6 +74,6 @@ class FastQuantizedDiffusersModel(QuantizedDiffusersModel):
             # Requantize and load quantized weights from state_dict
             requantize(model, state_dict=state_dict, quantization_map=qmap)
             model.eval()
-            return cls(model)
+            return cls(model)._wrapped
         else:
             raise NotImplementedError("Reloading quantized models directly from the hub is not supported yet.")
