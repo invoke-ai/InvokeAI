@@ -8,13 +8,8 @@ import { RGBA_RED } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-const TYPE = 'eraser_line';
-
 export class CanvasEraserLineRenderer {
-  static GROUP_NAME = `${TYPE}_group`;
-  static LINE_NAME = `${TYPE}_line`;
-
-  readonly type = TYPE;
+  readonly type = 'eraser_line_renderer';
 
   id: string;
   path: string[];
@@ -40,12 +35,12 @@ export class CanvasEraserLineRenderer {
 
     this.konva = {
       group: new Konva.Group({
-        name: CanvasEraserLineRenderer.GROUP_NAME,
+        name: `${this.type}:group`,
         clip,
         listening: false,
       }),
       line: new Konva.Line({
-        name: CanvasEraserLineRenderer.LINE_NAME,
+        name: `${this.type}:line`,
         listening: false,
         shadowForStrokeEnabled: false,
         strokeWidth,

@@ -14,9 +14,10 @@ import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
 
 export class CanvasMaskAdapter {
+  readonly type = 'mask_adapter';
+
   id: string;
   path: string[];
-  type: CanvasInpaintMaskState['type'] | CanvasRegionalGuidanceState['type'];
   manager: CanvasManager;
   log: Logger;
 
@@ -34,11 +35,11 @@ export class CanvasMaskAdapter {
 
   constructor(state: CanvasMaskAdapter['state'], manager: CanvasMaskAdapter['manager']) {
     this.id = state.id;
-    this.type = state.type;
     this.manager = manager;
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.debug({ state }, 'Creating mask');
+    this.state = state;
 
     this.konva = {
       layer: new Konva.Layer({
@@ -54,7 +55,6 @@ export class CanvasMaskAdapter {
     this.renderer = new CanvasObjectRenderer(this);
     this.transformer = new CanvasTransformer(this);
 
-    this.state = state;
     this.maskOpacity = this.manager.stateApi.getMaskOpacity();
   }
 
@@ -62,7 +62,7 @@ export class CanvasMaskAdapter {
    * Get this entity's entity identifier
    */
   getEntityIdentifier = (): CanvasEntityIdentifier => {
-    return { id: this.id, type: this.type };
+    return { id: this.id, type: this.state.type };
   };
 
   destroy = (): void => {

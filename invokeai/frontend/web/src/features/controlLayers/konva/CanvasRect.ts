@@ -7,13 +7,8 @@ import type { CanvasRectState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-const TYPE = 'rect';
-
 export class CanvasRectRenderer {
-  static GROUP_NAME = `${TYPE}_group`;
-  static RECT_NAME = `${TYPE}_rect`;
-
-  readonly type = TYPE;
+  readonly type = 'rect_renderer';
 
   id: string;
   path: string[];
@@ -38,9 +33,9 @@ export class CanvasRectRenderer {
     this.log.trace({ state }, 'Creating rect');
 
     this.konva = {
-      group: new Konva.Group({ name: CanvasRectRenderer.GROUP_NAME, listening: false }),
+      group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
       rect: new Konva.Rect({
-        name: CanvasRectRenderer.RECT_NAME,
+        name: `${this.type}:rect`,
         ...rect,
         listening: false,
         fill: rgbaColorToString(color),

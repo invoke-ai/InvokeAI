@@ -8,10 +8,8 @@ import Konva from 'konva';
 import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
 
-const TYPE = 'layer';
-
 export class CanvasLayerAdapter {
-  readonly type = TYPE;
+  readonly type = 'layer_adapter';
 
   id: string;
   path: string[];
@@ -34,6 +32,7 @@ export class CanvasLayerAdapter {
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.debug({ state }, 'Creating layer');
+    this.state = state;
 
     this.konva = {
       layer: new Konva.Layer({
@@ -48,15 +47,13 @@ export class CanvasLayerAdapter {
 
     this.renderer = new CanvasObjectRenderer(this);
     this.transformer = new CanvasTransformer(this);
-
-    this.state = state;
   }
 
   /**
    * Get this entity's entity identifier
    */
   getEntityIdentifier = (): CanvasEntityIdentifier => {
-    return { id: this.id, type: this.type };
+    return { id: this.id, type: this.state.type };
   };
 
   destroy = (): void => {
