@@ -65,6 +65,10 @@ class TransformerField(BaseModel):
     transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
     scheduler: ModelIdentifierField = Field(description="Info to load scheduler submodel")
 
+class T5EncoderField(BaseModel):
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
 
 class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
@@ -133,8 +137,8 @@ class FluxModelLoaderOutput(BaseInvocationOutput):
     """Flux base model loader output"""
 
     transformer: TransformerField = OutputField(description=FieldDescriptions.transformer, title="Transformer")
-    clip: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP 1")
-    clip2: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP 2")
+    clip: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP")
+    t5Encoder: T5EncoderField = OutputField(description=FieldDescriptions.t5Encoder, title="T5 Encoder")
     vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
 
 
@@ -166,7 +170,7 @@ class FluxModelLoaderInvocation(BaseInvocation):
         return FluxModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, scheduler=scheduler),
             clip=CLIPField(tokenizer=tokenizer, text_encoder=text_encoder, loras=[], skipped_layers=0),
-            clip2=CLIPField(tokenizer=tokenizer2, text_encoder=text_encoder2, loras=[], skipped_layers=0),
+            t5Encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=text_encoder2),
             vae=VAEField(vae=vae),
         )
 

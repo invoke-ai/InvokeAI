@@ -5697,15 +5697,15 @@ export type components = {
              */
             transformer: components["schemas"]["TransformerField"];
             /**
-             * CLIP 1
+             * CLIP
              * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
              */
             clip: components["schemas"]["CLIPField"];
             /**
-             * CLIP 2
-             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+             * T5 Encoder
+             * @description T5 tokenizer and text encoder
              */
-            clip2: components["schemas"]["CLIPField"];
+            t5Encoder: components["schemas"]["T5EncoderField"];
             /**
              * VAE
              * @description VAE
@@ -5739,19 +5739,17 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * Model
-             * @description The FLUX model to use for text-to-image generation.
+             * CLIP
+             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
              * @default null
-             * @constant
-             * @enum {string}
              */
-            model?: "flux-schnell";
+            clip?: components["schemas"]["CLIPField"];
             /**
-             * Use 8Bit
-             * @description Whether to quantize the transformer model to 8-bit precision.
-             * @default false
+             * T5EncoderField
+             * @description T5 tokenizer and text encoder
+             * @default null
              */
-            use_8bit?: boolean;
+            t5Encoder?: components["schemas"]["T5EncoderField"];
             /**
              * Positive Prompt
              * @description Positive prompt for text-to-image generation.
@@ -5799,31 +5797,16 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * @description The Flux model
+             * Transformer
+             * @description UNet (scheduler, LoRAs)
              * @default null
              */
-            flux_model?: components["schemas"]["ModelIdentifierField"];
+            transformer?: components["schemas"]["TransformerField"];
             /**
-             * Model
-             * @description The FLUX model to use for text-to-image generation.
+             * @description VAE
              * @default null
-             * @constant
-             * @enum {string}
              */
-            model?: "flux-schnell";
-            /**
-             * Quantization Type
-             * @description The type of quantization to use for the transformer model.
-             * @default raw
-             * @enum {string}
-             */
-            quantization_type?: "raw" | "NF4" | "llm_int8";
-            /**
-             * Use 8Bit
-             * @description Whether to quantize the transformer model to 8-bit precision.
-             * @default false
-             */
-            use_8bit?: boolean;
+            vae?: components["schemas"]["VAEField"];
             /**
              * @description Positive conditioning tensor
              * @default null
@@ -14267,6 +14250,13 @@ export type components = {
              * @enum {string}
              */
             type: "t2i_adapter_output";
+        };
+        /** T5EncoderField */
+        T5EncoderField: {
+            /** @description Info to load tokenizer submodel */
+            tokenizer: components["schemas"]["ModelIdentifierField"];
+            /** @description Info to load text_encoder submodel */
+            text_encoder: components["schemas"]["ModelIdentifierField"];
         };
         /** TBLR */
         TBLR: {
