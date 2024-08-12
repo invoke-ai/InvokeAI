@@ -154,7 +154,7 @@ class InvokeAIAppConfig(BaseSettings):
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
-    style_preset_images_dir:      Path = Field(default=Path("style_preset_images"),      description="Path to directory for style preset images.")
+    style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
 
     # LOGGING
     log_handlers:             list[str] = Field(default=["console"],        description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".')
@@ -303,9 +303,9 @@ class InvokeAIAppConfig(BaseSettings):
         return self._resolve(self.models_dir)
 
     @property
-    def style_preset_images_path(self) -> Path:
-        """Path to the style preset images directory, resolved to an absolute path.."""
-        return self._resolve(self.style_preset_images_dir)
+    def style_presets_path(self) -> Path:
+        """Path to the style presets directory, resolved to an absolute path.."""
+        return self._resolve(self.style_presets_dir)
 
     @property
     def convert_cache_path(self) -> Path:

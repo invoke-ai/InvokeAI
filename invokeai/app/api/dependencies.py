@@ -76,7 +76,7 @@ class ApiDependencies:
         image_files = DiskImageFileStorage(f"{output_folder}/images")
 
         model_images_folder = config.models_path
-        style_preset_images_folder = config.style_preset_images_path
+        style_presets_folder = config.style_presets_path
 
         db = init_db(config=config, logger=logger, image_files=image_files)
 
@@ -113,7 +113,7 @@ class ApiDependencies:
         urls = LocalUrlService()
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
         style_preset_records = SqliteStylePresetRecordsStorage(db=db)
-        style_preset_image_files = StylePresetImageFileStorageDisk(style_preset_images_folder / "style_preset_images")
+        style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
 
         services = InvocationServices(
             board_image_records=board_image_records,

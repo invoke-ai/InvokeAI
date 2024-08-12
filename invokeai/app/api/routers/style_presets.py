@@ -1,4 +1,5 @@
 import io
+import json
 import traceback
 from typing import Optional
 
@@ -49,9 +50,7 @@ async def get_style_preset(
 async def update_style_preset(
     image: Optional[UploadFile] = File(description="The image file to upload", default=None),
     style_preset_id: str = Path(description="The id of the style preset to update"),
-    name: str = Form(description="The name of the style preset to create"),
-    positive_prompt: str = Form(description="The positive prompt of the style preset"),
-    negative_prompt: str = Form(description="The negative prompt of the style preset"),
+    data: str = Form(description="The data of the style preset to update"),
 ) -> StylePresetRecordWithImage:
     """Updates a style preset"""
     if image is not None:
@@ -75,6 +74,12 @@ async def update_style_preset(
             ApiDependencies.invoker.services.style_preset_image_files.delete(style_preset_id)
         except StylePresetImageFileNotFoundException:
             pass
+
+    parsed_data = json.loads(data)
+
+    name = parsed_data.get("name", "")
+    positive_prompt = parsed_data.get("positive_prompt", "")
+    negative_prompt = parsed_data.get("negative_prompt", "")
 
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
     changes = StylePresetChanges(name=name, preset_data=preset_data)
@@ -110,12 +115,17 @@ async def delete_style_preset(
     },
 )
 async def create_style_preset(
-    name: str = Form(description="The name of the style preset to create"),
-    positive_prompt: str = Form(description="The positive prompt of the style preset"),
-    negative_prompt: str = Form(description="The negative prompt of the style preset"),
     image: Optional[UploadFile] = File(description="The image file to upload", default=None),
+    data: str = Form(description="The data of the style preset to create"),
 ) -> StylePresetRecordWithImage:
     """Creates a style preset"""
+
+    parsed_data = json.loads(data)
+
+    name = parsed_data.get("name", "")
+    positive_prompt = parsed_data.get("positive_prompt", "")
+    negative_prompt = parsed_data.get("negative_prompt", "")
+
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
     style_preset = StylePresetWithoutId(name=name, preset_data=preset_data)
     new_style_preset = ApiDependencies.invoker.services.style_preset_records.create(style_preset=style_preset)
