@@ -14,6 +14,8 @@ import {
   isEnumFieldInputTemplate,
   isFloatFieldInputInstance,
   isFloatFieldInputTemplate,
+  isFluxMainModelFieldInputInstance,
+  isFluxMainModelFieldInputTemplate,
   isImageFieldInputInstance,
   isImageFieldInputTemplate,
   isIntegerFieldInputInstance,
@@ -48,6 +50,7 @@ import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
 import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
 import ControlNetModelFieldInputComponent from './inputs/ControlNetModelFieldInputComponent';
 import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
+import FluxMainModelFieldInputComponent from './inputs/FluxMainModelFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
 import IPAdapterModelFieldInputComponent from './inputs/IPAdapterModelFieldInputComponent';
 import LoRAModelFieldInputComponent from './inputs/LoRAModelFieldInputComponent';
@@ -69,6 +72,7 @@ type InputFieldProps = {
 const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   const fieldInstance = useFieldInputInstance(nodeId, fieldName);
   const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
+  window.console.log("Hit 0")
 
   if (isStringFieldInputInstance(fieldInstance) && isStringFieldInputTemplate(fieldTemplate)) {
     return <StringFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
@@ -144,6 +148,9 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   if (isColorFieldInputInstance(fieldInstance) && isColorFieldInputTemplate(fieldTemplate)) {
     return <ColorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+  if (isFluxMainModelFieldInputInstance(fieldInstance) && isFluxMainModelFieldInputTemplate(fieldTemplate)) {
+    return <FluxMainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isSDXLMainModelFieldInputInstance(fieldInstance) && isSDXLMainModelFieldInputTemplate(fieldTemplate)) {

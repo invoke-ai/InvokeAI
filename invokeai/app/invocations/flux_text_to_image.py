@@ -1,14 +1,13 @@
 from pathlib import Path
 from typing import Literal
+from pydantic import Field
 
 import accelerate
 import torch
 from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
-from einops import rearrange, repeat
-from flux.model import Flux
-from flux.modules.autoencoder import AutoEncoder
-from flux.sampling import denoise, get_noise, get_schedule, unpack
-from flux.util import configs as flux_configs
+from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
+from invokeai.app.invocations.model import ModelIdentifierField
+from optimum.quanto import qfloat8
 from PIL import Image
 from safetensors.torch import load_file
 from transformers.models.auto import AutoModelForTextEncoding
@@ -21,6 +20,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     WithBoard,
     WithMetadata,
+    UIType,
 )
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -52,6 +52,11 @@ class QuantizedModelForTextEncoding(FastQuantizedTransformersModel):
 class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Text-to-image generation using a FLUX model."""
 
+    flux_model: ModelIdentifierField = InputField(
+        description="The Flux model",
+        input=Input.Any,
+        ui_type=UIType.FluxMainModel
+    )
     model: TFluxModelKeys = InputField(description="The FLUX model to use for text-to-image generation.")
     quantization_type: Literal["raw", "NF4", "llm_int8"] = InputField(
         default="raw", description="The type of quantization to use for the transformer model."

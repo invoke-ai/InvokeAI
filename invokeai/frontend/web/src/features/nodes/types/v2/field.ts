@@ -203,6 +203,20 @@ const zSDXLMainModelFieldOutputInstance = zFieldOutputInstanceBase.extend({
 });
 // #endregion
 
+// #region FluxMainModelField
+const zFluxMainModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('FluxMainModelField'),
+});
+const zFluxMainModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL models only.
+const zFluxMainModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  type: zFluxMainModelFieldType,
+  value: zFluxMainModelFieldValue,
+});
+const zFluxMainModelFieldOutputInstance = zFieldOutputInstanceBase.extend({
+  type: zFluxMainModelFieldType,
+});
+// #endregion
+
 // #region SDXLRefinerModelField
 const zSDXLRefinerModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLRefinerModelField'),
@@ -338,6 +352,7 @@ const zStatefulFieldType = z.union([
   zBoardFieldType,
   zMainModelFieldType,
   zSDXLMainModelFieldType,
+  zFluxMainModelFieldType,
   zSDXLRefinerModelFieldType,
   zVAEModelFieldType,
   zLoRAModelFieldType,
@@ -377,6 +392,7 @@ const zStatefulFieldInputInstance = z.union([
   zBoardFieldInputInstance,
   zMainModelFieldInputInstance,
   zSDXLMainModelFieldInputInstance,
+  zFluxMainModelFieldInputInstance,
   zSDXLRefinerModelFieldInputInstance,
   zVAEModelFieldInputInstance,
   zLoRAModelFieldInputInstance,
@@ -401,6 +417,7 @@ const zStatefulFieldOutputInstance = z.union([
   zBoardFieldOutputInstance,
   zMainModelFieldOutputInstance,
   zSDXLMainModelFieldOutputInstance,
+  zFluxMainModelFieldOutputInstance,
   zSDXLRefinerModelFieldOutputInstance,
   zVAEModelFieldOutputInstance,
   zLoRAModelFieldOutputInstance,

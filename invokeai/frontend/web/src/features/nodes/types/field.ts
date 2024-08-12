@@ -115,6 +115,10 @@ const zSDXLMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLMainModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zFluxMainModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('FluxMainModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSDXLRefinerModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLRefinerModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -158,6 +162,7 @@ const zStatefulFieldType = z.union([
   zModelIdentifierFieldType,
   zMainModelFieldType,
   zSDXLMainModelFieldType,
+  zFluxMainModelFieldType,
   zSDXLRefinerModelFieldType,
   zVAEModelFieldType,
   zLoRAModelFieldType,
@@ -447,6 +452,29 @@ export const isSDXLMainModelFieldInputTemplate = (val: unknown): val is SDXLMain
   zSDXLMainModelFieldInputTemplate.safeParse(val).success;
 // #endregion
 
+// #region FluxMainModelField
+
+const zFluxMainModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL models only.
+const zFluxMainModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zFluxMainModelFieldValue,
+});
+const zFluxMainModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zFluxMainModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zFluxMainModelFieldValue,
+});
+const zFluxMainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zFluxMainModelFieldType,
+});
+export type FluxMainModelFieldInputInstance = z.infer<typeof zFluxMainModelFieldInputInstance>;
+export type FluxMainModelFieldInputTemplate = z.infer<typeof zFluxMainModelFieldInputTemplate>;
+export const isFluxMainModelFieldInputInstance = (val: unknown): val is FluxMainModelFieldInputInstance =>
+  zFluxMainModelFieldInputInstance.safeParse(val).success;
+export const isFluxMainModelFieldInputTemplate = (val: unknown): val is FluxMainModelFieldInputTemplate =>
+  zFluxMainModelFieldInputTemplate.safeParse(val).success;
+
+// #endregion
+
 // #region SDXLRefinerModelField
 
 /** @alias */ // tells knip to ignore this duplicate export
@@ -693,6 +721,7 @@ export const zStatefulFieldValue = z.union([
   zModelIdentifierFieldValue,
   zMainModelFieldValue,
   zSDXLMainModelFieldValue,
+  zFluxMainModelFieldValue,
   zSDXLRefinerModelFieldValue,
   zVAEModelFieldValue,
   zLoRAModelFieldValue,
@@ -720,6 +749,7 @@ const zStatefulFieldInputInstance = z.union([
   zBoardFieldInputInstance,
   zModelIdentifierFieldInputInstance,
   zMainModelFieldInputInstance,
+  zFluxMainModelFieldInputInstance,
   zSDXLMainModelFieldInputInstance,
   zSDXLRefinerModelFieldInputInstance,
   zVAEModelFieldInputInstance,
@@ -749,6 +779,7 @@ const zStatefulFieldInputTemplate = z.union([
   zBoardFieldInputTemplate,
   zModelIdentifierFieldInputTemplate,
   zMainModelFieldInputTemplate,
+  zFluxMainModelFieldInputTemplate,
   zSDXLMainModelFieldInputTemplate,
   zSDXLRefinerModelFieldInputTemplate,
   zVAEModelFieldInputTemplate,
@@ -779,6 +810,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zBoardFieldOutputTemplate,
   zModelIdentifierFieldOutputTemplate,
   zMainModelFieldOutputTemplate,
+  zFluxMainModelFieldOutputTemplate,
   zSDXLMainModelFieldOutputTemplate,
   zSDXLRefinerModelFieldOutputTemplate,
   zVAEModelFieldOutputTemplate,
