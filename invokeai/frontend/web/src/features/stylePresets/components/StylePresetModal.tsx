@@ -8,13 +8,9 @@ import {
   ModalOverlay,
   Spinner,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
 import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
-import {
-  isModalOpenChanged,
-  prefilledFormDataChanged,
-  updatingStylePresetIdChanged,
-} from 'features/stylePresets/store/stylePresetModalSlice';
+import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import type { PrefilledFormData } from 'features/stylePresets/store/types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,21 +20,22 @@ import { StylePresetForm } from './StylePresetForm';
 
 export const StylePresetModal = () => {
   const [formData, setFormData] = useState<StylePresetFormData | null>(null);
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const isModalOpen = useAppSelector((s) => s.stylePresetModal.isModalOpen);
-  const updatingStylePresetId = useAppSelector((s) => s.stylePresetModal.updatingStylePresetId);
-  const prefilledFormData = useAppSelector((s) => s.stylePresetModal.prefilledFormData);
+  const stylePresetModalState = useStore($stylePresetModalState);
 
   const modalTitle = useMemo(() => {
-    return updatingStylePresetId ? t('stylePresets.updatePromptTemplate') : t('stylePresets.createPromptTemplate');
-  }, [updatingStylePresetId, t]);
+    return stylePresetModalState.updatingStylePresetId
+      ? t('stylePresets.updatePromptTemplate')
+      : t('stylePresets.createPromptTemplate');
+  }, [stylePresetModalState.updatingStylePresetId, t]);
 
   const handleCloseModal = useCallback(() => {
-    dispatch(prefilledFormDataChanged(null));
-    dispatch(updatingStylePresetIdChanged(null));
-    dispatch(isModalOpenChanged(false));
-  }, [dispatch]);
+    $stylePresetModalState.set({
+      prefilledFormData: null,
+      updatingStylePresetId: null,
+      isModalOpen: false,
+    });
+  }, []);
 
   useEffect(() => {
     setFormData(null);
@@ -62,18 +59,18 @@ export const StylePresetModal = () => {
         });
       }
     };
-    convertImageToBlob(prefilledFormData);
-  }, [prefilledFormData]);
+    convertImageToBlob(stylePresetModalState.prefilledFormData);
+  }, [stylePresetModalState.prefilledFormData]);
 
   return (
-    <Modal isOpen={isModalOpen} onClose={handleCloseModal} isCentered size="2xl">
+    <Modal isOpen={stylePresetModalState.isModalOpen} onClose={handleCloseModal} isCentered size="2xl">
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>{modalTitle}</ModalHeader>
         <ModalCloseButton />
         <ModalBody display="flex" flexDir="column" gap={4}>
-          {!prefilledFormData || formData ? (
-            <StylePresetForm updatingStylePresetId={updatingStylePresetId} formData={formData} />
+          {!stylePresetModalState.prefilledFormData || formData ? (
+            <StylePresetForm updatingStylePresetId={stylePresetModalState.updatingStylePresetId} formData={formData} />
           ) : (
             <Spinner />
           )}

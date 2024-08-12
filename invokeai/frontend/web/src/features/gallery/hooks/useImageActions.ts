@@ -1,7 +1,7 @@
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { handlers, parseAndRecallAllMetadata, parseAndRecallPrompts } from 'features/metadata/util/handlers';
-import { isModalOpenChanged, prefilledFormDataChanged } from 'features/stylePresets/store/stylePresetModalSlice';
+import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -13,7 +13,6 @@ export const useImageActions = (image_name?: string) => {
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasSeed, setHasSeed] = useState(false);
   const [hasPrompts, setHasPrompts] = useState(false);
-  const dispatch = useAppDispatch();
   const { data: imageDTO } = useGetImageDTOQuery(image_name ?? skipToken);
 
   useEffect(() => {
@@ -71,17 +70,18 @@ export const useImageActions = (image_name?: string) => {
       const positivePrompt = await handlers.positivePrompt.parse(metadata);
       const negativePrompt = await handlers.negativePrompt.parse(metadata);
 
-      dispatch(
-        prefilledFormDataChanged({
+      $stylePresetModalState.set({
+        prefilledFormData: {
           name: '',
           positivePrompt,
           negativePrompt,
           imageUrl: imageDTO.image_url,
-        })
-      );
-      dispatch(isModalOpenChanged(true));
+        },
+        updatingStylePresetId: null,
+        isModalOpen: true,
+      });
     }
-  }, [image_name, metadata, dispatch, imageDTO]);
+  }, [image_name, metadata, imageDTO]);
 
   return {
     recallAll,

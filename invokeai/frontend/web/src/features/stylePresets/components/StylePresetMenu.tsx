@@ -1,11 +1,7 @@
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  isModalOpenChanged,
-  prefilledFormDataChanged,
-  updatingStylePresetIdChanged,
-} from 'features/stylePresets/store/stylePresetModalSlice';
+import { useAppSelector } from 'app/store/storeHooks';
+import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -40,14 +36,15 @@ export const StylePresetMenu = () => {
     },
   });
 
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const handleClickAddNew = useCallback(() => {
-    dispatch(prefilledFormDataChanged(null));
-    dispatch(updatingStylePresetIdChanged(null));
-    dispatch(isModalOpenChanged(true));
-  }, [dispatch]);
+    $stylePresetModalState.set({
+      prefilledFormData: null,
+      updatingStylePresetId: null,
+      isModalOpen: true,
+    });
+  }, []);
 
   return (
     <Flex flexDir="column" gap={2} padding={3} layerStyle="second" borderRadius="base">

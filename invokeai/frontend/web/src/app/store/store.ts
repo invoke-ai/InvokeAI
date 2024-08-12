@@ -28,7 +28,6 @@ import { generationPersistConfig, generationSlice } from 'features/parameters/st
 import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
-import { stylePresetModalSlice } from 'features/stylePresets/store/stylePresetModalSlice';
 import { stylePresetPersistConfig, stylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
@@ -71,7 +70,6 @@ const allReducers = {
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [api.reducerPath]: api.reducer,
   [upscaleSlice.name]: upscaleSlice.reducer,
-  [stylePresetModalSlice.name]: stylePresetModalSlice.reducer,
   [stylePresetSlice.name]: stylePresetSlice.reducer,
 };
 

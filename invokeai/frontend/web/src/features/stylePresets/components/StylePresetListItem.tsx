@@ -1,11 +1,7 @@
 import { Badge, ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
-import {
-  isModalOpenChanged,
-  prefilledFormDataChanged,
-  updatingStylePresetIdChanged,
-} from 'features/stylePresets/store/stylePresetModalSlice';
+import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import type { MouseEvent } from 'react';
@@ -30,19 +26,18 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
       const { name, preset_data } = preset;
       const { positive_prompt, negative_prompt } = preset_data;
 
-      dispatch(
-        prefilledFormDataChanged({
+      $stylePresetModalState.set({
+        prefilledFormData: {
           name,
           positivePrompt: positive_prompt || '',
           negativePrompt: negative_prompt || '',
           imageUrl: preset.image,
-        })
-      );
-
-      dispatch(updatingStylePresetIdChanged(preset.id));
-      dispatch(isModalOpenChanged(true));
+        },
+        updatingStylePresetId: preset.id,
+        isModalOpen: true,
+      });
     },
-    [dispatch, preset]
+    [preset]
   );
 
   const handleClickApply = useCallback(async () => {
@@ -64,19 +59,18 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
       const { name, preset_data } = preset;
       const { positive_prompt, negative_prompt } = preset_data;
 
-      dispatch(
-        prefilledFormDataChanged({
+      $stylePresetModalState.set({
+        prefilledFormData: {
           name: `${name} (${t('common.copy')})`,
           positivePrompt: positive_prompt || '',
           negativePrompt: negative_prompt || '',
           imageUrl: preset.image,
-        })
-      );
-
-      dispatch(updatingStylePresetIdChanged(null));
-      dispatch(isModalOpenChanged(true));
+        },
+        updatingStylePresetId: null,
+        isModalOpen: true,
+      });
     },
-    [dispatch, preset, t]
+    [preset, t]
   );
 
   const handleDeletePreset = useCallback(async () => {
