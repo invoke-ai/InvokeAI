@@ -1,13 +1,15 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 
 export class CanvasBackground {
-  static BASE_NAME = 'background';
-  static LAYER_NAME = `${CanvasBackground.BASE_NAME}_layer`;
+  readonly type = 'background_grid';
+
   static GRID_LINE_COLOR_COARSE = getArbitraryBaseColor(27);
   static GRID_LINE_COLOR_FINE = getArbitraryBaseColor(18);
 
+  id: string;
   manager: CanvasManager;
 
   konva: {
@@ -20,8 +22,10 @@ export class CanvasBackground {
   subscriptions: Set<() => void> = new Set();
 
   constructor(manager: CanvasManager) {
+    this.id = getPrefixedId(this.type);
     this.manager = manager;
-    this.konva = { layer: new Konva.Layer({ name: CanvasBackground.LAYER_NAME, listening: false }) };
+    this.konva = { layer: new Konva.Layer({ name: `${this.type}:layer`, listening: false }) };
+
     this.subscriptions.add(
       this.manager.stateApi.$stageAttrs.listen(() => {
         this.render();

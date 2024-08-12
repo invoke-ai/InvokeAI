@@ -7,12 +7,8 @@ import type { StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-const TYPE = 'staging_area';
-
 export class CanvasStagingArea {
-  static GROUP_NAME = `${TYPE}_group`;
-
-  readonly type = TYPE;
+  readonly type = 'staging_area';
 
   id: string;
   path: string[];
@@ -31,14 +27,14 @@ export class CanvasStagingArea {
   subscriptions: Set<() => void> = new Set();
 
   constructor(parent: CanvasPreview) {
-    this.id = getPrefixedId(TYPE);
+    this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = this.parent.manager;
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.debug('Creating staging area');
 
-    this.konva = { group: new Konva.Group({ name: CanvasStagingArea.GROUP_NAME, listening: false }) };
+    this.konva = { group: new Konva.Group({ name: `${this.type}:group`, listening: false }) };
     this.image = null;
     this.selectedImage = null;
 

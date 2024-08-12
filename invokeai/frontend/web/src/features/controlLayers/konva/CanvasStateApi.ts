@@ -209,7 +209,7 @@ export class CanvasStateApi {
       entityAdapter = this.manager.inpaintMask;
     }
 
-    if (entityState && entityAdapter && entityState.type === entityAdapter.type) {
+    if (entityState && entityAdapter) {
       return {
         id: entityState.id,
         type: entityState.type,

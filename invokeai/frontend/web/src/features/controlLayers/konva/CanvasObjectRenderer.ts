@@ -33,16 +33,11 @@ type AnyObjectRenderer = CanvasBrushLineRenderer | CanvasEraserLineRenderer | Ca
  */
 type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImageState | CanvasRectState;
 
-const TYPE = 'object_renderer';
-
 /**
  * Handles rendering of objects for a canvas entity.
  */
 export class CanvasObjectRenderer {
-  static KONVA_OBJECT_GROUP_NAME = `${TYPE}:object_group`;
-  static KONVA_COMPOSITING_RECT_NAME = `${TYPE}:compositing_rect`;
-
-  readonly type = TYPE;
+  readonly type = 'object_renderer';
 
   id: string;
   path: string[];
@@ -93,7 +88,7 @@ export class CanvasObjectRenderer {
   };
 
   constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
-    this.id = getPrefixedId(TYPE);
+    this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.path = this.parent.path.concat(this.id);
     this.manager = parent.manager;
@@ -101,15 +96,15 @@ export class CanvasObjectRenderer {
     this.log.trace('Creating object renderer');
 
     this.konva = {
-      objectGroup: new Konva.Group({ name: CanvasObjectRenderer.KONVA_OBJECT_GROUP_NAME, listening: false }),
+      objectGroup: new Konva.Group({ name: `${this.type}:object_group`, listening: false }),
       compositingRect: null,
     };
 
     this.parent.konva.layer.add(this.konva.objectGroup);
 
-    if (this.parent.type === 'inpaint_mask' || this.parent.type === 'regional_guidance') {
+    if (this.parent.state.type === 'inpaint_mask' || this.parent.state.type === 'regional_guidance') {
       this.konva.compositingRect = new Konva.Rect({
-        name: CanvasObjectRenderer.KONVA_COMPOSITING_RECT_NAME,
+        name: `${this.type}:compositing_rect`,
         globalCompositeOperation: 'source-in',
         listening: false,
         strokeEnabled: false,
