@@ -2,6 +2,7 @@ import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { positivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
+import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
@@ -63,20 +64,27 @@ export const ParamPositivePrompt = memo(() => {
           name="prompt"
           ref={textareaRef}
           value={prompt}
-          placeholder={t('parameters.globalPositivePromptPlaceholder')}
           onChange={onChange}
-          minH={28}
+          minH={40}
           onKeyDown={onKeyDown}
           variant="darkFilled"
-          paddingRight={30}
+          paddingRight={10}
+          paddingLeft={3}
+          paddingTop={7}
+          paddingBottom={3}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
           {baseModel === 'sdxl' && <SDXLConcatButton />}
           <ShowDynamicPromptsPreviewButton />
         </PromptOverlayButtonWrapper>
+        <PromptLabel label={t('parameters.positivePromptPlaceholder')} />
         {viewMode && (
-          <ViewModePrompt prompt={prompt} presetPrompt={activeStylePreset?.preset_data.positive_prompt || ''} />
+          <ViewModePrompt
+            prompt={prompt}
+            presetPrompt={activeStylePreset?.preset_data.positive_prompt || ''}
+            label={`${t('parameters.positivePromptPlaceholder')} (${t('stylePresets.preview')})`}
+          />
         )}
       </Box>
     </PromptPopover>

@@ -6,7 +6,17 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold } from 'react-icons/pi';
 
-export const ViewModePrompt = ({ presetPrompt, prompt }: { presetPrompt: string; prompt: string }) => {
+import { PromptLabel } from './PromptLabel';
+
+export const ViewModePrompt = ({
+  presetPrompt,
+  prompt,
+  label,
+}: {
+  presetPrompt: string;
+  prompt: string;
+  label: string;
+}) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -20,13 +30,23 @@ export const ViewModePrompt = ({ presetPrompt, prompt }: { presetPrompt: string;
 
   return (
     <Box position="absolute" top={0} bottom={0} left={0} right={0} layerStyle="second" borderRadius="base">
-      <Flex flexDir="column" onClick={handleExitViewMode} justifyContent="space-between" h="full" padding="8px 10px">
+      <Flex
+        flexDir="column"
+        onClick={handleExitViewMode}
+        justifyContent="space-between"
+        h="full"
+        paddingRight={3}
+        paddingLeft={3}
+        paddingTop={7}
+        paddingBottom={3}
+      >
+        <PromptLabel label={label} />
         <Flex overflow="scroll">
-          <Text fontSize="sm" lineHeight="1rem" w="full">
+          <Text w="full">
             {presetChunks.map((chunk, index) => (
               <Text
                 as="span"
-                color={index === 1 ? 'white' : 'base.300'}
+                color={index === 1 ? 'white' : 'base.200'}
                 fontWeight={index === 1 ? 'semibold' : 'normal'}
                 key={index}
               >

@@ -1,6 +1,7 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { negativePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
+import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
@@ -48,18 +49,26 @@ export const ParamNegativePrompt = memo(() => {
           name="negativePrompt"
           ref={textareaRef}
           value={prompt}
-          placeholder={t('parameters.globalNegativePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}
           fontSize="sm"
           variant="darkFilled"
-          paddingRight={30}
+          minH={24}
+          paddingRight={10}
+          paddingLeft={3}
+          paddingTop={7}
+          paddingBottom={3}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
+        <PromptLabel label={t('parameters.negativePromptPlaceholder')} />
         {viewMode && (
-          <ViewModePrompt prompt={prompt} presetPrompt={activeStylePreset?.preset_data.negative_prompt || ''} />
+          <ViewModePrompt
+            prompt={prompt}
+            presetPrompt={activeStylePreset?.preset_data.negative_prompt || ''}
+            label={`${t('parameters.negativePromptPlaceholder')} (${t('stylePresets.preview')})`}
+          />
         )}
       </Box>
     </PromptPopover>

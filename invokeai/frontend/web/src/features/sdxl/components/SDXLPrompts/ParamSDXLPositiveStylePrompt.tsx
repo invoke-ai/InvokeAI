@@ -1,6 +1,7 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { positivePrompt2Changed } from 'features/controlLayers/store/controlLayersSlice';
+import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
@@ -33,16 +34,20 @@ export const ParamSDXLPositiveStylePrompt = memo(() => {
           name="prompt"
           ref={textareaRef}
           value={prompt}
-          placeholder={t('sdxl.posStylePrompt')}
           onChange={onChange}
           onKeyDown={onKeyDown}
           fontSize="sm"
           variant="darkFilled"
-          paddingRight={30}
+          minH={24}
+          paddingRight={10}
+          paddingLeft={3}
+          paddingTop={7}
+          paddingBottom={3}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
+        <PromptLabel label={t('sdxl.posStylePrompt')} />
       </Box>
     </PromptPopover>
   );
