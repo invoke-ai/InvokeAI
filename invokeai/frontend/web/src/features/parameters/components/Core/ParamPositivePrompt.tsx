@@ -58,9 +58,6 @@ export const ParamPositivePrompt = memo(() => {
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative">
-        {viewMode && (
-          <ViewModePrompt prompt={prompt} presetPrompt={activeStylePreset?.preset_data.positive_prompt || ''} />
-        )}
         <Textarea
           id="prompt"
           name="prompt"
@@ -78,6 +75,9 @@ export const ParamPositivePrompt = memo(() => {
           {baseModel === 'sdxl' && <SDXLConcatButton />}
           <ShowDynamicPromptsPreviewButton />
         </PromptOverlayButtonWrapper>
+        {viewMode && (
+          <ViewModePrompt prompt={prompt} presetPrompt={activeStylePreset?.preset_data.positive_prompt || ''} />
+        )}
       </Box>
     </PromptPopover>
   );

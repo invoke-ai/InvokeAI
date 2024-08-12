@@ -1693,6 +1693,7 @@
         "active": "Active",
         "choosePromptTemplate": "Choose Prompt Template",
         "clearTemplateSelection": "Clear Template Selection",
+        "copyTemplate": "Copy Template",
         "createPromptTemplate": "Create Prompt Template",
         "defaultTemplates": "Default Templates",
         "deleteImage": "Delete Image",

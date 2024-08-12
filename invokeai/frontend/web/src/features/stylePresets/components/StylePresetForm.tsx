@@ -1,6 +1,10 @@
 import { Button, Flex, FormControl, FormLabel, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { isModalOpenChanged, updatingStylePresetIdChanged } from 'features/stylePresets/store/stylePresetModalSlice';
+import {
+  isModalOpenChanged,
+  prefilledFormDataChanged,
+  updatingStylePresetIdChanged,
+} from 'features/stylePresets/store/stylePresetModalSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
@@ -65,6 +69,7 @@ export const StylePresetForm = ({
         });
       }
 
+      dispatch(prefilledFormDataChanged(null));
       dispatch(updatingStylePresetIdChanged(null));
       dispatch(isModalOpenChanged(false));
     },

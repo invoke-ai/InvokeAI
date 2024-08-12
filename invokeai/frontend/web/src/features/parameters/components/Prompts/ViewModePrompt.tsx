@@ -19,7 +19,7 @@ export const ViewModePrompt = ({ presetPrompt, prompt }: { presetPrompt: string;
   }, [dispatch]);
 
   return (
-    <Box position="absolute" top={0} bottom={0} left={0} right={0} zIndex={1} layerStyle="second" borderRadius="base">
+    <Box position="absolute" top={0} bottom={0} left={0} right={0} layerStyle="second" borderRadius="base">
       <Flex flexDir="column" onClick={handleExitViewMode} justifyContent="space-between" h="full" padding="8px 10px">
         <Flex overflow="scroll">
           <Text fontSize="sm" lineHeight="1rem" w="full">

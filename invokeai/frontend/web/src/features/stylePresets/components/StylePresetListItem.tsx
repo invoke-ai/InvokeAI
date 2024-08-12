@@ -11,7 +11,7 @@ import { toast } from 'features/toast/toast';
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPencilBold, PiTrashBold } from 'react-icons/pi';
+import { PiCopyBold, PiPencilBold, PiTrashBold } from 'react-icons/pi';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useDeleteStylePresetMutation } from 'services/api/endpoints/stylePresets';
 
@@ -56,6 +56,27 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
       onOpen();
     },
     [onOpen]
+  );
+
+  const handleClickCopy = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      const { name, preset_data } = preset;
+      const { positive_prompt, negative_prompt } = preset_data;
+
+      dispatch(
+        prefilledFormDataChanged({
+          name: `${name} (${t('common.copy')})`,
+          positivePrompt: positive_prompt || '',
+          negativePrompt: negative_prompt || '',
+          imageUrl: preset.image,
+        })
+      );
+
+      dispatch(updatingStylePresetIdChanged(null));
+      dispatch(isModalOpenChanged(true));
+    },
+    [dispatch, preset, t]
   );
 
   const handleDeletePreset = useCallback(async () => {
@@ -106,25 +127,34 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
               )}
             </Flex>
 
-            {preset.type !== 'default' && (
-              <Flex alignItems="center" gap={1}>
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t('stylePresets.editTemplate')}
-                  onClick={handleClickEdit}
-                  icon={<PiPencilBold />}
-                />
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  aria-label={t('stylePresets.deleteTemplate')}
-                  onClick={handleClickDelete}
-                  colorScheme="error"
-                  icon={<PiTrashBold />}
-                />
-              </Flex>
-            )}
+            <Flex alignItems="center" gap={1}>
+              <IconButton
+                size="sm"
+                variant="ghost"
+                aria-label={t('stylePresets.copyTemplate')}
+                onClick={handleClickCopy}
+                icon={<PiCopyBold />}
+              />
+              {preset.type !== 'default' && (
+                <>
+                  <IconButton
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t('stylePresets.editTemplate')}
+                    onClick={handleClickEdit}
+                    icon={<PiPencilBold />}
+                  />
+                  <IconButton
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t('stylePresets.deleteTemplate')}
+                    onClick={handleClickDelete}
+                    colorScheme="error"
+                    icon={<PiTrashBold />}
+                  />
+                </>
+              )}
+            </Flex>
           </Flex>
 
           <Flex flexDir="column" gap={1}>

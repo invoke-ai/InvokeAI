@@ -43,9 +43,6 @@ export const ParamNegativePrompt = memo(() => {
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative" w="full">
-        {viewMode && (
-          <ViewModePrompt prompt={prompt} presetPrompt={activeStylePreset?.preset_data.negative_prompt || ''} />
-        )}
         <Textarea
           id="negativePrompt"
           name="negativePrompt"
@@ -61,6 +58,9 @@ export const ParamNegativePrompt = memo(() => {
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
+        {viewMode && (
+          <ViewModePrompt prompt={prompt} presetPrompt={activeStylePreset?.preset_data.negative_prompt || ''} />
+        )}
       </Box>
     </PromptPopover>
   );
