@@ -1,20 +1,24 @@
+import type { JSONObject } from 'common/types';
 import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasPreview } from 'features/controlLayers/konva/CanvasPreview';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { GetLoggingContext, StagingAreaImage } from 'features/controlLayers/store/types';
+import type { StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
+const TYPE = 'staging_area';
+
 export class CanvasStagingArea {
-  static TYPE = 'staging_area';
-  static GROUP_NAME = `${CanvasStagingArea.TYPE}_group`;
+  static GROUP_NAME = `${TYPE}_group`;
+
+  readonly type = TYPE;
 
   id: string;
+  path: string[];
   parent: CanvasPreview;
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: GetLoggingContext;
 
   konva: { group: Konva.Group };
 
@@ -27,10 +31,10 @@ export class CanvasStagingArea {
   subscriptions: Set<() => void> = new Set();
 
   constructor(parent: CanvasPreview) {
-    this.id = getPrefixedId(CanvasStagingArea.TYPE);
+    this.id = getPrefixedId(TYPE);
     this.parent = parent;
     this.manager = this.parent.manager;
-    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
+    this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.debug('Creating staging area');
 
@@ -103,8 +107,12 @@ export class CanvasStagingArea {
   repr = () => {
     return {
       id: this.id,
-      type: CanvasStagingArea.TYPE,
+      type: this.type,
       selectedImage: this.selectedImage,
     };
+  };
+
+  getLoggingContext = (): JSONObject => {
+    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }
