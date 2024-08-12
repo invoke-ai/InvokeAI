@@ -167,6 +167,7 @@ export const CanvasScale = memo(() => {
             defaultValue={sliderDefaultValue}
             marks={marks}
             formatValue={formatSliderValue}
+            alwaysShowMarks
           />
         </PopoverBody>
       </PopoverContent>
