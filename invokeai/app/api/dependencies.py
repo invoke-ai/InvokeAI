@@ -1,5 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+import asyncio
 from logging import Logger
 
 import torch
@@ -65,7 +66,12 @@ class ApiDependencies:
     invoker: Invoker
 
     @staticmethod
-    def initialize(config: InvokeAIAppConfig, event_handler_id: int, logger: Logger = logger) -> None:
+    def initialize(
+        config: InvokeAIAppConfig,
+        event_handler_id: int,
+        loop: asyncio.AbstractEventLoop,
+        logger: Logger = logger,
+    ) -> None:
         logger.info(f"InvokeAI version {__version__}")
         logger.info(f"Root directory = {str(config.root_path)}")
 
@@ -87,7 +93,7 @@ class ApiDependencies:
         board_images = BoardImagesService()
         board_records = SqliteBoardRecordStorage(db=db)
         boards = BoardService()
-        events = FastAPIEventService(event_handler_id)
+        events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
         image_records = SqliteImageRecordStorage(db=db)
         images = ImageService()
