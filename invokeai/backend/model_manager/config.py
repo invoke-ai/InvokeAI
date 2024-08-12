@@ -52,6 +52,7 @@ class BaseModelType(str, Enum):
     StableDiffusion2 = "sd-2"
     StableDiffusionXL = "sdxl"
     StableDiffusionXLRefiner = "sdxl-refiner"
+    Flux = "flux"
     # Kandinsky2_1 = "kandinsky-2.1"
 
 
@@ -74,6 +75,7 @@ class SubModelType(str, Enum):
     """Submodel type."""
 
     UNet = "unet"
+    Transformer = "transformer"
     TextEncoder = "text_encoder"
     TextEncoder2 = "text_encoder_2"
     Tokenizer = "tokenizer"

@@ -61,7 +61,7 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 // #endregion
 
 // #region Model-related schemas
-const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner', 'flux']);
 const zModelType = z.enum([
   'main',
   'vae',
@@ -76,6 +76,7 @@ const zModelType = z.enum([
 ]);
 const zSubModelType = z.enum([
   'unet',
+  'transformer',
   'text_encoder',
   'text_encoder_2',
   'tokenizer',

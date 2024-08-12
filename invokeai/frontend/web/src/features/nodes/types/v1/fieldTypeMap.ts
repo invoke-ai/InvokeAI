@@ -114,6 +114,11 @@ const FIELD_TYPE_V1_TO_STATEFUL_FIELD_TYPE_V2: {
     isCollection: false,
     isCollectionOrScalar: false,
   },
+  FluxMainModelField: {
+    name: 'FluxMainModelField',
+    isCollection: false,
+    isCollectionOrScalar: false,
+  },
   SDXLMainModelField: {
     name: 'SDXLMainModelField',
     isCollection: false,

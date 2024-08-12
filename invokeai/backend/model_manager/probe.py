@@ -95,6 +95,7 @@ class ModelProbe(object):
     }
 
     CLASS2TYPE = {
+        "FluxPipeline": ModelType.Main,
         "StableDiffusionPipeline": ModelType.Main,
         "StableDiffusionInpaintPipeline": ModelType.Main,
         "StableDiffusionXLPipeline": ModelType.Main,
@@ -626,6 +627,10 @@ class FolderProbeBase(ProbeBase):
 
 class PipelineFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
+        with open(f"{self.model_path}/model_index.json", "r") as file:
+            conf = json.load(file)
+        if "_class_name" in conf and conf.get("_class_name") == "FluxPipeline":
+            return BaseModelType.Flux
         with open(self.model_path / "unet" / "config.json", "r") as file:
             unet_conf = json.load(file)
         if unet_conf["cross_attention_dim"] == 768:

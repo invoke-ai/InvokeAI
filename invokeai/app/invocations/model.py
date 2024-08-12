@@ -60,6 +60,12 @@ class CLIPField(BaseModel):
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
 
 
+
+class TransformerField(BaseModel):
+    transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
+    scheduler: ModelIdentifierField = Field(description="Info to load scheduler submodel")
+
+
 class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
@@ -120,6 +126,49 @@ class ModelIdentifierInvocation(BaseInvocation):
             raise Exception(f"Unknown model {self.model.key}")
 
         return ModelIdentifierOutput(model=self.model)
+
+
+@invocation_output("flux_model_loader_output")
+class FluxModelLoaderOutput(BaseInvocationOutput):
+    """Flux base model loader output"""
+
+    transformer: TransformerField = OutputField(description=FieldDescriptions.transformer, title="Transformer")
+    clip: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP 1")
+    clip2: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP 2")
+    vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
+
+
+@invocation("flux_model_loader", title="Flux Main Model", tags=["model", "flux"], category="model", version="1.0.3")
+class FluxModelLoaderInvocation(BaseInvocation):
+    """Loads a flux base model, outputting its submodels."""
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.flux_model,
+        ui_type=UIType.FluxMainModel,
+        input=Input.Direct,
+    )
+
+    def invoke(self, context: InvocationContext) -> FluxModelLoaderOutput:
+        model_key = self.model.key
+
+        # TODO: not found exceptions
+        if not context.models.exists(model_key):
+            raise Exception(f"Unknown model: {model_key}")
+
+        transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+        scheduler = self.model.model_copy(update={"submodel_type": SubModelType.Scheduler})
+        tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+        text_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        tokenizer2 = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
+        text_encoder2 = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
+        vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
+
+        return FluxModelLoaderOutput(
+            transformer=TransformerField(transformer=transformer, scheduler=scheduler),
+            clip=CLIPField(tokenizer=tokenizer, text_encoder=text_encoder, loras=[], skipped_layers=0),
+            clip2=CLIPField(tokenizer=tokenizer2, text_encoder=text_encoder2, loras=[], skipped_layers=0),
+            vae=VAEField(vae=vae),
+        )
 
 
 @invocation(
