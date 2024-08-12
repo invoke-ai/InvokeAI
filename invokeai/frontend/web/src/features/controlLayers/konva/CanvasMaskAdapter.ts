@@ -1,3 +1,4 @@
+import type { JSONObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
@@ -7,7 +8,6 @@ import type {
   CanvasInpaintMaskState,
   CanvasRegionalGuidanceState,
   CanvasV2State,
-  GetLoggingContext,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { get } from 'lodash-es';
@@ -15,10 +15,10 @@ import type { Logger } from 'roarr';
 
 export class CanvasMaskAdapter {
   id: string;
+  path: string[];
   type: CanvasInpaintMaskState['type'] | CanvasRegionalGuidanceState['type'];
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: GetLoggingContext;
 
   state: CanvasInpaintMaskState | CanvasRegionalGuidanceState;
   maskOpacity: number;
@@ -36,7 +36,7 @@ export class CanvasMaskAdapter {
     this.id = state.id;
     this.type = state.type;
     this.manager = manager;
-    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
+    this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.debug({ state }, 'Creating mask');
 
@@ -145,5 +145,9 @@ export class CanvasMaskAdapter {
       type: this.type,
       state: deepClone(this.state),
     };
+  };
+
+  getLoggingContext = (): JSONObject => {
+    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }
