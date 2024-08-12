@@ -26,11 +26,6 @@ class BasicConditioningInfo:
 
 
 @dataclass
-class ConditioningFieldData:
-    conditionings: List[BasicConditioningInfo]
-
-
-@dataclass
 class SDXLConditioningInfo(BasicConditioningInfo):
     """SDXL text conditioning information produced by Compel."""
 
@@ -41,6 +36,17 @@ class SDXLConditioningInfo(BasicConditioningInfo):
         self.pooled_embeds = self.pooled_embeds.to(device=device, dtype=dtype)
         self.add_time_ids = self.add_time_ids.to(device=device, dtype=dtype)
         return super().to(device=device, dtype=dtype)
+
+
+@dataclass
+class FLUXConditioningInfo:
+    clip_embeds: torch.Tensor
+    t5_embeds: torch.Tensor
+
+
+@dataclass
+class ConditioningFieldData:
+    conditionings: List[BasicConditioningInfo] | List[SDXLConditioningInfo] | List[FLUXConditioningInfo]
 
 
 @dataclass
