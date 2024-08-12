@@ -1,6 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import { Button } from '@chakra-ui/react';
-import { Flex, Switch } from '@invoke-ai/ui-library';
+import { Button, Flex, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { BrushWidth } from 'features/controlLayers/components/BrushWidth';
