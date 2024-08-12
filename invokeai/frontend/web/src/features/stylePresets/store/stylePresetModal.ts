@@ -11,7 +11,7 @@ const initialState: StylePresetModalState = {
  */
 export const $stylePresetModalState = atom<StylePresetModalState>(initialState);
 
-export type StylePresetModalState = {
+type StylePresetModalState = {
   isModalOpen: boolean;
   updatingStylePresetId: string | null;
   prefilledFormData: PrefilledFormData | null;

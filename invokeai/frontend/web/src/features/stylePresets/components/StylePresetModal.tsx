@@ -10,8 +10,8 @@ import {
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
+import type { PrefilledFormData } from 'features/stylePresets/store/stylePresetModal';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
-import type { PrefilledFormData } from 'features/stylePresets/store/types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

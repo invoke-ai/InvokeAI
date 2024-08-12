@@ -43,9 +43,11 @@ export const StylePresetForm = ({
   const handleClickSave = useCallback<SubmitHandler<StylePresetFormData>>(
     async (data) => {
       const payload = {
-        name: data.name,
-        positive_prompt: data.positivePrompt,
-        negative_prompt: data.negativePrompt,
+        data: {
+          name: data.name,
+          positive_prompt: data.positivePrompt,
+          negative_prompt: data.negativePrompt,
+        },
         image: data.image,
       };
 

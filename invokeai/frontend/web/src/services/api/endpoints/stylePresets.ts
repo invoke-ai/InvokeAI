@@ -37,15 +37,15 @@ export const stylePresetsApi = api.injectEndpoints({
     }),
     createStylePreset: build.mutation<
       paths['/api/v1/style_presets/']['post']['responses']['200']['content']['application/json'],
-      paths['/api/v1/style_presets/']['post']['requestBody']['content']['multipart/form-data']
+      { data: { name: string; positive_prompt: string; negative_prompt: string }; image: Blob | null }
     >({
-      query: ({ name, positive_prompt, negative_prompt, image }) => {
+      query: ({ data, image }) => {
         const formData = new FormData();
         if (image) {
           formData.append('image', image);
         }
 
-        formData.append('data', JSON.stringify({ name, positive_prompt, negative_prompt }));
+        formData.append('data', JSON.stringify(data));
 
         return {
           url: buildStylePresetsUrl(),
@@ -60,16 +60,14 @@ export const stylePresetsApi = api.injectEndpoints({
     }),
     updateStylePreset: build.mutation<
       paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['responses']['200']['content']['application/json'],
-      paths['/api/v1/style_presets/i/{style_preset_id}']['patch']['requestBody']['content']['multipart/form-data'] & {
-        id: string;
-      }
+      { data: { name: string; positive_prompt: string; negative_prompt: string }; image: Blob | null; id: string }
     >({
-      query: ({ id, name, positive_prompt, negative_prompt, image }) => {
+      query: ({ id, data, image }) => {
         const formData = new FormData();
         if (image) {
           formData.append('image', image);
         }
-        formData.append('data', JSON.stringify({ name, positive_prompt, negative_prompt }));
+        formData.append('data', JSON.stringify(data));
 
         return {
           url: buildStylePresetsUrl(`i/${id}`),
