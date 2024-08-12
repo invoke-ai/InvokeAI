@@ -5,6 +5,7 @@ import type { AnyModelConfig } from 'services/api/types';
 import {
   isControlNetModelConfig,
   isControlNetOrT2IAdapterModelConfig,
+  isFluxMainModelModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
@@ -35,6 +36,7 @@ const buildModelsHook =
 export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
+export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
 export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlNetAndT2IAdapterModels = buildModelsHook(isControlNetOrT2IAdapterModelConfig);
