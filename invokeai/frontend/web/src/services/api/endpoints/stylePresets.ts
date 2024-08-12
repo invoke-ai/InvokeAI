@@ -44,9 +44,8 @@ export const stylePresetsApi = api.injectEndpoints({
         if (image) {
           formData.append('image', image);
         }
-        formData.append('name', name);
-        formData.append('positive_prompt', positive_prompt);
-        formData.append('negative_prompt', negative_prompt);
+
+        formData.append('data', JSON.stringify({ name, positive_prompt, negative_prompt }));
 
         return {
           url: buildStylePresetsUrl(),
@@ -70,10 +69,7 @@ export const stylePresetsApi = api.injectEndpoints({
         if (image) {
           formData.append('image', image);
         }
-
-        formData.append('name', name);
-        formData.append('positive_prompt', positive_prompt);
-        formData.append('negative_prompt', negative_prompt);
+        formData.append('data', JSON.stringify({ name, positive_prompt, negative_prompt }));
 
         return {
           url: buildStylePresetsUrl(`i/${id}`),

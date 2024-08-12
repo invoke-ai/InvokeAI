@@ -1,5 +1,6 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
@@ -15,6 +16,7 @@ import { ImageSettingsAccordion } from 'features/settingsAccordions/components/I
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
 import { StylePresetMenu } from 'features/stylePresets/components/StylePresetMenu';
 import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePresetMenuTrigger';
+import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
@@ -61,7 +63,7 @@ const ParametersPanelTextToImage = () => {
   );
 
   const ref = useRef<HTMLDivElement>(null);
-  const isMenuOpen = useAppSelector((s) => s.stylePreset.isMenuOpen);
+  const isMenuOpen = useStore($isMenuOpen);
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
@@ -69,57 +71,56 @@ const ParametersPanelTextToImage = () => {
       <StylePresetMenuTrigger />
       <Flex w="full" h="full" position="relative">
         <Box position="absolute" top={0} left={0} right={0} bottom={0} ref={ref}>
-          {isMenuOpen ? (
+          {isMenuOpen && (
             <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
               <Flex gap={2} flexDirection="column" h="full" w="full">
                 <StylePresetMenu />
               </Flex>
             </OverlayScrollbarsComponent>
-          ) : (
-            <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
-              <Flex gap={2} flexDirection="column" h="full" w="full">
-                <Prompts />
-                <Tabs
-                  defaultIndex={0}
-                  variant="enclosed"
-                  display="flex"
-                  flexDir="column"
-                  w="full"
-                  h="full"
-                  gap={2}
-                  onChange={onChangeTabs}
-                >
-                  <TabList gap={2} fontSize="sm" borderColor="base.800">
-                    <Tab sx={baseStyles} _selected={selectedStyles} data-testid="generation-tab-settings-tab-button">
-                      {t('common.settingsLabel')}
-                    </Tab>
-                    <Tab
-                      sx={baseStyles}
-                      _selected={selectedStyles}
-                      data-testid="generation-tab-control-layers-tab-button"
-                    >
-                      {controlLayersTitle}
-                    </Tab>
-                  </TabList>
-                  <TabPanels w="full" h="full">
-                    <TabPanel p={0} w="full" h="full">
-                      <Flex gap={2} flexDirection="column" h="full" w="full">
-                        <ImageSettingsAccordion />
-                        <GenerationSettingsAccordion />
-                        {activeTabName !== 'generation' && <ControlSettingsAccordion />}
-                        {activeTabName === 'canvas' && <CompositingSettingsAccordion />}
-                        {isSDXL && <RefinerSettingsAccordion />}
-                        <AdvancedSettingsAccordion />
-                      </Flex>
-                    </TabPanel>
-                    <TabPanel p={0} w="full" h="full">
-                      <ControlLayersPanelContent />
-                    </TabPanel>
-                  </TabPanels>
-                </Tabs>
-              </Flex>
-            </OverlayScrollbarsComponent>
           )}
+          <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
+            <Flex gap={2} flexDirection="column" h="full" w="full">
+              <Prompts />
+              <Tabs
+                defaultIndex={0}
+                variant="enclosed"
+                display="flex"
+                flexDir="column"
+                w="full"
+                h="full"
+                gap={2}
+                onChange={onChangeTabs}
+              >
+                <TabList gap={2} fontSize="sm" borderColor="base.800">
+                  <Tab sx={baseStyles} _selected={selectedStyles} data-testid="generation-tab-settings-tab-button">
+                    {t('common.settingsLabel')}
+                  </Tab>
+                  <Tab
+                    sx={baseStyles}
+                    _selected={selectedStyles}
+                    data-testid="generation-tab-control-layers-tab-button"
+                  >
+                    {controlLayersTitle}
+                  </Tab>
+                </TabList>
+                <TabPanels w="full" h="full">
+                  <TabPanel p={0} w="full" h="full">
+                    <Flex gap={2} flexDirection="column" h="full" w="full">
+                      <ImageSettingsAccordion />
+                      <GenerationSettingsAccordion />
+                      {activeTabName !== 'generation' && <ControlSettingsAccordion />}
+                      {activeTabName === 'canvas' && <CompositingSettingsAccordion />}
+                      {isSDXL && <RefinerSettingsAccordion />}
+                      <AdvancedSettingsAccordion />
+                    </Flex>
+                  </TabPanel>
+                  <TabPanel p={0} w="full" h="full">
+                    <ControlLayersPanelContent />
+                  </TabPanel>
+                </TabPanels>
+              </Tabs>
+            </Flex>
+          </OverlayScrollbarsComponent>
         </Box>
       </Flex>
     </Flex>

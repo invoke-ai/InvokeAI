@@ -1,11 +1,12 @@
 import { Badge, ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
 import {
   isModalOpenChanged,
   prefilledFormDataChanged,
   updatingStylePresetIdChanged,
 } from 'features/stylePresets/store/stylePresetModalSlice';
-import { activeStylePresetIdChanged, isMenuOpenChanged } from 'features/stylePresets/store/stylePresetSlice';
+import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
@@ -46,7 +47,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
 
   const handleClickApply = useCallback(async () => {
     dispatch(activeStylePresetIdChanged(preset.id));
-    dispatch(isMenuOpenChanged(false));
+    $isMenuOpen.set(false);
   }, [dispatch, preset.id]);
 
   const handleClickDelete = useCallback(

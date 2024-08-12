@@ -5,7 +5,6 @@ import type { PersistConfig } from 'app/store/store';
 import type { StylePresetState } from './types';
 
 const initialState: StylePresetState = {
-  isMenuOpen: false,
   activeStylePresetId: null,
   searchTerm: '',
   viewMode: false,
@@ -15,9 +14,6 @@ export const stylePresetSlice = createSlice({
   name: 'stylePreset',
   initialState: initialState,
   reducers: {
-    isMenuOpenChanged: (state, action: PayloadAction<boolean>) => {
-      state.isMenuOpen = action.payload;
-    },
     activeStylePresetIdChanged: (state, action: PayloadAction<string | null>) => {
       state.activeStylePresetId = action.payload;
     },
@@ -30,8 +26,7 @@ export const stylePresetSlice = createSlice({
   },
 });
 
-export const { isMenuOpenChanged, activeStylePresetIdChanged, searchTermChanged, viewModeChanged } =
-  stylePresetSlice.actions;
+export const { activeStylePresetIdChanged, searchTermChanged, viewModeChanged } = stylePresetSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateStylePresetState = (state: any): any => {

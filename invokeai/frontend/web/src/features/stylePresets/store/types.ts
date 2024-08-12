@@ -12,7 +12,6 @@ export type PrefilledFormData = {
 };
 
 export type StylePresetState = {
-  isMenuOpen: boolean;
   activeStylePresetId: string | null;
   searchTerm: string;
   viewMode: boolean;

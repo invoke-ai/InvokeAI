@@ -1,6 +1,6 @@
 import { Flex, IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isMenuOpenChanged } from 'features/stylePresets/store/stylePresetSlice';
+import { useStore } from '@nanostores/react';
+import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
@@ -8,13 +8,12 @@ import { PiCaretDownBold } from 'react-icons/pi';
 import { ActiveStylePreset } from './ActiveStylePreset';
 
 export const StylePresetMenuTrigger = () => {
-  const isMenuOpen = useAppSelector((s) => s.stylePreset.isMenuOpen);
-  const dispatch = useAppDispatch();
+  const isMenuOpen = useStore($isMenuOpen);
   const { t } = useTranslation();
 
   const handleToggle = useCallback(() => {
-    dispatch(isMenuOpenChanged(!isMenuOpen));
-  }, [dispatch, isMenuOpen]);
+    $isMenuOpen.set(!isMenuOpen);
+  }, [isMenuOpen]);
 
   return (
     <Flex
