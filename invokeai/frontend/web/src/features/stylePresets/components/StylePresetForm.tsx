@@ -1,10 +1,12 @@
-import { Button, Flex, FormControl, FormLabel, Input, Text } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, FormControl, FormLabel, Input, Text } from '@invoke-ai/ui-library';
+import { PRESET_PLACEHOLDER } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import { toast } from 'features/toast/toast';
+import type { PropsWithChildren } from 'react';
 import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useCreateStylePresetMutation, useUpdateStylePresetMutation } from 'services/api/endpoints/stylePresets';
 
 import { StylePresetImageField } from './StylePresetImageField';
@@ -84,7 +86,17 @@ export const StylePresetForm = ({
 
       <StylePresetPromptField label="Positive Prompt" control={control} name="positivePrompt" />
       <StylePresetPromptField label="Negative Prompt" control={control} name="negativePrompt" />
-      <Text variant="subtext">{t('stylePresets.placeholderDirections')}</Text>
+      <Box>
+        <Text variant="subtext">{t('stylePresets.promptTemplatesDesc1')}</Text>
+        <Text variant="subtext">
+          <Trans
+            i18nKey="stylePresets.promptTemplatesDesc2"
+            components={{ Pre: <Pre /> }}
+            values={{ placeholder: PRESET_PLACEHOLDER }}
+          />
+        </Text>
+        <Text variant="subtext">{t('stylePresets.promptTemplatesDesc3')}</Text>
+      </Box>
 
       <Flex justifyContent="flex-end">
         <Button onClick={handleSubmit(handleClickSave)} isDisabled={!formState.isValid}>
@@ -94,3 +106,9 @@ export const StylePresetForm = ({
     </Flex>
   );
 };
+
+const Pre = (props: PropsWithChildren) => (
+  <Text as="span" fontFamily="monospace" fontWeight="semibold">
+    {props.children}
+  </Text>
+);
