@@ -1,29 +1,33 @@
 import { Mutex } from 'async-mutex';
+import type { JSONObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
 import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import { loadImage } from 'features/controlLayers/konva/util';
-import type { CanvasImageState, GetLoggingContext } from 'features/controlLayers/store/types';
+import type { CanvasImageState } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
 
+const TYPE = 'image';
+
 export class CanvasImageRenderer {
-  static TYPE = 'image';
-  static GROUP_NAME = `${CanvasImageRenderer.TYPE}_group`;
-  static IMAGE_NAME = `${CanvasImageRenderer.TYPE}_image`;
-  static PLACEHOLDER_GROUP_NAME = `${CanvasImageRenderer.TYPE}_placeholder-group`;
-  static PLACEHOLDER_RECT_NAME = `${CanvasImageRenderer.TYPE}_placeholder-rect`;
-  static PLACEHOLDER_TEXT_NAME = `${CanvasImageRenderer.TYPE}_placeholder-text`;
+  static GROUP_NAME = `${TYPE}_group`;
+  static IMAGE_NAME = `${TYPE}_image`;
+  static PLACEHOLDER_GROUP_NAME = `${TYPE}_placeholder-group`;
+  static PLACEHOLDER_RECT_NAME = `${TYPE}_placeholder-rect`;
+  static PLACEHOLDER_TEXT_NAME = `${TYPE}_placeholder-text`;
+
+  readonly type = TYPE;
 
   id: string;
+  path: string[];
   parent: CanvasObjectRenderer | CanvasStagingArea;
   manager: CanvasManager;
   log: Logger;
-  getLoggingContext: GetLoggingContext;
 
   state: CanvasImageState;
   konva: {
@@ -42,7 +46,7 @@ export class CanvasImageRenderer {
     this.id = id;
     this.parent = parent;
     this.manager = parent.manager;
-    this.getLoggingContext = this.manager.buildGetLoggingContext(this);
+    this.path = this.parent.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
     this.log.trace({ state }, 'Creating image');
@@ -197,11 +201,15 @@ export class CanvasImageRenderer {
   repr = () => {
     return {
       id: this.id,
-      type: CanvasImageRenderer.TYPE,
+      type: this.type,
       parent: this.parent.id,
       isLoading: this.isLoading,
       isError: this.isError,
       state: deepClone(this.state),
     };
+  };
+
+  getLoggingContext = (): JSONObject => {
+    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }
