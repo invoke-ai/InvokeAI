@@ -13,21 +13,31 @@ import StylePresetSearch from './StylePresetSearch';
 
 export const StylePresetMenu = () => {
   const searchTerm = useAppSelector((s) => s.stylePreset.searchTerm);
+  const allowPrivateStylePresets = useAppSelector((s) => s.config.allowPrivateStylePresets);
   const { data } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
       const filteredData =
         data?.filter((preset) => preset.name.toLowerCase().includes(searchTerm.toLowerCase())) || EMPTY_ARRAY;
 
       const groupedData = filteredData.reduce(
-        (acc: { defaultPresets: StylePresetRecordWithImage[]; presets: StylePresetRecordWithImage[] }, preset) => {
+        (
+          acc: {
+            defaultPresets: StylePresetRecordWithImage[];
+            sharedPresets: StylePresetRecordWithImage[];
+            presets: StylePresetRecordWithImage[];
+          },
+          preset
+        ) => {
           if (preset.type === 'default') {
             acc.defaultPresets.push(preset);
+          } else if (preset.type === 'project') {
+            acc.sharedPresets.push(preset);
           } else {
             acc.presets.push(preset);
           }
           return acc;
         },
-        { defaultPresets: [], presets: [] }
+        { defaultPresets: [], sharedPresets: [], presets: [] }
       );
 
       return {
@@ -69,6 +79,10 @@ export const StylePresetMenu = () => {
       )}
 
       <StylePresetList title={t('stylePresets.myTemplates')} data={data.presets} />
+
+      {allowPrivateStylePresets && (
+        <StylePresetList title={t('stylePresets.sharedTemplates')} data={data.sharedPresets} />
+      )}
 
       <StylePresetList title={t('stylePresets.defaultTemplates')} data={data.defaultPresets} />
     </Flex>

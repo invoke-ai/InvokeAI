@@ -1,4 +1,5 @@
 import { atom } from 'nanostores';
+import type { PresetType } from 'services/api/endpoints/stylePresets';
 
 const initialState: StylePresetModalState = {
   isModalOpen: false,
@@ -22,4 +23,5 @@ export type PrefilledFormData = {
   positivePrompt: string;
   negativePrompt: string;
   imageUrl: string | null;
+  type: PresetType;
 };

@@ -32,7 +32,7 @@ class StylePresetChanges(BaseModel, extra="forbid"):
 class StylePresetWithoutId(BaseModel):
     name: str = Field(description="The name of the style preset.")
     preset_data: PresetData = Field(description="The preset data")
-    type: PresetType = Field(description="The type of style preset", default=PresetType.User)
+    type: PresetType = Field(description="The type of style preset")
 
 
 class StylePresetRecordDTO(StylePresetWithoutId):

@@ -1,4 +1,5 @@
-import { Box, Button, Flex, FormControl, FormLabel, Input, Text } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, FormControl, FormLabel, Input, Spacer, Text } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { PRESET_PLACEHOLDER } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import { toast } from 'features/toast/toast';
@@ -12,12 +13,14 @@ import { useCreateStylePresetMutation, useUpdateStylePresetMutation } from 'serv
 
 import { StylePresetImageField } from './StylePresetImageField';
 import { StylePresetPromptField } from './StylePresetPromptField';
+import { StylePresetTypeField } from './StylePresetTypeField';
 
 export type StylePresetFormData = {
   name: string;
   positivePrompt: string;
   negativePrompt: string;
   image: File | null;
+  type: PresetType;
 };
 
 export const StylePresetForm = ({
@@ -30,6 +33,7 @@ export const StylePresetForm = ({
   const [createStylePreset] = useCreateStylePresetMutation();
   const [updateStylePreset] = useUpdateStylePresetMutation();
   const { t } = useTranslation();
+  const allowPrivateStylePresets = useAppSelector((s) => s.config.allowPrivateStylePresets);
 
   const { handleSubmit, control, register, formState } = useForm<StylePresetFormData>({
     defaultValues: formData || {
@@ -37,6 +41,7 @@ export const StylePresetForm = ({
       positivePrompt: '',
       negativePrompt: '',
       image: null,
+      type: 'user',
     },
     mode: 'onChange',
   });
@@ -48,7 +53,7 @@ export const StylePresetForm = ({
           name: data.name,
           positive_prompt: data.positivePrompt,
           negative_prompt: data.negativePrompt,
-          type: 'user' as PresetType,
+          type: data.type,
         },
         image: data.image,
       };
@@ -102,7 +107,8 @@ export const StylePresetForm = ({
         <Text variant="subtext">{t('stylePresets.promptTemplatesDesc3')}</Text>
       </Box>
 
-      <Flex justifyContent="flex-end">
+      <Flex justifyContent="space-between" alignItems="flex-end" gap={10}>
+        {allowPrivateStylePresets ? <StylePresetTypeField control={control} name="type" /> : <Spacer />}
         <Button onClick={handleSubmit(handleClickSave)} isDisabled={!formState.isValid}>
           {t('common.save')}
         </Button>

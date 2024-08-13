@@ -13730,11 +13730,8 @@ export type components = {
             name: string;
             /** @description The preset data */
             preset_data: components["schemas"]["PresetData"];
-            /**
-             * @description The type of style preset
-             * @default user
-             */
-            type?: components["schemas"]["PresetType"];
+            /** @description The type of style preset */
+            type: components["schemas"]["PresetType"];
             /**
              * Id
              * @description The style preset ID.

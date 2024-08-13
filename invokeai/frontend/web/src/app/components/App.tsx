@@ -13,7 +13,7 @@ import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardMo
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
-import { StylePresetModal } from 'features/stylePresets/components/StylePresetModal';
+import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';

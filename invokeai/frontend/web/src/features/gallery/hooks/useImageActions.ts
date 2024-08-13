@@ -76,6 +76,7 @@ export const useImageActions = (image_name?: string) => {
           positivePrompt,
           negativePrompt,
           imageUrl: imageDTO.image_url,
+          type: 'user',
         },
         updatingStylePresetId: null,
         isModalOpen: true,

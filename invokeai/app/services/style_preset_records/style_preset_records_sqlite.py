@@ -5,7 +5,6 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
-    PresetType,
     StylePresetChanges,
     StylePresetNotFoundError,
     StylePresetRecordDTO,
@@ -136,7 +135,7 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
                 SELECT
                     *
                 FROM style_presets
-                ORDER BY name ASC
+                ORDER BY LOWER(name) ASC
                 """
 
             self._cursor.execute(main_query)
@@ -173,5 +172,4 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
             presets = json.load(file)
             for preset in presets:
                 style_preset = StylePresetWithoutId.model_validate(preset)
-                style_preset.type = PresetType.Default
                 self.create(style_preset)
