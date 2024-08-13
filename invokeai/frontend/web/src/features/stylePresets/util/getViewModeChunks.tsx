@@ -5,7 +5,7 @@ export const getViewModeChunks = (currentPrompt: string, presetPrompt?: string):
   }
   const [firstPart, ...remainingParts] = presetPrompt.split(PRESET_PLACEHOLDER);
   const chunks = [firstPart, remainingParts.join(PRESET_PLACEHOLDER)];
-  if (chunks.length === 1) {
+  if (chunks.filter((chunk) => chunk !== '').length === 1) {
     return ['', currentPrompt, chunks[0] ?? ''];
   } else {
     return [chunks[0] ?? '', currentPrompt, chunks[1] ?? ''];

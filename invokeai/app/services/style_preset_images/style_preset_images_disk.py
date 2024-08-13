@@ -10,6 +10,7 @@ from invokeai.app.services.style_preset_images.style_preset_images_common import
     StylePresetImageFileNotFoundException,
     StylePresetImageFileSaveException,
 )
+from invokeai.app.services.style_preset_records.style_preset_records_common import PresetType
 from invokeai.app.util.misc import uuid_string
 from invokeai.app.util.thumbnails import make_thumbnail
 
@@ -43,7 +44,12 @@ class StylePresetImageFileStorageDisk(StylePresetImageFileStorageBase):
             raise StylePresetImageFileSaveException from e
 
     def get_path(self, style_preset_id: str) -> Path:
-        path = self._style_preset_images_folder / (style_preset_id + ".webp")
+        style_preset = self._invoker.services.style_preset_records.get(style_preset_id)
+        if style_preset.type is PresetType.Default:
+            default_images_dir = Path(__file__).parent / Path("default_style_preset_images")
+            path = default_images_dir / (style_preset.name + ".png")
+        else:
+            path = self._style_preset_images_folder / (style_preset_id + ".webp")
 
         return path
 
