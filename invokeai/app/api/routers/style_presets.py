@@ -3,20 +3,34 @@ import json
 import traceback
 from typing import Optional
 
+import pydantic
 from fastapi import APIRouter, File, Form, HTTPException, Path, UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image
+from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.model_manager import IMAGE_MAX_AGE
 from invokeai.app.services.style_preset_images.style_preset_images_common import StylePresetImageFileNotFoundException
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
     PresetData,
+    PresetType,
     StylePresetChanges,
     StylePresetNotFoundError,
     StylePresetRecordWithImage,
     StylePresetWithoutId,
 )
+
+
+class StylePresetUpdateFormData(BaseModel):
+    name: str = Field(description="Preset name")
+    positive_prompt: str = Field(description="Positive prompt")
+    negative_prompt: str = Field(description="Negative prompt")
+
+
+class StylePresetCreateFormData(StylePresetUpdateFormData):
+    type: PresetType = Field(description="Preset type")
+
 
 style_presets_router = APIRouter(prefix="/v1/style_presets", tags=["style_presets"])
 
@@ -75,11 +89,16 @@ async def update_style_preset(
         except StylePresetImageFileNotFoundException:
             pass
 
-    parsed_data = json.loads(data)
+    try:
+        parsed_data = json.loads(data)
+        validated_data = StylePresetUpdateFormData(**parsed_data)
 
-    name = parsed_data.get("name", "")
-    positive_prompt = parsed_data.get("positive_prompt", "")
-    negative_prompt = parsed_data.get("negative_prompt", "")
+        name = validated_data.name
+        positive_prompt = validated_data.positive_prompt
+        negative_prompt = validated_data.negative_prompt
+
+    except pydantic.ValidationError:
+        raise HTTPException(status_code=400, detail="Invalid preset data")
 
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
     changes = StylePresetChanges(name=name, preset_data=preset_data)
@@ -120,14 +139,20 @@ async def create_style_preset(
 ) -> StylePresetRecordWithImage:
     """Creates a style preset"""
 
-    parsed_data = json.loads(data)
+    try:
+        parsed_data = json.loads(data)
+        validated_data = StylePresetCreateFormData(**parsed_data)
 
-    name = parsed_data.get("name", "")
-    positive_prompt = parsed_data.get("positive_prompt", "")
-    negative_prompt = parsed_data.get("negative_prompt", "")
+        name = validated_data.name
+        type = validated_data.type
+        positive_prompt = validated_data.positive_prompt
+        negative_prompt = validated_data.negative_prompt
+
+    except pydantic.ValidationError:
+        raise HTTPException(status_code=400, detail="Invalid preset data")
 
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
-    style_preset = StylePresetWithoutId(name=name, preset_data=preset_data)
+    style_preset = StylePresetWithoutId(name=name, preset_data=preset_data, type=type)
     new_style_preset = ApiDependencies.invoker.services.style_preset_records.create(style_preset=style_preset)
 
     if image is not None:

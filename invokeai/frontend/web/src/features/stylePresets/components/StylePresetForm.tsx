@@ -7,6 +7,7 @@ import { useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
+import type { PresetType } from 'services/api/endpoints/stylePresets';
 import { useCreateStylePresetMutation, useUpdateStylePresetMutation } from 'services/api/endpoints/stylePresets';
 
 import { StylePresetImageField } from './StylePresetImageField';
@@ -47,6 +48,7 @@ export const StylePresetForm = ({
           name: data.name,
           positive_prompt: data.positivePrompt,
           negative_prompt: data.negativePrompt,
+          type: 'user' as PresetType,
         },
         image: data.image,
       };
