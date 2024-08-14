@@ -38,11 +38,11 @@ interface Props {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
-  selectedWorkflow?: string;
+  selectedWorkflowId?: string;
   destination?: InvokeTabName | undefined;
 }
 
-const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflow, destination }: Props) => {
+const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflowId, destination }: Props) => {
   const language = useAppSelector(languageSelector);
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
@@ -81,11 +81,11 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflow, destina
   });
 
   useEffect(() => {
-    if (selectedWorkflow && !hasLoadedRef.current) {
-      getAndLoadWorkflow(selectedWorkflow);
+    if (selectedWorkflowId && !hasLoadedRef.current) {
+      getAndLoadWorkflow(selectedWorkflowId);
       hasLoadedRef.current = true;
     }
-  }, [selectedWorkflow, getAndLoadWorkflow]);
+  }, [selectedWorkflowId, getAndLoadWorkflow]);
 
   useEffect(() => {
     if (destination) {

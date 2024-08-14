@@ -44,7 +44,7 @@ interface Props extends PropsWithChildren {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
-  selectedWorkflow?: string;
+  selectedWorkflowId?: string;
   destination?: InvokeTabName;
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
@@ -65,7 +65,7 @@ const InvokeAIUI = ({
   projectUrl,
   queueId,
   selectedImage,
-  selectedWorkflow,
+  selectedWorkflowId,
   destination,
   customStarUi,
   socketOptions,
@@ -226,7 +226,7 @@ const InvokeAIUI = ({
               <App
                 config={config}
                 selectedImage={selectedImage}
-                selectedWorkflow={selectedWorkflow}
+                selectedWorkflowId={selectedWorkflowId}
                 destination={destination}
               />
             </AppDndContext>
