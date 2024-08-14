@@ -8,6 +8,7 @@ import { PiPlusBold } from 'react-icons/pi';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
+import { StylePresetImport } from './StylePresetImport';
 import { StylePresetList } from './StylePresetList';
 import StylePresetSearch from './StylePresetSearch';
 
@@ -60,16 +61,20 @@ export const StylePresetMenu = () => {
     <Flex flexDir="column" gap={2} padding={3} layerStyle="second" borderRadius="base">
       <Flex alignItems="center" gap={2} w="full" justifyContent="space-between">
         <StylePresetSearch />
-        <IconButton
-          icon={<PiPlusBold />}
-          tooltip={t('stylePresets.createPromptTemplate')}
-          aria-label={t('stylePresets.createPromptTemplate')}
-          onClick={handleClickAddNew}
-          size="md"
-          variant="link"
-          w={8}
-          h={8}
-        />
+        <Flex alignItems="center" justifyContent="space-between">
+          <StylePresetImport />
+
+          <IconButton
+            icon={<PiPlusBold />}
+            tooltip={t('stylePresets.createPromptTemplate')}
+            aria-label={t('stylePresets.createPromptTemplate')}
+            onClick={handleClickAddNew}
+            size="md"
+            variant="link"
+            w={8}
+            h={8}
+          />
+        </Flex>
       </Flex>
 
       {data.presets.length === 0 && data.defaultPresets.length === 0 && (
