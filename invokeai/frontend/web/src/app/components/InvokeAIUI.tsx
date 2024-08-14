@@ -223,7 +223,12 @@ const InvokeAIUI = ({
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
-              <App config={config} selectedImage={selectedImage} selectedWorkflow={selectedWorkflow} destination={destination} />
+              <App
+                config={config}
+                selectedImage={selectedImage}
+                selectedWorkflow={selectedWorkflow}
+                destination={destination}
+              />
             </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>
