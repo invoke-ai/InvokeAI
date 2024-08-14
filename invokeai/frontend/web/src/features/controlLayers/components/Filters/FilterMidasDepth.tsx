@@ -1,16 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAdapter/processors/types';
 import type { MidasDepthProcessorConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import ProcessorWrapper from './ProcessorWrapper';
+import type { FilterComponentProps } from './types';
 
-type Props = ProcessorComponentProps<MidasDepthProcessorConfig>;
+type Props = FilterComponentProps<MidasDepthProcessorConfig>;
 const DEFAULTS = IMAGE_FILTERS['midas_depth_image_processor'].buildDefaults();
 
-export const MidasDepthProcessor = memo(({ onChange, config }: Props) => {
+export const FilterMidasDepth = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();
 
   const handleAMultChanged = useCallback(
@@ -28,7 +27,7 @@ export const MidasDepthProcessor = memo(({ onChange, config }: Props) => {
   );
 
   return (
-    <ProcessorWrapper>
+    <>
       <FormControl>
         <FormLabel m={0}>{t('controlnet.amult')}</FormLabel>
         <CompositeSlider
@@ -69,8 +68,8 @@ export const MidasDepthProcessor = memo(({ onChange, config }: Props) => {
           step={0.01}
         />
       </FormControl>
-    </ProcessorWrapper>
+    </>
   );
 });
 
-MidasDepthProcessor.displayName = 'MidasDepthProcessor';
+FilterMidasDepth.displayName = 'FilterMidasDepth';

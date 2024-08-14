@@ -2,12 +2,12 @@ import { getCAId, getImageObjectId, getIPAId, getLayerId } from 'features/contro
 import { defaultLoRAConfig } from 'features/controlLayers/store/lorasReducers';
 import type { CanvasControlAdapterState, CanvasIPAdapterState, CanvasLayerState, LoRA } from 'features/controlLayers/store/types';
 import {
-  CA_PROCESSOR_DATA,
+  IMAGE_FILTERS,
   imageDTOToImageWithDims,
   initialControlNetV2,
   initialIPAdapterV2,
   initialT2IAdapterV2,
-  isProcessorTypeV2,
+  isFilterType,
   zCanvasLayerState,
 } from 'features/controlLayers/store/types';
 import type {
@@ -559,8 +559,8 @@ const parseControlNetToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapt
     .parse(await getProperty(metadataItem, 'control_mode'));
 
   const defaultPreprocessor = controlNetModel.default_settings?.preprocessor;
-  const processorConfig = isProcessorTypeV2(defaultPreprocessor)
-    ? CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults()
+  const processorConfig = isFilterType(defaultPreprocessor)
+    ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults()
     : null;
   const beginEndStepPct: [number, number] = [
     begin_step_percent ?? initialControlNetV2.beginEndStepPct[0],
@@ -620,8 +620,8 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapt
     .parse(await getProperty(metadataItem, 'end_step_percent'));
 
   const defaultPreprocessor = t2iAdapterModel.default_settings?.preprocessor;
-  const processorConfig = isProcessorTypeV2(defaultPreprocessor)
-    ? CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults()
+  const processorConfig = isFilterType(defaultPreprocessor)
+    ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults()
     : null;
   const beginEndStepPct: [number, number] = [
     begin_step_percent ?? initialT2IAdapterV2.beginEndStepPct[0],

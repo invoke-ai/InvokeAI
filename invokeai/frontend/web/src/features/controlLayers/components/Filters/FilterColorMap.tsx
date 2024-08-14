@@ -1,16 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAdapter/processors/types';
 import type { ColorMapProcessorConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import ProcessorWrapper from './ProcessorWrapper';
+import type { FilterComponentProps } from './types';
 
-type Props = ProcessorComponentProps<ColorMapProcessorConfig>;
+type Props = FilterComponentProps<ColorMapProcessorConfig>;
 const DEFAULTS = IMAGE_FILTERS['color_map_image_processor'].buildDefaults();
 
-export const ColorMapProcessor = memo(({ onChange, config }: Props) => {
+export const FilterColorMap = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();
   const handleColorMapTileSizeChanged = useCallback(
     (v: number) => {
@@ -20,7 +19,7 @@ export const ColorMapProcessor = memo(({ onChange, config }: Props) => {
   );
 
   return (
-    <ProcessorWrapper>
+    <>
       <FormControl>
         <FormLabel m={0}>{t('controlnet.colorMapTileSize')}</FormLabel>
         <CompositeSlider
@@ -41,8 +40,8 @@ export const ColorMapProcessor = memo(({ onChange, config }: Props) => {
           step={1}
         />
       </FormControl>
-    </ProcessorWrapper>
+    </>
   );
 });
 
-ColorMapProcessor.displayName = 'ColorMapProcessor';
+FilterColorMap.displayName = 'FilterColorMap';
