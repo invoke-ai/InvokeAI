@@ -35,7 +35,7 @@
     "name": "Photography (Black and White)",
     "type": "default",
     "preset_data": {
-      "positive_prompt": "[prompt] photography. natural light.  80mm lens. F1.4. strong contrast, hard light. dark contrast. blurred background. black and white",
+      "positive_prompt": "[prompt] photography. natural light. 80mm lens. F1.4. strong contrast, hard light. dark contrast. blurred background. black and white",
       "negative_prompt": "painting, digital art. sketch, colour+"
     }
   },
@@ -51,7 +51,7 @@
     "name": "Concept Art (Fantasy)",
     "type": "default",
     "preset_data": {
-      "positive_prompt": "concept artwork of a [prompt]. (digital painterly art style)++, mythological, (textured 2d dry media brushpack)++, glazed brushstrokes, otherworldly. painting+, illustration+, ",
+      "positive_prompt": "concept artwork of a [prompt]. (digital painterly art style)++, mythological, (textured 2d dry media brushpack)++, glazed brushstrokes, otherworldly. painting+, illustration+",
       "negative_prompt": "photo. distorted, blurry, out of focus. sketch. (cgi, 3d.)++"
     }
   },
@@ -75,7 +75,7 @@
     "name": "Concept Art (Painterly)",
     "type": "default",
     "preset_data": {
-      "positive_prompt": "[prompt] Oil painting. high contrast. impasto. sfumato. chiaroscuro. Palette knife.",
+      "positive_prompt": "[prompt] oil painting. high contrast. impasto. sfumato. chiaroscuro. Palette knife.",
       "negative_prompt": "photo. smooth. border. frame"
     }
   },
@@ -84,7 +84,7 @@
     "type": "default",
     "preset_data": {
       "positive_prompt": "[prompt] environment artwork, hyper-realistic digital painting style with cinematic composition, atmospheric, depth and detail, voluminous. textured dry brush 2d media",
-      "negative_prompt": "photo, distorted, blurry, out of focus. sketch. "
+      "negative_prompt": "photo, distorted, blurry, out of focus. sketch."
     }
   },
   {
@@ -116,7 +116,7 @@
     "type": "default",
     "preset_data": {
       "positive_prompt": "[prompt] Line art. bold outline. simplistic. white background. 2d",
-      "negative_prompt": "photo. digital art. greyscale. solid black. painting "
+      "negative_prompt": "photo. digital art. greyscale. solid black. painting"
     }
   },
   {
@@ -124,23 +124,23 @@
     "type": "default",
     "preset_data": {
       "positive_prompt": "[prompt] anime++, bold outline, cel-shaded coloring, shounen, seinen",
-      "negative_prompt": "(photo)+++. greyscale. solid black. painting "
+      "negative_prompt": "(photo)+++. greyscale. solid black. painting"
     }
   },
   {
     "name": "Illustration",
     "type": "default",
     "preset_data": {
-      "positive_prompt": "[prompt] illustration, bold linework, illustrative details, vector art style, flat coloring,",
-      "negative_prompt": "(photo)+++.  greyscale. painting, black and white. "
+      "positive_prompt": "[prompt] illustration, bold linework, illustrative details, vector art style, flat coloring",
+      "negative_prompt": "(photo)+++. greyscale. painting, black and white."
     }
   },
   {
     "name": "Vehicles",
     "type": "default",
     "preset_data": {
-      "positive_prompt": "A weird futuristic normal auto, [prompt] elegant design , nice color , nice wheels",
-      "negative_prompt": "sketch. digital art. greyscale. painting "
+      "positive_prompt": "A weird futuristic normal auto, [prompt] elegant design, nice color, nice wheels",
+      "negative_prompt": "sketch. digital art. greyscale. painting"
     }
   }
 ]
