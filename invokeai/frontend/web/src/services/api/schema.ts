@@ -1272,6 +1272,78 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/style_presets/i/{style_preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Style Preset
+         * @description Gets a style preset
+         */
+        get: operations["get_style_preset"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Style Preset
+         * @description Deletes a style preset
+         */
+        delete: operations["delete_style_preset"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Style Preset
+         * @description Updates a style preset
+         */
+        patch: operations["update_style_preset"];
+        trace?: never;
+    };
+    "/api/v1/style_presets/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Style Presets
+         * @description Gets a page of style presets
+         */
+        get: operations["list_style_presets"];
+        put?: never;
+        /**
+         * Create Style Preset
+         * @description Creates a style preset
+         */
+        post: operations["create_style_preset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/style_presets/i/{style_preset_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Style Preset Image
+         * @description Gets an image file that previews the model
+         */
+        get: operations["get_style_preset_image"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -1851,6 +1923,19 @@ export type components = {
              */
             batch_ids: string[];
         };
+        /** Body_create_style_preset */
+        Body_create_style_preset: {
+            /**
+             * Image
+             * @description The image file to upload
+             */
+            image?: Blob | null;
+            /**
+             * Data
+             * @description The data of the style preset to create
+             */
+            data: string;
+        };
         /** Body_create_workflow */
         Body_create_workflow: {
             /** @description The workflow to create */
@@ -1972,6 +2057,19 @@ export type components = {
              * Format: binary
              */
             image: Blob;
+        };
+        /** Body_update_style_preset */
+        Body_update_style_preset: {
+            /**
+             * Image
+             * @description The image file to upload
+             */
+            image?: Blob | null;
+            /**
+             * Data
+             * @description The data of the style preset to update
+             */
+            data: string;
         };
         /** Body_update_workflow */
         Body_update_workflow: {
@@ -11206,6 +11304,24 @@ export type components = {
              */
             type: "pidi_image_processor";
         };
+        /** PresetData */
+        PresetData: {
+            /**
+             * Positive Prompt
+             * @description Positive prompt
+             */
+            positive_prompt: string;
+            /**
+             * Negative Prompt
+             * @description Negative prompt
+             */
+            negative_prompt: string;
+        };
+        /**
+         * PresetType
+         * @enum {string}
+         */
+        PresetType: "user" | "default" | "project";
         /**
          * ProgressImage
          * @description The progress image sent intermittently during processing
@@ -13604,6 +13720,28 @@ export type components = {
              * @enum {string}
              */
             type: "string_split_neg";
+        };
+        /** StylePresetRecordWithImage */
+        StylePresetRecordWithImage: {
+            /**
+             * Name
+             * @description The name of the style preset.
+             */
+            name: string;
+            /** @description The preset data */
+            preset_data: components["schemas"]["PresetData"];
+            /** @description The type of style preset */
+            type: components["schemas"]["PresetType"];
+            /**
+             * Id
+             * @description The style preset ID.
+             */
+            id: string;
+            /**
+             * Image
+             * @description The path for image
+             */
+            image: string | null;
         };
         /**
          * SubModelType
@@ -17734,6 +17872,205 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkflowRecordDTO"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_style_preset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The style preset to get */
+                style_preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StylePresetRecordWithImage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_style_preset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The style preset to delete */
+                style_preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_style_preset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the style preset to update */
+                style_preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_update_style_preset"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StylePresetRecordWithImage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_style_presets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StylePresetRecordWithImage"][];
+                };
+            };
+        };
+    };
+    create_style_preset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_create_style_preset"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StylePresetRecordWithImage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_style_preset_image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the style preset image to get */
+                style_preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The style preset image was fetched successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Bad request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The style preset image could not be found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

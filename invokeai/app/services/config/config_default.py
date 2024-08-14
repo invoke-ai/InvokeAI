@@ -91,6 +91,7 @@ class InvokeAIAppConfig(BaseSettings):
         db_dir: Path to InvokeAI databases directory.
         outputs_dir: Path to directory for outputs.
         custom_nodes_dir: Path to directory for custom nodes.
+        style_presets_dir: Path to directory for style presets.
         log_handlers: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
         log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`
         log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
@@ -153,6 +154,7 @@ class InvokeAIAppConfig(BaseSettings):
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
+    style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
 
     # LOGGING
     log_handlers:             list[str] = Field(default=["console"],        description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".')
@@ -299,6 +301,11 @@ class InvokeAIAppConfig(BaseSettings):
     def models_path(self) -> Path:
         """Path to the models directory, resolved to an absolute path.."""
         return self._resolve(self.models_dir)
+
+    @property
+    def style_presets_path(self) -> Path:
+        """Path to the style presets directory, resolved to an absolute path.."""
+        return self._resolve(self.style_presets_dir)
 
     @property
     def convert_cache_path(self) -> Path:

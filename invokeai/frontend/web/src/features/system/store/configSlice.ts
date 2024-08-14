@@ -19,6 +19,7 @@ const initialConfigState: AppConfig = {
   shouldUpdateImagesOnConnect: false,
   shouldFetchMetadataFromApi: false,
   allowPrivateBoards: false,
+  allowPrivateStylePresets: false,
   disabledTabs: [],
   disabledFeatures: ['lightbox', 'faceRestore', 'batches'],
   disabledSDFeatures: ['variation', 'symmetry', 'hires', 'perlinNoise', 'noiseThreshold'],

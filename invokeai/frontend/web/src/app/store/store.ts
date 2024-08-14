@@ -28,6 +28,7 @@ import { generationPersistConfig, generationSlice } from 'features/parameters/st
 import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
+import { stylePresetPersistConfig, stylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
@@ -69,6 +70,7 @@ const allReducers = {
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [api.reducerPath]: api.reducer,
   [upscaleSlice.name]: upscaleSlice.reducer,
+  [stylePresetSlice.name]: stylePresetSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -114,6 +116,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [controlLayersPersistConfig.name]: controlLayersPersistConfig,
   [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
   [upscalePersistConfig.name]: upscalePersistConfig,
+  [stylePresetPersistConfig.name]: stylePresetPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
@@ -164,8 +167,8 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
-        serializableCheck: false,
-        immutableCheck: false,
+        serializableCheck: import.meta.env.MODE === 'development',
+        immutableCheck: import.meta.env.MODE === 'development',
       })
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
