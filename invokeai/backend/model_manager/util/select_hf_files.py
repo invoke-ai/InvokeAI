@@ -54,7 +54,7 @@ def filter_files(
                 "lora_weights.safetensors",
                 "weights.pb",
                 "onnx_data",
-                "spiece.model", # Added for `black-forest-labs/FLUX.1-schnell`.
+                "spiece.model",  # Added for `black-forest-labs/FLUX.1-schnell`.
             )
         ):
             paths.append(file)
