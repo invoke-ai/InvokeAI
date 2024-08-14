@@ -1,12 +1,13 @@
 from pathlib import Path
 from typing import Literal
 
+import accelerate
 import torch
 from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler
 from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
-from optimum.quanto import qfloat8
 from PIL import Image
+from safetensors.torch import load_file
 from transformers.models.auto import AutoModelForTextEncoding
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
@@ -20,6 +21,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.bnb import quantize_model_nf4
 from invokeai.backend.quantization.fast_quantized_diffusion_model import FastQuantizedDiffusersModel
 from invokeai.backend.quantization.fast_quantized_transformers_model import FastQuantizedTransformersModel
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
@@ -107,8 +109,9 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 transformer=transformer,
             )
 
-            t5_embeddings = t5_embeddings.to(dtype=transformer.dtype)
-            clip_embeddings = clip_embeddings.to(dtype=transformer.dtype)
+            dtype = torch.bfloat16
+            t5_embeddings = t5_embeddings.to(dtype=dtype)
+            clip_embeddings = clip_embeddings.to(dtype=dtype)
 
             latents = flux_pipeline_with_transformer(
                 height=self.height,
@@ -160,32 +163,49 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _load_flux_transformer(self, path: Path) -> FluxTransformer2DModel:
         if self.use_8bit:
-            model_8bit_path = path / "quantized"
-            if model_8bit_path.exists():
-                # The quantized model exists, load it.
-                # TODO(ryand): The requantize(...) operation in from_pretrained(...) is very slow. This seems like
-                # something that we should be able to make much faster.
-                q_model = QuantizedFluxTransformer2DModel.from_pretrained(model_8bit_path)
+            model_config = FluxTransformer2DModel.load_config(path, local_files_only=True)
+            with accelerate.init_empty_weights():
+                empty_model = FluxTransformer2DModel.from_config(model_config)
+            assert isinstance(empty_model, FluxTransformer2DModel)
 
-                # Access the underlying wrapped model.
-                # We access the wrapped model, even though it is private, because it simplifies the type checking by
-                # always returning a FluxTransformer2DModel from this function.
-                model = q_model._wrapped
-            else:
-                # The quantized model does not exist yet, quantize and save it.
-                # TODO(ryand): Loading in float16 and then quantizing seems to result in NaNs. In order to run this on
-                # GPUs that don't support bfloat16, we would need to host the quantized model instead of generating it
-                # here.
-                model = FluxTransformer2DModel.from_pretrained(path, local_files_only=True, torch_dtype=torch.bfloat16)
-                assert isinstance(model, FluxTransformer2DModel)
+            model_nf4_path = path / "bnb_nf4"
+            if model_nf4_path.exists():
+                with accelerate.init_empty_weights():
+                    model = quantize_model_nf4(empty_model, modules_to_not_convert=set(), compute_dtype=torch.bfloat16)
 
-                q_model = QuantizedFluxTransformer2DModel.quantize(model, weights=qfloat8)
+                # model.to_empty(device="cpu")
+                # TODO(ryand): Right now, some of the weights are loaded in bfloat16. Think about how best to handle
+                # this on GPUs without bfloat16 support.
+                sd = load_file(model_nf4_path / "model.safetensors")
+                model.load_state_dict(sd, strict=True, assign=True)
+                # model = model.to("cuda")
 
-                model_8bit_path.mkdir(parents=True, exist_ok=True)
-                q_model.save_pretrained(model_8bit_path)
+            # model_8bit_path = path / "quantized"
+            # if model_8bit_path.exists():
+            #     # The quantized model exists, load it.
+            #     # TODO(ryand): The requantize(...) operation in from_pretrained(...) is very slow. This seems like
+            #     # something that we should be able to make much faster.
+            #     q_model = QuantizedFluxTransformer2DModel.from_pretrained(model_8bit_path)
 
-                # (See earlier comment about accessing the wrapped model.)
-                model = q_model._wrapped
+            #     # Access the underlying wrapped model.
+            #     # We access the wrapped model, even though it is private, because it simplifies the type checking by
+            #     # always returning a FluxTransformer2DModel from this function.
+            #     model = q_model._wrapped
+            # else:
+            #     # The quantized model does not exist yet, quantize and save it.
+            #     # TODO(ryand): Loading in float16 and then quantizing seems to result in NaNs. In order to run this on
+            #     # GPUs that don't support bfloat16, we would need to host the quantized model instead of generating it
+            #     # here.
+            #     model = FluxTransformer2DModel.from_pretrained(path, local_files_only=True, torch_dtype=torch.bfloat16)
+            #     assert isinstance(model, FluxTransformer2DModel)
+
+            #     q_model = QuantizedFluxTransformer2DModel.quantize(model, weights=qfloat8)
+
+            #     model_8bit_path.mkdir(parents=True, exist_ok=True)
+            #     q_model.save_pretrained(model_8bit_path)
+
+            #     # (See earlier comment about accessing the wrapped model.)
+            #     model = q_model._wrapped
         else:
             model = FluxTransformer2DModel.from_pretrained(path, local_files_only=True, torch_dtype=torch.bfloat16)
 

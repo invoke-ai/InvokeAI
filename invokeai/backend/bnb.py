@@ -51,7 +51,7 @@ import torch
 #             self.SCB = SCB
 
 
-class InvokeLinear4Bit(bnb.nn.Linear4bit):
+class InvokeLinearNF4(bnb.nn.LinearNF4):
     def _load_from_state_dict(
         self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs
     ):
@@ -60,31 +60,36 @@ class InvokeLinear4Bit(bnb.nn.Linear4bit):
 
         I'm not sure why this was not included in the original `Linear4bit` implementation.
         """
-        # During serialization, the quant_state is stored as subkeys of "weight.". Here we extract those keys.
-        quant_state_keys = [k for k in state_dict.keys() if k.startswith(prefix + "weight.")]
 
-        if len(quant_state_keys) > 0:
+        weight = state_dict.pop(prefix + "weight")
+        bias = state_dict.pop(prefix + "bias", None)
+        # During serialization, the quant_state is stored as subkeys of "weight.".
+        # We expect the remaining keys to be quant_state keys. We validate that they at least have the correct prefix.
+        quant_state_sd = state_dict
+        assert all(k.startswith(prefix + "weight.") for k in quant_state_sd.keys())
+
+        if len(quant_state_sd) > 0:
             # We are loading a quantized state dict.
-            quant_state_sd = {k: state_dict.pop(k) for k in quant_state_keys}
-            weight = state_dict.pop(prefix + "weight")
-            bias = state_dict.pop(prefix + "bias", None)
-
-            if len(state_dict) != 0:
-                raise RuntimeError(f"Unexpected keys in state_dict: {state_dict.keys()}")
-
             self.weight = bnb.nn.Params4bit.from_prequantized(
                 data=weight, quantized_stats=quant_state_sd, device=weight.device
             )
-            if bias is None:
-                self.bias = None
-            else:
-                self.bias = torch.nn.Parameter(bias)
+            self.bias = bias if bias is None else torch.nn.Parameter(bias, requires_grad=False)
 
         else:
             # We are loading a non-quantized state dict.
-            return super()._load_from_state_dict(
-                state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs
+
+            # We could simply call the `super()._load_from_state_dict` method here, but then we wouldn't be able to load
+            # into from a state_dict into a model on the "meta" device. By initializing a new `Params4bit` object, we
+            # work around this issue.
+            self.weight = bnb.nn.Params4bit(
+                data=weight,
+                requires_grad=self.weight.requires_grad,
+                compress_statistics=self.weight.compress_statistics,
+                quant_type=self.weight.quant_type,
+                quant_storage=self.weight.quant_storage,
+                module=self,
             )
+            self.bias = bias if bias is None else torch.nn.Parameter(bias)
 
 
 class Invoke2Linear8bitLt(torch.nn.Linear):
@@ -545,7 +550,7 @@ def _convert_linear_layers_to_nf4(
         fullname = f"{prefix}.{name}" if prefix else name
         if isinstance(child, torch.nn.Linear) and not any(fullname.startswith(s) for s in ignore_modules):
             has_bias = child.bias is not None
-            replacement = InvokeLinear4Bit(
+            replacement = InvokeLinearNF4(
                 child.in_features,
                 child.out_features,
                 bias=has_bias,
@@ -553,9 +558,14 @@ def _convert_linear_layers_to_nf4(
                 # TODO(ryand): Test compress_statistics=True.
                 # compress_statistics=True,
             )
-            replacement.weight.data = child.weight.data
+            # replacement.weight.data = child.weight.data
+            # if has_bias:
+            #     replacement.bias.data = child.bias.data
             if has_bias:
-                replacement.bias.data = child.bias.data
+                replacement.bias = _replace_param(replacement.bias, child.bias.data)
+            replacement.weight = _replace_param(
+                replacement.weight, child.weight.data, quant_state=replacement.weight.quant_state
+            )
             replacement.requires_grad_(False)
             module.__setattr__(name, replacement)
         else:
