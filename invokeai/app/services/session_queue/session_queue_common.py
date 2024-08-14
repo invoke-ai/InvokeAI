@@ -86,7 +86,7 @@ BatchDataCollection: TypeAlias = list[list[BatchDatum]]
 
 class Batch(BaseModel):
     batch_id: str = Field(default_factory=uuid_string, description="The ID of the batch")
-    origin: QueueItemOrigin | None = Field(default=None, description="The origin of this batch.")
+    origin: str | None = Field(default=None, description="The origin of this batch.")
     data: Optional[BatchDataCollection] = Field(default=None, description="The batch data collection.")
     graph: Graph = Field(description="The graph to initialize the session with")
     workflow: Optional[WorkflowWithoutID] = Field(
@@ -205,7 +205,7 @@ class SessionQueueItemWithoutGraph(BaseModel):
     status: QUEUE_ITEM_STATUS = Field(default="pending", description="The status of this queue item")
     priority: int = Field(default=0, description="The priority of this queue item")
     batch_id: str = Field(description="The ID of the batch associated with this queue item")
-    origin: QueueItemOrigin | None = Field(default=None, description="The origin of this queue item. ")
+    origin: str | None = Field(default=None, description="The origin of this queue item. ")
     session_id: str = Field(
         description="The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed."
     )
@@ -305,7 +305,7 @@ class SessionQueueStatus(BaseModel):
 class BatchStatus(BaseModel):
     queue_id: str = Field(..., description="The ID of the queue")
     batch_id: str = Field(..., description="The ID of the batch")
-    origin: QueueItemOrigin | None = Field(..., description="The origin of the batch")
+    origin: str | None = Field(..., description="The origin of the batch")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
     completed: int = Field(..., description="Number of queue items with status 'complete'")
@@ -451,7 +451,7 @@ class SessionQueueValueToInsert(NamedTuple):
     field_values: Optional[str]  # field_values json
     priority: int  # priority
     workflow: Optional[str]  # workflow json
-    origin: QueueItemOrigin | None
+    origin: str | None
 
 
 ValuesToInsert: TypeAlias = list[SessionQueueValueToInsert]

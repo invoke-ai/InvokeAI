@@ -1,6 +1,6 @@
-import type { Store } from '@reduxjs/toolkit';
+import type { AppSocket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
-import type { RootState } from 'app/store/store';
+import type { AppStore } from 'app/store/store';
 import type { JSONObject } from 'common/types';
 import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva/constants';
 import {
@@ -12,7 +12,7 @@ import {
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import type { CanvasV2State, Coordinate, Dimensions, GenerationMode, Rect } from 'features/controlLayers/store/types';
-import { isValidLayer } from 'features/nodes/util/graph/generation/addLayers';
+import { isValidLayerWithoutControlAdapter } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
 import { clamp } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -49,8 +49,9 @@ export class CanvasManager {
 
   log: Logger;
   workerLog: Logger;
+  socket: AppSocket;
 
-  _store: Store<RootState>;
+  _store: AppStore;
   _prevState: CanvasV2State;
   _isFirstRender: boolean = true;
   _isDebugging: boolean = false;
@@ -58,12 +59,13 @@ export class CanvasManager {
   _worker: Worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
   _tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }> = new Map();
 
-  constructor(stage: Konva.Stage, container: HTMLDivElement, store: Store<RootState>) {
+  constructor(stage: Konva.Stage, container: HTMLDivElement, store: AppStore, socket: AppSocket) {
     this.id = getPrefixedId(this.type);
     this.path = [this.id];
     this.stage = stage;
     this.container = container;
     this._store = store;
+    this.socket = socket;
     this.stateApi = new CanvasStateApi(this._store, this);
 
     this._prevState = this.stateApi.getState();
@@ -547,7 +549,7 @@ export class CanvasManager {
     stageClone.x(0);
     stageClone.y(0);
 
-    const validLayers = layersState.entities.filter(isValidLayer);
+    const validLayers = layersState.entities.filter(isValidLayerWithoutControlAdapter);
     // getLayers() returns the internal `children` array of the stage directly - calling destroy on a layer will
     // mutate that array. We need to clone the array to avoid mutating the original.
     for (const konvaLayer of stageClone.getLayers().slice()) {

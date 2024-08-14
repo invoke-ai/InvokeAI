@@ -13,7 +13,7 @@ import type {
   ControlModeV2,
   ControlNetConfig,
   Filter,
-  ProcessorConfig,
+  FilterConfig,
   T2IAdapterConfig,
 } from './types';
 import { buildControlAdapterProcessorV2, imageDTOToImageObject } from './types';
@@ -145,7 +145,7 @@ export const controlAdaptersReducers = {
     }
     ca.controlMode = controlMode;
   },
-  caProcessorConfigChanged: (state, action: PayloadAction<{ id: string; processorConfig: ProcessorConfig | null }>) => {
+  caProcessorConfigChanged: (state, action: PayloadAction<{ id: string; processorConfig: FilterConfig | null }>) => {
     const { id, processorConfig } = action.payload;
     const ca = selectCA(state, id);
     if (!ca) {
