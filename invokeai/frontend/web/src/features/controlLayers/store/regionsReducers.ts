@@ -1,7 +1,7 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasV2State, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import { isEqual } from 'lodash-es';
@@ -99,7 +99,7 @@ export const regionsReducers = {
     if (!rg) {
       return;
     }
-    rg.imageCache = imageDTOToImageWithDims(imageDTO);
+    rg.imageCache = imageDTO.image_name;
   },
   rgAutoNegativeChanged: (state, action: PayloadAction<{ id: string; autoNegative: ParameterAutoNegative }>) => {
     const { id, autoNegative } = action.payload;

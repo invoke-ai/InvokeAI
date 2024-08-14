@@ -1,6 +1,8 @@
 import { Flex } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { $socket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
-import { useAppStore } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/nanostores/store';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
 import { $canvasManager, CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import Konva from 'konva';
@@ -17,6 +19,7 @@ Konva.showWarnings = false;
 
 const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, asPreview: boolean) => {
   const store = useAppStore();
+  const socket = useStore($socket);
   const dpr = useDevicePixelRatio({ round: false });
 
   useLayoutEffect(() => {
@@ -27,12 +30,17 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
       return () => {};
     }
 
-    const manager = new CanvasManager(stage, container, store);
+    if (!socket) {
+      log.debug('Socket not connected, skipping initialization');
+      return () => {};
+    }
+
+    const manager = new CanvasManager(stage, container, store, socket);
     $canvasManager.set(manager);
     console.log(manager);
     const cleanup = manager.initialize();
     return cleanup;
-  }, [asPreview, container, stage, store]);
+  }, [asPreview, container, socket, stage, store]);
 
   useLayoutEffect(() => {
     Konva.pixelRatio = dpr;

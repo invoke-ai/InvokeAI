@@ -33,9 +33,10 @@ import type {
   EntityMovedPayload,
   EntityRasterizedPayload,
   EntityRectAddedPayload,
+  FilterConfig,
   StageAttrs,
 } from './types';
-import { RGBA_RED } from './types';
+import { IMAGE_FILTERS, RGBA_RED } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
@@ -133,6 +134,10 @@ const initialState: CanvasV2State = {
     stagedImages: [],
     selectedStagedImageIndex: 0,
   },
+  filter: {
+    autoProcess: true,
+    config: IMAGE_FILTERS.canny_image_processor.buildDefaults(),
+  },
 };
 
 export function selectEntity(state: CanvasV2State, { id, type }: CanvasEntityIdentifier) {
@@ -222,11 +227,12 @@ export const canvasV2Slice = createSlice({
       } else if (entity.type === 'layer') {
         entity.objects = [imageObject];
         entity.position = position;
+        entity.imageCache = imageObject.image.image_name;
         state.layers.imageCache = null;
       } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
         entity.objects = [imageObject];
         entity.position = position;
-        entity.imageCache = null;
+        entity.imageCache = imageObject.image.image_name;
       } else {
         assert(false, 'Not implemented');
       }
@@ -354,6 +360,12 @@ export const canvasV2Slice = createSlice({
       state.ipAdapters.entities = [];
       state.controlAdapters.entities = [];
     },
+    filterSelected: (state, action: PayloadAction<{ type: FilterConfig['type'] }>) => {
+      state.filter.config = IMAGE_FILTERS[action.payload.type].buildDefaults();
+    },
+    filterConfigChanged: (state, action: PayloadAction<{ config: FilterConfig }>) => {
+      state.filter.config = action.payload.config;
+    },
     canvasReset: (state) => {
       state.bbox = deepClone(initialState.bbox);
       const optimalDimension = getOptimalDimension(state.params.model);
@@ -415,6 +427,11 @@ export const {
   layerOpacityChanged,
   layerAllDeleted,
   layerImageCacheChanged,
+  layerUsedAsControlChanged,
+  layerControlAdapterModelChanged,
+  layerControlAdapterControlModeChanged,
+  layerControlAdapterWeightChanged,
+  layerControlAdapterBeginEndStepPctChanged,
   // IP Adapters
   ipaAdded,
   ipaRecalled,
@@ -513,6 +530,9 @@ export const {
   sessionStagingAreaReset,
   sessionNextStagedImageSelected,
   sessionPrevStagedImageSelected,
+  // Filter
+  filterSelected,
+  filterConfigChanged,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
@@ -539,6 +559,8 @@ export const $lastAddedPoint = atom<Coordinate | null>(null);
 export const $lastMouseDownPos = atom<Coordinate | null>(null);
 export const $lastCursorPos = atom<Coordinate | null>(null);
 export const $spaceKey = atom<boolean>(false);
+export const $transformingEntity = atom<CanvasEntityIdentifier | null>(null);
+export const $filteringEntity = atom<CanvasEntityIdentifier | null>(null);
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   name: canvasV2Slice.name,

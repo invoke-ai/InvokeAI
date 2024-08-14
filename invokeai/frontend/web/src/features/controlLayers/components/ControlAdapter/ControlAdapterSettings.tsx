@@ -19,7 +19,7 @@ import {
   caWeightChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { selectCAOrThrow } from 'features/controlLayers/store/controlAdaptersReducers';
-import type { ControlModeV2, ProcessorConfig } from 'features/controlLayers/store/types';
+import type { ControlModeV2, FilterConfig } from 'features/controlLayers/store/types';
 import type { CAImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -62,7 +62,7 @@ export const ControlAdapterSettings = memo(() => {
   );
 
   const onChangeProcessorConfig = useCallback(
-    (processorConfig: ProcessorConfig | null) => {
+    (processorConfig: FilterConfig | null) => {
       dispatch(caProcessorConfigChanged({ id, processorConfig }));
     },
     [dispatch, id]

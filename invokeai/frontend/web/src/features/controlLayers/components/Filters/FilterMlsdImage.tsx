@@ -1,16 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAdapter/processors/types';
 import type { MlsdProcessorConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import ProcessorWrapper from './ProcessorWrapper';
+import type { FilterComponentProps } from './types';
 
-type Props = ProcessorComponentProps<MlsdProcessorConfig>;
+type Props = FilterComponentProps<MlsdProcessorConfig>;
 const DEFAULTS = IMAGE_FILTERS['mlsd_image_processor'].buildDefaults();
 
-export const MlsdImageProcessor = memo(({ onChange, config }: Props) => {
+export const FilterMlsdImage = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();
 
   const handleThrDChanged = useCallback(
@@ -28,7 +27,7 @@ export const MlsdImageProcessor = memo(({ onChange, config }: Props) => {
   );
 
   return (
-    <ProcessorWrapper>
+    <>
       <FormControl>
         <FormLabel m={0}>{t('controlnet.w')} </FormLabel>
         <CompositeSlider
@@ -69,8 +68,8 @@ export const MlsdImageProcessor = memo(({ onChange, config }: Props) => {
           step={0.01}
         />
       </FormControl>
-    </ProcessorWrapper>
+    </>
   );
 });
 
-MlsdImageProcessor.displayName = 'MlsdImageProcessor';
+FilterMlsdImage.displayName = 'FilterMlsdImage';
