@@ -15,7 +15,9 @@ from invokeai.backend.requantize import requantize
 
 class FastQuantizedTransformersModel(QuantizedTransformersModel):
     @classmethod
-    def from_pretrained(cls, model_name_or_path: Union[str, os.PathLike], auto_class = AutoModelForTextEncoding, **kwargs):
+    def from_pretrained(
+        cls, model_name_or_path: Union[str, os.PathLike], auto_class=AutoModelForTextEncoding, **kwargs
+    ):
         """We override the `from_pretrained()` method in order to use our custom `requantize()` implementation."""
         auto_class = auto_class or cls.auto_class
         if auto_class is None:

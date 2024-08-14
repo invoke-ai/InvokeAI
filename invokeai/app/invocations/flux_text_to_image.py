@@ -101,10 +101,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         # if the cache is not empty.
         # context.models._services.model_manager.load.ram_cache.make_room(24 * 2**30)
 
-        with (
-            transformer_info as transformer,
-            scheduler_info as scheduler
-        ):
+        with transformer_info as transformer, scheduler_info as scheduler:
             assert isinstance(transformer, FluxTransformer2DModel)
             assert isinstance(scheduler, FlowMatchEulerDiscreteScheduler)
 

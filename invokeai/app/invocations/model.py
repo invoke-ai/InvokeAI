@@ -60,10 +60,10 @@ class CLIPField(BaseModel):
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
 
 
-
 class TransformerField(BaseModel):
     transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
     scheduler: ModelIdentifierField = Field(description="Info to load scheduler submodel")
+
 
 class T5EncoderField(BaseModel):
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")

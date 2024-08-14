@@ -19,7 +19,7 @@ from invokeai.backend.requantize import requantize
 
 class FastQuantizedDiffusersModel(QuantizedDiffusersModel):
     @classmethod
-    def from_pretrained(cls, model_name_or_path: Union[str, os.PathLike], base_class = FluxTransformer2DModel, **kwargs):
+    def from_pretrained(cls, model_name_or_path: Union[str, os.PathLike], base_class=FluxTransformer2DModel, **kwargs):
         """We override the `from_pretrained()` method in order to use our custom `requantize()` implementation."""
         base_class = base_class or cls.base_class
         if base_class is None:

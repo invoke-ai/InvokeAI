@@ -52,9 +52,7 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
         return model.calc_size()
     elif isinstance(
         model,
-        (
-            T5TokenizerFast,
-        ),
+        (T5TokenizerFast,),
     ):
         return len(model)
     else:
