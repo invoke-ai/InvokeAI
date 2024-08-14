@@ -14,14 +14,16 @@ import type {
   CanvasEraserLineState,
   CanvasImageState,
   CanvasRectState,
+  ImageCache,
   Rect,
   RgbColor,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { isEqual } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
-import type { ImageCategory, ImageDTO } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
 /**
@@ -61,12 +63,6 @@ export class CanvasObjectRenderer {
    * A map of object renderers, keyed by their ID.
    */
   renderers: Map<string, AnyObjectRenderer> = new Map();
-
-  /**
-   * A cache of the rasterized image data URL. If the cache is null, the parent has not been rasterized since its last
-   * change.
-   */
-  rasterizedImageCache: string | null = null;
 
   /**
    * A object containing singleton Konva nodes.
@@ -166,19 +162,6 @@ export class CanvasObjectRenderer {
 
     if (this.buffer) {
       didRender = (await this.renderObject(this.buffer)) || didRender;
-    }
-
-    if (didRender && this.rasterizedImageCache) {
-      const hasOneObject = this.renderers.size === 1;
-      const firstObject = Array.from(this.renderers.values())[0];
-      if (
-        hasOneObject &&
-        firstObject &&
-        firstObject.state.type === 'image' &&
-        firstObject.state.image.image_name !== this.rasterizedImageCache
-      ) {
-        this.rasterizedImageCache = null;
-      }
     }
 
     return didRender;
@@ -376,29 +359,37 @@ export class CanvasObjectRenderer {
     return this.renderers.size > 0 || this.buffer !== null;
   };
 
+  getRasterizedImageCache = (rect: Rect): ImageCache | null => {
+    const imageCache = this.parent.state.rasterizationCache.find((cache) => isEqual(cache.rect, rect));
+    return imageCache ?? null;
+  };
+
   /**
-   * Rasterizes the parent entity. If the entity has a rasterization cache, the cached image is returned after
-   * validating that it exists on the server.
+   * Rasterizes the parent entity. If the entity has a rasterization cache for the given rect, the cached image is
+   * returned. Otherwise, the entity is rasterized and the image is uploaded to the server.
    *
-   * The rasterization cache is reset when the entity's objects change. The buffer object is not considered part of the
-   * entity's objects for this purpose.
+   * The rasterization cache is reset when the entity's state changes. The buffer object is not considered part of the
+   * entity state for this purpose as it is a temporary object.
    *
+   * @param rect The rect to rasterize. If omitted, the entity's full rect will be used.
    * @returns A promise that resolves to the rasterized image DTO.
    */
-  rasterize = async (): Promise<ImageDTO> => {
-    this.log.debug('Rasterizing entity');
-
+  rasterize = async (rect?: Rect): Promise<ImageDTO> => {
+    rect = rect ?? this.parent.transformer.getRelativeRect();
     let imageDTO: ImageDTO | null = null;
-    if (this.rasterizedImageCache) {
-      imageDTO = await getImageDTO(this.rasterizedImageCache);
+    const rasterizedImageCache = this.getRasterizedImageCache(rect);
+
+    if (rasterizedImageCache) {
+      imageDTO = await getImageDTO(rasterizedImageCache.imageName);
+      if (imageDTO) {
+        this.log.trace({ rect, rasterizedImageCache, imageDTO }, 'Using cached rasterized image');
+        return imageDTO;
+      }
     }
 
-    if (imageDTO) {
-      return imageDTO;
-    }
+    this.log.trace({ rect }, 'Rasterizing entity');
 
-    const rect = this.parent.transformer.getRelativeRect();
-    const blob = await this.getBlob({ rect });
+    const blob = await this.getBlob(rect);
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Rasterized entity');
     }
@@ -408,39 +399,18 @@ export class CanvasObjectRenderer {
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.getEntityIdentifier(),
       imageObject,
-      position: { x: Math.round(rect.x), y: Math.round(rect.y) },
+      rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: imageDTO.width, height: imageDTO.height },
     });
-
-    this.rasterizedImageCache = imageDTO.image_name;
 
     return imageDTO;
   };
 
-  getBlob = ({ rect }: { rect?: Rect }): Promise<Blob> => {
+  getBlob = (rect?: Rect): Promise<Blob> => {
     return konvaNodeToBlob(this.konva.objectGroup.clone(), rect);
   };
 
-  getImageData = ({ rect }: { rect?: Rect }): ImageData => {
+  getImageData = (rect?: Rect): ImageData => {
     return konvaNodeToImageData(this.konva.objectGroup.clone(), rect);
-  };
-
-  getImageDTO = async ({
-    rect,
-    category,
-    is_intermediate,
-    onUploaded,
-  }: {
-    rect?: Rect;
-    category: ImageCategory;
-    is_intermediate: boolean;
-    onUploaded?: (imageDTO: ImageDTO) => void;
-  }): Promise<ImageDTO> => {
-    const blob = await this.getBlob({ rect });
-    const imageDTO = await uploadImage(blob, `${this.id}.png`, category, is_intermediate);
-    if (onUploaded) {
-      onUploaded(imageDTO);
-    }
-    return imageDTO;
   };
 
   /**

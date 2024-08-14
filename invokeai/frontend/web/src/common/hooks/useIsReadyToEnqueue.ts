@@ -125,41 +125,41 @@ const createSelector = (templates: Templates) =>
           reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
         }
 
-        canvasV2.controlAdapters.entities
-          .filter((ca) => ca.isEnabled)
-          .forEach((ca, i) => {
-            const layerLiteral = i18n.t('controlLayers.layers_one');
-            const layerNumber = i + 1;
-            const layerType = i18n.t(LAYER_TYPE_TO_TKEY[ca.type]);
-            const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-            const problems: string[] = [];
-            // Must have model
-            if (!ca.model) {
-              problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoModelSelected'));
-            }
-            // Model base must match
-            if (ca.model?.base !== model?.base) {
-              problems.push(i18n.t('parameters.invoke.layer.controlAdapterIncompatibleBaseModel'));
-            }
-            // Must have a control image OR, if it has a processor, it must have a processed image
-            if (!ca.imageObject) {
-              problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoImageSelected'));
-            } else if (ca.processorConfig && !ca.processedImageObject) {
-              problems.push(i18n.t('parameters.invoke.layer.controlAdapterImageNotProcessed'));
-            }
-            // T2I Adapters require images have dimensions that are multiples of 64 (SD1.5) or 32 (SDXL)
-            if (ca.adapterType === 't2i_adapter') {
-              const multiple = model?.base === 'sdxl' ? 32 : 64;
-              if (bbox.rect.width % multiple !== 0 || bbox.rect.height % multiple !== 0) {
-                problems.push(i18n.t('parameters.invoke.layer.t2iAdapterIncompatibleDimensions', { multiple }));
-              }
-            }
+        // canvasV2.controlAdapters.entities
+        //   .filter((ca) => ca.isEnabled)
+        //   .forEach((ca, i) => {
+        //     const layerLiteral = i18n.t('controlLayers.layers_one');
+        //     const layerNumber = i + 1;
+        //     const layerType = i18n.t(LAYER_TYPE_TO_TKEY[ca.type]);
+        //     const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
+        //     const problems: string[] = [];
+        //     // Must have model
+        //     if (!ca.model) {
+        //       problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoModelSelected'));
+        //     }
+        //     // Model base must match
+        //     if (ca.model?.base !== model?.base) {
+        //       problems.push(i18n.t('parameters.invoke.layer.controlAdapterIncompatibleBaseModel'));
+        //     }
+        //     // Must have a control image OR, if it has a processor, it must have a processed image
+        //     if (!ca.imageObject) {
+        //       problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoImageSelected'));
+        //     } else if (ca.processorConfig && !ca.processedImageObject) {
+        //       problems.push(i18n.t('parameters.invoke.layer.controlAdapterImageNotProcessed'));
+        //     }
+        //     // T2I Adapters require images have dimensions that are multiples of 64 (SD1.5) or 32 (SDXL)
+        //     if (ca.adapterType === 't2i_adapter') {
+        //       const multiple = model?.base === 'sdxl' ? 32 : 64;
+        //       if (bbox.rect.width % multiple !== 0 || bbox.rect.height % multiple !== 0) {
+        //         problems.push(i18n.t('parameters.invoke.layer.t2iAdapterIncompatibleDimensions', { multiple }));
+        //       }
+        //     }
 
-            if (problems.length) {
-              const content = upperFirst(problems.join(', '));
-              reasons.push({ prefix, content });
-            }
-          });
+        //     if (problems.length) {
+        //       const content = upperFirst(problems.join(', '));
+        //       reasons.push({ prefix, content });
+        //     }
+        //   });
 
         canvasV2.ipAdapters.entities
           .filter((ipa) => ipa.isEnabled)

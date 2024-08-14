@@ -100,7 +100,12 @@ export class CanvasFilter {
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.getEntityIdentifier(),
       imageObject: this.imageState,
-      position: { x: Math.round(rect.x), y: Math.round(rect.y) },
+      rect: {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: this.imageState.image.height,
+        height: this.imageState.image.width,
+      },
     });
     this.parent.renderer.showObjects();
     this.manager.stateApi.$filteringEntity.set(null);

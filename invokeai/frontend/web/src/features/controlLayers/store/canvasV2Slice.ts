@@ -5,7 +5,6 @@ import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/uti
 import { deepClone } from 'common/util/deepClone';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
-import { controlAdaptersReducers } from 'features/controlLayers/store/controlAdaptersReducers';
 import { inpaintMaskReducers } from 'features/controlLayers/store/inpaintMaskReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
 import { layersReducers } from 'features/controlLayers/store/layersReducers';
@@ -18,13 +17,16 @@ import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { initialAspectRatioState } from 'features/parameters/components/DocumentSize/constants';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
-import { pick } from 'lodash-es';
+import { isEqual, pick } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 import { assert } from 'tsafe';
 
 import type {
   CanvasEntityIdentifier,
+  CanvasInpaintMaskState,
+  CanvasLayerState,
+  CanvasRegionalGuidanceState,
   CanvasV2State,
   Coordinate,
   EntityBrushLineAddedPayload,
@@ -41,8 +43,7 @@ import { IMAGE_FILTERS, RGBA_RED } from './types';
 const initialState: CanvasV2State = {
   _version: 3,
   selectedEntityIdentifier: null,
-  layers: { entities: [], imageCache: null },
-  controlAdapters: { entities: [] },
+  layers: { entities: [], compositeRasterizationCache: [] },
   ipAdapters: { entities: [] },
   regions: { entities: [] },
   loras: [],
@@ -50,7 +51,7 @@ const initialState: CanvasV2State = {
     id: 'inpaint_mask',
     type: 'inpaint_mask',
     fill: RGBA_RED,
-    imageCache: null,
+    rasterizationCache: [],
     isEnabled: true,
     objects: [],
     position: {
@@ -144,8 +145,6 @@ export function selectEntity(state: CanvasV2State, { id, type }: CanvasEntityIde
   switch (type) {
     case 'layer':
       return state.layers.entities.find((layer) => layer.id === id);
-    case 'control_adapter':
-      return state.controlAdapters.entities.find((ca) => ca.id === id);
     case 'inpaint_mask':
       return state.inpaintMask;
     case 'regional_guidance':
@@ -157,13 +156,37 @@ export function selectEntity(state: CanvasV2State, { id, type }: CanvasEntityIde
   }
 }
 
+const invalidateCompositeRasterizationCache = (entity: CanvasLayerState, state: CanvasV2State) => {
+  if (entity.controlAdapter === null) {
+    state.layers.compositeRasterizationCache = [];
+  }
+};
+
+const invalidateRasterizationCaches = (
+  entity: CanvasLayerState | CanvasInpaintMaskState | CanvasRegionalGuidanceState,
+  state: CanvasV2State
+) => {
+  // TODO(psyche): We can be more efficient and only invalidate caches when the entity's changes intersect with the
+  // cached rect.
+
+  // Reset the entity's rasterization cache
+  entity.rasterizationCache = [];
+
+  // When an individual layer has its cache reset, we must also reset the composite rasterization cache because the
+  // layer's image data will contribute to the composite layer's image data.
+  // If the layer is used as a control layer, it will not contribute to the composite layer, so we do not need to reset
+  // its cache.
+  if (entity.type === 'layer') {
+    invalidateCompositeRasterizationCache(entity, state);
+  }
+};
+
 export const canvasV2Slice = createSlice({
   name: 'canvasV2',
   initialState,
   reducers: {
     ...layersReducers,
     ...ipAdaptersReducers,
-    ...controlAdaptersReducers,
     ...regionsReducers,
     ...lorasReducers,
     ...paramsReducers,
@@ -182,16 +205,11 @@ export const canvasV2Slice = createSlice({
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      } else if (entity.type === 'layer') {
+      } else if (entity.type === 'layer' || entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
         entity.isEnabled = true;
         entity.objects = [];
         entity.position = { x: 0, y: 0 };
-        state.layers.imageCache = null;
-      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
-        entity.isEnabled = true;
-        entity.objects = [];
-        entity.position = { x: 0, y: 0 };
-        entity.imageCache = null;
+        invalidateRasterizationCaches(entity, state);
       } else {
         assert(false, 'Not implemented');
       }
@@ -209,32 +227,28 @@ export const canvasV2Slice = createSlice({
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      } else if (entity.type === 'layer') {
+      }
+
+      if (entity.type === 'layer' || entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
         entity.position = position;
-        state.layers.imageCache = null;
-      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
-        entity.position = position;
-        entity.imageCache = null;
-      } else {
-        assert(false, 'Not implemented');
+        // When an entity is moved, we need to invalidate the rasterization caches.
+        invalidateRasterizationCaches(entity, state);
       }
     },
     entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
-      const { entityIdentifier, imageObject, position } = action.payload;
+      const { entityIdentifier, imageObject, rect } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      } else if (entity.type === 'layer') {
+      }
+
+      if (entity.type === 'layer' || entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
         entity.objects = [imageObject];
-        entity.position = position;
-        entity.imageCache = imageObject.image.image_name;
-        state.layers.imageCache = null;
-      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
-        entity.objects = [imageObject];
-        entity.position = position;
-        entity.imageCache = imageObject.image.image_name;
-      } else {
-        assert(false, 'Not implemented');
+        entity.position = { x: rect.x, y: rect.y };
+        // Remove the cache for the given rect. This should never happen, because we should never rasterize the same
+        // rect twice. Just in case, we remove the old cache.
+        entity.rasterizationCache = entity.rasterizationCache.filter((cache) => !isEqual(cache.rect, rect));
+        entity.rasterizationCache.push({ imageName: imageObject.image.image_name, rect });
       }
     },
     entityBrushLineAdded: (state, action: PayloadAction<EntityBrushLineAddedPayload>) => {
@@ -242,14 +256,12 @@ export const canvasV2Slice = createSlice({
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      } else if (entity.type === 'layer') {
+      }
+
+      if (entity.type === 'layer' || entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
         entity.objects.push(brushLine);
-        state.layers.imageCache = null;
-      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
-        entity.objects.push(brushLine);
-        entity.imageCache = null;
-      } else {
-        assert(false, 'Not implemented');
+        // When adding a brush line, we need to invalidate the rasterization caches.
+        invalidateRasterizationCaches(entity, state);
       }
     },
     entityEraserLineAdded: (state, action: PayloadAction<EntityEraserLineAddedPayload>) => {
@@ -257,12 +269,10 @@ export const canvasV2Slice = createSlice({
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      } else if (entity.type === 'layer') {
+      } else if (entity.type === 'layer' || entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
         entity.objects.push(eraserLine);
-        state.layers.imageCache = null;
-      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
-        entity.objects.push(eraserLine);
-        entity.imageCache = null;
+        // When adding an eraser line, we need to invalidate the rasterization caches.
+        invalidateRasterizationCaches(entity, state);
       } else {
         assert(false, 'Not implemented');
       }
@@ -274,19 +284,21 @@ export const canvasV2Slice = createSlice({
         return;
       } else if (entity.type === 'layer') {
         entity.objects.push(rect);
-        state.layers.imageCache = null;
-      } else if (entity.type === 'inpaint_mask' || entity.type === 'regional_guidance') {
-        entity.objects.push(rect);
-        entity.imageCache = null;
+        // When adding an eraser line, we need to invalidate the rasterization caches.
+        invalidateRasterizationCaches(entity, state);
       } else {
         assert(false, 'Not implemented');
       }
     },
     entityDeleted: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (entity?.type === 'layer') {
+        // When a layer is deleted, we may need to invalidate the composite rasterization cache.
+        invalidateCompositeRasterizationCache(entity, state);
+      }
       if (entityIdentifier.type === 'layer') {
         state.layers.entities = state.layers.entities.filter((layer) => layer.id !== entityIdentifier.id);
-        state.layers.imageCache = null;
       } else if (entityIdentifier.type === 'regional_guidance') {
         state.regions.entities = state.regions.entities.filter((rg) => rg.id !== entityIdentifier.id);
       } else {
@@ -301,11 +313,10 @@ export const canvasV2Slice = createSlice({
       }
       if (entity.type === 'layer') {
         moveOneToEnd(state.layers.entities, entity);
-        state.layers.imageCache = null;
+        // When arranging an entity, we may need to invalidate the composite rasterization cache.
+        invalidateCompositeRasterizationCache(entity, state);
       } else if (entity.type === 'regional_guidance') {
         moveOneToEnd(state.regions.entities, entity);
-      } else if (entity.type === 'control_adapter') {
-        moveOneToEnd(state.controlAdapters.entities, entity);
       }
     },
     entityArrangedToFront: (state, action: PayloadAction<EntityIdentifierPayload>) => {
@@ -316,11 +327,10 @@ export const canvasV2Slice = createSlice({
       }
       if (entity.type === 'layer') {
         moveToEnd(state.layers.entities, entity);
-        state.layers.imageCache = null;
+        // When arranging an entity, we may need to invalidate the composite rasterization cache.
+        invalidateCompositeRasterizationCache(entity, state);
       } else if (entity.type === 'regional_guidance') {
         moveToEnd(state.regions.entities, entity);
-      } else if (entity.type === 'control_adapter') {
-        moveToEnd(state.controlAdapters.entities, entity);
       }
     },
     entityArrangedBackwardOne: (state, action: PayloadAction<EntityIdentifierPayload>) => {
@@ -331,11 +341,10 @@ export const canvasV2Slice = createSlice({
       }
       if (entity.type === 'layer') {
         moveOneToStart(state.layers.entities, entity);
-        state.layers.imageCache = null;
+        // When arranging an entity, we may need to invalidate the composite rasterization cache.
+        invalidateCompositeRasterizationCache(entity, state);
       } else if (entity.type === 'regional_guidance') {
         moveOneToStart(state.regions.entities, entity);
-      } else if (entity.type === 'control_adapter') {
-        moveOneToStart(state.controlAdapters.entities, entity);
       }
     },
     entityArrangedToBack: (state, action: PayloadAction<EntityIdentifierPayload>) => {
@@ -346,25 +355,40 @@ export const canvasV2Slice = createSlice({
       }
       if (entity.type === 'layer') {
         moveToStart(state.layers.entities, entity);
-        state.layers.imageCache = null;
+        // When arranging an entity, we may need to invalidate the composite rasterization cache.
+        invalidateCompositeRasterizationCache(entity, state);
       } else if (entity.type === 'regional_guidance') {
         moveToStart(state.regions.entities, entity);
-      } else if (entity.type === 'control_adapter') {
-        moveToStart(state.controlAdapters.entities, entity);
       }
     },
     allEntitiesDeleted: (state) => {
       state.regions.entities = [];
       state.layers.entities = [];
-      state.layers.imageCache = null;
+      state.layers.compositeRasterizationCache = [];
       state.ipAdapters.entities = [];
-      state.controlAdapters.entities = [];
     },
     filterSelected: (state, action: PayloadAction<{ type: FilterConfig['type'] }>) => {
       state.filter.config = IMAGE_FILTERS[action.payload.type].buildDefaults();
     },
     filterConfigChanged: (state, action: PayloadAction<{ config: FilterConfig }>) => {
       state.filter.config = action.payload.config;
+    },
+    rasterizationCachesInvalidated: (state) => {
+      // Invalidate the rasterization caches for all entities.
+
+      // Layers & composite layer
+      state.layers.compositeRasterizationCache = [];
+      for (const layer of state.layers.entities) {
+        layer.rasterizationCache = [];
+      }
+
+      // Regions
+      for (const region of state.regions.entities) {
+        region.rasterizationCache = [];
+      }
+
+      // Inpaint mask
+      state.inpaintMask.rasterizationCache = [];
     },
     canvasReset: (state) => {
       state.bbox = deepClone(initialState.bbox);
@@ -374,7 +398,6 @@ export const canvasV2Slice = createSlice({
       const size = pick(state.bbox.rect, 'width', 'height');
       state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, optimalDimension);
 
-      state.controlAdapters = deepClone(initialState.controlAdapters);
       state.ipAdapters = deepClone(initialState.ipAdapters);
       state.layers = deepClone(initialState.layers);
       state.regions = deepClone(initialState.regions);
@@ -397,6 +420,7 @@ export const {
   allEntitiesDeleted,
   clipToBboxChanged,
   canvasReset,
+  rasterizationCachesInvalidated,
   // All entities
   entitySelected,
   entityReset,
@@ -424,14 +448,13 @@ export const {
   // layers
   layerAdded,
   layerRecalled,
-  layerOpacityChanged,
   layerAllDeleted,
-  layerImageCacheChanged,
   layerUsedAsControlChanged,
   layerControlAdapterModelChanged,
   layerControlAdapterControlModeChanged,
   layerControlAdapterWeightChanged,
   layerControlAdapterBeginEndStepPctChanged,
+  layerCompositeRasterized,
   // IP Adapters
   ipaAdded,
   ipaRecalled,
@@ -444,20 +467,6 @@ export const {
   ipaCLIPVisionModelChanged,
   ipaWeightChanged,
   ipaBeginEndStepPctChanged,
-  // Control Adapters
-  caAdded,
-  caAllDeleted,
-  caOpacityChanged,
-  caRecalled,
-  caImageChanged,
-  caProcessedImageChanged,
-  caModelChanged,
-  caControlModeChanged,
-  caProcessorConfigChanged,
-  caFilterChanged,
-  caProcessorPendingBatchIdChanged,
-  caWeightChanged,
-  caBeginEndStepPctChanged,
   // Regions
   rgAdded,
   rgRecalled,
@@ -465,7 +474,6 @@ export const {
   rgPositivePromptChanged,
   rgNegativePromptChanged,
   rgFillChanged,
-  rgImageCacheChanged,
   rgAutoNegativeChanged,
   rgIPAdapterAdded,
   rgIPAdapterDeleted,
@@ -522,7 +530,6 @@ export const {
   // Inpaint mask
   imRecalled,
   imFillChanged,
-  imImageCacheChanged,
   // Staging
   sessionStartedStaging,
   sessionImageStaged,

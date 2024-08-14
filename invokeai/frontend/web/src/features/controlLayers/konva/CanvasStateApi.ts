@@ -26,9 +26,7 @@ import {
   entityReset,
   entitySelected,
   eraserWidthChanged,
-  imImageCacheChanged,
-  layerImageCacheChanged,
-  rgImageCacheChanged,
+  layerCompositeRasterized,
   toolBufferChanged,
   toolChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
@@ -51,7 +49,6 @@ import type {
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
-import type { ImageDTO } from 'services/api/types';
 
 type EntityStateAndAdapter =
   | {
@@ -118,6 +115,10 @@ export class CanvasStateApi {
     log.trace(arg, 'Rasterizing entity');
     this._store.dispatch(entityRasterized(arg));
   };
+  compositeLayerRasterized = (arg: { imageName: string; rect: Rect }) => {
+    log.trace(arg, 'Composite layer rasterized');
+    this._store.dispatch(layerCompositeRasterized(arg));
+  };
   setSelectedEntity = (arg: EntityIdentifierPayload) => {
     log.trace({ arg }, 'Setting selected entity');
     this._store.dispatch(entitySelected(arg));
@@ -133,18 +134,6 @@ export class CanvasStateApi {
   setEraserWidth = (width: number) => {
     log.trace({ width }, 'Setting eraser width');
     this._store.dispatch(eraserWidthChanged(width));
-  };
-  setRegionMaskImageCache = (id: string, imageDTO: ImageDTO) => {
-    log.trace({ id, imageDTO }, 'Setting region mask image cache');
-    this._store.dispatch(rgImageCacheChanged({ id, imageDTO }));
-  };
-  setInpaintMaskImageCache = (imageDTO: ImageDTO) => {
-    log.trace({ imageDTO }, 'Setting inpaint mask image cache');
-    this._store.dispatch(imImageCacheChanged({ imageDTO }));
-  };
-  setLayerImageCache = (imageDTO: ImageDTO) => {
-    log.trace({ imageDTO }, 'Setting layer image cache');
-    this._store.dispatch(layerImageCacheChanged({ imageDTO }));
   };
   setTool = (tool: Tool) => {
     log.trace({ tool }, 'Setting tool');
@@ -170,9 +159,6 @@ export class CanvasStateApi {
   };
   getLayersState = () => {
     return this.getState().layers;
-  };
-  getControlAdaptersState = () => {
-    return this.getState().controlAdapters;
   };
   getInpaintMaskState = () => {
     return this.getState().inpaintMask;
@@ -202,9 +188,6 @@ export class CanvasStateApi {
     if (identifier.type === 'layer') {
       entityState = state.layers.entities.find((i) => i.id === identifier.id) ?? null;
       entityAdapter = this.manager.layers.get(identifier.id) ?? null;
-    } else if (identifier.type === 'control_adapter') {
-      entityState = state.controlAdapters.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.manager.controlAdapters.get(identifier.id) ?? null;
     } else if (identifier.type === 'regional_guidance') {
       entityState = state.regions.entities.find((i) => i.id === identifier.id) ?? null;
       entityAdapter = this.manager.regions.get(identifier.id) ?? null;
