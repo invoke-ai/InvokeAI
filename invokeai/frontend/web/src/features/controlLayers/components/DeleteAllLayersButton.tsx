@@ -11,7 +11,7 @@ export const DeleteAllLayersButton = memo(() => {
   const entityCount = useAppSelector((s) => {
     return (
       s.canvasV2.regions.entities.length +
-      s.canvasV2.controlAdapters.entities.length +
+      // s.canvasV2.controlAdapters.entities.length +
       s.canvasV2.ipAdapters.entities.length +
       s.canvasV2.layers.entities.length
     );

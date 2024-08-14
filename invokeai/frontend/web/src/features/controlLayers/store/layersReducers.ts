@@ -1,12 +1,11 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { merge } from 'lodash-es';
-import type { ControlNetModelConfig, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
+import { isEqual, merge } from 'lodash-es';
+import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
-import type { CanvasLayerState, CanvasV2State, ControlModeV2, ControlNetConfig, T2IAdapterConfig } from './types';
-import { imageDTOToImageWithDims } from './types';
+import type { CanvasLayerState, CanvasV2State, ControlModeV2, ControlNetConfig, Rect, T2IAdapterConfig } from './types';
 
 export const selectLayer = (state: CanvasV2State, id: string) => state.layers.entities.find((layer) => layer.id === id);
 export const selectLayerOrThrow = (state: CanvasV2State, id: string) => {
@@ -29,7 +28,7 @@ export const layersReducers = {
         objects: [],
         opacity: 1,
         position: { x: 0, y: 0 },
-        imageCache: null,
+        rasterizationCache: [],
         controlAdapter: null,
       };
       merge(layer, overrides);
@@ -37,7 +36,11 @@ export const layersReducers = {
       if (isSelected) {
         state.selectedEntityIdentifier = { type: 'layer', id };
       }
-      state.layers.imageCache = null;
+
+      if (layer.objects.length > 0) {
+        // This new layer will change the composite layer's image data. Invalidate the cache.
+        state.layers.compositeRasterizationCache = [];
+      }
     },
     prepare: (payload: { overrides?: Partial<CanvasLayerState>; isSelected?: boolean }) => ({
       payload: { ...payload, id: getPrefixedId('layer') },
@@ -47,24 +50,20 @@ export const layersReducers = {
     const { data } = action.payload;
     state.layers.entities.push(data);
     state.selectedEntityIdentifier = { type: 'layer', id: data.id };
-    state.layers.imageCache = null;
+    if (data.objects.length > 0) {
+      // This new layer will change the composite layer's image data. Invalidate the cache.
+      state.layers.compositeRasterizationCache = [];
+    }
   },
   layerAllDeleted: (state) => {
     state.layers.entities = [];
-    state.layers.imageCache = null;
+    state.layers.compositeRasterizationCache = [];
   },
-  layerOpacityChanged: (state, action: PayloadAction<{ id: string; opacity: number }>) => {
-    const { id, opacity } = action.payload;
-    const layer = selectLayer(state, id);
-    if (!layer) {
-      return;
-    }
-    layer.opacity = opacity;
-    state.layers.imageCache = null;
-  },
-  layerImageCacheChanged: (state, action: PayloadAction<{ imageDTO: ImageDTO | null }>) => {
-    const { imageDTO } = action.payload;
-    state.layers.imageCache = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+  layerCompositeRasterized: (state, action: PayloadAction<{ imageName: string; rect: Rect }>) => {
+    state.layers.compositeRasterizationCache = state.layers.compositeRasterizationCache.filter(
+      (cache) => !isEqual(cache.rect, action.payload.rect)
+    );
+    state.layers.compositeRasterizationCache.push(action.payload);
   },
   layerUsedAsControlChanged: (
     state,
@@ -76,6 +75,8 @@ export const layersReducers = {
       return;
     }
     layer.controlAdapter = controlAdapter;
+    // The composite layer's image data will change when the layer is used as control (or not). Invalidate the cache.
+    state.layers.compositeRasterizationCache = [];
   },
   layerControlAdapterModelChanged: (
     state,

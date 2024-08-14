@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
-  entityIsEnabledToggled,
   loraDeleted,
   modelChanged,
   vaeSelected,
@@ -50,14 +49,14 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
 
         // handle incompatible controlnets
-        state.canvasV2.controlAdapters.entities.forEach((ca) => {
-          if (ca.model?.base !== newBaseModel) {
-            modelsCleared += 1;
-            if (ca.isEnabled) {
-              dispatch(entityIsEnabledToggled({ entityIdentifier: { id: ca.id, type: 'control_adapter' } }));
-            }
-          }
-        });
+        // state.canvasV2.controlAdapters.entities.forEach((ca) => {
+        //   if (ca.model?.base !== newBaseModel) {
+        //     modelsCleared += 1;
+        //     if (ca.isEnabled) {
+        //       dispatch(entityIsEnabledToggled({ entityIdentifier: { id: ca.id, type: 'control_adapter' } }));
+        //     }
+        //   }
+        // });
 
         if (modelsCleared > 0) {
           toast({
