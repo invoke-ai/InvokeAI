@@ -1,16 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAdapter/processors/types';
 import type { CannyProcessorConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import ProcessorWrapper from './ProcessorWrapper';
+import type { FilterComponentProps } from './types';
 
-type Props = ProcessorComponentProps<CannyProcessorConfig>;
+type Props = FilterComponentProps<CannyProcessorConfig>;
 const DEFAULTS = IMAGE_FILTERS['canny_image_processor'].buildDefaults();
 
-export const CannyProcessor = ({ onChange, config }: Props) => {
+export const FilterCanny = ({ onChange, config }: Props) => {
   const { t } = useTranslation();
   const handleLowThresholdChanged = useCallback(
     (v: number) => {
@@ -26,7 +25,7 @@ export const CannyProcessor = ({ onChange, config }: Props) => {
   );
 
   return (
-    <ProcessorWrapper>
+    <>
       <FormControl>
         <FormLabel m={0}>{t('controlnet.lowThreshold')}</FormLabel>
         <CompositeSlider
@@ -61,8 +60,8 @@ export const CannyProcessor = ({ onChange, config }: Props) => {
           max={255}
         />
       </FormControl>
-    </ProcessorWrapper>
+    </>
   );
 };
 
-CannyProcessor.displayName = 'CannyProcessor';
+FilterCanny.displayName = 'FilterCanny';

@@ -1,4 +1,4 @@
-import { Spacer, useDisclosure } from '@invoke-ai/ui-library';
+import { Spacer } from '@invoke-ai/ui-library';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
 import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
@@ -18,12 +18,11 @@ type Props = {
 
 export const Layer = memo(({ id }: Props) => {
   const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'layer' }), [id]);
-  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: false });
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <CanvasEntityContainer>
-        <CanvasEntityHeader onDoubleClick={onToggle}>
+        <CanvasEntityHeader>
           <CanvasEntityEnabledToggle />
           <CanvasEntityTitle />
           <Spacer />
@@ -31,7 +30,7 @@ export const Layer = memo(({ id }: Props) => {
           <LayerActionsMenu />
           <CanvasEntityDeleteButton />
         </CanvasEntityHeader>
-        {isOpen && <LayerSettings />}
+        <LayerSettings />
       </CanvasEntityContainer>
     </EntityIdentifierContext.Provider>
   );

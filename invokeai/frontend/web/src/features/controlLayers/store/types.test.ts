@@ -21,14 +21,14 @@ import type {
   MlsdProcessorConfig,
   NormalbaeProcessorConfig,
   PidiProcessorConfig,
-  ProcessorConfig,
-  ProcessorTypeV2,
+  FilterConfig,
+  FilterType,
   ZoeDepthProcessorConfig,
 } from './types';
 
 describe('Control Adapter Types', () => {
   test('ProcessorType', () => {
-    assert<Equals<ProcessorConfig['type'], ProcessorTypeV2>>();
+    assert<Equals<FilterConfig['type'], FilterType>>();
   });
   test('IP Adapter Method', () => {
     assert<Equals<NonNullable<Invocation<'ip_adapter'>['method']>, IPMethodV2>>();

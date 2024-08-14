@@ -1,17 +1,16 @@
 import { Flex, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAdapter/processors/types';
 import type { DWOpenposeProcessorConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import ProcessorWrapper from './ProcessorWrapper';
+import type { FilterComponentProps } from './types';
 
-type Props = ProcessorComponentProps<DWOpenposeProcessorConfig>;
+type Props = FilterComponentProps<DWOpenposeProcessorConfig>;
 const DEFAULTS = IMAGE_FILTERS['dw_openpose_image_processor'].buildDefaults();
 
-export const DWOpenposeProcessor = memo(({ onChange, config }: Props) => {
+export const FilterDWOpenpose = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();
 
   const handleDrawBodyChanged = useCallback(
@@ -36,7 +35,7 @@ export const DWOpenposeProcessor = memo(({ onChange, config }: Props) => {
   );
 
   return (
-    <ProcessorWrapper>
+    <>
       <Flex sx={{ flexDir: 'row', gap: 6 }}>
         <FormControl w="max-content">
           <FormLabel m={0}>{t('controlnet.body')}</FormLabel>
@@ -55,8 +54,8 @@ export const DWOpenposeProcessor = memo(({ onChange, config }: Props) => {
           />
         </FormControl>
       </Flex>
-    </ProcessorWrapper>
+    </>
   );
 });
 
-DWOpenposeProcessor.displayName = 'DWOpenposeProcessor';
+FilterDWOpenpose.displayName = 'FilterDWOpenpose';

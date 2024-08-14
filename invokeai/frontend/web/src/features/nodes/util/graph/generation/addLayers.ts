@@ -1,9 +1,10 @@
 import type { CanvasLayerState } from 'features/controlLayers/store/types';
 
-export const isValidLayer = (entity: CanvasLayerState) => {
+export const isValidLayerWithoutControlAdapter = (layer: CanvasLayerState) => {
   return (
-    entity.isEnabled &&
+    layer.isEnabled &&
     // Boolean(entity.bbox) && TODO(psyche): Re-enable this check when we have a way to calculate bbox for all layers
-    entity.objects.length > 0
+    layer.objects.length > 0 &&
+    layer.controlAdapter === null
   );
 };

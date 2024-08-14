@@ -1,11 +1,11 @@
 import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
-import type { Store } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import type { RootState } from 'app/store/store';
+import type { AppStore } from 'app/store/store';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import {
+  $filteringEntity,
   $isDrawing,
   $isMouseDown,
   $lastAddedPoint,
@@ -15,6 +15,7 @@ import {
   $shouldShowStagedImage,
   $spaceKey,
   $stageAttrs,
+  $transformingEntity,
   bboxChanged,
   brushWidthChanged,
   entityBrushLineAdded,
@@ -81,10 +82,10 @@ type EntityStateAndAdapter =
 const log = logger('canvas');
 
 export class CanvasStateApi {
-  _store: Store<RootState>;
+  _store: AppStore;
   manager: CanvasManager;
 
-  constructor(store: Store<RootState>, manager: CanvasManager) {
+  constructor(store: AppStore, manager: CanvasManager) {
     this._store = store;
     this.manager = manager;
   }
@@ -188,6 +189,9 @@ export class CanvasStateApi {
   getLogLevel = () => {
     return this._store.getState().system.consoleLogLevel;
   };
+  getFilterState = () => {
+    return this._store.getState().canvasV2.filter;
+  };
 
   getEntity(identifier: CanvasEntityIdentifier): EntityStateAndAdapter | null {
     const state = this.getState();
@@ -256,7 +260,9 @@ export class CanvasStateApi {
     return currentFill;
   };
 
-  $transformingEntity: WritableAtom<CanvasEntityIdentifier | null> = atom();
+  $transformingEntity = $transformingEntity;
+  $filteringEntity = $filteringEntity;
+
   $toolState: WritableAtom<CanvasV2State['tool']> = atom();
   $currentFill: WritableAtom<RgbaColor> = atom();
   $selectedEntity: WritableAtom<EntityStateAndAdapter | null> = atom();

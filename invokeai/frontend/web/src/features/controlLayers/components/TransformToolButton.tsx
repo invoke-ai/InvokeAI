@@ -2,7 +2,8 @@ import { Button, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { memo, useCallback, useEffect, useState } from 'react';
+import { $transformingEntity } from 'features/controlLayers/store/canvasV2Slice';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiResizeBold } from 'react-icons/pi';
@@ -10,19 +11,10 @@ import { PiResizeBold } from 'react-icons/pi';
 export const TransformToolButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useStore($canvasManager);
-  const [isTransforming, setIsTransforming] = useState(false);
+  const transformingEntity = useStore($transformingEntity);
   const isDisabled = useAppSelector(
     (s) => s.canvasV2.selectedEntityIdentifier === null || s.canvasV2.session.isStaging
   );
-
-  useEffect(() => {
-    if (!canvasManager) {
-      return;
-    }
-    return canvasManager.stateApi.$transformingEntity.listen((newValue) => {
-      setIsTransforming(Boolean(newValue));
-    });
-  }, [canvasManager]);
 
   const onTransform = useCallback(() => {
     if (!canvasManager) {
@@ -47,7 +39,7 @@ export const TransformToolButton = memo(() => {
 
   useHotkeys(['ctrl+t', 'meta+t'], onTransform, { enabled: !isDisabled }, [isDisabled, onTransform]);
 
-  if (isTransforming) {
+  if (transformingEntity) {
     return (
       <>
         <Button onClick={onApplyTransformation}>{t('common.apply')}</Button>

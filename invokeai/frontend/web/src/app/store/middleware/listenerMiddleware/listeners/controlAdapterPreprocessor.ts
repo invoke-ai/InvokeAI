@@ -12,7 +12,7 @@ import {
   caRecalled,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { selectCA } from 'features/controlLayers/store/controlAdaptersReducers';
-import { CA_PROCESSOR_DATA } from 'features/controlLayers/store/types';
+import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { isEqual } from 'lodash-es';
@@ -95,7 +95,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
       }
 
       // TODO(psyche): I can't get TS to be happy, it thinkgs `config` is `never` but it should be inferred from the generic... I'll just cast it for now
-      const processorNode = CA_PROCESSOR_DATA[config.type].buildNode(image.image, config as never);
+      const processorNode = IMAGE_FILTERS[config.type].buildNode(image.image, config as never);
       const enqueueBatchArg: BatchConfig = {
         prepend: true,
         batch: {
