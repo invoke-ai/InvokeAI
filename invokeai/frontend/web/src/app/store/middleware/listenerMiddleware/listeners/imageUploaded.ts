@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { caImageChanged, ipaImageChanged, rgIPAdapterImageChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { ipaImageChanged, rgIPAdapterImageChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
@@ -79,12 +79,12 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
-      if (postUploadAction?.type === 'SET_CA_IMAGE') {
-        const { id } = postUploadAction;
-        dispatch(caImageChanged({ id, imageDTO }));
-        toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
-        return;
-      }
+      // if (postUploadAction?.type === 'SET_CA_IMAGE') {
+      //   const { id } = postUploadAction;
+      //   dispatch(caImageChanged({ id, imageDTO }));
+      //   toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
+      //   return;
+      // }
 
       if (postUploadAction?.type === 'SET_IPA_IMAGE') {
         const { id } = postUploadAction;

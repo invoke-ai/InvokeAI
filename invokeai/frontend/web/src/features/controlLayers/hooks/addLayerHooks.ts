@@ -1,6 +1,6 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
-import { caAdded, ipaAdded, rgIPAdapterAdded } from 'features/controlLayers/store/canvasV2Slice';
+import {  ipaAdded, rgIPAdapterAdded } from 'features/controlLayers/store/canvasV2Slice';
 import {
   IMAGE_FILTERS,
   initialControlNetV2,
@@ -37,7 +37,7 @@ export const useAddCALayer = () => {
     const initialConfig = deepClone(model.type === 'controlnet' ? initialControlNetV2 : initialT2IAdapterV2);
     const config = { ...initialConfig, model: zModelIdentifierField.parse(model), processorConfig };
 
-    dispatch(caAdded({ config }));
+    // dispatch(caAdded({ config }));
   }, [dispatch, model, baseModel]);
 
   return [addCALayer, isDisabled] as const;

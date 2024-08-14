@@ -1,4 +1,5 @@
 import {
+  Button,
   Checkbox,
   Flex,
   FormControl,
@@ -11,7 +12,11 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { MaskOpacity } from 'features/controlLayers/components/MaskOpacity';
-import { clipToBboxChanged, invertScrollChanged } from 'features/controlLayers/store/canvasV2Slice';
+import {
+  clipToBboxChanged,
+  invertScrollChanged,
+  rasterizationCachesInvalidated,
+} from 'features/controlLayers/store/canvasV2Slice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +35,9 @@ const ControlLayersSettingsPopover = () => {
     (e: ChangeEvent<HTMLInputElement>) => dispatch(clipToBboxChanged(e.target.checked)),
     [dispatch]
   );
+  const invalidateRasterizationCaches = useCallback(() => {
+    dispatch(rasterizationCachesInvalidated());
+  }, [dispatch]);
   return (
     <Popover isLazy>
       <PopoverTrigger>
@@ -47,6 +55,9 @@ const ControlLayersSettingsPopover = () => {
               <FormLabel flexGrow={1}>{t('unifiedCanvas.clipToBbox')}</FormLabel>
               <Checkbox isChecked={clipToBbox} onChange={onChangeClipToBbox} />
             </FormControl>
+            <Button onClick={invalidateRasterizationCaches} size="sm">
+              Invalidate Rasterization Caches
+            </Button>
           </Flex>
         </PopoverBody>
       </PopoverContent>

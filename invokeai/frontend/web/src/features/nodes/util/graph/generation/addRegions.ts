@@ -43,15 +43,16 @@ export const addRegions = async (
   const validRegions = regions.filter((rg) => isValidRegion(rg, base));
 
   for (const region of validRegions) {
-    // Upload the mask image, or get the cached image if it exists
-    const { image_name } = await manager.getRegionMaskImageDTO(region.id, bbox);
+    const adapter = manager.regions.get(region.id);
+    assert(adapter, 'Adapter not found');
+    const imageDTO = await adapter.renderer.rasterize(bbox);
 
     // The main mask-to-tensor node
     const maskToTensor = g.addNode({
       id: `${PROMPT_REGION_MASK_TO_TENSOR_PREFIX}_${region.id}`,
       type: 'alpha_mask_to_tensor',
       image: {
-        image_name,
+        image_name: imageDTO.image_name,
       },
     });
 

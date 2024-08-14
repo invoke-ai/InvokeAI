@@ -1,5 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { caAllDeleted, ipaAllDeleted, layerAllDeleted } from 'features/controlLayers/store/canvasV2Slice';
+import { ipaAllDeleted, layerAllDeleted } from 'features/controlLayers/store/canvasV2Slice';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -14,7 +14,7 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
 
       let wereLayersReset = false;
       let wasNodeEditorReset = false;
-      let wereControlAdaptersReset = false;
+      const wereControlAdaptersReset = false;
       let wereIPAdaptersReset = false;
 
       const { nodes, canvasV2 } = getState();
@@ -31,10 +31,10 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
           wasNodeEditorReset = true;
         }
 
-        if (imageUsage.isControlAdapterImage && !wereControlAdaptersReset) {
-          dispatch(caAllDeleted());
-          wereControlAdaptersReset = true;
-        }
+        // if (imageUsage.isControlAdapterImage && !wereControlAdaptersReset) {
+        //   dispatch(caAllDeleted());
+        //   wereControlAdaptersReset = true;
+        // }
 
         if (imageUsage.isIPAdapterImage && !wereIPAdaptersReset) {
           dispatch(ipaAllDeleted());

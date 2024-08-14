@@ -3,7 +3,6 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
 import {
-  caImageChanged,
   ipaImageChanged,
   layerAdded,
   rgIPAdapterImageChanged,
@@ -60,18 +59,18 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         return;
       }
 
-      /**
-       * Image dropped on Control Adapter Layer
-       */
-      if (
-        overData.actionType === 'SET_CA_IMAGE' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO
-      ) {
-        const { id } = overData.context;
-        dispatch(caImageChanged({ id, imageDTO: activeData.payload.imageDTO }));
-        return;
-      }
+      // /**
+      //  * Image dropped on Control Adapter Layer
+      //  */
+      // if (
+      //   overData.actionType === 'SET_CA_IMAGE' &&
+      //   activeData.payloadType === 'IMAGE_DTO' &&
+      //   activeData.payload.imageDTO
+      // ) {
+      //   const { id } = overData.context;
+      //   dispatch(caImageChanged({ id, imageDTO: activeData.payload.imageDTO }));
+      //   return;
+      // }
 
       /**
        * Image dropped on IP Adapter Layer
