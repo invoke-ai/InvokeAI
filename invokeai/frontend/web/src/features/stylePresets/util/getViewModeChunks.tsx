@@ -1,13 +1,15 @@
 import { PRESET_PLACEHOLDER } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
+
 export const getViewModeChunks = (currentPrompt: string, presetPrompt?: string): [string, string, string] => {
   if (!presetPrompt || !presetPrompt.length) {
     return ['', currentPrompt, ''];
   }
-  const [firstPart, ...remainingParts] = presetPrompt.split(PRESET_PLACEHOLDER);
-  const chunks = [firstPart, remainingParts.join(PRESET_PLACEHOLDER)];
-  if (chunks.filter((chunk) => chunk !== '').length === 1) {
-    return ['', currentPrompt, chunks[0] ?? ''];
-  } else {
-    return [chunks[0] ?? '', currentPrompt, chunks[1] ?? ''];
+
+  const [before, after] = presetPrompt.split(PRESET_PLACEHOLDER, 2);
+
+  if (!before || !after) {
+    return ['', `${currentPrompt} `, presetPrompt];
   }
+
+  return [before ?? '', currentPrompt, after ?? ''];
 };
