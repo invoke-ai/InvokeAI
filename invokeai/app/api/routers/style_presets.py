@@ -16,9 +16,11 @@ from invokeai.app.services.style_preset_records.style_preset_records_common impo
     PresetData,
     PresetType,
     StylePresetChanges,
+    StylePresetImportValidationError,
     StylePresetNotFoundError,
     StylePresetRecordWithImage,
     StylePresetWithoutId,
+    parse_csv,
 )
 
 
@@ -225,3 +227,28 @@ async def get_style_preset_image(
         return response
     except Exception:
         raise HTTPException(status_code=404)
+
+
+@style_presets_router.post(
+    "/import",
+    operation_id="import_style_presets",
+)
+async def import_style_presets(file: UploadFile = File(description="The file to import")):
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    try:
+        parsed_data = parse_csv(file)
+    except StylePresetImportValidationError:
+        raise HTTPException(
+            status_code=400, detail="Invalid CSV format: must include columns 'name', 'prompt', and 'negative_prompt'"
+        )
+
+    style_presets: list[StylePresetWithoutId] = []
+
+    for style_preset in parsed_data:
+        preset_data = PresetData(positive_prompt=style_preset.prompt, negative_prompt=style_preset.negative_prompt)
+        style_preset = StylePresetWithoutId(name=style_preset.name, preset_data=preset_data, type=PresetType.User)
+        style_presets.append(style_preset)
+
+    ApiDependencies.invoker.services.style_preset_records.create_many(style_presets)
