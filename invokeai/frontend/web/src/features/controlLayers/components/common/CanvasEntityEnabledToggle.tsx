@@ -11,6 +11,7 @@ import { PiCheckBold } from 'react-icons/pi';
 export const CanvasEntityEnabledToggle = memo(() => {
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
+
   const isEnabled = useEntityIsEnabled(entityIdentifier);
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {

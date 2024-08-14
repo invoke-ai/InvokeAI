@@ -1,4 +1,3 @@
-import type { JSONObject } from 'common/types';
 import type { CanvasControlAdapter } from 'features/controlLayers/konva/CanvasControlAdapter';
 import { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
@@ -36,6 +35,7 @@ import type {
   BaseModelType,
   ControlNetModelConfig,
   ImageDTO,
+  S,
   T2IAdapterModelConfig,
 } from 'services/api/types';
 import { z } from 'zod';
@@ -175,7 +175,7 @@ const zZoeDepthProcessorConfig = z.object({
 });
 export type ZoeDepthProcessorConfig = z.infer<typeof zZoeDepthProcessorConfig>;
 
-export const zProcessorConfig = z.discriminatedUnion('type', [
+export const zFilterConfig = z.discriminatedUnion('type', [
   zCannyProcessorConfig,
   zColorMapProcessorConfig,
   zContentShuffleProcessorConfig,
@@ -191,9 +191,9 @@ export const zProcessorConfig = z.discriminatedUnion('type', [
   zPidiProcessorConfig,
   zZoeDepthProcessorConfig,
 ]);
-export type ProcessorConfig = z.infer<typeof zProcessorConfig>;
+export type FilterConfig = z.infer<typeof zFilterConfig>;
 
-const zProcessorTypeV2 = z.enum([
+const zFilterType = z.enum([
   'canny_image_processor',
   'color_map_image_processor',
   'content_shuffle_image_processor',
@@ -209,22 +209,19 @@ const zProcessorTypeV2 = z.enum([
   'pidi_image_processor',
   'zoe_depth_image_processor',
 ]);
-export type ProcessorTypeV2 = z.infer<typeof zProcessorTypeV2>;
-export const isProcessorTypeV2 = (v: unknown): v is ProcessorTypeV2 => zProcessorTypeV2.safeParse(v).success;
-
-type ProcessorData<T extends ProcessorTypeV2> = {
-  type: T;
-  labelTKey: string;
-  descriptionTKey: string;
-  buildDefaults(baseModel?: BaseModelType): Extract<ProcessorConfig, { type: T }>;
-  buildNode(image: ImageWithDims, config: Extract<ProcessorConfig, { type: T }>): Extract<AnyInvocation, { type: T }>;
-};
+export type FilterType = z.infer<typeof zFilterType>;
+export const isFilterType = (v: unknown): v is FilterType => zFilterType.safeParse(v).success;
 
 const minDim = (image: ImageWithDims): number => Math.min(image.width, image.height);
 
-type CAProcessorsData = {
-  [key in ProcessorTypeV2]: ProcessorData<key>;
+type ImageFilterData<T extends FilterConfig['type']> = {
+  type: T;
+  labelTKey: string;
+  descriptionTKey: string;
+  buildDefaults(baseModel?: BaseModelType): Extract<FilterConfig, { type: T }>;
+  buildNode(imageDTO: ImageWithDims, config: Extract<FilterConfig, { type: T }>): Extract<AnyInvocation, { type: T }>;
 };
+
 /**
  * A dict of ControlNet processors, including:
  * - label translation key
@@ -234,234 +231,243 @@ type CAProcessorsData = {
  *
  * TODO: Generate from the OpenAPI schema
  */
-export const CA_PROCESSOR_DATA: CAProcessorsData = {
+export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key> } = {
   canny_image_processor: {
     type: 'canny_image_processor',
     labelTKey: 'controlnet.canny',
     descriptionTKey: 'controlnet.cannyDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): CannyProcessorConfig => ({
       id: 'canny_image_processor',
       type: 'canny_image_processor',
       low_threshold: 100,
       high_threshold: 200,
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: CannyProcessorConfig): S['CannyImageProcessorInvocation'] => ({
       ...config,
       type: 'canny_image_processor',
-      image: { image_name: image.image_name },
-      detect_resolution: minDim(image),
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      detect_resolution: minDim(imageDTO),
+      image_resolution: minDim(imageDTO),
     }),
   },
   color_map_image_processor: {
     type: 'color_map_image_processor',
     labelTKey: 'controlnet.colorMap',
     descriptionTKey: 'controlnet.colorMapDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): ColorMapProcessorConfig => ({
       id: 'color_map_image_processor',
       type: 'color_map_image_processor',
       color_map_tile_size: 64,
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: ColorMapProcessorConfig): S['ColorMapImageProcessorInvocation'] => ({
       ...config,
       type: 'color_map_image_processor',
-      image: { image_name: image.image_name },
+      image: { image_name: imageDTO.image_name },
     }),
   },
   content_shuffle_image_processor: {
     type: 'content_shuffle_image_processor',
     labelTKey: 'controlnet.contentShuffle',
     descriptionTKey: 'controlnet.contentShuffleDescription',
-    buildDefaults: (baseModel) => ({
+    buildDefaults: (baseModel: BaseModelType): ContentShuffleProcessorConfig => ({
       id: 'content_shuffle_image_processor',
       type: 'content_shuffle_image_processor',
       h: baseModel === 'sdxl' ? 1024 : 512,
       w: baseModel === 'sdxl' ? 1024 : 512,
       f: baseModel === 'sdxl' ? 512 : 256,
     }),
-    buildNode: (image, config) => ({
+    buildNode: (
+      imageDTO: ImageDTO,
+      config: ContentShuffleProcessorConfig
+    ): S['ContentShuffleImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      detect_resolution: minDim(image),
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      detect_resolution: minDim(imageDTO),
+      image_resolution: minDim(imageDTO),
     }),
   },
   depth_anything_image_processor: {
     type: 'depth_anything_image_processor',
     labelTKey: 'controlnet.depthAnything',
     descriptionTKey: 'controlnet.depthAnythingDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): DepthAnythingProcessorConfig => ({
       id: 'depth_anything_image_processor',
       type: 'depth_anything_image_processor',
       model_size: 'small_v2',
     }),
-    buildNode: (image, config) => ({
+    buildNode: (
+      imageDTO: ImageDTO,
+      config: DepthAnythingProcessorConfig
+    ): S['DepthAnythingImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      resolution: minDim(imageDTO),
     }),
   },
   hed_image_processor: {
     type: 'hed_image_processor',
     labelTKey: 'controlnet.hed',
     descriptionTKey: 'controlnet.hedDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): HedProcessorConfig => ({
       id: 'hed_image_processor',
       type: 'hed_image_processor',
       scribble: false,
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: HedProcessorConfig): S['HedImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      detect_resolution: minDim(image),
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      detect_resolution: minDim(imageDTO),
+      image_resolution: minDim(imageDTO),
     }),
   },
   lineart_anime_image_processor: {
     type: 'lineart_anime_image_processor',
     labelTKey: 'controlnet.lineartAnime',
     descriptionTKey: 'controlnet.lineartAnimeDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): LineartAnimeProcessorConfig => ({
       id: 'lineart_anime_image_processor',
       type: 'lineart_anime_image_processor',
     }),
-    buildNode: (image, config) => ({
+    buildNode: (
+      imageDTO: ImageDTO,
+      config: LineartAnimeProcessorConfig
+    ): S['LineartAnimeImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      detect_resolution: minDim(image),
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      detect_resolution: minDim(imageDTO),
+      image_resolution: minDim(imageDTO),
     }),
   },
   lineart_image_processor: {
     type: 'lineart_image_processor',
     labelTKey: 'controlnet.lineart',
     descriptionTKey: 'controlnet.lineartDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): LineartProcessorConfig => ({
       id: 'lineart_image_processor',
       type: 'lineart_image_processor',
       coarse: false,
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: LineartProcessorConfig): S['LineartImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      detect_resolution: minDim(image),
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      detect_resolution: minDim(imageDTO),
+      image_resolution: minDim(imageDTO),
     }),
   },
   mediapipe_face_processor: {
     type: 'mediapipe_face_processor',
     labelTKey: 'controlnet.mediapipeFace',
     descriptionTKey: 'controlnet.mediapipeFaceDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): MediapipeFaceProcessorConfig => ({
       id: 'mediapipe_face_processor',
       type: 'mediapipe_face_processor',
       max_faces: 1,
       min_confidence: 0.5,
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: MediapipeFaceProcessorConfig): S['MediapipeFaceProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      detect_resolution: minDim(image),
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      detect_resolution: minDim(imageDTO),
+      image_resolution: minDim(imageDTO),
     }),
   },
   midas_depth_image_processor: {
     type: 'midas_depth_image_processor',
     labelTKey: 'controlnet.depthMidas',
     descriptionTKey: 'controlnet.depthMidasDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): MidasDepthProcessorConfig => ({
       id: 'midas_depth_image_processor',
       type: 'midas_depth_image_processor',
       a_mult: 2,
       bg_th: 0.1,
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: MidasDepthProcessorConfig): S['MidasDepthImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      detect_resolution: minDim(image),
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      detect_resolution: minDim(imageDTO),
+      image_resolution: minDim(imageDTO),
     }),
   },
   mlsd_image_processor: {
     type: 'mlsd_image_processor',
     labelTKey: 'controlnet.mlsd',
     descriptionTKey: 'controlnet.mlsdDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): MlsdProcessorConfig => ({
       id: 'mlsd_image_processor',
       type: 'mlsd_image_processor',
       thr_d: 0.1,
       thr_v: 0.1,
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: MlsdProcessorConfig): S['MlsdImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      detect_resolution: minDim(image),
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      detect_resolution: minDim(imageDTO),
+      image_resolution: minDim(imageDTO),
     }),
   },
   normalbae_image_processor: {
     type: 'normalbae_image_processor',
     labelTKey: 'controlnet.normalBae',
     descriptionTKey: 'controlnet.normalBaeDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): NormalbaeProcessorConfig => ({
       id: 'normalbae_image_processor',
       type: 'normalbae_image_processor',
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: NormalbaeProcessorConfig): S['NormalbaeImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      detect_resolution: minDim(image),
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      detect_resolution: minDim(imageDTO),
+      image_resolution: minDim(imageDTO),
     }),
   },
   dw_openpose_image_processor: {
     type: 'dw_openpose_image_processor',
     labelTKey: 'controlnet.dwOpenpose',
     descriptionTKey: 'controlnet.dwOpenposeDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): DWOpenposeProcessorConfig => ({
       id: 'dw_openpose_image_processor',
       type: 'dw_openpose_image_processor',
       draw_body: true,
       draw_face: false,
       draw_hands: false,
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: DWOpenposeProcessorConfig): S['DWOpenposeImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      image_resolution: minDim(imageDTO),
     }),
   },
   pidi_image_processor: {
     type: 'pidi_image_processor',
     labelTKey: 'controlnet.pidi',
     descriptionTKey: 'controlnet.pidiDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): PidiProcessorConfig => ({
       id: 'pidi_image_processor',
       type: 'pidi_image_processor',
       scribble: false,
       safe: false,
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: PidiProcessorConfig): S['PidiImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
-      detect_resolution: minDim(image),
-      image_resolution: minDim(image),
+      image: { image_name: imageDTO.image_name },
+      detect_resolution: minDim(imageDTO),
+      image_resolution: minDim(imageDTO),
     }),
   },
   zoe_depth_image_processor: {
     type: 'zoe_depth_image_processor',
     labelTKey: 'controlnet.depthZoe',
     descriptionTKey: 'controlnet.depthZoeDescription',
-    buildDefaults: () => ({
+    buildDefaults: (): ZoeDepthProcessorConfig => ({
       id: 'zoe_depth_image_processor',
       type: 'zoe_depth_image_processor',
     }),
-    buildNode: (image, config) => ({
+    buildNode: (imageDTO: ImageDTO, config: ZoeDepthProcessorConfig): S['ZoeDepthImageProcessorInvocation'] => ({
       ...config,
-      image: { image_name: image.image_name },
+      image: { image_name: imageDTO.image_name },
     }),
   },
-};
+} as const;
 
 const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox']);
 export type Tool = z.infer<typeof zTool>;
@@ -575,17 +581,6 @@ export function isCanvasBrushLineState(obj: CanvasObjectState): obj is CanvasBru
   return obj.type === 'brush_line';
 }
 
-export const zCanvasLayerState = z.object({
-  id: zId,
-  type: z.literal('layer'),
-  isEnabled: z.boolean(),
-  position: zCoordinate,
-  opacity: zOpacity,
-  objects: z.array(zCanvasObjectState),
-  imageCache: z.string().min(1).nullable(),
-});
-export type CanvasLayerState = z.infer<typeof zCanvasLayerState>;
-
 export const zCanvasIPAdapterState = z.object({
   id: zId,
   type: z.literal('ip_adapter'),
@@ -689,7 +684,7 @@ const zCanvasControlAdapterStateBase = z.object({
   weight: z.number().gte(-1).lte(2),
   imageObject: zCanvasImageState.nullable(),
   processedImageObject: zCanvasImageState.nullable(),
-  processorConfig: zProcessorConfig.nullable(),
+  processorConfig: zFilterConfig.nullable(),
   processorPendingBatchId: z.string().nullable().default(null),
   beginEndStepPct: zBeginEndStepPct,
   model: zModelIdentifierField.nullable(),
@@ -709,41 +704,55 @@ export const zCanvasControlAdapterState = z.discriminatedUnion('adapterType', [
   zCanvasT2IAdapteState,
 ]);
 export type CanvasControlAdapterState = z.infer<typeof zCanvasControlAdapterState>;
-export type ControlNetConfig = Pick<
-  CanvasControlNetState,
-  | 'adapterType'
-  | 'weight'
-  | 'imageObject'
-  | 'processedImageObject'
-  | 'processorConfig'
-  | 'beginEndStepPct'
-  | 'model'
-  | 'controlMode'
->;
-export type T2IAdapterConfig = Pick<
-  CanvasT2IAdapterState,
-  'adapterType' | 'weight' | 'imageObject' | 'processedImageObject' | 'processorConfig' | 'beginEndStepPct' | 'model'
->;
+
+const zControlNetConfig = z.object({
+  type: z.literal('controlnet'),
+  model: zModelIdentifierField.nullable(),
+  weight: z.number().gte(-1).lte(2),
+  beginEndStepPct: zBeginEndStepPct,
+  controlMode: zControlModeV2,
+});
+export type ControlNetConfig = z.infer<typeof zControlNetConfig>;
+
+const zT2IAdapterConfig = z.object({
+  type: z.literal('t2i_adapter'),
+  model: zModelIdentifierField.nullable(),
+  weight: z.number().gte(-1).lte(2),
+  beginEndStepPct: zBeginEndStepPct,
+});
+export type T2IAdapterConfig = z.infer<typeof zT2IAdapterConfig>;
+
+export const zCanvasLayerState = z.object({
+  id: zId,
+  type: z.literal('layer'),
+  isEnabled: z.boolean(),
+  position: zCoordinate,
+  opacity: zOpacity,
+  objects: z.array(zCanvasObjectState),
+  imageCache: z.string().min(1).nullable(),
+  controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig]).nullable(),
+});
+export type CanvasLayerState = z.infer<typeof zCanvasLayerState>;
+export type CanvasLayerStateWithValidControlNet = Omit<CanvasLayerState, 'controlAdapter'> & {
+  controlAdapter: Omit<ControlNetConfig, 'model'> & { model: ControlNetModelConfig };
+};
+export type CanvasLayerStateWithValidT2IAdapter = Omit<CanvasLayerState, 'controlAdapter'> & {
+  controlAdapter: Omit<T2IAdapterConfig, 'model'> & { model: T2IAdapterModelConfig };
+};
 
 export const initialControlNetV2: ControlNetConfig = {
-  adapterType: 'controlnet',
+  type: 'controlnet',
   model: null,
   weight: 1,
   beginEndStepPct: [0, 1],
   controlMode: 'balanced',
-  imageObject: null,
-  processedImageObject: null,
-  processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
 export const initialT2IAdapterV2: T2IAdapterConfig = {
-  adapterType: 't2i_adapter',
+  type: 't2i_adapter',
   model: null,
   weight: 1,
   beginEndStepPct: [0, 1],
-  imageObject: null,
-  processedImageObject: null,
-  processorConfig: CA_PROCESSOR_DATA.canny_image_processor.buildDefaults(),
 };
 
 export const initialIPAdapterV2: IPAdapterConfig = {
@@ -757,12 +766,12 @@ export const initialIPAdapterV2: IPAdapterConfig = {
 
 export const buildControlAdapterProcessorV2 = (
   modelConfig: ControlNetModelConfig | T2IAdapterModelConfig
-): ProcessorConfig | null => {
+): FilterConfig | null => {
   const defaultPreprocessor = modelConfig.default_settings?.preprocessor;
-  if (!isProcessorTypeV2(defaultPreprocessor)) {
+  if (!isFilterType(defaultPreprocessor)) {
     return null;
   }
-  const processorConfig = CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults(modelConfig.base);
+  const processorConfig = IMAGE_FILTERS[defaultPreprocessor].buildDefaults(modelConfig.base);
   return processorConfig;
 };
 
@@ -901,6 +910,10 @@ export type CanvasV2State = {
     stagedImages: StagingAreaImage[];
     selectedStagedImageIndex: number;
   };
+  filter: {
+    autoProcess: boolean;
+    config: FilterConfig;
+  };
 };
 
 export type StageAttrs = {
@@ -964,5 +977,3 @@ export function isDrawableEntityType(
 ): entityType is 'layer' | 'regional_guidance' | 'inpaint_mask' {
   return entityType === 'layer' || entityType === 'regional_guidance' || entityType === 'inpaint_mask';
 }
-
-export type GetLoggingContext = (extra?: JSONObject) => JSONObject;

@@ -1,16 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAdapter/processors/types';
 import type { MediapipeFaceProcessorConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import ProcessorWrapper from './ProcessorWrapper';
+import type { FilterComponentProps } from './types';
 
-type Props = ProcessorComponentProps<MediapipeFaceProcessorConfig>;
+type Props = FilterComponentProps<MediapipeFaceProcessorConfig>;
 const DEFAULTS = IMAGE_FILTERS['mediapipe_face_processor'].buildDefaults();
 
-export const MediapipeFaceProcessor = memo(({ onChange, config }: Props) => {
+export const FilterMediapipeFace = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();
 
   const handleMaxFacesChanged = useCallback(
@@ -28,7 +27,7 @@ export const MediapipeFaceProcessor = memo(({ onChange, config }: Props) => {
   );
 
   return (
-    <ProcessorWrapper>
+    <>
       <FormControl>
         <FormLabel m={0}>{t('controlnet.maxFaces')}</FormLabel>
         <CompositeSlider
@@ -67,8 +66,8 @@ export const MediapipeFaceProcessor = memo(({ onChange, config }: Props) => {
           step={0.01}
         />
       </FormControl>
-    </ProcessorWrapper>
+    </>
   );
 });
 
-MediapipeFaceProcessor.displayName = 'MediapipeFaceProcessor';
+FilterMediapipeFace.displayName = 'FilterMediapipeFace';
