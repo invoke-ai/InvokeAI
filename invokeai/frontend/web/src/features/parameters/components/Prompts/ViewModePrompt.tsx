@@ -35,14 +35,17 @@ export const ViewModePrompt = ({
         onClick={handleExitViewMode}
         justifyContent="space-between"
         h="full"
-        paddingRight={3}
-        paddingLeft={3}
-        paddingTop={7}
+        borderWidth={1}
+        borderTopWidth={24} // This prevents the prompt from being hidden behind the header
+        borderColor="transparent"
+        paddingInlineEnd={10}
+        paddingInlineStart={3}
+        paddingTop={0}
         paddingBottom={3}
       >
         <PromptLabel label={label} />
         <Flex overflow="scroll">
-          <Text w="full">
+          <Text w="full" lineHeight="short">
             {presetChunks.map((chunk, index) => (
               <Text
                 as="span"
