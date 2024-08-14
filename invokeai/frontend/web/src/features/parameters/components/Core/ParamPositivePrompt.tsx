@@ -68,9 +68,10 @@ export const ParamPositivePrompt = memo(() => {
           minH={40}
           onKeyDown={onKeyDown}
           variant="darkFilled"
-          paddingRight={10}
-          paddingLeft={3}
-          paddingTop={7}
+          borderTopWidth={24} // This prevents the prompt from being hidden behind the header
+          paddingInlineEnd={10}
+          paddingInlineStart={3}
+          paddingTop={0}
           paddingBottom={3}
         />
         <PromptOverlayButtonWrapper>

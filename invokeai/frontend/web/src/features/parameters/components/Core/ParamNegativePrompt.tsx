@@ -53,10 +53,11 @@ export const ParamNegativePrompt = memo(() => {
           onKeyDown={onKeyDown}
           fontSize="sm"
           variant="darkFilled"
-          minH={24}
-          paddingRight={10}
-          paddingLeft={3}
-          paddingTop={7}
+          minH={28}
+          borderTopWidth={24} // This prevents the prompt from being hidden behind the header
+          paddingInlineEnd={10}
+          paddingInlineStart={3}
+          paddingTop={0}
           paddingBottom={3}
         />
         <PromptOverlayButtonWrapper>

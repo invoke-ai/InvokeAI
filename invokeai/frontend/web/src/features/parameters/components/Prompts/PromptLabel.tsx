@@ -1,9 +1,9 @@
-import { FormLabel } from '@invoke-ai/ui-library';
+import { Text } from '@invoke-ai/ui-library';
 
 export const PromptLabel = ({ label }: { label: string }) => {
   return (
-    <FormLabel color="base.450" fontSize="xs" pos="absolute" top={2} left={3}>
+    <Text variant="subtext" fontWeight="semibold" pos="absolute" top={1} left={2}>
       {label}
-    </FormLabel>
+    </Text>
   );
 };
