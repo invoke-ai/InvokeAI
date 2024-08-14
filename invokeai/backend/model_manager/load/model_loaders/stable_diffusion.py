@@ -123,7 +123,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         with SilenceWarnings():
             pipeline = load_class.from_single_file(
                 config.path,
-                original_config_file=original_config_file,
+                original_config=original_config_file,
                 torch_dtype=self._torch_dtype,
                 prediction_type=prediction_type,
                 upcast_attention=upcast_attention,
