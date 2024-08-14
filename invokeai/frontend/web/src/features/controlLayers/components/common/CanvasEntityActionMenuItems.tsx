@@ -40,11 +40,6 @@ const getIndexAndCount = (
       index: canvasV2.layers.entities.findIndex((entity) => entity.id === id),
       count: canvasV2.layers.entities.length,
     };
-  } else if (type === 'control_adapter') {
-    return {
-      index: canvasV2.controlAdapters.entities.findIndex((entity) => entity.id === id),
-      count: canvasV2.controlAdapters.entities.length,
-    };
   } else if (type === 'regional_guidance') {
     return {
       index: canvasV2.regions.entities.findIndex((entity) => entity.id === id),

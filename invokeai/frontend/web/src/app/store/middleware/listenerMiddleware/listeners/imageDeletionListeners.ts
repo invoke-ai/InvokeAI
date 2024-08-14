@@ -1,12 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch, RootState } from 'app/store/store';
-import {
-  caImageChanged,
-  caProcessedImageChanged,
-  entityDeleted,
-  ipaImageChanged,
-} from 'features/controlLayers/store/canvasV2Slice';
+import { entityDeleted, ipaImageChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -39,14 +34,17 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
   });
 };
 
-const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.canvasV2.controlAdapters.entities.forEach(({ id, imageObject, processedImageObject }) => {
-    if (imageObject?.image.image_name === imageDTO.image_name || processedImageObject?.image.image_name === imageDTO.image_name) {
-      dispatch(caImageChanged({ id, imageDTO: null }));
-      dispatch(caProcessedImageChanged({ id, imageDTO: null }));
-    }
-  });
-};
+// const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+//   state.canvasV2.controlAdapters.entities.forEach(({ id, imageObject, processedImageObject }) => {
+//     if (
+//       imageObject?.image.image_name === imageDTO.image_name ||
+//       processedImageObject?.image.image_name === imageDTO.image_name
+//     ) {
+//       dispatch(caImageChanged({ id, imageDTO: null }));
+//       dispatch(caProcessedImageChanged({ id, imageDTO: null }));
+//     }
+//   });
+// };
 
 const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   state.canvasV2.ipAdapters.entities.forEach(({ id, imageObject }) => {
@@ -120,7 +118,7 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
         }
 
         deleteNodesImages(state, dispatch, imageDTO);
-        deleteControlAdapterImages(state, dispatch, imageDTO);
+        // deleteControlAdapterImages(state, dispatch, imageDTO);
         deleteIPAdapterImages(state, dispatch, imageDTO);
         deleteLayerImages(state, dispatch, imageDTO);
       } catch {
@@ -161,7 +159,7 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
 
         imageDTOs.forEach((imageDTO) => {
           deleteNodesImages(state, dispatch, imageDTO);
-          deleteControlAdapterImages(state, dispatch, imageDTO);
+          // deleteControlAdapterImages(state, dispatch, imageDTO);
           deleteIPAdapterImages(state, dispatch, imageDTO);
           deleteLayerImages(state, dispatch, imageDTO);
         });

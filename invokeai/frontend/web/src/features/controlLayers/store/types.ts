@@ -639,6 +639,12 @@ const zMaskObject = z
   })
   .pipe(z.discriminatedUnion('type', [zCanvasBrushLineState, zCanvasEraserLineState, zCanvasRectState]));
 
+const zImageCache = z.object({
+  imageName: z.string(),
+  rect: zRect,
+});
+export type ImageCache = z.infer<typeof zImageCache>;
+
 export const zCanvasRegionalGuidanceState = z.object({
   id: zId,
   type: z.literal('regional_guidance'),
@@ -650,7 +656,7 @@ export const zCanvasRegionalGuidanceState = z.object({
   negativePrompt: zParameterNegativePrompt.nullable(),
   ipAdapters: z.array(zCanvasIPAdapterState),
   autoNegative: zAutoNegative,
-  imageCache: z.string().min(1).nullable(),
+  rasterizationCache: z.array(zImageCache),
 });
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
 
@@ -670,7 +676,7 @@ const zCanvasInpaintMaskState = z.object({
   position: zCoordinate,
   fill: zRgbColor,
   objects: z.array(zCanvasObjectState),
-  imageCache: z.string().min(1).nullable(),
+  rasterizationCache: z.array(zImageCache),
 });
 export type CanvasInpaintMaskState = z.infer<typeof zCanvasInpaintMaskState>;
 
@@ -729,7 +735,7 @@ export const zCanvasLayerState = z.object({
   position: zCoordinate,
   opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
-  imageCache: z.string().min(1).nullable(),
+  rasterizationCache: z.array(zImageCache),
   controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig]).nullable(),
 });
 export type CanvasLayerState = z.infer<typeof zCanvasLayerState>;
@@ -826,11 +832,7 @@ export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
   inpaintMask: CanvasInpaintMaskState;
-  layers: {
-    imageCache: ImageWithDims | null;
-    entities: CanvasLayerState[];
-  };
-  controlAdapters: { entities: CanvasControlAdapterState[] };
+  layers: { entities: CanvasLayerState[]; compositeRasterizationCache: ImageCache[] };
   ipAdapters: { entities: CanvasIPAdapterState[] };
   regions: { entities: CanvasRegionalGuidanceState[] };
   loras: LoRA[];
@@ -938,7 +940,7 @@ export type EntityRectAddedPayload = { entityIdentifier: CanvasEntityIdentifier;
 export type EntityRasterizedPayload = {
   entityIdentifier: CanvasEntityIdentifier;
   imageObject: CanvasImageState;
-  position: Coordinate;
+  rect: Rect;
 };
 export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: Coordinate };
 

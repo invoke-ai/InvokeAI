@@ -5,7 +5,6 @@ import type { JSONObject } from 'common/types';
 import {
   bboxHeightChanged,
   bboxWidthChanged,
-  caModelChanged,
   ipaModelChanged,
   loraDeleted,
   modelChanged,
@@ -21,7 +20,6 @@ import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
-  isControlNetOrT2IAdapterModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
@@ -171,14 +169,14 @@ const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
 };
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
-  const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
-  state.canvasV2.controlAdapters.entities.forEach((ca) => {
-    const isModelAvailable = caModels.some((m) => m.key === ca.model?.key);
-    if (isModelAvailable) {
-      return;
-    }
-    dispatch(caModelChanged({ id: ca.id, modelConfig: null }));
-  });
+  // const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
+  // state.canvasV2.controlAdapters.entities.forEach((ca) => {
+  //   const isModelAvailable = caModels.some((m) => m.key === ca.model?.key);
+  //   if (isModelAvailable) {
+  //     return;
+  //   }
+  //   dispatch(caModelChanged({ id: ca.id, modelConfig: null }));
+  // });
 };
 
 const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
