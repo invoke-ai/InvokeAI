@@ -9,12 +9,12 @@ import { MediapipeFaceProcessor } from 'features/controlLayers/components/Contro
 import { MidasDepthProcessor } from 'features/controlLayers/components/ControlAdapter/processors/MidasDepthProcessor';
 import { MlsdImageProcessor } from 'features/controlLayers/components/ControlAdapter/processors/MlsdImageProcessor';
 import { PidiProcessor } from 'features/controlLayers/components/ControlAdapter/processors/PidiProcessor';
-import type { ProcessorConfig } from 'features/controlLayers/store/types';
+import type { FilterConfig } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 
 type Props = {
-  config: ProcessorConfig | null;
-  onChange: (config: ProcessorConfig | null) => void;
+  config: FilterConfig | null;
+  onChange: (config: FilterConfig | null) => void;
 };
 
 export const ControlAdapterProcessorConfig = memo(({ config, onChange }: Props) => {

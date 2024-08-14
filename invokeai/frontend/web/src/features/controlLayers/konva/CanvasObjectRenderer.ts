@@ -20,7 +20,7 @@ import type {
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
-import { uploadImage } from 'services/api/endpoints/images';
+import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageCategory, ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -61,6 +61,12 @@ export class CanvasObjectRenderer {
    * A map of object renderers, keyed by their ID.
    */
   renderers: Map<string, AnyObjectRenderer> = new Map();
+
+  /**
+   * A cache of the rasterized image data URL. If the cache is null, the parent has not been rasterized since its last
+   * change.
+   */
+  rasterizedImageCache: string | null = null;
 
   /**
    * A object containing singleton Konva nodes.
@@ -160,6 +166,19 @@ export class CanvasObjectRenderer {
 
     if (this.buffer) {
       didRender = (await this.renderObject(this.buffer)) || didRender;
+    }
+
+    if (didRender && this.rasterizedImageCache) {
+      const hasOneObject = this.renderers.size === 1;
+      const firstObject = Array.from(this.renderers.values())[0];
+      if (
+        hasOneObject &&
+        firstObject &&
+        firstObject.state.type === 'image' &&
+        firstObject.state.image.image_name !== this.rasterizedImageCache
+      ) {
+        this.rasterizedImageCache = null;
+      }
     }
 
     return didRender;
@@ -313,6 +332,18 @@ export class CanvasObjectRenderer {
     this.buffer = null;
   };
 
+  hideObjects = (except: string[] = []) => {
+    for (const renderer of this.renderers.values()) {
+      renderer.setVisibility(except.includes(renderer.id));
+    }
+  };
+
+  showObjects = (except: string[] = []) => {
+    for (const renderer of this.renderers.values()) {
+      renderer.setVisibility(!except.includes(renderer.id));
+    }
+  };
+
   /**
    * Determines if the objects in the renderer require a pixel bbox calculation.
    *
@@ -345,15 +376,33 @@ export class CanvasObjectRenderer {
     return this.renderers.size > 0 || this.buffer !== null;
   };
 
-  rasterize = async () => {
+  /**
+   * Rasterizes the parent entity. If the entity has a rasterization cache, the cached image is returned after
+   * validating that it exists on the server.
+   *
+   * The rasterization cache is reset when the entity's objects change. The buffer object is not considered part of the
+   * entity's objects for this purpose.
+   *
+   * @returns A promise that resolves to the rasterized image DTO.
+   */
+  rasterize = async (): Promise<ImageDTO> => {
     this.log.debug('Rasterizing entity');
+
+    let imageDTO: ImageDTO | null = null;
+    if (this.rasterizedImageCache) {
+      imageDTO = await getImageDTO(this.rasterizedImageCache);
+    }
+
+    if (imageDTO) {
+      return imageDTO;
+    }
 
     const rect = this.parent.transformer.getRelativeRect();
     const blob = await this.getBlob({ rect });
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Rasterized entity');
     }
-    const imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
+    imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const imageObject = imageDTOToImageObject(imageDTO);
     await this.renderObject(imageObject, true);
     this.manager.stateApi.rasterizeEntity({
@@ -361,6 +410,10 @@ export class CanvasObjectRenderer {
       imageObject,
       position: { x: Math.round(rect.x), y: Math.round(rect.y) },
     });
+
+    this.rasterizedImageCache = imageDTO.image_name;
+
+    return imageDTO;
   };
 
   getBlob = ({ rect }: { rect?: Rect }): Promise<Blob> => {

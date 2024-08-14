@@ -155,7 +155,7 @@ export class CanvasTool {
     const isMouseDown = this.manager.stateApi.$isMouseDown.get();
 
     const tool = toolState.selected;
-    console.log(selectedEntity);
+
     const isDrawableEntity =
       selectedEntity?.state.type === 'regional_guidance' ||
       selectedEntity?.state.type === 'layer' ||

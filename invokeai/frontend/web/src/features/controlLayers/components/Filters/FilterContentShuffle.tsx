@@ -1,16 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { ProcessorComponentProps } from 'features/controlLayers/components/ControlAdapter/processors/types';
 import type { ContentShuffleProcessorConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import ProcessorWrapper from './ProcessorWrapper';
+import type { FilterComponentProps } from './types';
 
-type Props = ProcessorComponentProps<ContentShuffleProcessorConfig>;
+type Props = FilterComponentProps<ContentShuffleProcessorConfig>;
 const DEFAULTS = IMAGE_FILTERS['content_shuffle_image_processor'].buildDefaults();
 
-export const ContentShuffleProcessor = memo(({ onChange, config }: Props) => {
+export const FilterContentShuffle = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();
 
   const handleWChanged = useCallback(
@@ -35,7 +34,7 @@ export const ContentShuffleProcessor = memo(({ onChange, config }: Props) => {
   );
 
   return (
-    <ProcessorWrapper>
+    <>
       <FormControl>
         <FormLabel m={0}>{t('controlnet.w')}</FormLabel>
         <CompositeSlider
@@ -72,8 +71,8 @@ export const ContentShuffleProcessor = memo(({ onChange, config }: Props) => {
         />
         <CompositeNumberInput value={config.f} defaultValue={DEFAULTS.f} onChange={handleFChanged} min={0} max={4096} />
       </FormControl>
-    </ProcessorWrapper>
+    </>
   );
 });
 
-ContentShuffleProcessor.displayName = 'ContentShuffleProcessor';
+FilterContentShuffle.displayName = 'FilterContentShuffle';

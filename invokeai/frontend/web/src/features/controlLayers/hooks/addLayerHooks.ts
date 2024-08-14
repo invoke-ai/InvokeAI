@@ -2,11 +2,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { caAdded, ipaAdded, rgIPAdapterAdded } from 'features/controlLayers/store/canvasV2Slice';
 import {
-  CA_PROCESSOR_DATA,
+  IMAGE_FILTERS,
   initialControlNetV2,
   initialIPAdapterV2,
   initialT2IAdapterV2,
-  isProcessorTypeV2,
+  isFilterType,
 } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback, useMemo } from 'react';
@@ -30,8 +30,8 @@ export const useAddCALayer = () => {
     }
 
     const defaultPreprocessor = model.default_settings?.preprocessor;
-    const processorConfig = isProcessorTypeV2(defaultPreprocessor)
-      ? CA_PROCESSOR_DATA[defaultPreprocessor].buildDefaults(baseModel)
+    const processorConfig = isFilterType(defaultPreprocessor)
+      ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults(baseModel)
       : null;
 
     const initialConfig = deepClone(model.type === 'controlnet' ? initialControlNetV2 : initialT2IAdapterV2);

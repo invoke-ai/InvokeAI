@@ -219,7 +219,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
 
   const _addedCAs = await addControlAdapters(
     manager,
-    state.canvasV2.controlAdapters.entities,
+    state.canvasV2.layers.entities,
     g,
     state.canvasV2.bbox.rect,
     denoise,

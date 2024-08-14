@@ -10,7 +10,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
     BatchStatus,
     EnqueueBatchResult,
-    QueueItemOrigin,
     SessionQueueItem,
     SessionQueueStatus,
 )
@@ -89,7 +88,7 @@ class QueueItemEventBase(QueueEventBase):
 
     item_id: int = Field(description="The ID of the queue item")
     batch_id: str = Field(description="The ID of the queue batch")
-    origin: QueueItemOrigin | None = Field(default=None, description="The origin of the batch")
+    origin: str | None = Field(default=None, description="The origin of the batch")
 
 
 class InvocationEventBase(QueueItemEventBase):
@@ -284,7 +283,7 @@ class BatchEnqueuedEvent(QueueEventBase):
         description="The number of invocations initially requested to be enqueued (may be less than enqueued if queue was full)"
     )
     priority: int = Field(description="The priority of the batch")
-    origin: QueueItemOrigin | None = Field(default=None, description="The origin of the batch")
+    origin: str | None = Field(default=None, description="The origin of the batch")
 
     @classmethod
     def build(cls, enqueue_result: EnqueueBatchResult) -> "BatchEnqueuedEvent":
