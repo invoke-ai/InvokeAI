@@ -8,7 +8,7 @@ export const getViewModeChunks = (currentPrompt: string, presetPrompt?: string):
   const [before, after] = presetPrompt.split(PRESET_PLACEHOLDER, 2);
 
   if (!before || !after) {
-    return ['', `${currentPrompt} `, presetPrompt];
+    return ['', `${currentPrompt} `, before || after || ''];
   }
 
   return [before ?? '', currentPrompt, after ?? ''];
