@@ -30,6 +30,7 @@ from invokeai.app.api.routers import (
     images,
     model_manager,
     session_queue,
+    style_presets,
     utilities,
     workflows,
 )
@@ -108,6 +109,7 @@ app.include_router(board_images.board_images_router, prefix="/api")
 app.include_router(app_info.app_router, prefix="/api")
 app.include_router(session_queue.session_queue_router, prefix="/api")
 app.include_router(workflows.workflows_router, prefix="/api")
+app.include_router(style_presets.style_presets_router, prefix="/api")
 
 app.openapi = get_openapi_func(app)
 

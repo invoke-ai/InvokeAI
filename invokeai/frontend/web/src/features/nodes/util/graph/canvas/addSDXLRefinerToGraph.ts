@@ -16,7 +16,7 @@ import {
   SDXL_REFINER_POSITIVE_CONDITIONING,
   SDXL_REFINER_SEAMLESS,
 } from 'features/nodes/util/graph/constants';
-import { getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { NonNullableGraph } from 'services/api/types';
 import { isRefinerMainModelModelConfig } from 'services/api/types';
 
@@ -59,7 +59,7 @@ export const addSDXLRefinerToGraph = async (
   const modelLoaderId = modelLoaderNodeId ? modelLoaderNodeId : SDXL_MODEL_LOADER;
 
   // Construct Style Prompt
-  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
 
   // Unplug SDXL Latents Generation To Latents To Image
   graph.edges = graph.edges.filter((e) => !(e.source.node_id === baseNodeId && ['latents'].includes(e.source.field)));

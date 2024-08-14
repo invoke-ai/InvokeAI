@@ -1,4 +1,4 @@
-import { useImageUrlToBlob } from 'common/hooks/useImageUrlToBlob';
+import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
 import { copyBlobToClipboard } from 'features/system/util/copyBlobToClipboard';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 
 export const useCopyImageToClipboard = () => {
   const { t } = useTranslation();
-  const imageUrlToBlob = useImageUrlToBlob();
 
   const isClipboardAPIAvailable = useMemo(() => {
     return Boolean(navigator.clipboard) && Boolean(window.ClipboardItem);
@@ -23,7 +22,7 @@ export const useCopyImageToClipboard = () => {
         });
       }
       try {
-        const blob = await imageUrlToBlob(image_url);
+        const blob = await convertImageUrlToBlob(image_url);
 
         if (!blob) {
           throw new Error('Unable to create Blob');
@@ -45,7 +44,7 @@ export const useCopyImageToClipboard = () => {
         });
       }
     },
-    [imageUrlToBlob, isClipboardAPIAvailable, t]
+    [isClipboardAPIAvailable, t]
   );
 
   return { isClipboardAPIAvailable, copyImageToClipboard };
