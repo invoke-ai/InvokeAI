@@ -10,8 +10,6 @@ import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityI
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
-import { LayerOpacity } from './LayerOpacity';
-
 type Props = {
   id: string;
 };
@@ -26,7 +24,6 @@ export const Layer = memo(({ id }: Props) => {
           <CanvasEntityEnabledToggle />
           <CanvasEntityTitle />
           <Spacer />
-          <LayerOpacity />
           <LayerActionsMenu />
           <CanvasEntityDeleteButton />
         </CanvasEntityHeader>

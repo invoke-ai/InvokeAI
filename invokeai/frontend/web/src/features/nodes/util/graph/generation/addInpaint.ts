@@ -22,7 +22,7 @@ export const addInpaint = async (
   denoise.denoising_start = denoising_start;
 
   const initialImage = await manager.getCompositeLayerImageDTO(bbox.rect);
-  const maskImage = await manager.getInpaintMaskImageDTO(bbox.rect);
+  const maskImage = await manager.inpaintMask.renderer.rasterize(bbox.rect);
 
   if (!isEqual(scaledSize, originalSize)) {
     // Scale before processing requires some resizing
