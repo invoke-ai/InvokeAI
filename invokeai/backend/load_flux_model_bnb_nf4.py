@@ -4,7 +4,7 @@ from pathlib import Path
 import accelerate
 import torch
 from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
-from safetensors.torch import load_file
+from safetensors.torch import load_file, save_file
 
 from invokeai.backend.bnb import quantize_model_nf4
 
@@ -62,6 +62,9 @@ def load_flux_transformer(path: Path) -> FluxTransformer2DModel:
 
         # ---------------------
 
+        with accelerate.init_empty_weights():
+            model = quantize_model_nf4(empty_model, modules_to_not_convert=set(), compute_dtype=torch.bfloat16)
+
         # Load sharded state dict.
         files = list(path.glob("*.safetensors"))
         state_dict = dict()
@@ -69,8 +72,9 @@ def load_flux_transformer(path: Path) -> FluxTransformer2DModel:
             sd = load_file(file)
             state_dict.update(sd)
 
-        empty_model.load_state_dict(state_dict, strict=True, assign=True)
-        model = quantize_model_nf4(empty_model, modules_to_not_convert=set(), compute_dtype=torch.bfloat16)
+        # model.to_empty(device="cpu")
+        # model.to(dtype=torch.float16)
+        model.load_state_dict(state_dict, strict=True, assign=True)
 
         # Load the state dict into the model. The bitsandbytes layers know how to load from both quantized and
         # non-quantized state dicts.
@@ -80,7 +84,7 @@ def load_flux_transformer(path: Path) -> FluxTransformer2DModel:
         model = model.to("cuda")
 
         model_nf4_path.mkdir(parents=True, exist_ok=True)
-        # save_file(model.state_dict(), model_nf4_path / "model.safetensors")
+        save_file(model.state_dict(), model_nf4_path / "model.safetensors")
 
         # ---------------------
 
