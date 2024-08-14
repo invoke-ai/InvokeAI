@@ -13,7 +13,7 @@ import {
 import {
   bboxHeightChanged,
   bboxWidthChanged,
-  caRecalled,
+  // caRecalled,
   ipaRecalled,
   layerAllDeleted,
   layerRecalled,
@@ -43,8 +43,8 @@ import type {
   CanvasControlAdapterState,
   CanvasIPAdapterState,
   CanvasLayerState,
-  LoRA,
   CanvasRegionalGuidanceState,
+  LoRA,
 } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type {
@@ -271,7 +271,7 @@ const recallCA: MetadataRecallFunc<CanvasControlAdapterState> = async (ca) => {
   }
   // No clobber
   clone.id = getCAId(uuidv4());
-  dispatch(caRecalled({ data: clone }));
+  // dispatch(caRecalled({ data: clone }));
   return;
 };
 

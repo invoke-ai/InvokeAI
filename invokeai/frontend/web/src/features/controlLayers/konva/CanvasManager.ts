@@ -9,20 +9,27 @@ import {
   konvaNodeToBlob,
   konvaNodeToImageData,
   nanoid,
+  previewBlob,
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
-import type { CanvasV2State, Coordinate, Dimensions, GenerationMode, Rect } from 'features/controlLayers/store/types';
+import type {
+  CanvasV2State,
+  Coordinate,
+  Dimensions,
+  GenerationMode,
+  ImageCache,
+  Rect,
+} from 'features/controlLayers/store/types';
 import { isValidLayerWithoutControlAdapter } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
-import { clamp } from 'lodash-es';
+import { clamp, isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { assert } from 'tsafe';
 
 import { CanvasBackground } from './CanvasBackground';
-import { CanvasControlAdapter } from './CanvasControlAdapter';
+import type { CanvasControlAdapter } from './CanvasControlAdapter';
 import { CanvasLayerAdapter } from './CanvasLayerAdapter';
 import { CanvasMaskAdapter } from './CanvasMaskAdapter';
 import { CanvasPreview } from './CanvasPreview';
@@ -144,39 +151,14 @@ export class CanvasManager {
     this._worker.postMessage(task, [data.buffer]);
   }
 
-  async renderControlAdapters() {
-    const { entities } = this.stateApi.getControlAdaptersState();
-
-    for (const canvasControlAdapter of this.controlAdapters.values()) {
-      if (!entities.find((ca) => ca.id === canvasControlAdapter.id)) {
-        canvasControlAdapter.destroy();
-        this.controlAdapters.delete(canvasControlAdapter.id);
-      }
-    }
-
-    for (const entity of entities) {
-      let adapter = this.controlAdapters.get(entity.id);
-      if (!adapter) {
-        adapter = new CanvasControlAdapter(entity, this);
-        this.controlAdapters.set(adapter.id, adapter);
-        this.stage.add(adapter.konva.layer);
-      }
-      await adapter.render(entity);
-    }
-  }
-
   arrangeEntities() {
-    const { getLayersState, getControlAdaptersState, getRegionsState } = this.stateApi;
+    const { getLayersState, getRegionsState } = this.stateApi;
     const layers = getLayersState().entities;
-    const controlAdapters = getControlAdaptersState().entities;
     const regions = getRegionsState().entities;
     let zIndex = 0;
     this.background.konva.layer.zIndex(++zIndex);
     for (const layer of layers) {
       this.layers.get(layer.id)?.konva.layer.zIndex(++zIndex);
-    }
-    for (const ca of controlAdapters) {
-      this.controlAdapters.get(ca.id)?.konva.layer.zIndex(++zIndex);
     }
     for (const rg of regions) {
       this.regions.get(rg.id)?.konva.layer.zIndex(++zIndex);
@@ -358,16 +340,6 @@ export class CanvasManager {
       });
     }
 
-    if (
-      this._isFirstRender ||
-      state.controlAdapters.entities !== this._prevState.controlAdapters.entities ||
-      state.tool.selected !== this._prevState.tool.selected ||
-      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
-    ) {
-      this.log.debug('Rendering control adapters');
-      await this.renderControlAdapters();
-    }
-
     this.stateApi.$toolState.set(state.tool);
     this.stateApi.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
     this.stateApi.$selectedEntity.set(this.stateApi.getSelectedEntity());
@@ -382,12 +354,7 @@ export class CanvasManager {
       await this.preview.bbox.render();
     }
 
-    if (
-      this._isFirstRender ||
-      state.layers !== this._prevState.layers ||
-      state.controlAdapters !== this._prevState.controlAdapters ||
-      state.regions !== this._prevState.regions
-    ) {
+    if (this._isFirstRender || state.layers !== this._prevState.layers || state.regions !== this._prevState.regions) {
       // this.log.debug('Updating entity bboxes');
       // debouncedUpdateBboxes(stage, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions, onBboxChanged);
     }
@@ -400,7 +367,6 @@ export class CanvasManager {
     if (
       this._isFirstRender ||
       state.layers.entities !== this._prevState.layers.entities ||
-      state.controlAdapters.entities !== this._prevState.controlAdapters.entities ||
       state.regions.entities !== this._prevState.regions.entities ||
       state.inpaintMask !== this._prevState.inpaintMask ||
       state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
@@ -569,45 +535,43 @@ export class CanvasManager {
     return konvaNodeToImageData(this.getCompositeLayerStageClone(), rect);
   };
 
-  getCompositeLayerImageDTO = async (rect?: Rect): Promise<ImageDTO> => {
+  getCompositeRasterizedImageCache = (rect: Rect): ImageCache | null => {
+    const layerState = this.stateApi.getLayersState();
+    const imageCache = layerState.compositeRasterizationCache.find((cache) => isEqual(cache.rect, rect));
+    return imageCache ?? null;
+  };
+
+  getCompositeLayerImageDTO = async (rect: Rect): Promise<ImageDTO> => {
+    let imageDTO: ImageDTO | null = null;
+    const compositeRasterizedImageCache = this.getCompositeRasterizedImageCache(rect);
+
+    if (compositeRasterizedImageCache) {
+      imageDTO = await getImageDTO(compositeRasterizedImageCache.imageName);
+      if (imageDTO) {
+        this.log.trace({ rect, compositeRasterizedImageCache, imageDTO }, 'Using cached composite rasterized image');
+        return imageDTO;
+      }
+    }
+
+    this.log.trace({ rect }, 'Rasterizing composite layer');
+
     const blob = await this.getCompositeLayerBlob(rect);
-    const imageDTO = await uploadImage(blob, 'composite-layer.png', 'general', true);
-    this.stateApi.setLayerImageCache(imageDTO);
+
+    if (this._isDebugging) {
+      previewBlob(blob, 'Rasterized entity');
+    }
+
+    imageDTO = await uploadImage(blob, 'composite-layer.png', 'general', true);
+    this.stateApi.compositeLayerRasterized({ imageName: imageDTO.image_name, rect });
     return imageDTO;
   };
 
   getInpaintMaskBlob = (rect?: Rect): Promise<Blob> => {
-    return this.inpaintMask.renderer.getBlob({ rect });
+    return this.inpaintMask.renderer.getBlob(rect);
   };
 
   getInpaintMaskImageData = (rect?: Rect): ImageData => {
-    return this.inpaintMask.renderer.getImageData({ rect });
-  };
-
-  getInpaintMaskImageDTO = async (rect?: Rect): Promise<ImageDTO> => {
-    const blob = await this.inpaintMask.renderer.getBlob({ rect });
-    const imageDTO = await uploadImage(blob, 'inpaint-mask.png', 'mask', true);
-    this.stateApi.setInpaintMaskImageCache(imageDTO);
-    return imageDTO;
-  };
-
-  getRegionMaskImageDTO = async (id: string, rect?: Rect): Promise<ImageDTO> => {
-    const region = this.stateApi.getEntity({ id, type: 'regional_guidance' });
-    assert(region?.type === 'regional_guidance');
-    if (region.state.imageCache) {
-      const imageDTO = await getImageDTO(region.state.imageCache);
-      if (imageDTO) {
-        return imageDTO;
-      }
-    }
-    return region.adapter.renderer.getImageDTO({
-      rect,
-      category: 'other',
-      is_intermediate: true,
-      onUploaded: (imageDTO) => {
-        this.stateApi.setRegionMaskImageCache(region.state.id, imageDTO);
-      },
-    });
+    return this.inpaintMask.renderer.getImageData(rect);
   };
 
   getGenerationMode(): GenerationMode {

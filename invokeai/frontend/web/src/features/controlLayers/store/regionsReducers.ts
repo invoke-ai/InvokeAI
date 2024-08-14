@@ -54,7 +54,7 @@ export const regionsReducers = {
         positivePrompt: '',
         negativePrompt: null,
         ipAdapters: [],
-        imageCache: null,
+        rasterizationCache: [],
       };
       state.regions.entities.push(rg);
       state.selectedEntityIdentifier = { type: 'regional_guidance', id };
@@ -92,14 +92,6 @@ export const regionsReducers = {
       return;
     }
     rg.fill = fill;
-  },
-  rgImageCacheChanged: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO }>) => {
-    const { id, imageDTO } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
-      return;
-    }
-    rg.imageCache = imageDTO.image_name;
   },
   rgAutoNegativeChanged: (state, action: PayloadAction<{ id: string; autoNegative: ParameterAutoNegative }>) => {
     const { id, autoNegative } = action.payload;

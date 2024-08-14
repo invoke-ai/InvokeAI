@@ -26,10 +26,11 @@ export const addControlAdapters = async (
   const layersWithValidControlAdapters = layers
     .filter((layer) => layer.isEnabled)
     .filter((layer) => doesLayerHaveValidControlAdapter(layer, base));
+
   for (const layer of layersWithValidControlAdapters) {
     const adapter = manager.layers.get(layer.id);
     assert(adapter, 'Adapter not found');
-    const imageDTO = await adapter.renderer.getImageDTO({ rect: bbox, is_intermediate: true, category: 'control' });
+    const imageDTO = await adapter.renderer.rasterize(bbox);
     if (layer.controlAdapter.type === 'controlnet') {
       await addControlNetToGraph(g, layer, imageDTO, denoise);
     } else {
