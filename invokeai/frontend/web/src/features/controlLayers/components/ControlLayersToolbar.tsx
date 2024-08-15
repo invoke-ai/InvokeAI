@@ -20,7 +20,6 @@ import { memo, useCallback } from 'react';
 export const ControlLayersToolbar = memo(() => {
   const tool = useAppSelector((s) => s.canvasV2.tool.selected);
   const canvasManager = useStore($canvasManager);
-
   const onChangeDebugging = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       if (!canvasManager) {

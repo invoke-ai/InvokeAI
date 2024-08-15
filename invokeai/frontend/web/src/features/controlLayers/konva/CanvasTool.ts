@@ -35,6 +35,11 @@ export class CanvasTool {
       innerBorderCircle: Konva.Circle;
       outerBorderCircle: Konva.Circle;
     };
+    eyeDropper: {
+      group: Konva.Group;
+      fillCircle: Konva.Circle;
+      transparentCenterCircle: Konva.Circle;
+    };
   };
 
   /**
@@ -96,6 +101,26 @@ export class CanvasTool {
           strokeEnabled: true,
         }),
       },
+      eyeDropper: {
+        group: new Konva.Group({ name: `${this.type}:eyeDropper_group` }),
+        fillCircle: new Konva.Circle({
+          name: `${this.type}:eyeDropper_fill_circle`,
+          listening: false,
+          fill: '',
+          radius: 20,
+          strokeWidth: 1,
+          stroke: 'black',
+          strokeScaleEnabled: false,
+        }),
+        transparentCenterCircle: new Konva.Circle({
+          name: `${this.type}:eyeDropper_fill_circle`,
+          listening: false,
+          strokeEnabled: false,
+          fill: 'white',
+          radius: 5,
+          globalCompositeOperation: 'destination-out',
+        }),
+      },
     };
     this.konva.brush.group.add(this.konva.brush.fillCircle);
     this.konva.brush.group.add(this.konva.brush.innerBorderCircle);
@@ -106,6 +131,10 @@ export class CanvasTool {
     this.konva.eraser.group.add(this.konva.eraser.innerBorderCircle);
     this.konva.eraser.group.add(this.konva.eraser.outerBorderCircle);
     this.konva.group.add(this.konva.eraser.group);
+
+    this.konva.eyeDropper.group.add(this.konva.eyeDropper.fillCircle);
+    this.konva.eyeDropper.group.add(this.konva.eyeDropper.transparentCenterCircle);
+    this.konva.group.add(this.konva.eyeDropper.group);
 
     this.subscriptions.add(
       this.manager.stateApi.$stageAttrs.listen(() => {
@@ -146,6 +175,12 @@ export class CanvasTool {
     });
   };
 
+  setToolVisibility = (tool: 'brush' | 'eraser' | 'eyeDropper' | 'none') => {
+    this.konva.brush.group.visible(tool === 'brush');
+    this.konva.eraser.group.visible(tool === 'eraser');
+    this.konva.eyeDropper.group.visible(tool === 'eyeDropper');
+  };
+
   render() {
     const stage = this.manager.stage;
     const renderedEntityCount: number = 1; // TODO(psyche): this.manager should be renderable entity count
@@ -154,6 +189,7 @@ export class CanvasTool {
     const cursorPos = this.manager.stateApi.$lastCursorPos.get();
     const isDrawing = this.manager.stateApi.$isDrawing.get();
     const isMouseDown = this.manager.stateApi.$isMouseDown.get();
+    const colorUnderCursor = this.manager.stateApi.$colorUnderCursor.get();
 
     const tool = toolState.selected;
 
@@ -180,6 +216,8 @@ export class CanvasTool {
       stage.container().style.cursor = 'none';
     } else if (tool === 'bbox') {
       stage.container().style.cursor = 'default';
+    } else if (tool === 'eyeDropper') {
+      stage.container().style.cursor = 'none';
     }
 
     stage.draggable(tool === 'view');
@@ -216,9 +254,7 @@ export class CanvasTool {
         });
 
         this.scaleTool();
-
-        this.konva.brush.group.visible(true);
-        this.konva.eraser.group.visible(false);
+        this.setToolVisibility('brush');
       } else if (cursorPos && tool === 'eraser') {
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.eraser.width);
 
@@ -243,12 +279,20 @@ export class CanvasTool {
         });
 
         this.scaleTool();
-
-        this.konva.brush.group.visible(false);
-        this.konva.eraser.group.visible(true);
+        this.setToolVisibility('eraser');
+      } else if (cursorPos && colorUnderCursor) {
+        this.konva.eyeDropper.fillCircle.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          fill: rgbaColorToString(colorUnderCursor),
+        });
+        this.konva.eyeDropper.transparentCenterCircle.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+        });
+        this.setToolVisibility('eyeDropper');
       } else {
-        this.konva.brush.group.visible(false);
-        this.konva.eraser.group.visible(false);
+        this.setToolVisibility('none');
       }
     }
   }
