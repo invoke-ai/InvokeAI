@@ -4,10 +4,10 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { parseify } from 'common/util/serialize';
 import {
   ipaImageChanged,
-  layerAdded,
+  rasterLayerAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasLayerState } from 'features/controlLayers/store/types';
+import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
@@ -108,11 +108,11 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
         const { x, y } = getState().canvasV2.bbox.rect;
-        const overrides: Partial<CanvasLayerState> = {
+        const overrides: Partial<CanvasRasterLayerState> = {
           objects: [imageObject],
           position: { x, y },
         };
-        dispatch(layerAdded({ overrides, isSelected: true }));
+        dispatch(rasterLayerAdded({ overrides, isSelected: true }));
         return;
       }
 

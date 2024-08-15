@@ -1,7 +1,7 @@
 import { Button, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useAddCALayer, useAddIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
-import { layerAdded, rgAdded } from 'features/controlLayers/store/canvasV2Slice';
+import { rasterLayerAdded, rgAdded } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -15,7 +15,7 @@ export const AddLayerButton = memo(() => {
     dispatch(rgAdded());
   }, [dispatch]);
   const addRasterLayer = useCallback(() => {
-    dispatch(layerAdded({ isSelected: true }));
+    dispatch(rasterLayerAdded({ isSelected: true }));
   }, [dispatch]);
 
   return (

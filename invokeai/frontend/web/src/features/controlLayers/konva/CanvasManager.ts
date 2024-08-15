@@ -29,7 +29,6 @@ import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 import { CanvasBackground } from './CanvasBackground';
-import type { CanvasControlAdapter } from './CanvasControlAdapter';
 import { CanvasLayerAdapter } from './CanvasLayerAdapter';
 import { CanvasMaskAdapter } from './CanvasMaskAdapter';
 import { CanvasPreview } from './CanvasPreview';
@@ -46,10 +45,10 @@ export class CanvasManager {
   path: string[];
   stage: Konva.Stage;
   container: HTMLDivElement;
-  controlAdapters: Map<string, CanvasControlAdapter>;
-  layers: Map<string, CanvasLayerAdapter>;
-  regions: Map<string, CanvasMaskAdapter>;
-  inpaintMask: CanvasMaskAdapter;
+  rasterLayerAdapters: Map<string, CanvasLayerAdapter> = new Map();
+  controlLayerAdapters: Map<string, CanvasLayerAdapter> = new Map();
+  regionalGuidanceAdapters: Map<string, CanvasMaskAdapter> = new Map();
+  inpaintMaskAdapter: CanvasMaskAdapter;
   stateApi: CanvasStateApi;
   preview: CanvasPreview;
   background: CanvasBackground;
@@ -94,10 +93,6 @@ export class CanvasManager {
     this.background = new CanvasBackground(this);
     this.stage.add(this.background.konva.layer);
 
-    this.layers = new Map();
-    this.regions = new Map();
-    this.controlAdapters = new Map();
-
     this._worker.onmessage = (event: MessageEvent<ExtentsResult | WorkerLogMessage>) => {
       const { type, data } = event.data;
       if (type === 'log') {
@@ -128,8 +123,8 @@ export class CanvasManager {
     this.stateApi.$currentFill.set(this.stateApi.getCurrentFill());
     this.stateApi.$selectedEntity.set(this.stateApi.getSelectedEntity());
 
-    this.inpaintMask = new CanvasMaskAdapter(this.stateApi.getInpaintMaskState(), this);
-    this.stage.add(this.inpaintMask.konva.layer);
+    this.inpaintMaskAdapter = new CanvasMaskAdapter(this.stateApi.getInpaintMaskState(), this);
+    this.stage.add(this.inpaintMaskAdapter.konva.layer);
   }
 
   enableDebugging() {
@@ -152,18 +147,24 @@ export class CanvasManager {
   }
 
   arrangeEntities() {
-    const { getLayersState, getRegionsState } = this.stateApi;
-    const layers = getLayersState().entities;
-    const regions = getRegionsState().entities;
     let zIndex = 0;
+
     this.background.konva.layer.zIndex(++zIndex);
-    for (const layer of layers) {
-      this.layers.get(layer.id)?.konva.layer.zIndex(++zIndex);
+
+    for (const layer of this.stateApi.getRasterLayersState().entities) {
+      this.rasterLayerAdapters.get(layer.id)?.konva.layer.zIndex(++zIndex);
     }
-    for (const rg of regions) {
-      this.regions.get(rg.id)?.konva.layer.zIndex(++zIndex);
+
+    for (const layer of this.stateApi.getControlLayersState().entities) {
+      this.controlLayerAdapters.get(layer.id)?.konva.layer.zIndex(++zIndex);
     }
-    this.inpaintMask.konva.layer.zIndex(++zIndex);
+
+    for (const rg of this.stateApi.getRegionsState().entities) {
+      this.regionalGuidanceAdapters.get(rg.id)?.konva.layer.zIndex(++zIndex);
+    }
+
+    this.inpaintMaskAdapter.konva.layer.zIndex(++zIndex);
+
     this.preview.getLayer().zIndex(++zIndex);
   }
 
@@ -215,12 +216,14 @@ export class CanvasManager {
 
     const { id, type } = transformingEntity;
 
-    if (type === 'layer') {
-      return this.layers.get(id) ?? null;
+    if (type === 'raster_layer') {
+      return this.rasterLayerAdapters.get(id) ?? null;
+    } else if (type === 'control_layer') {
+      return this.controlLayerAdapters.get(id) ?? null;
     } else if (type === 'inpaint_mask') {
-      return this.inpaintMask;
+      return this.inpaintMaskAdapter;
     } else if (type === 'regional_guidance') {
-      return this.regions.get(id) ?? null;
+      return this.regionalGuidanceAdapters.get(id) ?? null;
     }
 
     return null;
@@ -268,21 +271,46 @@ export class CanvasManager {
       return;
     }
 
-    if (this._isFirstRender || state.layers.entities !== this._prevState.layers.entities) {
-      this.log.debug('Rendering layers');
+    if (this._isFirstRender || state.rasterLayers.entities !== this._prevState.rasterLayers.entities) {
+      this.log.debug('Rendering raster layers');
 
-      for (const canvasLayer of this.layers.values()) {
-        if (!state.layers.entities.find((l) => l.id === canvasLayer.id)) {
+      for (const canvasLayer of this.rasterLayerAdapters.values()) {
+        if (!state.rasterLayers.entities.find((l) => l.id === canvasLayer.id)) {
           await canvasLayer.destroy();
-          this.layers.delete(canvasLayer.id);
+          this.rasterLayerAdapters.delete(canvasLayer.id);
         }
       }
 
-      for (const entityState of state.layers.entities) {
-        let adapter = this.layers.get(entityState.id);
+      for (const entityState of state.rasterLayers.entities) {
+        let adapter = this.rasterLayerAdapters.get(entityState.id);
         if (!adapter) {
           adapter = new CanvasLayerAdapter(entityState, this);
-          this.layers.set(adapter.id, adapter);
+          this.rasterLayerAdapters.set(adapter.id, adapter);
+          this.stage.add(adapter.konva.layer);
+        }
+        await adapter.update({
+          state: entityState,
+          toolState: state.tool,
+          isSelected: state.selectedEntityIdentifier?.id === entityState.id,
+        });
+      }
+    }
+
+    if (this._isFirstRender || state.controlLayers.entities !== this._prevState.controlLayers.entities) {
+      this.log.debug('Rendering control layers');
+
+      for (const canvasLayer of this.controlLayerAdapters.values()) {
+        if (!state.controlLayers.entities.find((l) => l.id === canvasLayer.id)) {
+          await canvasLayer.destroy();
+          this.controlLayerAdapters.delete(canvasLayer.id);
+        }
+      }
+
+      for (const entityState of state.controlLayers.entities) {
+        let adapter = this.controlLayerAdapters.get(entityState.id);
+        if (!adapter) {
+          adapter = new CanvasLayerAdapter(entityState, this);
+          this.controlLayerAdapters.set(adapter.id, adapter);
           this.stage.add(adapter.konva.layer);
         }
         await adapter.update({
@@ -303,18 +331,18 @@ export class CanvasManager {
       this.log.debug('Rendering regions');
 
       // Destroy the konva nodes for nonexistent entities
-      for (const canvasRegion of this.regions.values()) {
+      for (const canvasRegion of this.regionalGuidanceAdapters.values()) {
         if (!state.regions.entities.find((rg) => rg.id === canvasRegion.id)) {
           canvasRegion.destroy();
-          this.regions.delete(canvasRegion.id);
+          this.regionalGuidanceAdapters.delete(canvasRegion.id);
         }
       }
 
       for (const entityState of state.regions.entities) {
-        let adapter = this.regions.get(entityState.id);
+        let adapter = this.regionalGuidanceAdapters.get(entityState.id);
         if (!adapter) {
           adapter = new CanvasMaskAdapter(entityState, this);
-          this.regions.set(adapter.id, adapter);
+          this.regionalGuidanceAdapters.set(adapter.id, adapter);
           this.stage.add(adapter.konva.layer);
         }
         await adapter.update({
@@ -333,7 +361,7 @@ export class CanvasManager {
       state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Rendering inpaint mask');
-      await this.inpaintMask.update({
+      await this.inpaintMaskAdapter.update({
         state: state.inpaintMask,
         toolState: state.tool,
         isSelected: state.selectedEntityIdentifier?.id === state.inpaintMask.id,
@@ -354,11 +382,6 @@ export class CanvasManager {
       await this.preview.bbox.render();
     }
 
-    if (this._isFirstRender || state.layers !== this._prevState.layers || state.regions !== this._prevState.regions) {
-      // this.log.debug('Updating entity bboxes');
-      // debouncedUpdateBboxes(stage, canvasV2.layers, canvasV2.controlAdapters, canvasV2.regions, onBboxChanged);
-    }
-
     if (this._isFirstRender || state.session !== this._prevState.session) {
       this.log.debug('Rendering staging area');
       await this.preview.stagingArea.render();
@@ -366,7 +389,7 @@ export class CanvasManager {
 
     if (
       this._isFirstRender ||
-      state.layers.entities !== this._prevState.layers.entities ||
+      state.rasterLayers.entities !== this._prevState.rasterLayers.entities ||
       state.regions.entities !== this._prevState.regions.entities ||
       state.inpaintMask !== this._prevState.inpaintMask ||
       state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
@@ -402,15 +425,15 @@ export class CanvasManager {
 
     return () => {
       this.log.debug('Cleaning up konva renderer');
-      this.inpaintMask.destroy();
-      for (const region of this.regions.values()) {
-        region.destroy();
+      this.inpaintMaskAdapter.destroy();
+      for (const adapter of this.regionalGuidanceAdapters.values()) {
+        adapter.destroy();
       }
-      for (const layer of this.layers.values()) {
-        layer.destroy();
+      for (const adapter of this.rasterLayerAdapters.values()) {
+        adapter.destroy();
       }
-      for (const controlAdapter of this.controlAdapters.values()) {
-        controlAdapter.destroy();
+      for (const adapter of this.controlLayerAdapters.values()) {
+        adapter.destroy();
       }
       this.background.destroy();
       this.preview.destroy();
@@ -507,7 +530,7 @@ export class CanvasManager {
   }
 
   getCompositeLayerStageClone = (): Konva.Stage => {
-    const layersState = this.stateApi.getLayersState();
+    const layersState = this.stateApi.getRasterLayersState();
     const stageClone = this.stage.clone();
 
     stageClone.scaleX(1);
@@ -536,7 +559,7 @@ export class CanvasManager {
   };
 
   getCompositeRasterizedImageCache = (rect: Rect): ImageCache | null => {
-    const layerState = this.stateApi.getLayersState();
+    const layerState = this.stateApi.getRasterLayersState();
     const imageCache = layerState.compositeRasterizationCache.find((cache) => isEqual(cache.rect, rect));
     return imageCache ?? null;
   };
@@ -567,11 +590,11 @@ export class CanvasManager {
   };
 
   getInpaintMaskBlob = (rect?: Rect): Promise<Blob> => {
-    return this.inpaintMask.renderer.getBlob(rect);
+    return this.inpaintMaskAdapter.renderer.getBlob(rect);
   };
 
   getInpaintMaskImageData = (rect?: Rect): ImageData => {
-    return this.inpaintMask.renderer.getImageData(rect);
+    return this.inpaintMaskAdapter.renderer.getImageData(rect);
   };
 
   getGenerationMode(): GenerationMode {
@@ -617,7 +640,7 @@ export class CanvasManager {
   logDebugInfo() {
     // eslint-disable-next-line no-console
     console.log(this);
-    for (const layer of this.layers.values()) {
+    for (const layer of this.rasterLayerAdapters.values()) {
       // eslint-disable-next-line no-console
       console.log(layer);
     }

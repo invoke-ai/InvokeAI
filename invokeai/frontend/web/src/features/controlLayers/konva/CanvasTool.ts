@@ -8,6 +8,7 @@ import {
   BRUSH_ERASER_BORDER_WIDTH,
 } from 'features/controlLayers/konva/constants';
 import { alignCoordForTool, getPrefixedId } from 'features/controlLayers/konva/util';
+import { isDrawableEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
@@ -156,10 +157,7 @@ export class CanvasTool {
 
     const tool = toolState.selected;
 
-    const isDrawableEntity =
-      selectedEntity?.state.type === 'regional_guidance' ||
-      selectedEntity?.state.type === 'layer' ||
-      selectedEntity?.state.type === 'inpaint_mask';
+    const isDrawable = selectedEntity && isDrawableEntity(selectedEntity.state);
 
     // Update the stage's pointer style
     if (tool === 'view') {
@@ -168,7 +166,7 @@ export class CanvasTool {
     } else if (renderedEntityCount === 0) {
       // We have no layers, so we should not render any tool
       stage.container().style.cursor = 'default';
-    } else if (!isDrawableEntity) {
+    } else if (!isDrawable) {
       // Non-drawable layers don't have tools
       stage.container().style.cursor = 'not-allowed';
     } else if (tool === 'move' || Boolean(this.manager.stateApi.$transformingEntity.get())) {
@@ -186,7 +184,7 @@ export class CanvasTool {
 
     stage.draggable(tool === 'view');
 
-    if (!cursorPos || renderedEntityCount === 0 || !isDrawableEntity) {
+    if (!cursorPos || renderedEntityCount === 0 || !isDrawable) {
       // We can bail early if the mouse isn't over the stage or there are no layers
       this.konva.group.visible(false);
     } else {

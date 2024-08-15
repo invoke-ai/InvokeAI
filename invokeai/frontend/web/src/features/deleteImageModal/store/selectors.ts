@@ -11,7 +11,7 @@ import { some } from 'lodash-es';
 import type { ImageUsage } from './types';
 
 export const getImageUsage = (nodes: NodesState, canvasV2: CanvasV2State, image_name: string) => {
-  const isLayerImage = canvasV2.layers.entities.some((layer) =>
+  const isLayerImage = canvasV2.rasterLayers.entities.some((layer) =>
     layer.objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
   );
 

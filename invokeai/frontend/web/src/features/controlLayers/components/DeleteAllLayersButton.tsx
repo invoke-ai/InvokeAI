@@ -13,7 +13,7 @@ export const DeleteAllLayersButton = memo(() => {
       s.canvasV2.regions.entities.length +
       // s.canvasV2.controlAdapters.entities.length +
       s.canvasV2.ipAdapters.entities.length +
-      s.canvasV2.layers.entities.length
+      s.canvasV2.rasterLayers.entities.length
     );
   });
   const onClick = useCallback(() => {

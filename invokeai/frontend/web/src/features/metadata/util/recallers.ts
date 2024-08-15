@@ -15,8 +15,8 @@ import {
   bboxWidthChanged,
   // caRecalled,
   ipaRecalled,
-  layerAllDeleted,
-  layerRecalled,
+  rasterLayerAllDeleted,
+  rasterLayerRecalled,
   loraAllDeleted,
   loraRecalled,
   negativePrompt2Changed,
@@ -42,7 +42,7 @@ import {
 import type {
   CanvasControlAdapterState,
   CanvasIPAdapterState,
-  CanvasLayerState,
+  CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   LoRA,
 } from 'features/controlLayers/store/types';
@@ -328,7 +328,7 @@ const recallRG: MetadataRecallFunc<CanvasRegionalGuidanceState> = async (rg) => 
 };
 
 //#region Control Layers
-const recallLayer: MetadataRecallFunc<CanvasLayerState> = async (layer) => {
+const recallLayer: MetadataRecallFunc<CanvasRasterLayerState> = async (layer) => {
   const { dispatch } = getStore();
   const clone = deepClone(layer);
   const invalidObjects: string[] = [];
@@ -355,13 +355,13 @@ const recallLayer: MetadataRecallFunc<CanvasLayerState> = async (layer) => {
     }
   }
   clone.id = getRGId(uuidv4());
-  dispatch(layerRecalled({ data: clone }));
+  dispatch(rasterLayerRecalled({ data: clone }));
   return;
 };
 
-const recallLayers: MetadataRecallFunc<CanvasLayerState[]> = (layers) => {
+const recallLayers: MetadataRecallFunc<CanvasRasterLayerState[]> = (layers) => {
   const { dispatch } = getStore();
-  dispatch(layerAllDeleted());
+  dispatch(rasterLayerAllDeleted());
   for (const l of layers) {
     recallLayer(l);
   }

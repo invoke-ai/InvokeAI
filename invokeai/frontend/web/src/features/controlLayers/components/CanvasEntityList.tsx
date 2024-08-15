@@ -1,8 +1,9 @@
 import { Flex } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { ControlLayerEntityList } from 'features/controlLayers/components/ControlLayer/ControlLayerEntityList';
 import { InpaintMask } from 'features/controlLayers/components/InpaintMask/InpaintMask';
 import { IPAdapterList } from 'features/controlLayers/components/IPAdapter/IPAdapterList';
-import { LayerEntityList } from 'features/controlLayers/components/Layer/LayerEntityList';
+import { RasterLayerEntityList } from 'features/controlLayers/components/RasterLayer/RasterLayerEntityList';
 import { RegionalGuidanceEntityList } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceEntityList';
 import { memo } from 'react';
 
@@ -13,7 +14,8 @@ export const CanvasEntityList = memo(() => {
         <InpaintMask />
         <RegionalGuidanceEntityList />
         <IPAdapterList />
-        <LayerEntityList />
+        <ControlLayerEntityList />
+        <RasterLayerEntityList />
       </Flex>
     </ScrollableContent>
   );

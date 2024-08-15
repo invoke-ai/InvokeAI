@@ -3,9 +3,10 @@ import { CanvasEntityContainer } from 'features/controlLayers/components/common/
 import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
+import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
-import { LayerActionsMenu } from 'features/controlLayers/components/Layer/LayerActionsMenu';
-import { LayerSettings } from 'features/controlLayers/components/Layer/LayerSettings';
+import { ControlLayerActionsMenu } from 'features/controlLayers/components/ControlLayer/ControlLayerActionsMenu';
+import { ControlLayerControlAdapter } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapter';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
@@ -14,8 +15,8 @@ type Props = {
   id: string;
 };
 
-export const Layer = memo(({ id }: Props) => {
-  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'layer' }), [id]);
+export const ControlLayer = memo(({ id }: Props) => {
+  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'control_layer' }), [id]);
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
@@ -24,13 +25,15 @@ export const Layer = memo(({ id }: Props) => {
           <CanvasEntityEnabledToggle />
           <CanvasEntityTitle />
           <Spacer />
-          <LayerActionsMenu />
+          <ControlLayerActionsMenu />
           <CanvasEntityDeleteButton />
         </CanvasEntityHeader>
-        <LayerSettings />
+        <CanvasEntitySettingsWrapper>
+          <ControlLayerControlAdapter />
+        </CanvasEntitySettingsWrapper>
       </CanvasEntityContainer>
     </EntityIdentifierContext.Provider>
   );
 });
 
-Layer.displayName = 'Layer';
+ControlLayer.displayName = 'ControlLayer';
