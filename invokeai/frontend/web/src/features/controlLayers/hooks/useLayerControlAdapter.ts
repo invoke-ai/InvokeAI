@@ -4,10 +4,10 @@ import { deepClone } from 'common/util/deepClone';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { selectControlLayerOrThrow } from 'features/controlLayers/store/controlLayersReducers';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
-import { initialControlNetV2, initialT2IAdapterV2 } from 'features/controlLayers/store/types';
+import { initialControlNetV2, initialIPAdapterV2, initialT2IAdapterV2 } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useMemo } from 'react';
-import { useControlNetAndT2IAdapterModels } from 'services/api/hooks/modelsByType';
+import { useControlNetAndT2IAdapterModels, useIPAdapterModels } from 'services/api/hooks/modelsByType';
 
 export const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier) => {
   const selectControlAdapter = useMemo(
@@ -38,6 +38,26 @@ export const useDefaultControlAdapter = () => {
     }
 
     return controlAdapter;
+  }, [baseModel, modelConfigs]);
+
+  return defaultControlAdapter;
+};
+
+export const useDefaultIPAdapter = () => {
+  const [modelConfigs] = useIPAdapterModels();
+
+  const baseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
+
+  const defaultControlAdapter = useMemo(() => {
+    const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));
+    const model = compatibleModels[0] ?? modelConfigs[0] ?? null;
+    const ipAdapter = deepClone(initialIPAdapterV2);
+
+    if (model) {
+      ipAdapter.model = zModelIdentifierField.parse(model);
+    }
+
+    return ipAdapter;
   }, [baseModel, modelConfigs]);
 
   return defaultControlAdapter;

@@ -5,7 +5,6 @@ import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/com
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
-import { ControlLayerActionsMenu } from 'features/controlLayers/components/ControlLayer/ControlLayerActionsMenu';
 import { ControlLayerControlAdapter } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapter';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
@@ -25,7 +24,6 @@ export const ControlLayer = memo(({ id }: Props) => {
           <CanvasEntityEnabledToggle />
           <CanvasEntityTitle />
           <Spacer />
-          <ControlLayerActionsMenu />
           <CanvasEntityDeleteButton />
         </CanvasEntityHeader>
         <CanvasEntitySettingsWrapper>

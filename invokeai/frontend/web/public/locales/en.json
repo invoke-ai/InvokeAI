@@ -1651,7 +1651,7 @@
         "storeNotInitialized": "Store is not initialized"
     },
     "controlLayers": {
-        "deleteAll": "Delete All",
+        "resetAll": "Reset All",
         "addLayer": "Add Layer",
         "moveToFront": "Move to Front",
         "moveToBack": "Move to Back",
@@ -1699,7 +1699,10 @@
         "layers_other": "Layers",
         "objects_zero": "empty",
         "objects_one": "{{count}} object",
-        "objects_other": "{{count}} objects"
+        "objects_other": "{{count}} objects",
+        "filter": "Filter",
+        "convertToControlLayer": "Convert to Control Layer",
+        "convertToRasterLayer": "Convert to Raster Layer"
     },
     "upscaling": {
         "upscale": "Upscale",

@@ -2,8 +2,8 @@ import { Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { Weight } from 'features/controlLayers/components/common/Weight';
-import { ControlAdapterControlModeSelect } from 'features/controlLayers/components/ControlAdapter/ControlAdapterControlModeSelect';
-import { ControlAdapterModel } from 'features/controlLayers/components/ControlAdapter/ControlAdapterModel';
+import { ControlLayerControlAdapterControlMode } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterControlMode';
+import { ControlLayerControlAdapterModel } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useControlLayerControlAdapter } from 'features/controlLayers/hooks/useLayerControlAdapter';
 import {
@@ -51,11 +51,11 @@ export const ControlLayerControlAdapter = memo(() => {
 
   return (
     <Flex flexDir="column" gap={3} position="relative" w="full">
-      <ControlAdapterModel modelKey={controlAdapter.model?.key ?? null} onChange={onChangeModel} />
+      <ControlLayerControlAdapterModel modelKey={controlAdapter.model?.key ?? null} onChange={onChangeModel} />
       <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
       <BeginEndStepPct beginEndStepPct={controlAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
       {controlAdapter.type === 'controlnet' && (
-        <ControlAdapterControlModeSelect controlMode={controlAdapter.controlMode} onChange={onChangeControlMode} />
+        <ControlLayerControlAdapterControlMode controlMode={controlAdapter.controlMode} onChange={onChangeControlMode} />
       )}
     </Flex>
   );
