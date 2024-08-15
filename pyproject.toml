@@ -54,6 +54,7 @@ dependencies = [
   "torchsde==0.2.6",
   "torchvision==0.18.1",
   "transformers==4.41.2",
+  "spandrel",
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.11.1",
   "fastapi==0.111.0",
