@@ -7,7 +7,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiRectangleBold } from 'react-icons/pi';
 
-export const RectToolButton = memo(() => {
+export const ToolRectButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'rect');
@@ -26,8 +26,8 @@ export const RectToolButton = memo(() => {
 
   return (
     <IconButton
-      aria-label={`${t('controlLayers.rectangle')} (U)`}
-      tooltip={`${t('controlLayers.rectangle')} (U)`}
+      aria-label={`${t('controlLayers.tool.rectangle')} (U)`}
+      tooltip={`${t('controlLayers.tool.rectangle')} (U)`}
       icon={<PiRectangleBold />}
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="outline"
@@ -37,4 +37,4 @@ export const RectToolButton = memo(() => {
   );
 });
 
-RectToolButton.displayName = 'RectToolButton';
+ToolRectButton.displayName = 'ToolRectButton';

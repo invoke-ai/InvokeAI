@@ -4,25 +4,27 @@ import { toolChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiBoundingBoxBold } from 'react-icons/pi';
+import { PiCursorBold } from 'react-icons/pi';
 
-export const BboxToolButton = memo(() => {
+export const ToolMoveButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isDisabled = useAppSelector((s) => s.canvasV2.session.isStaging || s.canvasV2.tool.isTransforming);
-  const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'bbox');
+  const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'move');
+  const isDisabled = useAppSelector(
+    (s) => s.canvasV2.selectedEntityIdentifier === null || s.canvasV2.session.isStaging || s.canvasV2.tool.isTransforming
+  );
 
   const onClick = useCallback(() => {
-    dispatch(toolChanged('bbox'));
+    dispatch(toolChanged('move'));
   }, [dispatch]);
 
-  useHotkeys('q', onClick, { enabled: !isDisabled }, [onClick, isDisabled]);
+  useHotkeys('v', onClick, { enabled: !isDisabled }, [isDisabled, onClick]);
 
   return (
     <IconButton
-      aria-label={`${t('controlLayers.bbox')} (Q)`}
-      tooltip={`${t('controlLayers.bbox')} (Q)`}
-      icon={<PiBoundingBoxBold />}
+      aria-label={`${t('controlLayers.tool.move')} (V)`}
+      tooltip={`${t('controlLayers.tool.move')} (V)`}
+      icon={<PiCursorBold />}
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="outline"
       onClick={onClick}
@@ -31,4 +33,4 @@ export const BboxToolButton = memo(() => {
   );
 });
 
-BboxToolButton.displayName = 'BboxToolButton';
+ToolMoveButton.displayName = 'ToolMoveButton';
