@@ -1,6 +1,5 @@
 from typing import Any, Optional, Set, Type
 
-import accelerate
 import bitsandbytes as bnb
 import torch
 
@@ -460,27 +459,6 @@ def _convert_linear_layers(
             _convert_linear_layers(child, linear_cls, ignore_modules, prefix=fullname)
 
 
-def _convert_linear_layers_to_llm_8bit(module: torch.nn.Module, ignore_modules: Set[str], prefix: str = "") -> None:
-    for name, child in module.named_children():
-        fullname = f"{prefix}.{name}" if prefix else name
-        if isinstance(child, torch.nn.Linear) and not any(fullname.startswith(s) for s in ignore_modules):
-            has_bias = child.bias is not None
-            replacement = InvokeLinear8bitLt(
-                child.in_features,
-                child.out_features,
-                bias=has_bias,
-                has_fp16_weights=False,
-                # device=device,
-            )
-            replacement.weight.data = child.weight.data
-            if has_bias:
-                replacement.bias.data = child.bias.data
-            replacement.requires_grad_(False)
-            module.__setattr__(name, replacement)
-        else:
-            _convert_linear_layers_to_llm_8bit(child, ignore_modules, prefix=fullname)
-
-
 # def _replace_linear_layers(
 #     model: torch.nn.Module,
 #     linear_layer_type: Literal["Linear8bitLt", "Linear4bit"],
@@ -537,21 +515,3 @@ def _convert_linear_layers_to_llm_8bit(module: torch.nn.Module, ignore_modules: 
 #         # Remove the last key for recursion
 #         current_key_name.pop(-1)
 #     return model, has_been_replaced
-
-
-def get_parameter_device(parameter: torch.nn.Module):
-    return next(parameter.parameters()).device
-
-
-def quantize_model_llm_int8(model: torch.nn.Module, modules_to_not_convert: set[str]):
-    """Apply bitsandbytes LLM.8bit() quantization to the model."""
-    model_device = get_parameter_device(model)
-    if model_device.type != "meta":
-        # Note: This is not strictly required, but I can't think of a good reason to quantize a model that's not on the
-        # meta device, so we enforce it for now.
-        raise RuntimeError("The model should be on the meta device to apply LLM.8bit() quantization.")
-
-    with accelerate.init_empty_weights():
-        _convert_linear_layers_to_llm_8bit(module=model, ignore_modules=modules_to_not_convert)
-
-    return model

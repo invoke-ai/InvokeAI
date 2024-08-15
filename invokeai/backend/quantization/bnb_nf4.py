@@ -5,6 +5,10 @@ import torch
 # The utils in this file are partially inspired by:
 # https://github.com/Lightning-AI/pytorch-lightning/blob/1551a16b94f5234a4a78801098f64d0732ef5cb5/src/lightning/fabric/plugins/precision/bitsandbytes.py
 
+# NOTE(ryand): All of the custom state_dict manipulation logic in this file is pretty hacky. This could be made much
+# cleaner by re-implementing bnb.nn.LinearNF4 with proper use of buffers and less magic. But, for now, we try to stick
+# close to the bitsandbytes classes to make interoperability easier with other models that might use bitsandbytes.
+
 
 class InvokeLinearNF4(bnb.nn.LinearNF4):
     """A class that extends `bnb.nn.LinearNF4` to add the following functionality:
