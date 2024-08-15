@@ -67,6 +67,7 @@ class ModelType(str, Enum):
     IPAdapter = "ip_adapter"
     CLIPVision = "clip_vision"
     T2IAdapter = "t2i_adapter"
+    SpandrelImageToImage = "spandrel_image_to_image"
 
 
 class SubModelType(str, Enum):
@@ -353,7 +354,7 @@ class CLIPVisionDiffusersConfig(DiffusersConfigBase):
     """Model config for CLIPVision."""
 
     type: Literal[ModelType.CLIPVision] = ModelType.CLIPVision
-    format: Literal[ModelFormat.Diffusers]
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
     @staticmethod
     def get_tag() -> Tag:
@@ -364,11 +365,22 @@ class T2IAdapterConfig(DiffusersConfigBase, ControlAdapterConfigBase):
     """Model config for T2I."""
 
     type: Literal[ModelType.T2IAdapter] = ModelType.T2IAdapter
-    format: Literal[ModelFormat.Diffusers]
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
 
     @staticmethod
     def get_tag() -> Tag:
         return Tag(f"{ModelType.T2IAdapter.value}.{ModelFormat.Diffusers.value}")
+
+
+class SpandrelImageToImageConfig(ModelConfigBase):
+    """Model config for Spandrel Image to Image models."""
+
+    type: Literal[ModelType.SpandrelImageToImage] = ModelType.SpandrelImageToImage
+    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.SpandrelImageToImage.value}.{ModelFormat.Checkpoint.value}")
 
 
 def get_model_discriminator_value(v: Any) -> str:
@@ -407,6 +419,7 @@ AnyModelConfig = Annotated[
         Annotated[IPAdapterInvokeAIConfig, IPAdapterInvokeAIConfig.get_tag()],
         Annotated[IPAdapterCheckpointConfig, IPAdapterCheckpointConfig.get_tag()],
         Annotated[T2IAdapterConfig, T2IAdapterConfig.get_tag()],
+        Annotated[SpandrelImageToImageConfig, SpandrelImageToImageConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),

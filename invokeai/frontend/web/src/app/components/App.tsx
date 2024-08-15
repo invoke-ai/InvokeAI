@@ -13,9 +13,12 @@ import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardMo
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
+import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
+import type { InvokeTabName } from 'features/ui/store/tabMap';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
@@ -34,9 +37,10 @@ interface Props {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
+  destination?: InvokeTabName | undefined;
 }
 
-const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
+const App = ({ config = DEFAULT_CONFIG, selectedImage, destination }: Props) => {
   const language = useAppSelector(languageSelector);
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
@@ -68,6 +72,12 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
   }, [dispatch, config, logger]);
 
   useEffect(() => {
+    if (destination) {
+      dispatch(setActiveTab(destination));
+    }
+  }, [dispatch, destination]);
+
+  useEffect(() => {
     dispatch(appStarted());
   }, [dispatch]);
 
@@ -95,6 +105,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage }: Props) => {
       <DeleteImageModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
+      <StylePresetModal />
       <PreselectedImage selectedImage={selectedImage} />
     </ErrorBoundary>
   );

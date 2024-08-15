@@ -35,7 +35,6 @@ type Props = {
 const DeleteBoardModal = (props: Props) => {
   const { boardToDelete, setBoardToDelete } = props;
   const { t } = useTranslation();
-  const canRestoreDeletedImagesFromBin = useAppSelector((s) => s.config.canRestoreDeletedImagesFromBin);
   const { currentData: boardImageNames, isFetching: isFetchingBoardNames } = useListAllImageNamesForBoardQuery(
     boardToDelete?.board_id ?? skipToken
   );
@@ -120,10 +119,12 @@ const DeleteBoardModal = (props: Props) => {
                   bottomMessage={t('boards.bottomMessage')}
                 />
               )}
-              <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
               <Text>
-                {canRestoreDeletedImagesFromBin ? t('gallery.deleteImageBin') : t('gallery.deleteImagePermanent')}
+                {boardToDelete.is_private
+                  ? t('boards.deletedPrivateBoardsCannotbeRestored')
+                  : t('boards.deletedBoardsCannotbeRestored')}
               </Text>
+              <Text>{t('gallery.deleteImagePermanent')}</Text>
             </Flex>
           </AlertDialogBody>
           <AlertDialogFooter>

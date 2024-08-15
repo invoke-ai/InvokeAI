@@ -167,7 +167,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
         size = calc_model_size_by_data(self.logger, model)
         self.make_room(size)
 
-        state_dict = model.state_dict() if isinstance(model, torch.nn.Module) else None
+        running_on_cpu = self.execution_device == torch.device("cpu")
+        state_dict = model.state_dict() if isinstance(model, torch.nn.Module) and not running_on_cpu else None
         cache_record = CacheRecord(key=key, model=model, device=self.storage_device, state_dict=state_dict, size=size)
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
@@ -289,11 +290,9 @@ class ModelCache(ModelCacheBase[AnyModel]):
                 else:
                     new_dict: Dict[str, torch.Tensor] = {}
                     for k, v in cache_entry.state_dict.items():
-                        new_dict[k] = v.to(
-                            target_device, copy=True, non_blocking=TorchDevice.get_non_blocking(target_device)
-                        )
+                        new_dict[k] = v.to(target_device, copy=True)
                     cache_entry.model.load_state_dict(new_dict, assign=True)
-            cache_entry.model.to(target_device, non_blocking=TorchDevice.get_non_blocking(target_device))
+            cache_entry.model.to(target_device)
             cache_entry.device = target_device
         except Exception as e:  # blow away cache entry
             self._delete_cache_entry(cache_entry)

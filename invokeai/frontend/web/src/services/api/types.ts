@@ -11,6 +11,8 @@ export type ListBoardsArgs = NonNullable<paths['/api/v1/boards/']['get']['parame
 export type DeleteBoardResult =
   paths['/api/v1/boards/{board_id}']['delete']['responses']['200']['content']['application/json'];
 
+export type CreateBoardArg = paths['/api/v1/boards/']['post']['parameters']['query'];
+
 export type UpdateBoardArg = paths['/api/v1/boards/{board_id}']['patch']['parameters']['path'] & {
   changes: paths['/api/v1/boards/{board_id}']['patch']['requestBody']['content']['application/json'];
 };
@@ -49,9 +51,10 @@ export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
 export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
 export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
+export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
 type TextualInversionModelConfig = S['TextualInversionFileConfig'] | S['TextualInversionFolderConfig'];
 type DiffusersModelConfig = S['MainDiffusersConfig'];
-type CheckpointModelConfig = S['MainCheckpointConfig'];
+export type CheckpointModelConfig = S['MainCheckpointConfig'];
 type CLIPVisionDiffusersConfig = S['CLIPVisionDiffusersConfig'];
 export type MainModelConfig = DiffusersModelConfig | CheckpointModelConfig;
 export type AnyModelConfig =
@@ -60,6 +63,7 @@ export type AnyModelConfig =
   | ControlNetModelConfig
   | IPAdapterModelConfig
   | T2IAdapterModelConfig
+  | SpandrelImageToImageModelConfig
   | TextualInversionModelConfig
   | MainModelConfig
   | CLIPVisionDiffusersConfig;
@@ -82,6 +86,12 @@ export const isIPAdapterModelConfig = (config: AnyModelConfig): config is IPAdap
 
 export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {
   return config.type === 't2i_adapter';
+};
+
+export const isSpandrelImageToImageModelConfig = (
+  config: AnyModelConfig
+): config is SpandrelImageToImageModelConfig => {
+  return config.type === 'spandrel_image_to_image';
 };
 
 export const isControlAdapterModelConfig = (
@@ -195,6 +205,10 @@ type CanvasInitialImageAction = {
   type: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
+type UpscaleInitialImageAction = {
+  type: 'SET_UPSCALE_INITIAL_IMAGE';
+};
+
 type ToastAction = {
   type: 'TOAST';
   title?: string;
@@ -213,4 +227,5 @@ export type PostUploadAction =
   | CALayerImagePostUploadAction
   | IPALayerImagePostUploadAction
   | RGLayerIPAdapterImagePostUploadAction
-  | IILayerImagePostUploadAction;
+  | IILayerImagePostUploadAction
+  | UpscaleInitialImageAction;

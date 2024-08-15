@@ -36,7 +36,7 @@ export const CONTROL_NET_COLLECT = 'control_net_collect';
 export const IP_ADAPTER_COLLECT = 'ip_adapter_collect';
 export const T2I_ADAPTER_COLLECT = 't2i_adapter_collect';
 export const METADATA = 'core_metadata';
-export const ESRGAN = 'esrgan';
+export const SPANDREL = 'spandrel';
 export const SDXL_MODEL_LOADER = 'sdxl_model_loader';
 export const SDXL_DENOISE_LATENTS = 'sdxl_denoise_latents';
 export const SDXL_REFINER_MODEL_LOADER = 'sdxl_refiner_model_loader';
@@ -53,6 +53,8 @@ export const PROMPT_REGION_NEGATIVE_COND_PREFIX = 'prompt_region_negative_cond';
 export const PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX = 'prompt_region_positive_cond_inverted';
 export const POSITIVE_CONDITIONING_COLLECT = 'positive_conditioning_collect';
 export const NEGATIVE_CONDITIONING_COLLECT = 'negative_conditioning_collect';
+export const UNSHARP_MASK = 'unsharp_mask';
+export const TILED_MULTI_DIFFUSION_DENOISE_LATENTS = 'tiled_multi_diffusion_denoise_latents';
 
 // friendly graph ids
 export const CONTROL_LAYERS_GRAPH = 'control_layers_graph';

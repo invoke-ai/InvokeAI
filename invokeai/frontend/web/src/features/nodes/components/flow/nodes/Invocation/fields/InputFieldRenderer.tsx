@@ -32,6 +32,8 @@ import {
   isSDXLMainModelFieldInputTemplate,
   isSDXLRefinerModelFieldInputInstance,
   isSDXLRefinerModelFieldInputTemplate,
+  isSpandrelImageToImageModelFieldInputInstance,
+  isSpandrelImageToImageModelFieldInputTemplate,
   isStringFieldInputInstance,
   isStringFieldInputTemplate,
   isT2IAdapterModelFieldInputInstance,
@@ -54,6 +56,7 @@ import NumberFieldInputComponent from './inputs/NumberFieldInputComponent';
 import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComponent';
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
 import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
+import SpandrelImageToImageModelFieldInputComponent from './inputs/SpandrelImageToImageModelFieldInputComponent';
 import StringFieldInputComponent from './inputs/StringFieldInputComponent';
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
 import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
@@ -125,6 +128,20 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   if (isT2IAdapterModelFieldInputInstance(fieldInstance) && isT2IAdapterModelFieldInputTemplate(fieldTemplate)) {
     return <T2IAdapterModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
+
+  if (
+    isSpandrelImageToImageModelFieldInputInstance(fieldInstance) &&
+    isSpandrelImageToImageModelFieldInputTemplate(fieldTemplate)
+  ) {
+    return (
+      <SpandrelImageToImageModelFieldInputComponent
+        nodeId={nodeId}
+        field={fieldInstance}
+        fieldTemplate={fieldTemplate}
+      />
+    );
+  }
+
   if (isColorFieldInputInstance(fieldInstance) && isColorFieldInputTemplate(fieldTemplate)) {
     return <ColorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }

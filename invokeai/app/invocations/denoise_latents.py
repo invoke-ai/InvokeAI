@@ -1,5 +1,6 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 import inspect
+import os
 from contextlib import ExitStack
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
@@ -36,9 +37,10 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_manager import BaseModelType
+from invokeai.backend.model_manager import BaseModelType, ModelVariantType
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.stable_diffusion import PipelineIntermediateState, set_seamless
+from invokeai.backend.stable_diffusion import PipelineIntermediateState
+from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
     StableDiffusionGeneratorPipeline,
@@ -53,6 +55,19 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     TextConditioningData,
     TextConditioningRegions,
 )
+from invokeai.backend.stable_diffusion.diffusion.custom_atttention import CustomAttnProcessor2_0
+from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionBackend
+from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
+from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetExt
+from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
+from invokeai.backend.stable_diffusion.extensions.inpaint import InpaintExt
+from invokeai.backend.stable_diffusion.extensions.inpaint_model import InpaintModelExt
+from invokeai.backend.stable_diffusion.extensions.lora import LoRAExt
+from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
+from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
+from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
+from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterExt
+from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import TorchDevice
@@ -314,9 +329,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         positive_conditioning_field: Union[ConditioningField, list[ConditioningField]],
         negative_conditioning_field: Union[ConditioningField, list[ConditioningField]],
-        unet: UNet2DConditionModel,
         latent_height: int,
         latent_width: int,
+        device: torch.device,
+        dtype: torch.dtype,
         cfg_scale: float | list[float],
         steps: int,
         cfg_rescale_multiplier: float,
@@ -330,10 +346,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             uncond_list = [uncond_list]
 
         cond_text_embeddings, cond_text_embedding_masks = DenoiseLatentsInvocation._get_text_embeddings_and_masks(
-            cond_list, context, unet.device, unet.dtype
+            cond_list, context, device, dtype
         )
         uncond_text_embeddings, uncond_text_embedding_masks = DenoiseLatentsInvocation._get_text_embeddings_and_masks(
-            uncond_list, context, unet.device, unet.dtype
+            uncond_list, context, device, dtype
         )
 
         cond_text_embedding, cond_regions = DenoiseLatentsInvocation._concat_regional_text_embeddings(
@@ -341,14 +357,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             masks=cond_text_embedding_masks,
             latent_height=latent_height,
             latent_width=latent_width,
-            dtype=unet.dtype,
+            dtype=dtype,
         )
         uncond_text_embedding, uncond_regions = DenoiseLatentsInvocation._concat_regional_text_embeddings(
             text_conditionings=uncond_text_embeddings,
             masks=uncond_text_embedding_masks,
             latent_height=latent_height,
             latent_width=latent_width,
-            dtype=unet.dtype,
+            dtype=dtype,
         )
 
         if isinstance(cfg_scale, list):
@@ -454,6 +470,65 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # MultiControlNetModel has been refactored out, just need list[ControlNetData]
 
         return controlnet_data
+
+    @staticmethod
+    def parse_controlnet_field(
+        exit_stack: ExitStack,
+        context: InvocationContext,
+        control_input: ControlField | list[ControlField] | None,
+        ext_manager: ExtensionsManager,
+    ) -> None:
+        # Normalize control_input to a list.
+        control_list: list[ControlField]
+        if isinstance(control_input, ControlField):
+            control_list = [control_input]
+        elif isinstance(control_input, list):
+            control_list = control_input
+        elif control_input is None:
+            control_list = []
+        else:
+            raise ValueError(f"Unexpected control_input type: {type(control_input)}")
+
+        for control_info in control_list:
+            model = exit_stack.enter_context(context.models.load(control_info.control_model))
+            ext_manager.add_extension(
+                ControlNetExt(
+                    model=model,
+                    image=context.images.get_pil(control_info.image.image_name),
+                    weight=control_info.control_weight,
+                    begin_step_percent=control_info.begin_step_percent,
+                    end_step_percent=control_info.end_step_percent,
+                    control_mode=control_info.control_mode,
+                    resize_mode=control_info.resize_mode,
+                )
+            )
+
+    @staticmethod
+    def parse_t2i_adapter_field(
+        exit_stack: ExitStack,
+        context: InvocationContext,
+        t2i_adapters: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
+        ext_manager: ExtensionsManager,
+    ) -> None:
+        if t2i_adapters is None:
+            return
+
+        # Handle the possibility that t2i_adapters could be a list or a single T2IAdapterField.
+        if isinstance(t2i_adapters, T2IAdapterField):
+            t2i_adapters = [t2i_adapters]
+
+        for t2i_adapter_field in t2i_adapters:
+            ext_manager.add_extension(
+                T2IAdapterExt(
+                    node_context=context,
+                    model_id=t2i_adapter_field.t2i_adapter_model,
+                    image=context.images.get_pil(t2i_adapter_field.image.image_name),
+                    weight=t2i_adapter_field.weight,
+                    begin_step_percent=t2i_adapter_field.begin_step_percent,
+                    end_step_percent=t2i_adapter_field.end_step_percent,
+                    resize_mode=t2i_adapter_field.resize_mode,
+                )
+            )
 
     def prep_ip_adapter_image_prompts(
         self,
@@ -664,7 +739,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         else:
             masked_latents = torch.where(mask < 0.5, 0.0, latents)
 
-        return 1 - mask, masked_latents, self.denoise_mask.gradient
+        return mask, masked_latents, self.denoise_mask.gradient
 
     @staticmethod
     def prepare_noise_and_latents(
@@ -707,12 +782,157 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         return seed, noise, latents
 
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        if os.environ.get("USE_MODULAR_DENOISE", False):
+            return self._new_invoke(context)
+        else:
+            return self._old_invoke(context)
+
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def _new_invoke(self, context: InvocationContext) -> LatentsOutput:
+        ext_manager = ExtensionsManager(is_canceled=context.util.is_canceled)
+
+        device = TorchDevice.choose_torch_device()
+        dtype = TorchDevice.choose_torch_dtype()
+
+        seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
+        _, _, latent_height, latent_width = latents.shape
+
+        conditioning_data = self.get_conditioning_data(
+            context=context,
+            positive_conditioning_field=self.positive_conditioning,
+            negative_conditioning_field=self.negative_conditioning,
+            cfg_scale=self.cfg_scale,
+            steps=self.steps,
+            latent_height=latent_height,
+            latent_width=latent_width,
+            device=device,
+            dtype=dtype,
+            # TODO: old backend, remove
+            cfg_rescale_multiplier=self.cfg_rescale_multiplier,
+        )
+
+        scheduler = get_scheduler(
+            context=context,
+            scheduler_info=self.unet.scheduler,
+            scheduler_name=self.scheduler,
+            seed=seed,
+        )
+
+        timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
+            scheduler,
+            seed=seed,
+            device=device,
+            steps=self.steps,
+            denoising_start=self.denoising_start,
+            denoising_end=self.denoising_end,
+        )
+
+        # get the unet's config so that we can pass the base to sd_step_callback()
+        unet_config = context.models.get_config(self.unet.unet.key)
+
+        ### preview
+        def step_callback(state: PipelineIntermediateState) -> None:
+            context.util.sd_step_callback(state, unet_config.base)
+
+        ext_manager.add_extension(PreviewExt(step_callback))
+
+        ### cfg rescale
+        if self.cfg_rescale_multiplier > 0:
+            ext_manager.add_extension(RescaleCFGExt(self.cfg_rescale_multiplier))
+
+        ### freeu
+        if self.unet.freeu_config:
+            ext_manager.add_extension(FreeUExt(self.unet.freeu_config))
+
+        ### lora
+        if self.unet.loras:
+            for lora_field in self.unet.loras:
+                ext_manager.add_extension(
+                    LoRAExt(
+                        node_context=context,
+                        model_id=lora_field.lora,
+                        weight=lora_field.weight,
+                    )
+                )
+        ### seamless
+        if self.unet.seamless_axes:
+            ext_manager.add_extension(SeamlessExt(self.unet.seamless_axes))
+
+        ### inpaint
+        mask, masked_latents, is_gradient_mask = self.prep_inpaint_mask(context, latents)
+        # NOTE: We used to identify inpainting models by inpecting the shape of the loaded UNet model weights. Now we
+        # use the ModelVariantType config. During testing, there was a report of a user with models that had an
+        # incorrect ModelVariantType value. Re-installing the model fixed the issue. If this issue turns out to be
+        # prevalent, we will have to revisit how we initialize the inpainting extensions.
+        if unet_config.variant == ModelVariantType.Inpaint:
+            ext_manager.add_extension(InpaintModelExt(mask, masked_latents, is_gradient_mask))
+        elif mask is not None:
+            ext_manager.add_extension(InpaintExt(mask, is_gradient_mask))
+
+        # Initialize context for modular denoise
+        latents = latents.to(device=device, dtype=dtype)
+        if noise is not None:
+            noise = noise.to(device=device, dtype=dtype)
+        denoise_ctx = DenoiseContext(
+            inputs=DenoiseInputs(
+                orig_latents=latents,
+                timesteps=timesteps,
+                init_timestep=init_timestep,
+                noise=noise,
+                seed=seed,
+                scheduler_step_kwargs=scheduler_step_kwargs,
+                conditioning_data=conditioning_data,
+                attention_processor_cls=CustomAttnProcessor2_0,
+            ),
+            unet=None,
+            scheduler=scheduler,
+        )
+
+        # context for loading additional models
+        with ExitStack() as exit_stack:
+            # later should be smth like:
+            # for extension_field in self.extensions:
+            #    ext = extension_field.to_extension(exit_stack, context, ext_manager)
+            #    ext_manager.add_extension(ext)
+            self.parse_controlnet_field(exit_stack, context, self.control, ext_manager)
+            self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager)
+
+            # ext: t2i/ip adapter
+            ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
+
+            unet_info = context.models.load(self.unet.unet)
+            assert isinstance(unet_info.model, UNet2DConditionModel)
+            with (
+                unet_info.model_on_device() as (cached_weights, unet),
+                ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls),
+                # ext: controlnet
+                ext_manager.patch_extensions(denoise_ctx),
+                # ext: freeu, seamless, ip adapter, lora
+                ext_manager.patch_unet(unet, cached_weights),
+            ):
+                sd_backend = StableDiffusionBackend(unet, scheduler)
+                denoise_ctx.unet = unet
+                result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
+
+        # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
+        result_latents = result_latents.detach().to("cpu")
+        TorchDevice.empty_cache()
+
+        name = context.tensors.save(tensor=result_latents)
+        return LatentsOutput.build(latents_name=name, latents=result_latents, seed=None)
+
+    @torch.no_grad()
+    @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
+    def _old_invoke(self, context: InvocationContext) -> LatentsOutput:
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
         mask, masked_latents, gradient_mask = self.prep_inpaint_mask(context, latents)
+        # At this point, the mask ranges from 0 (leave unchanged) to 1 (inpaint).
+        # We invert the mask here for compatibility with the old backend implementation.
+        if mask is not None:
+            mask = 1 - mask
 
         # TODO(ryand): I have hard-coded `do_classifier_free_guidance=True` to mirror the behaviour of ControlNets,
         # below. Investigate whether this is appropriate.
@@ -755,14 +975,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
         assert isinstance(unet_info.model, UNet2DConditionModel)
         with (
             ExitStack() as exit_stack,
-            unet_info.model_on_device() as (model_state_dict, unet),
+            unet_info.model_on_device() as (cached_weights, unet),
             ModelPatcher.apply_freeu(unet, self.unet.freeu_config),
-            set_seamless(unet, self.unet.seamless_axes),  # FIXME
+            SeamlessExt.static_patch_model(unet, self.unet.seamless_axes),  # FIXME
             # Apply the LoRA after unet has been moved to its target device for faster patching.
             ModelPatcher.apply_lora_unet(
                 unet,
                 loras=_lora_loader(),
-                model_state_dict=model_state_dict,
+                cached_weights=cached_weights,
             ),
         ):
             assert isinstance(unet, UNet2DConditionModel)
@@ -788,7 +1008,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 context=context,
                 positive_conditioning_field=self.positive_conditioning,
                 negative_conditioning_field=self.negative_conditioning,
-                unet=unet,
+                device=unet.device,
+                dtype=unet.dtype,
                 latent_height=latent_height,
                 latent_width=latent_width,
                 cfg_scale=self.cfg_scale,

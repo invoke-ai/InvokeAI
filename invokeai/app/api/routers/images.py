@@ -218,10 +218,21 @@ async def get_image_workflow(
         raise HTTPException(status_code=404)
 
 
-@images_router.api_route(
+@images_router.get(
     "/i/{image_name}/full",
-    methods=["GET", "HEAD"],
     operation_id="get_image_full",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "Return the full-resolution image",
+            "content": {"image/png": {}},
+        },
+        404: {"description": "Image not found"},
+    },
+)
+@images_router.head(
+    "/i/{image_name}/full",
+    operation_id="get_image_full_head",
     response_class=Response,
     responses={
         200: {
@@ -233,22 +244,16 @@ async def get_image_workflow(
 )
 async def get_image_full(
     image_name: str = Path(description="The name of full-resolution image file to get"),
-) -> FileResponse:
+) -> Response:
     """Gets a full-resolution image file"""
 
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name)
-
-        if not ApiDependencies.invoker.services.images.validate_path(path):
-            raise HTTPException(status_code=404)
-
-        response = FileResponse(
-            path,
-            media_type="image/png",
-            filename=image_name,
-            content_disposition_type="inline",
-        )
+        with open(path, "rb") as f:
+            content = f.read()
+        response = Response(content, media_type="image/png")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+        response.headers["Content-Disposition"] = f'inline; filename="{image_name}"'
         return response
     except Exception:
         raise HTTPException(status_code=404)
@@ -268,15 +273,14 @@ async def get_image_full(
 )
 async def get_image_thumbnail(
     image_name: str = Path(description="The name of thumbnail image file to get"),
-) -> FileResponse:
+) -> Response:
     """Gets a thumbnail image file"""
 
     try:
         path = ApiDependencies.invoker.services.images.get_path(image_name, thumbnail=True)
-        if not ApiDependencies.invoker.services.images.validate_path(path):
-            raise HTTPException(status_code=404)
-
-        response = FileResponse(path, media_type="image/webp", content_disposition_type="inline")
+        with open(path, "rb") as f:
+            content = f.read()
+        response = Response(content, media_type="image/webp")
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         return response
     except Exception:

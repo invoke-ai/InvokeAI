@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pickle
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
@@ -17,8 +17,9 @@ from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import AnyModel
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
+from invokeai.backend.stable_diffusion.extensions.lora import LoRAExt
 from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
 """
 loras = [
@@ -32,8 +33,27 @@ with LoRAHelper.apply_lora_unet(unet, loras):
 """
 
 
-# TODO: rename smth like ModelPatcher and add TI method?
 class ModelPatcher:
+    @staticmethod
+    @contextmanager
+    def patch_unet_attention_processor(unet: UNet2DConditionModel, processor_cls: Type[Any]):
+        """A context manager that patches `unet` with the provided attention processor.
+
+        Args:
+            unet (UNet2DConditionModel): The UNet model to patch.
+            processor (Type[Any]): Class which will be initialized for each key and passed to set_attn_processor(...).
+        """
+        unet_orig_processors = unet.attn_processors
+
+        # create separate instance for each attention, to be able modify each attention separately
+        unet_new_processors = {key: processor_cls() for key in unet_orig_processors.keys()}
+        try:
+            unet.set_attn_processor(unet_new_processors)
+            yield None
+
+        finally:
+            unet.set_attn_processor(unet_orig_processors)
+
     @staticmethod
     def _resolve_lora_key(model: torch.nn.Module, lora_key: str, prefix: str) -> Tuple[str, torch.nn.Module]:
         assert "." not in lora_key
@@ -66,13 +86,13 @@ class ModelPatcher:
         cls,
         unet: UNet2DConditionModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
-        model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
+        cached_weights: Optional[Dict[str, torch.Tensor]] = None,
     ) -> Generator[None, None, None]:
         with cls.apply_lora(
             unet,
             loras=loras,
             prefix="lora_unet_",
-            model_state_dict=model_state_dict,
+            cached_weights=cached_weights,
         ):
             yield
 
@@ -82,9 +102,9 @@ class ModelPatcher:
         cls,
         text_encoder: CLIPTextModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
-        model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
+        cached_weights: Optional[Dict[str, torch.Tensor]] = None,
     ) -> Generator[None, None, None]:
-        with cls.apply_lora(text_encoder, loras=loras, prefix="lora_te_", model_state_dict=model_state_dict):
+        with cls.apply_lora(text_encoder, loras=loras, prefix="lora_te_", cached_weights=cached_weights):
             yield
 
     @classmethod
@@ -94,7 +114,7 @@ class ModelPatcher:
         model: AnyModel,
         loras: Iterator[Tuple[LoRAModelRaw, float]],
         prefix: str,
-        model_state_dict: Optional[Dict[str, torch.Tensor]] = None,
+        cached_weights: Optional[Dict[str, torch.Tensor]] = None,
     ) -> Generator[None, None, None]:
         """
         Apply one or more LoRAs to a model.
@@ -102,71 +122,26 @@ class ModelPatcher:
         :param model: The model to patch.
         :param loras: An iterator that returns the LoRA to patch in and its patch weight.
         :param prefix: A string prefix that precedes keys used in the LoRAs weight layers.
-        :model_state_dict: Read-only copy of the model's state dict in CPU, for unpatching purposes.
+        :cached_weights: Read-only copy of the model's state dict in CPU, for unpatching purposes.
         """
-        original_weights = {}
+        original_weights = OriginalWeightsStorage(cached_weights)
         try:
-            with torch.no_grad():
-                for lora, lora_weight in loras:
-                    # assert lora.device.type == "cpu"
-                    for layer_key, layer in lora.layers.items():
-                        if not layer_key.startswith(prefix):
-                            continue
+            for lora_model, lora_weight in loras:
+                LoRAExt.patch_model(
+                    model=model,
+                    prefix=prefix,
+                    lora=lora_model,
+                    lora_weight=lora_weight,
+                    original_weights=original_weights,
+                )
+                del lora_model
 
-                        # TODO(ryand): A non-negligible amount of time is currently spent resolving LoRA keys. This
-                        # should be improved in the following ways:
-                        # 1. The key mapping could be more-efficiently pre-computed. This would save time every time a
-                        #    LoRA model is applied.
-                        # 2. From an API perspective, there's no reason that the `ModelPatcher` should be aware of the
-                        #    intricacies of Stable Diffusion key resolution. It should just expect the input LoRA
-                        #    weights to have valid keys.
-                        assert isinstance(model, torch.nn.Module)
-                        module_key, module = cls._resolve_lora_key(model, layer_key, prefix)
-
-                        # All of the LoRA weight calculations will be done on the same device as the module weight.
-                        # (Performance will be best if this is a CUDA device.)
-                        device = module.weight.device
-                        dtype = module.weight.dtype
-
-                        if module_key not in original_weights:
-                            if model_state_dict is not None:  # we were provided with the CPU copy of the state dict
-                                original_weights[module_key] = model_state_dict[module_key + ".weight"]
-                            else:
-                                original_weights[module_key] = module.weight.detach().to(device="cpu", copy=True)
-
-                        layer_scale = layer.alpha / layer.rank if (layer.alpha and layer.rank) else 1.0
-
-                        # We intentionally move to the target device first, then cast. Experimentally, this was found to
-                        # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
-                        # same thing in a single call to '.to(...)'.
-                        layer.to(device=device, non_blocking=TorchDevice.get_non_blocking(device))
-                        layer.to(dtype=torch.float32, non_blocking=TorchDevice.get_non_blocking(device))
-                        # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
-                        # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-                        layer_weight = layer.get_weight(module.weight) * (lora_weight * layer_scale)
-                        layer.to(
-                            device=TorchDevice.CPU_DEVICE,
-                            non_blocking=TorchDevice.get_non_blocking(TorchDevice.CPU_DEVICE),
-                        )
-
-                        assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
-                        if module.weight.shape != layer_weight.shape:
-                            # TODO: debug on lycoris
-                            assert hasattr(layer_weight, "reshape")
-                            layer_weight = layer_weight.reshape(module.weight.shape)
-
-                        assert isinstance(layer_weight, torch.Tensor)  # mypy thinks layer_weight is a float|Any ??!
-                        module.weight += layer_weight.to(dtype=dtype, non_blocking=TorchDevice.get_non_blocking(device))
-
-            yield  # wait for context manager exit
+            yield
 
         finally:
-            assert hasattr(model, "get_submodule")  # mypy not picking up fact that torch.nn.Module has get_submodule()
             with torch.no_grad():
-                for module_key, weight in original_weights.items():
-                    model.get_submodule(module_key).weight.copy_(
-                        weight, non_blocking=TorchDevice.get_non_blocking(weight.device)
-                    )
+                for param_key, weight in original_weights.get_changed_weights():
+                    model.get_parameter(param_key).copy_(weight)
 
     @classmethod
     @contextmanager

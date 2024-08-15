@@ -1,28 +1,28 @@
 import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { StarterModelsForm } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterModelsForm';
-import { useMemo } from 'react';
+import { atom } from 'nanostores';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMainModels } from 'services/api/hooks/modelsByType';
 
 import { HuggingFaceForm } from './AddModelPanel/HuggingFaceFolder/HuggingFaceForm';
 import { InstallModelForm } from './AddModelPanel/InstallModelForm';
 import { ModelInstallQueue } from './AddModelPanel/ModelInstallQueue/ModelInstallQueue';
 import { ScanModelsForm } from './AddModelPanel/ScanFolder/ScanFolderForm';
 
-export const InstallModels = () => {
+export const $installModelsTab = atom(0);
+
+export const InstallModels = memo(() => {
   const { t } = useTranslation();
-  const [mainModels, { data }] = useMainModels();
-  const defaultIndex = useMemo(() => {
-    if (data && mainModels.length) {
-      return 0;
-    }
-    return 3;
-  }, [data, mainModels.length]);
+  const index = useStore($installModelsTab);
+  const onChange = useCallback((index: number) => {
+    $installModelsTab.set(index);
+  }, []);
 
   return (
     <Flex layerStyle="first" borderRadius="base" w="full" h="full" flexDir="column" gap={4}>
       <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
-      <Tabs variant="collapse" height="50%" display="flex" flexDir="column" defaultIndex={defaultIndex}>
+      <Tabs variant="collapse" height="50%" display="flex" flexDir="column" index={index} onChange={onChange}>
         <TabList>
           <Tab>{t('modelManager.urlOrLocalPath')}</Tab>
           <Tab>{t('modelManager.huggingFace')}</Tab>
@@ -49,4 +49,6 @@ export const InstallModels = () => {
       </Box>
     </Flex>
   );
-};
+});
+
+InstallModels.displayName = 'InstallModels';

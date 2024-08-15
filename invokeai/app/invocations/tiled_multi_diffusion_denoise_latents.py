@@ -175,6 +175,10 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         _, _, latent_height, latent_width = latents.shape
 
         # Calculate the tile locations to cover the latent-space image.
+        # TODO(ryand): In the future, we may want to revisit the tile overlap strategy. Things to consider:
+        # - How much overlap 'context' to provide for each denoising step.
+        # - How much overlap to use during merging/blending.
+        # - Should we 'jitter' the tile locations in each step so that the seams are in different places?
         tiles = calc_tiles_min_overlap(
             image_height=latent_height,
             image_width=latent_width,
@@ -218,7 +222,8 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 context=context,
                 positive_conditioning_field=self.positive_conditioning,
                 negative_conditioning_field=self.negative_conditioning,
-                unet=unet,
+                device=unet.device,
+                dtype=unet.dtype,
                 latent_height=latent_tile_height,
                 latent_width=latent_tile_width,
                 cfg_scale=self.cfg_scale,

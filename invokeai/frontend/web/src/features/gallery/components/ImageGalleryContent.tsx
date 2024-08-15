@@ -1,90 +1,124 @@
-import { Box, Button, ButtonGroup, Flex, Tab, TabList, Tabs, useDisclosure } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { $galleryHeader } from 'app/store/nanostores/galleryHeader';
+import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
-import { memo, useCallback } from 'react';
+import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
+import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
+import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
+import { usePanel, type UsePanelOptions } from 'features/ui/hooks/usePanel';
+import type { CSSProperties } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImagesBold } from 'react-icons/pi';
-import { RiServerLine } from 'react-icons/ri';
+import { PiCaretDownBold, PiCaretUpBold, PiMagnifyingGlassBold } from 'react-icons/pi';
+import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
+import { Panel, PanelGroup } from 'react-resizable-panels';
 
-import BoardsList from './Boards/BoardsList/BoardsList';
-import GalleryBoardName from './GalleryBoardName';
+import BoardsListWrapper from './Boards/BoardsList/BoardsListWrapper';
+import BoardsSearch from './Boards/BoardsList/BoardsSearch';
+import { Gallery } from './Gallery';
 import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
-import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
-import { GalleryPagination } from './ImageGrid/GalleryPagination';
-import { GallerySearch } from './ImageGrid/GallerySearch';
+
+const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 
 const ImageGalleryContent = () => {
   const { t } = useTranslation();
-  const galleryView = useAppSelector((s) => s.gallery.galleryView);
+  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const dispatch = useAppDispatch();
-  const galleryHeader = useStore($galleryHeader);
-  const { isOpen: isBoardListOpen, onToggle: onToggleBoardList } = useDisclosure({ defaultIsOpen: true });
+  const boardSearchDisclosure = useDisclosure({ defaultIsOpen: !!boardSearchText.length });
+  const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
 
-  const handleClickImages = useCallback(() => {
-    dispatch(galleryViewChanged('images'));
-  }, [dispatch]);
+  const boardsListPanelOptions = useMemo<UsePanelOptions>(
+    () => ({
+      unit: 'pixels',
+      minSize: 128,
+      defaultSize: 256,
+      fallbackMinSizePct: 20,
+      panelGroupRef,
+      panelGroupDirection: 'vertical',
+    }),
+    []
+  );
+  const boardsListPanel = usePanel(boardsListPanelOptions);
 
-  const handleClickAssets = useCallback(() => {
-    dispatch(galleryViewChanged('assets'));
-  }, [dispatch]);
+  const handleClickBoardSearch = useCallback(() => {
+    if (boardSearchText.length) {
+      dispatch(boardSearchTextChanged(''));
+    }
+    boardSearchDisclosure.onToggle();
+    boardsListPanel.expand();
+  }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
+
+  const handleToggleBoardPanel = useCallback(() => {
+    if (boardSearchText.length) {
+      dispatch(boardSearchTextChanged(''));
+    }
+    boardSearchDisclosure.onClose();
+    boardsListPanel.toggle();
+  }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
   return (
-    <Flex
-      layerStyle="first"
-      position="relative"
-      flexDirection="column"
-      h="full"
-      w="full"
-      borderRadius="base"
-      p={2}
-      gap={2}
-    >
-      {galleryHeader}
-      <Box>
-        <Flex alignItems="center" justifyContent="space-between" gap={2}>
-          <GalleryBoardName isOpen={isBoardListOpen} onToggle={onToggleBoardList} />
-          <GallerySettingsPopover />
+    <Flex position="relative" flexDirection="column" h="full" w="full" pt={2}>
+      <Flex alignItems="center" gap={0}>
+        <GalleryHeader />
+        <Flex alignItems="center" justifyContent="space-between" w="full">
+          <Button
+            w={112}
+            size="sm"
+            variant="ghost"
+            onClick={handleToggleBoardPanel}
+            rightIcon={boardsListPanel.isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
+          >
+            {boardsListPanel.isCollapsed ? t('boards.viewBoards') : t('boards.hideBoards')}
+          </Button>
+          <Flex alignItems="center" justifyContent="space-between">
+            <GallerySettingsPopover />
+            <Flex>
+              <IconButton
+                w="full"
+                h="full"
+                onClick={handleClickBoardSearch}
+                tooltip={
+                  boardSearchDisclosure.isOpen
+                    ? `${t('gallery.exitBoardSearch')}`
+                    : `${t('gallery.displayBoardSearch')}`
+                }
+                aria-label={t('gallery.displayBoardSearch')}
+                icon={<PiMagnifyingGlassBold />}
+                colorScheme={boardSearchDisclosure.isOpen ? 'invokeBlue' : 'base'}
+                variant="link"
+              />
+            </Flex>
+          </Flex>
         </Flex>
-        <Box>
-          <BoardsList isOpen={isBoardListOpen} />
-        </Box>
-      </Box>
-      <Flex alignItems="center" justifyContent="space-between" gap={2}>
-        <Tabs index={galleryView === 'images' ? 0 : 1} variant="unstyled" size="sm" w="full">
-          <TabList>
-            <ButtonGroup w="full">
-              <Tab
-                as={Button}
-                size="sm"
-                isChecked={galleryView === 'images'}
-                onClick={handleClickImages}
-                w="full"
-                leftIcon={<PiImagesBold size="16px" />}
-                data-testid="images-tab"
-              >
-                {t('parameters.images')}
-              </Tab>
-              <Tab
-                as={Button}
-                size="sm"
-                isChecked={galleryView === 'assets'}
-                onClick={handleClickAssets}
-                w="full"
-                leftIcon={<RiServerLine size="16px" />}
-                data-testid="assets-tab"
-              >
-                {t('gallery.assets')}
-              </Tab>
-            </ButtonGroup>
-          </TabList>
-        </Tabs>
       </Flex>
 
-      <GallerySearch />
-      <GalleryImageGrid />
-      <GalleryPagination />
+      <PanelGroup ref={panelGroupRef} direction="vertical">
+        <Panel
+          id="boards-list-panel"
+          ref={boardsListPanel.ref}
+          defaultSize={boardsListPanel.defaultSize}
+          minSize={boardsListPanel.minSize}
+          onCollapse={boardsListPanel.onCollapse}
+          onExpand={boardsListPanel.onExpand}
+          collapsible
+        >
+          <Flex flexDir="column" w="full" h="full">
+            <Collapse in={boardSearchDisclosure.isOpen} style={COLLAPSE_STYLES}>
+              <Box w="full" pt={2}>
+                <BoardsSearch />
+              </Box>
+            </Collapse>
+            <Divider pt={2} />
+            <BoardsListWrapper />
+          </Flex>
+        </Panel>
+        <ResizeHandle
+          id="gallery-panel-handle"
+          orientation="horizontal"
+          onDoubleClick={boardsListPanel.onDoubleClickHandle}
+        />
+        <Panel id="gallery-wrapper-panel" minSize={20}>
+          <Gallery />
+        </Panel>
+      </PanelGroup>
     </Flex>
   );
 };

@@ -1,6 +1,7 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { negativePrompt2Changed } from 'features/controlLayers/store/controlLayersSlice';
+import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
@@ -36,16 +37,21 @@ export const ParamSDXLNegativeStylePrompt = memo(() => {
           name="prompt"
           ref={textareaRef}
           value={prompt}
-          placeholder={t('sdxl.negStylePrompt')}
           onChange={onChange}
           onKeyDown={onKeyDown}
           fontSize="sm"
           variant="darkFilled"
-          paddingRight={30}
+          minH={24}
+          borderTopWidth={24} // This prevents the prompt from being hidden behind the header
+          paddingInlineEnd={10}
+          paddingInlineStart={3}
+          paddingTop={0}
+          paddingBottom={3}
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
+        <PromptLabel label={t('sdxl.negStylePrompt')} />
       </Box>
     </PromptPopover>
   );

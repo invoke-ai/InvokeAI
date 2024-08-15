@@ -110,7 +110,7 @@ def mm2_installer(
     logger = InvokeAILogger.get_logger()
     db = create_mock_sqlite_database(mm2_app_config, logger)
     events = TestEventService()
-    store = ModelRecordServiceSQL(db)
+    store = ModelRecordServiceSQL(db, logger)
 
     installer = ModelInstallService(
         app_config=mm2_app_config,
@@ -128,7 +128,7 @@ def mm2_installer(
 def mm2_record_store(mm2_app_config: InvokeAIAppConfig) -> ModelRecordServiceBase:
     logger = InvokeAILogger.get_logger(config=mm2_app_config)
     db = create_mock_sqlite_database(mm2_app_config, logger)
-    store = ModelRecordServiceSQL(db)
+    store = ModelRecordServiceSQL(db, logger)
     # add five simple config records to the database
     config1 = VAEDiffusersConfig(
         key="test_config_1",
