@@ -128,9 +128,9 @@ async def parse_presets_from_file(file: UploadFile) -> list[StylePresetWithoutId
             style_presets.append(style_preset)
     except pydantic.ValidationError as e:
         if file.content_type == "text/csv":
-            msg = "Invalid CSV format: must include columns 'name', 'prompt', and 'negative_prompt'"
+            msg = "Invalid CSV format: must include columns 'name', 'prompt', and 'negative_prompt' and name cannot be blank"
         else:  # file.content_type == "application/json":
-            msg = "Invalid JSON format: must be a list of objects with keys 'name', 'prompt', and 'negative_prompt'"
+            msg = "Invalid JSON format: must be a list of objects with keys 'name', 'prompt', and 'negative_prompt' and name cannot be blank"
         raise InvalidPresetImportDataError(msg) from e
     finally:
         file.file.close()
