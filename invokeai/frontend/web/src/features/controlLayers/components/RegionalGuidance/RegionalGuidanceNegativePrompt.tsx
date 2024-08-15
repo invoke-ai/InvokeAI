@@ -2,7 +2,7 @@ import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { RegionalGuidanceDeletePromptButton } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceDeletePromptButton';
 import { rgNegativePromptChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
+import { selectRegionalGuidanceEntityOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
@@ -15,7 +15,7 @@ type Props = {
 };
 
 export const RegionalGuidanceNegativePrompt = memo(({ id }: Props) => {
-  const prompt = useAppSelector((s) => selectRGOrThrow(s.canvasV2, id).negativePrompt ?? '');
+  const prompt = useAppSelector((s) => selectRegionalGuidanceEntityOrThrow(s.canvasV2, id).negativePrompt ?? '');
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();

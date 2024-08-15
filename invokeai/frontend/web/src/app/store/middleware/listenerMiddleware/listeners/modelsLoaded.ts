@@ -5,6 +5,7 @@ import type { JSONObject } from 'common/types';
 import {
   bboxHeightChanged,
   bboxWidthChanged,
+  controlLayerModelChanged,
   ipaModelChanged,
   loraDeleted,
   modelChanged,
@@ -20,6 +21,7 @@ import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isControlNetOrT2IAdapterModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
@@ -31,7 +33,7 @@ import {
 export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: modelsApi.endpoints.getModelConfigs.matchFulfilled,
-    effect: async (action, { getState, dispatch }) => {
+    effect: (action, { getState, dispatch }) => {
       // models loaded, we need to ensure the selected model is available and if not, select the first one
       const log = logger('models');
       log.info({ models: action.payload.entities }, `Models loaded (${action.payload.ids.length})`);
@@ -169,24 +171,24 @@ const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
 };
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
-  // const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
-  // state.canvasV2.controlAdapters.entities.forEach((ca) => {
-  //   const isModelAvailable = caModels.some((m) => m.key === ca.model?.key);
-  //   if (isModelAvailable) {
-  //     return;
-  //   }
-  //   dispatch(caModelChanged({ id: ca.id, modelConfig: null }));
-  // });
+  const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
+  state.canvasV2.controlLayers.entities.forEach((entity) => {
+    const isModelAvailable = caModels.some((m) => m.key === entity.controlAdapter.model?.key);
+    if (isModelAvailable) {
+      return;
+    }
+    dispatch(controlLayerModelChanged({ id: entity.id, modelConfig: null }));
+  });
 };
 
 const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
   const ipaModels = models.filter(isIPAdapterModelConfig);
-  state.canvasV2.ipAdapters.entities.forEach(({ id, model }) => {
-    const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
+  state.canvasV2.ipAdapters.entities.forEach((entity) => {
+    const isModelAvailable = ipaModels.some((m) => m.key === entity.ipAdapter.model?.key);
     if (isModelAvailable) {
       return;
     }
-    dispatch(ipaModelChanged({ id, modelConfig: null }));
+    dispatch(ipaModelChanged({ id: entity.id, modelConfig: null }));
   });
 
   state.canvasV2.regions.entities.forEach(({ id, ipAdapters }) => {

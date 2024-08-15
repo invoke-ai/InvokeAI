@@ -21,7 +21,7 @@ export const AddLayerButton = memo(() => {
     dispatch(controlLayerAdded({ isSelected: true, overrides: { controlAdapter: defaultControlAdapter } }));
   }, [defaultControlAdapter, dispatch]);
   const addIPAdapter = useCallback(() => {
-    dispatch(ipaAdded({ config: defaultIPAdapter }));
+    dispatch(ipaAdded({ ipAdapter: defaultIPAdapter }));
   }, [defaultIPAdapter, dispatch]);
 
   return (

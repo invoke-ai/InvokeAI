@@ -1,6 +1,10 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { CanvasIPAdapterState, CanvasRegionalGuidanceState, Rect } from 'features/controlLayers/store/types';
+import type {
+  CanvasRegionalGuidanceState,
+  Rect,
+  RegionalGuidanceIPAdapterConfig,
+} from 'features/controlLayers/store/types';
 import {
   PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,
   PROMPT_REGION_MASK_TO_TENSOR_PREFIX,
@@ -174,13 +178,15 @@ export const addRegions = async (
       }
     }
 
-    const validRGIPAdapters: CanvasIPAdapterState[] = region.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base));
+    const validRGIPAdapters: RegionalGuidanceIPAdapterConfig[] = region.ipAdapters.filter((ipAdapter) =>
+      isValidIPAdapter(ipAdapter, base)
+    );
 
     for (const ipa of validRGIPAdapters) {
       const ipAdapterCollect = addIPAdapterCollectorSafe(g, denoise);
-      const { id, weight, model, clipVisionModel, method, beginEndStepPct, imageObject } = ipa;
+      const { id, weight, model, clipVisionModel, method, beginEndStepPct, image } = ipa;
       assert(model, 'IP Adapter model is required');
-      assert(imageObject, 'IP Adapter image is required');
+      assert(image, 'IP Adapter image is required');
 
       const ipAdapter = g.addNode({
         id: `ip_adapter_${id}`,
@@ -192,7 +198,7 @@ export const addRegions = async (
         begin_step_percent: beginEndStepPct[0],
         end_step_percent: beginEndStepPct[1],
         image: {
-          image_name: imageObject.image.image_name,
+          image_name: image.image_name,
         },
       });
 

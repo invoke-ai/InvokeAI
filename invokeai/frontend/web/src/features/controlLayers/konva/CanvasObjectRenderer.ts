@@ -374,8 +374,7 @@ export class CanvasObjectRenderer {
    * @param rect The rect to rasterize. If omitted, the entity's full rect will be used.
    * @returns A promise that resolves to the rasterized image DTO.
    */
-  rasterize = async (rect?: Rect): Promise<ImageDTO> => {
-    rect = rect ?? this.parent.transformer.getRelativeRect();
+  rasterize = async (rect: Rect, replaceObjects: boolean = false): Promise<ImageDTO> => {
     let imageDTO: ImageDTO | null = null;
     const rasterizedImageCache = this.getRasterizedImageCache(rect);
 
@@ -400,6 +399,7 @@ export class CanvasObjectRenderer {
       entityIdentifier: this.parent.getEntityIdentifier(),
       imageObject,
       rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: imageDTO.width, height: imageDTO.height },
+      replaceObjects,
     });
 
     return imageDTO;
