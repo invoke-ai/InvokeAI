@@ -21,7 +21,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.bnb import quantize_model_nf4
+from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 from invokeai.backend.quantization.fast_quantized_diffusion_model import FastQuantizedDiffusersModel
 from invokeai.backend.quantization.fast_quantized_transformers_model import FastQuantizedTransformersModel
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
