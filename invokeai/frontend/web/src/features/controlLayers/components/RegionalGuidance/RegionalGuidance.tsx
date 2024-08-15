@@ -4,7 +4,6 @@ import { CanvasEntityDeleteButton } from 'features/controlLayers/components/comm
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
-import { RegionalGuidanceActionsMenu } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceActionsMenu';
 import { RegionalGuidanceBadges } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceBadges';
 import { RegionalGuidanceSettings } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceSettings';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -30,7 +29,6 @@ export const RegionalGuidance = memo(({ id }: Props) => {
           <RegionalGuidanceBadges />
           <RegionalGuidanceMaskFillColorPicker />
           <RegionalGuidanceSettingsPopover />
-          <RegionalGuidanceActionsMenu />
           <CanvasEntityDeleteButton />
         </CanvasEntityHeader>
         <RegionalGuidanceSettings />

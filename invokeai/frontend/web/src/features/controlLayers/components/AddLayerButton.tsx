@@ -1,7 +1,7 @@
 import { Button, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { useAddCALayer, useAddIPALayer } from 'features/controlLayers/hooks/addLayerHooks';
-import { rasterLayerAdded, rgAdded } from 'features/controlLayers/store/canvasV2Slice';
+import { useDefaultControlAdapter, useDefaultIPAdapter } from 'features/controlLayers/hooks/useLayerControlAdapter';
+import { controlLayerAdded, ipaAdded, rasterLayerAdded, rgAdded } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -9,14 +9,20 @@ import { PiPlusBold } from 'react-icons/pi';
 export const AddLayerButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const [addCALayer, isAddCALayerDisabled] = useAddCALayer();
-  const [addIPALayer, isAddIPALayerDisabled] = useAddIPALayer();
+  const defaultControlAdapter = useDefaultControlAdapter();
+  const defaultIPAdapter = useDefaultIPAdapter();
   const addRGLayer = useCallback(() => {
     dispatch(rgAdded());
   }, [dispatch]);
   const addRasterLayer = useCallback(() => {
     dispatch(rasterLayerAdded({ isSelected: true }));
   }, [dispatch]);
+  const addControlLayer = useCallback(() => {
+    dispatch(controlLayerAdded({ isSelected: true, overrides: { controlAdapter: defaultControlAdapter } }));
+  }, [defaultControlAdapter, dispatch]);
+  const addIPAdapter = useCallback(() => {
+    dispatch(ipaAdded({ config: defaultIPAdapter }));
+  }, [defaultIPAdapter, dispatch]);
 
   return (
     <Menu>
@@ -29,18 +35,10 @@ export const AddLayerButton = memo(() => {
         {t('controlLayers.addLayer')}
       </MenuButton>
       <MenuList>
-        <MenuItem icon={<PiPlusBold />} onClick={addRGLayer}>
-          {t('controlLayers.regionalGuidanceLayer')}
-        </MenuItem>
-        <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>
-          {t('controlLayers.rasterLayer')}
-        </MenuItem>
-        <MenuItem icon={<PiPlusBold />} onClick={addCALayer} isDisabled={isAddCALayerDisabled}>
-          {t('controlLayers.globalControlAdapterLayer')}
-        </MenuItem>
-        <MenuItem icon={<PiPlusBold />} onClick={addIPALayer} isDisabled={isAddIPALayerDisabled}>
-          {t('controlLayers.globalIPAdapterLayer')}
-        </MenuItem>
+        <MenuItem onClick={addRGLayer}>{t('controlLayers.regionalGuidanceLayer')}</MenuItem>
+        <MenuItem onClick={addRasterLayer}>{t('controlLayers.rasterLayer')}</MenuItem>
+        <MenuItem onClick={addControlLayer}>{t('controlLayers.controlLayer')}</MenuItem>
+        <MenuItem onClick={addIPAdapter}>{t('controlLayers.globalIPAdapterLayer')}</MenuItem>
       </MenuList>
     </Menu>
   );
