@@ -21,6 +21,11 @@ class StylePresetRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
+    def create_many(self, style_presets: list[StylePresetWithoutId]) -> None:
+        """Creates many style presets."""
+        pass
+
+    @abstractmethod
     def update(self, style_preset_id: str, changes: StylePresetChanges) -> StylePresetRecordDTO:
         """Updates a style preset."""
         pass

@@ -1344,6 +1344,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/style_presets/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Style Presets */
+        post: operations["import_style_presets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -1997,6 +2014,15 @@ export type components = {
              * @default false
              */
             prepend?: boolean;
+        };
+        /** Body_import_style_presets */
+        Body_import_style_presets: {
+            /**
+             * File
+             * Format: binary
+             * @description The file to import
+             */
+            file: Blob;
         };
         /** Body_parse_dynamicprompts */
         Body_parse_dynamicprompts: {
@@ -18071,6 +18097,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_style_presets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_style_presets"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {

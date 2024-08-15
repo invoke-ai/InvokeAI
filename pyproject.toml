@@ -198,6 +198,7 @@ exclude = [
   "dist",
   "invokeai/frontend/web/node_modules/",
   ".venv*",
+  "*.ipynb",
 ]
 
 [tool.ruff.lint]

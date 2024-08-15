@@ -1,7 +1,7 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
-export const PRESET_PLACEHOLDER = `[prompt]`;
+export const PRESET_PLACEHOLDER = '{prompt}';
 
 export const buildPresetModifiedPrompt = (presetPrompt: string, currentPrompt: string) => {
   return presetPrompt.includes(PRESET_PLACEHOLDER)
