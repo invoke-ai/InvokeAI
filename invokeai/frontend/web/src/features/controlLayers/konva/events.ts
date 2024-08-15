@@ -121,7 +121,9 @@ const getColorUnderCursor = (stage: Konva.Stage): RgbaColor | null => {
   if (!pos) {
     return null;
   }
-  const ctx = stage.toCanvas({ x: pos.x, y: pos.y, width: 1, height: 1 }).getContext('2d');
+  const ctx = stage
+    .toCanvas({ x: pos.x, y: pos.y, width: 1, height: 1, imageSmoothingEnabled: false })
+    .getContext('2d');
   if (!ctx) {
     return null;
   }
