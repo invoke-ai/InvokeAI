@@ -5745,7 +5745,7 @@ export type components = {
              */
             clip?: components["schemas"]["CLIPField"];
             /**
-             * T5EncoderField
+             * T5Encoder
              * @description T5 tokenizer and text encoder
              * @default null
              */
