@@ -30,6 +30,7 @@ export const rasterLayersReducers = {
       const { id, overrides, isSelected } = action.payload;
       const layer: CanvasRasterLayerState = {
         id,
+        name: null,
         type: 'raster_layer',
         isEnabled: true,
         objects: [],
