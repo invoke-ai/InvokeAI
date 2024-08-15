@@ -1698,7 +1698,17 @@
         "objects_other": "{{count}} objects",
         "filter": "Filter",
         "convertToControlLayer": "Convert to Control Layer",
-        "convertToRasterLayer": "Convert to Raster Layer"
+        "convertToRasterLayer": "Convert to Raster Layer",
+        "tool": {
+            "brush": "Brush",
+            "eraser": "Eraser",
+            "rectangle": "Rectangle",
+            "bbox": "Bbox",
+            "move": "Move",
+            "view": "View",
+            "transform": "Transform",
+            "eyeDropper": "Eye Dropper"
+        }
     },
     "upscaling": {
         "upscale": "Upscale",
