@@ -8,7 +8,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiResizeBold } from 'react-icons/pi';
 
-export const TransformToolButton = memo(() => {
+export const ToolTransformButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useStore($canvasManager);
   const transformingEntity = useStore($transformingEntity);
@@ -50,8 +50,8 @@ export const TransformToolButton = memo(() => {
 
   return (
     <IconButton
-      aria-label={`${t('unifiedCanvas.transform')} (Ctrl+T)`}
-      tooltip={`${t('unifiedCanvas.transform')} (Ctrl+T)`}
+      aria-label={`${t('controlLayers.tool.transform')} (Ctrl+T)`}
+      tooltip={`${t('controlLayers.tool.transform')} (Ctrl+T)`}
       icon={<PiResizeBold />}
       variant="solid"
       onClick={onTransform}
@@ -60,4 +60,4 @@ export const TransformToolButton = memo(() => {
   );
 });
 
-TransformToolButton.displayName = 'TransformToolButton';
+ToolTransformButton.displayName = 'ToolTransformButton';

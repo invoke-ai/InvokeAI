@@ -6,7 +6,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiHandBold } from 'react-icons/pi';
 
-export const ViewToolButton = memo(() => {
+export const ToolViewButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'view');
@@ -19,8 +19,8 @@ export const ViewToolButton = memo(() => {
 
   return (
     <IconButton
-      aria-label={`${t('unifiedCanvas.view')} (H)`}
-      tooltip={`${t('unifiedCanvas.view')} (H)`}
+      aria-label={`${t('controlLayers.tool.view')} (H)`}
+      tooltip={`${t('controlLayers.tool.view')} (H)`}
       icon={<PiHandBold />}
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="outline"
@@ -30,4 +30,4 @@ export const ViewToolButton = memo(() => {
   );
 });
 
-ViewToolButton.displayName = 'ViewToolButton';
+ToolViewButton.displayName = 'ToolViewButton';

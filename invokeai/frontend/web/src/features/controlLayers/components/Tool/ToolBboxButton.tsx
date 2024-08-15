@@ -4,27 +4,25 @@ import { toolChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiCursorBold } from 'react-icons/pi';
+import { PiBoundingBoxBold } from 'react-icons/pi';
 
-export const MoveToolButton = memo(() => {
+export const ToolBboxButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'move');
-  const isDisabled = useAppSelector(
-    (s) => s.canvasV2.selectedEntityIdentifier === null || s.canvasV2.session.isStaging || s.canvasV2.tool.isTransforming
-  );
+  const isDisabled = useAppSelector((s) => s.canvasV2.session.isStaging || s.canvasV2.tool.isTransforming);
+  const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'bbox');
 
   const onClick = useCallback(() => {
-    dispatch(toolChanged('move'));
+    dispatch(toolChanged('bbox'));
   }, [dispatch]);
 
-  useHotkeys('v', onClick, { enabled: !isDisabled }, [isDisabled, onClick]);
+  useHotkeys('q', onClick, { enabled: !isDisabled }, [onClick, isDisabled]);
 
   return (
     <IconButton
-      aria-label={`${t('unifiedCanvas.move')} (V)`}
-      tooltip={`${t('unifiedCanvas.move')} (V)`}
-      icon={<PiCursorBold />}
+      aria-label={`${t('controlLayers.tool.bbox')} (Q)`}
+      tooltip={`${t('controlLayers.tool.bbox')} (Q)`}
+      icon={<PiBoundingBoxBold />}
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="outline"
       onClick={onClick}
@@ -33,4 +31,4 @@ export const MoveToolButton = memo(() => {
   );
 });
 
-MoveToolButton.displayName = 'MoveToolButton';
+ToolBboxButton.displayName = 'ToolBboxButton';

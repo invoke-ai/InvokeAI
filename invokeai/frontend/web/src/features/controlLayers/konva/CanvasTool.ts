@@ -8,6 +8,7 @@ import {
   BRUSH_ERASER_BORDER_WIDTH,
 } from 'features/controlLayers/konva/constants';
 import { alignCoordForTool, getPrefixedId } from 'features/controlLayers/konva/util';
+import type { Tool } from 'features/controlLayers/store/types';
 import { isDrawableEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
@@ -175,7 +176,7 @@ export class CanvasTool {
     });
   };
 
-  setToolVisibility = (tool: 'brush' | 'eraser' | 'eyeDropper' | 'none') => {
+  setToolVisibility = (tool: Tool) => {
     this.konva.brush.group.visible(tool === 'brush');
     this.konva.eraser.group.visible(tool === 'eraser');
     this.konva.eyeDropper.group.visible(tool === 'eyeDropper');
@@ -252,9 +253,6 @@ export class CanvasTool {
           y: cursorPos.y,
           radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
         });
-
-        this.scaleTool();
-        this.setToolVisibility('brush');
       } else if (cursorPos && tool === 'eraser') {
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.eraser.width);
 
@@ -277,9 +275,6 @@ export class CanvasTool {
           y: cursorPos.y,
           radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
         });
-
-        this.scaleTool();
-        this.setToolVisibility('eraser');
       } else if (cursorPos && colorUnderCursor) {
         this.konva.eyeDropper.fillCircle.setAttrs({
           x: cursorPos.x,
@@ -290,10 +285,10 @@ export class CanvasTool {
           x: cursorPos.x,
           y: cursorPos.y,
         });
-        this.setToolVisibility('eyeDropper');
-      } else {
-        this.setToolVisibility('none');
       }
+
+      this.scaleTool();
+      this.setToolVisibility(tool);
     }
   }
 
