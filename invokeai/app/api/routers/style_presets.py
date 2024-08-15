@@ -254,7 +254,9 @@ async def export_style_presets():
     output.close()
 
     return Response(
-        content=csv_data, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=data.csv"}
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=prompt_templates.csv"},
     )
 
 
