@@ -23,7 +23,7 @@ import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/use
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
@@ -47,7 +47,6 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflowId, desti
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
   const clearStorage = useClearStorage();
-  const hasLoadedRef = useRef<boolean>(false);
 
   // singleton!
   useSocketIO();
@@ -74,16 +73,11 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflowId, desti
     }
   }, [dispatch, config, logger]);
 
-  const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow({
-    onSuccess: () => {
-      setActiveTab('workflows');
-    },
-  });
+  const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
 
   useEffect(() => {
-    if (selectedWorkflowId && !hasLoadedRef.current) {
+    if (selectedWorkflowId) {
       getAndLoadWorkflow(selectedWorkflowId);
-      hasLoadedRef.current = true;
     }
   }, [selectedWorkflowId, getAndLoadWorkflow]);
 
