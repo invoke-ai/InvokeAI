@@ -49,7 +49,15 @@ export const CanvasEntityTitleEdit = memo(({ onStopEditing }: Props) => {
   }, []);
 
   return (
-    <Input ref={ref} value={localTitle} onChange={onChange} onBlur={onBlur} onKeyDown={onKeyDown} variant="outline" />
+    <Input
+      ref={ref}
+      value={localTitle}
+      onChange={onChange}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
+      variant="outline"
+      _focusVisible={{ borderWidth: 1, borderColor: 'invokeBlueAlpha.400', borderRadius: 'base' }}
+    />
   );
 });
 

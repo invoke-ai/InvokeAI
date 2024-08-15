@@ -14,7 +14,7 @@ import {
   rgIPAdapterModelChanged,
   rgIPAdapterWeightChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
-import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
+import { selectRegionalGuidanceEntityOrThrow } from 'features/controlLayers/store/regionsReducers';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { RGIPAdapterImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -34,7 +34,7 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ id, ipAdapterId, ipAdap
     dispatch(rgIPAdapterDeleted({ id, ipAdapterId }));
   }, [dispatch, ipAdapterId, id]);
   const ipAdapter = useAppSelector((s) => {
-    const ipa = selectRGOrThrow(s.canvasV2, id).ipAdapters.find((ipa) => ipa.id === ipAdapterId);
+    const ipa = selectRegionalGuidanceEntityOrThrow(s.canvasV2, id).ipAdapters.find((ipa) => ipa.id === ipAdapterId);
     assert(ipa, `Regional GuidanceIP Adapter with id ${ipAdapterId} not found`);
     return ipa;
   });
@@ -123,7 +123,7 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ id, ipAdapterId, ipAdap
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
             <IPAdapterImagePreview
-              image={ipAdapter.imageObject?.image ?? null}
+              image={ipAdapter.image ?? null}
               onChangeImage={onChangeImage}
               ipAdapterId={ipAdapter.id}
               droppableData={droppableData}

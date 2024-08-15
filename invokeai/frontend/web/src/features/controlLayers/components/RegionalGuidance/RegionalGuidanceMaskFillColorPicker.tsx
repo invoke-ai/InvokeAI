@@ -5,7 +5,7 @@ import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { stopPropagation } from 'common/util/stopPropagation';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rgFillChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { selectRGOrThrow } from 'features/controlLayers/store/regionsReducers';
+import { selectRegionalGuidanceEntityOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo, useCallback } from 'react';
 import type { RgbColor } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +14,7 @@ export const RegionalGuidanceMaskFillColorPicker = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const fill = useAppSelector((s) => selectRGOrThrow(s.canvasV2, entityIdentifier.id).fill);
+  const fill = useAppSelector((s) => selectRegionalGuidanceEntityOrThrow(s.canvasV2, entityIdentifier.id).fill);
   const onChange = useCallback(
     (fill: RgbColor) => {
       dispatch(rgFillChanged({ id: entityIdentifier.id, fill }));

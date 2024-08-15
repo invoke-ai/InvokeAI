@@ -20,7 +20,6 @@ import type {
   ImageCache,
   Rect,
 } from 'features/controlLayers/store/types';
-import { isValidLayerWithoutControlAdapter } from 'features/nodes/util/graph/generation/addLayers';
 import type Konva from 'konva';
 import { clamp, isEqual } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -538,7 +537,8 @@ export class CanvasManager {
     stageClone.x(0);
     stageClone.y(0);
 
-    const validLayers = layersState.entities.filter(isValidLayerWithoutControlAdapter);
+    const validLayers = layersState.entities.filter((entity) => entity.isEnabled && entity.objects.length > 0);
+
     // getLayers() returns the internal `children` array of the stage directly - calling destroy on a layer will
     // mutate that array. We need to clone the array to avoid mutating the original.
     for (const konvaLayer of stageClone.getLayers().slice()) {

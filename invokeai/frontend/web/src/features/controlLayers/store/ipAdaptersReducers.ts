@@ -4,30 +4,32 @@ import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { CanvasV2State, CLIPVisionModelV2, IPAdapterConfig, CanvasIPAdapterState, IPMethodV2 } from './types';
-import { imageDTOToImageObject } from './types';
+import type { CanvasIPAdapterState, CanvasV2State, CLIPVisionModelV2, IPAdapterConfig, IPMethodV2 } from './types';
+import { imageDTOToImageWithDims } from './types';
 
-export const selectIPA = (state: CanvasV2State, id: string) => state.ipAdapters.entities.find((ipa) => ipa.id === id);
-export const selectIPAOrThrow = (state: CanvasV2State, id: string) => {
-  const ipa = selectIPA(state, id);
-  assert(ipa, `IP Adapter with id ${id} not found`);
-  return ipa;
+export const selectIPAdapterEntity = (state: CanvasV2State, id: string) =>
+  state.ipAdapters.entities.find((ipa) => ipa.id === id);
+export const selectIPAdapterEntityOrThrow = (state: CanvasV2State, id: string) => {
+  const entity = selectIPAdapterEntity(state, id);
+  assert(entity, `IP Adapter with id ${id} not found`);
+  return entity;
 };
 
 export const ipAdaptersReducers = {
   ipaAdded: {
-    reducer: (state, action: PayloadAction<{ id: string; config: IPAdapterConfig }>) => {
-      const { id, config } = action.payload;
+    reducer: (state, action: PayloadAction<{ id: string; ipAdapter: IPAdapterConfig }>) => {
+      const { id, ipAdapter } = action.payload;
       const layer: CanvasIPAdapterState = {
         id,
         type: 'ip_adapter',
+        name: null,
         isEnabled: true,
-        ...config,
+        ipAdapter,
       };
       state.ipAdapters.entities.push(layer);
       state.selectedEntityIdentifier = { type: 'ip_adapter', id };
     },
-    prepare: (payload: { config: IPAdapterConfig }) => ({ payload: { id: uuidv4(), ...payload } }),
+    prepare: (payload: { ipAdapter: IPAdapterConfig }) => ({ payload: { id: uuidv4(), ...payload } }),
   },
   ipaRecalled: (state, action: PayloadAction<{ data: CanvasIPAdapterState }>) => {
     const { data } = action.payload;
@@ -36,7 +38,7 @@ export const ipAdaptersReducers = {
   },
   ipaIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
-    const ipa = selectIPA(state, id);
+    const ipa = selectIPAdapterEntity(state, id);
     if (ipa) {
       ipa.isEnabled = !ipa.isEnabled;
     }
@@ -49,64 +51,54 @@ export const ipAdaptersReducers = {
     state.ipAdapters.entities = [];
   },
   ipaImageChanged: {
-    reducer: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null; objectId: string }>) => {
-      const { id, imageDTO, objectId } = action.payload;
-      const ipa = selectIPA(state, id);
-      if (!ipa) {
+    reducer: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null }>) => {
+      const { id, imageDTO } = action.payload;
+      const entity = selectIPAdapterEntity(state, id);
+      if (!entity) {
         return;
       }
-      ipa.imageObject = imageDTO ? imageDTOToImageObject(imageDTO) : null;
+      entity.ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
     },
     prepare: (payload: { id: string; imageDTO: ImageDTO | null }) => ({ payload: { ...payload, objectId: uuidv4() } }),
   },
   ipaMethodChanged: (state, action: PayloadAction<{ id: string; method: IPMethodV2 }>) => {
     const { id, method } = action.payload;
-    const ipa = selectIPA(state, id);
-    if (!ipa) {
+    const entity = selectIPAdapterEntity(state, id);
+    if (!entity) {
       return;
     }
-    ipa.method = method;
+    entity.ipAdapter.method = method;
   },
-  ipaModelChanged: (
-    state,
-    action: PayloadAction<{
-      id: string;
-      modelConfig: IPAdapterModelConfig | null;
-    }>
-  ) => {
+  ipaModelChanged: (state, action: PayloadAction<{ id: string; modelConfig: IPAdapterModelConfig | null }>) => {
     const { id, modelConfig } = action.payload;
-    const ipa = selectIPA(state, id);
-    if (!ipa) {
+    const entity = selectIPAdapterEntity(state, id);
+    if (!entity) {
       return;
     }
-    if (modelConfig) {
-      ipa.model = zModelIdentifierField.parse(modelConfig);
-    } else {
-      ipa.model = null;
-    }
+    entity.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
   },
   ipaCLIPVisionModelChanged: (state, action: PayloadAction<{ id: string; clipVisionModel: CLIPVisionModelV2 }>) => {
     const { id, clipVisionModel } = action.payload;
-    const ipa = selectIPA(state, id);
-    if (!ipa) {
+    const entity = selectIPAdapterEntity(state, id);
+    if (!entity) {
       return;
     }
-    ipa.clipVisionModel = clipVisionModel;
+    entity.ipAdapter.clipVisionModel = clipVisionModel;
   },
   ipaWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
     const { id, weight } = action.payload;
-    const ipa = selectIPA(state, id);
-    if (!ipa) {
+    const entity = selectIPAdapterEntity(state, id);
+    if (!entity) {
       return;
     }
-    ipa.weight = weight;
+    entity.ipAdapter.weight = weight;
   },
   ipaBeginEndStepPctChanged: (state, action: PayloadAction<{ id: string; beginEndStepPct: [number, number] }>) => {
     const { id, beginEndStepPct } = action.payload;
-    const ipa = selectIPA(state, id);
-    if (!ipa) {
+    const entity = selectIPAdapterEntity(state, id);
+    if (!entity) {
       return;
     }
-    ipa.beginEndStepPct = beginEndStepPct;
+    entity.ipAdapter.beginEndStepPct = beginEndStepPct;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;

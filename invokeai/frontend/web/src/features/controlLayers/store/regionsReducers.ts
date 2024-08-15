@@ -1,18 +1,32 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasV2State, CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import type {
+  CanvasV2State,
+  CLIPVisionModelV2,
+  IPMethodV2,
+  RegionalGuidanceIPAdapterConfig,
+} from 'features/controlLayers/store/types';
+import { imageDTOToImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import { isEqual } from 'lodash-es';
 import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
-import type { CanvasIPAdapterState, CanvasRegionalGuidanceState, RgbColor } from './types';
+import type { CanvasRegionalGuidanceState, RgbColor } from './types';
 
-export const selectRG = (state: CanvasV2State, id: string) => state.regions.entities.find((rg) => rg.id === id);
-export const selectRGOrThrow = (state: CanvasV2State, id: string) => {
-  const rg = selectRG(state, id);
+export const selectRegionalGuidanceEntity = (state: CanvasV2State, id: string) => {
+  return state.regions.entities.find((rg) => rg.id === id);
+};
+export const selectRegionalGuidanceIPAdapter = (state: CanvasV2State, id: string, ipAdapterId: string) => {
+  const entity = state.regions.entities.find((rg) => rg.id === id);
+  if (!entity) {
+    return;
+  }
+  return entity.ipAdapters.find((ipa) => ipa.id === ipAdapterId);
+};
+export const selectRegionalGuidanceEntityOrThrow = (state: CanvasV2State, id: string) => {
+  const rg = selectRegionalGuidanceEntity(state, id);
   assert(rg, `Region with id ${id} not found`);
   return rg;
 };
@@ -72,105 +86,89 @@ export const regionsReducers = {
   },
   rgPositivePromptChanged: (state, action: PayloadAction<{ id: string; prompt: string | null }>) => {
     const { id, prompt } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const entity = selectRegionalGuidanceEntity(state, id);
+    if (!entity) {
       return;
     }
-    rg.positivePrompt = prompt;
+    entity.positivePrompt = prompt;
   },
   rgNegativePromptChanged: (state, action: PayloadAction<{ id: string; prompt: string | null }>) => {
     const { id, prompt } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const entity = selectRegionalGuidanceEntity(state, id);
+    if (!entity) {
       return;
     }
-    rg.negativePrompt = prompt;
+    entity.negativePrompt = prompt;
   },
   rgFillChanged: (state, action: PayloadAction<{ id: string; fill: RgbColor }>) => {
     const { id, fill } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const entity = selectRegionalGuidanceEntity(state, id);
+    if (!entity) {
       return;
     }
-    rg.fill = fill;
+    entity.fill = fill;
   },
   rgAutoNegativeChanged: (state, action: PayloadAction<{ id: string; autoNegative: ParameterAutoNegative }>) => {
     const { id, autoNegative } = action.payload;
-    const rg = selectRG(state, id);
+    const rg = selectRegionalGuidanceEntity(state, id);
     if (!rg) {
       return;
     }
     rg.autoNegative = autoNegative;
   },
-  rgIPAdapterAdded: (state, action: PayloadAction<{ id: string; ipAdapter: CanvasIPAdapterState }>) => {
+  rgIPAdapterAdded: (state, action: PayloadAction<{ id: string; ipAdapter: RegionalGuidanceIPAdapterConfig }>) => {
     const { id, ipAdapter } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const entity = selectRegionalGuidanceEntity(state, id);
+    if (!entity) {
       return;
     }
-    rg.ipAdapters.push(ipAdapter);
+    entity.ipAdapters.push(ipAdapter);
   },
   rgIPAdapterDeleted: (state, action: PayloadAction<{ id: string; ipAdapterId: string }>) => {
     const { id, ipAdapterId } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const entity = selectRegionalGuidanceEntity(state, id);
+    if (!entity) {
       return;
     }
-    rg.ipAdapters = rg.ipAdapters.filter((ipAdapter) => ipAdapter.id !== ipAdapterId);
+    entity.ipAdapters = entity.ipAdapters.filter((ipAdapter) => ipAdapter.id !== ipAdapterId);
   },
   rgIPAdapterImageChanged: (
     state,
-    action: PayloadAction<{ id: string; ipAdapterId: string; imageDTO: ImageDTO | null; objectId: string }>
+    action: PayloadAction<{ id: string; ipAdapterId: string; imageDTO: ImageDTO | null }>
   ) => {
     const { id, ipAdapterId, imageDTO } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const ipAdapter = selectRegionalGuidanceIPAdapter(state, id, ipAdapterId);
+    if (!ipAdapter) {
       return;
     }
-    const ipa = rg.ipAdapters.find((ipa) => ipa.id === ipAdapterId);
-    if (!ipa) {
-      return;
-    }
-    ipa.imageObject = imageDTO ? imageDTOToImageObject(imageDTO) : null;
+    ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
   },
   rgIPAdapterWeightChanged: (state, action: PayloadAction<{ id: string; ipAdapterId: string; weight: number }>) => {
     const { id, ipAdapterId, weight } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const ipAdapter = selectRegionalGuidanceIPAdapter(state, id, ipAdapterId);
+    if (!ipAdapter) {
       return;
     }
-    const ipa = rg.ipAdapters.find((ipa) => ipa.id === ipAdapterId);
-    if (!ipa) {
-      return;
-    }
-    ipa.weight = weight;
+    ipAdapter.weight = weight;
   },
   rgIPAdapterBeginEndStepPctChanged: (
     state,
     action: PayloadAction<{ id: string; ipAdapterId: string; beginEndStepPct: [number, number] }>
   ) => {
     const { id, ipAdapterId, beginEndStepPct } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const ipAdapter = selectRegionalGuidanceIPAdapter(state, id, ipAdapterId);
+    if (!ipAdapter) {
       return;
     }
-    const ipa = rg.ipAdapters.find((ipa) => ipa.id === ipAdapterId);
-    if (!ipa) {
-      return;
-    }
-    ipa.beginEndStepPct = beginEndStepPct;
+    ipAdapter.beginEndStepPct = beginEndStepPct;
   },
   rgIPAdapterMethodChanged: (state, action: PayloadAction<{ id: string; ipAdapterId: string; method: IPMethodV2 }>) => {
     const { id, ipAdapterId, method } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const ipAdapter = selectRegionalGuidanceIPAdapter(state, id, ipAdapterId);
+    if (!ipAdapter) {
       return;
     }
-    const ipa = rg.ipAdapters.find((ipa) => ipa.id === ipAdapterId);
-    if (!ipa) {
-      return;
-    }
-    ipa.method = method;
+    ipAdapter.method = method;
   },
   rgIPAdapterModelChanged: (
     state,
@@ -181,33 +179,21 @@ export const regionsReducers = {
     }>
   ) => {
     const { id, ipAdapterId, modelConfig } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const ipAdapter = selectRegionalGuidanceIPAdapter(state, id, ipAdapterId);
+    if (!ipAdapter) {
       return;
     }
-    const ipa = rg.ipAdapters.find((ipa) => ipa.id === ipAdapterId);
-    if (!ipa) {
-      return;
-    }
-    if (modelConfig) {
-      ipa.model = zModelIdentifierField.parse(modelConfig);
-    } else {
-      ipa.model = null;
-    }
+    ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
   },
   rgIPAdapterCLIPVisionModelChanged: (
     state,
     action: PayloadAction<{ id: string; ipAdapterId: string; clipVisionModel: CLIPVisionModelV2 }>
   ) => {
     const { id, ipAdapterId, clipVisionModel } = action.payload;
-    const rg = selectRG(state, id);
-    if (!rg) {
+    const ipAdapter = selectRegionalGuidanceIPAdapter(state, id, ipAdapterId);
+    if (!ipAdapter) {
       return;
     }
-    const ipa = rg.ipAdapters.find((ipa) => ipa.id === ipAdapterId);
-    if (!ipa) {
-      return;
-    }
-    ipa.clipVisionModel = clipVisionModel;
+    ipAdapter.clipVisionModel = clipVisionModel;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
