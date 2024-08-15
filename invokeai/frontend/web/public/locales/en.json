@@ -1704,7 +1704,7 @@
         "editTemplate": "Edit Template",
         "flatten": "Flatten selected template into current prompt",
         "importTemplates": "Import Prompt Templates",
-        "importTemplatesDesc": "Format must be csv with columns: 'name', 'prompt', and 'negative_prompt' included",
+        "importTemplatesDesc": "Format must be either a CSV with columns: 'name', 'prompt' or 'positive_prompt', and 'negative_prompt' included, or a JSON file with keys 'name', 'prompt' or 'positive_prompt', and 'negative_prompt",
         "insertPlaceholder": "Insert placeholder",
         "myTemplates": "My Templates",
         "name": "Name",
