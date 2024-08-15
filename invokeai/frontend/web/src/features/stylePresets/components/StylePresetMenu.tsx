@@ -1,12 +1,14 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
+import { StylePresetExportButton } from 'features/stylePresets/components/StylePresetExportButton';
+import { StylePresetImportButton } from 'features/stylePresets/components/StylePresetImportButton';
 import { useTranslation } from 'react-i18next';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
+import { StylePresetCreateButton } from './StylePresetCreateButton';
 import { StylePresetList } from './StylePresetList';
-import { StylePresetMenuActions } from './StylePresetMenuActions/StylePresetMenuActions';
 import StylePresetSearch from './StylePresetSearch';
 
 export const StylePresetMenu = () => {
@@ -50,7 +52,9 @@ export const StylePresetMenu = () => {
     <Flex flexDir="column" gap={2} padding={3} layerStyle="second" borderRadius="base">
       <Flex alignItems="center" gap={2} w="full" justifyContent="space-between">
         <StylePresetSearch />
-        <StylePresetMenuActions />
+        <StylePresetCreateButton />
+        <StylePresetImportButton />
+        <StylePresetExportButton />
       </Flex>
 
       {data.presets.length === 0 && data.defaultPresets.length === 0 && (

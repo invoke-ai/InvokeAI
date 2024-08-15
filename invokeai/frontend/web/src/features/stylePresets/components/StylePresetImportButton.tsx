@@ -1,4 +1,5 @@
-import { Flex, MenuItem, Text } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Flex, IconButton, ListItem, spinAnimation, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -6,7 +7,11 @@ import { useTranslation } from 'react-i18next';
 import { PiSpinner, PiUploadSimpleBold } from 'react-icons/pi';
 import { useImportStylePresetsMutation } from 'services/api/endpoints/stylePresets';
 
-export const StylePresetImport = ({ onClose }: { onClose: () => void }) => {
+const loadingStyles: SystemStyleObject = {
+  svg: { animation: spinAnimation },
+};
+
+export const StylePresetImportButton = () => {
   const [importStylePresets, { isLoading }] = useImportStylePresetsMutation();
   const { t } = useTranslation();
 
@@ -30,12 +35,9 @@ export const StylePresetImport = ({ onClose }: { onClose: () => void }) => {
             title: t('toast.importFailed'),
             description: error ? `${error.data.detail}` : undefined,
           });
-        })
-        .finally(() => {
-          onClose();
         });
     },
-    [importStylePresets, t, onClose]
+    [importStylePresets, t]
   );
 
   const { getInputProps, getRootProps } = useDropzone({
@@ -46,17 +48,37 @@ export const StylePresetImport = ({ onClose }: { onClose: () => void }) => {
   });
 
   return (
-    <MenuItem icon={!isLoading ? <PiUploadSimpleBold /> : <PiSpinner />} alignItems="flex-start" {...getRootProps()}>
-      <Flex flexDir="column">
-        <Text>{t('stylePresets.importTemplates')}</Text>
-        <Text maxW="200px" fontSize="xs" variant="subtext">
-          {t('stylePresets.importTemplatesDesc')}
-        </Text>
-        <Text maxW="200px" fontSize="xs" variant="subtext">
-          {t('stylePresets.importTemplatesDesc2')}
-        </Text>
-      </Flex>
+    <>
+      <IconButton
+        icon={!isLoading ? <PiUploadSimpleBold /> : <PiSpinner />}
+        tooltip={<TooltipContent />}
+        aria-label={t('stylePresets.importTemplates')}
+        size="md"
+        variant="link"
+        w={8}
+        h={8}
+        sx={isLoading ? loadingStyles : undefined}
+        isDisabled={isLoading}
+        {...getRootProps()}
+      />
       <input {...getInputProps()} />
-    </MenuItem>
+    </>
+  );
+};
+
+const TooltipContent = () => {
+  const { t } = useTranslation();
+  return (
+    <Flex flexDir="column">
+      <Text pb={1} fontWeight="semibold">
+        {t('stylePresets.importTemplates')}
+      </Text>
+      <Text>{t('stylePresets.acceptedColumnsKeys')}</Text>
+      <UnorderedList>
+        <ListItem>{t('stylePresets.nameColumn')}</ListItem>
+        <ListItem>{t('stylePresets.positivePromptColumn')}</ListItem>
+        <ListItem>{t('stylePresets.negativePromptColumn')}</ListItem>
+      </UnorderedList>
+    </Flex>
   );
 };
