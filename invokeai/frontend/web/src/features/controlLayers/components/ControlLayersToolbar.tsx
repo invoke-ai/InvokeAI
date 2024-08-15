@@ -2,14 +2,14 @@
 import { Flex, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { BrushWidth } from 'features/controlLayers/components/BrushWidth';
 import { CanvasResetViewButton } from 'features/controlLayers/components/CanvasResetViewButton';
 import { CanvasScale } from 'features/controlLayers/components/CanvasScale';
 import ControlLayersSettingsPopover from 'features/controlLayers/components/ControlLayersSettingsPopover';
-import { EraserWidth } from 'features/controlLayers/components/EraserWidth';
-import { FillColorPicker } from 'features/controlLayers/components/FillColorPicker';
 import { ResetCanvasButton } from 'features/controlLayers/components/ResetCanvasButton';
-import { ToolChooser } from 'features/controlLayers/components/ToolChooser';
+import { ToolBrushWidth } from 'features/controlLayers/components/Tool/ToolBrushWidth';
+import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
+import { ToolEraserWidth } from 'features/controlLayers/components/Tool/ToolEraserWidth';
+import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { UndoRedoButtonGroup } from 'features/controlLayers/components/UndoRedoButtonGroup';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
@@ -42,15 +42,15 @@ export const ControlLayersToolbar = memo(() => {
         </Flex>
       </Flex>
       <Flex flex={1} gap={2} justifyContent="center" alignItems="center">
-        {tool === 'brush' && <BrushWidth />}
-        {tool === 'eraser' && <EraserWidth />}
+        {tool === 'brush' && <ToolBrushWidth />}
+        {tool === 'eraser' && <ToolEraserWidth />}
       </Flex>
       <CanvasScale />
       <CanvasResetViewButton />
       <Switch onChange={onChangeDebugging}>debug</Switch>
       <Flex flex={1} justifyContent="center">
         <Flex gap={2} marginInlineStart="auto" alignItems="center">
-          <FillColorPicker />
+          <ToolFillColorPicker />
           <UndoRedoButtonGroup />
           <ControlLayersSettingsPopover />
           <ResetCanvasButton />

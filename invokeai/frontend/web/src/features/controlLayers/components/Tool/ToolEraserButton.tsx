@@ -5,12 +5,12 @@ import { isDrawableEntityType } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiPaintBrushBold } from 'react-icons/pi';
+import { PiEraserBold } from 'react-icons/pi';
 
-export const BrushToolButton = memo(() => {
+export const ToolEraserButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'brush');
+  const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'eraser');
   const isDisabled = useAppSelector((s) => {
     const entityType = s.canvasV2.selectedEntityIdentifier?.type;
     const isDrawingToolAllowed = entityType ? isDrawableEntityType(entityType) : false;
@@ -19,16 +19,16 @@ export const BrushToolButton = memo(() => {
   });
 
   const onClick = useCallback(() => {
-    dispatch(toolChanged('brush'));
+    dispatch(toolChanged('eraser'));
   }, [dispatch]);
 
-  useHotkeys('b', onClick, { enabled: !isDisabled }, [isDisabled, onClick]);
+  useHotkeys('e', onClick, { enabled: !isDisabled }, [isDisabled, onClick]);
 
   return (
     <IconButton
-      aria-label={`${t('unifiedCanvas.brush')} (B)`}
-      tooltip={`${t('unifiedCanvas.brush')} (B)`}
-      icon={<PiPaintBrushBold />}
+      aria-label={`${t('controlLayers.tool.eraser')} (E)`}
+      tooltip={`${t('controlLayers.tool.eraser')} (E)`}
+      icon={<PiEraserBold />}
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="outline"
       onClick={onClick}
@@ -37,4 +37,4 @@ export const BrushToolButton = memo(() => {
   );
 });
 
-BrushToolButton.displayName = 'BrushToolButton';
+ToolEraserButton.displayName = 'ToolEraserButton';
