@@ -1,14 +1,9 @@
-from pathlib import Path
-
 import torch
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
-from optimum.quanto import qfloat8
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.model import CLIPField, T5EncoderField
-from invokeai.app.invocations.fields import InputField, FieldDescriptions, Input
-from invokeai.app.invocations.flux_text_to_image import FLUX_MODELS, QuantizedModelForTextEncoding
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -40,7 +35,6 @@ class FluxTextEncoderInvocation(BaseInvocation):
     # compatible with other ConditioningOutputs.
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-
         t5_embeddings, clip_embeddings = self._encode_prompt(context)
         conditioning_data = ConditioningFieldData(
             conditionings=[FLUXConditioningInfo(clip_embeds=clip_embeddings, t5_embeds=t5_embeddings)]
@@ -48,7 +42,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
 
         conditioning_name = context.conditioning.save(conditioning_data)
         return ConditioningOutput.build(conditioning_name)
-    
+
     def _encode_prompt(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor]:
         # TODO: Determine the T5 max sequence length based on the model.
         # if self.model == "flux-schnell":
