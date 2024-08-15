@@ -43,7 +43,7 @@ export const addRegions = async (
   const validRegions = regions.filter((rg) => isValidRegion(rg, base));
 
   for (const region of validRegions) {
-    const adapter = manager.regions.get(region.id);
+    const adapter = manager.regionalGuidanceAdapters.get(region.id);
     assert(adapter, 'Adapter not found');
     const imageDTO = await adapter.renderer.rasterize(bbox);
 

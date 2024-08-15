@@ -1,5 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { ipaAllDeleted, layerAllDeleted } from 'features/controlLayers/store/canvasV2Slice';
+import { ipaAllDeleted, rasterLayerAllDeleted } from 'features/controlLayers/store/canvasV2Slice';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -22,7 +22,7 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
         const imageUsage = getImageUsage(nodes.present, canvasV2, image_name);
 
         if (imageUsage.isLayerImage && !wereLayersReset) {
-          dispatch(layerAllDeleted());
+          dispatch(rasterLayerAllDeleted());
           wereLayersReset = true;
         }
 
