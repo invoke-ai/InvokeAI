@@ -12,6 +12,7 @@ import type {
   CanvasRegionalGuidanceState,
   CanvasV2State,
   Coordinate,
+  RgbaColor,
   Tool,
 } from 'features/controlLayers/store/types';
 import { isDrawableEntity, isDrawableEntityAdapter } from 'features/controlLayers/store/types';
@@ -115,6 +116,23 @@ const getLastPointOfLastLineOfEntity = (
   return { x, y };
 };
 
+const getColorUnderCursor = (stage: Konva.Stage): RgbaColor | null => {
+  const pos = stage.getPointerPosition();
+  if (!pos) {
+    return null;
+  }
+  const ctx = stage.toCanvas({ x: pos.x, y: pos.y, width: 1, height: 1 }).getContext('2d');
+  if (!ctx) {
+    return null;
+  }
+  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+  if (r === undefined || g === undefined || b === undefined || a === undefined) {
+    return null;
+  }
+
+  return { r, g, b, a };
+};
+
 export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   const { stage, stateApi } = manager;
   const {
@@ -173,6 +191,14 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     const toolState = getToolState();
     const pos = updateLastCursorPos(stage, $lastCursorPos.set);
     const selectedEntity = getSelectedEntity();
+
+    if (toolState.selected === 'eyeDropper') {
+      const color = getColorUnderCursor(stage);
+      manager.stateApi.$colorUnderCursor.set(color);
+      if (color) {
+        manager.stateApi.setFill(color);
+      }
+    }
 
     if (
       pos &&
@@ -321,6 +347,11 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     const toolState = getToolState();
     const pos = updateLastCursorPos(stage, $lastCursorPos.set);
     const selectedEntity = getSelectedEntity();
+
+    if (toolState.selected === 'eyeDropper') {
+      const color = getColorUnderCursor(stage);
+      manager.stateApi.$colorUnderCursor.set(color);
+    }
 
     if (
       pos &&
