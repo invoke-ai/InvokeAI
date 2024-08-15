@@ -1,6 +1,6 @@
 import { getCAId, getImageObjectId, getIPAId, getLayerId } from 'features/controlLayers/konva/naming';
 import { defaultLoRAConfig } from 'features/controlLayers/store/lorasReducers';
-import type { CanvasControlAdapterState, CanvasIPAdapterState, CanvasLayerState, LoRA } from 'features/controlLayers/store/types';
+import type { CanvasControlAdapterState, CanvasIPAdapterState, CanvasRasterLayerState, LoRA } from 'features/controlLayers/store/types';
 import {
   IMAGE_FILTERS,
   imageDTOToImageWithDims,
@@ -8,7 +8,7 @@ import {
   initialIPAdapterV2,
   initialT2IAdapterV2,
   isFilterType,
-  zCanvasLayerState,
+  zCanvasRasterLayerState,
 } from 'features/controlLayers/store/types';
 import type {
   ControlNetConfigMetadata,
@@ -424,22 +424,22 @@ const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (
 };
 
 //#region Control Layers
-const parseLayer: MetadataParseFunc<CanvasLayerState> = async (metadataItem) => zCanvasLayerState.parseAsync(metadataItem);
+const parseLayer: MetadataParseFunc<CanvasRasterLayerState> = async (metadataItem) => zCanvasRasterLayerState.parseAsync(metadataItem);
 
-const parseLayers: MetadataParseFunc<CanvasLayerState[]> = async (metadata) => {
+const parseLayers: MetadataParseFunc<CanvasRasterLayerState[]> = async (metadata) => {
   // We need to support recalling pre-Control Layers metadata into Control Layers. A separate set of parsers handles
   // taking pre-CL metadata and parsing it into layers. It doesn't always map 1-to-1, so this is best-effort. For
   // example, CL Control Adapters don't support resize mode, so we simply omit that property.
 
   try {
-    const layers: CanvasLayerState[] = [];
+    const layers: CanvasRasterLayerState[] = [];
 
     try {
       const control_layers = await getProperty(metadata, 'control_layers');
       const controlLayersRaw = await getProperty(control_layers, 'layers', isArray);
       const controlLayersParseResults = await Promise.allSettled(controlLayersRaw.map(parseLayer));
       const controlLayers = controlLayersParseResults
-        .filter((result): result is PromiseFulfilledResult<CanvasLayerState> => result.status === 'fulfilled')
+        .filter((result): result is PromiseFulfilledResult<CanvasRasterLayerState> => result.status === 'fulfilled')
         .map((result) => result.value);
       layers.push(...controlLayers);
     } catch {
@@ -498,16 +498,16 @@ const parseLayers: MetadataParseFunc<CanvasLayerState[]> = async (metadata) => {
   }
 };
 
-const parseInitialImageToInitialImageLayer: MetadataParseFunc<CanvasLayerState> = async (metadata) => {
+const parseInitialImageToInitialImageLayer: MetadataParseFunc<CanvasRasterLayerState> = async (metadata) => {
   // TODO(psyche): recall denoise strength
   // const denoisingStrength = await getProperty(metadata, 'strength', isParameterStrength);
   const imageName = await getProperty(metadata, 'init_image', isString);
   const imageDTO = await getImageDTO(imageName);
   assert(imageDTO, 'ImageDTO is null');
   const id = getLayerId(uuidv4());
-  const layer: CanvasLayerState = {
+  const layer: CanvasRasterLayerState = {
     id,
-    type: 'layer',
+    type: 'raster_layer',
     bbox: null,
     bboxNeedsUpdate: true,
     x: 0,

@@ -1,7 +1,7 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
-import { CanvasEntitySettings } from 'features/controlLayers/components/common/CanvasEntitySettings';
+import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -73,7 +73,7 @@ export const IPAdapterSettings = memo(() => {
   const postUploadAction = useMemo<IPALayerImagePostUploadAction>(() => ({ type: 'SET_IPA_IMAGE', id }), [id]);
 
   return (
-    <CanvasEntitySettings>
+    <CanvasEntitySettingsWrapper>
       <Flex flexDir="column" gap={4} position="relative" w="full">
         <Flex gap={3} alignItems="center" w="full">
           <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
@@ -102,7 +102,7 @@ export const IPAdapterSettings = memo(() => {
           </Flex>
         </Flex>
       </Flex>
-    </CanvasEntitySettings>
+    </CanvasEntitySettingsWrapper>
   );
 });
 

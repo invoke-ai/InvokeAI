@@ -5,50 +5,48 @@ import { Weight } from 'features/controlLayers/components/common/Weight';
 import { ControlAdapterControlModeSelect } from 'features/controlLayers/components/ControlAdapter/ControlAdapterControlModeSelect';
 import { ControlAdapterModel } from 'features/controlLayers/components/ControlAdapter/ControlAdapterModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useControlLayerControlAdapter } from 'features/controlLayers/hooks/useLayerControlAdapter';
 import {
-  layerControlAdapterBeginEndStepPctChanged,
-  layerControlAdapterControlModeChanged,
-  layerControlAdapterModelChanged,
-  layerControlAdapterWeightChanged,
+  controlLayerBeginEndStepPctChanged,
+  controlLayerControlModeChanged,
+  controlLayerModelChanged,
+  controlLayerWeightChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
-import type { ControlModeV2, ControlNetConfig, T2IAdapterConfig } from 'features/controlLayers/store/types';
+import type { ControlModeV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
-type Props = {
-  controlAdapter: ControlNetConfig | T2IAdapterConfig;
-};
-
-export const LayerControlAdapter = memo(({ controlAdapter }: Props) => {
+export const ControlLayerControlAdapter = memo(() => {
   const dispatch = useAppDispatch();
-  const { id } = useEntityIdentifierContext();
+  const entityIdentifier = useEntityIdentifierContext();
+  const controlAdapter = useControlLayerControlAdapter(entityIdentifier);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
-      dispatch(layerControlAdapterBeginEndStepPctChanged({ id, beginEndStepPct }));
+      dispatch(controlLayerBeginEndStepPctChanged({ id: entityIdentifier.id, beginEndStepPct }));
     },
-    [dispatch, id]
+    [dispatch, entityIdentifier.id]
   );
 
   const onChangeControlMode = useCallback(
     (controlMode: ControlModeV2) => {
-      dispatch(layerControlAdapterControlModeChanged({ id, controlMode }));
+      dispatch(controlLayerControlModeChanged({ id: entityIdentifier.id, controlMode }));
     },
-    [dispatch, id]
+    [dispatch, entityIdentifier.id]
   );
 
   const onChangeWeight = useCallback(
     (weight: number) => {
-      dispatch(layerControlAdapterWeightChanged({ id, weight }));
+      dispatch(controlLayerWeightChanged({ id: entityIdentifier.id, weight }));
     },
-    [dispatch, id]
+    [dispatch, entityIdentifier.id]
   );
 
   const onChangeModel = useCallback(
     (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig) => {
-      dispatch(layerControlAdapterModelChanged({ id, modelConfig }));
+      dispatch(controlLayerModelChanged({ id: entityIdentifier.id, modelConfig }));
     },
-    [dispatch, id]
+    [dispatch, entityIdentifier.id]
   );
 
   return (
@@ -63,4 +61,4 @@ export const LayerControlAdapter = memo(({ controlAdapter }: Props) => {
   );
 });
 
-LayerControlAdapter.displayName = 'LayerControlAdapter';
+ControlLayerControlAdapter.displayName = 'ControlLayerControlAdapter';

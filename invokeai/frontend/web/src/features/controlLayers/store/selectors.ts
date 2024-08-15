@@ -7,7 +7,7 @@ export const selectEntityCount = createSelector(selectCanvasV2Slice, (canvasV2) 
     canvasV2.regions.entities.length +
     // canvasV2.controlAdapters.entities.length +
     canvasV2.ipAdapters.entities.length +
-    canvasV2.layers.entities.length
+    canvasV2.rasterLayers.entities.length
   );
 });
 

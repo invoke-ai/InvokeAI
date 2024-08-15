@@ -18,7 +18,7 @@ export const Filter = memo(() => {
       return;
     }
     const entity = canvasManager.stateApi.getEntity(filteringEntity);
-    if (!entity || entity.type !== 'layer') {
+    if (!entity || (entity.type !== 'raster_layer' && entity.type !== 'control_layer')) {
       return;
     }
     entity.adapter.filter.previewFilter();
@@ -33,7 +33,7 @@ export const Filter = memo(() => {
       return;
     }
     const entity = canvasManager.stateApi.getEntity(filteringEntity);
-    if (!entity || entity.type !== 'layer') {
+    if (!entity || (entity.type !== 'raster_layer' && entity.type !== 'control_layer')) {
       return;
     }
     entity.adapter.filter.applyFilter();
@@ -48,7 +48,7 @@ export const Filter = memo(() => {
       return;
     }
     const entity = canvasManager.stateApi.getEntity(filteringEntity);
-    if (!entity || entity.type !== 'layer') {
+    if (!entity || (entity.type !== 'raster_layer' && entity.type !== 'control_layer')) {
       return;
     }
     entity.adapter.filter.cancelFilter();

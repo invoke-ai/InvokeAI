@@ -55,7 +55,7 @@ const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO
 };
 
 const deleteLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.canvasV2.layers.entities.forEach(({ id, objects }) => {
+  state.canvasV2.rasterLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
       if (obj.type === 'image' && obj.image.image_name === imageDTO.image_name) {
@@ -64,7 +64,7 @@ const deleteLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
       }
     }
     if (shouldDelete) {
-      dispatch(entityDeleted({ entityIdentifier: { id, type: 'layer' } }));
+      dispatch(entityDeleted({ entityIdentifier: { id, type: 'raster_layer' } }));
     }
   });
 };
