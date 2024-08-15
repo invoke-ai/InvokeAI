@@ -25,7 +25,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
         input=Input.Connection,
     )
     t5Encoder: T5EncoderField = InputField(
-        title="T5EncoderField",
+        title="T5Encoder",
         description=FieldDescriptions.t5Encoder,
         input=Input.Connection,
     )

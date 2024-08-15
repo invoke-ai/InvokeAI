@@ -39,6 +39,7 @@ export const MODEL_TYPES = [
   'VAEField',
   'CLIPField',
   'T2IAdapterModelField',
+  'T5EncoderField',
   'SpandrelImageToImageModelField',
 ];
 
@@ -70,6 +71,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   T2IAdapterField: 'teal.500',
   T2IAdapterModelField: 'teal.500',
   UNetField: 'red.500',
+  T5EncoderField: 'green.500',
   TransformerField: 'red.500',
   VAEField: 'blue.500',
   VAEModelField: 'teal.500',
