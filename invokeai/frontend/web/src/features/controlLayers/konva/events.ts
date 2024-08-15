@@ -6,8 +6,9 @@ import {
   offsetCoord,
 } from 'features/controlLayers/konva/util';
 import type {
+  CanvasControlLayerState,
   CanvasInpaintMaskState,
-  CanvasLayerState,
+  CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasV2State,
   Coordinate,
@@ -84,7 +85,7 @@ const getLastPointOfLine = (points: number[]): Coordinate | null => {
 };
 
 const getLastPointOfLastLineOfEntity = (
-  entity: CanvasLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState,
+  entity: CanvasRasterLayerState | CanvasControlLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState,
   tool: Tool
 ): Coordinate | null => {
   const lastObject = entity.objects[entity.objects.length - 1];
@@ -138,7 +139,9 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     return e.evt.buttons === 1;
   }
 
-  function getClip(entity: CanvasRegionalGuidanceState | CanvasLayerState | CanvasInpaintMaskState) {
+  function getClip(
+    entity: CanvasRegionalGuidanceState | CanvasControlLayerState | CanvasRasterLayerState | CanvasInpaintMaskState
+  ) {
     const settings = getSettings();
     const bboxRect = getBbox().rect;
 

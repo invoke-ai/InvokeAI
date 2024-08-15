@@ -728,23 +728,22 @@ const zT2IAdapterConfig = z.object({
 });
 export type T2IAdapterConfig = z.infer<typeof zT2IAdapterConfig>;
 
-export const zCanvasLayerState = z.object({
+export const zCanvasRasterLayerState = z.object({
   id: zId,
-  type: z.literal('layer'),
+  type: z.literal('raster_layer'),
   isEnabled: z.boolean(),
   position: zCoordinate,
   opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
   rasterizationCache: z.array(zImageCache),
-  controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig]).nullable(),
 });
-export type CanvasLayerState = z.infer<typeof zCanvasLayerState>;
-export type CanvasLayerStateWithValidControlNet = Omit<CanvasLayerState, 'controlAdapter'> & {
-  controlAdapter: Omit<ControlNetConfig, 'model'> & { model: ControlNetModelConfig };
-};
-export type CanvasLayerStateWithValidT2IAdapter = Omit<CanvasLayerState, 'controlAdapter'> & {
-  controlAdapter: Omit<T2IAdapterConfig, 'model'> & { model: T2IAdapterModelConfig };
-};
+export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
+
+export const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
+  type: z.literal('control_layer'),
+  controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig]),
+});
+export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
 
 export const initialControlNetV2: ControlNetConfig = {
   type: 'controlnet',
@@ -808,8 +807,8 @@ export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMetho
   zBoundingBoxScaleMethod.safeParse(v).success;
 
 export type CanvasEntityState =
-  | CanvasLayerState
-  | CanvasControlAdapterState
+  | CanvasRasterLayerState
+  | CanvasControlLayerState
   | CanvasRegionalGuidanceState
   | CanvasInpaintMaskState
   | CanvasIPAdapterState;
@@ -832,7 +831,8 @@ export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
   inpaintMask: CanvasInpaintMaskState;
-  layers: { entities: CanvasLayerState[]; compositeRasterizationCache: ImageCache[] };
+  rasterLayers: { entities: CanvasRasterLayerState[]; compositeRasterizationCache: ImageCache[] };
+  controlLayers: { entities: CanvasControlLayerState[] };
   ipAdapters: { entities: CanvasIPAdapterState[] };
   regions: { entities: CanvasRegionalGuidanceState[] };
   loras: LoRA[];
@@ -962,20 +962,23 @@ export type RemoveIndexString<T> = {
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
+export function isDrawableEntityType(entityType: CanvasEntityState['type']) {
+  return (
+    entityType === 'raster_layer' ||
+    entityType === 'control_layer' ||
+    entityType === 'regional_guidance' ||
+    entityType === 'inpaint_mask'
+  );
+}
+
 export function isDrawableEntity(
   entity: CanvasEntityState
-): entity is CanvasLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState {
-  return entity.type === 'layer' || entity.type === 'regional_guidance' || entity.type === 'inpaint_mask';
+): entity is CanvasRasterLayerState | CanvasControlLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState {
+  return isDrawableEntityType(entity.type);
 }
 
 export function isDrawableEntityAdapter(
   adapter: CanvasLayerAdapter | CanvasControlAdapter | CanvasMaskAdapter
 ): adapter is CanvasLayerAdapter | CanvasMaskAdapter {
   return adapter instanceof CanvasLayerAdapter || adapter instanceof CanvasMaskAdapter;
-}
-
-export function isDrawableEntityType(
-  entityType: CanvasEntityState['type']
-): entityType is 'layer' | 'regional_guidance' | 'inpaint_mask' {
-  return entityType === 'layer' || entityType === 'regional_guidance' || entityType === 'inpaint_mask';
 }

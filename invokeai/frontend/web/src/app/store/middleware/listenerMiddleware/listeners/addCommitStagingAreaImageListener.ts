@@ -2,11 +2,11 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
   $lastProgressEvent,
-  layerAdded,
+  rasterLayerAdded,
   sessionStagingAreaImageAccepted,
   sessionStagingAreaReset,
 } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasLayerState } from 'features/controlLayers/store/types';
+import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -62,12 +62,12 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
 
       const { imageDTO, offsetX, offsetY } = stagingAreaImage;
       const imageObject = imageDTOToImageObject(imageDTO);
-      const overrides: Partial<CanvasLayerState> = {
+      const overrides: Partial<CanvasRasterLayerState> = {
         position: { x: x + offsetX, y: y + offsetY },
         objects: [imageObject],
       };
 
-      api.dispatch(layerAdded({ overrides }));
+      api.dispatch(rasterLayerAdded({ overrides }));
       api.dispatch(sessionStagingAreaReset());
     },
   });

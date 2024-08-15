@@ -1,4 +1,4 @@
-import type { CanvasLayerState } from 'features/controlLayers/store/types';
+import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { MetadataItemView } from 'features/metadata/components/MetadataItemView';
 import type { MetadataHandlers } from 'features/metadata/types';
 import { handlers } from 'features/metadata/util/handlers';
@@ -9,7 +9,7 @@ type Props = {
 };
 
 export const MetadataLayers = ({ metadata }: Props) => {
-  const [layers, setLayers] = useState<CanvasLayerState[]>([]);
+  const [layers, setLayers] = useState<CanvasRasterLayerState[]>([]);
 
   useEffect(() => {
     const parse = async () => {
@@ -40,8 +40,8 @@ const MetadataViewLayer = ({
   handlers,
 }: {
   label: string;
-  layer: CanvasLayerState;
-  handlers: MetadataHandlers<CanvasLayerState[], CanvasLayerState>;
+  layer: CanvasRasterLayerState;
+  handlers: MetadataHandlers<CanvasRasterLayerState[], CanvasRasterLayerState>;
 }) => {
   const onRecall = useCallback(() => {
     if (!handlers.recallItem) {

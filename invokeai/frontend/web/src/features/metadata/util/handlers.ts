@@ -2,7 +2,7 @@ import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import { objectKeys } from 'common/util/objectKeys';
 import { shouldConcatPromptsChanged } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasLayerState, LoRA } from 'features/controlLayers/store/types';
+import type { CanvasRasterLayerState, LoRA } from 'features/controlLayers/store/types';
 import type {
   AnyControlAdapterConfigMetadata,
   BuildMetadataHandlers,
@@ -48,7 +48,7 @@ const renderControlAdapterValue: MetadataRenderValueFunc<AnyControlAdapterConfig
     return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
   }
 };
-const renderLayerValue: MetadataRenderValueFunc<CanvasLayerState> = async (layer) => {
+const renderLayerValue: MetadataRenderValueFunc<CanvasRasterLayerState> = async (layer) => {
   if (layer.type === 'initial_image_layer') {
     let rendered = t('controlLayers.globalInitialImageLayer');
     if (layer.image) {
@@ -88,7 +88,7 @@ const renderLayerValue: MetadataRenderValueFunc<CanvasLayerState> = async (layer
   }
   assert(false, 'Unknown layer type');
 };
-const renderLayersValue: MetadataRenderValueFunc<CanvasLayerState[]> = async (layers) => {
+const renderLayersValue: MetadataRenderValueFunc<CanvasRasterLayerState[]> = async (layers) => {
   return `${layers.length} ${t('controlLayers.layers', { count: layers.length })}`;
 };
 
