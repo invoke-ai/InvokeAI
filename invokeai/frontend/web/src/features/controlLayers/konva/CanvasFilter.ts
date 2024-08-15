@@ -38,8 +38,8 @@ export class CanvasFilter {
     const { config } = this.manager.stateApi.getFilterState();
     this.log.trace({ config }, 'Previewing filter');
     const dispatch = this.manager.stateApi._store.dispatch;
-
-    const imageDTO = await this.parent.renderer.rasterize();
+    const rect = this.parent.transformer.getRelativeRect()
+    const imageDTO = await this.parent.renderer.rasterize(rect, false);
     // TODO(psyche): I can't get TS to be happy, it thinkgs `config` is `never` but it should be inferred from the generic... I'll just cast it for now
     const filterNode = IMAGE_FILTERS[config.type].buildNode(imageDTO, config as never);
     const enqueueBatchArg: BatchConfig = {
@@ -106,6 +106,7 @@ export class CanvasFilter {
         width: this.imageState.image.height,
         height: this.imageState.image.width,
       },
+      replaceObjects: true,
     });
     this.parent.renderer.showObjects();
     this.manager.stateApi.$filteringEntity.set(null);

@@ -3,7 +3,12 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { selectControlLayerOrThrow } from 'features/controlLayers/store/controlLayersReducers';
-import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import type {
+  CanvasEntityIdentifier,
+  ControlNetConfig,
+  IPAdapterConfig,
+  T2IAdapterConfig,
+} from 'features/controlLayers/store/types';
 import { initialControlNetV2, initialIPAdapterV2, initialT2IAdapterV2 } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useMemo } from 'react';
@@ -22,7 +27,7 @@ export const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIden
   return controlAdapter;
 };
 
-export const useDefaultControlAdapter = () => {
+export const useDefaultControlAdapter = (): ControlNetConfig | T2IAdapterConfig => {
   const [modelConfigs] = useControlNetAndT2IAdapterModels();
 
   const baseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
@@ -43,7 +48,7 @@ export const useDefaultControlAdapter = () => {
   return defaultControlAdapter;
 };
 
-export const useDefaultIPAdapter = () => {
+export const useDefaultIPAdapter = (): IPAdapterConfig => {
   const [modelConfigs] = useIPAdapterModels();
 
   const baseModel = useAppSelector((s) => s.canvasV2.params.model?.base);

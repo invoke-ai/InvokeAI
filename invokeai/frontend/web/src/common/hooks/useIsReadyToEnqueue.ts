@@ -154,24 +154,24 @@ const createSelector = (templates: Templates) =>
           });
 
         canvasV2.ipAdapters.entities
-          .filter((ipa) => ipa.isEnabled)
-          .forEach((ipa, i) => {
+          .filter((entity) => entity.isEnabled)
+          .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
             const layerNumber = i + 1;
-            const layerType = i18n.t(LAYER_TYPE_TO_TKEY[ipa.type]);
+            const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
             const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
             const problems: string[] = [];
 
             // Must have model
-            if (!ipa.model) {
+            if (!entity.ipAdapter.model) {
               problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoModelSelected'));
             }
             // Model base must match
-            if (ipa.model?.base !== model?.base) {
+            if (entity.ipAdapter.model?.base !== model?.base) {
               problems.push(i18n.t('parameters.invoke.layer.ipAdapterIncompatibleBaseModel'));
             }
             // Must have an image
-            if (!ipa.imageObject) {
+            if (!entity.ipAdapter.image) {
               problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoImageSelected'));
             }
 
@@ -182,22 +182,22 @@ const createSelector = (templates: Templates) =>
           });
 
         canvasV2.regions.entities
-          .filter((rg) => rg.isEnabled)
-          .forEach((rg, i) => {
+          .filter((entity) => entity.isEnabled)
+          .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
             const layerNumber = i + 1;
-            const layerType = i18n.t(LAYER_TYPE_TO_TKEY[rg.type]);
+            const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
             const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
             const problems: string[] = [];
             // Must have a region
-            if (rg.objects.length === 0) {
+            if (entity.objects.length === 0) {
               problems.push(i18n.t('parameters.invoke.layer.rgNoRegion'));
             }
             // Must have at least 1 prompt or IP Adapter
-            if (rg.positivePrompt === null && rg.negativePrompt === null && rg.ipAdapters.length === 0) {
+            if (entity.positivePrompt === null && entity.negativePrompt === null && entity.ipAdapters.length === 0) {
               problems.push(i18n.t('parameters.invoke.layer.rgNoPromptsOrIPAdapters'));
             }
-            rg.ipAdapters.forEach((ipAdapter) => {
+            entity.ipAdapters.forEach((ipAdapter) => {
               // Must have model
               if (!ipAdapter.model) {
                 problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoModelSelected'));
@@ -207,7 +207,7 @@ const createSelector = (templates: Templates) =>
                 problems.push(i18n.t('parameters.invoke.layer.ipAdapterIncompatibleBaseModel'));
               }
               // Must have an image
-              if (!ipAdapter.imageObject) {
+              if (!ipAdapter.image) {
                 problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoImageSelected'));
               }
             });
@@ -219,12 +219,11 @@ const createSelector = (templates: Templates) =>
           });
 
         canvasV2.rasterLayers.entities
-          .filter((l) => l.isEnabled)
-          .filter((l) => l.type === 'raster_layer')
-          .forEach((l, i) => {
+          .filter((entity) => entity.isEnabled)
+          .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
             const layerNumber = i + 1;
-            const layerType = i18n.t(LAYER_TYPE_TO_TKEY[l.type]);
+            const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
             const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
             const problems: string[] = [];
 
