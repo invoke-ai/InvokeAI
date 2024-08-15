@@ -121,6 +121,7 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
   - [Automated Installer](installation/010_INSTALL_AUTOMATED.md)
   - [Manual Installation](installation/020_INSTALL_MANUAL.md)
   - [Docker Installation](installation/040_INSTALL_DOCKER.md)
+  - [Unraid Installation](installation/045_INSTALL_UNRAID.md)
 
 ### The InvokeAI Web Interface
 - [WebUI overview](features/WEB.md)
@@ -160,9 +161,9 @@ get solutions for common installation problems and other issues.
 
 Anyone who wishes to contribute to this project, whether documentation,
 features, bug fixes, code cleanup, testing, or code reviews, is very much
-encouraged to do so. 
+encouraged to do so.
 
-[Please take a look at our Contribution documentation to learn more about contributing to InvokeAI. 
+[Please take a look at our Contribution documentation to learn more about contributing to InvokeAI.
 ](contributing/CONTRIBUTING.md)
 
 ## :octicons-person-24: Contributors
