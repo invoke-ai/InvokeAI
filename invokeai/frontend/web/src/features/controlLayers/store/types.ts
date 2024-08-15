@@ -469,7 +469,7 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
   },
 } as const;
 
-const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox']);
+const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox', 'eyeDropper']);
 export type Tool = z.infer<typeof zTool>;
 export function isDrawingTool(tool: Tool): tool is 'brush' | 'eraser' | 'rect' {
   return tool === 'brush' || tool === 'eraser' || tool === 'rect';

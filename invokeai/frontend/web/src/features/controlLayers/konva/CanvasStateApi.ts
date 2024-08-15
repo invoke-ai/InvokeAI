@@ -26,6 +26,7 @@ import {
   entityReset,
   entitySelected,
   eraserWidthChanged,
+  fillChanged,
   rasterLayerCompositeRasterized,
   toolBufferChanged,
   toolChanged,
@@ -144,6 +145,9 @@ export class CanvasStateApi {
     log.trace({ toolBuffer }, 'Setting tool buffer');
     this._store.dispatch(toolBufferChanged(toolBuffer));
   };
+  setFill = (fill: RgbaColor) => {
+    return this._store.dispatch(fillChanged(fill));
+  };
 
   getBbox = () => {
     return this.getState().bbox;
@@ -257,6 +261,7 @@ export class CanvasStateApi {
   $currentFill: WritableAtom<RgbaColor> = atom();
   $selectedEntity: WritableAtom<EntityStateAndAdapter | null> = atom();
   $selectedEntityIdentifier: WritableAtom<CanvasEntityIdentifier | null> = atom();
+  $colorUnderCursor: WritableAtom<RgbaColor | null> = atom();
 
   // Read-write state, ephemeral interaction state
   $isDrawing = $isDrawing;
