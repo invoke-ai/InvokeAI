@@ -647,6 +647,7 @@ export type ImageCache = z.infer<typeof zImageCache>;
 
 export const zCanvasRegionalGuidanceState = z.object({
   id: zId,
+  name: z.string().nullable(),
   type: z.literal('regional_guidance'),
   isEnabled: z.boolean(),
   position: zCoordinate,
@@ -730,6 +731,7 @@ export type T2IAdapterConfig = z.infer<typeof zT2IAdapterConfig>;
 
 export const zCanvasRasterLayerState = z.object({
   id: zId,
+  name: z.string().nullable(),
   type: z.literal('raster_layer'),
   isEnabled: z.boolean(),
   position: zCoordinate,
