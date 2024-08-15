@@ -154,6 +154,8 @@ export function selectEntity(state: CanvasV2State, { id, type }: CanvasEntityIde
       return state.inpaintMask;
     case 'regional_guidance':
       return state.regions.entities.find((rg) => rg.id === id);
+    case 'ip_adapter':
+      return state.ipAdapters.entities.find((ipa) => ipa.id === id);
     default:
       return;
   }
@@ -246,19 +248,22 @@ export const canvasV2Slice = createSlice({
       }
     },
     entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
-      const { entityIdentifier, imageObject, rect } = action.payload;
+      const { entityIdentifier, imageObject, rect, replaceObjects } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
 
       if (isDrawableEntity(entity)) {
-        entity.objects = [imageObject];
-        entity.position = { x: rect.x, y: rect.y };
         // Remove the cache for the given rect. This should never happen, because we should never rasterize the same
         // rect twice. Just in case, we remove the old cache.
         entity.rasterizationCache = entity.rasterizationCache.filter((cache) => !isEqual(cache.rect, rect));
         entity.rasterizationCache.push({ imageName: imageObject.image.image_name, rect });
+
+        if (replaceObjects) {
+          entity.objects = [imageObject];
+          entity.position = { x: rect.x, y: rect.y };
+        }
       }
     },
     entityBrushLineAdded: (state, action: PayloadAction<EntityBrushLineAddedPayload>) => {
@@ -327,6 +332,13 @@ export const canvasV2Slice = createSlice({
         const region = state.regions.entities[index];
         if (region) {
           selectedEntityIdentifier = { type: region.type, id: region.id };
+        }
+      } else if (entityIdentifier.type === 'ip_adapter') {
+        const index = state.ipAdapters.entities.findIndex((layer) => layer.id === entityIdentifier.id);
+        state.ipAdapters.entities = state.ipAdapters.entities.filter((rg) => rg.id !== entityIdentifier.id);
+        const entity = state.ipAdapters.entities[index];
+        if (entity) {
+          selectedEntityIdentifier = { type: entity.type, id: entity.id };
         }
       } else {
         assert(false, 'Not implemented');

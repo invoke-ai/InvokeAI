@@ -13,7 +13,7 @@ import {
   ipaModelChanged,
   ipaWeightChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
-import { selectIPAOrThrow } from 'features/controlLayers/store/ipAdaptersReducers';
+import { selectIPAdapterEntityOrThrow } from 'features/controlLayers/store/ipAdaptersReducers';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { IPAImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -25,7 +25,7 @@ import { IPAdapterModel } from './IPAdapterModel';
 export const IPAdapterSettings = memo(() => {
   const dispatch = useAppDispatch();
   const { id } = useEntityIdentifierContext();
-  const ipAdapter = useAppSelector((s) => selectIPAOrThrow(s.canvasV2, id));
+  const ipAdapter = useAppSelector((s) => selectIPAdapterEntityOrThrow(s.canvasV2, id).ipAdapter);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
@@ -93,9 +93,9 @@ export const IPAdapterSettings = memo(() => {
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
             <IPAdapterImagePreview
-              image={ipAdapter.imageObject?.image ?? null}
+              image={ipAdapter.image ?? null}
               onChangeImage={onChangeImage}
-              ipAdapterId={ipAdapter.id}
+              ipAdapterId={id}
               droppableData={droppableData}
               postUploadAction={postUploadAction}
             />

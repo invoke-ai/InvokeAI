@@ -58,7 +58,7 @@ export class CanvasTransformer {
   /**
    * Whether the transformer is currently calculating the rect of the parent.
    */
-  isPendingRectCalculation: boolean = false;
+  isPendingRectCalculation: boolean = true;
 
   /**
    * A set of subscriptions that should be cleaned up when the transformer is destroyed.
@@ -506,7 +506,8 @@ export class CanvasTransformer {
    */
   applyTransform = async () => {
     this.log.debug('Applying transform');
-    await this.parent.renderer.rasterize();
+    const rect = this.getRelativeRect();
+    await this.parent.renderer.rasterize(rect, true);
     this.requestRectCalculation();
     this.stopTransform();
   };
@@ -589,7 +590,7 @@ export class CanvasTransformer {
   };
 
   updateBbox = () => {
-    this.log.trace('Updating bbox');
+    this.log.trace({ nodeRect: this.nodeRect, pixelRect: this.pixelRect }, 'Updating bbox');
 
     if (this.isPendingRectCalculation) {
       this.syncInteractionState();
@@ -600,10 +601,8 @@ export class CanvasTransformer {
     // eraser lines, fully clipped brush lines or if it has been fully erased.
     if (this.pixelRect.width === 0 || this.pixelRect.height === 0) {
       // We shouldn't reset on the first render - the bbox will be calculated on the next render
-      if (!this.parent.renderer.hasObjects()) {
-        // The layer is fully transparent but has objects - reset it
-        this.manager.stateApi.resetEntity({ entityIdentifier: this.parent.getEntityIdentifier() });
-      }
+      // The layer is fully transparent but has objects - reset it
+      this.manager.stateApi.resetEntity({ entityIdentifier: this.parent.getEntityIdentifier() });
       this.syncInteractionState();
       return;
     }
