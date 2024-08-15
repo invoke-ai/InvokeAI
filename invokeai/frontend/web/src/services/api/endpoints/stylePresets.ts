@@ -92,6 +92,16 @@ export const stylePresetsApi = api.injectEndpoints({
       }),
       providesTags: ['FetchOnReconnect', { type: 'StylePreset', id: LIST_TAG }],
     }),
+    exportStylePresets: build.query<
+      string,
+      void
+    >({
+      query: () => ({
+        url: buildStylePresetsUrl("/export"),
+        responseHandler: response => response.text()
+      }),
+      providesTags: ['FetchOnReconnect', { type: 'StylePreset', id: LIST_TAG }],
+    }),
   }),
 });
 
@@ -100,4 +110,5 @@ export const {
   useDeleteStylePresetMutation,
   useUpdateStylePresetMutation,
   useListStylePresetsQuery,
+  useLazyExportStylePresetsQuery
 } = stylePresetsApi;

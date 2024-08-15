@@ -4,12 +4,23 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold } from 'react-icons/pi';
+import { PiDownloadBold, PiPlusBold } from 'react-icons/pi';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
-import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
+import { useLazyExportStylePresetsQuery, useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 import { StylePresetList } from './StylePresetList';
 import StylePresetSearch from './StylePresetSearch';
+import { toast } from '../../toast/toast';
+
+const generateCSV = (data: any[]) => {
+  const header = ['Column1', 'Column2', 'Column3'];
+  const csvRows = [
+    header.join(','), // add header row
+    ...data.map((row) => row.join(',')), // add data rows
+  ];
+
+  return csvRows.join('\n');
+};
 
 export const StylePresetMenu = () => {
   const searchTerm = useAppSelector((s) => s.stylePreset.searchTerm);
@@ -47,6 +58,7 @@ export const StylePresetMenu = () => {
   });
 
   const { t } = useTranslation();
+  const [exportStylePresets, { isLoading }] = useLazyExportStylePresetsQuery();
 
   const handleClickAddNew = useCallback(() => {
     $stylePresetModalState.set({
@@ -56,10 +68,49 @@ export const StylePresetMenu = () => {
     });
   }, []);
 
+  const handleClickDownloadCsv = useCallback(async () => {
+    let blob;
+    try {
+      const response = await exportStylePresets().unwrap();
+      blob = new Blob([response], { type: 'text/csv' });
+    } catch (error) {
+      toast({
+        status: 'error',
+        title: 'Unable to generate and download export',
+      });
+    }
+
+    if (blob) {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'data.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }
+    toast({
+      status: 'success',
+      title: 'Export downloaded',
+    });
+  }, [exportStylePresets]);
+
   return (
     <Flex flexDir="column" gap={2} padding={3} layerStyle="second" borderRadius="base">
       <Flex alignItems="center" gap={2} w="full" justifyContent="space-between">
         <StylePresetSearch />
+        <IconButton
+          icon={<PiDownloadBold />}
+          tooltip={t('stylePresets.createPromptTemplate')}
+          aria-label={t('stylePresets.createPromptTemplate')}
+          onClick={handleClickDownloadCsv}
+          size="md"
+          variant="link"
+          w={8}
+          h={8}
+          isDisabled={isLoading}
+        />
         <IconButton
           icon={<PiPlusBold />}
           tooltip={t('stylePresets.createPromptTemplate')}
