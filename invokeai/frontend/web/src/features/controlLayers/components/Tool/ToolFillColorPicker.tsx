@@ -7,7 +7,7 @@ import type { RgbaColor } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const FillColorPicker = memo(() => {
+export const ToolFillColorPicker = memo(() => {
   const { t } = useTranslation();
   const fill = useAppSelector((s) => s.canvasV2.tool.fill);
   const dispatch = useAppDispatch();
@@ -41,4 +41,4 @@ export const FillColorPicker = memo(() => {
   );
 });
 
-FillColorPicker.displayName = 'BrushColorPicker';
+ToolFillColorPicker.displayName = 'ToolFillColorPicker';

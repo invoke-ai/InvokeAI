@@ -10,20 +10,20 @@ import {
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { brushWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { eraserWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const marks = [0, 100, 200, 300];
 const formatPx = (v: number | string) => `${v} px`;
 
-export const BrushWidth = memo(() => {
+export const ToolEraserWidth = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const width = useAppSelector((s) => s.canvasV2.tool.brush.width);
+  const width = useAppSelector((s) => s.canvasV2.tool.eraser.width);
   const onChange = useCallback(
     (v: number) => {
-      dispatch(brushWidthChanged(Math.round(v)));
+      dispatch(eraserWidthChanged(Math.round(v)));
     },
     [dispatch]
   );
@@ -53,4 +53,4 @@ export const BrushWidth = memo(() => {
   );
 });
 
-BrushWidth.displayName = 'BrushSize';
+ToolEraserWidth.displayName = 'ToolEraserWidth';
