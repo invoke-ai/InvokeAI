@@ -245,7 +245,7 @@ async def export_style_presets():
     # Write the header
     writer.writerow(["name", "prompt", "negative_prompt"])
 
-    style_presets = ApiDependencies.invoker.services.style_preset_records.get_many()
+    style_presets = ApiDependencies.invoker.services.style_preset_records.get_many(type=PresetType.User)
 
     for preset in style_presets:
         writer.writerow([preset.name, preset.preset_data.positive_prompt, preset.preset_data.negative_prompt])
