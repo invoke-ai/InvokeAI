@@ -20,8 +20,8 @@ export const ToolEyeDropperButton = memo(() => {
 
   return (
     <IconButton
-      aria-label={`${t('controlLayers.eyeDropper')} (I)`}
-      tooltip={`${t('controlLayers.eyeDropper')} (I)`}
+      aria-label={`${t('controlLayers.tool.eyeDropper')} (I)`}
+      tooltip={`${t('controlLayers.tool.eyeDropper')} (I)`}
       icon={<PiEyedropperBold />}
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="outline"
