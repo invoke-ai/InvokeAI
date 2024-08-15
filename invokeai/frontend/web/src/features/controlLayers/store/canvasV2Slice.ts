@@ -198,6 +198,18 @@ export const canvasV2Slice = createSlice({
       const { entityIdentifier } = action.payload;
       state.selectedEntityIdentifier = entityIdentifier;
     },
+    entityNameChanged: (state, action: PayloadAction<EntityIdentifierPayload & { name: string | null }>) => {
+      const { entityIdentifier, name } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      if (entity.type === 'inpaint_mask') {
+        // Inpaint mask cannot be renamed
+        return;
+      }
+      entity.name = name;
+    },
     entityReset: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -451,6 +463,7 @@ export const {
   rasterizationCachesInvalidated,
   // All entities
   entitySelected,
+  entityNameChanged,
   entityReset,
   entityIsEnabledToggled,
   entityMoved,
