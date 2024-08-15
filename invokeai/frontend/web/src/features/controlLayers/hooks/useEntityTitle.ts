@@ -13,10 +13,10 @@ export const useEntityTitle = (entityIdentifier: CanvasEntityIdentifier) => {
     const parts: string[] = [];
     if (entityIdentifier.type === 'inpaint_mask') {
       parts.push(t('controlLayers.inpaintMask'));
-    } else if (entityIdentifier.type === 'control_adapter') {
-      parts.push(t('controlLayers.globalControlAdapter'));
-    } else if (entityIdentifier.type === 'layer') {
-      parts.push(t('controlLayers.layer'));
+    } else if (entityIdentifier.type === 'control_layer') {
+      parts.push(t('controlLayers.controlLayer'));
+    } else if (entityIdentifier.type === 'raster_layer') {
+      parts.push(t('controlLayers.rasterLayer'));
     } else if (entityIdentifier.type === 'ip_adapter') {
       parts.push(t('controlLayers.ipAdapter'));
     } else if (entityIdentifier.type === 'regional_guidance') {

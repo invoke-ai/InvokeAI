@@ -8,7 +8,7 @@ type Props = {
 
 export const CanvasEntityGroupTitle = memo(({ title, isSelected }: Props) => {
   return (
-    <Text color={isSelected ? 'base.100' : 'base.300'} userSelect="none">
+    <Text color={isSelected ? 'base.200' : 'base.500'} fontWeight="semibold" userSelect="none">
       {title}
     </Text>
   );

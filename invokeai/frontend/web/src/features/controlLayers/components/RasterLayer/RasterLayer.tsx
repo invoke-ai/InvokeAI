@@ -4,22 +4,18 @@ import { CanvasEntityDeleteButton } from 'features/controlLayers/components/comm
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
-import { RegionalGuidanceActionsMenu } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceActionsMenu';
-import { RegionalGuidanceBadges } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceBadges';
-import { RegionalGuidanceSettings } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceSettings';
+import { RasterLayerActionsMenu } from 'features/controlLayers/components/RasterLayer/RasterLayerActionsMenu';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
-
-import { RegionalGuidanceMaskFillColorPicker } from './RegionalGuidanceMaskFillColorPicker';
-import { RegionalGuidanceSettingsPopover } from './RegionalGuidanceSettingsPopover';
 
 type Props = {
   id: string;
 };
 
-export const RegionalGuidance = memo(({ id }: Props) => {
-  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'regional_guidance' }), [id]);
+export const RasterLayer = memo(({ id }: Props) => {
+  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'raster_layer' }), [id]);
+
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <CanvasEntityContainer>
@@ -27,16 +23,12 @@ export const RegionalGuidance = memo(({ id }: Props) => {
           <CanvasEntityEnabledToggle />
           <CanvasEntityTitle />
           <Spacer />
-          <RegionalGuidanceBadges />
-          <RegionalGuidanceMaskFillColorPicker />
-          <RegionalGuidanceSettingsPopover />
-          <RegionalGuidanceActionsMenu />
+          <RasterLayerActionsMenu />
           <CanvasEntityDeleteButton />
         </CanvasEntityHeader>
-        <RegionalGuidanceSettings />
       </CanvasEntityContainer>
     </EntityIdentifierContext.Provider>
   );
 });
 
-RegionalGuidance.displayName = 'RegionalGuidance';
+RasterLayer.displayName = 'RasterLayer';

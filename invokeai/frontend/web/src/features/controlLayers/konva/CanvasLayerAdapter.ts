@@ -4,7 +4,12 @@ import { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import type { CanvasEntityIdentifier, CanvasLayerState, CanvasV2State } from 'features/controlLayers/store/types';
+import type {
+  CanvasControlLayerState,
+  CanvasEntityIdentifier,
+  CanvasRasterLayerState,
+  CanvasV2State,
+} from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
@@ -17,7 +22,7 @@ export class CanvasLayerAdapter {
   manager: CanvasManager;
   log: Logger;
 
-  state: CanvasLayerState;
+  state: CanvasRasterLayerState | CanvasControlLayerState;
 
   konva: {
     layer: Konva.Layer;
@@ -110,7 +115,7 @@ export class CanvasLayerAdapter {
     this.konva.layer.visible(isEnabled);
   };
 
-  updateObjects = async (arg?: { objects: CanvasLayerState['objects'] }) => {
+  updateObjects = async (arg?: { objects: CanvasRasterLayerState['objects'] }) => {
     this.log.trace('Updating objects');
 
     const objects = get(arg, 'objects', this.state.objects);
