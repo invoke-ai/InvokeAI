@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Generator, Optional
 
 from fastapi import UploadFile
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, TypeAdapter
 
 from invokeai.app.util.metaenum import MetaEnum
 
@@ -59,9 +59,19 @@ class StylePresetRecordWithImage(StylePresetRecordDTO):
 
 
 class StylePresetImportRow(BaseModel):
-    name: str
-    prompt: str
-    negative_prompt: str
+    name: str = Field(min_length=1, description="The name of the preset.")
+    positive_prompt: str = Field(
+        default="",
+        description="The positive prompt for the preset.",
+        validation_alias=AliasChoices("positive_prompt", "prompt"),
+    )
+    negative_prompt: str = Field(default="", description="The negative prompt for the preset.")
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+StylePresetImportList = list[StylePresetImportRow]
+StylePresetImportListTypeAdapter = TypeAdapter(StylePresetImportList)
 
 
 def parse_csv(file: UploadFile) -> Generator[StylePresetImportRow, None, None]:
@@ -74,5 +84,5 @@ def parse_csv(file: UploadFile) -> Generator[StylePresetImportRow, None, None]:
             raise StylePresetImportValidationError()
 
         yield StylePresetImportRow(
-            name=row["name"].strip(), prompt=row["prompt"].strip(), negative_prompt=row["negative_prompt"].strip()
+            name=row["name"].strip(), positive_prompt=row["prompt"].strip(), negative_prompt=row["negative_prompt"].strip()
         )
