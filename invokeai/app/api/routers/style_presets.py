@@ -14,12 +14,15 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.model_manager import IMAGE_MAX_AGE
 from invokeai.app.services.style_preset_images.style_preset_images_common import StylePresetImageFileNotFoundException
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
+    InvalidPresetImportDataError,
     PresetData,
     PresetType,
     StylePresetChanges,
     StylePresetNotFoundError,
     StylePresetRecordWithImage,
     StylePresetWithoutId,
+    UnsupportedFileTypeError,
+    parse_presets_from_file,
 )
 
 
@@ -253,3 +256,19 @@ async def export_style_presets():
     return Response(
         content=csv_data, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=data.csv"}
     )
+
+
+@style_presets_router.post(
+    "/import",
+    operation_id="import_style_presets",
+)
+async def import_style_presets(file: UploadFile = File(description="The file to import")):
+    try:
+        style_presets = await parse_presets_from_file(file)
+        ApiDependencies.invoker.services.style_preset_records.create_many(style_presets)
+    except InvalidPresetImportDataError as e:
+        ApiDependencies.invoker.services.logger.error(traceback.format_exc())
+        raise HTTPException(status_code=400, detail=str(e))
+    except UnsupportedFileTypeError as e:
+        ApiDependencies.invoker.services.logger.error(traceback.format_exc())
+        raise HTTPException(status_code=415, detail=str(e))

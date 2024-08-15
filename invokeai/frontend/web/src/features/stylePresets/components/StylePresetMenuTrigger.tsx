@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
@@ -6,6 +7,10 @@ import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
 import { ActiveStylePreset } from './ActiveStylePreset';
+
+const _hover: SystemStyleObject = {
+  bg: 'base.750',
+};
 
 export const StylePresetMenuTrigger = () => {
   const isMenuOpen = useStore($isMenuOpen);
@@ -26,6 +31,9 @@ export const StylePresetMenuTrigger = () => {
       borderRadius="base"
       gap={1}
       role="button"
+      _hover={_hover}
+      transitionProperty="background-color"
+      transitionDuration="normal"
     >
       <ActiveStylePreset />
 
