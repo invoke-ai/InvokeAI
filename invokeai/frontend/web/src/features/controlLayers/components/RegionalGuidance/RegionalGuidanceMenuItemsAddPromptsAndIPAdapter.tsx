@@ -37,9 +37,7 @@ export const RegionalGuidanceMenuItemsAddPromptsAndIPAdapter = memo(() => {
     dispatch(rgNegativePromptChanged({ id: id, prompt: '' }));
   }, [dispatch, id]);
   const addIPAdapter = useCallback(() => {
-    dispatch(
-      rgIPAdapterAdded({ id, ipAdapter: { ...defaultIPAdapter, id: nanoid(), type: 'ip_adapter', isEnabled: true } })
-    );
+    dispatch(rgIPAdapterAdded({ id, ipAdapter: { ...defaultIPAdapter, id: nanoid() } }));
   }, [defaultIPAdapter, dispatch, id]);
 
   return (

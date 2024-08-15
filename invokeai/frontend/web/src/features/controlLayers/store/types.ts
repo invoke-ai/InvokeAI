@@ -581,22 +581,24 @@ export function isCanvasBrushLineState(obj: CanvasObjectState): obj is CanvasBru
   return obj.type === 'brush_line';
 }
 
+const zIPAdapterConfig = z.object({
+  image: zImageWithDims.nullable(),
+  model: zModelIdentifierField.nullable(),
+  weight: z.number().gte(-1).lte(2),
+  beginEndStepPct: zBeginEndStepPct,
+  method: zIPMethodV2,
+  clipVisionModel: zCLIPVisionModelV2,
+});
+export type IPAdapterConfig = z.infer<typeof zIPAdapterConfig>;
+
 export const zCanvasIPAdapterState = z.object({
   id: zId,
+  name: z.string().nullable(),
   type: z.literal('ip_adapter'),
   isEnabled: z.boolean(),
-  weight: z.number().gte(-1).lte(2),
-  method: zIPMethodV2,
-  imageObject: zCanvasImageState.nullable(),
-  model: zModelIdentifierField.nullable(),
-  clipVisionModel: zCLIPVisionModelV2,
-  beginEndStepPct: zBeginEndStepPct,
+  ipAdapter: zIPAdapterConfig,
 });
 export type CanvasIPAdapterState = z.infer<typeof zCanvasIPAdapterState>;
-export type IPAdapterConfig = Pick<
-  CanvasIPAdapterState,
-  'weight' | 'imageObject' | 'beginEndStepPct' | 'model' | 'clipVisionModel' | 'method'
->;
 
 const zMaskObject = z
   .discriminatedUnion('type', [
@@ -645,6 +647,17 @@ const zImageCache = z.object({
 });
 export type ImageCache = z.infer<typeof zImageCache>;
 
+const zRegionalGuidanceIPAdapterConfig = z.object({
+  id: zId,
+  image: zImageWithDims.nullable(),
+  model: zModelIdentifierField.nullable(),
+  weight: z.number().gte(-1).lte(2),
+  beginEndStepPct: zBeginEndStepPct,
+  method: zIPMethodV2,
+  clipVisionModel: zCLIPVisionModelV2,
+});
+export type RegionalGuidanceIPAdapterConfig = z.infer<typeof zRegionalGuidanceIPAdapterConfig>;
+
 export const zCanvasRegionalGuidanceState = z.object({
   id: zId,
   name: z.string().nullable(),
@@ -655,7 +668,7 @@ export const zCanvasRegionalGuidanceState = z.object({
   fill: zRgbColor,
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
-  ipAdapters: z.array(zCanvasIPAdapterState),
+  ipAdapters: z.array(zRegionalGuidanceIPAdapterConfig),
   autoNegative: zAutoNegative,
   rasterizationCache: z.array(zImageCache),
 });
@@ -763,7 +776,7 @@ export const initialT2IAdapterV2: T2IAdapterConfig = {
 };
 
 export const initialIPAdapterV2: IPAdapterConfig = {
-  imageObject: null,
+  image: null,
   model: null,
   beginEndStepPct: [0, 1],
   method: 'full',
@@ -943,6 +956,7 @@ export type EntityRasterizedPayload = {
   entityIdentifier: CanvasEntityIdentifier;
   imageObject: CanvasImageState;
   rect: Rect;
+  replaceObjects: boolean;
 };
 export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: Coordinate };
 
