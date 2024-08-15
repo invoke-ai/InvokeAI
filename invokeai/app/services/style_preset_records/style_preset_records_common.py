@@ -1,9 +1,6 @@
-import csv
-import io
 from enum import Enum
-from typing import Any, Generator, Optional
+from typing import Any, Optional
 
-from fastapi import UploadFile
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, TypeAdapter
 
 from invokeai.app.util.metaenum import MetaEnum
@@ -72,17 +69,3 @@ class StylePresetImportRow(BaseModel):
 
 StylePresetImportList = list[StylePresetImportRow]
 StylePresetImportListTypeAdapter = TypeAdapter(StylePresetImportList)
-
-
-def parse_csv(file: UploadFile) -> Generator[StylePresetImportRow, None, None]:
-    """Yield parsed and validated rows from the CSV file."""
-    file_content = file.file.read().decode("utf-8")
-    csv_reader = csv.DictReader(io.StringIO(file_content))
-
-    for row in csv_reader:
-        if "name" not in row or "prompt" not in row or "negative_prompt" not in row:
-            raise StylePresetImportValidationError()
-
-        yield StylePresetImportRow(
-            name=row["name"].strip(), positive_prompt=row["prompt"].strip(), negative_prompt=row["negative_prompt"].strip()
-        )
