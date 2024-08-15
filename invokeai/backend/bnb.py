@@ -1,4 +1,4 @@
-from typing import Any, Optional, Set, Tuple, Type
+from typing import Any, Optional, Set, Type
 
 import accelerate
 import bitsandbytes as bnb
@@ -49,47 +49,6 @@ import torch
 #             self.data = CB
 #             self.CB = CB
 #             self.SCB = SCB
-
-
-class InvokeLinearNF4(bnb.nn.LinearNF4):
-    def _load_from_state_dict(
-        self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs
-    ):
-        """This method is based on the logic in the bitsandbytes serialization unit tests for `Linear4bit`:
-        https://github.com/bitsandbytes-foundation/bitsandbytes/blob/6d714a5cce3db5bd7f577bc447becc7a92d5ccc7/tests/test_linear4bit.py#L52-L71
-
-        I'm not sure why this was not included in the original `Linear4bit` implementation.
-        """
-
-        weight = state_dict.pop(prefix + "weight")
-        bias = state_dict.pop(prefix + "bias", None)
-        # During serialization, the quant_state is stored as subkeys of "weight.".
-        # We expect the remaining keys to be quant_state keys. We validate that they at least have the correct prefix.
-        quant_state_sd = state_dict
-        assert all(k.startswith(prefix + "weight.") for k in quant_state_sd.keys())
-
-        if len(quant_state_sd) > 0:
-            # We are loading a quantized state dict.
-            self.weight = bnb.nn.Params4bit.from_prequantized(
-                data=weight, quantized_stats=quant_state_sd, device=weight.device
-            )
-            self.bias = bias if bias is None else torch.nn.Parameter(bias, requires_grad=False)
-
-        else:
-            # We are loading a non-quantized state dict.
-
-            # We could simply call the `super()._load_from_state_dict` method here, but then we wouldn't be able to load
-            # into from a state_dict into a model on the "meta" device. By initializing a new `Params4bit` object, we
-            # work around this issue.
-            self.weight = bnb.nn.Params4bit(
-                data=weight,
-                requires_grad=self.weight.requires_grad,
-                compress_statistics=self.weight.compress_statistics,
-                quant_type=self.weight.quant_type,
-                quant_storage=self.weight.quant_storage,
-                module=self,
-            )
-            self.bias = bias if bias is None else torch.nn.Parameter(bias)
 
 
 class Invoke2Linear8bitLt(torch.nn.Linear):
@@ -474,27 +433,6 @@ def convert_model_to_bnb_llm_int8(model: torch.nn.Module, ignore_modules: set[st
 #             incompatible_keys.missing_keys.remove(key)
 
 
-def _replace_param(
-    param: torch.nn.Parameter, data: torch.Tensor, quant_state: Optional[Tuple] = None
-) -> torch.nn.Parameter:
-    # doing `param.data = weight` raises a RuntimeError if param.data was on meta-device, so
-    # we need to re-create the parameters instead of overwriting the data
-    if param.device.type == "meta":
-        if isinstance(param, bnb.nn.Params4bit):
-            return bnb.nn.Params4bit(
-                data,
-                requires_grad=data.requires_grad,
-                quant_state=quant_state,
-                compress_statistics=param.compress_statistics,
-                quant_type=param.quant_type,
-            )
-        return torch.nn.Parameter(data, requires_grad=data.requires_grad)
-    param.data = data
-    if isinstance(param, bnb.nn.Params4bit):
-        param.quant_state = quant_state
-    return param
-
-
 def _convert_linear_layers(
     module: torch.nn.Module, linear_cls: Type, ignore_modules: Set[str], prefix: str = ""
 ) -> None:
@@ -541,35 +479,6 @@ def _convert_linear_layers_to_llm_8bit(module: torch.nn.Module, ignore_modules: 
             module.__setattr__(name, replacement)
         else:
             _convert_linear_layers_to_llm_8bit(child, ignore_modules, prefix=fullname)
-
-
-def _convert_linear_layers_to_nf4(
-    module: torch.nn.Module, ignore_modules: Set[str], compute_dtype: torch.dtype, prefix: str = ""
-) -> None:
-    for name, child in module.named_children():
-        fullname = f"{prefix}.{name}" if prefix else name
-        if isinstance(child, torch.nn.Linear) and not any(fullname.startswith(s) for s in ignore_modules):
-            has_bias = child.bias is not None
-            replacement = InvokeLinearNF4(
-                child.in_features,
-                child.out_features,
-                bias=has_bias,
-                compute_dtype=torch.float16,
-                # TODO(ryand): Test compress_statistics=True.
-                # compress_statistics=True,
-            )
-            # replacement.weight.data = child.weight.data
-            # if has_bias:
-            #     replacement.bias.data = child.bias.data
-            if has_bias:
-                replacement.bias = _replace_param(replacement.bias, child.bias.data)
-            replacement.weight = _replace_param(
-                replacement.weight, child.weight.data, quant_state=replacement.weight.quant_state
-            )
-            replacement.requires_grad_(False)
-            module.__setattr__(name, replacement)
-        else:
-            _convert_linear_layers_to_nf4(child, ignore_modules, compute_dtype=compute_dtype, prefix=fullname)
 
 
 # def _replace_linear_layers(
@@ -644,19 +553,5 @@ def quantize_model_llm_int8(model: torch.nn.Module, modules_to_not_convert: set[
 
     with accelerate.init_empty_weights():
         _convert_linear_layers_to_llm_8bit(module=model, ignore_modules=modules_to_not_convert)
-
-    return model
-
-
-def quantize_model_nf4(model: torch.nn.Module, modules_to_not_convert: set[str], compute_dtype: torch.dtype):
-    """Apply bitsandbytes nf4 quantization to the model."""
-    # model_device = get_parameter_device(model)
-    # if model_device.type != "meta":
-    #     # Note: This is not strictly required, but I can't think of a good reason to quantize a model that's not on the
-    #     # meta device, so we enforce it for now.
-    #     raise RuntimeError("The model should be on the meta device to apply LLM.8bit() quantization.")
-
-    # with accelerate.init_empty_weights():
-    _convert_linear_layers_to_nf4(module=model, ignore_modules=modules_to_not_convert, compute_dtype=compute_dtype)
 
     return model
