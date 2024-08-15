@@ -5,7 +5,6 @@ import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/com
 import { CanvasEntityGroupTitle } from 'features/controlLayers/components/common/CanvasEntityGroupTitle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
-import { InpaintMaskActionsMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskActionsMenu';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
@@ -28,7 +27,6 @@ export const InpaintMask = memo(() => {
             <CanvasEntityTitle />
             <Spacer />
             <InpaintMaskMaskFillColorPicker />
-            <InpaintMaskActionsMenu />
           </CanvasEntityHeader>
         </CanvasEntityContainer>
       </EntityIdentifierContext.Provider>
