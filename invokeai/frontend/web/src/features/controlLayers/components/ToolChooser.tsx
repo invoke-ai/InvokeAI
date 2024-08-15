@@ -5,6 +5,7 @@ import { BrushToolButton } from 'features/controlLayers/components/BrushToolButt
 import { EraserToolButton } from 'features/controlLayers/components/EraserToolButton';
 import { MoveToolButton } from 'features/controlLayers/components/MoveToolButton';
 import { RectToolButton } from 'features/controlLayers/components/RectToolButton';
+import { ToolEyeDropperButton } from 'features/controlLayers/components/ToolEyeDropperButton';
 import { TransformToolButton } from 'features/controlLayers/components/TransformToolButton';
 import { ViewToolButton } from 'features/controlLayers/components/ViewToolButton';
 import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanvasDeleteLayerHotkey';
@@ -24,6 +25,7 @@ export const ToolChooser: React.FC = () => {
         <MoveToolButton />
         <ViewToolButton />
         <BboxToolButton />
+        <ToolEyeDropperButton />
       </ButtonGroup>
       <TransformToolButton />
     </>
