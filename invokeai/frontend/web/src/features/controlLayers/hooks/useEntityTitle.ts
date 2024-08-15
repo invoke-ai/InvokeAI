@@ -38,7 +38,7 @@ export const useEntityTitle = (entityIdentifier: CanvasEntityIdentifier) => {
     } else if (entityIdentifier.type === 'raster_layer') {
       parts.push(t('controlLayers.rasterLayer'));
     } else if (entityIdentifier.type === 'ip_adapter') {
-      parts.push(t('controlLayers.ipAdapter'));
+      parts.push(t('common.ipAdapter'));
     } else if (entityIdentifier.type === 'regional_guidance') {
       parts.push(t('controlLayers.regionalGuidance'));
     } else {
