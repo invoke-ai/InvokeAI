@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasV2Slice, selectEntity } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import { type CanvasEntityIdentifier,isDrawableEntity } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
 
 export const useEntityObjectCount = (entityIdentifier: CanvasEntityIdentifier) => {
@@ -11,11 +11,7 @@ export const useEntityObjectCount = (entityIdentifier: CanvasEntityIdentifier) =
         const entity = selectEntity(canvasV2, entityIdentifier);
         if (!entity) {
           return 0;
-        } else if (entity.type === 'layer') {
-          return entity.objects.length;
-        } else if (entity.type === 'inpaint_mask') {
-          return entity.objects.length;
-        } else if (entity.type === 'regional_guidance') {
+        } else if (isDrawableEntity(entity)) {
           return entity.objects.length;
         } else {
           return 0;

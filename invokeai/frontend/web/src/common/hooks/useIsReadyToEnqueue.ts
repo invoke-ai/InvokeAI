@@ -2,7 +2,6 @@ import { useStore } from '@nanostores/react';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasEntityState } from 'features/controlLayers/store/types';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
@@ -18,14 +17,13 @@ import { forEach, upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
 
-const LAYER_TYPE_TO_TKEY: Record<CanvasEntityState['type'], string> = {
-  control_adapter: 'controlLayers.globalControlAdapter',
-  ip_adapter: 'controlLayers.globalIPAdapter',
-  regional_guidance: 'controlLayers.regionalGuidance',
-  layer: 'controlLayers.raster',
+const LAYER_TYPE_TO_TKEY = {
+  ip_adapter: 'controlLayers.ipAdapter',
   inpaint_mask: 'controlLayers.inpaintMask',
-  initial_image: 'controlLayers.initialImage',
-};
+  regional_guidance: 'controlLayers.regionalGuidance',
+  raster_layer: 'controlLayers.raster',
+  control_layer: 'controlLayers.globalControlAdapter',
+} as const;
 
 const createSelector = (templates: Templates) =>
   createMemoizedSelector(
@@ -125,41 +123,35 @@ const createSelector = (templates: Templates) =>
           reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
         }
 
-        // canvasV2.controlAdapters.entities
-        //   .filter((ca) => ca.isEnabled)
-        //   .forEach((ca, i) => {
-        //     const layerLiteral = i18n.t('controlLayers.layers_one');
-        //     const layerNumber = i + 1;
-        //     const layerType = i18n.t(LAYER_TYPE_TO_TKEY[ca.type]);
-        //     const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
-        //     const problems: string[] = [];
-        //     // Must have model
-        //     if (!ca.model) {
-        //       problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoModelSelected'));
-        //     }
-        //     // Model base must match
-        //     if (ca.model?.base !== model?.base) {
-        //       problems.push(i18n.t('parameters.invoke.layer.controlAdapterIncompatibleBaseModel'));
-        //     }
-        //     // Must have a control image OR, if it has a processor, it must have a processed image
-        //     if (!ca.imageObject) {
-        //       problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoImageSelected'));
-        //     } else if (ca.processorConfig && !ca.processedImageObject) {
-        //       problems.push(i18n.t('parameters.invoke.layer.controlAdapterImageNotProcessed'));
-        //     }
-        //     // T2I Adapters require images have dimensions that are multiples of 64 (SD1.5) or 32 (SDXL)
-        //     if (ca.adapterType === 't2i_adapter') {
-        //       const multiple = model?.base === 'sdxl' ? 32 : 64;
-        //       if (bbox.rect.width % multiple !== 0 || bbox.rect.height % multiple !== 0) {
-        //         problems.push(i18n.t('parameters.invoke.layer.t2iAdapterIncompatibleDimensions', { multiple }));
-        //       }
-        //     }
+        canvasV2.controlLayers.entities
+          .filter((controlLayer) => controlLayer.isEnabled)
+          .forEach((controlLayer, i) => {
+            const layerLiteral = i18n.t('controlLayers.layers_one');
+            const layerNumber = i + 1;
+            const layerType = i18n.t(LAYER_TYPE_TO_TKEY['control_layer']);
+            const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
+            const problems: string[] = [];
+            // Must have model
+            if (!controlLayer.controlAdapter.model) {
+              problems.push(i18n.t('parameters.invoke.layer.controlAdapterNoModelSelected'));
+            }
+            // Model base must match
+            if (controlLayer.controlAdapter.model?.base !== model?.base) {
+              problems.push(i18n.t('parameters.invoke.layer.controlAdapterIncompatibleBaseModel'));
+            }
+            // T2I Adapters require images have dimensions that are multiples of 64 (SD1.5) or 32 (SDXL)
+            if (controlLayer.controlAdapter.type === 't2i_adapter') {
+              const multiple = model?.base === 'sdxl' ? 32 : 64;
+              if (bbox.rect.width % multiple !== 0 || bbox.rect.height % multiple !== 0) {
+                problems.push(i18n.t('parameters.invoke.layer.t2iAdapterIncompatibleDimensions', { multiple }));
+              }
+            }
 
-        //     if (problems.length) {
-        //       const content = upperFirst(problems.join(', '));
-        //       reasons.push({ prefix, content });
-        //     }
-        //   });
+            if (problems.length) {
+              const content = upperFirst(problems.join(', '));
+              reasons.push({ prefix, content });
+            }
+          });
 
         canvasV2.ipAdapters.entities
           .filter((ipa) => ipa.isEnabled)
@@ -226,8 +218,9 @@ const createSelector = (templates: Templates) =>
             }
           });
 
-        canvasV2.layers.entities
+        canvasV2.rasterLayers.entities
           .filter((l) => l.isEnabled)
+          .filter((l) => l.type === 'raster_layer')
           .forEach((l, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
             const layerNumber = i + 1;

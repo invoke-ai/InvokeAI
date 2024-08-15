@@ -1,23 +1,19 @@
 import { createMemoizedAppSelector } from 'app/store/createMemoizedSelector';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
-import { layerUsedAsControlChanged, selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
-import { selectLayer } from 'features/controlLayers/store/layersReducers';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { selectControlLayerOrThrow } from 'features/controlLayers/store/controlLayersReducers';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { initialControlNetV2, initialT2IAdapterV2 } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useControlNetAndT2IAdapterModels } from 'services/api/hooks/modelsByType';
-import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
-export const useLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier) => {
+export const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier) => {
   const selectControlAdapter = useMemo(
     () =>
       createMemoizedAppSelector(selectCanvasV2Slice, (canvasV2) => {
-        const layer = selectLayer(canvasV2, entityIdentifier.id);
-        if (!layer) {
-          return null;
-        }
+        const layer = selectControlLayerOrThrow(canvasV2, entityIdentifier.id);
         return layer.controlAdapter;
       }),
     [entityIdentifier]
@@ -26,32 +22,23 @@ export const useLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier)
   return controlAdapter;
 };
 
-export const useLayerUseAsControl = (entityIdentifier: CanvasEntityIdentifier) => {
-  const dispatch = useAppDispatch();
+export const useDefaultControlAdapter = () => {
   const [modelConfigs] = useControlNetAndT2IAdapterModels();
 
   const baseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
-  const controlAdapter = useLayerControlAdapter(entityIdentifier);
 
-  const model: ControlNetModelConfig | T2IAdapterModelConfig | null = useMemo(() => {
-    // prefer to use a model that matches the base model
+  const defaultControlAdapter = useMemo(() => {
     const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));
-    return compatibleModels[0] ?? modelConfigs[0] ?? null;
-  }, [baseModel, modelConfigs]);
-
-  const toggle = useCallback(() => {
-    if (controlAdapter) {
-      dispatch(layerUsedAsControlChanged({ id: entityIdentifier.id, controlAdapter: null }));
-      return;
-    }
-    const newControlAdapter = deepClone(model?.type === 't2i_adapter' ? initialT2IAdapterV2 : initialControlNetV2);
+    const model = compatibleModels[0] ?? modelConfigs[0] ?? null;
+    const controlAdapter =
+      model?.type === 't2i_adapter' ? deepClone(initialT2IAdapterV2) : deepClone(initialControlNetV2);
 
     if (model) {
-      newControlAdapter.model = zModelIdentifierField.parse(model);
+      controlAdapter.model = zModelIdentifierField.parse(model);
     }
 
-    dispatch(layerUsedAsControlChanged({ id: entityIdentifier.id, controlAdapter: newControlAdapter }));
-  }, [controlAdapter, dispatch, entityIdentifier.id, model]);
+    return controlAdapter;
+  }, [baseModel, modelConfigs]);
 
-  return { hasControlAdapter: Boolean(controlAdapter), toggle };
+  return defaultControlAdapter;
 };

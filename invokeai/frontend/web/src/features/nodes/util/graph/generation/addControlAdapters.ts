@@ -1,15 +1,10 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type {
-  CanvasLayerState,
-  CanvasLayerStateWithValidControlNet,
-  CanvasLayerStateWithValidT2IAdapter,
+  CanvasControlLayerState,
   ControlNetConfig,
-  FilterConfig,
-  ImageWithDims,
   Rect,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
-import type { ImageField } from 'features/nodes/types/common';
 import { CONTROL_NET_COLLECT, T2I_ADAPTER_COLLECT } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { BaseModelType, ImageDTO, Invocation } from 'services/api/types';
@@ -17,18 +12,18 @@ import { assert } from 'tsafe';
 
 export const addControlAdapters = async (
   manager: CanvasManager,
-  layers: CanvasLayerState[],
+  layers: CanvasControlLayerState[],
   g: Graph,
   bbox: Rect,
   denoise: Invocation<'denoise_latents'>,
   base: BaseModelType
-): Promise<(CanvasLayerStateWithValidControlNet | CanvasLayerStateWithValidT2IAdapter)[]> => {
-  const layersWithValidControlAdapters = layers
+): Promise<CanvasControlLayerState[]> => {
+  const validControlLayers = layers
     .filter((layer) => layer.isEnabled)
-    .filter((layer) => doesLayerHaveValidControlAdapter(layer, base));
+    .filter((layer) => isValidControlAdapter(layer.controlAdapter, base));
 
-  for (const layer of layersWithValidControlAdapters) {
-    const adapter = manager.layers.get(layer.id);
+  for (const layer of validControlLayers) {
+    const adapter = manager.controlLayerAdapters.get(layer.id);
     assert(adapter, 'Adapter not found');
     const imageDTO = await adapter.renderer.rasterize(bbox);
     if (layer.controlAdapter.type === 'controlnet') {
@@ -37,7 +32,7 @@ export const addControlAdapters = async (
       await addT2IAdapterToGraph(g, layer, imageDTO, denoise);
     }
   }
-  return layersWithValidControlAdapters;
+  return validControlLayers;
 };
 
 const addControlNetCollectorSafe = (g: Graph, denoise: Invocation<'denoise_latents'>): Invocation<'collect'> => {
@@ -59,12 +54,14 @@ const addControlNetCollectorSafe = (g: Graph, denoise: Invocation<'denoise_laten
 
 const addControlNetToGraph = (
   g: Graph,
-  layer: CanvasLayerStateWithValidControlNet,
+  layer: CanvasControlLayerState,
   imageDTO: ImageDTO,
   denoise: Invocation<'denoise_latents'>
 ) => {
   const { id, controlAdapter } = layer;
+  assert(controlAdapter.type === 'controlnet');
   const { beginEndStepPct, model, weight, controlMode } = controlAdapter;
+  assert(model !== null);
   const { image_name } = imageDTO;
 
   const controlNetCollect = addControlNetCollectorSafe(g, denoise);
@@ -103,12 +100,14 @@ const addT2IAdapterCollectorSafe = (g: Graph, denoise: Invocation<'denoise_laten
 
 const addT2IAdapterToGraph = (
   g: Graph,
-  layer: CanvasLayerStateWithValidT2IAdapter,
+  layer: CanvasControlLayerState,
   imageDTO: ImageDTO,
   denoise: Invocation<'denoise_latents'>
 ) => {
   const { id, controlAdapter } = layer;
+  assert(controlAdapter.type === 't2i_adapter');
   const { beginEndStepPct, model, weight } = controlAdapter;
+  assert(model !== null);
   const { image_name } = imageDTO;
 
   const t2iAdapterCollect = addT2IAdapterCollectorSafe(g, denoise);
@@ -127,48 +126,10 @@ const addT2IAdapterToGraph = (
   g.addEdge(t2iAdapter, 't2i_adapter', t2iAdapterCollect, 'item');
 };
 
-const buildControlImage = (
-  image: ImageWithDims | null,
-  processedImage: ImageWithDims | null,
-  processorConfig: FilterConfig | null
-): ImageField => {
-  if (processedImage && processorConfig) {
-    // We've processed the image in the app - use it for the control image.
-    return {
-      image_name: processedImage.image_name,
-    };
-  } else if (image) {
-    // No processor selected, and we have an image - the user provided a processed image, use it for the control image.
-    return {
-      image_name: image.image_name,
-    };
-  }
-  assert(false, 'Attempted to add unprocessed control image');
-};
-
 const isValidControlAdapter = (controlAdapter: ControlNetConfig | T2IAdapterConfig, base: BaseModelType): boolean => {
   // Must be have a model
   const hasModel = Boolean(controlAdapter.model);
   // Model must match the current base model
   const modelMatchesBase = controlAdapter.model?.base === base;
   return hasModel && modelMatchesBase;
-};
-
-const doesLayerHaveValidControlAdapter = (
-  layer: CanvasLayerState,
-  base: BaseModelType
-): layer is CanvasLayerStateWithValidControlNet | CanvasLayerStateWithValidT2IAdapter => {
-  if (!layer.controlAdapter) {
-    // Must have a control adapter
-    return false;
-  }
-  if (!layer.controlAdapter.model) {
-    // Control adapter must have a model selected
-    return false;
-  }
-  if (layer.controlAdapter.model.base !== base) {
-    // Selected model must match current base model
-    return false;
-  }
-  return true;
 };
