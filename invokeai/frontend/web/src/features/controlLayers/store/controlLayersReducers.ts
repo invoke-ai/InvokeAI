@@ -33,6 +33,7 @@ export const controlLayersReducers = {
       const { id, overrides, isSelected } = action.payload;
       const layer: CanvasControlLayerState = {
         id,
+        name: null,
         type: 'control_layer',
         isEnabled: true,
         objects: [],

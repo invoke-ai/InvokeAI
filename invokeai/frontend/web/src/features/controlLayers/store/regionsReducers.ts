@@ -45,6 +45,7 @@ export const regionsReducers = {
       const { id } = action.payload;
       const rg: CanvasRegionalGuidanceState = {
         id,
+        name: null,
         type: 'regional_guidance',
         isEnabled: true,
         objects: [],
