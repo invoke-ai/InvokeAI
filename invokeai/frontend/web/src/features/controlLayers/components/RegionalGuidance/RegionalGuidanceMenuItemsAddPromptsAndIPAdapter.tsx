@@ -1,6 +1,7 @@
-import { Button, Flex } from '@invoke-ai/ui-library';
+import { MenuItem } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useDefaultIPAdapter } from 'features/controlLayers/hooks/useLayerControlAdapter';
 import { nanoid } from 'features/controlLayers/konva/util';
 import {
@@ -9,15 +10,11 @@ import {
   rgPositivePromptChanged,
   selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold } from 'react-icons/pi';
 
-type AddPromptButtonProps = {
-  id: string;
-};
-
-export const AddPromptButtons = ({ id }: AddPromptButtonProps) => {
+export const RegionalGuidanceMenuItemsAddPromptsAndIPAdapter = memo(() => {
+  const { id } = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useDefaultIPAdapter();
@@ -34,10 +31,10 @@ export const AddPromptButtons = ({ id }: AddPromptButtonProps) => {
   );
   const validActions = useAppSelector(selectValidActions);
   const addPositivePrompt = useCallback(() => {
-    dispatch(rgPositivePromptChanged({ id, prompt: '' }));
+    dispatch(rgPositivePromptChanged({ id: id, prompt: '' }));
   }, [dispatch, id]);
   const addNegativePrompt = useCallback(() => {
-    dispatch(rgNegativePromptChanged({ id, prompt: '' }));
+    dispatch(rgNegativePromptChanged({ id: id, prompt: '' }));
   }, [dispatch, id]);
   const addIPAdapter = useCallback(() => {
     dispatch(
@@ -46,28 +43,16 @@ export const AddPromptButtons = ({ id }: AddPromptButtonProps) => {
   }, [defaultIPAdapter, dispatch, id]);
 
   return (
-    <Flex w="full" p={2} justifyContent="space-between">
-      <Button
-        size="sm"
-        variant="ghost"
-        leftIcon={<PiPlusBold />}
-        onClick={addPositivePrompt}
-        isDisabled={!validActions.canAddPositivePrompt}
-      >
-        {t('common.positivePrompt')}
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        leftIcon={<PiPlusBold />}
-        onClick={addNegativePrompt}
-        isDisabled={!validActions.canAddNegativePrompt}
-      >
-        {t('common.negativePrompt')}
-      </Button>
-      <Button size="sm" variant="ghost" leftIcon={<PiPlusBold />} onClick={addIPAdapter}>
-        {t('common.ipAdapter')}
-      </Button>
-    </Flex>
+    <>
+      <MenuItem onClick={addPositivePrompt} isDisabled={!validActions.canAddPositivePrompt}>
+        {t('controlLayers.addPositivePrompt')}
+      </MenuItem>
+      <MenuItem onClick={addNegativePrompt} isDisabled={!validActions.canAddNegativePrompt}>
+        {t('controlLayers.addNegativePrompt')}
+      </MenuItem>
+      <MenuItem onClick={addIPAdapter}>{t('controlLayers.addIPAdapter')}</MenuItem>
+    </>
   );
-};
+});
+
+RegionalGuidanceMenuItemsAddPromptsAndIPAdapter.displayName = 'RegionalGuidanceMenuItemsExtra';

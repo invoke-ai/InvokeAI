@@ -44,7 +44,7 @@ import { IMAGE_FILTERS, isDrawableEntity, RGBA_RED } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
-  selectedEntityIdentifier: null,
+  selectedEntityIdentifier: { id: 'inpaint_mask', type: 'inpaint_mask' },
   rasterLayers: { entities: [], compositeRasterizationCache: [] },
   controlLayers: { entities: [] },
   ipAdapters: { entities: [] },
@@ -385,10 +385,13 @@ export const canvasV2Slice = createSlice({
       }
     },
     allEntitiesDeleted: (state) => {
-      state.regions.entities = [];
-      state.rasterLayers.entities = [];
+      state.ipAdapters = deepClone(initialState.ipAdapters);
+      state.rasterLayers = deepClone(initialState.rasterLayers);
       state.rasterLayers.compositeRasterizationCache = [];
-      state.ipAdapters.entities = [];
+      state.controlLayers = deepClone(initialState.controlLayers);
+      state.regions = deepClone(initialState.regions);
+      state.inpaintMask = deepClone(initialState.inpaintMask);
+      state.selectedEntityIdentifier = deepClone(initialState.selectedEntityIdentifier);
     },
     filterSelected: (state, action: PayloadAction<{ type: FilterConfig['type'] }>) => {
       state.filter.config = IMAGE_FILTERS[action.payload.type].buildDefaults();
@@ -423,6 +426,7 @@ export const canvasV2Slice = createSlice({
 
       state.ipAdapters = deepClone(initialState.ipAdapters);
       state.rasterLayers = deepClone(initialState.rasterLayers);
+      state.rasterLayers.compositeRasterizationCache = [];
       state.controlLayers = deepClone(initialState.controlLayers);
       state.regions = deepClone(initialState.regions);
       state.selectedEntityIdentifier = deepClone(initialState.selectedEntityIdentifier);
