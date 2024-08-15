@@ -1,13 +1,9 @@
-from pathlib import Path
 from typing import Literal
-from pydantic import Field
 
 import accelerate
 import torch
 from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
-from invokeai.app.invocations.model import TransformerField, VAEField
-from optimum.quanto import qfloat8
 from PIL import Image
 from safetensors.torch import load_file
 from transformers.models.auto import AutoModelForTextEncoding
@@ -20,8 +16,8 @@ from invokeai.app.invocations.fields import (
     InputField,
     WithBoard,
     WithMetadata,
-    UIType,
 )
+from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
@@ -75,7 +71,6 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
-
         # Load the conditioning data.
         cond_data = context.conditioning.load(self.positive_text_conditioning.conditioning_name)
         assert len(cond_data.conditionings) == 1

@@ -3,6 +3,7 @@ import os
 from typing import Union
 
 from diffusers.models.model_loading_utils import load_state_dict
+from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
 from diffusers.utils import (
     CONFIG_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
@@ -12,7 +13,6 @@ from diffusers.utils import (
 )
 from optimum.quanto.models import QuantizedDiffusersModel
 from optimum.quanto.models.shared_dict import ShardedStateDict
-from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
 
 from invokeai.backend.requantize import requantize
 

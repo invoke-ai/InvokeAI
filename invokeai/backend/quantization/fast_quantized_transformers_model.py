@@ -1,14 +1,13 @@
 import json
 import os
-import torch
 from typing import Union
 
 from optimum.quanto.models import QuantizedTransformersModel
 from optimum.quanto.models.shared_dict import ShardedStateDict
 from transformers import AutoConfig
 from transformers.modeling_utils import get_checkpoint_shard_files, load_state_dict
-from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME, is_accelerate_available
 from transformers.models.auto import AutoModelForTextEncoding
+from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME, is_accelerate_available
 
 from invokeai.backend.requantize import requantize
 
