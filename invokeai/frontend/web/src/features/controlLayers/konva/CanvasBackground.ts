@@ -34,6 +34,15 @@ export class CanvasBackground {
   }
 
   render() {
+    const settings = this.manager.stateApi.getSettings();
+
+    if (settings.canvasBackgroundStyle !== 'dynamicGrid') {
+      this.konva.layer.visible(false);
+      return;
+    }
+
+    this.konva.layer.visible(true);
+
     this.konva.layer.zIndex(0);
     const scale = this.manager.stage.scaleX();
     const gridSpacing = CanvasBackground.getGridSpacing(scale);
