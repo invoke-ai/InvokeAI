@@ -88,7 +88,6 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         clip_embeddings: torch.Tensor,
         t5_embeddings: torch.Tensor,
     ):
-        scheduler_info = context.models.load(self.transformer.scheduler)
         transformer_info = context.models.load(self.transformer.transformer)
 
         # HACK(ryand): Manually empty the cache. Currently we don't check the size of the model before loading it from
@@ -96,9 +95,8 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         # if the cache is not empty.
         # context.models._services.model_manager.load.ram_cache.make_room(24 * 2**30)
 
-        with transformer_info as transformer, scheduler_info as scheduler:
+        with transformer_info as transformer:
             assert isinstance(transformer, FluxTransformer2DModel)
-            assert isinstance(scheduler, FlowMatchEulerDiscreteScheduler)
 
             x = denoise(
                 model=transformer,

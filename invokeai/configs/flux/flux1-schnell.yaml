@@ -1,0 +1,34 @@
+repo_id: "black-forest-labs/FLUX.1-schnell"
+repo_ae: "ae.safetensors"
+t5_encoder: "google/t5-v1_1-xxl"
+max_length: 512
+params:
+  in_channels: 64
+  vec_in_dim: 768
+  context_in_dim: 4096
+  hidden_size: 3072
+  mlp_ratio: 4.0
+  num_heads: 24
+  depth: 19
+  depth_single_blocks: 38
+  axes_dim:
+  - 16
+  - 56
+  - 56
+  theta: 10_000
+  qkv_bias: True
+  guidance_embed: False
+  ae_params:
+    resolution: 256
+    in_channels: 3
+    ch: 128
+    out_ch: 3
+    ch_mult:
+    - 1
+    - 2
+    - 4
+    - 4
+    num_res_blocks: 2
+    z_channels: 16
+    scale_factor: 0.3611
+    shift_factor: 0.1159

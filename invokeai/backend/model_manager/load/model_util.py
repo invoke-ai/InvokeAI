@@ -9,7 +9,7 @@ from typing import Optional
 import torch
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
-from transformers import CLIPTokenizer, T5TokenizerFast
+from transformers import CLIPTokenizer, T5TokenizerFast, T5Tokenizer
 
 from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
@@ -52,7 +52,7 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
         return model.calc_size()
     elif isinstance(
         model,
-        (T5TokenizerFast,),
+        (T5TokenizerFast,T5Tokenizer,),
     ):
         return len(model)
     else:
