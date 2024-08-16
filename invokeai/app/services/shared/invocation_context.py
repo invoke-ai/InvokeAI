@@ -13,6 +13,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
+from invokeai.app.services.model_records import ModelRecordChanges
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import (
@@ -462,6 +463,20 @@ class ModelsInterface(InvocationContextInterface):
             Path to the downloaded model
         """
         return self._services.model_manager.install.download_and_cache_model(source=source)
+
+    def import_local_model(
+            self,
+            model_path: Path,
+            config: Optional[ModelRecordChanges] = None,
+            access_token: Optional[str] = None,
+            inplace: Optional[bool] = False,
+    ):
+        """
+        TODO: Fill out description of this method
+        """
+        if not model_path.exists():
+            raise Exception("Models provided to import_local_model must already exist on disk")
+        return self._services.model_manager.install.heuristic_import(str(model_path), config=config, access_token=access_token, inplace=inplace)
 
     def load_local_model(
         self,

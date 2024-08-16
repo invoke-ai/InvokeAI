@@ -1,6 +1,9 @@
 import torch
+
+
+from einops import repeat
 from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
-from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
+from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
@@ -9,6 +12,7 @@ from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.flux.modules.conditioner import HFEncoder
 
 
 @invocation(
@@ -69,26 +73,15 @@ class FluxTextEncoderInvocation(BaseInvocation):
             assert isinstance(clip_text_encoder, CLIPTextModel)
             assert isinstance(t5_text_encoder, T5EncoderModel)
             assert isinstance(clip_tokenizer, CLIPTokenizer)
-            assert isinstance(t5_tokenizer, T5TokenizerFast)
+            assert isinstance(t5_tokenizer, T5Tokenizer)
 
-            pipeline = FluxPipeline(
-                scheduler=None,
-                vae=None,
-                text_encoder=clip_text_encoder,
-                tokenizer=clip_tokenizer,
-                text_encoder_2=t5_text_encoder,
-                tokenizer_2=t5_tokenizer,
-                transformer=None,
-            )
+            clip_encoder = HFEncoder(clip_text_encoder, clip_tokenizer, True, 77)
+            t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, max_seq_len)
 
-            # prompt_embeds: T5 embeddings
-            # pooled_prompt_embeds: CLIP embeddings
-            prompt_embeds, pooled_prompt_embeds, _ = pipeline.encode_prompt(
-                prompt=self.positive_prompt,
-                prompt_2=self.positive_prompt,
-                device=TorchDevice.choose_torch_device(),
-                max_sequence_length=max_seq_len,
-            )
+            prompt = [self.positive_prompt]
+            prompt_embeds = t5_encoder(prompt)
+
+            pooled_prompt_embeds = clip_encoder(prompt)
 
         assert isinstance(prompt_embeds, torch.Tensor)
         assert isinstance(pooled_prompt_embeds, torch.Tensor)
