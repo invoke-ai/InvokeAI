@@ -98,6 +98,10 @@ export class CanvasMaskAdapter {
       this.updateVisibility({ isEnabled });
     }
 
+    if (this.isFirstRender || state.fill !== this.state.fill) {
+      this.renderer.updateCompositingRect(state.fill);
+    }
+
     // this.transformer.syncInteractionState();
 
     if (this.isFirstRender) {
