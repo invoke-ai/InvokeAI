@@ -13,9 +13,9 @@ export const useEntitySelectionColor = (entityIdentifier: CanvasEntityIdentifier
         if (!entity) {
           return 'base.400';
         } else if (entity.type === 'inpaint_mask') {
-          return rgbColorToString(entity.fill);
+          return rgbColorToString(entity.fill.color);
         } else if (entity.type === 'regional_guidance') {
-          return rgbColorToString(entity.fill);
+          return rgbColorToString(entity.fill.color);
         } else {
           return 'base.400';
         }
