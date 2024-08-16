@@ -839,6 +839,11 @@ export type StagingAreaImage = {
   offsetY: number;
 };
 
+const zCanvasBackgroundStyle = z.enum(['checkerboard', 'dynamicGrid', 'solid']);
+export type CanvasBackgroundStyle = z.infer<typeof zCanvasBackgroundStyle>;
+export const isCanvasBackgroundStyle = (v: unknown): v is CanvasBackgroundStyle =>
+  zCanvasBackgroundStyle.safeParse(v).success;
+
 export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
@@ -863,6 +868,7 @@ export type CanvasV2State = {
     preserveMaskedArea: boolean;
     cropToBboxOnSave: boolean;
     clipToBbox: boolean;
+    canvasBackgroundStyle: CanvasBackgroundStyle;
   };
   bbox: {
     rect: {
