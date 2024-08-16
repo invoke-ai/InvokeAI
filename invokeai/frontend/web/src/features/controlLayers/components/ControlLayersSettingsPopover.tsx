@@ -12,7 +12,6 @@ import {
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { MaskOpacity } from 'features/controlLayers/components/MaskOpacity';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
 import {
   clipToBboxChanged,
@@ -64,7 +63,6 @@ const ControlLayersSettingsPopover = () => {
       <PopoverContent>
         <PopoverBody>
           <Flex direction="column" gap={2}>
-            <MaskOpacity />
             <FormControl w="full">
               <FormLabel flexGrow={1}>{t('unifiedCanvas.invertBrushSizeScrollDirection')}</FormLabel>
               <Checkbox isChecked={invertScroll} onChange={onChangeInvertScroll} />
