@@ -171,9 +171,6 @@ export class CanvasStateApi {
   getInpaintMaskState = () => {
     return this.getState().inpaintMask;
   };
-  getMaskOpacity = () => {
-    return this.getState().settings.maskOpacity;
-  };
   getSession = () => {
     return this.getState().session;
   };
@@ -232,26 +229,23 @@ export class CanvasStateApi {
     let currentFill: RgbaColor = state.tool.fill;
     const selectedEntity = this.getSelectedEntity();
     if (selectedEntity) {
-      // These two entity types use a compositing rect for opacity. Their fill is always white.
+      // These two entity types use a compositing rect for opacity. Their fill is always a solid color.
       if (selectedEntity.state.type === 'regional_guidance' || selectedEntity.state.type === 'inpaint_mask') {
         currentFill = RGBA_RED;
-        // currentFill = RGBA_WHITE;
       }
     }
     return currentFill;
   };
 
-  getBrushPreviewFill = () => {
-    const state = this.getState();
-    let currentFill: RgbaColor = state.tool.fill;
+  getBrushPreviewFill = (): RgbaColor => {
     const selectedEntity = this.getSelectedEntity();
-    if (selectedEntity) {
+    if (selectedEntity?.state.type === 'regional_guidance' || selectedEntity?.state.type === 'inpaint_mask') {
       // The brush should use the mask opacity for these entity types
-      if (selectedEntity.state.type === 'regional_guidance' || selectedEntity.state.type === 'inpaint_mask') {
-        currentFill = { ...selectedEntity.state.fill.color, a: this.getSettings().maskOpacity };
-      }
+      return selectedEntity.state.fill.color;
+    } else {
+      const state = this.getState();
+      return state.tool.fill;
     }
-    return currentFill;
   };
 
   $transformingEntity = $transformingEntity;

@@ -40,7 +40,7 @@ import type {
   FilterConfig,
   StageAttrs,
 } from './types';
-import { IMAGE_FILTERS, isDrawableEntity, RGBA_RED } from './types';
+import { IMAGE_FILTERS, isDrawableEntity } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
@@ -55,7 +55,7 @@ const initialState: CanvasV2State = {
     type: 'inpaint_mask',
     fill: {
       style: 'diagonal',
-      color: RGBA_RED,
+      color: { r: 255, g: 122, b: 0, a: 1 }, // some orange color
     },
     rasterizationCache: [],
     isEnabled: true,
@@ -69,7 +69,7 @@ const initialState: CanvasV2State = {
     selected: 'view',
     selectedBuffer: null,
     invertScroll: false,
-    fill: RGBA_RED,
+    fill: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
     brush: {
       width: 50,
     },
@@ -87,7 +87,6 @@ const initialState: CanvasV2State = {
     },
   },
   settings: {
-    maskOpacity: 0.3,
     // TODO(psyche): These are copied from old canvas state, need to be implemented
     autoSave: false,
     imageSmoothing: true,
@@ -471,7 +470,6 @@ export const {
   invertScrollChanged,
   toolChanged,
   toolBufferChanged,
-  maskOpacityChanged,
   allEntitiesDeleted,
   clipToBboxChanged,
   canvasReset,
