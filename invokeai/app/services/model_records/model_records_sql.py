@@ -301,7 +301,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         for row in result:
             try:
                 model_config = ModelConfigFactory.make_config(json.loads(row[0]), timestamp=row[1])
-            except pydantic.ValidationError:
+            except pydantic.ValidationError as e:
                 # We catch this error so that the app can still run if there are invalid model configs in the database.
                 # One reason that an invalid model config might be in the database is if someone had to rollback from a
                 # newer version of the app that added a new model type.

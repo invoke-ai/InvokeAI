@@ -67,7 +67,9 @@ class ModelType(str, Enum):
     TextualInversion = "embedding"
     IPAdapter = "ip_adapter"
     CLIPVision = "clip_vision"
+    CLIPEmbed = "clip_embed"
     T2IAdapter = "t2i_adapter"
+    T5Encoder = "t5_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
 
 
@@ -106,6 +108,9 @@ class ModelFormat(str, Enum):
     EmbeddingFile = "embedding_file"
     EmbeddingFolder = "embedding_folder"
     InvokeAI = "invokeai"
+    T5Encoder = "t5_encoder"
+    T5Encoder8b = "t5_encoder_8b"
+    T5Encoder4b = "t5_encoder_4b"
 
 
 class SchedulerPredictionType(str, Enum):
@@ -205,6 +210,18 @@ class DiffusersConfigBase(ModelConfigBase):
 class LoRAConfigBase(ModelConfigBase):
     type: Literal[ModelType.LoRA] = ModelType.LoRA
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+
+
+class T5EncoderConfigBase(ModelConfigBase):
+    type: Literal[ModelType.T5Encoder] = ModelType.T5Encoder
+
+
+class T5EncoderConfig(T5EncoderConfigBase):
+    format: Literal[ModelFormat.T5Encoder] = ModelFormat.T5Encoder
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.T5Encoder.value}.{ModelFormat.T5Encoder.value}")
 
 
 class LoRALyCORISConfig(LoRAConfigBase):
@@ -352,6 +369,17 @@ class IPAdapterCheckpointConfig(IPAdapterBaseConfig):
         return Tag(f"{ModelType.IPAdapter.value}.{ModelFormat.Checkpoint.value}")
 
 
+class CLIPEmbedDiffusersConfig(DiffusersConfigBase):
+    """Model config for Clip Embeddings."""
+
+    type: Literal[ModelType.CLIPEmbed] = ModelType.CLIPEmbed
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}")
+
+
 class CLIPVisionDiffusersConfig(DiffusersConfigBase):
     """Model config for CLIPVision."""
 
@@ -416,6 +444,7 @@ AnyModelConfig = Annotated[
         Annotated[ControlNetCheckpointConfig, ControlNetCheckpointConfig.get_tag()],
         Annotated[LoRALyCORISConfig, LoRALyCORISConfig.get_tag()],
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
+        Annotated[T5EncoderConfig, T5EncoderConfig.get_tag()],
         Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],
         Annotated[TextualInversionFolderConfig, TextualInversionFolderConfig.get_tag()],
         Annotated[IPAdapterInvokeAIConfig, IPAdapterInvokeAIConfig.get_tag()],
@@ -423,6 +452,7 @@ AnyModelConfig = Annotated[
         Annotated[T2IAdapterConfig, T2IAdapterConfig.get_tag()],
         Annotated[SpandrelImageToImageConfig, SpandrelImageToImageConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
+        Annotated[CLIPEmbedDiffusersConfig, CLIPEmbedDiffusersConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),
 ]
