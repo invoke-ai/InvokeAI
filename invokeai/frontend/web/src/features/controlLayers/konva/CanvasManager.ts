@@ -270,6 +270,13 @@ export class CanvasManager {
       return;
     }
 
+    if (
+      this._isFirstRender ||
+      state.settings.canvasBackgroundStyle !== this._prevState.settings.canvasBackgroundStyle
+    ) {
+      this.background.render();
+    }
+
     if (this._isFirstRender || state.rasterLayers.entities !== this._prevState.rasterLayers.entities) {
       this.log.debug('Rendering raster layers');
 

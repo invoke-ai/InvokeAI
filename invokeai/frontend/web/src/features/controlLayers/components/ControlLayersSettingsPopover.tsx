@@ -12,6 +12,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { CanvasSettingsBackgroundStyle } from 'features/controlLayers/components/CanvasSettingsBackgroundStyle';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
 import {
   clipToBboxChanged,
@@ -71,6 +72,7 @@ const ControlLayersSettingsPopover = () => {
               <FormLabel flexGrow={1}>{t('unifiedCanvas.clipToBbox')}</FormLabel>
               <Checkbox isChecked={clipToBbox} onChange={onChangeClipToBbox} />
             </FormControl>
+            <CanvasSettingsBackgroundStyle />
             <Button onClick={invalidateRasterizationCaches} size="sm">
               Invalidate Rasterization Caches
             </Button>

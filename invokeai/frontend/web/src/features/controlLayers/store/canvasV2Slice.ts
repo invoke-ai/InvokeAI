@@ -94,6 +94,7 @@ const initialState: CanvasV2State = {
     showHUD: true,
     clipToBbox: false,
     cropToBboxOnSave: false,
+    canvasBackgroundStyle: 'dynamicGrid',
   },
   compositing: {
     maskBlur: 16,
@@ -474,6 +475,7 @@ export const {
   clipToBboxChanged,
   canvasReset,
   rasterizationCachesInvalidated,
+  canvasBackgroundStyleChanged,
   // All entities
   entitySelected,
   entityNameChanged,
