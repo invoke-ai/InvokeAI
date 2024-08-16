@@ -22,7 +22,6 @@ export class CanvasMaskAdapter {
   log: Logger;
 
   state: CanvasInpaintMaskState | CanvasRegionalGuidanceState;
-  maskOpacity: number;
 
   transformer: CanvasTransformer;
   renderer: CanvasObjectRenderer;
@@ -54,8 +53,6 @@ export class CanvasMaskAdapter {
 
     this.renderer = new CanvasObjectRenderer(this);
     this.transformer = new CanvasTransformer(this);
-
-    this.maskOpacity = this.manager.stateApi.getMaskOpacity();
   }
 
   /**
@@ -79,14 +76,8 @@ export class CanvasMaskAdapter {
     isSelected: boolean;
   }) => {
     const state = get(arg, 'state', this.state);
-    const maskOpacity = this.manager.stateApi.getMaskOpacity();
 
-    if (
-      !this.isFirstRender &&
-      state === this.state &&
-      state.fill === this.state.fill &&
-      maskOpacity === this.maskOpacity
-    ) {
+    if (!this.isFirstRender && state === this.state && state.fill === this.state.fill) {
       this.log.trace('State unchanged, skipping update');
       return;
     }
@@ -107,10 +98,6 @@ export class CanvasMaskAdapter {
       this.updateVisibility({ isEnabled });
     }
 
-    if (this.isFirstRender || state.fill !== this.state.fill || maskOpacity !== this.maskOpacity) {
-      this.renderer.updateCompositingRect(state.fill, maskOpacity);
-      this.maskOpacity = maskOpacity;
-    }
     // this.transformer.syncInteractionState();
 
     if (this.isFirstRender) {

@@ -1,6 +1,5 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
-import type { CanvasInpaintMaskState, CanvasV2State, FillStyle } from 'features/controlLayers/store/types';
-import type { RgbColor } from 'react-colorful';
+import type { CanvasInpaintMaskState, CanvasV2State, FillStyle, RgbaColor } from 'features/controlLayers/store/types';
 
 export const inpaintMaskReducers = {
   imRecalled: (state, action: PayloadAction<{ data: CanvasInpaintMaskState }>) => {
@@ -8,7 +7,7 @@ export const inpaintMaskReducers = {
     state.inpaintMask = data;
     state.selectedEntityIdentifier = { type: 'inpaint_mask', id: data.id };
   },
-  imFillColorChanged: (state, action: PayloadAction<{ color: RgbColor }>) => {
+  imFillColorChanged: (state, action: PayloadAction<{ color: RgbaColor }>) => {
     const { color } = action.payload;
     state.inpaintMask.fill.color = color;
   },

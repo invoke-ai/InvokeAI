@@ -323,7 +323,6 @@ export class CanvasManager {
     if (
       this._isFirstRender ||
       state.regions.entities !== this._prevState.regions.entities ||
-      state.settings.maskOpacity !== this._prevState.settings.maskOpacity ||
       state.tool.selected !== this._prevState.tool.selected ||
       state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
@@ -355,7 +354,6 @@ export class CanvasManager {
     if (
       this._isFirstRender ||
       state.inpaintMask !== this._prevState.inpaintMask ||
-      state.settings.maskOpacity !== this._prevState.settings.maskOpacity ||
       state.tool.selected !== this._prevState.tool.selected ||
       state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
     ) {
