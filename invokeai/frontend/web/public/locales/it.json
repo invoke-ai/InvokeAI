@@ -701,7 +701,9 @@
         "baseModelChanged": "Modello base modificato",
         "sessionRef": "Sessione: {{sessionId}}",
         "somethingWentWrong": "Qualcosa è andato storto",
-        "outOfMemoryErrorDesc": "Le impostazioni della generazione attuale superano la capacità del sistema. Modifica le impostazioni e riprova."
+        "outOfMemoryErrorDesc": "Le impostazioni della generazione attuale superano la capacità del sistema. Modifica le impostazioni e riprova.",
+        "importFailed": "Importazione non riuscita",
+        "importSuccessful": "Importazione riuscita"
     },
     "tooltip": {
         "feature": {
@@ -1779,6 +1781,8 @@
         "unableToDeleteTemplate": "Impossibile eliminare il modello di prompt",
         "updatePromptTemplate": "Aggiorna il modello di prompt",
         "type": "Tipo",
-        "promptTemplatesDesc2": "Utilizza la stringa segnaposto <Pre>{{placeholder}}</Pre> per specificare dove inserire il tuo prompt nel modello."
+        "promptTemplatesDesc2": "Utilizza la stringa segnaposto <Pre>{{placeholder}}</Pre> per specificare dove inserire il tuo prompt nel modello.",
+        "importTemplates": "Importa modelli di prompt",
+        "importTemplatesDesc": "Il formato deve essere un CSV con colonne 'name' e 'prompt' o 'positive_prompt' e 'negative_prompt' incluse, oppure un file JSON con chiavi 'name' e 'prompt' o 'positive_prompt' e 'negative_prompt"
     }
 }
