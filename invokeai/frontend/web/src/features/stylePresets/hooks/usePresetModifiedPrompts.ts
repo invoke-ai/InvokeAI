@@ -10,7 +10,8 @@ export const buildPresetModifiedPrompt = (presetPrompt: string, currentPrompt: s
 };
 
 export const usePresetModifiedPrompts = () => {
-  const { positivePrompt, negativePrompt } = useAppSelector((s) => s.canvasV2.prompts);
+  const positivePrompt = useAppSelector((s) => s.canvasV2.params.positivePrompt);
+  const negativePrompt = useAppSelector((s) => s.canvasV2.params.negativePrompt);
 
   const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
 
