@@ -1,5 +1,5 @@
 import type { JSONObject } from 'common/types';
-import { rgbColorToString } from 'common/util/colorCodeTransformers';
+import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
 import { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
@@ -149,7 +149,7 @@ export class CanvasObjectRenderer {
     this.subscriptions.add(
       this.manager.stateApi.$stageAttrs.listen(() => {
         if (this.konva.compositing && this.parent.type === 'mask_adapter') {
-          this.updateCompositingRect(this.parent.state.fill, this.manager.stateApi.getMaskOpacity());
+          this.updateCompositingRect(this.parent.state.fill);
         }
       })
     );
@@ -183,14 +183,13 @@ export class CanvasObjectRenderer {
     return didRender;
   };
 
-  updateCompositingRect = (fill: Fill, opacity: number) => {
+  updateCompositingRect = (fill: Fill) => {
     this.log.trace('Updating compositing rect');
     assert(this.konva.compositing, 'Missing compositing rect');
 
     const { x, y, width, height, scale } = this.manager.stateApi.$stageAttrs.get();
-    console.log('stageAttrs', this.manager.stateApi.$stageAttrs.get());
+
     const attrs: RectConfig = {
-      opacity,
       x: -x / scale,
       y: -y / scale,
       width: width / scale,
@@ -198,7 +197,7 @@ export class CanvasObjectRenderer {
     };
 
     if (fill.style === 'solid') {
-      attrs.fill = rgbColorToString(fill.color);
+      attrs.fill = rgbaColorToString(fill.color);
       attrs.fillPriority = 'color';
       this.konva.compositing.rect.setAttrs(attrs);
     } else {

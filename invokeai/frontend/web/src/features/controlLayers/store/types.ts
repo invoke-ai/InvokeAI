@@ -644,7 +644,7 @@ const zMaskObject = z
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
 export const isFillStyle = (v: unknown): v is FillStyle => zFillStyle.safeParse(v).success;
-const zFill = z.object({ style: zFillStyle, color: zRgbColor });
+const zFill = z.object({ style: zFillStyle, color: zRgbaColor });
 export type Fill = z.infer<typeof zFill>;
 
 const zImageCache = z.object({
@@ -858,7 +858,6 @@ export type CanvasV2State = {
   };
   settings: {
     imageSmoothing: boolean;
-    maskOpacity: number;
     showHUD: boolean;
     autoSave: boolean;
     preserveMaskedArea: boolean;
