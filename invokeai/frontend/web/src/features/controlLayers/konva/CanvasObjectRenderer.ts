@@ -8,23 +8,34 @@ import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLaye
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
+import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import { getPrefixedId, konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
 import type {
   CanvasBrushLineState,
   CanvasEraserLineState,
   CanvasImageState,
   CanvasRectState,
+  Fill,
   ImageCache,
   Rect,
-  RgbColor,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { RectConfig } from 'konva/lib/shapes/Rect';
 import { isEqual } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
+
+function setFillPatternImage(shape: Konva.Shape, ...args: Parameters<typeof getPatternSVG>): HTMLImageElement {
+  const imageElement = new Image();
+  imageElement.onload = () => {
+    shape.fillPatternImage(imageElement);
+  };
+  imageElement.src = getPatternSVG(...args);
+  return imageElement;
+}
 
 /**
  * Union of all object renderers.
@@ -86,7 +97,11 @@ export class CanvasObjectRenderer {
      *
      * The compositing rect is not added to the object group.
      */
-    compositingRect: Konva.Rect | null;
+    compositing: {
+      group: Konva.Group;
+      rect: Konva.Rect;
+      patternImage: HTMLImageElement;
+    } | null;
   };
 
   constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
@@ -99,20 +114,26 @@ export class CanvasObjectRenderer {
 
     this.konva = {
       objectGroup: new Konva.Group({ name: `${this.type}:object_group`, listening: false }),
-      compositingRect: null,
+      compositing: null,
     };
 
     this.parent.konva.layer.add(this.konva.objectGroup);
 
     if (this.parent.state.type === 'inpaint_mask' || this.parent.state.type === 'regional_guidance') {
-      this.konva.compositingRect = new Konva.Rect({
+      const rect = new Konva.Rect({
         name: `${this.type}:compositing_rect`,
         globalCompositeOperation: 'source-in',
         listening: false,
         strokeEnabled: false,
         perfectDrawEnabled: false,
       });
-      this.parent.konva.layer.add(this.konva.compositingRect);
+      this.konva.compositing = {
+        group: new Konva.Group({ name: `${this.type}:compositing_group`, listening: false }),
+        rect,
+        patternImage: new Image(), // we will set the src on this on the first render
+      };
+      this.konva.compositing.group.add(this.konva.compositing.rect);
+      this.parent.konva.layer.add(this.konva.compositing.group);
     }
 
     this.subscriptions.add(
@@ -126,14 +147,9 @@ export class CanvasObjectRenderer {
     // The compositing rect must cover the whole stage at all times. When the stage is scaled, moved or resized, we
     // need to update the compositing rect to match the stage.
     this.subscriptions.add(
-      this.manager.stateApi.$stageAttrs.listen(({ x, y, width, height, scale }) => {
-        if (this.konva.compositingRect) {
-          this.konva.compositingRect.setAttrs({
-            x: -x / scale,
-            y: -y / scale,
-            width: width / scale,
-            height: height / scale,
-          });
+      this.manager.stateApi.$stageAttrs.listen(() => {
+        if (this.konva.compositing && this.parent.type === 'mask_adapter') {
+          this.updateCompositingRect(this.parent.state.fill, this.manager.stateApi.getMaskOpacity());
         }
       })
     );
@@ -167,20 +183,31 @@ export class CanvasObjectRenderer {
     return didRender;
   };
 
-  updateCompositingRect = (fill: RgbColor, opacity: number) => {
+  updateCompositingRect = (fill: Fill, opacity: number) => {
     this.log.trace('Updating compositing rect');
-    assert(this.konva.compositingRect, 'Missing compositing rect');
+    assert(this.konva.compositing, 'Missing compositing rect');
 
-    const rgbColor = rgbColorToString(fill);
     const { x, y, width, height, scale } = this.manager.stateApi.$stageAttrs.get();
-    this.konva.compositingRect.setAttrs({
-      fill: rgbColor,
+    console.log('stageAttrs', this.manager.stateApi.$stageAttrs.get());
+    const attrs: RectConfig = {
       opacity,
       x: -x / scale,
       y: -y / scale,
       width: width / scale,
       height: height / scale,
-    });
+    };
+
+    if (fill.style === 'solid') {
+      attrs.fill = rgbColorToString(fill.color);
+      attrs.fillPriority = 'color';
+      this.konva.compositing.rect.setAttrs(attrs);
+    } else {
+      attrs.fillPatternScaleX = 1 / scale;
+      attrs.fillPatternScaleY = 1 / scale;
+      attrs.fillPriority = 'pattern';
+      this.konva.compositing.rect.setAttrs(attrs);
+      setFillPatternImage(this.konva.compositing.rect, fill.style, fill.color);
+    }
   };
 
   /**
