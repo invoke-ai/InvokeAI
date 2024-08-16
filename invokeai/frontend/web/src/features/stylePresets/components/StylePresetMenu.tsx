@@ -1,4 +1,4 @@
-import { Flex, Text } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { StylePresetExportButton } from 'features/stylePresets/components/StylePresetExportButton';
@@ -56,12 +56,6 @@ export const StylePresetMenu = () => {
         <StylePresetImportButton />
         <StylePresetExportButton />
       </Flex>
-
-      {data.presets.length === 0 && data.defaultPresets.length === 0 && (
-        <Text p={10} textAlign="center">
-          {t('stylePresets.noMatchingTemplates')}
-        </Text>
-      )}
 
       <StylePresetList title={t('stylePresets.myTemplates')} data={data.presets} />
       {allowPrivateStylePresets && (

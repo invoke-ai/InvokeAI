@@ -1715,6 +1715,7 @@
         "myTemplates": "My Templates",
         "name": "Name",
         "negativePrompt": "Negative Prompt",
+        "noTemplates": "No templates",
         "noMatchingTemplates": "No matching templates",
         "promptTemplatesDesc1": "Prompt templates add text to the prompts you write in the prompt box.",
         "promptTemplatesDesc2": "Use the placeholder string <Pre>{{placeholder}}</Pre> to specify where your prompt should be included in the template.",
