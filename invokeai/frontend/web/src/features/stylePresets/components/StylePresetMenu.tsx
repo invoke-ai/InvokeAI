@@ -1,14 +1,13 @@
-import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
-import { useCallback } from 'react';
+import { StylePresetExportButton } from 'features/stylePresets/components/StylePresetExportButton';
+import { StylePresetImportButton } from 'features/stylePresets/components/StylePresetImportButton';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold } from 'react-icons/pi';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
-import { StylePresetImport } from './StylePresetImport';
+import { StylePresetCreateButton } from './StylePresetCreateButton';
 import { StylePresetList } from './StylePresetList';
 import StylePresetSearch from './StylePresetSearch';
 
@@ -49,46 +48,19 @@ export const StylePresetMenu = () => {
 
   const { t } = useTranslation();
 
-  const handleClickAddNew = useCallback(() => {
-    $stylePresetModalState.set({
-      prefilledFormData: null,
-      updatingStylePresetId: null,
-      isModalOpen: true,
-    });
-  }, []);
-
   return (
     <Flex flexDir="column" gap={2} padding={3} layerStyle="second" borderRadius="base">
       <Flex alignItems="center" gap={2} w="full" justifyContent="space-between">
         <StylePresetSearch />
-        <Flex alignItems="center" justifyContent="space-between">
-          <StylePresetImport />
-
-          <IconButton
-            icon={<PiPlusBold />}
-            tooltip={t('stylePresets.createPromptTemplate')}
-            aria-label={t('stylePresets.createPromptTemplate')}
-            onClick={handleClickAddNew}
-            size="md"
-            variant="link"
-            w={8}
-            h={8}
-          />
-        </Flex>
+        <StylePresetCreateButton />
+        <StylePresetImportButton />
+        <StylePresetExportButton />
       </Flex>
 
-      {data.presets.length === 0 && data.defaultPresets.length === 0 && (
-        <Text p={10} textAlign="center">
-          {t('stylePresets.noMatchingTemplates')}
-        </Text>
-      )}
-
       <StylePresetList title={t('stylePresets.myTemplates')} data={data.presets} />
-
       {allowPrivateStylePresets && (
         <StylePresetList title={t('stylePresets.sharedTemplates')} data={data.sharedPresets} />
       )}
-
       <StylePresetList title={t('stylePresets.defaultTemplates')} data={data.defaultPresets} />
     </Flex>
   );

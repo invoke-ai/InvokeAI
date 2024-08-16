@@ -1,15 +1,16 @@
 import { Button, Collapse, Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 
 import { StylePresetListItem } from './StylePresetListItem';
 
 export const StylePresetList = ({ title, data }: { title: string; data: StylePresetRecordWithImage[] }) => {
+  const { t } = useTranslation();
   const { onToggle, isOpen } = useDisclosure({ defaultIsOpen: true });
-
-  if (!data.length) {
-    return <></>;
-  }
+  const searchTerm = useAppSelector((s) => s.stylePreset.searchTerm);
 
   return (
     <Flex flexDir="column">
@@ -22,9 +23,16 @@ export const StylePresetList = ({ title, data }: { title: string; data: StylePre
         </Flex>
       </Button>
       <Collapse in={isOpen}>
-        {data.map((preset) => (
-          <StylePresetListItem preset={preset} key={preset.id} />
-        ))}
+        {data.length ? (
+          data.map((preset) => <StylePresetListItem preset={preset} key={preset.id} />)
+        ) : (
+          <IAINoContentFallback
+            fontSize="sm"
+            py={4}
+            label={searchTerm ? t('stylePresets.noMatchingTemplates') : t('stylePresets.noTemplates')}
+            icon={null}
+          />
+        )}
       </Collapse>
     </Flex>
   );

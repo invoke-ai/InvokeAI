@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
+    PresetType,
     StylePresetChanges,
     StylePresetRecordDTO,
     StylePresetWithoutId,
@@ -36,6 +37,6 @@ class StylePresetRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_many(self) -> list[StylePresetRecordDTO]:
+    def get_many(self, type: PresetType | None = None) -> list[StylePresetRecordDTO]:
         """Gets many workflows."""
         pass

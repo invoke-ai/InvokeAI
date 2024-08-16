@@ -1,10 +1,11 @@
+import csv
 import io
 import json
 import traceback
 from typing import Optional
 
 import pydantic
-from fastapi import APIRouter, File, Form, HTTPException, Path, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Path, Response, UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image
 from pydantic import BaseModel, Field
@@ -228,6 +229,35 @@ async def get_style_preset_image(
         return response
     except Exception:
         raise HTTPException(status_code=404)
+
+
+@style_presets_router.get(
+    "/export",
+    operation_id="export_style_presets",
+    responses={200: {"content": {"text/csv": {}}, "description": "A CSV file with the requested data."}},
+    status_code=200,
+)
+async def export_style_presets():
+    # Create an in-memory stream to store the CSV data
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write the header
+    writer.writerow(["name", "prompt", "negative_prompt"])
+
+    style_presets = ApiDependencies.invoker.services.style_preset_records.get_many(type=PresetType.User)
+
+    for preset in style_presets:
+        writer.writerow([preset.name, preset.preset_data.positive_prompt, preset.preset_data.negative_prompt])
+
+    csv_data = output.getvalue()
+    output.close()
+
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=prompt_templates.csv"},
+    )
 
 
 @style_presets_router.post(
