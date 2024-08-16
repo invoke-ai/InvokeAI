@@ -53,7 +53,10 @@ const initialState: CanvasV2State = {
   inpaintMask: {
     id: 'inpaint_mask',
     type: 'inpaint_mask',
-    fill: RGBA_RED,
+    fill: {
+      style: 'diagonal',
+      color: RGBA_RED,
+    },
     rasterizationCache: [],
     isEnabled: true,
     objects: [],
@@ -531,7 +534,8 @@ export const {
   rgAllDeleted,
   rgPositivePromptChanged,
   rgNegativePromptChanged,
-  rgFillChanged,
+  rgFillColorChanged,
+  rgFillStyleChanged,
   rgAutoNegativeChanged,
   rgIPAdapterAdded,
   rgIPAdapterDeleted,
@@ -587,7 +591,8 @@ export const {
   loraAllDeleted,
   // Inpaint mask
   imRecalled,
-  imFillChanged,
+  imFillColorChanged,
+  imFillStyleChanged,
   // Staging
   sessionStartedStaging,
   sessionImageStaged,

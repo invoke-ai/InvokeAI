@@ -248,7 +248,7 @@ export class CanvasStateApi {
     if (selectedEntity) {
       // The brush should use the mask opacity for these entity types
       if (selectedEntity.state.type === 'regional_guidance' || selectedEntity.state.type === 'inpaint_mask') {
-        currentFill = { ...selectedEntity.state.fill, a: this.getSettings().maskOpacity };
+        currentFill = { ...selectedEntity.state.fill.color, a: this.getSettings().maskOpacity };
       }
     }
     return currentFill;

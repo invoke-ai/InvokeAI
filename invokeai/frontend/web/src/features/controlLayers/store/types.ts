@@ -641,6 +641,12 @@ const zMaskObject = z
   })
   .pipe(z.discriminatedUnion('type', [zCanvasBrushLineState, zCanvasEraserLineState, zCanvasRectState]));
 
+const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
+export type FillStyle = z.infer<typeof zFillStyle>;
+export const isFillStyle = (v: unknown): v is FillStyle => zFillStyle.safeParse(v).success;
+const zFill = z.object({ style: zFillStyle, color: zRgbColor });
+export type Fill = z.infer<typeof zFill>;
+
 const zImageCache = z.object({
   imageName: z.string(),
   rect: zRect,
@@ -665,7 +671,7 @@ export const zCanvasRegionalGuidanceState = z.object({
   isEnabled: z.boolean(),
   position: zCoordinate,
   objects: z.array(zCanvasObjectState),
-  fill: zRgbColor,
+  fill: zFill,
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
   ipAdapters: z.array(zRegionalGuidanceIPAdapterConfig),
@@ -674,21 +680,12 @@ export const zCanvasRegionalGuidanceState = z.object({
 });
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
 
-const zColorFill = z.object({
-  type: z.literal('color_fill'),
-  color: zRgbaColor,
-});
-const zImageFill = z.object({
-  type: z.literal('image_fill'),
-  src: z.string(),
-});
-const zFill = z.discriminatedUnion('type', [zColorFill, zImageFill]);
 const zCanvasInpaintMaskState = z.object({
   id: z.literal('inpaint_mask'),
   type: z.literal('inpaint_mask'),
   isEnabled: z.boolean(),
   position: zCoordinate,
-  fill: zRgbColor,
+  fill: zFill,
   objects: z.array(zCanvasObjectState),
   rasterizationCache: z.array(zImageCache),
 });
