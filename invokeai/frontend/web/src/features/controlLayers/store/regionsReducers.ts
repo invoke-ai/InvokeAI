@@ -3,6 +3,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
   CanvasV2State,
   CLIPVisionModelV2,
+  FillStyle,
   IPMethodV2,
   RegionalGuidanceIPAdapterConfig,
 } from 'features/controlLayers/store/types';
@@ -42,7 +43,7 @@ const DEFAULT_MASK_COLORS: RgbColor[] = [
 ];
 
 const getRGMaskFill = (state: CanvasV2State): RgbColor => {
-  const lastFill = state.regions.entities.slice(-1)[0]?.fill;
+  const lastFill = state.regions.entities.slice(-1)[0]?.fill.color;
   let i = DEFAULT_MASK_COLORS.findIndex((c) => isEqual(c, lastFill));
   if (i === -1) {
     i = 0;
@@ -63,7 +64,10 @@ export const regionsReducers = {
         type: 'regional_guidance',
         isEnabled: true,
         objects: [],
-        fill: getRGMaskFill(state),
+        fill: {
+          style: 'solid',
+          color: getRGMaskFill(state),
+        },
         position: { x: 0, y: 0 },
         autoNegative: 'invert',
         positivePrompt: '',
@@ -100,14 +104,23 @@ export const regionsReducers = {
     }
     entity.negativePrompt = prompt;
   },
-  rgFillChanged: (state, action: PayloadAction<{ id: string; fill: RgbColor }>) => {
-    const { id, fill } = action.payload;
+  rgFillColorChanged: (state, action: PayloadAction<{ id: string; color: RgbColor }>) => {
+    const { id, color } = action.payload;
     const entity = selectRegionalGuidanceEntity(state, id);
     if (!entity) {
       return;
     }
-    entity.fill = fill;
+    entity.fill.color = color;
   },
+  rgFillStyleChanged: (state, action: PayloadAction<{ id: string; style: FillStyle }>) => {
+    const { id, style } = action.payload;
+    const entity = selectRegionalGuidanceEntity(state, id);
+    if (!entity) {
+      return;
+    }
+    entity.fill.style = style;
+  },
+
   rgAutoNegativeChanged: (state, action: PayloadAction<{ id: string; autoNegative: ParameterAutoNegative }>) => {
     const { id, autoNegative } = action.payload;
     const rg = selectRegionalGuidanceEntity(state, id);
