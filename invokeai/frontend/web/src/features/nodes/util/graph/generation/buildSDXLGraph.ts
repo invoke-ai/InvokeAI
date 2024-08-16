@@ -27,7 +27,7 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { getBoardField, getSDXLStylePrompts, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getBoardField, getPresetModifiedPrompts, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -61,7 +61,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
 
   const { originalSize, scaledSize } = getSizes(bbox);
 
-  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
+  const { positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
 
   const g = new Graph(SDXL_CONTROL_LAYERS_GRAPH);
   const modelLoader = g.addNode({

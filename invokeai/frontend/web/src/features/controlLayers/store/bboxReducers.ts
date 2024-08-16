@@ -12,12 +12,10 @@ import { pick } from 'lodash-es';
 
 export const bboxReducers = {
   bboxScaledSizeChanged: (state, action: PayloadAction<Partial<Dimensions>>) => {
-    state.rasterLayers.imageCache = null;
     state.bbox.scaledSize = { ...state.bbox.scaledSize, ...action.payload };
   },
   bboxScaleMethodChanged: (state, action: PayloadAction<BoundingBoxScaleMethod>) => {
     state.bbox.scaleMethod = action.payload;
-    state.rasterLayers.imageCache = null;
 
     if (action.payload === 'auto') {
       const optimalDimension = getOptimalDimension(state.params.model);
@@ -27,7 +25,6 @@ export const bboxReducers = {
   },
   bboxChanged: (state, action: PayloadAction<IRect>) => {
     state.bbox.rect = action.payload;
-    state.rasterLayers.imageCache = null;
 
     if (state.bbox.scaleMethod === 'auto') {
       const optimalDimension = getOptimalDimension(state.params.model);
