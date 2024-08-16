@@ -1699,6 +1699,15 @@
         "filter": "Filter",
         "convertToControlLayer": "Convert to Control Layer",
         "convertToRasterLayer": "Convert to Raster Layer",
+        "fill": {
+            "fillStyle": "Fill Style",
+            "solid": "Solid",
+            "grid": "Grid",
+            "crosshatch": "Crosshatch",
+            "vertical": "Vertical",
+            "horizontal": "Horizontal",
+            "diagonal": "Diagonal"
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
