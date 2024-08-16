@@ -39,6 +39,8 @@ export const StylePresetPromptField = (props: Props) => {
     } else {
       field.onChange(value + PRESET_PLACEHOLDER);
     }
+
+    textareaRef.current?.focus();
   }, [value, field, textareaRef]);
 
   const isPromptPresent = useMemo(() => value?.includes(PRESET_PLACEHOLDER), [value]);
