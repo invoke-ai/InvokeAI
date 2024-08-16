@@ -1717,6 +1717,12 @@
             "view": "View",
             "transform": "Transform",
             "eyeDropper": "Eye Dropper"
+        },
+        "background": {
+            "backgroundStyle": "Background Style",
+            "solid": "Solid",
+            "checkerboard": "Checkerboard",
+            "dynamicGrid": "Dynamic Grid"
         }
     },
     "upscaling": {

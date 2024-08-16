@@ -3,8 +3,10 @@ import { useStore } from '@nanostores/react';
 import { $socket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/nanostores/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
 import { $canvasManager, CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
 import Konva from 'konva';
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
@@ -52,6 +54,8 @@ type Props = {
 };
 
 export const StageComponent = memo(({ asPreview = false }: Props) => {
+  const canvasBackgroundStyle = useAppSelector((s) => s.canvasV2.settings.canvasBackgroundStyle);
+
   const [stage] = useState(
     () =>
       new Konva.Stage({
@@ -77,6 +81,17 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
 
   return (
     <Flex position="relative" w="full" h="full">
+      {canvasBackgroundStyle === 'checkerboard' && (
+        <Flex
+          position="absolute"
+          bgImage={TRANSPARENCY_CHECKER_PATTERN}
+          top={0}
+          right={0}
+          bottom={0}
+          left={0}
+          opacity={0.1}
+        />
+      )}
       <Flex
         position="absolute"
         top={0}
