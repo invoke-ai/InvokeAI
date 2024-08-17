@@ -15,7 +15,7 @@ import { getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilder
 import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
-import { socketConnected } from 'services/events/actions';
+import { socketConnected } from 'services/events/setEventListeners';
 
 const matcher = isAnyOf(
   positivePromptChanged,
