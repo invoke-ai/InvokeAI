@@ -24,8 +24,6 @@ const matcher = isAnyOf(
   maxPromptsReset,
   socketConnected,
   activeStylePresetIdChanged,
-  stylePresetsApi.endpoints.deleteStylePreset.matchFulfilled,
-  stylePresetsApi.endpoints.updateStylePreset.matchFulfilled,
   stylePresetsApi.endpoints.listStylePresets.matchFulfilled
 );
 
