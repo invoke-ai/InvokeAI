@@ -21,7 +21,7 @@ export const getImageUsage = (nodes: NodesState, canvasV2: CanvasV2State, image_
       some(node.data.inputs, (input) => isImageFieldInputInstance(input) && input.value?.image_name === image_name)
     );
 
-  const isControlAdapterImage = canvasV2.controlAdapters.entities.some(
+  const isControlAdapterImage = canvasV2.controlLayers.entities.some(
     (ca) => ca.imageObject?.image.image_name === image_name || ca.processedImageObject?.image.image_name === image_name
   );
 
