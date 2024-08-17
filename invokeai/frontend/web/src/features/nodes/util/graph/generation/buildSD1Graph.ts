@@ -28,7 +28,7 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { getBoardField, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getBoardField, getPresetModifiedPrompts, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -53,11 +53,11 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     vaePrecision,
     seed,
     vae,
-    positivePrompt,
-    negativePrompt,
   } = params;
 
   assert(model, 'No model found in state');
+
+  const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
 
   const { originalSize, scaledSize } = getSizes(bbox);
 
