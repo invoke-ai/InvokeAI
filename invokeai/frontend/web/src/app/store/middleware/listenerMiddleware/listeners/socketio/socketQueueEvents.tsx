@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
-import { $lastProgressEvent } from 'features/controlLayers/store/canvasV2Slice';
 import { $nodeExecutionStates } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/ErrorToastDescription';
@@ -9,6 +8,7 @@ import { toast } from 'features/toast/toast';
 import { forEach } from 'lodash-es';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import { socketQueueItemStatusChanged } from 'services/events/actions';
+import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
 
 const log = logger('socketio');
 
@@ -17,13 +17,13 @@ export const addSocketQueueEventsListeners = (startAppListening: AppStartListeni
   startAppListening({
     matcher: queueApi.endpoints.clearQueue.matchFulfilled,
     effect: () => {
-      $lastProgressEvent.set(null);
+      $lastCanvasProgressEvent.set(null);
     },
   });
 
   startAppListening({
     actionCreator: socketQueueItemStatusChanged,
-    effect: async (action, { dispatch, getState }) => {
+    effect: (action, { dispatch, getState }) => {
       // we've got new status for the queue item, batch and queue
       const {
         item_id,
@@ -103,7 +103,7 @@ export const addSocketQueueEventsListeners = (startAppListening: AppStartListeni
         const isLocal = getState().config.isLocal ?? true;
         const sessionId = session_id;
         if (origin === 'canvas') {
-          $lastProgressEvent.set(null);
+          $lastCanvasProgressEvent.set(null);
         }
 
         toast({
@@ -122,7 +122,7 @@ export const addSocketQueueEventsListeners = (startAppListening: AppStartListeni
           ),
         });
       } else if (status === 'canceled' && origin === 'canvas') {
-        $lastProgressEvent.set(null);
+        $lastCanvasProgressEvent.set(null);
       }
     },
   });
