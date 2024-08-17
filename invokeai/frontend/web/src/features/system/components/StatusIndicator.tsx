@@ -1,11 +1,12 @@
 import { Icon, Tooltip } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
+import { $isConnected } from 'app/hooks/useSocketIO';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiWarningBold } from 'react-icons/pi';
 
 const StatusIndicator = () => {
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const { t } = useTranslation();
 
   if (!isConnected) {

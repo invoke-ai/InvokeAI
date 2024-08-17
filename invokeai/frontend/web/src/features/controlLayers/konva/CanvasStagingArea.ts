@@ -76,7 +76,7 @@ export class CanvasStagingArea {
 
       if (!this.image.isLoading && !this.image.isError) {
         await this.image.updateImageSource(imageDTO.image_name);
-        this.manager.stateApi.$lastProgressEvent.set(null);
+        this.manager.stateApi.$lastCanvasProgressEvent.set(null);
       }
       this.image.konva.group.visible(shouldShowStagedImage);
     } else {

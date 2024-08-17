@@ -48,7 +48,7 @@ export class CanvasProgressImage {
       image: null,
     };
 
-    this.manager.stateApi.$lastProgressEvent.listen((event) => {
+    this.manager.stateApi.$lastCanvasProgressEvent.listen((event) => {
       this.lastProgressEvent = event;
       this.render();
     });

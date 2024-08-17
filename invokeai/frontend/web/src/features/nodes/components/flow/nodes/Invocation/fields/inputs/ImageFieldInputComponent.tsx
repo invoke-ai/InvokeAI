@@ -1,6 +1,8 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { $isConnected } from 'app/hooks/useSocketIO';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
@@ -17,7 +19,7 @@ import type { FieldComponentProps } from './types';
 const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInstance, ImageFieldInputTemplate>) => {
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const { currentData: imageDTO, isError } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
 
   const handleReset = useCallback(() => {

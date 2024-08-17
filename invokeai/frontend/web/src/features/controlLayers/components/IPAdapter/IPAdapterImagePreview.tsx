@@ -1,5 +1,7 @@
 import { Flex, useShiftModifier } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { $isConnected } from 'app/hooks/useSocketIO';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
@@ -22,79 +24,85 @@ type Props = {
   postUploadAction: PostUploadAction;
 };
 
-export const IPAdapterImagePreview = memo(({ image, onChangeImage, ipAdapterId, droppableData, postUploadAction }: Props) => {
-  const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
-  const optimalDimension = useAppSelector(selectOptimalDimension);
-  const shift = useShiftModifier();
+export const IPAdapterImagePreview = memo(
+  ({ image, onChangeImage, ipAdapterId, droppableData, postUploadAction }: Props) => {
+    const { t } = useTranslation();
+    const dispatch = useAppDispatch();
+    const isConnected = useStore($isConnected);
+    const optimalDimension = useAppSelector(selectOptimalDimension);
+    const shift = useShiftModifier();
 
-  const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(image?.image_name ?? skipToken);
-  const handleResetControlImage = useCallback(() => {
-    onChangeImage(null);
-  }, [onChangeImage]);
+    const { currentData: controlImage, isError: isErrorControlImage } = useGetImageDTOQuery(
+      image?.image_name ?? skipToken
+    );
+    const handleResetControlImage = useCallback(() => {
+      onChangeImage(null);
+    }, [onChangeImage]);
 
-  const handleSetControlImageToDimensions = useCallback(() => {
-    if (!controlImage) {
-      return;
-    }
+    const handleSetControlImageToDimensions = useCallback(() => {
+      if (!controlImage) {
+        return;
+      }
 
-    const options = { updateAspectRatio: true, clamp: true };
-    if (shift) {
-      const { width, height } = controlImage;
-      dispatch(bboxWidthChanged({ width, ...options }));
-      dispatch(bboxHeightChanged({ height, ...options }));
-    } else {
-      const { width, height } = calculateNewSize(
-        controlImage.width / controlImage.height,
-        optimalDimension * optimalDimension
-      );
-      dispatch(bboxWidthChanged({ width, ...options }));
-      dispatch(bboxHeightChanged({ height, ...options }));
-    }
-  }, [controlImage, dispatch, optimalDimension, shift]);
+      const options = { updateAspectRatio: true, clamp: true };
+      if (shift) {
+        const { width, height } = controlImage;
+        dispatch(bboxWidthChanged({ width, ...options }));
+        dispatch(bboxHeightChanged({ height, ...options }));
+      } else {
+        const { width, height } = calculateNewSize(
+          controlImage.width / controlImage.height,
+          optimalDimension * optimalDimension
+        );
+        dispatch(bboxWidthChanged({ width, ...options }));
+        dispatch(bboxHeightChanged({ height, ...options }));
+      }
+    }, [controlImage, dispatch, optimalDimension, shift]);
 
-  const draggableData = useMemo<ImageDraggableData | undefined>(() => {
-    if (controlImage) {
-      return {
-        id: ipAdapterId,
-        payloadType: 'IMAGE_DTO',
-        payload: { imageDTO: controlImage },
-      };
-    }
-  }, [controlImage, ipAdapterId]);
+    const draggableData = useMemo<ImageDraggableData | undefined>(() => {
+      if (controlImage) {
+        return {
+          id: ipAdapterId,
+          payloadType: 'IMAGE_DTO',
+          payload: { imageDTO: controlImage },
+        };
+      }
+    }, [controlImage, ipAdapterId]);
 
-  useEffect(() => {
-    if (isConnected && isErrorControlImage) {
-      handleResetControlImage();
-    }
-  }, [handleResetControlImage, isConnected, isErrorControlImage]);
+    useEffect(() => {
+      if (isConnected && isErrorControlImage) {
+        handleResetControlImage();
+      }
+    }, [handleResetControlImage, isConnected, isErrorControlImage]);
 
-  return (
-    <Flex position="relative" w={36} h={36} alignItems="center">
-      <IAIDndImage
-        draggableData={draggableData}
-        droppableData={droppableData}
-        imageDTO={controlImage}
-        postUploadAction={postUploadAction}
-      />
+    return (
+      <Flex position="relative" w={36} h={36} alignItems="center">
+        <IAIDndImage
+          draggableData={draggableData}
+          droppableData={droppableData}
+          imageDTO={controlImage}
+          postUploadAction={postUploadAction}
+        />
 
-      {controlImage && (
-        <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
-          <IAIDndImageIcon
-            onClick={handleResetControlImage}
-            icon={<PiArrowCounterClockwiseBold size={16} />}
-            tooltip={t('controlnet.resetControlImage')}
-          />
-          <IAIDndImageIcon
-            onClick={handleSetControlImageToDimensions}
-            icon={<PiRulerBold size={16} />}
-            tooltip={shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')}
-          />
-        </Flex>
-      )}
-    </Flex>
-  );
-});
+        {controlImage && (
+          <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
+            <IAIDndImageIcon
+              onClick={handleResetControlImage}
+              icon={<PiArrowCounterClockwiseBold size={16} />}
+              tooltip={t('controlnet.resetControlImage')}
+            />
+            <IAIDndImageIcon
+              onClick={handleSetControlImageToDimensions}
+              icon={<PiRulerBold size={16} />}
+              tooltip={
+                shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')
+              }
+            />
+          </Flex>
+        )}
+      </Flex>
+    );
+  }
+);
 
 IPAdapterImagePreview.displayName = 'IPAdapterImagePreview';

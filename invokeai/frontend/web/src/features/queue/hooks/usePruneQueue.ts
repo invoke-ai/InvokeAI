@@ -1,4 +1,6 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
+import { $isConnected } from 'app/hooks/useSocketIO';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
@@ -8,7 +10,7 @@ import { useGetQueueStatusQuery, usePruneQueueMutation } from 'services/api/endp
 export const usePruneQueue = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const [trigger, { isLoading }] = usePruneQueueMutation({
     fixedCacheKey: 'pruneQueue',
   });
