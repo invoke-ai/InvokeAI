@@ -93,8 +93,8 @@ export const StylePresetForm = ({
         </FormControl>
       </Flex>
 
-      <StylePresetPromptField label="Positive Prompt" control={control} name="positivePrompt" />
-      <StylePresetPromptField label="Negative Prompt" control={control} name="negativePrompt" />
+      <StylePresetPromptField label={t('stylePresets.positivePrompt')} control={control} name="positivePrompt" />
+      <StylePresetPromptField label={t('stylePresets.negativePrompt')} control={control} name="negativePrompt" />
       <Box>
         <Text variant="subtext">{t('stylePresets.promptTemplatesDesc1')}</Text>
         <Text variant="subtext">
