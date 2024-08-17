@@ -26,7 +26,7 @@ export const sessionReducers = {
   },
   sessionStagedImageDiscarded: (state, action: PayloadAction<{ index: number }>) => {
     const { index } = action.payload;
-    state.session.stagedImages = state.session.stagedImages.splice(index, 1);
+    state.session.stagedImages.splice(index, 1);
     state.session.selectedStagedImageIndex = Math.min(
       state.session.selectedStagedImageIndex,
       state.session.stagedImages.length - 1
