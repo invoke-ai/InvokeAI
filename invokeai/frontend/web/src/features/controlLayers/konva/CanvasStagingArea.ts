@@ -3,7 +3,7 @@ import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasPreview } from 'features/controlLayers/konva/CanvasPreview';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { StagingAreaImage } from 'features/controlLayers/store/types';
+import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
@@ -75,7 +75,7 @@ export class CanvasStagingArea {
       }
 
       if (!this.image.isLoading && !this.image.isError) {
-        await this.image.updateImageSource(imageDTO.image_name);
+        await this.image.update({...this.image.state, image: imageDTOToImageWithDims(imageDTO)}, true);
         this.manager.stateApi.$lastCanvasProgressEvent.set(null);
       }
       this.image.konva.group.visible(shouldShowStagedImage);
