@@ -11,7 +11,6 @@ import {
   $lastAddedPoint,
   $lastCursorPos,
   $lastMouseDownPos,
-  $lastProgressEvent,
   $shouldShowStagedImage,
   $spaceKey,
   $stageAttrs,
@@ -51,6 +50,7 @@ import type {
 import { RGBA_RED } from 'features/controlLayers/store/types';
 import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
+import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
 
 type EntityStateAndAdapter =
   | {
@@ -263,7 +263,7 @@ export class CanvasStateApi {
   $lastAddedPoint = $lastAddedPoint;
   $lastMouseDownPos = $lastMouseDownPos;
   $lastCursorPos = $lastCursorPos;
-  $lastProgressEvent = $lastProgressEvent;
+  $lastCanvasProgressEvent = $lastCanvasProgressEvent;
   $spaceKey = $spaceKey;
   $altKey = $alt;
   $ctrlKey = $ctrl;
