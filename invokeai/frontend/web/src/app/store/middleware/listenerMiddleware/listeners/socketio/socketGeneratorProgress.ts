@@ -2,10 +2,10 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
-import { $lastProgressEvent } from 'features/controlLayers/store/canvasV2Slice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { socketGeneratorProgress } from 'services/events/actions';
+import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
 
 const log = logger('socketio');
 
@@ -27,7 +27,7 @@ export const addGeneratorProgressEventListener = (startAppListening: AppStartLis
       }
 
       if (origin === 'canvas') {
-        $lastProgressEvent.set(action.payload.data);
+        $lastCanvasProgressEvent.set(action.payload.data);
       }
     },
   });
