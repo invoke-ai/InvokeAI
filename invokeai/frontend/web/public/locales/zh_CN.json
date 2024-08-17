@@ -493,7 +493,8 @@
         "defaultSettingsSaved": "默认设置已保存",
         "huggingFacePlaceholder": "所有者或模型名称",
         "huggingFaceRepoID": "HuggingFace仓库ID",
-        "loraTriggerPhrases": "LoRA 触发词"
+        "loraTriggerPhrases": "LoRA 触发词",
+        "ipAdapters": "IP适配器"
     },
     "parameters": {
         "images": "图像",
@@ -1702,7 +1703,9 @@
         "upscaleModelDesc": "图像放大（图像到图像转换）模型",
         "postProcessingMissingModelWarning": "请访问 <LinkComponent>模型管理器</LinkComponent>来安装一个后处理(图像到图像转换)模型.",
         "missingModelsWarning": "请访问<LinkComponent>模型管理器</LinkComponent> 安装所需的模型：",
-        "mainModelDesc": "主模型（SD1.5或SDXL架构）"
+        "mainModelDesc": "主模型（SD1.5或SDXL架构）",
+        "exceedsMaxSize": "放大设置超出了最大尺寸限制",
+        "exceedsMaxSizeDetails": "最大放大限制是 {{maxUpscaleDimension}}x{{maxUpscaleDimension}} 像素.请尝试一个较小的图像或减少您的缩放选择."
     },
     "upsell": {
         "inviteTeammates": "邀请团队成员",

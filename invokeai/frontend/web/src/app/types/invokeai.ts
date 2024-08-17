@@ -71,6 +71,7 @@ export type AppConfig = {
    */
   maxUpscaleDimension?: number;
   allowPrivateBoards: boolean;
+  allowPrivateStylePresets: boolean;
   disabledTabs: InvokeTabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];

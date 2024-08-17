@@ -19,7 +19,11 @@ import {
   POSITIVE_CONDITIONING,
   SEAMLESS,
 } from 'features/nodes/util/graph/constants';
-import { getBoardField, getIsIntermediate } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getBoardField,
+  getIsIntermediate,
+  getPresetModifiedPrompts,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ImageDTO, Invocation, NonNullableGraph } from 'services/api/types';
 
 import { addControlNetToLinearGraph } from './addControlNetToLinearGraph';
@@ -58,7 +62,6 @@ export const buildCanvasInpaintGraph = async (
     canvasCoherenceEdgeSize,
     maskBlur,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   if (!model) {
     log.error('No model found in state');
@@ -78,6 +81,8 @@ export const buildCanvasInpaintGraph = async (
   let modelLoaderNodeId = MAIN_MODEL_LOADER;
 
   const use_cpu = shouldUseCpuNoise;
+
+  const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
 
   const graph: NonNullableGraph = {
     id: CANVAS_INPAINT_GRAPH,
