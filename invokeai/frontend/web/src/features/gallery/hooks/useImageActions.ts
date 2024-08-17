@@ -1,7 +1,10 @@
+import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import { handlers, parseAndRecallAllMetadata, parseAndRecallPrompts } from 'features/metadata/util/handlers';
+import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
+import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 
 export const useImageActions = (image_name?: string) => {
@@ -10,6 +13,7 @@ export const useImageActions = (image_name?: string) => {
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasSeed, setHasSeed] = useState(false);
   const [hasPrompts, setHasPrompts] = useState(false);
+  const { data: imageDTO } = useGetImageDTOQuery(image_name ?? skipToken);
 
   useEffect(() => {
     const parseMetadata = async () => {
@@ -61,5 +65,34 @@ export const useImageActions = (image_name?: string) => {
     parseAndRecallPrompts(metadata);
   }, [metadata]);
 
-  return { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata };
+  const createAsPreset = useCallback(async () => {
+    if (image_name && metadata && imageDTO) {
+      const positivePrompt = await handlers.positivePrompt.parse(metadata);
+      const negativePrompt = await handlers.negativePrompt.parse(metadata);
+
+      $stylePresetModalState.set({
+        prefilledFormData: {
+          name: '',
+          positivePrompt,
+          negativePrompt,
+          imageUrl: imageDTO.image_url,
+          type: 'user',
+        },
+        updatingStylePresetId: null,
+        isModalOpen: true,
+      });
+    }
+  }, [image_name, metadata, imageDTO]);
+
+  return {
+    recallAll,
+    remix,
+    recallSeed,
+    recallPrompts,
+    hasMetadata,
+    hasSeed,
+    hasPrompts,
+    isLoadingMetadata,
+    createAsPreset,
+  };
 };

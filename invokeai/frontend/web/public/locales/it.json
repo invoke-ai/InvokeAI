@@ -90,7 +90,7 @@
         "disabled": "Disabilitato",
         "comparingDesc": "Confronta due immagini",
         "comparing": "Confronta",
-        "dontShowMeThese": "Non mostrarmi questi"
+        "dontShowMeThese": "Non mostrare più"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -701,7 +701,9 @@
         "baseModelChanged": "Modello base modificato",
         "sessionRef": "Sessione: {{sessionId}}",
         "somethingWentWrong": "Qualcosa è andato storto",
-        "outOfMemoryErrorDesc": "Le impostazioni della generazione attuale superano la capacità del sistema. Modifica le impostazioni e riprova."
+        "outOfMemoryErrorDesc": "Le impostazioni della generazione attuale superano la capacità del sistema. Modifica le impostazioni e riprova.",
+        "importFailed": "Importazione non riuscita",
+        "importSuccessful": "Importazione riuscita"
     },
     "tooltip": {
         "feature": {
@@ -1526,7 +1528,7 @@
         },
         "upscaleModel": {
             "paragraphs": [
-                "Il modello di ampliamento ridimensiona l'immagine alle dimensioni di uscita prima che vengano aggiunti i dettagli. È possibile utilizzare qualsiasi modello di ampliamento supportato, ma alcuni sono specializzati per diversi tipi di immagini, come foto o disegni al tratto."
+                "Il modello di ampliamento (Upscale), scala l'immagine alle dimensioni di uscita prima di aggiungere i dettagli. È possibile utilizzare qualsiasi modello di ampliamento supportato, ma alcuni sono specializzati per diversi tipi di immagini, come foto o disegni al tratto."
             ],
             "heading": "Modello di ampliamento"
         },
@@ -1735,12 +1737,52 @@
         "missingUpscaleModel": "Modello per l’ampliamento mancante",
         "missingTileControlNetModel": "Nessun modello ControlNet Tile valido installato",
         "postProcessingModel": "Modello di post-elaborazione",
-        "postProcessingMissingModelWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare un modello di post-elaborazione (da immagine a immagine)."
+        "postProcessingMissingModelWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare un modello di post-elaborazione (da immagine a immagine).",
+        "exceedsMaxSize": "Le impostazioni di ampliamento superano il limite massimo delle dimensioni",
+        "exceedsMaxSizeDetails": "Il limite massimo di ampliamento è {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixel. Prova un'immagine più piccola o diminuisci la scala selezionata."
     },
     "upsell": {
         "inviteTeammates": "Invita collaboratori",
         "shareAccess": "Condividi l'accesso",
         "professional": "Professionale",
         "professionalUpsell": "Disponibile nell'edizione Professional di Invoke. Fai clic qui o visita invoke.com/pricing per ulteriori dettagli."
+    },
+    "stylePresets": {
+        "active": "Attivo",
+        "choosePromptTemplate": "Scegli un modello di prompt",
+        "clearTemplateSelection": "Cancella selezione modello",
+        "copyTemplate": "Copia modello",
+        "createPromptTemplate": "Crea modello di prompt",
+        "defaultTemplates": "Modelli predefiniti",
+        "deleteImage": "Elimina immagine",
+        "deleteTemplate": "Elimina modello",
+        "editTemplate": "Modifica modello",
+        "flatten": "Unisci il modello selezionato al prompt corrente",
+        "insertPlaceholder": "Inserisci segnaposto",
+        "myTemplates": "I miei modelli",
+        "name": "Nome",
+        "negativePrompt": "Prompt Negativo",
+        "noMatchingTemplates": "Nessun modello corrispondente",
+        "promptTemplatesDesc1": "I modelli di prompt aggiungono testo ai prompt che scrivi nelle caselle dei prompt.",
+        "promptTemplatesDesc3": "Se si omette il segnaposto, il modello verrà aggiunto alla fine del prompt.",
+        "positivePrompt": "Prompt Positivo",
+        "preview": "Anteprima",
+        "private": "Privato",
+        "searchByName": "Cerca per nome",
+        "shared": "Condiviso",
+        "sharedTemplates": "Modelli condivisi",
+        "templateDeleted": "Modello di prompt eliminato",
+        "toggleViewMode": "Attiva/disattiva visualizzazione",
+        "uploadImage": "Carica immagine",
+        "useForTemplate": "Usa per modello di prompt",
+        "viewList": "Visualizza l'elenco dei modelli",
+        "viewModeTooltip": "Ecco come apparirà il tuo prompt con il modello attualmente selezionato. Per modificare il tuo prompt, clicca in un punto qualsiasi della casella di testo.",
+        "deleteTemplate2": "Vuoi davvero eliminare questo modello? Questa operazione non può essere annullata.",
+        "unableToDeleteTemplate": "Impossibile eliminare il modello di prompt",
+        "updatePromptTemplate": "Aggiorna il modello di prompt",
+        "type": "Tipo",
+        "promptTemplatesDesc2": "Utilizza la stringa segnaposto <Pre>{{placeholder}}</Pre> per specificare dove inserire il tuo prompt nel modello.",
+        "importTemplates": "Importa modelli di prompt",
+        "importTemplatesDesc": "Il formato deve essere un CSV con colonne 'name' e 'prompt' o 'positive_prompt' e 'negative_prompt' incluse, oppure un file JSON con chiavi 'name' e 'prompt' o 'positive_prompt' e 'negative_prompt"
     }
 }

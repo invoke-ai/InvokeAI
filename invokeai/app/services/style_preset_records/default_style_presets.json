@@ -1,0 +1,146 @@
+[
+  {
+    "name": "Photography (General)",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt}. photography. f/2.8 macro photo, bokeh, photorealism",
+      "negative_prompt": "painting, digital art. sketch, blurry"
+    }
+  },
+  {
+    "name": "Photography (Studio Lighting)",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt}, photography. f/8 photo. centered subject, studio lighting.",
+      "negative_prompt": "painting, digital art. sketch, blurry"
+    }
+  },
+  {
+    "name": "Photography (Landscape)",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt}, landscape photograph, f/12, lifelike,  highly detailed.",
+      "negative_prompt": "painting, digital art. sketch, blurry"
+    }
+  },
+  {
+    "name": "Photography (Portrait)",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt}. photography. portraiture. catch light in eyes. one flash. rembrandt lighting. Soft box. dark shadows. High contrast. 80mm lens. F2.8.",
+      "negative_prompt": "painting, digital art. sketch, blurry"
+    }
+  },
+  {
+    "name": "Photography (Black and White)",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt} photography. natural light. 80mm lens. F1.4. strong contrast, hard light. dark contrast. blurred background. black and white",
+      "negative_prompt": "painting, digital art. sketch, colour+"
+    }
+  },
+  {
+    "name": "Architectural Visualization",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt}. architectural photography, f/12, luxury, aesthetically pleasing form and function.",
+      "negative_prompt": "painting, digital art. sketch, blurry"
+    }
+  },
+  {
+    "name": "Concept Art (Fantasy)",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "concept artwork of a {prompt}. (digital painterly art style)++, mythological, (textured 2d dry media brushpack)++, glazed brushstrokes, otherworldly. painting+, illustration+",
+      "negative_prompt": "photo. distorted, blurry, out of focus. sketch. (cgi, 3d.)++"
+    }
+  },
+  {
+    "name": "Concept Art (Sci-Fi)",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "(concept art)++, {prompt}, (sleek futurism)++, (textured 2d dry media)++, metallic highlights, digital painting style",
+      "negative_prompt": "photo. distorted, blurry, out of focus. sketch. (cgi, 3d.)++"
+    }
+  },
+  {
+    "name": "Concept Art (Character)",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "(character concept art)++, stylized painterly digital painting of {prompt}, (painterly, impasto. Dry brush.)++",
+      "negative_prompt": "photo. distorted, blurry, out of focus. sketch. (cgi, 3d.)++"
+    }
+  },
+  {
+    "name": "Concept Art (Painterly)",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt} oil painting. high contrast. impasto. sfumato. chiaroscuro. Palette knife.",
+      "negative_prompt": "photo. smooth. border. frame"
+    }
+  },
+  {
+    "name": "Environment Art",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt} environment artwork, hyper-realistic digital painting style with cinematic composition, atmospheric, depth and detail, voluminous. textured dry brush 2d media",
+      "negative_prompt": "photo, distorted, blurry, out of focus. sketch."
+    }
+  },
+  {
+    "name": "Interior Design (Visualization)",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt} interior design photo, gentle shadows, light mid-tones, dimension, mix of smooth and textured surfaces, focus on negative space and clean lines, focus",
+      "negative_prompt": "photo, distorted. sketch."
+    }
+  },
+  {
+    "name": "Product Rendering",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt} high quality product photography, 3d rendering with key lighting, shallow depth of field, simple plain background, studio lighting.",
+      "negative_prompt": "blurry, sketch, messy, dirty. unfinished."
+    }
+  },
+  {
+    "name": "Sketch",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt} black and white pencil drawing, off-center composition, cross-hatching for shadows, bold strokes, textured paper. sketch+++",
+      "negative_prompt": "blurry, photo, painting, color. messy, dirty. unfinished. frame, borders."
+    }
+  },
+  {
+    "name": "Line Art",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt} Line art. bold outline. simplistic. white background. 2d",
+      "negative_prompt": "photo. digital art. greyscale. solid black. painting"
+    }
+  },
+  {
+    "name": "Anime",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt} anime++, bold outline, cel-shaded coloring, shounen, seinen",
+      "negative_prompt": "(photo)+++. greyscale. solid black. painting"
+    }
+  },
+  {
+    "name": "Illustration",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "{prompt} illustration, bold linework, illustrative details, vector art style, flat coloring",
+      "negative_prompt": "(photo)+++. greyscale. painting, black and white."
+    }
+  },
+  {
+    "name": "Vehicles",
+    "type": "default",
+    "preset_data": {
+      "positive_prompt": "A weird futuristic normal auto, {prompt} elegant design, nice color, nice wheels",
+      "negative_prompt": "sketch. digital art. greyscale. painting"
+    }
+  }
+]
