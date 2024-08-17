@@ -1,4 +1,5 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -14,6 +15,7 @@ import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { $hasProgress } from 'services/events/setEventListeners';
 
 import ProgressImage from './ProgressImage';
 
@@ -26,7 +28,7 @@ const CurrentImagePreview = () => {
   const { t } = useTranslation();
   const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
-  const hasDenoiseProgress = useAppSelector((s) => Boolean(s.system.denoiseProgress));
+  const hasDenoiseProgress = useStore($hasProgress);
   const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
 
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);

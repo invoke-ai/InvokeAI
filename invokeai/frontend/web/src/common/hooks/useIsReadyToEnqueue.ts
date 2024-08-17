@@ -1,4 +1,5 @@
 import { useStore } from '@nanostores/react';
+import { $isConnected } from 'app/hooks/useSocketIO';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
@@ -25,7 +26,7 @@ const LAYER_TYPE_TO_TKEY = {
   control_layer: 'controlLayers.globalControlAdapter',
 } as const;
 
-const createSelector = (templates: Templates) =>
+const createSelector = (templates: Templates, isConnected: boolean) =>
   createMemoizedSelector(
     [
       selectSystemSlice,
@@ -40,8 +41,6 @@ const createSelector = (templates: Templates) =>
     (system, nodes, workflowSettings, dynamicPrompts, canvasV2, upscale, config, activeTabName) => {
       const { bbox } = canvasV2;
       const { model, positivePrompt } = canvasV2.params;
-
-      const { isConnected } = system;
 
       const reasons: { prefix?: string; content: string }[] = [];
 
@@ -240,7 +239,8 @@ const createSelector = (templates: Templates) =>
 
 export const useIsReadyToEnqueue = () => {
   const templates = useStore($templates);
-  const selector = useMemo(() => createSelector(templates), [templates]);
+  const isConnected = useStore($isConnected)
+  const selector = useMemo(() => createSelector(templates, isConnected), [templates, isConnected]);
   const value = useAppSelector(selector);
   return value;
 };

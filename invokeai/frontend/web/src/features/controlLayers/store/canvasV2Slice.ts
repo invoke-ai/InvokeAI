@@ -20,7 +20,6 @@ import { initialAspectRatioState } from 'features/parameters/components/Document
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { isEqual, pick } from 'lodash-es';
 import { atom } from 'nanostores';
-import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 import { assert } from 'tsafe';
 
 import type {
@@ -622,7 +621,6 @@ export const $stageAttrs = atom<StageAttrs>({
   scale: 0,
 });
 export const $shouldShowStagedImage = atom(true);
-export const $lastProgressEvent = atom<InvocationDenoiseProgressEvent | null>(null);
 export const $isDrawing = atom<boolean>(false);
 export const $isMouseDown = atom<boolean>(false);
 export const $lastAddedPoint = atom<Coordinate | null>(null);
