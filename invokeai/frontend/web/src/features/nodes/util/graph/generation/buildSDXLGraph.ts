@@ -51,8 +51,6 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
     shouldUseCpuNoise,
     vaePrecision,
     vae,
-    positivePrompt,
-    negativePrompt,
     refinerModel,
     refinerStart,
   } = params;
@@ -61,7 +59,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
 
   const { originalSize, scaledSize } = getSizes(bbox);
 
-  const { positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
+  const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
 
   const g = new Graph(SDXL_CONTROL_LAYERS_GRAPH);
   const modelLoader = g.addNode({
