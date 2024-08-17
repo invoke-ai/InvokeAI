@@ -19,6 +19,7 @@ from invokeai.backend.model_manager import (
     ModelFormat,
     ModelType,
     ModelVariantType,
+    SchedulerPredictionType,
     SubModelType,
 )
 from invokeai.backend.model_manager.config import (
@@ -103,11 +104,34 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                 ModelVariantType.Normal: StableDiffusionXLPipeline,
             },
         }
+        config_dirs = {
+            BaseModelType.StableDiffusion1: {
+                SchedulerPredictionType.Epsilon: "stable-diffusion-1.5-epsilon",
+                SchedulerPredictionType.VPrediction: "stable-diffusion-1.5-v_prediction",
+            },
+            BaseModelType.StableDiffusion2: {
+                SchedulerPredictionType.VPrediction: "stable-diffusion-2.0-v_prediction",
+            },
+            BaseModelType.StableDiffusionXL: {
+                SchedulerPredictionType.Epsilon: "stable-diffusion-xl-base-1.0",
+            },
+            BaseModelType.StableDiffusionXLRefiner: {
+                SchedulerPredictionType.Epsilon: "stable-diffusion-xl-refiner-1.0",
+            },
+        }
+
         assert isinstance(config, MainCheckpointConfig)
         try:
             load_class = load_classes[config.base][config.variant]
         except KeyError as e:
             raise Exception(f"No diffusers pipeline known for base={config.base}, variant={config.variant}") from e
+
+        try:
+            config_dir = config_dirs[config.base][config.prediction_type]
+        except KeyError as e:
+            raise Exception(
+                f"No configuration template known for base={config.base}, prediction_type={config.prediction_type}"
+            ) from e
 
         # Without SilenceWarnings we get log messages like this:
         # site-packages/huggingface_hub/file_download.py:1132: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
@@ -122,7 +146,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         with SilenceWarnings():
             pipeline = load_class.from_single_file(
                 config.path,
-                cache_dir=conf_file_cache.__path__[0],
+                config=Path(conf_file_cache.__path__[0], config_dir).as_posix(),
                 original_config=original_config_file,
                 torch_dtype=self._torch_dtype,
                 local_files_only=True,
