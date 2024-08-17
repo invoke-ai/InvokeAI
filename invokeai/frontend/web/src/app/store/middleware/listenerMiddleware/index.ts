@@ -26,15 +26,7 @@ import { addModelSelectedListener } from 'app/store/middleware/listenerMiddlewar
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
 import { addDynamicPromptsListener } from 'app/store/middleware/listenerMiddleware/listeners/promptChanged';
 import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMiddleware/listeners/setDefaultSettings';
-import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketConnected';
-import { addSocketDisconnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketDisconnected';
-import { addGeneratorProgressEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketGeneratorProgress';
-import { addInvocationCompleteEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationComplete';
-import { addInvocationErrorEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationError';
-import { addInvocationStartedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketInvocationStarted';
-import { addModelInstallEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketModelInstall';
-import { addModelLoadEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketModelLoad';
-import { addSocketQueueEventsListeners } from 'app/store/middleware/listenerMiddleware/listeners/socketio/socketQueueEvents';
+import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { addUpdateAllNodesRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/updateAllNodesRequested';
 import { addWorkflowLoadRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/workflowLoadRequested';
 import type { AppDispatch, RootState } from 'app/store/store';
@@ -90,15 +82,9 @@ addBatchEnqueuedListener(startAppListening);
 addStagingListeners(startAppListening);
 
 // Socket.IO
-addGeneratorProgressEventListener(startAppListening);
-addInvocationCompleteEventListener(startAppListening);
-addInvocationErrorEventListener(startAppListening);
-addInvocationStartedEventListener(startAppListening);
 addSocketConnectedEventListener(startAppListening);
-addSocketDisconnectedEventListener(startAppListening);
-addModelLoadEventListener(startAppListening);
-addModelInstallEventListener(startAppListening);
-addSocketQueueEventsListeners(startAppListening);
+
+// Gallery bulk download
 addBulkDownloadListeners(startAppListening);
 
 // Boards

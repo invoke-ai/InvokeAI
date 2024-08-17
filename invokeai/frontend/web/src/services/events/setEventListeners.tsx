@@ -1,4 +1,5 @@
 import { ExternalLink } from '@invoke-ai/ui-library';
+import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
@@ -21,9 +22,10 @@ import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import { getCategories, getListImagesUrl } from 'services/api/util';
-import { socketConnected } from 'services/events/actions';
 import type { ClientToServerEvents, InvocationDenoiseProgressEvent, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
+
+export const socketConnected = createAction('socket/connected');
 
 const log = logger('socketio');
 

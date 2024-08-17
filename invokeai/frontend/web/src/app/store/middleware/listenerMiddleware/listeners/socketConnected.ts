@@ -6,7 +6,7 @@ import { atom } from 'nanostores';
 import { api } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, selectQueueStatus } from 'services/api/endpoints/queue';
-import { socketConnected } from 'services/events/actions';
+import { socketConnected } from 'services/events/setEventListeners';
 
 const log = logger('socketio');
 
