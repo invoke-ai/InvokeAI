@@ -1,4 +1,5 @@
-import { useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
+import { $isConnected } from 'app/hooks/useSocketIO';
 import { toast } from 'features/toast/toast';
 import { isNil } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
@@ -6,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useCancelQueueItemMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 export const useCancelCurrentQueueItem = () => {
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const { data: queueStatus } = useGetQueueStatusQuery();
   const [trigger, { isLoading }] = useCancelQueueItemMutation();
   const { t } = useTranslation();

@@ -1,4 +1,6 @@
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
+import { $isConnected } from 'app/hooks/useSocketIO';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
@@ -9,7 +11,7 @@ export const useClearQueue = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { data: queueStatus } = useGetQueueStatusQuery();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const [trigger, { isLoading }] = useClearQueueMutation({
     fixedCacheKey: 'clearQueue',
   });
