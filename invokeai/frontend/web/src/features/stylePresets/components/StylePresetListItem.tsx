@@ -174,7 +174,8 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
         onClose={onClose}
         title={t('stylePresets.deleteTemplate')}
         acceptCallback={handleDeletePreset}
-        acceptButtonText="Delete"
+        acceptButtonText={t('common.delete')}
+        cancelButtonText={t('common.cancel')}
       >
         <p>{t('stylePresets.deleteTemplate2')}</p>
       </ConfirmationAlertDialog>
