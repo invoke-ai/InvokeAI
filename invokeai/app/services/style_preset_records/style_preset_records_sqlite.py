@@ -5,6 +5,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
+    PresetType,
     StylePresetChanges,
     StylePresetNotFoundError,
     StylePresetRecordDTO,
@@ -75,6 +76,39 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
             self._lock.release()
         return self.get(style_preset_id)
 
+    def create_many(self, style_presets: list[StylePresetWithoutId]) -> None:
+        style_preset_ids = []
+        try:
+            self._lock.acquire()
+            for style_preset in style_presets:
+                style_preset_id = uuid_string()
+                style_preset_ids.append(style_preset_id)
+                self._cursor.execute(
+                    """--sql
+                    INSERT OR IGNORE INTO style_presets (
+                        id,
+                        name,
+                        preset_data,
+                        type
+                    )
+                    VALUES (?, ?, ?, ?);
+                    """,
+                    (
+                        style_preset_id,
+                        style_preset.name,
+                        style_preset.preset_data.model_dump_json(),
+                        style_preset.type,
+                    ),
+                )
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            self._lock.release()
+
+        return None
+
     def update(self, style_preset_id: str, changes: StylePresetChanges) -> StylePresetRecordDTO:
         try:
             self._lock.acquire()
@@ -126,19 +160,25 @@ class SqliteStylePresetRecordsStorage(StylePresetRecordsStorageBase):
             self._lock.release()
         return None
 
-    def get_many(
-        self,
-    ) -> list[StylePresetRecordDTO]:
+    def get_many(self, type: PresetType | None = None) -> list[StylePresetRecordDTO]:
         try:
             self._lock.acquire()
             main_query = """
                 SELECT
                     *
                 FROM style_presets
-                ORDER BY LOWER(name) ASC
                 """
 
-            self._cursor.execute(main_query)
+            if type is not None:
+                main_query += "WHERE type = ? "
+
+            main_query += "ORDER BY LOWER(name) ASC"
+
+            if type is not None:
+                self._cursor.execute(main_query, (type,))
+            else:
+                self._cursor.execute(main_query)
+
             rows = self._cursor.fetchall()
             style_presets = [StylePresetRecordDTO.from_dict(dict(row)) for row in rows]
 

@@ -19,6 +19,7 @@ import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab } from 'features/ui/store/uiSlice';
+import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
@@ -37,10 +38,11 @@ interface Props {
     imageName: string;
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
+  selectedWorkflowId?: string;
   destination?: InvokeTabName | undefined;
 }
 
-const App = ({ config = DEFAULT_CONFIG, selectedImage, destination }: Props) => {
+const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflowId, destination }: Props) => {
   const language = useAppSelector(languageSelector);
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
@@ -70,6 +72,14 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage, destination }: Props) => 
       dispatch(configChanged(config));
     }
   }, [dispatch, config, logger]);
+
+  const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
+
+  useEffect(() => {
+    if (selectedWorkflowId) {
+      getAndLoadWorkflow(selectedWorkflowId);
+    }
+  }, [selectedWorkflowId, getAndLoadWorkflow]);
 
   useEffect(() => {
     if (destination) {

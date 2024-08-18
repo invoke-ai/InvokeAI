@@ -15,9 +15,9 @@ type UseGetAndLoadLibraryWorkflowReturn = {
   getAndLoadWorkflowResult: ReturnType<typeof useLazyGetWorkflowQuery>[1];
 };
 
-type UseGetAndLoadLibraryWorkflow = (arg: UseGetAndLoadLibraryWorkflowOptions) => UseGetAndLoadLibraryWorkflowReturn;
+type UseGetAndLoadLibraryWorkflow = (arg?: UseGetAndLoadLibraryWorkflowOptions) => UseGetAndLoadLibraryWorkflowReturn;
 
-export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({ onSuccess, onError }) => {
+export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = (arg) => {
   const dispatch = useAppDispatch();
   const toast = useToast();
   const { t } = useTranslation();
@@ -29,17 +29,17 @@ export const useGetAndLoadLibraryWorkflow: UseGetAndLoadLibraryWorkflow = ({ onS
         // This action expects a stringified workflow, instead of updating the routes and services we will just stringify it here
         dispatch(workflowLoadRequested({ data: { workflow: JSON.stringify(workflow), graph: null }, asCopy: false }));
         // No toast - the listener for this action does that after the workflow is loaded
-        onSuccess && onSuccess();
+        arg?.onSuccess && arg.onSuccess();
       } catch {
         toast({
           id: `AUTH_ERROR_TOAST_${workflowsApi.endpoints.getWorkflow.name}`,
           title: t('toast.problemRetrievingWorkflow'),
           status: 'error',
         });
-        onError && onError();
+        arg?.onError && arg.onError();
       }
     },
-    [_getAndLoadWorkflow, dispatch, onSuccess, t, onError, toast]
+    [_getAndLoadWorkflow, dispatch, arg, t, toast]
   );
 
   return { getAndLoadWorkflow, getAndLoadWorkflowResult };
