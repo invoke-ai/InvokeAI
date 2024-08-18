@@ -5,6 +5,7 @@ import { Combobox, Flex, Popover, PopoverAnchor, PopoverBody, PopoverContent } f
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppStore } from 'app/store/storeHooks';
 import type { SelectInstance } from 'chakra-react-select';
+import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
   $cursorPos,
@@ -67,6 +68,7 @@ const AddNodePopover = () => {
   const pendingConnection = useStore($pendingConnection);
   const isOpen = useStore($isAddNodePopoverOpen);
   const store = useAppStore();
+  const isWorkflowsActive = useStore(INTERACTION_SCOPES.workflows.$isActive);
 
   const filteredTemplates = useMemo(() => {
     // If we have a connection in progress, we need to filter the node choices
@@ -214,14 +216,7 @@ const AddNodePopover = () => {
     }
   }, []);
 
-  const handleHotkeyClose: HotkeyCallback = useCallback(() => {
-    if ($isAddNodePopoverOpen.get()) {
-      closeAddNodePopover();
-    }
-  }, []);
-
-  useHotkeys(['shift+a', 'space'], handleHotkeyOpen);
-  useHotkeys(['escape'], handleHotkeyClose, { enableOnFormTags: ['TEXTAREA'] });
+  useHotkeys(['shift+a', 'space'], handleHotkeyOpen, { enabled: isWorkflowsActive }, [isWorkflowsActive]);
 
   const noOptionsMessage = useCallback(() => t('nodes.noMatchingNodes'), [t]);
 
