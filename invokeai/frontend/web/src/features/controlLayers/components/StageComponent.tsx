@@ -80,7 +80,7 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
   );
 
   return (
-    <Flex position="relative" w="full" h="full">
+    <Flex position="relative" w="full" h="full" bg={canvasBackgroundStyle === 'checkerboard' ? 'base.900' : 'base.850'}>
       {canvasBackgroundStyle === 'checkerboard' && (
         <Flex
           position="absolute"

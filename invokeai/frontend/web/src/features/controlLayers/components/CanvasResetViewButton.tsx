@@ -1,5 +1,6 @@
 import { $shift, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -9,6 +10,7 @@ import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 export const CanvasResetViewButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useStore($canvasManager);
+  const isCanvasActive = useStore(INTERACTION_SCOPES.canvas.$isActive);
 
   const resetZoom = useCallback(() => {
     if (!canvasManager) {
@@ -32,8 +34,8 @@ export const CanvasResetViewButton = memo(() => {
     }
   }, [resetView, resetZoom]);
 
-  useHotkeys('r', resetView);
-  useHotkeys('shift+r', resetZoom);
+  useHotkeys('r', resetView, { enabled: isCanvasActive }, [isCanvasActive]);
+  useHotkeys('shift+r', resetZoom, { enabled: isCanvasActive }, [isCanvasActive]);
 
   return (
     <IconButton

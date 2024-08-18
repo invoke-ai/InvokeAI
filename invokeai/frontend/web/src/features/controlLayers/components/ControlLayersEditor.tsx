@@ -1,18 +1,27 @@
 /* eslint-disable i18next/no-literal-string */
 import { Flex } from '@invoke-ai/ui-library';
+import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea';
 import { ControlLayersToolbar } from 'features/controlLayers/components/ControlLayersToolbar';
 import { StageComponent } from 'features/controlLayers/components/StageComponent';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 
-export const ControlLayersEditor = memo(() => {
+export const CanvasEditor = memo(() => {
+  const ref = useRef<HTMLDivElement>(null);
+  useScopeOnFocus('canvas', ref);
+
   return (
     <Flex
+      tabIndex={-1}
+      ref={ref}
+      layerStyle="first"
+      p={2}
+      borderRadius="base"
       position="relative"
       flexDirection="column"
-      height="100%"
-      width="100%"
+      height="full"
+      width="full"
       gap={2}
       alignItems="center"
       justifyContent="center"
@@ -22,12 +31,9 @@ export const ControlLayersEditor = memo(() => {
       <Flex position="absolute" bottom={2} gap={2} align="center" justify="center">
         <StagingAreaToolbar />
       </Flex>
-      {/* <Flex position="absolute" top={0} right={0} bottom={0} left={0} align="center" justify="center">
-        <CanvasResizer />
-      </Flex> */}
       <CanvasDropArea />
     </Flex>
   );
 });
 
-ControlLayersEditor.displayName = 'ControlLayersEditor';
+CanvasEditor.displayName = 'CanvasEditor';
