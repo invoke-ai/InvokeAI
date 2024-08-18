@@ -5,11 +5,13 @@ export const getViewModeChunks = (currentPrompt: string, presetPrompt?: string):
     return ['', currentPrompt, ''];
   }
 
-  const [before, after] = presetPrompt.split(PRESET_PLACEHOLDER, 2);
-
-  if (!before || !after) {
-    return ['', `${currentPrompt} `, before || after || ''];
+  // When preset prompt does not contain the placeholder, we append the preset to the current prompt
+  if (!presetPrompt.includes(PRESET_PLACEHOLDER)) {
+    return ['', `${currentPrompt} `, presetPrompt];
   }
 
-  return [before ?? '', currentPrompt, after ?? ''];
+  // Otherwise, we split the preset prompt into 3 parts: before, current, and after the placeholder
+  const [before, after] = presetPrompt.split(PRESET_PLACEHOLDER, 2);
+
+  return [before || '', currentPrompt, after || ''];
 };
