@@ -1,6 +1,7 @@
 import { Button, ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
 import {
   $shouldShowStagedImage,
   sessionNextStagedImageSelected,
@@ -37,13 +38,13 @@ StagingAreaToolbar.displayName = 'StagingAreaToolbar';
 
 export const StagingAreaToolbarContent = memo(() => {
   const dispatch = useAppDispatch();
-  const stagingArea = useAppSelector((s) => s.canvasV2.session);
+  const session = useAppSelector((s) => s.canvasV2.session);
   const shouldShowStagedImage = useStore($shouldShowStagedImage);
-  const images = useMemo(() => stagingArea.stagedImages, [stagingArea]);
+  const images = useMemo(() => session.stagedImages, [session]);
   const selectedImage = useMemo(() => {
-    return images[stagingArea.selectedStagedImageIndex] ?? null;
-  }, [images, stagingArea.selectedStagedImageIndex]);
-
+    return images[session.selectedStagedImageIndex] ?? null;
+  }, [images, session.selectedStagedImageIndex]);
+  const isCanvasActive = useStore(INTERACTION_SCOPES.canvas.$isActive);
   // const [changeIsImageIntermediate] = useChangeImageIsIntermediateMutation();
 
   const { t } = useTranslation();
@@ -60,8 +61,8 @@ export const StagingAreaToolbarContent = memo(() => {
     if (!selectedImage) {
       return;
     }
-    dispatch(sessionStagingAreaImageAccepted({ index: stagingArea.selectedStagedImageIndex }));
-  }, [dispatch, selectedImage, stagingArea.selectedStagedImageIndex]);
+    dispatch(sessionStagingAreaImageAccepted({ index: session.selectedStagedImageIndex }));
+  }, [dispatch, selectedImage, session.selectedStagedImageIndex]);
 
   const onDiscardOne = useCallback(() => {
     if (!selectedImage) {
@@ -70,9 +71,9 @@ export const StagingAreaToolbarContent = memo(() => {
     if (images.length === 1) {
       dispatch(sessionStagingAreaReset());
     } else {
-      dispatch(sessionStagedImageDiscarded({ index: stagingArea.selectedStagedImageIndex }));
+      dispatch(sessionStagedImageDiscarded({ index: session.selectedStagedImageIndex }));
     }
-  }, [selectedImage, images.length, dispatch, stagingArea.selectedStagedImageIndex]);
+  }, [selectedImage, images.length, dispatch, session.selectedStagedImageIndex]);
 
   const onDiscardAll = useCallback(() => {
     dispatch(sessionStagingAreaReset());
@@ -95,25 +96,43 @@ export const StagingAreaToolbarContent = memo(() => {
     ]
   );
 
-  useHotkeys(['left'], onPrev, {
-    preventDefault: true,
-  });
+  useHotkeys(
+    ['left'],
+    onPrev,
+    {
+      preventDefault: true,
+      enabled: isCanvasActive,
+    },
+    [isCanvasActive]
+  );
 
-  useHotkeys(['right'], onNext, {
-    preventDefault: true,
-  });
+  useHotkeys(
+    ['right'],
+    onNext,
+    {
+      preventDefault: true,
+      enabled: isCanvasActive,
+    },
+    [isCanvasActive]
+  );
 
-  useHotkeys(['enter'], onAccept, {
-    preventDefault: true,
-  });
+  useHotkeys(
+    ['enter'],
+    onAccept,
+    {
+      preventDefault: true,
+      enabled: isCanvasActive,
+    },
+    [isCanvasActive]
+  );
 
   const counterText = useMemo(() => {
     if (images.length > 0) {
-      return `${(stagingArea.selectedStagedImageIndex ?? 0) + 1} of ${images.length}`;
+      return `${(session.selectedStagedImageIndex ?? 0) + 1} of ${images.length}`;
     } else {
       return `0 of 0`;
     }
-  }, [images.length, stagingArea.selectedStagedImageIndex]);
+  }, [images.length, session.selectedStagedImageIndex]);
 
   return (
     <>

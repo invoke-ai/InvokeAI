@@ -1,6 +1,7 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { INTERACTION_SCOPES, useScopeImperativeApi } from 'common/hooks/interactionScopes';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
@@ -79,16 +80,13 @@ export const Flow = memo(() => {
   const cancelConnection = useReactFlowStore(selectCancelConnection);
   const updateNodeInternals = useUpdateNodeInternals();
   const store = useAppStore();
+  const isWorkflowsActive = useStore(INTERACTION_SCOPES.workflows.$isActive);
+  const workflowsScopeApi = useScopeImperativeApi('workflows');
+
   useWorkflowWatcher();
   useSyncExecutionState();
   const [borderRadius] = useToken('radii', ['base']);
-
-  const flowStyles = useMemo<CSSProperties>(
-    () => ({
-      borderRadius,
-    }),
-    [borderRadius]
-  );
+  const flowStyles = useMemo<CSSProperties>(() => ({ borderRadius }), [borderRadius]);
 
   const onNodesChange: OnNodesChange = useCallback(
     (nodeChanges) => {
@@ -121,7 +119,8 @@ export const Flow = memo(() => {
   const { onCloseGlobal } = useGlobalMenuClose();
   const handlePaneClick = useCallback(() => {
     onCloseGlobal();
-  }, [onCloseGlobal]);
+    workflowsScopeApi.add();
+  }, [onCloseGlobal, workflowsScopeApi]);
 
   const onInit: OnInit = useCallback((flow) => {
     $flow.set(flow);
@@ -237,7 +236,7 @@ export const Flow = memo(() => {
     },
     [dispatch, store]
   );
-  useHotkeys(['Ctrl+a', 'Meta+a'], onSelectAllHotkey);
+  useHotkeys(['Ctrl+a', 'Meta+a'], onSelectAllHotkey, { enabled: isWorkflowsActive }, [isWorkflowsActive]);
 
   const onPasteHotkey = useCallback(
     (e: KeyboardEvent) => {

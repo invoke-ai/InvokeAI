@@ -1,19 +1,25 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useScopeOnFocus, useScopeOnMount } from 'common/hooks/interactionScopes';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
+import { ImageComparisonDroppable } from 'features/gallery/components/ImageViewer/ImageComparisonDroppable';
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import { useMeasure } from 'react-use';
 
-import { useImageViewer } from './useImageViewer';
-
 export const ImageViewer = memo(() => {
-  const imageViewer = useImageViewer();
+  const isComparing = useAppSelector((s) => s.gallery.imageToCompare !== null);
   const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
+  const ref = useRef<HTMLDivElement>(null);
+  useScopeOnFocus('imageViewer', ref);
+  useScopeOnMount('imageViewer');
 
   return (
     <Flex
+      ref={ref}
+      tabIndex={-1}
       layerStyle="first"
       borderRadius="base"
       position="absolute"
@@ -27,12 +33,13 @@ export const ImageViewer = memo(() => {
       alignItems="center"
       justifyContent="center"
     >
-      {imageViewer.isComparing && <CompareToolbar />}
-      {!imageViewer.isComparing && <ViewerToolbar />}
+      {isComparing && <CompareToolbar />}
+      {!isComparing && <ViewerToolbar />}
       <Box ref={containerRef} w="full" h="full">
-        {!imageViewer.isComparing && <CurrentImagePreview />}
-        {imageViewer.isComparing && <ImageComparison containerDims={containerDims} />}
+        {!isComparing && <CurrentImagePreview />}
+        {isComparing && <ImageComparison containerDims={containerDims} />}
       </Box>
+      <ImageComparisonDroppable />
     </Flex>
   );
 });

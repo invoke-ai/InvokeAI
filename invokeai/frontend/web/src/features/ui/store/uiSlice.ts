@@ -2,6 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
+import { atom } from 'nanostores';
 
 import type { InvokeTabName } from './tabMap';
 import type { UIState } from './uiTypes';
@@ -77,3 +78,6 @@ export const uiPersistConfig: PersistConfig<UIState> = {
   migrate: migrateUIState,
   persistDenylist: ['shouldShowImageDetails'],
 };
+
+export const $isGalleryPanelOpen = atom(true);
+export const $isParametersPanelOpen = atom(true);

@@ -1,20 +1,20 @@
 import { Flex } from '@invoke-ai/ui-library';
 import type { Meta, StoryObj } from '@storybook/react';
-import { ControlLayersEditor } from 'features/controlLayers/components/ControlLayersEditor';
+import { CanvasEditor } from 'features/controlLayers/components/ControlLayersEditor';
 
-const meta: Meta<typeof ControlLayersEditor> = {
+const meta: Meta<typeof CanvasEditor> = {
   title: 'Feature/ControlLayers',
   tags: ['autodocs'],
-  component: ControlLayersEditor,
+  component: CanvasEditor,
 };
 
 export default meta;
-type Story = StoryObj<typeof ControlLayersEditor>;
+type Story = StoryObj<typeof CanvasEditor>;
 
 const Component = () => {
   return (
     <Flex w={1500} h={1500}>
-      <ControlLayersEditor />
+      <CanvasEditor />
     </Flex>
   );
 };
