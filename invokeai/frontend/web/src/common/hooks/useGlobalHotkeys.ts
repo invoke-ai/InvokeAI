@@ -1,4 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
+import { addScope, removeScope, setScopes } from 'common/hooks/interactionScopes';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
@@ -16,7 +17,7 @@ export const useGlobalHotkeys = () => {
     ['ctrl+enter', 'meta+enter'],
     queueBack,
     {
-      enabled: () => !isDisabledQueueBack && !isLoadingQueueBack,
+      enabled: !isDisabledQueueBack && !isLoadingQueueBack,
       preventDefault: true,
       enableOnFormTags: ['input', 'textarea', 'select'],
     },
@@ -29,7 +30,7 @@ export const useGlobalHotkeys = () => {
     ['ctrl+shift+enter', 'meta+shift+enter'],
     queueFront,
     {
-      enabled: () => !isDisabledQueueFront && !isLoadingQueueFront,
+      enabled: !isDisabledQueueFront && !isLoadingQueueFront,
       preventDefault: true,
       enableOnFormTags: ['input', 'textarea', 'select'],
     },
@@ -46,7 +47,7 @@ export const useGlobalHotkeys = () => {
     ['shift+x'],
     cancelQueueItem,
     {
-      enabled: () => !isDisabledCancelQueueItem && !isLoadingCancelQueueItem,
+      enabled: !isDisabledCancelQueueItem && !isLoadingCancelQueueItem,
       preventDefault: true,
     },
     [cancelQueueItem, isDisabledCancelQueueItem, isLoadingCancelQueueItem]
@@ -58,7 +59,7 @@ export const useGlobalHotkeys = () => {
     ['ctrl+shift+x', 'meta+shift+x'],
     clearQueue,
     {
-      enabled: () => !isDisabledClearQueue && !isLoadingClearQueue,
+      enabled: !isDisabledClearQueue && !isLoadingClearQueue,
       preventDefault: true,
     },
     [clearQueue, isDisabledClearQueue, isLoadingClearQueue]
@@ -68,6 +69,8 @@ export const useGlobalHotkeys = () => {
     '1',
     () => {
       dispatch(setActiveTab('generation'));
+      addScope('canvas');
+      removeScope('workflows');
     },
     [dispatch]
   );
@@ -75,7 +78,9 @@ export const useGlobalHotkeys = () => {
   useHotkeys(
     '2',
     () => {
-      dispatch(setActiveTab('workflows'));
+      dispatch(setActiveTab('upscaling'));
+      removeScope('canvas');
+      removeScope('workflows');
     },
     [dispatch]
   );
@@ -83,17 +88,29 @@ export const useGlobalHotkeys = () => {
   useHotkeys(
     '3',
     () => {
+      dispatch(setActiveTab('workflows'));
+      removeScope('canvas');
+      addScope('workflows');
+    },
+    [dispatch]
+  );
+
+  useHotkeys(
+    '4',
+    () => {
       if (isModelManagerEnabled) {
         dispatch(setActiveTab('models'));
+        setScopes([]);
       }
     },
     [dispatch, isModelManagerEnabled]
   );
 
   useHotkeys(
-    isModelManagerEnabled ? '4' : '3',
+    isModelManagerEnabled ? '5' : '4',
     () => {
       dispatch(setActiveTab('queue'));
+      setScopes([]);
     },
     [dispatch, isModelManagerEnabled]
   );

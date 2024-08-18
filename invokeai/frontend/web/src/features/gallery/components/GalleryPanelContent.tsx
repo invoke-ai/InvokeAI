@@ -1,5 +1,6 @@
 import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
@@ -18,19 +19,21 @@ import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopo
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 
-const ImageGalleryContent = () => {
+const GalleryPanelContent = () => {
   const { t } = useTranslation();
   const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
   const dispatch = useAppDispatch();
   const boardSearchDisclosure = useDisclosure({ defaultIsOpen: !!boardSearchText.length });
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  useScopeOnFocus('gallery', ref);
 
   const boardsListPanelOptions = useMemo<UsePanelOptions>(
     () => ({
+      id: 'boards-list-panel',
       unit: 'pixels',
       minSize: 128,
-      defaultSize: 256,
-      fallbackMinSizePct: 20,
+      defaultSize: 20,
       panelGroupRef,
       panelGroupDirection: 'vertical',
     }),
@@ -55,7 +58,7 @@ const ImageGalleryContent = () => {
   }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
   return (
-    <Flex position="relative" flexDirection="column" h="full" w="full" pt={2}>
+    <Flex ref={ref} position="relative" flexDirection="column" h="full" w="full" pt={2} tabIndex={-1}>
       <Flex alignItems="center" gap={0}>
         <GalleryHeader />
         <Flex alignItems="center" justifyContent="space-between" w="full">
@@ -90,15 +93,7 @@ const ImageGalleryContent = () => {
       </Flex>
 
       <PanelGroup ref={panelGroupRef} direction="vertical">
-        <Panel
-          id="boards-list-panel"
-          ref={boardsListPanel.ref}
-          defaultSize={boardsListPanel.defaultSize}
-          minSize={boardsListPanel.minSize}
-          onCollapse={boardsListPanel.onCollapse}
-          onExpand={boardsListPanel.onExpand}
-          collapsible
-        >
+        <Panel collapsible {...boardsListPanel.panelProps}>
           <Flex flexDir="column" w="full" h="full">
             <Collapse in={boardSearchDisclosure.isOpen} style={COLLAPSE_STYLES}>
               <Box w="full" pt={2}>
@@ -109,11 +104,7 @@ const ImageGalleryContent = () => {
             <BoardsListWrapper />
           </Flex>
         </Panel>
-        <ResizeHandle
-          id="gallery-panel-handle"
-          orientation="horizontal"
-          onDoubleClick={boardsListPanel.onDoubleClickHandle}
-        />
+        <ResizeHandle id="gallery-panel-handle" orientation="horizontal" {...boardsListPanel.resizeHandleProps} />
         <Panel id="gallery-wrapper-panel" minSize={20}>
           <Gallery />
         </Panel>
@@ -122,4 +113,4 @@ const ImageGalleryContent = () => {
   );
 };
 
-export default memo(ImageGalleryContent);
+export default memo(GalleryPanelContent);

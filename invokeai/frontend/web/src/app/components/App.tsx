@@ -9,6 +9,7 @@ import ImageUploadOverlay from 'common/components/ImageUploadOverlay';
 import { useClearStorage } from 'common/hooks/useClearStorage';
 import { useFullscreenDropzone } from 'common/hooks/useFullscreenDropzone';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
+import { useScopeFocusWatcher } from 'common/hooks/interactionScopes';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
@@ -17,7 +18,7 @@ import { StylePresetModal } from 'features/stylePresets/components/StylePresetFo
 import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
-import InvokeTabs from 'features/ui/components/InvokeTabs';
+import { AppContent } from 'features/ui/components/AppContent';
 import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
@@ -107,6 +108,7 @@ const App = ({
 
   useStarterModelsToast();
   useSyncQueueStatus();
+  useScopeFocusWatcher();
 
   return (
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
@@ -119,7 +121,7 @@ const App = ({
         {...dropzone.getRootProps()}
       >
         <input {...dropzone.getInputProps()} />
-        <InvokeTabs />
+        <AppContent />
         <AnimatePresence>
           {dropzone.isDragActive && isHandlingUpload && (
             <ImageUploadOverlay dropzone={dropzone} setIsHandlingUpload={setIsHandlingUpload} />

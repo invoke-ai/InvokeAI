@@ -4,6 +4,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { $isConnected } from 'app/hooks/useSocketIO';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
@@ -46,7 +47,7 @@ const CurrentImageButtons = () => {
   const isUpscalingEnabled = useFeatureStatus('upscaling');
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
-
+  const isImageViewerActive = useStore(INTERACTION_SCOPES.imageViewer.$isActive);
   const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
 
   const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =
@@ -61,18 +62,9 @@ const CurrentImageButtons = () => {
     getAndLoadEmbeddedWorkflow(lastSelectedImage.image_name);
   }, [getAndLoadEmbeddedWorkflow, lastSelectedImage]);
 
-  useHotkeys('w', handleLoadWorkflow, [lastSelectedImage]);
-  useHotkeys('a', recallAll, [recallAll]);
-  useHotkeys('s', recallSeed, [recallSeed]);
-  useHotkeys('p', recallPrompts, [recallPrompts]);
-  useHotkeys('r', remix, [remix]);
-
   const handleUseSize = useCallback(() => {
     parseAndRecallImageDimensions(lastSelectedImage);
   }, [lastSelectedImage]);
-
-  useHotkeys('d', handleUseSize, [handleUseSize]);
-
   const handleSendToImageToImage = useCallback(() => {
     if (!imageDTO) {
       return;
@@ -81,9 +73,6 @@ const CurrentImageButtons = () => {
     dispatch(sentImageToImg2Img());
     dispatch(setActiveTab('generation'));
   }, [dispatch, imageDTO]);
-
-  useHotkeys('shift+i', handleSendToImageToImage, [imageDTO]);
-
   const handleClickUpscale = useCallback(() => {
     if (!imageDTO) {
       return;
@@ -98,24 +87,21 @@ const CurrentImageButtons = () => {
     dispatch(imagesToDeleteSelected(selection));
   }, [dispatch, imageDTO, selection]);
 
+  useHotkeys('w', handleLoadWorkflow, { enabled: isImageViewerActive }, [lastSelectedImage, isImageViewerActive]);
+  useHotkeys('a', recallAll, { enabled: isImageViewerActive }, [recallAll, isImageViewerActive]);
+  useHotkeys('s', recallSeed, { enabled: isImageViewerActive }, [recallSeed, isImageViewerActive]);
+  useHotkeys('p', recallPrompts, { enabled: isImageViewerActive }, [recallPrompts, isImageViewerActive]);
+  useHotkeys('r', remix, { enabled: isImageViewerActive }, [remix, isImageViewerActive]);
+  useHotkeys('d', handleUseSize, { enabled: isImageViewerActive }, [handleUseSize, isImageViewerActive]);
+  useHotkeys('shift+i', handleSendToImageToImage, { enabled: isImageViewerActive }, [imageDTO, isImageViewerActive]);
   useHotkeys(
     'Shift+U',
-    () => {
-      handleClickUpscale();
-    },
-    {
-      enabled: () => Boolean(isUpscalingEnabled && !shouldDisableToolbarButtons && isConnected),
-    },
-    [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected]
+    handleClickUpscale,
+    { enabled: Boolean(isUpscalingEnabled && isImageViewerActive && isConnected) },
+    [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected, isImageViewerActive]
   );
 
-  useHotkeys(
-    'delete',
-    () => {
-      handleDelete();
-    },
-    [dispatch, imageDTO]
-  );
+  useHotkeys('delete', handleDelete, { enabled: isImageViewerActive }, [imageDTO, isImageViewerActive]);
 
   return (
     <>
