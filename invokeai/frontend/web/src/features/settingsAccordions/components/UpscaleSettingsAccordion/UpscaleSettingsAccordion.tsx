@@ -48,7 +48,12 @@ export const UpscaleSettingsAccordion = memo(() => {
   });
 
   return (
-    <StandaloneAccordion label="Upscale" badges={badges} isOpen={isOpenAccordion} onToggle={onToggleAccordion}>
+    <StandaloneAccordion
+      label={t('upscaling.upscale')}
+      badges={badges}
+      isOpen={isOpenAccordion}
+      onToggle={onToggleAccordion}
+    >
       <Flex pt={4} px={4} w="full" h="full" flexDir="column" data-testid="upscale-settings-accordion">
         <Flex flexDir="column" gap={4}>
           <Flex gap={4}>

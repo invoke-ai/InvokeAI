@@ -1675,6 +1675,7 @@
         "layers_other": "Layers"
     },
     "upscaling": {
+        "upscale": "Upscale",
         "creativity": "Creativity",
         "exceedsMaxSize": "Upscale settings exceed max size limit",
         "exceedsMaxSizeDetails": "Max upscale limit is {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixels. Please try a smaller image or decrease your scale selection.",
