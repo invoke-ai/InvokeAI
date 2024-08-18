@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="9px" height="9px" version="1.1"
+<svg width="6px" height="6px" version="1.1"
     xmlns="http://www.w3.org/2000/svg"
     xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve"
     xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;">
-    <path d="M9.9,7.2L7.2,9.9" style="fill:none;stroke:black;stroke-width:1px;"/>
-    <path d="M9.9,2.7L2.7,9.9" style="fill:none;stroke:black;stroke-width:1px;"/>
-    <path d="M9,-0.9L-0.9,9" style="fill:none;stroke:black;stroke-width:1px;"/>
-    <path d="M4.5,-0.9L-0.9,4.5" style="fill:none;stroke:black;stroke-width:1px;"/>
+    <path d="M0,10L9,1" style="fill:none;stroke:black;stroke-width:1.3px;"/>
+    <path d="M-1,5L8,-4" style="fill:none;stroke:black;stroke-width:1.3px;"/>
 </svg>
