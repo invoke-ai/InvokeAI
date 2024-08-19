@@ -55,9 +55,9 @@ export class CanvasTool {
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.konva = {
-      group: new Konva.Group({ name: `${this.type}:group` }),
+      group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
       brush: {
-        group: new Konva.Group({ name: `${this.type}:brush_group` }),
+        group: new Konva.Group({ name: `${this.type}:brush_group`, listening: false }),
         fillCircle: new Konva.Circle({
           name: `${this.type}:brush_fill_circle`,
           listening: false,
@@ -79,7 +79,7 @@ export class CanvasTool {
         }),
       },
       eraser: {
-        group: new Konva.Group({ name: `${this.type}:eraser_group` }),
+        group: new Konva.Group({ name: `${this.type}:eraser_group`, listening: false }),
         fillCircle: new Konva.Circle({
           name: `${this.type}:eraser_fill_circle`,
           listening: false,
@@ -103,7 +103,7 @@ export class CanvasTool {
         }),
       },
       eyeDropper: {
-        group: new Konva.Group({ name: `${this.type}:eyeDropper_group` }),
+        group: new Konva.Group({ name: `${this.type}:eyeDropper_group`, listening: false }),
         fillCircle: new Konva.Circle({
           name: `${this.type}:eyeDropper_fill_circle`,
           listening: false,

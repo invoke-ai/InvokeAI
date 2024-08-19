@@ -21,7 +21,7 @@ export class CanvasPreview {
   constructor(manager: CanvasManager) {
     this.manager = manager;
     this.konva = {
-      layer: new Konva.Layer({ listening: true, imageSmoothingEnabled: false }),
+      layer: new Konva.Layer({ listening: false, imageSmoothingEnabled: false }),
     };
 
     this.stagingArea = new CanvasStagingArea(this);
