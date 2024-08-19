@@ -64,8 +64,7 @@ class FluxVAELoader(GenericDiffusersLoader):
             params = AutoEncoderParams(**filtered_data)
 
             with SilenceWarnings():
-                model = load_class(params).to(self._torch_dtype)
-                # load_sft doesn't support torch.device
+                model = load_class(params)
                 sd = load_file(model_path)
                 model.load_state_dict(sd, strict=False, assign=True)
 
@@ -203,8 +202,6 @@ class FluxBnbQuantizednf4bCheckpointModel(GenericDiffusersLoader):
             with accelerate.init_empty_weights():
                 model = load_class(params)
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=torch.bfloat16)
-            # TODO(ryand): Right now, some of the weights are loaded in bfloat16. Think about how best to handle
-            # this on GPUs without bfloat16 support.
             sd = load_file(model_path)
             model.load_state_dict(sd, strict=False, assign=True)
         return model

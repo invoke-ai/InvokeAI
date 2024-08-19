@@ -69,7 +69,7 @@ def filter_files(
     # limit search to subfolder if requested
     if subfolder:
         subfolder = root / subfolder
-        paths = [x for x in paths if x.parent == Path(subfolder)]
+        paths = [x for x in paths if Path(subfolder) in x.parents]
 
     # _filter_by_variant uniquifies the paths and returns a set
     return sorted(_filter_by_variant(paths, variant))

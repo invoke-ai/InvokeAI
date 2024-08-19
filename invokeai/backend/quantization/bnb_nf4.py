@@ -116,7 +116,7 @@ def _convert_linear_layers_to_nf4(
                 child.in_features,
                 child.out_features,
                 bias=has_bias,
-                compute_dtype=torch.float16,
+                compute_dtype=compute_dtype,
                 compress_statistics=compress_statistics,
             )
             if has_bias:
