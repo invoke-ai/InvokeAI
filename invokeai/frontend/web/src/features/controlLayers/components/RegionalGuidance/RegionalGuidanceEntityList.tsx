@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { CanvasEntityGroupTitle } from 'features/controlLayers/components/common/CanvasEntityGroupTitle';
+import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
 import { RegionalGuidance } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidance';
 import { mapId } from 'features/controlLayers/konva/util';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
@@ -22,15 +22,15 @@ export const RegionalGuidanceEntityList = memo(() => {
 
   if (rgIds.length > 0) {
     return (
-      <>
-        <CanvasEntityGroupTitle
-          title={t('controlLayers.regionalGuidance_withCount', { count: rgIds.length })}
-          isSelected={isSelected}
-        />
+      <CanvasEntityGroupList
+        type="regional_guidance"
+        title={t('controlLayers.regionalGuidance_withCount', { count: rgIds.length })}
+        isSelected={isSelected}
+      >
         {rgIds.map((id) => (
           <RegionalGuidance key={id} id={id} />
         ))}
-      </>
+      </CanvasEntityGroupList>
     );
   }
 });

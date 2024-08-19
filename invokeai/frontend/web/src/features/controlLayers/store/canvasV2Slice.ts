@@ -25,6 +25,7 @@ import { assert } from 'tsafe';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
+  CanvasEntityState,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
@@ -160,6 +161,22 @@ export function selectEntity(state: CanvasV2State, { id, type }: CanvasEntityIde
       return state.ipAdapters.entities.find((ipa) => ipa.id === id);
     default:
       return;
+  }
+}
+
+export function selectAllEntitiesOfType(state: CanvasV2State, type: CanvasEntityState['type']): CanvasEntityState[] {
+  if (type === 'raster_layer') {
+    return state.rasterLayers.entities;
+  } else if (type === 'control_layer') {
+    return state.controlLayers.entities;
+  } else if (type === 'inpaint_mask') {
+    return [state.inpaintMask];
+  } else if (type === 'regional_guidance') {
+    return state.regions.entities;
+  } else if (type === 'ip_adapter') {
+    return state.ipAdapters.entities;
+  } else {
+    assert(false, 'Not implemented');
   }
 }
 
@@ -410,6 +427,48 @@ export const canvasV2Slice = createSlice({
         moveToStart(state.regions.entities, entity);
       }
     },
+    entityOpacityChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ opacity: number }>>) => {
+      const { entityIdentifier, opacity } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      if (entity.type === 'ip_adapter') {
+        return;
+      }
+      entity.opacity = opacity;
+    },
+    allEntitiesOfTypeToggled: (state, action: PayloadAction<{ type: CanvasEntityIdentifier['type'] }>) => {
+      const { type } = action.payload;
+      let entities: (
+        | CanvasRasterLayerState
+        | CanvasControlLayerState
+        | CanvasInpaintMaskState
+        | CanvasRegionalGuidanceState
+      )[];
+
+      switch (type) {
+        case 'raster_layer':
+          entities = state.rasterLayers.entities;
+          break;
+        case 'control_layer':
+          entities = state.controlLayers.entities;
+          break;
+        case 'inpaint_mask':
+          entities = [state.inpaintMask];
+          break;
+        case 'regional_guidance':
+          entities = state.regions.entities;
+          break;
+        default:
+          assert(false, 'Not implemented');
+      }
+
+      const allEnabled = entities.every((entity) => entity.isEnabled);
+      for (const entity of entities) {
+        entity.isEnabled = !allEnabled;
+      }
+    },
     allEntitiesDeleted: (state) => {
       state.ipAdapters = deepClone(initialState.ipAdapters);
       state.rasterLayers = deepClone(initialState.rasterLayers);
@@ -490,6 +549,8 @@ export const {
   entityArrangedToFront,
   entityArrangedBackwardOne,
   entityArrangedToBack,
+  entityOpacityChanged,
+  allEntitiesOfTypeToggled,
   // bbox
   bboxChanged,
   bboxScaledSizeChanged,

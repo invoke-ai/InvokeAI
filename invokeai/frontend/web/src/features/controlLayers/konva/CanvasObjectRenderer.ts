@@ -1,5 +1,5 @@
 import type { JSONObject } from 'common/types';
-import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
 import { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
@@ -21,7 +21,6 @@ import type {
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import type { RectConfig } from 'konva/lib/shapes/Rect';
 import { isEqual } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
@@ -149,7 +148,8 @@ export class CanvasObjectRenderer {
     this.subscriptions.add(
       this.manager.stateApi.$stageAttrs.listen(() => {
         if (this.konva.compositing && this.parent.type === 'mask_adapter') {
-          this.updateCompositingRect(this.parent.state.fill);
+          this.updateCompositingRectFill(this.parent.state.fill);
+          this.updateCompositingRectSize();
         }
       })
     );
@@ -162,6 +162,7 @@ export class CanvasObjectRenderer {
    */
   render = async (objectStates: AnyObjectState[]): Promise<boolean> => {
     let didRender = false;
+
     const objectIds = objectStates.map((objectState) => objectState.id);
 
     for (const renderer of this.renderers.values()) {
@@ -180,32 +181,61 @@ export class CanvasObjectRenderer {
       didRender = (await this.renderObject(this.buffer)) || didRender;
     }
 
+    this.syncCache(didRender);
+
     return didRender;
   };
 
-  updateCompositingRect = (fill: Fill) => {
-    this.log.trace('Updating compositing rect');
+  syncCache = (force: boolean = false) => {
+    if (this.renderers.size === 0) {
+      this.log.trace('Clearing object group cache');
+      this.konva.objectGroup.clearCache();
+    } else if (force || !this.konva.objectGroup.isCached()) {
+      this.log.trace('Caching object group');
+      this.konva.objectGroup.clearCache();
+      this.konva.objectGroup.cache();
+    }
+  };
+
+  updateCompositingRectFill = (fill: Fill) => {
+    this.log.trace('Updating compositing rect fill');
+    assert(this.konva.compositing, 'Missing compositing rect');
+
+    if (fill.style === 'solid') {
+      this.konva.compositing.rect.setAttrs({
+        fill: rgbColorToString(fill.color),
+        fillPriority: 'color',
+      });
+    } else {
+      this.konva.compositing.rect.setAttrs({
+        fillPriority: 'pattern',
+      });
+      setFillPatternImage(this.konva.compositing.rect, fill.style, fill.color);
+    }
+  };
+
+  updateCompositingRectSize = () => {
+    this.log.trace('Updating compositing rect size');
     assert(this.konva.compositing, 'Missing compositing rect');
 
     const { x, y, width, height, scale } = this.manager.stateApi.$stageAttrs.get();
 
-    const attrs: RectConfig = {
+    this.konva.compositing.rect.setAttrs({
       x: -x / scale,
       y: -y / scale,
       width: width / scale,
       height: height / scale,
-    };
+      fillPatternScaleX: 1 / scale,
+      fillPatternScaleY: 1 / scale,
+    });
+  };
 
-    if (fill.style === 'solid') {
-      attrs.fill = rgbaColorToString(fill.color);
-      attrs.fillPriority = 'color';
-      this.konva.compositing.rect.setAttrs(attrs);
+  updateOpacity = (opacity: number) => {
+    this.log.trace('Updating opacity');
+    if (this.konva.compositing) {
+      this.konva.compositing.group.opacity(opacity);
     } else {
-      attrs.fillPatternScaleX = 1 / scale;
-      attrs.fillPatternScaleY = 1 / scale;
-      attrs.fillPriority = 'pattern';
-      this.konva.compositing.rect.setAttrs(attrs);
-      setFillPatternImage(this.konva.compositing.rect, fill.style, fill.color);
+      this.konva.objectGroup.opacity(opacity);
     }
   };
 
@@ -264,6 +294,10 @@ export class CanvasObjectRenderer {
         this.konva.objectGroup.add(renderer.konva.group);
       }
       didRender = await renderer.update(objectState, force || isFirstRender);
+    }
+
+    if (didRender && this.konva.objectGroup.isCached()) {
+      this.konva.objectGroup.clearCache();
     }
 
     return didRender;
@@ -421,7 +455,7 @@ export class CanvasObjectRenderer {
     imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const imageObject = imageDTOToImageObject(imageDTO);
     if (replaceObjects) {
-    await this.renderObject(imageObject, true);
+      await this.renderObject(imageObject, true);
     }
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.getEntityIdentifier(),

@@ -1,8 +1,9 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Flex, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton';
 import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
 import { $isPreviewVisible } from 'features/controlLayers/store/canvasV2Slice';
 import { selectEntityCount } from 'features/controlLayers/store/selectors';
@@ -89,7 +90,7 @@ const ParametersPanelTextToImage = () => {
                 gap={2}
                 onChange={onChangeTabs}
               >
-                <TabList gap={2} fontSize="sm" borderColor="base.800">
+                <TabList gap={2} fontSize="sm" borderColor="base.800" alignItems="center" w="full">
                   <Tab sx={baseStyles} _selected={selectedStyles} data-testid="generation-tab-settings-tab-button">
                     {t('common.settingsLabel')}
                   </Tab>
@@ -100,6 +101,8 @@ const ParametersPanelTextToImage = () => {
                   >
                     {controlLayersTitle}
                   </Tab>
+                  <Spacer />
+                  <AddLayerButton />
                 </TabList>
                 <TabPanels w="full" h="full">
                   <TabPanel p={0} w="full" h="full">

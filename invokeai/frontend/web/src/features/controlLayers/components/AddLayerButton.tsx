@@ -1,4 +1,4 @@
-import { Button, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { IconButton, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useDefaultControlAdapter, useDefaultIPAdapter } from 'features/controlLayers/hooks/useLayerControlAdapter';
 import { controlLayerAdded, ipaAdded, rasterLayerAdded, rgAdded } from 'features/controlLayers/store/canvasV2Slice';
@@ -27,13 +27,12 @@ export const AddLayerButton = memo(() => {
   return (
     <Menu>
       <MenuButton
-        as={Button}
-        leftIcon={<PiPlusBold />}
-        variant="ghost"
+        as={IconButton}
+        aria-label={t('controlLayers.addLayer')}
+        icon={<PiPlusBold />}
+        variant="link"
         data-testid="control-layers-add-layer-menu-button"
-      >
-        {t('controlLayers.addLayer')}
-      </MenuButton>
+      />
       <MenuList>
         <MenuItem onClick={addRGLayer}>{t('controlLayers.regionalGuidanceLayer')}</MenuItem>
         <MenuItem onClick={addRasterLayer}>{t('controlLayers.rasterLayer')}</MenuItem>

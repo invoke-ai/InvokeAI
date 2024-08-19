@@ -644,7 +644,7 @@ const zMaskObject = z
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
 export const isFillStyle = (v: unknown): v is FillStyle => zFillStyle.safeParse(v).success;
-const zFill = z.object({ style: zFillStyle, color: zRgbaColor });
+const zFill = z.object({ style: zFillStyle, color: zRgbColor });
 export type Fill = z.infer<typeof zFill>;
 
 const zImageCache = z.object({
@@ -670,6 +670,7 @@ export const zCanvasRegionalGuidanceState = z.object({
   type: z.literal('regional_guidance'),
   isEnabled: z.boolean(),
   position: zCoordinate,
+  opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
   fill: zFill,
   positivePrompt: zParameterPositivePrompt.nullable(),
@@ -686,6 +687,7 @@ const zCanvasInpaintMaskState = z.object({
   isEnabled: z.boolean(),
   position: zCoordinate,
   fill: zFill,
+  opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
   rasterizationCache: z.array(zImageCache),
 });
@@ -946,20 +948,16 @@ export type PositionChangedArg = { id: string; position: Coordinate };
 export type ScaleChangedArg = { id: string; scale: Coordinate; position: Coordinate };
 export type BboxChangedArg = { id: string; bbox: Rect | null };
 
-export type EntityIdentifierPayload = { entityIdentifier: CanvasEntityIdentifier };
-export type EntityMovedPayload = { entityIdentifier: CanvasEntityIdentifier; position: Coordinate };
-export type EntityBrushLineAddedPayload = { entityIdentifier: CanvasEntityIdentifier; brushLine: CanvasBrushLineState };
-export type EntityEraserLineAddedPayload = {
-  entityIdentifier: CanvasEntityIdentifier;
-  eraserLine: CanvasEraserLineState;
-};
-export type EntityRectAddedPayload = { entityIdentifier: CanvasEntityIdentifier; rect: CanvasRectState };
-export type EntityRasterizedPayload = {
-  entityIdentifier: CanvasEntityIdentifier;
+export type EntityIdentifierPayload<T = object> = { entityIdentifier: CanvasEntityIdentifier } & T;
+export type EntityMovedPayload = EntityIdentifierPayload<{ position: Coordinate }>;
+export type EntityBrushLineAddedPayload = EntityIdentifierPayload<{ brushLine: CanvasBrushLineState }>;
+export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{ eraserLine: CanvasEraserLineState }>;
+export type EntityRectAddedPayload = EntityIdentifierPayload<{ rect: CanvasRectState }>;
+export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;
   rect: Rect;
   replaceObjects: boolean;
-};
+}>;
 export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: Coordinate };
 
 //#region Type guards
@@ -1000,3 +998,7 @@ export function isDrawableEntityAdapter(
 ): adapter is CanvasLayerAdapter | CanvasMaskAdapter {
   return adapter instanceof CanvasLayerAdapter || adapter instanceof CanvasMaskAdapter;
 }
+
+export const getEntityIdentifier = (entity: CanvasEntityState): CanvasEntityIdentifier => {
+  return { id: entity.id, type: entity.type };
+};
