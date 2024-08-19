@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { CanvasEntityGroupTitle } from 'features/controlLayers/components/common/CanvasEntityGroupTitle';
+import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
 import { IPAdapter } from 'features/controlLayers/components/IPAdapter/IPAdapter';
 import { mapId } from 'features/controlLayers/konva/util';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
@@ -23,15 +23,15 @@ export const IPAdapterList = memo(() => {
 
   if (ipaIds.length > 0) {
     return (
-      <>
-        <CanvasEntityGroupTitle
-          title={t('controlLayers.ipAdapters_withCount', { count: ipaIds.length })}
-          isSelected={isSelected}
-        />
+      <CanvasEntityGroupList
+        type="ip_adapter"
+        title={t('controlLayers.ipAdapters_withCount', { count: ipaIds.length })}
+        isSelected={isSelected}
+      >
         {ipaIds.map((id) => (
           <IPAdapter key={id} id={id} />
         ))}
-      </>
+      </CanvasEntityGroupList>
     );
   }
 });

@@ -1,8 +1,8 @@
-import { Spacer } from '@invoke-ai/ui-library';
+import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
-import { CanvasEntityGroupTitle } from 'features/controlLayers/components/common/CanvasEntityGroupTitle';
+import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -18,8 +18,8 @@ export const InpaintMask = memo(() => {
   const isSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'inpaint_mask'));
 
   return (
-    <>
-      <CanvasEntityGroupTitle title={t('controlLayers.inpaintMask')} isSelected={isSelected} />
+    <Flex flexDir="column" gap={2}>
+      <CanvasEntityGroupList title={t('controlLayers.inpaintMask')} isSelected={isSelected} type="inpaint_mask" />
       <EntityIdentifierContext.Provider value={entityIdentifier}>
         <CanvasEntityContainer>
           <CanvasEntityHeader>
@@ -30,7 +30,7 @@ export const InpaintMask = memo(() => {
           </CanvasEntityHeader>
         </CanvasEntityContainer>
       </EntityIdentifierContext.Provider>
-    </>
+    </Flex>
   );
 });
 

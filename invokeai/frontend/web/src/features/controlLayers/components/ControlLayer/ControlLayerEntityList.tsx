@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { CanvasEntityGroupTitle } from 'features/controlLayers/components/common/CanvasEntityGroupTitle';
+import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
 import { ControlLayer } from 'features/controlLayers/components/ControlLayer/ControlLayer';
 import { mapId } from 'features/controlLayers/konva/util';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
@@ -22,15 +22,15 @@ export const ControlLayerEntityList = memo(() => {
 
   if (layerIds.length > 0) {
     return (
-      <>
-        <CanvasEntityGroupTitle
-          title={t('controlLayers.controlLayers_withCount', { count: layerIds.length })}
-          isSelected={isSelected}
-        />
+      <CanvasEntityGroupList
+        type="control_layer"
+        title={t('controlLayers.controlLayers_withCount', { count: layerIds.length })}
+        isSelected={isSelected}
+      >
         {layerIds.map((id) => (
           <ControlLayer key={id} id={id} />
         ))}
-      </>
+      </CanvasEntityGroupList>
     );
   }
 });
