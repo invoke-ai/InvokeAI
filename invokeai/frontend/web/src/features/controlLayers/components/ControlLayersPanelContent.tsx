@@ -1,10 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
-import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton';
 import { CanvasEntityList } from 'features/controlLayers/components/CanvasEntityList';
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
-import { ResetAllEntitiesButton } from 'features/controlLayers/components/ResetAllEntitiesButton';
 import { $filteringEntity } from 'features/controlLayers/store/canvasV2Slice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { memo } from 'react';
@@ -15,13 +12,7 @@ export const ControlLayersPanelContent = memo(() => {
   return (
     <PanelGroup direction="vertical">
       <Panel id="canvas-entity-list-panel" order={0}>
-        <Flex flexDir="column" gap={2} w="full" h="full">
-          <Flex justifyContent="space-around">
-            <AddLayerButton />
-            <ResetAllEntitiesButton />
-          </Flex>
-          <CanvasEntityList />
-        </Flex>
+        <CanvasEntityList />
       </Panel>
       {Boolean(filteringEntity) && (
         <>
