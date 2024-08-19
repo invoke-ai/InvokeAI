@@ -89,7 +89,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         img, img_ids = self._prepare_latent_img_patches(x)
 
         # HACK(ryand): Find a better way to determine if this is a schnell model or not.
-        is_schnell = "shnell" in transformer_info.config.path if transformer_info.config else ""
+        is_schnell = "schnell" in transformer_info.config.path if transformer_info.config else ""
         timesteps = get_schedule(
             num_steps=self.num_steps,
             image_seq_len=img.shape[1],
@@ -139,9 +139,9 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             img = repeat(img, "1 ... -> bs ...", bs=bs)
 
         # Generate patch position ids.
-        img_ids = torch.zeros(h // 2, w // 2, 3)
-        img_ids[..., 1] = img_ids[..., 1] + torch.arange(h // 2)[:, None]
-        img_ids[..., 2] = img_ids[..., 2] + torch.arange(w // 2)[None, :]
+        img_ids = torch.zeros(h // 2, w // 2, 3, device=img.device)
+        img_ids[..., 1] = img_ids[..., 1] + torch.arange(h // 2, device=img.device)[:, None]
+        img_ids[..., 2] = img_ids[..., 2] + torch.arange(w // 2, device=img.device)[None, :]
         img_ids = repeat(img_ids, "h w c -> b (h w) c", b=bs)
 
         return img, img_ids
@@ -155,8 +155,10 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         with vae_info as vae:
             assert isinstance(vae, AutoEncoder)
             # TODO(ryand): Test that this works with both float16 and bfloat16.
-            with torch.autocast(device_type=latents.device.type, dtype=TorchDevice.choose_torch_dtype()):
-                img = vae.decode(latents)
+            # with torch.autocast(device_type=latents.device.type, dtype=torch.float32):
+            vae.to(torch.float32)
+            latents.to(torch.float32)
+            img = vae.decode(latents)
 
         img.clamp(-1, 1)
         img = rearrange(img[0], "c h w -> h w c")
