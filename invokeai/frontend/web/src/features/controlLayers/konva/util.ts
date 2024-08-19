@@ -374,6 +374,7 @@ export function getObjectId(type: CanvasObjectState['type'], isBuffer?: boolean)
 export const getEmptyRect = (): Rect => {
   return { x: 0, y: 0, width: 0, height: 0 };
 };
+
 export function snapToNearest(value: number, candidateValues: number[], threshold: number): number {
   let closest = value;
   let minDiff = Number.MAX_VALUE;
@@ -388,3 +389,20 @@ export function snapToNearest(value: number, candidateValues: number[], threshol
 
   return closest;
 }
+
+/**
+ * Gets the union of two rects
+ * @param rect1 The first rect
+ * @param rect2 The second rect
+ * @returns The union of the two rects
+ */
+export const getRectUnion = (...rects: Rect[]): Rect => {
+  const rect = rects.reduce<Rect>((acc, r) => {
+    const x = Math.min(acc.x, r.x);
+    const y = Math.min(acc.y, r.y);
+    const width = Math.max(acc.x + acc.width, r.x + r.width) - x;
+    const height = Math.max(acc.y + acc.height, r.y + r.height) - y;
+    return { x, y, width, height };
+  }, getEmptyRect());
+  return rect;
+};
