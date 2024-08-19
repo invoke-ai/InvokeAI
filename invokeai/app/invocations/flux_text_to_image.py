@@ -1,12 +1,6 @@
-from typing import Literal
-
-import accelerate
 import torch
-from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
-from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
+from einops import rearrange, repeat
 from PIL import Image
-from safetensors.torch import load_file
-from transformers.models.auto import AutoModelForTextEncoding
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import (
@@ -20,22 +14,11 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
-from invokeai.backend.quantization.fast_quantized_diffusion_model import FastQuantizedDiffusersModel
-from invokeai.backend.quantization.fast_quantized_transformers_model import FastQuantizedTransformersModel
+from invokeai.backend.flux.model import Flux
+from invokeai.backend.flux.modules.autoencoder import AutoEncoder
+from invokeai.backend.flux.sampling import denoise, get_noise, get_schedule, unpack
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
-
-TFluxModelKeys = Literal["flux-schnell"]
-FLUX_MODELS: dict[TFluxModelKeys, str] = {"flux-schnell": "black-forest-labs/FLUX.1-schnell"}
-
-
-class QuantizedFluxTransformer2DModel(FastQuantizedDiffusersModel):
-    base_class = FluxTransformer2DModel
-
-
-class QuantizedModelForTextEncoding(FastQuantizedTransformersModel):
-    auto_class = AutoModelForTextEncoding
 
 
 @invocation(
@@ -78,7 +61,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         assert isinstance(flux_conditioning, FLUXConditioningInfo)
 
         latents = self._run_diffusion(context, flux_conditioning.clip_embeds, flux_conditioning.t5_embeds)
-        image = self._run_vae_decoding(context, latents)
+        image = self._run_vae_decoding(context, flux_ae_path, latents)
         image_dto = context.images.save(image=image)
         return ImageOutput.build(image_dto)
 
@@ -89,14 +72,40 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         t5_embeddings: torch.Tensor,
     ):
         transformer_info = context.models.load(self.transformer.transformer)
+        inference_dtype = TorchDevice.choose_torch_dtype()
+
+        # Prepare input noise.
+        # TODO(ryand): Does the seed behave the same on different devices? Should we re-implement this to always use a
+        # CPU RNG?
+        x = get_noise(
+            num_samples=1,
+            height=self.height,
+            width=self.width,
+            device=TorchDevice.choose_torch_device(),
+            dtype=inference_dtype,
+            seed=self.seed,
+        )
+
+        img, img_ids = self._prepare_latent_img_patches(x)
+
+        # HACK(ryand): Find a better way to determine if this is a schnell model or not.
+        is_schnell = "shnell" in transformer_info.config.path if transformer_info.config else ""
+        timesteps = get_schedule(
+            num_steps=self.num_steps,
+            image_seq_len=img.shape[1],
+            shift=not is_schnell,
+        )
+
+        bs, t5_seq_len, _ = t5_embeddings.shape
+        txt_ids = torch.zeros(bs, t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device())
 
         # HACK(ryand): Manually empty the cache. Currently we don't check the size of the model before loading it from
         # disk. Since the transformer model is large (24GB), there's a good chance that it will OOM on 32GB RAM systems
         # if the cache is not empty.
-        # context.models._services.model_manager.load.ram_cache.make_room(24 * 2**30)
+        context.models._services.model_manager.load.ram_cache.make_room(24 * 2**30)
 
         with transformer_info as transformer:
-            assert isinstance(transformer, FluxTransformer2DModel)
+            assert isinstance(transformer, Flux)
 
             x = denoise(
                 model=transformer,
@@ -144,21 +153,13 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     ) -> Image.Image:
         vae_info = context.models.load(self.vae.vae)
         with vae_info as vae:
-            assert isinstance(vae, AutoencoderKL)
+            assert isinstance(vae, AutoEncoder)
+            # TODO(ryand): Test that this works with both float16 and bfloat16.
+            with torch.autocast(device_type=latents.device.type, dtype=TorchDevice.choose_torch_dtype()):
+                img = vae.decode(latents)
 
         img.clamp(-1, 1)
         img = rearrange(img[0], "c h w -> h w c")
         img_pil = Image.fromarray((127.5 * (img + 1.0)).byte().cpu().numpy())
 
-            latents = flux_pipeline_with_vae._unpack_latents(
-                latents, self.height, self.width, flux_pipeline_with_vae.vae_scale_factor
-            )
-            latents = (
-                latents / flux_pipeline_with_vae.vae.config.scaling_factor
-            ) + flux_pipeline_with_vae.vae.config.shift_factor
-            latents = latents.to(dtype=vae.dtype)
-            image = flux_pipeline_with_vae.vae.decode(latents, return_dict=False)[0]
-            image = flux_pipeline_with_vae.image_processor.postprocess(image, output_type="pil")[0]
-
-        assert isinstance(image, Image.Image)
-        return image
+        return img_pil

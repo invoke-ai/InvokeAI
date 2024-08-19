@@ -3,9 +3,15 @@ from dataclasses import dataclass
 import torch
 from torch import Tensor, nn
 
-from invokeai.backend.flux.modules.layers import (DoubleStreamBlock, EmbedND, LastLayer,
-                                 MLPEmbedder, SingleStreamBlock,
-                                 timestep_embedding)
+from invokeai.backend.flux.modules.layers import (
+    DoubleStreamBlock,
+    EmbedND,
+    LastLayer,
+    MLPEmbedder,
+    SingleStreamBlock,
+    timestep_embedding,
+)
+
 
 @dataclass
 class FluxParams:
@@ -35,9 +41,7 @@ class Flux(nn.Module):
         self.in_channels = params.in_channels
         self.out_channels = self.in_channels
         if params.hidden_size % params.num_heads != 0:
-            raise ValueError(
-                f"Hidden size {params.hidden_size} must be divisible by num_heads {params.num_heads}"
-            )
+            raise ValueError(f"Hidden size {params.hidden_size} must be divisible by num_heads {params.num_heads}")
         pe_dim = params.hidden_size // params.num_heads
         if sum(params.axes_dim) != pe_dim:
             raise ValueError(f"Got {params.axes_dim} but expected positional dim {pe_dim}")
