@@ -1,14 +1,17 @@
 # Copyright (c) 2024, Brandon W. Rising and the InvokeAI Development Team
 """Class for Flux model loading in InvokeAI."""
 
-from pathlib import Path
-import yaml
-
 from dataclasses import fields
-from safetensors.torch import load_file
-from typing import Optional, Any
-from transformers import T5EncoderModel, T5Tokenizer
+from pathlib import Path
+from typing import Any, Optional
 
+import yaml
+from safetensors.torch import load_file
+from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
+
+from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.flux.model import Flux, FluxParams
+from invokeai.backend.flux.modules.autoencoder import AutoEncoder, AutoEncoderParams
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -19,20 +22,15 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
-    MainCheckpointConfig,
     CLIPEmbedDiffusersConfig,
+    MainCheckpointConfig,
     T5EncoderConfig,
     VAECheckpointConfig,
 )
-from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
-from invokeai.backend.util.silence_warnings import SilenceWarnings
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.flux.model import Flux, FluxParams
-from invokeai.backend.flux.modules.autoencoder import AutoEncoderParams, AutoEncoder
-from transformers import (CLIPTextModel, CLIPTokenizer, T5EncoderModel,
-                          T5Tokenizer)
+from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 app_config = get_config()
 
@@ -56,9 +54,9 @@ class FluxVAELoader(GenericDiffusersLoader):
                     flux_conf = yaml.safe_load(stream)
                 except:
                     raise
-            
+
             dataclass_fields = {f.name for f in fields(AutoEncoderParams)}
-            filtered_data = {k: v for k, v in flux_conf['params']['ae_params'].items() if k in dataclass_fields}
+            filtered_data = {k: v for k, v in flux_conf["params"]["ae_params"].items() if k in dataclass_fields}
             params = AutoEncoderParams(**filtered_data)
 
             with SilenceWarnings():
@@ -92,6 +90,7 @@ class ClipCheckpointModel(GenericDiffusersLoader):
 
         raise Exception("Only Checkpoint Flux models are currently supported.")
 
+
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.T5Encoder)
 class T5EncoderCheckpointModel(GenericDiffusersLoader):
     """Class to load main models."""
@@ -106,9 +105,9 @@ class T5EncoderCheckpointModel(GenericDiffusersLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer2:
-                return T5Tokenizer.from_pretrained(Path(config.path), max_length=512)
+                return T5Tokenizer.from_pretrained(Path(config.path) / "encoder", max_length=512)
             case SubModelType.TextEncoder2:
-                return T5EncoderModel.from_pretrained(Path(config.path))
+                return T5EncoderModel.from_pretrained(Path(config.path) / "tokenizer")
 
         raise Exception("Only Checkpoint Flux models are currently supported.")
 
@@ -148,7 +147,7 @@ class FluxCheckpointModel(GenericDiffusersLoader):
         params = None
         model_path = Path(config.path)
         dataclass_fields = {f.name for f in fields(FluxParams)}
-        filtered_data = {k: v for k, v in flux_conf['params'].items() if k in dataclass_fields}
+        filtered_data = {k: v for k, v in flux_conf["params"].items() if k in dataclass_fields}
         params = FluxParams(**filtered_data)
 
         with SilenceWarnings():

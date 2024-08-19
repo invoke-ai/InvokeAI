@@ -465,18 +465,20 @@ class ModelsInterface(InvocationContextInterface):
         return self._services.model_manager.install.download_and_cache_model(source=source)
 
     def import_local_model(
-            self,
-            model_path: Path,
-            config: Optional[ModelRecordChanges] = None,
-            access_token: Optional[str] = None,
-            inplace: Optional[bool] = False,
+        self,
+        model_path: Path,
+        config: Optional[ModelRecordChanges] = None,
+        access_token: Optional[str] = None,
+        inplace: Optional[bool] = False,
     ):
         """
         TODO: Fill out description of this method
         """
         if not model_path.exists():
             raise Exception("Models provided to import_local_model must already exist on disk")
-        return self._services.model_manager.install.heuristic_import(str(model_path), config=config, access_token=access_token, inplace=inplace)
+        return self._services.model_manager.install.heuristic_import(
+            str(model_path), config=config, access_token=access_token, inplace=inplace
+        )
 
     def load_local_model(
         self,
