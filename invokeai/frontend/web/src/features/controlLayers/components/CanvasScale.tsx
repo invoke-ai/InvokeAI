@@ -19,6 +19,7 @@ import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva
 import { snapToNearest } from 'features/controlLayers/konva/util';
 import { $stageAttrs } from 'features/controlLayers/store/canvasV2Slice';
 import { clamp, round } from 'lodash-es';
+import { computed } from 'nanostores';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -71,11 +72,13 @@ const sliderDefaultValue = mapScaleToSliderValue(100);
 
 const snapCandidates = marks.slice(1, marks.length - 1);
 
+const $scale = computed($stageAttrs, (attrs) => attrs.scale);
+
 export const CanvasScale = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useStore($canvasManager);
-  const stageAttrs = useStore($stageAttrs);
-  const [localScale, setLocalScale] = useState(stageAttrs.scale * 100);
+  const scale = useStore($scale);
+  const [localScale, setLocalScale] = useState(scale * 100);
 
   const onChangeSlider = useCallback(
     (scale: number) => {
@@ -119,8 +122,8 @@ export const CanvasScale = memo(() => {
   );
 
   useEffect(() => {
-    setLocalScale(stageAttrs.scale * 100);
-  }, [stageAttrs.scale]);
+    setLocalScale(scale * 100);
+  }, [scale]);
 
   return (
     <Popover>
