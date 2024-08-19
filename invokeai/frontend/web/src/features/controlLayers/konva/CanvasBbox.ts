@@ -235,6 +235,7 @@ export class CanvasBbox {
     const toolState = this.manager.stateApi.getToolState();
 
     this.konva.group.visible(true);
+    this.parent.getLayer().listening(toolState.selected === 'bbox');
     this.konva.group.listening(toolState.selected === 'bbox');
     this.konva.rect.setAttrs({
       x: bbox.rect.x,
