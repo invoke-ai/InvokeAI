@@ -32,7 +32,6 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 
@@ -60,7 +59,7 @@ class FluxVAELoader(GenericDiffusersLoader):
                     raise
 
             dataclass_fields = {f.name for f in fields(AutoEncoderParams)}
-            filtered_data = {k: v for k, v in flux_conf["params"]["ae_params"].items() if k in dataclass_fields}
+            filtered_data = {k: v for k, v in flux_conf["params"].items() if k in dataclass_fields}
             params = AutoEncoderParams(**filtered_data)
 
             with SilenceWarnings():

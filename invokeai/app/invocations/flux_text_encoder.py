@@ -1,4 +1,5 @@
 import torch
+from typing import Literal
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
@@ -23,11 +24,12 @@ class FluxTextEncoderInvocation(BaseInvocation):
         description=FieldDescriptions.clip,
         input=Input.Connection,
     )
-    t5Encoder: T5EncoderField = InputField(
+    t5_encoder: T5EncoderField = InputField(
         title="T5Encoder",
         description=FieldDescriptions.t5Encoder,
         input=Input.Connection,
     )
+    max_seq_len: Literal[256, 512] = InputField(description="Max sequence length for the desired flux model")
     positive_prompt: str = InputField(description="Positive prompt for text-to-image generation.")
 
     # TODO(ryand): Should we create a new return type for this invocation? This ConditioningOutput is clearly not
@@ -43,21 +45,15 @@ class FluxTextEncoderInvocation(BaseInvocation):
         return ConditioningOutput.build(conditioning_name)
 
     def _encode_prompt(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor]:
-        # TODO: Determine the T5 max sequence length based on the model.
-        # if self.model == "flux-schnell":
-        max_seq_len = 256
-        # # elif self.model == "flux-dev":
-        # #     max_seq_len = 512
-        # else:
-        #     raise ValueError(f"Unknown model: {self.model}")
+        max_seq_len = self.max_seq_len
 
         # Load CLIP.
         clip_tokenizer_info = context.models.load(self.clip.tokenizer)
         clip_text_encoder_info = context.models.load(self.clip.text_encoder)
 
         # Load T5.
-        t5_tokenizer_info = context.models.load(self.t5Encoder.tokenizer)
-        t5_text_encoder_info = context.models.load(self.t5Encoder.text_encoder)
+        t5_tokenizer_info = context.models.load(self.t5_encoder.tokenizer)
+        t5_text_encoder_info = context.models.load(self.t5_encoder.text_encoder)
 
         with (
             clip_text_encoder_info as clip_text_encoder,

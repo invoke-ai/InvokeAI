@@ -324,7 +324,12 @@ class ModelProbe(object):
         if model_type is ModelType.Main:
             if base_type == BaseModelType.Flux:
                 # TODO: Decide between dev/schnell
-                config_file = "flux/flux1-schnell.yaml"
+                checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
+                state_dict = checkpoint.get("state_dict") or checkpoint
+                if 'guidance_in.out_layer.weight' in state_dict:
+                    config_file = "flux/flux1-dev.yaml"
+                else:
+                    config_file = "flux/flux1-schnell.yaml"
             else:
                 config_file = LEGACY_CONFIGS[base_type][variant_type]
                 if isinstance(config_file, dict):  # need another tier for sd-2.x models
@@ -338,7 +343,7 @@ class ModelProbe(object):
             )
         elif model_type is ModelType.VAE:
             config_file = (
-                "flux/flux1-schnell.yaml"
+                "flux/flux1-vae.yaml"
                 if base_type is BaseModelType.Flux
                 else "stable-diffusion/v1-inference.yaml"
                 if base_type is BaseModelType.StableDiffusion1
