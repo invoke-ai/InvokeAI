@@ -162,7 +162,7 @@ class ModelProbe(object):
         fields["description"] = (
             fields.get("description") or f"{fields['base'].value} {model_type.value} model {fields['name']}"
         )
-        fields["format"] = ModelFormat(fields.get("format")) or probe.get_format()
+        fields["format"] = ModelFormat(fields.get("format")) if "format" in fields else probe.get_format()
         fields["hash"] = fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)
 
         fields["default_settings"] = fields.get("default_settings")
@@ -179,7 +179,7 @@ class ModelProbe(object):
         # additional fields needed for main and controlnet models
         if (
             fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE]
-            and fields["format"] is ModelFormat.Checkpoint
+            and fields["format"] in [ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b]
         ):
             ckpt_config_path = cls._get_checkpoint_config_path(
                 model_path,
@@ -323,6 +323,7 @@ class ModelProbe(object):
 
         if model_type is ModelType.Main:
             if base_type == BaseModelType.Flux:
+                # TODO: Decide between dev/schnell
                 config_file = "flux/flux1-schnell.yaml"
             else:
                 config_file = LEGACY_CONFIGS[base_type][variant_type]
@@ -422,6 +423,9 @@ class CheckpointProbeBase(ProbeBase):
         self.checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
 
     def get_format(self) -> ModelFormat:
+        state_dict = self.checkpoint.get("state_dict") or self.checkpoint
+        if "double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict:
+            return ModelFormat.BnbQuantizednf4b
         return ModelFormat("checkpoint")
 
     def get_variant_type(self) -> ModelVariantType:
