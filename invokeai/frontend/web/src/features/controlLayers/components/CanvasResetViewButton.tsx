@@ -28,9 +28,9 @@ export const CanvasResetViewButton = memo(() => {
 
   const onReset = useCallback(() => {
     if ($shift.get()) {
-      resetZoom();
-    } else {
       resetView();
+    } else {
+      resetZoom();
     }
   }, [resetView, resetZoom]);
 
