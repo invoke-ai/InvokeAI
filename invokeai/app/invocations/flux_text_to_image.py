@@ -61,7 +61,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         assert isinstance(flux_conditioning, FLUXConditioningInfo)
 
         latents = self._run_diffusion(context, flux_conditioning.clip_embeds, flux_conditioning.t5_embeds)
-        image = self._run_vae_decoding(context, flux_ae_path, latents)
+        image = self._run_vae_decoding(context, latents)
         image_dto = context.images.save(image=image)
         return ImageOutput.build(image_dto)
 
