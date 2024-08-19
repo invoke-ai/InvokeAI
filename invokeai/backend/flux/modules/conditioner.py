@@ -1,5 +1,6 @@
 from torch import Tensor, nn
-from transformers import (PreTrainedModel, PreTrainedTokenizer)
+from transformers import PreTrainedModel, PreTrainedTokenizer
+
 
 class HFEncoder(nn.Module):
     def __init__(self, encoder: PreTrainedModel, tokenizer: PreTrainedTokenizer, is_clip: bool, max_length: int):

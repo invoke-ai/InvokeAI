@@ -1,8 +1,4 @@
 import torch
-
-
-from einops import repeat
-from diffusers.pipelines.flux.pipeline_flux import FluxPipeline
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
@@ -10,9 +6,8 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.flux.modules.conditioner import HFEncoder
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
 
 
 @invocation(

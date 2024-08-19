@@ -56,7 +56,7 @@ LEGACY_CONFIGS: Dict[BaseModelType, Dict[ModelVariantType, Union[str, Dict[Sched
     },
     BaseModelType.StableDiffusionXLRefiner: {
         ModelVariantType.Normal: "sd_xl_refiner.yaml",
-    }
+    },
 }
 
 
@@ -132,7 +132,7 @@ class ModelProbe(object):
             fields = {}
 
         model_path = model_path.resolve()
-        
+
         format_type = ModelFormat.Diffusers if model_path.is_dir() else ModelFormat.Checkpoint
         model_info = None
         model_type = ModelType(fields["type"]) if "type" in fields and fields["type"] else None
@@ -323,7 +323,7 @@ class ModelProbe(object):
 
         if model_type is ModelType.Main:
             if base_type == BaseModelType.Flux:
-                config_file="flux/flux1-schnell.yaml"
+                config_file = "flux/flux1-schnell.yaml"
             else:
                 config_file = LEGACY_CONFIGS[base_type][variant_type]
                 if isinstance(config_file, dict):  # need another tier for sd-2.x models
@@ -726,6 +726,7 @@ class TextualInversionFolderProbe(FolderProbeBase):
 class T5EncoderFolderProbe(FolderProbeBase):
     def get_format(self) -> ModelFormat:
         return ModelFormat.T5Encoder
+
 
 class ONNXFolderProbe(PipelineFolderProbe):
     def get_base_type(self) -> BaseModelType:

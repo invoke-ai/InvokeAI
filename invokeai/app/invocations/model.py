@@ -1,6 +1,6 @@
 import copy
 from time import sleep
-from typing import List, Optional, Literal, Dict
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,10 +12,10 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
+from invokeai.app.services.model_records import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
-from invokeai.app.services.model_records import ModelRecordChanges
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType, SubModelType, ModelFormat
+from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
 
 
 class ModelIdentifierField(BaseModel):
@@ -132,30 +132,21 @@ class ModelIdentifierInvocation(BaseInvocation):
 
         return ModelIdentifierOutput(model=self.model)
 
-T5_ENCODER_OPTIONS = Literal["base", "16b_quantized", "8b_quantized"]
+
+T5_ENCODER_OPTIONS = Literal["base", "8b_quantized"]
 T5_ENCODER_MAP: Dict[str, Dict[str, str]] = {
     "base": {
-        "text_encoder_repo": "black-forest-labs/FLUX.1-schnell::text_encoder_2",
-        "tokenizer_repo": "black-forest-labs/FLUX.1-schnell::tokenizer_2",
-        "text_encoder_name": "FLUX.1-schnell_text_encoder_2",
-        "tokenizer_name": "FLUX.1-schnell_tokenizer_2",
+        "repo": "invokeai/flux_dev::t5_xxl_encoder/base",
+        "name": "t5_base_encoder",
         "format": ModelFormat.T5Encoder,
     },
     "8b_quantized": {
-        "text_encoder_repo": "hf_repo1",
-        "tokenizer_repo": "hf_repo1",
-        "text_encoder_name": "hf_repo1",
-        "tokenizer_name": "hf_repo1",
-        "format": ModelFormat.T5Encoder8b,
-    },
-    "4b_quantized": {
-        "text_encoder_repo": "hf_repo2",
-        "tokenizer_repo": "hf_repo2",
-        "text_encoder_name": "hf_repo2",
-        "tokenizer_name": "hf_repo2",
-        "format": ModelFormat.T5Encoder8b,
+        "repo": "invokeai/flux_dev::t5_xxl_encoder/8b_quantized",
+        "name": "t5_8b_quantized_encoder",
+        "format": ModelFormat.T5Encoder,
     },
 }
+
 
 @invocation_output("flux_model_loader_output")
 class FluxModelLoaderOutput(BaseInvocationOutput):
@@ -176,7 +167,7 @@ class FluxModelLoaderInvocation(BaseInvocation):
         ui_type=UIType.FluxMainModel,
         input=Input.Direct,
     )
-    
+
     t5_encoder: T5_ENCODER_OPTIONS = InputField(description="The T5 Encoder model to use.")
 
     def invoke(self, context: InvocationContext) -> FluxModelLoaderOutput:
@@ -189,7 +180,15 @@ class FluxModelLoaderInvocation(BaseInvocation):
         tokenizer2 = self._get_model(context, SubModelType.Tokenizer2)
         clip_encoder = self._get_model(context, SubModelType.TextEncoder)
         t5_encoder = self._get_model(context, SubModelType.TextEncoder2)
-        vae = self._install_model(context, SubModelType.VAE, "FLUX.1-schnell_ae", "black-forest-labs/FLUX.1-schnell::ae.safetensors", ModelFormat.Checkpoint, ModelType.VAE, BaseModelType.Flux)
+        vae = self._install_model(
+            context,
+            SubModelType.VAE,
+            "FLUX.1-schnell_ae",
+            "black-forest-labs/FLUX.1-schnell::ae.safetensors",
+            ModelFormat.Checkpoint,
+            ModelType.VAE,
+            BaseModelType.Flux,
+        )
 
         return FluxModelLoaderOutput(
             transformer=TransformerField(transformer=transformer),
@@ -198,33 +197,59 @@ class FluxModelLoaderInvocation(BaseInvocation):
             vae=VAEField(vae=vae),
         )
 
-    def _get_model(self, context: InvocationContext, submodel:SubModelType) -> ModelIdentifierField:
-        match(submodel):
+    def _get_model(self, context: InvocationContext, submodel: SubModelType) -> ModelIdentifierField:
+        match submodel:
             case SubModelType.Transformer:
                 return self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
             case submodel if submodel in [SubModelType.Tokenizer, SubModelType.TextEncoder]:
-                return self._install_model(context, submodel, "clip-vit-large-patch14", "openai/clip-vit-large-patch14", ModelFormat.Diffusers, ModelType.CLIPEmbed, BaseModelType.Any)
-            case SubModelType.TextEncoder2:
-                return self._install_model(context, submodel, T5_ENCODER_MAP[self.t5_encoder]["text_encoder_name"], T5_ENCODER_MAP[self.t5_encoder]["text_encoder_repo"], ModelFormat(T5_ENCODER_MAP[self.t5_encoder]["format"]), ModelType.T5Encoder, BaseModelType.Any)
-            case SubModelType.Tokenizer2:
-                return self._install_model(context, submodel, T5_ENCODER_MAP[self.t5_encoder]["tokenizer_name"], T5_ENCODER_MAP[self.t5_encoder]["tokenizer_repo"], ModelFormat(T5_ENCODER_MAP[self.t5_encoder]["format"]), ModelType.T5Encoder, BaseModelType.Any)
+                return self._install_model(
+                    context,
+                    submodel,
+                    "clip-vit-large-patch14",
+                    "openai/clip-vit-large-patch14",
+                    ModelFormat.Diffusers,
+                    ModelType.CLIPEmbed,
+                    BaseModelType.Any,
+                )
+            case submodel if submodel in [SubModelType.Tokenizer2, SubModelType.TextEncoder2]:
+                return self._install_model(
+                    context,
+                    submodel,
+                    T5_ENCODER_MAP[self.t5_encoder]["name"],
+                    T5_ENCODER_MAP[self.t5_encoder]["repo"],
+                    ModelFormat(T5_ENCODER_MAP[self.t5_encoder]["format"]),
+                    ModelType.T5Encoder,
+                    BaseModelType.Any,
+                )
             case _:
-                raise Exception(f"{submodel.value} is not a supported submodule for a flux model")  
+                raise Exception(f"{submodel.value} is not a supported submodule for a flux model")
 
-    def _install_model(self, context: InvocationContext, submodel:SubModelType, name: str, repo_id: str, format: ModelFormat, type: ModelType, base: BaseModelType):
-        if (models := context.models.search_by_attrs(name=name, base=base, type=type)):
+    def _install_model(
+        self,
+        context: InvocationContext,
+        submodel: SubModelType,
+        name: str,
+        repo_id: str,
+        format: ModelFormat,
+        type: ModelType,
+        base: BaseModelType,
+    ):
+        if models := context.models.search_by_attrs(name=name, base=base, type=type):
             if len(models) != 1:
                 raise Exception(f"Multiple models detected for selected model with name {name}")
             return ModelIdentifierField.from_config(models[0]).model_copy(update={"submodel_type": submodel})
         else:
             model_path = context.models.download_and_cache_model(repo_id)
-            config = ModelRecordChanges(name = name, base = base, type=type, format=format)
+            config = ModelRecordChanges(name=name, base=base, type=type, format=format)
             model_install_job = context.models.import_local_model(model_path=model_path, config=config)
             while not model_install_job.in_terminal_state:
                 sleep(0.01)
             if not model_install_job.config_out:
                 raise Exception(f"Failed to install {name}")
-            return ModelIdentifierField.from_config(model_install_job.config_out).model_copy(update={"submodel_type": submodel})
+            return ModelIdentifierField.from_config(model_install_job.config_out).model_copy(
+                update={"submodel_type": submodel}
+            )
+
 
 @invocation(
     "main_model_loader",
