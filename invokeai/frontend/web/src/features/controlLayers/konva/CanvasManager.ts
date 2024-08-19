@@ -6,6 +6,7 @@ import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva
 import {
   getImageDataTransparency,
   getPrefixedId,
+  getRectUnion,
   konvaNodeToBlob,
   konvaNodeToImageData,
   nanoid,
@@ -179,9 +180,44 @@ export class CanvasManager {
     });
   }
 
+  getVisibleRect = (): Rect => {
+    const rects = [];
+
+    if (this.inpaintMaskAdapter.state.isEnabled) {
+      rects.push(this.inpaintMaskAdapter.transformer.getRelativeRect());
+    }
+
+    for (const adapter of this.rasterLayerAdapters.values()) {
+      if (adapter.state.isEnabled) {
+        rects.push(adapter.transformer.getRelativeRect());
+      }
+    }
+
+    for (const adapter of this.controlLayerAdapters.values()) {
+      if (adapter.state.isEnabled) {
+        rects.push(adapter.transformer.getRelativeRect());
+      }
+    }
+
+    for (const adapter of this.regionalGuidanceAdapters.values()) {
+      if (adapter.state.isEnabled) {
+        rects.push(adapter.transformer.getRelativeRect());
+      }
+    }
+
+    const rectUnion = getRectUnion(...rects);
+
+    if (rectUnion.width === 0 || rectUnion.height === 0) {
+      // fall back to the bbox if there is no content
+      return this.stateApi.getBbox().rect;
+    } else {
+      return rectUnion;
+    }
+  };
+
   resetView() {
     const { width, height } = this.getStageSize();
-    const { rect } = this.stateApi.getBbox();
+    const rect = this.getVisibleRect();
 
     const padding = 20; // Padding in absolute pixels
 
