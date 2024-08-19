@@ -77,7 +77,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
 
   const handleDeletePreset = useCallback(async () => {
     try {
-      await deleteStylePreset(preset.id);
+      await deleteStylePreset(preset.id).unwrap();
       toast({
         status: 'success',
         title: t('stylePresets.templateDeleted'),
