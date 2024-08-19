@@ -72,7 +72,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         t5_embeddings: torch.Tensor,
     ):
         transformer_info = context.models.load(self.transformer.transformer)
-        inference_dtype = TorchDevice.choose_torch_dtype()
+        inference_dtype = torch.bfloat16
 
         # Prepare input noise.
         # TODO(ryand): Does the seed behave the same on different devices? Should we re-implement this to always use a
