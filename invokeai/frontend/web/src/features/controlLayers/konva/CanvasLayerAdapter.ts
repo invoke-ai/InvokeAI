@@ -4,11 +4,12 @@ import { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import type {
-  CanvasControlLayerState,
-  CanvasEntityIdentifier,
-  CanvasRasterLayerState,
-  CanvasV2State,
+import {
+  type CanvasControlLayerState,
+  type CanvasEntityIdentifier,
+  type CanvasRasterLayerState,
+  type CanvasV2State,
+  getEntityIdentifier,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { get } from 'lodash-es';
@@ -61,7 +62,7 @@ export class CanvasLayerAdapter {
    * Get this entity's entity identifier
    */
   getEntityIdentifier = (): CanvasEntityIdentifier => {
-    return { id: this.id, type: this.state.type };
+    return getEntityIdentifier(this.state);
   };
 
   destroy = (): void => {
@@ -97,7 +98,7 @@ export class CanvasLayerAdapter {
       this.transformer.updatePosition({ position });
     }
     if (this.isFirstRender || opacity !== this.state.opacity) {
-      this.updateOpacity({ opacity });
+      this.renderer.updateOpacity(opacity);
     }
     // this.transformer.syncInteractionState();
 
@@ -113,6 +114,7 @@ export class CanvasLayerAdapter {
     this.log.trace('Updating visibility');
     const isEnabled = get(arg, 'isEnabled', this.state.isEnabled);
     this.konva.layer.visible(isEnabled);
+    this.renderer.syncCache(isEnabled);
   };
 
   updateObjects = async (arg?: { objects: CanvasRasterLayerState['objects'] }) => {
