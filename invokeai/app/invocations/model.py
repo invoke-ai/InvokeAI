@@ -1,4 +1,5 @@
 import copy
+import yaml
 from time import sleep
 from typing import Dict, List, Literal, Optional
 
@@ -16,6 +17,7 @@ from invokeai.app.services.model_records import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.config import CheckpointConfigBase
 
 
 class ModelIdentifierField(BaseModel):
@@ -154,8 +156,9 @@ class FluxModelLoaderOutput(BaseInvocationOutput):
 
     transformer: TransformerField = OutputField(description=FieldDescriptions.transformer, title="Transformer")
     clip: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP")
-    t5Encoder: T5EncoderField = OutputField(description=FieldDescriptions.t5Encoder, title="T5 Encoder")
+    t5_encoder: T5EncoderField = OutputField(description=FieldDescriptions.t5Encoder, title="T5 Encoder")
     vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
+    max_seq_len: Literal[256, 512] = OutputField(description=FieldDescriptions.vae, title="Max Seq Length")
 
 
 @invocation("flux_model_loader", title="Flux Main Model", tags=["model", "flux"], category="model", version="1.0.3")
@@ -189,12 +192,22 @@ class FluxModelLoaderInvocation(BaseInvocation):
             ModelType.VAE,
             BaseModelType.Flux,
         )
+        transformer_config = context.models.get_config(transformer)
+        assert isinstance(transformer_config, CheckpointConfigBase)
+        legacy_config_path = context.config.get().legacy_conf_path / transformer_config.config_path
+        config_path = legacy_config_path.as_posix()
+        with open(config_path, "r") as stream:
+            try:
+                flux_conf = yaml.safe_load(stream)
+            except:
+                raise
 
         return FluxModelLoaderOutput(
             transformer=TransformerField(transformer=transformer),
             clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], skipped_layers=0),
-            t5Encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder),
+            t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder),
             vae=VAEField(vae=vae),
+            max_seq_len=flux_conf['max_seq_len']
         )
 
     def _get_model(self, context: InvocationContext, submodel: SubModelType) -> ModelIdentifierField:
