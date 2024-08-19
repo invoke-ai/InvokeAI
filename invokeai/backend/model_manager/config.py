@@ -111,6 +111,7 @@ class ModelFormat(str, Enum):
     T5Encoder = "t5_encoder"
     T5Encoder8b = "t5_encoder_8b"
     T5Encoder4b = "t5_encoder_4b"
+    BnbQuantizednf4b = "bnb_quantized_nf4b"
 
 
 class SchedulerPredictionType(str, Enum):
@@ -193,7 +194,7 @@ class ModelConfigBase(BaseModel):
 class CheckpointConfigBase(ModelConfigBase):
     """Model config for checkpoint-style models."""
 
-    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
+    format: Literal[ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b] = Field(description="Format of the provided checkpoint model", default=ModelFormat.Checkpoint)
     config_path: str = Field(description="path to the checkpoint model config file")
     converted_at: Optional[float] = Field(
         description="When this model was last converted to diffusers", default_factory=time.time
@@ -248,7 +249,6 @@ class VAECheckpointConfig(CheckpointConfigBase):
     """Model config for standalone VAE models."""
 
     type: Literal[ModelType.VAE] = ModelType.VAE
-    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
     @staticmethod
     def get_tag() -> Tag:
@@ -287,7 +287,6 @@ class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase)
     """Model config for ControlNet models (diffusers version)."""
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
-    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
     @staticmethod
     def get_tag() -> Tag:
@@ -334,6 +333,21 @@ class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):
     @staticmethod
     def get_tag() -> Tag:
         return Tag(f"{ModelType.Main.value}.{ModelFormat.Checkpoint.value}")
+
+
+class MainBnbQuantized4bCheckpointConfig(CheckpointConfigBase, MainConfigBase):
+    """Model config for main checkpoint models."""
+
+    prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
+    upcast_attention: bool = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.format = ModelFormat.BnbQuantizednf4b
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.Main.value}.{ModelFormat.BnbQuantizednf4b.value}")
 
 
 class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase):
@@ -438,6 +452,7 @@ AnyModelConfig = Annotated[
     Union[
         Annotated[MainDiffusersConfig, MainDiffusersConfig.get_tag()],
         Annotated[MainCheckpointConfig, MainCheckpointConfig.get_tag()],
+        Annotated[MainBnbQuantized4bCheckpointConfig, MainBnbQuantized4bCheckpointConfig.get_tag()],
         Annotated[VAEDiffusersConfig, VAEDiffusersConfig.get_tag()],
         Annotated[VAECheckpointConfig, VAECheckpointConfig.get_tag()],
         Annotated[ControlNetDiffusersConfig, ControlNetDiffusersConfig.get_tag()],

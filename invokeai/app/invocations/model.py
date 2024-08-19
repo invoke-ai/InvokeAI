@@ -136,12 +136,12 @@ class ModelIdentifierInvocation(BaseInvocation):
 T5_ENCODER_OPTIONS = Literal["base", "8b_quantized"]
 T5_ENCODER_MAP: Dict[str, Dict[str, str]] = {
     "base": {
-        "repo": "invokeai/flux_dev::t5_xxl_encoder/base",
+        "repo": "InvokeAI/flux_schnell::t5_xxl_encoder/base",
         "name": "t5_base_encoder",
         "format": ModelFormat.T5Encoder,
     },
     "8b_quantized": {
-        "repo": "invokeai/flux_dev::t5_xxl_encoder/8b_quantized",
+        "repo": "invokeai/flux_dev::t5_xxl_encoder/optimum_quanto_qfloat8",
         "name": "t5_8b_quantized_encoder",
         "format": ModelFormat.T5Encoder,
     },
