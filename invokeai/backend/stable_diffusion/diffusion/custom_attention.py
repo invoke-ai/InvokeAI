@@ -53,6 +53,9 @@ class CustomAttnProcessor:
 
         self._ip_adapter_attention_weights = ip_adapter_attention_weights
 
+        device = TorchDevice.choose_torch_device()
+        self.is_old_cuda = device.type == "cuda" and torch.cuda.get_device_capability(device)[0] < 8
+
         config = get_config()
         self.attention_type = config.attention_type
         if self.attention_type == "auto":
@@ -76,7 +79,7 @@ class CustomAttnProcessor:
         elif device.type == "cuda":
             # Flash Attention is supported from sm80 compute capability onwards in PyTorch
             # https://pytorch.org/blog/accelerated-pytorch-2/
-            if torch.cuda.get_device_capability("cuda")[0] < 8 and xformers is not None:
+            if self.is_old_cuda and xformers is not None:
                 return "xformers"
             else:
                 return "torch-sdp"
@@ -265,9 +268,10 @@ class CustomAttnProcessor:
         key: torch.Tensor,
         value: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
+        no_sliced: bool = False,
     ) -> torch.Tensor:
         slice_size = self._get_slice_size(attn)
-        if slice_size is not None:
+        if not no_sliced and slice_size is not None:
             return self.run_attention_sliced(
                 attn=attn,
                 query=query,
@@ -294,6 +298,41 @@ class CustomAttnProcessor:
             attention_mask=attention_mask,
         )
 
+    @staticmethod
+    def _align_attention_mask_memory(attention_mask: torch.Tensor, alignment: int = 8) -> torch.Tensor:
+        if attention_mask.stride(-2) % alignment == 0 and attention_mask.stride(-2) != 0:
+            return attention_mask
+
+        last_mask_dim = attention_mask.shape[-1]
+        new_last_mask_dim = last_mask_dim + (alignment - (last_mask_dim % alignment))
+        attention_mask_mem = torch.empty(
+            attention_mask.shape[:-1] + (new_last_mask_dim,),
+            device=attention_mask.device,
+            dtype=attention_mask.dtype,
+        )
+        attention_mask_mem[..., :last_mask_dim] = attention_mask
+        return attention_mask_mem[..., :last_mask_dim]
+
+    @staticmethod
+    def _head_to_batch_dim(tensor: torch.Tensor, head_dim: int) -> torch.Tensor:
+        # [B, S, H*He] -> [B, S, H, He]
+        tensor = tensor.reshape(tensor.shape[0], tensor.shape[1], -1, head_dim)
+        # [B, S, H, He] -> [B, H, S, He]
+        tensor = tensor.permute(0, 2, 1, 3)
+        # [B, H, S, He] -> [B*H, S, He]
+        tensor = tensor.reshape(-1, tensor.shape[2], head_dim)
+        return tensor
+
+    @staticmethod
+    def _batch_to_head_dim(tensor: torch.Tensor, batch_size: int) -> torch.Tensor:
+        # [B*H, S, He] -> [B, H, S, He]
+        tensor = tensor.reshape(batch_size, -1, tensor.shape[1], tensor.shape[2])
+        # [B, H, S, He] -> [B, S, H, He]
+        tensor = tensor.permute(0, 2, 1, 3)
+        # [B, S, H, He] -> [B, S, H*He]
+        tensor = tensor.reshape(tensor.shape[0], tensor.shape[1], -1)
+        return tensor
+
     def run_attention_normal(
         self,
         attn: Attention,
@@ -302,14 +341,17 @@ class CustomAttnProcessor:
         value: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
     ) -> torch.Tensor:
-        query = attn.head_to_batch_dim(query)
-        key = attn.head_to_batch_dim(key)
-        value = attn.head_to_batch_dim(value)
+        batch_size = query.shape[0]
+        head_dim = attn.to_q.weight.shape[0] // attn.heads
+
+        query = self._head_to_batch_dim(query, head_dim)
+        key = self._head_to_batch_dim(key, head_dim)
+        value = self._head_to_batch_dim(value, head_dim)
 
         attention_probs = attn.get_attention_scores(query, key, attention_mask)
         hidden_states = torch.bmm(attention_probs, value)
-        hidden_states = attn.batch_to_head_dim(hidden_states)
 
+        hidden_states = self._batch_to_head_dim(hidden_states, batch_size)
         return hidden_states
 
     def run_attention_xformers(
@@ -319,25 +361,62 @@ class CustomAttnProcessor:
         key: torch.Tensor,
         value: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
+        multihead: Optional[bool] = None,
     ) -> torch.Tensor:
-        query = attn.head_to_batch_dim(query).contiguous()
-        key = attn.head_to_batch_dim(key).contiguous()
-        value = attn.head_to_batch_dim(value).contiguous()
+        batch_size = query.shape[0]
+        head_dim = attn.to_q.weight.shape[0] // attn.heads
 
-        if attention_mask is not None:
-            # expand our mask's singleton query_length dimension:
-            #   [batch*heads,            1, key_length] ->
-            #   [batch*heads, query_length, key_length]
-            # so that it can be added as a bias onto the attention scores that xformers computes:
-            #   [batch*heads, query_length, key_length]
-            # we do this explicitly because xformers doesn't broadcast the singleton dimension for us.
-            attention_mask = attention_mask.expand(-1, query.shape[1], -1)
+        # batched execution on xformers slightly faster for small heads count
+        if multihead is None:
+            heads_count = query.shape[2] // head_dim
+            multihead = heads_count >= 4
 
-        hidden_states = xformers.ops.memory_efficient_attention(
-            query, key, value, attn_bias=attention_mask, op=None, scale=attn.scale
-        )
-        hidden_states = hidden_states.to(query.dtype)
-        hidden_states = attn.batch_to_head_dim(hidden_states)
+        if multihead:
+            # [B, S, H*He] -> [B, S, H, He]
+            query = query.view(batch_size, query.shape[1], -1, head_dim)
+            key = key.view(batch_size, key.shape[1], -1, head_dim)
+            value = value.view(batch_size, value.shape[1], -1, head_dim)
+
+            if attention_mask is not None:
+                # [B*H, 1, S_key] -> [B, H, 1, S_key]
+                attention_mask = attention_mask.view(batch_size, -1, attention_mask.shape[1], attention_mask.shape[2])
+                # expand our mask's singleton query dimension:
+                #   [B, H,       1, S_key] ->
+                #   [B, H, S_query, S_key]
+                # we do this explicitly because xformers doesn't broadcast the singleton dimension for us.
+                attention_mask = attention_mask.expand(-1, -1, query.shape[1], -1)
+                # xformers requires mask memory to be aligned to 8
+                attention_mask = self._align_attention_mask_memory(attention_mask)
+
+            hidden_states = xformers.ops.memory_efficient_attention(
+                query, key, value, attn_bias=attention_mask, op=None, scale=attn.scale
+            )
+            # [B, S_query, H, He] -> [B, S_query, H*He]
+            hidden_states = hidden_states.reshape(hidden_states.shape[:-2] + (-1,))
+            hidden_states = hidden_states.to(query.dtype)
+
+        else:
+            # contiguous inputs slightly faster in batched execution
+            # [B, S, H*He] -> [B*H, S, He]
+            query = self._head_to_batch_dim(query, head_dim).contiguous()
+            key = self._head_to_batch_dim(key, head_dim).contiguous()
+            value = self._head_to_batch_dim(value, head_dim).contiguous()
+
+            if attention_mask is not None:
+                # expand our mask's singleton query dimension:
+                #   [B*H,       1, S_key] ->
+                #   [B*H, S_query, S_key]
+                # we do this explicitly because xformers doesn't broadcast the singleton dimension for us.
+                attention_mask = attention_mask.expand(-1, query.shape[1], -1)
+                # xformers requires mask memory to be aligned to 8
+                attention_mask = self._align_attention_mask_memory(attention_mask)
+
+            hidden_states = xformers.ops.memory_efficient_attention(
+                query, key, value, attn_bias=attention_mask, op=None, scale=attn.scale
+            )
+            hidden_states = hidden_states.to(query.dtype)
+            # [B*H, S_query, He] -> [B, S_query, H*He]
+            hidden_states = self._batch_to_head_dim(hidden_states, batch_size)
 
         return hidden_states
 
@@ -348,27 +427,54 @@ class CustomAttnProcessor:
         key: torch.Tensor,
         value: torch.Tensor,
         attention_mask: Optional[torch.Tensor],
+        multihead: Optional[bool] = None,
     ) -> torch.Tensor:
-        batch_size = key.shape[0]
-        inner_dim = key.shape[-1]
-        head_dim = inner_dim // attn.heads
+        batch_size = query.shape[0]
+        head_dim = attn.to_q.weight.shape[0] // attn.heads
 
-        query = query.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-        key = key.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-        value = value.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
+        if multihead is None:
+            # multihead extremely slow on old cuda gpu
+            multihead = not self.is_old_cuda
 
-        if attention_mask is not None:
-            # scaled_dot_product_attention expects attention_mask shape to be
-            # (batch, heads, source_length, target_length)
-            attention_mask = attention_mask.view(batch_size, attn.heads, -1, attention_mask.shape[-1])
+        if multihead:
+            # [B, S, H*He] -> [B, H, S, He]
+            query = query.view(batch_size, query.shape[1], -1, head_dim).transpose(1, 2)
+            key = key.view(batch_size, key.shape[1], -1, head_dim).transpose(1, 2)
+            value = value.view(batch_size, value.shape[1], -1, head_dim).transpose(1, 2)
 
-        # the output of sdp = (batch, num_heads, seq_len, head_dim)
-        hidden_states = F.scaled_dot_product_attention(
-            query, key, value, attn_mask=attention_mask, dropout_p=0.0, is_causal=False, scale=attn.scale
-        )
+            if attention_mask is not None:
+                # [B*H, 1, S_key] -> [B, H, 1, S_key]
+                attention_mask = attention_mask.view(batch_size, -1, attention_mask.shape[1], attention_mask.shape[2])
+                # mask alignment to 8 decreases memory consumption and increases speed
+                attention_mask = self._align_attention_mask_memory(attention_mask)
 
-        hidden_states = hidden_states.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
-        hidden_states = hidden_states.to(query.dtype)
+            hidden_states = F.scaled_dot_product_attention(
+                query, key, value, attn_mask=attention_mask, dropout_p=0.0, is_causal=False, scale=attn.scale
+            )
+
+            # [B, H, S_query, He] -> [B, S_query, H, He]
+            hidden_states = hidden_states.transpose(1, 2)
+            # [B, S_query, H, He] -> [B, S_query, H*He]
+            hidden_states = hidden_states.reshape(hidden_states.shape[:-2] + (-1,))
+            hidden_states = hidden_states.to(query.dtype)
+        else:
+            # [B, S, H*He] -> [B*H, S, He]
+            query = self._head_to_batch_dim(query, head_dim)
+            key = self._head_to_batch_dim(key, head_dim)
+            value = self._head_to_batch_dim(value, head_dim)
+
+            if attention_mask is not None:
+                # attention mask already in shape [B*H, 1, S_key]/[B*H, S_query, S_key]
+                # mask alignment to 8 decreases memory consumption and increases speed
+                attention_mask = self._align_attention_mask_memory(attention_mask)
+
+            hidden_states = F.scaled_dot_product_attention(
+                query, key, value, attn_mask=attention_mask, dropout_p=0.0, is_causal=False, scale=attn.scale
+            )
+
+            hidden_states = hidden_states.to(query.dtype)
+            # [B*H, S_query, He] -> [B, S_query, H*He]
+            hidden_states = self._batch_to_head_dim(hidden_states, batch_size)
 
         return hidden_states
 
@@ -381,52 +487,50 @@ class CustomAttnProcessor:
         attention_mask: Optional[torch.Tensor],
         slice_size: int,
     ) -> torch.Tensor:
-        dim = query.shape[-1]
+        batch_size = query.shape[0]
+        head_dim = attn.to_q.weight.shape[0] // attn.heads
+        heads_count = query.shape[2] // head_dim
 
-        query = attn.head_to_batch_dim(query)
-        key = attn.head_to_batch_dim(key)
-        value = attn.head_to_batch_dim(value)
+        # [B, S, H*He] -> [B, H, S, He]
+        query = query.reshape(query.shape[0], query.shape[1], -1, head_dim).transpose(1, 2)
+        key = key.reshape(key.shape[0], key.shape[1], -1, head_dim).transpose(1, 2)
+        value = value.reshape(value.shape[0], value.shape[1], -1, head_dim).transpose(1, 2)
+        # [B*H, S_query/1, S_key] -> [B, H, S_query/1, S_key]
+        if attention_mask is not None:
+            attention_mask = attention_mask.reshape(batch_size, -1, attention_mask.shape[1], attention_mask.shape[2])
 
-        batch_size_attention, query_tokens, _ = query.shape
-        hidden_states = torch.zeros(
-            (batch_size_attention, query_tokens, dim // attn.heads), device=query.device, dtype=query.dtype
-        )
+        # [B, H, S_query, He]
+        hidden_states = torch.empty(query.shape, device=query.device, dtype=query.dtype)
 
-        for i in range((batch_size_attention - 1) // slice_size + 1):
+        for i in range((heads_count - 1) // slice_size + 1):
             start_idx = i * slice_size
             end_idx = (i + 1) * slice_size
 
-            query_slice = query[start_idx:end_idx]
-            key_slice = key[start_idx:end_idx]
-            value_slice = value[start_idx:end_idx]
-            attn_mask_slice = attention_mask[start_idx:end_idx] if attention_mask is not None else None
+            # [B, H_s, S, He] -> [B, S, H_s*He]
+            query_slice = query[:, start_idx:end_idx, :, :].transpose(1, 2).reshape(batch_size, query.shape[2], -1)
+            key_slice = key[:, start_idx:end_idx, :, :].transpose(1, 2).reshape(batch_size, key.shape[2], -1)
+            value_slice = value[:, start_idx:end_idx, :, :].transpose(1, 2).reshape(batch_size, value.shape[2], -1)
 
-            if self.attention_type == "normal":
-                attn_slice = attn.get_attention_scores(query_slice, key_slice, attn_mask_slice)
-                torch.bmm(attn_slice, value_slice, out=hidden_states[start_idx:end_idx])
-                del attn_slice
-            elif self.attention_type == "xformers":
-                if attn_mask_slice is not None:
-                    attn_mask_slice = attn_mask_slice.expand(-1, query.shape[1], -1)
+            # [B, H_s, S_query/1, S_key] -> [B*H_s, S_query/1, S_key]
+            attn_mask_slice = None
+            if attention_mask is not None:
+                attn_mask_slice = attention_mask[:, start_idx:end_idx, :, :].reshape((-1,) + attention_mask.shape[-2:])
 
-                hidden_states[start_idx:end_idx] = xformers.ops.memory_efficient_attention(
-                    query_slice, key_slice, value_slice, attn_bias=attn_mask_slice, op=None, scale=attn.scale
-                )
-            elif self.attention_type == "torch-sdp":
-                if attn_mask_slice is not None:
-                    attn_mask_slice = attn_mask_slice.unsqueeze(0)
+            # [B, S_query, H_s*He]
+            hidden_states_slice = self.run_attention(
+                attn=attn,
+                query=query_slice,
+                key=key_slice,
+                value=value_slice,
+                attention_mask=attn_mask_slice,
+                no_sliced=True,
+            )
 
-                hidden_states[start_idx:end_idx] = F.scaled_dot_product_attention(
-                    query_slice.unsqueeze(0),
-                    key_slice.unsqueeze(0),
-                    value_slice.unsqueeze(0),
-                    attn_mask=attn_mask_slice,
-                    dropout_p=0.0,
-                    is_causal=False,
-                    scale=attn.scale,
-                ).squeeze(0)
-            else:
-                raise ValueError(f"Unknown attention type: {self.attention_type}")
+            # [B, S_query, H_s*He] -> [B, H_s, S_query, He]
+            hidden_states[:, start_idx:end_idx] = hidden_states_slice.reshape(
+                hidden_states_slice.shape[:-1] + (-1, head_dim)
+            ).transpose(1, 2)
 
-        hidden_states = attn.batch_to_head_dim(hidden_states)
-        return hidden_states
+        # [B, H_s, S_query, He] -> [B, S_query, H_s*He]
+        hidden_states = hidden_states.transpose(1, 2)
+        return hidden_states.reshape(hidden_states.shape[:-2] + (-1,))
