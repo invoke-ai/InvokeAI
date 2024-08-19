@@ -32,6 +32,7 @@ class PresetType(str, Enum, metaclass=MetaEnum):
 class StylePresetChanges(BaseModel, extra="forbid"):
     name: Optional[str] = Field(default=None, description="The style preset's new name.")
     preset_data: Optional[PresetData] = Field(default=None, description="The updated data for style preset.")
+    type: Optional[PresetType] = Field(description="The updated type of the style preset")
 
 
 class StylePresetWithoutId(BaseModel):
