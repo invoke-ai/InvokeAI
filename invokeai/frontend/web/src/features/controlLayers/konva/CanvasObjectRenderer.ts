@@ -420,7 +420,9 @@ export class CanvasObjectRenderer {
     }
     imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const imageObject = imageDTOToImageObject(imageDTO);
+    if (replaceObjects) {
     await this.renderObject(imageObject, true);
+    }
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.getEntityIdentifier(),
       imageObject,
