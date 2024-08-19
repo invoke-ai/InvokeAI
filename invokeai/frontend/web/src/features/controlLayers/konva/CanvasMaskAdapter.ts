@@ -3,11 +3,12 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import type {
-  CanvasEntityIdentifier,
-  CanvasInpaintMaskState,
-  CanvasRegionalGuidanceState,
-  CanvasV2State,
+import {
+  type CanvasEntityIdentifier,
+  type CanvasInpaintMaskState,
+  type CanvasRegionalGuidanceState,
+  type CanvasV2State,
+  getEntityIdentifier,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { get } from 'lodash-es';
@@ -59,7 +60,7 @@ export class CanvasMaskAdapter {
    * Get this entity's entity identifier
    */
   getEntityIdentifier = (): CanvasEntityIdentifier => {
-    return { id: this.id, type: this.state.type };
+    return getEntityIdentifier(this.state)
   };
 
   destroy = (): void => {
@@ -99,7 +100,11 @@ export class CanvasMaskAdapter {
     }
 
     if (this.isFirstRender || state.fill !== this.state.fill) {
-      this.renderer.updateCompositingRect(state.fill);
+      this.renderer.updateCompositingRectFill(state.fill);
+    }
+
+    if (this.isFirstRender) {
+      this.renderer.updateCompositingRectSize();
     }
 
     // this.transformer.syncInteractionState();

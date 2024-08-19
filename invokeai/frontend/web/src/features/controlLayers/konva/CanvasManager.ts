@@ -316,10 +316,10 @@ export class CanvasManager {
     if (this._isFirstRender || state.rasterLayers.entities !== this._prevState.rasterLayers.entities) {
       this.log.debug('Rendering raster layers');
 
-      for (const canvasLayer of this.rasterLayerAdapters.values()) {
-        if (!state.rasterLayers.entities.find((l) => l.id === canvasLayer.id)) {
-          await canvasLayer.destroy();
-          this.rasterLayerAdapters.delete(canvasLayer.id);
+      for (const entityAdapter of this.rasterLayerAdapters.values()) {
+        if (!state.rasterLayers.entities.find((l) => l.id === entityAdapter.id)) {
+          await entityAdapter.destroy();
+          this.rasterLayerAdapters.delete(entityAdapter.id);
         }
       }
 
@@ -341,10 +341,10 @@ export class CanvasManager {
     if (this._isFirstRender || state.controlLayers.entities !== this._prevState.controlLayers.entities) {
       this.log.debug('Rendering control layers');
 
-      for (const canvasLayer of this.controlLayerAdapters.values()) {
-        if (!state.controlLayers.entities.find((l) => l.id === canvasLayer.id)) {
-          await canvasLayer.destroy();
-          this.controlLayerAdapters.delete(canvasLayer.id);
+      for (const entityAdapter of this.controlLayerAdapters.values()) {
+        if (!state.controlLayers.entities.find((l) => l.id === entityAdapter.id)) {
+          await entityAdapter.destroy();
+          this.controlLayerAdapters.delete(entityAdapter.id);
         }
       }
 

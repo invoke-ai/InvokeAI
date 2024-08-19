@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { CanvasEntityGroupTitle } from 'features/controlLayers/components/common/CanvasEntityGroupTitle';
+import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
 import { RasterLayer } from 'features/controlLayers/components/RasterLayer/RasterLayer';
 import { mapId } from 'features/controlLayers/konva/util';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
@@ -22,15 +22,15 @@ export const RasterLayerEntityList = memo(() => {
 
   if (layerIds.length > 0) {
     return (
-      <>
-        <CanvasEntityGroupTitle
-          title={t('controlLayers.rasterLayers_withCount', { count: layerIds.length })}
-          isSelected={isSelected}
-        />
+      <CanvasEntityGroupList
+        type="raster_layer"
+        title={t('controlLayers.rasterLayers_withCount', { count: layerIds.length })}
+        isSelected={isSelected}
+      >
         {layerIds.map((id) => (
           <RasterLayer key={id} id={id} />
         ))}
-      </>
+      </CanvasEntityGroupList>
     );
   }
 });
