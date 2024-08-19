@@ -16,6 +16,7 @@ import { sessionReducers } from 'features/controlLayers/store/sessionReducers';
 import { settingsReducers } from 'features/controlLayers/store/settingsReducers';
 import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
+import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { initialAspectRatioState } from 'features/parameters/components/DocumentSize/constants';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { isEqual, pick } from 'lodash-es';
@@ -55,11 +56,12 @@ const initialState: CanvasV2State = {
     type: 'inpaint_mask',
     fill: {
       style: 'diagonal',
-      color: { r: 255, g: 122, b: 0, a: 1 }, // some orange color
+      color: { r: 255, g: 122, b: 0 }, // some orange color
     },
     rasterizationCache: [],
     isEnabled: true,
     objects: [],
+    opacity: 1,
     position: {
       x: 0,
       y: 0,
@@ -292,37 +294,43 @@ export const canvasV2Slice = createSlice({
         return;
       }
 
-      if (isDrawableEntity(entity)) {
-        entity.objects.push(brushLine);
-        // When adding a brush line, we need to invalidate the rasterization caches.
-        invalidateRasterizationCaches(entity, state);
+      if (!isDrawableEntity(entity)) {
+        assert(false, `Cannot add a brush line to a non-drawable entity of type ${entity.type}`);
       }
+
+      entity.objects.push({ ...brushLine, points: simplifyFlatNumbersArray(brushLine.points) });
+      // When adding a brush line, we need to invalidate the rasterization caches.
+      invalidateRasterizationCaches(entity, state);
     },
     entityEraserLineAdded: (state, action: PayloadAction<EntityEraserLineAddedPayload>) => {
       const { entityIdentifier, eraserLine } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      } else if (isDrawableEntity(entity)) {
-        entity.objects.push(eraserLine);
-        // When adding an eraser line, we need to invalidate the rasterization caches.
-        invalidateRasterizationCaches(entity, state);
-      } else {
-        assert(false, 'Not implemented');
       }
+
+      if (!isDrawableEntity(entity)) {
+        assert(false, `Cannot add a eraser line to a non-drawable entity of type ${entity.type}`);
+      }
+
+      entity.objects.push({ ...eraserLine, points: simplifyFlatNumbersArray(eraserLine.points) });
+      // When adding an eraser line, we need to invalidate the rasterization caches.
+      invalidateRasterizationCaches(entity, state);
     },
     entityRectAdded: (state, action: PayloadAction<EntityRectAddedPayload>) => {
       const { entityIdentifier, rect } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      } else if (isDrawableEntity(entity)) {
-        entity.objects.push(rect);
-        // When adding an eraser line, we need to invalidate the rasterization caches.
-        invalidateRasterizationCaches(entity, state);
-      } else {
-        assert(false, 'Not implemented');
       }
+
+      if (!isDrawableEntity(entity)) {
+        assert(false, `Cannot add a rect to a non-drawable entity of type ${entity.type}`);
+      }
+
+      entity.objects.push(rect);
+      // When adding an eraser line, we need to invalidate the rasterization caches.
+      invalidateRasterizationCaches(entity, state);
     },
     entityDeleted: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
