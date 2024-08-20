@@ -30,12 +30,13 @@ import {
   isVAEModelConfig,
 } from 'services/api/types';
 
+const log = logger('models');
+
 export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: modelsApi.endpoints.getModelConfigs.matchFulfilled,
     effect: (action, { getState, dispatch }) => {
       // models loaded, we need to ensure the selected model is available and if not, select the first one
-      const log = logger('models');
       log.info({ models: action.payload.entities }, `Models loaded (${action.payload.ids.length})`);
 
       const state = getState();

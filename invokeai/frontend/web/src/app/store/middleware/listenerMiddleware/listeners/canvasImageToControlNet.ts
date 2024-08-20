@@ -7,11 +7,12 @@ import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
+const log = logger('canvas');
+
 export const addCanvasImageToControlNetListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: canvasImageToControlAdapter,
     effect: async (action, { dispatch, getState }) => {
-      const log = logger('canvas');
       const state = getState();
       const { id } = action.payload;
 

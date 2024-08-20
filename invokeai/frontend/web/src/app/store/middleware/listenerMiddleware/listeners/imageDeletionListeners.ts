@@ -13,6 +13,8 @@ import { forEach, intersectionBy } from 'lodash-es';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
+const log = logger('gallery');
+
 // Some utils to delete images from different parts of the app
 const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   state.nodes.present.nodes.forEach((node) => {
@@ -185,7 +187,6 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchFulfilled,
     effect: (action) => {
-      const log = logger('images');
       log.debug({ imageDTO: action.meta.arg.originalArgs }, 'Image deleted');
     },
   });
@@ -193,7 +194,6 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
   startAppListening({
     matcher: imagesApi.endpoints.deleteImage.matchRejected,
     effect: (action) => {
-      const log = logger('images');
       log.debug({ imageDTO: action.meta.arg.originalArgs }, 'Unable to delete image');
     },
   });

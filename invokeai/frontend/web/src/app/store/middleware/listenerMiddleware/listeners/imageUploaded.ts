@@ -10,11 +10,12 @@ import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 
+const log = logger('gallery');
+
 export const addImageUploadedFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
-      const log = logger('images');
       const imageDTO = action.payload;
       const state = getState();
       const { autoAddBoardId } = state.gallery;
@@ -112,7 +113,6 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchRejected,
     effect: (action) => {
-      const log = logger('images');
       const sanitizedData = {
         arg: {
           ...omit(action.meta.arg.originalArgs, ['file', 'postUploadAction']),

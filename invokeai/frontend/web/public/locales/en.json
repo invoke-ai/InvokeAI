@@ -1106,7 +1106,6 @@
         "confirmOnDelete": "Confirm On Delete",
         "developer": "Developer",
         "displayInProgress": "Display Progress Images",
-        "enableImageDebugging": "Enable Image Debugging",
         "enableInformationalPopovers": "Enable Informational Popovers",
         "informationalPopoversDisabled": "Informational Popovers Disabled",
         "informationalPopoversDisabledDesc": "Informational popovers have been disabled. Enable them in Settings.",
@@ -1816,6 +1815,31 @@
             "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
             "upscaling": "Upscaling",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
+        }
+    },
+    "system": {
+        "enableLogging": "Enable Logging",
+        "logLevel": {
+            "logLevel": "Log Level",
+            "trace": "Trace",
+            "debug": "Debug",
+            "info": "Info",
+            "warn": "Warn",
+            "error": "Error",
+            "fatal": "Fatal"
+        },
+        "logNamespaces": {
+            "logNamespaces": "Log Namespaces",
+            "gallery": "Gallery",
+            "models": "Models",
+            "config": "Config",
+            "canvas": "Canvas",
+            "generation": "Generation",
+            "workflows": "Workflows",
+            "system": "System",
+            "events": "Events",
+            "queue": "Queue",
+            "metadata": "Metadata"
         }
     }
 }

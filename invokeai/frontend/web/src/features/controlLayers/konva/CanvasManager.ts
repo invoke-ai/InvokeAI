@@ -54,7 +54,6 @@ export class CanvasManager {
   background: CanvasBackground;
 
   log: Logger;
-  workerLog: Logger;
   socket: AppSocket;
 
   _store: AppStore;
@@ -85,7 +84,6 @@ export class CanvasManager {
         },
       };
     });
-    this.workerLog = logger('worker');
 
     this.preview = new CanvasPreview(this);
     this.stage.add(this.preview.getLayer());
@@ -97,9 +95,9 @@ export class CanvasManager {
       const { type, data } = event.data;
       if (type === 'log') {
         if (data.ctx) {
-          this.workerLog[data.level](data.ctx, data.message);
+          this.log[data.level](data.ctx, data.message);
         } else {
-          this.workerLog[data.level](data.message);
+          this.log[data.level](data.message);
         }
       } else if (type === 'extents') {
         const task = this._tasks.get(data.id);
