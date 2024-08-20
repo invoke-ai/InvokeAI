@@ -1,7 +1,7 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import {
   alignCoordForTool,
-  getObjectId,
+  getPrefixedId,
   getScaledCursorPosition,
   offsetCoord,
 } from 'features/controlLayers/konva/util';
@@ -216,7 +216,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             }
 
             await selectedEntity.adapter.renderer.setBuffer({
-              id: getObjectId('brush_line', true),
+              id: getPrefixedId('brush_line'),
               type: 'brush_line',
               points: [
                 // The last point of the last line is already normalized to the entity's coordinates
@@ -234,7 +234,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
               selectedEntity.adapter.renderer.commitBuffer();
             }
             await selectedEntity.adapter.renderer.setBuffer({
-              id: getObjectId('brush_line', true),
+              id: getPrefixedId('brush_line'),
               type: 'brush_line',
               points: [alignedPoint.x, alignedPoint.y],
               strokeWidth: toolState.brush.width,
@@ -254,7 +254,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
               selectedEntity.adapter.renderer.commitBuffer();
             }
             await selectedEntity.adapter.renderer.setBuffer({
-              id: getObjectId('eraser_line', true),
+              id: getPrefixedId('eraser_line'),
               type: 'eraser_line',
               points: [
                 // The last point of the last line is already normalized to the entity's coordinates
@@ -271,7 +271,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
               selectedEntity.adapter.renderer.commitBuffer();
             }
             await selectedEntity.adapter.renderer.setBuffer({
-              id: getObjectId('eraser_line', true),
+              id: getPrefixedId('eraser_line'),
               type: 'eraser_line',
               points: [alignedPoint.x, alignedPoint.y],
               strokeWidth: toolState.eraser.width,
@@ -286,7 +286,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             selectedEntity.adapter.renderer.commitBuffer();
           }
           await selectedEntity.adapter.renderer.setBuffer({
-            id: getObjectId('rect', true),
+            id: getPrefixedId('rect'),
             type: 'rect',
             rect: { x: Math.round(normalizedPoint.x), y: Math.round(normalizedPoint.y), width: 0, height: 0 },
             color: getCurrentFill(),
@@ -375,7 +375,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
             const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
             await selectedEntity.adapter.renderer.setBuffer({
-              id: getObjectId('brush_line', true),
+              id: getPrefixedId('brush_line'),
               type: 'brush_line',
               points: [alignedPoint.x, alignedPoint.y],
               strokeWidth: toolState.brush.width,
@@ -412,7 +412,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
             const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
             const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
             await selectedEntity.adapter.renderer.setBuffer({
-              id: getObjectId('eraser_line', true),
+              id: getPrefixedId('eraser_line'),
               type: 'eraser_line',
               points: [alignedPoint.x, alignedPoint.y],
               strokeWidth: toolState.eraser.width,

@@ -15,14 +15,14 @@ import {
   bboxWidthChanged,
   // caRecalled,
   ipaRecalled,
-  rasterLayerAllDeleted,
-  rasterLayerRecalled,
   loraAllDeleted,
   loraRecalled,
   negativePrompt2Changed,
   negativePromptChanged,
   positivePrompt2Changed,
   positivePromptChanged,
+  rasterLayerAllDeleted,
+  rasterLayerRecalled,
   refinerModelChanged,
   rgRecalled,
   setCfgRescaleMultiplier,
@@ -79,6 +79,8 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 import { getImageDTO } from 'services/api/endpoints/images';
 import { v4 as uuidv4 } from 'uuid';
+
+const log = logger('metadata');
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
   getStore().dispatch(positivePromptChanged(positivePrompt));
@@ -351,7 +353,7 @@ const recallLayer: MetadataRecallFunc<CanvasRasterLayerState> = async (layer) =>
     } else if (obj.type === 'rect') {
       obj.id = getRectShapeId(clone.id, uuidv4());
     } else {
-      logger('metadata').error(`Unknown object type ${obj.type}`);
+      log.error(`Unknown object type ${obj.type}`);
     }
   }
   clone.id = getRGId(uuidv4());

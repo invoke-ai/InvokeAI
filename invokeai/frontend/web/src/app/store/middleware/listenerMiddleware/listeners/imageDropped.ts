@@ -2,11 +2,7 @@ import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
-import {
-  ipaImageChanged,
-  rasterLayerAdded,
-  rgIPAdapterImageChanged,
-} from 'features/controlLayers/store/canvasV2Slice';
+import { ipaImageChanged, rasterLayerAdded, rgIPAdapterImageChanged } from 'features/controlLayers/store/canvasV2Slice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
@@ -26,11 +22,12 @@ export const dndDropped = createAction<{
   activeData: TypesafeDraggableData;
 }>('dnd/dndDropped');
 
+const log = logger('system');
+
 export const addImageDroppedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: dndDropped,
     effect: (action, { dispatch, getState }) => {
-      const log = logger('dnd');
       const { activeData, overData } = action.payload;
       if (!isValidDrop(overData, activeData)) {
         return;

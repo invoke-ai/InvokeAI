@@ -11,23 +11,21 @@ import { memo, useCallback, useState } from 'react';
 
 import { DndContextTypesafe } from './DndContextTypesafe';
 
+const log = logger('system');
+
 const AppDndContext = (props: PropsWithChildren) => {
   const [activeDragData, setActiveDragData] = useState<TypesafeDraggableData | null>(null);
-  const log = logger('images');
 
   const dispatch = useAppDispatch();
 
-  const handleDragStart = useCallback(
-    (event: DragStartEvent) => {
-      log.trace({ dragData: parseify(event.active.data.current) }, 'Drag started');
-      const activeData = event.active.data.current;
-      if (!activeData) {
-        return;
-      }
-      setActiveDragData(activeData);
-    },
-    [log]
-  );
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    log.trace({ dragData: parseify(event.active.data.current) }, 'Drag started');
+    const activeData = event.active.data.current;
+    if (!activeData) {
+      return;
+    }
+    setActiveDragData(activeData);
+  }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -39,7 +37,7 @@ const AppDndContext = (props: PropsWithChildren) => {
       dispatch(dndDropped({ overData, activeData: activeDragData }));
       setActiveDragData(null);
     },
-    [activeDragData, dispatch, log]
+    [activeDragData, dispatch]
   );
 
   const mouseSensor = useSensor(MouseSensor, {

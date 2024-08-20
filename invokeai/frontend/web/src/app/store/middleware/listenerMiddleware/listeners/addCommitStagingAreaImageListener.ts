@@ -13,12 +13,12 @@ import { queueApi } from 'services/api/endpoints/queue';
 import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
 import { assert } from 'tsafe';
 
+const log = logger('canvas');
+
 export const addStagingListeners = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: sessionStagingAreaReset,
     effect: async (_, { dispatch }) => {
-      const log = logger('canvas');
-
       try {
         const req = dispatch(
           queueApi.endpoints.cancelByBatchOrigin.initiate(

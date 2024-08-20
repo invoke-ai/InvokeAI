@@ -8,7 +8,7 @@ import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, selectQueueStatus } from 'services/api/endpoints/queue';
 import { socketConnected } from 'services/events/setEventListeners';
 
-const log = logger('socketio');
+const log = logger('events');
 
 const $isFirstConnection = atom(true);
 

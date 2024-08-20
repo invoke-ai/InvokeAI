@@ -36,6 +36,8 @@ import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { listenerMiddleware } from './middleware/listenerMiddleware';
 
+const log = logger('system');
+
 const allReducers = {
   [api.reducerPath]: api.reducer,
   [gallerySlice.name]: gallerySlice.reducer,
@@ -98,7 +100,6 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
-  const log = logger('system');
   const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
   if (!persistConfig) {
     throw new Error(`No persist config for slice "${key}"`);

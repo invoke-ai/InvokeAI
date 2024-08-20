@@ -4,7 +4,7 @@ import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 
-const log = logger('images');
+const log = logger('gallery');
 
 export const addBulkDownloadListeners = (startAppListening: AppStartListening) => {
   startAppListening({

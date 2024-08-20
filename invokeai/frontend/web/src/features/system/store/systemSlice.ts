@@ -1,21 +1,23 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
+import type { LogNamespace } from 'app/logging/logger';
+import { zLogNamespace } from 'app/logging/logger';
 import type { PersistConfig, RootState } from 'app/store/store';
-import type { LogLevelName } from 'roarr';
+import { uniq } from 'lodash-es';
 
 import type { Language, SystemState } from './types';
 
 const initialSystemState: SystemState = {
   _version: 1,
   shouldConfirmOnDelete: true,
-  enableImageDebugging: false,
   shouldAntialiasProgressImage: false,
-  consoleLogLevel: 'debug',
-  shouldLogToConsole: true,
   language: 'en',
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
   shouldEnableInformationalPopovers: true,
+  logIsEnabled: true,
+  logLevel: 'debug',
+  logNamespaces: [...zLogNamespace.options],
 };
 
 export const systemSlice = createSlice({
@@ -25,14 +27,18 @@ export const systemSlice = createSlice({
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
     },
-    setEnableImageDebugging: (state, action: PayloadAction<boolean>) => {
-      state.enableImageDebugging = action.payload;
+    logIsEnabledChanged: (state, action: PayloadAction<SystemState['logIsEnabled']>) => {
+      state.logIsEnabled = action.payload;
     },
-    consoleLogLevelChanged: (state, action: PayloadAction<LogLevelName>) => {
-      state.consoleLogLevel = action.payload;
+    logLevelChanged: (state, action: PayloadAction<SystemState['logLevel']>) => {
+      state.logLevel = action.payload;
     },
-    shouldLogToConsoleChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldLogToConsole = action.payload;
+    logNamespaceToggled: (state, action: PayloadAction<LogNamespace>) => {
+      if (state.logNamespaces.includes(action.payload)) {
+        state.logNamespaces = uniq(state.logNamespaces.filter((n) => n !== action.payload));
+      } else {
+        state.logNamespaces = uniq([...state.logNamespaces, action.payload]);
+      }
     },
     shouldAntialiasProgressImageChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAntialiasProgressImage = action.payload;
@@ -54,9 +60,9 @@ export const systemSlice = createSlice({
 
 export const {
   setShouldConfirmOnDelete,
-  setEnableImageDebugging,
-  consoleLogLevelChanged,
-  shouldLogToConsoleChanged,
+  logIsEnabledChanged,
+  logLevelChanged,
+  logNamespaceToggled,
   shouldAntialiasProgressImageChanged,
   languageChanged,
   shouldUseNSFWCheckerChanged,

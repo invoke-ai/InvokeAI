@@ -20,14 +20,16 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useClearStorage } from 'common/hooks/useClearStorage';
 import { shouldUseCpuNoiseChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
+import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
+import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
-  setEnableImageDebugging,
+  logIsEnabledChanged,
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
   shouldAntialiasProgressImageChanged,
-  shouldLogToConsoleChanged,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
@@ -38,7 +40,6 @@ import { useTranslation } from 'react-i18next';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 
 import { SettingsLanguageSelect } from './SettingsLanguageSelect';
-import { SettingsLogLevelSelect } from './SettingsLogLevelSelect';
 
 type ConfigOptions = {
   shouldShowDeveloperSettings?: boolean;
@@ -65,7 +66,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
   useEffect(() => {
     if (!shouldShowDeveloperSettings) {
-      dispatch(shouldLogToConsoleChanged(false));
+      dispatch(logIsEnabledChanged(false));
     }
   }, [shouldShowDeveloperSettings, dispatch]);
 
@@ -90,9 +91,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
   const shouldUseCpuNoise = useAppSelector((s) => s.canvasV2.params.shouldUseCpuNoise);
   const shouldConfirmOnDelete = useAppSelector((s) => s.system.shouldConfirmOnDelete);
-  const enableImageDebugging = useAppSelector((s) => s.system.enableImageDebugging);
   const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
-  const shouldLogToConsole = useAppSelector((s) => s.system.shouldLogToConsole);
   const shouldAntialiasProgressImage = useAppSelector((s) => s.system.shouldAntialiasProgressImage);
   const shouldUseNSFWChecker = useAppSelector((s) => s.system.shouldUseNSFWChecker);
   const shouldUseWatermarker = useAppSelector((s) => s.system.shouldUseWatermarker);
@@ -119,13 +118,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
       window.location.reload();
     }
   }, [countdown]);
-
-  const handleLogToConsoleChanged = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(shouldLogToConsoleChanged(e.target.checked));
-    },
-    [dispatch]
-  );
 
   const handleChangeShouldConfirmOnDelete = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -160,12 +152,6 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
   const handleChangeShouldEnableInformationalPopovers = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(setShouldEnableInformationalPopovers(e.target.checked));
-    },
-    [dispatch]
-  );
-  const handleChangeEnableImageDebugging = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      dispatch(setEnableImageDebugging(e.target.checked));
     },
     [dispatch]
   );
@@ -242,15 +228,9 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
                   {shouldShowDeveloperSettings && (
                     <StickyScrollable title={t('settings.developer')}>
-                      <FormControl>
-                        <FormLabel>{t('settings.shouldLogToConsole')}</FormLabel>
-                        <Switch isChecked={shouldLogToConsole} onChange={handleLogToConsoleChanged} />
-                      </FormControl>
-                      <SettingsLogLevelSelect />
-                      <FormControl>
-                        <FormLabel>{t('settings.enableImageDebugging')}</FormLabel>
-                        <Switch isChecked={enableImageDebugging} onChange={handleChangeEnableImageDebugging} />
-                      </FormControl>
+                      <SettingsDeveloperLogIsEnabled />
+                      <SettingsDeveloperLogLevel />
+                      <SettingsDeveloperLogNamespaces />
                     </StickyScrollable>
                   )}
 

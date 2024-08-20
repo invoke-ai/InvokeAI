@@ -6,12 +6,11 @@ import { logLevelChanged } from 'features/system/store/systemSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const SettingsLogLevelSelect = memo(() => {
+export const SettingsDeveloperLogLevel = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const logLevel = useAppSelector((s) => s.system.logLevel);
-  const logIsEnabled = useAppSelector((s) => s.system.logIsEnabled);
-  const options = useMemo(() => zLogLevel.options.map((o) => ({ label: o, value: o })), []);
+  const options = useMemo(() => zLogLevel.options.map((o) => ({ label: t(`system.logLevel.${o}`), value: o })), [t]);
 
   const value = useMemo(() => options.find((o) => o.value === logLevel), [logLevel, options]);
 
@@ -25,11 +24,11 @@ export const SettingsLogLevelSelect = memo(() => {
     [dispatch]
   );
   return (
-    <FormControl isDisabled={!logIsEnabled}>
-      <FormLabel>{t('common.loglevel')}</FormLabel>
-      <Combobox value={value} options={options} onChange={onChange} />
+    <FormControl>
+      <FormLabel>{t('system.logLevel.logLevel')}</FormLabel>
+      <Combobox value={value} options={options} onChange={onChange} isSearchable={false} />
     </FormControl>
   );
 });
 
-SettingsLogLevelSelect.displayName = 'SettingsLogLevelSelect';
+SettingsDeveloperLogLevel.displayName = 'SettingsDeveloperLogLevel';
