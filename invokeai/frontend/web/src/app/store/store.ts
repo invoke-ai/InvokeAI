@@ -22,7 +22,7 @@ import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
-import { isArray, keys, mergeWith, omit, pick } from 'lodash-es';
+import { keys, mergeWith, omit, pick } from 'lodash-es';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { rememberEnhancer, rememberReducer } from 'redux-remember';
@@ -100,14 +100,6 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [stylePresetPersistConfig.name]: stylePresetPersistConfig,
 };
 
-function mergeWidthCustomizer(val: unknown) {
-  // If the value is an array, return the value as it is. Without this, lodash will merge individual array elements
-  // by index, causing data loss.
-  if (isArray(val)) {
-    return val;
-  }
-}
-
 const unserialize: UnserializeFunction = (data, key) => {
   const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
   if (!persistConfig) {
@@ -121,8 +113,12 @@ const unserialize: UnserializeFunction = (data, key) => {
     const stripped = pick(deepClone(parsed), keys(initialState));
     // run (additive) migrations
     const migrated = migrate(stripped);
-    // merge in initial state as default values, covering any missing keys
-    const transformed = mergeWith(migrated, initialState, mergeWidthCustomizer);
+    /*
+     * Merge in initial state as default values, covering any missing keys. You might be tempted to use _.defaultsDeep,
+     * but that merges arrays by index and partial objects by key. Using an identity function as the customizer results
+     * in behaviour like defaultsDeep, but doesn't overwrite any values that are not undefined in the migrated state.
+     */
+    const transformed = mergeWith(migrated, initialState, (objVal) => objVal);
 
     log.debug(
       {
