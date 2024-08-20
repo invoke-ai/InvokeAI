@@ -1,7 +1,7 @@
 import type { CanvasControlAdapter } from 'features/controlLayers/konva/CanvasControlAdapter';
 import { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
-import { getObjectId } from 'features/controlLayers/konva/util';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/DocumentSize/types';
 import type {
@@ -803,7 +803,7 @@ export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO)
 export const imageDTOToImageObject = (imageDTO: ImageDTO, overrides?: Partial<CanvasImageState>): CanvasImageState => {
   const { width, height, image_name } = imageDTO;
   return {
-    id: getObjectId('image'),
+    id: getPrefixedId('image'),
     type: 'image',
     image: {
       image_name,

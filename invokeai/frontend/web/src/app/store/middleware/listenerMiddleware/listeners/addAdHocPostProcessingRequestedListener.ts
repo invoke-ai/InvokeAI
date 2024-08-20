@@ -8,14 +8,14 @@ import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
 
+const log = logger('queue');
+
 export const adHocPostProcessingRequested = createAction<{ imageDTO: ImageDTO }>(`upscaling/postProcessingRequested`);
 
 export const addAdHocPostProcessingRequestedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: adHocPostProcessingRequested,
     effect: async (action, { dispatch, getState }) => {
-      const log = logger('session');
-
       const { imageDTO } = action.payload;
       const state = getState();
 

@@ -1,4 +1,4 @@
-import type { CanvasObjectState, Coordinate, Rect, RgbaColor } from 'features/controlLayers/store/types';
+import type { Coordinate, Rect, RgbaColor } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -361,14 +361,6 @@ export const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef
 
 export function getPrefixedId(prefix: string): string {
   return `${prefix}:${nanoid()}`;
-}
-
-export function getObjectId(type: CanvasObjectState['type'], isBuffer?: boolean): string {
-  if (isBuffer) {
-    return getPrefixedId(`buffer_${type}`);
-  } else {
-    return getPrefixedId(type);
-  }
 }
 
 export const getEmptyRect = (): Rect => {
