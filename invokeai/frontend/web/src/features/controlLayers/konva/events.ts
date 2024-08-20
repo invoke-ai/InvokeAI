@@ -522,7 +522,10 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   });
 
   //#region dragmove
-  stage.on('dragmove', () => {
+  stage.on('dragmove', (e) => {
+    if (e.target !== stage) {
+      return;
+    }
     $stageAttrs.set({
       x: Math.floor(stage.x()),
       y: Math.floor(stage.y()),
@@ -533,8 +536,10 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
   });
 
   //#region dragend
-  stage.on('dragend', () => {
-    // Stage position should always be an integer, else we get fractional pixels which are blurry
+  stage.on('dragend', (e) => {
+    if (e.target !== stage) {
+      return;
+    } // Stage position should always be an integer, else we get fractional pixels which are blurry
     $stageAttrs.set({
       x: Math.floor(stage.x()),
       y: Math.floor(stage.y()),
