@@ -34,6 +34,7 @@ export const StylePresetMenuTrigger = () => {
       _hover={_hover}
       transitionProperty="background-color"
       transitionDuration="normal"
+      w="full"
     >
       <ActiveStylePreset />
 
