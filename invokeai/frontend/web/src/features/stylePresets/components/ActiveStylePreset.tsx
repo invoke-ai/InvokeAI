@@ -69,10 +69,10 @@ export const ActiveStylePreset = () => {
     );
   }
   return (
-    <Flex justifyContent="space-between" w="full" alignItems="center">
-      <Flex gap={2} alignItems="center">
-        <StylePresetImage imageWidth={25} presetImageUrl={activeStylePreset.image} />
-        <Flex flexDir="column">
+    <Flex justifyContent="space-between" flexGrow={1} alignItems="center" gap={2} overflow="hidden">
+      <StylePresetImage imageWidth={25} presetImageUrl={activeStylePreset.image} />
+      <Flex flexDir="column" flexGrow={1} overflow="hidden">
+        <Flex>
           <Badge colorScheme="invokeBlue" variant="subtle">
             {activeStylePreset.name}
           </Badge>
