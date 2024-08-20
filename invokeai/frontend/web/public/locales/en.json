@@ -1723,6 +1723,7 @@
         "positivePrompt": "Positive Prompt",
         "preview": "Preview",
         "private": "Private",
+        "promptTemplateCleared": "Prompt Template Cleared",
         "searchByName": "Search by name",
         "shared": "Shared",
         "sharedTemplates": "Shared Templates",
