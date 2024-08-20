@@ -60,7 +60,7 @@ export class CanvasMaskAdapter {
    * Get this entity's entity identifier
    */
   getEntityIdentifier = (): CanvasEntityIdentifier => {
-    return getEntityIdentifier(this.state)
+    return getEntityIdentifier(this.state);
   };
 
   destroy = (): void => {
@@ -84,7 +84,7 @@ export class CanvasMaskAdapter {
     }
 
     this.log.debug('Updating');
-    const { position, objects, isEnabled } = state;
+    const { position, objects, isEnabled, opacity } = state;
 
     if (this.isFirstRender || objects !== this.state.objects) {
       await this.updateObjects({ objects });
@@ -92,9 +92,9 @@ export class CanvasMaskAdapter {
     if (this.isFirstRender || position !== this.state.position) {
       this.transformer.updatePosition({ position });
     }
-    // if (this.isFirstRender || opacity !== this.state.opacity) {
-    //   await this.updateOpacity({ opacity });
-    // }
+    if (this.isFirstRender || opacity !== this.state.opacity) {
+      this.renderer.updateOpacity(opacity);
+    }
     if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
       this.updateVisibility({ isEnabled });
     }
@@ -106,8 +106,6 @@ export class CanvasMaskAdapter {
     if (this.isFirstRender) {
       this.renderer.updateCompositingRectSize();
     }
-
-    // this.transformer.syncInteractionState();
 
     if (this.isFirstRender) {
       this.transformer.updateBbox();
