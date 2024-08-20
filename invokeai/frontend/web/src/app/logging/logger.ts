@@ -15,24 +15,23 @@ export const BASE_CONTEXT = {};
 
 export const $logger = atom<Logger>(Roarr.child(BASE_CONTEXT));
 
-export type LoggerNamespace =
-  | 'images'
-  | 'models'
-  | 'config'
-  | 'canvas'
-  | 'generation'
-  | 'nodes'
-  | 'system'
-  | 'socketio'
-  | 'session'
-  | 'queue'
-  | 'dnd'
-  | 'controlLayers'
-  | 'metadata'
-  | 'konva'
-  | 'worker';
+export const zLogNamespace = z.enum([
+  'gallery',
+  'models',
+  'config',
+  'canvas',
+  'generation',
+  'workflows',
+  'system',
+  'events',
+  'queue',
+  'metadata',
+]);
+const zLogNamespacesArray = z.array(zLogNamespace);
+export type LogNamespace = z.infer<typeof zLogNamespace>;
+export const isLogNamespaceArray = (v: unknown): v is LogNamespace[] => zLogNamespacesArray.safeParse(v).success;
 
-export const logger = (namespace: LoggerNamespace) => $logger.get().child({ namespace });
+export const logger = (namespace: LogNamespace) => $logger.get().child({ namespace });
 
 export const zLogLevel = z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']);
 export type LogLevel = z.infer<typeof zLogLevel>;

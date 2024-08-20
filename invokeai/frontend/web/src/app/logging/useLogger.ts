@@ -3,27 +3,35 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useEffect, useMemo } from 'react';
 import { ROARR, Roarr } from 'roarr';
 
-import type { LoggerNamespace } from './logger';
+import type { LogNamespace } from './logger';
 import { $logger, BASE_CONTEXT, LOG_LEVEL_MAP, logger } from './logger';
 
-export const useLogger = (namespace: LoggerNamespace) => {
-  const consoleLogLevel = useAppSelector((s) => s.system.consoleLogLevel);
-  const shouldLogToConsole = useAppSelector((s) => s.system.shouldLogToConsole);
+export const useLogger = (namespace: LogNamespace) => {
+  const logLevel = useAppSelector((s) => s.system.logLevel);
+  const logNamespaces = useAppSelector((s) => s.system.logNamespaces);
+  const logIsEnabled = useAppSelector((s) => s.system.logIsEnabled);
 
   // The provided Roarr browser log writer uses localStorage to config logging to console
   useEffect(() => {
-    if (shouldLogToConsole) {
+    if (logIsEnabled) {
       // Enable console log output
       localStorage.setItem('ROARR_LOG', 'true');
 
       // Use a filter to show only logs of the given level
-      localStorage.setItem('ROARR_FILTER', `context.logLevel:>=${LOG_LEVEL_MAP[consoleLogLevel]}`);
+      let filter = `context.logLevel:>=${LOG_LEVEL_MAP[logLevel]}`;
+      if (logNamespaces.length > 0) {
+        filter += ' AND ';
+        filter = `(${logNamespaces.map((ns) => `context.namespace:${ns}`).join(' OR ')})`;
+      } else {
+        filter += ' AND context.namespace:undefined';
+      }
+      localStorage.setItem('ROARR_FILTER', filter);
     } else {
       // Disable console log output
       localStorage.setItem('ROARR_LOG', 'false');
     }
     ROARR.write = createLogWriter();
-  }, [consoleLogLevel, shouldLogToConsole]);
+  }, [logLevel, logIsEnabled, logNamespaces]);
 
   // Update the module-scoped logger context as needed
   useEffect(() => {

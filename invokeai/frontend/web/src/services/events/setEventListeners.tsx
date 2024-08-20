@@ -27,7 +27,7 @@ import type { Socket } from 'socket.io-client';
 
 export const socketConnected = createAction('socket/connected');
 
-const log = logger('socketio');
+const log = logger('events');
 
 type SetEventListenersArg = {
   socket: Socket<ServerToClientEvents, ClientToServerEvents>;

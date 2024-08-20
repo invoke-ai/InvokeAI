@@ -6,11 +6,12 @@ import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { size } from 'lodash-es';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 
+const log = logger('system');
+
 export const addGetOpenAPISchemaListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: appInfoApi.endpoints.getOpenAPISchema.matchFulfilled,
     effect: (action, { getState }) => {
-      const log = logger('system');
       const schemaJSON = action.payload;
 
       log.debug({ schemaJSON: parseify(schemaJSON) }, 'Received OpenAPI schema');
@@ -30,7 +31,6 @@ export const addGetOpenAPISchemaListener = (startAppListening: AppStartListening
       // If action.meta.condition === true, the request was canceled/skipped because another request was in flight or
       // the value was already in the cache. We don't want to log these errors.
       if (!action.meta.condition) {
-        const log = logger('system');
         log.error({ error: parseify(action.error) }, 'Problem retrieving OpenAPI Schema');
       }
     },
