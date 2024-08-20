@@ -48,9 +48,13 @@ export const StylePresetModal = () => {
       } else {
         let file = null;
         if (data.imageUrl) {
-          const blob = await convertImageUrlToBlob(data.imageUrl);
-          if (blob) {
-            file = new File([blob], 'style_preset.png', { type: 'image/png' });
+          try {
+            const blob = await convertImageUrlToBlob(data.imageUrl);
+            if (blob) {
+              file = new File([blob], 'style_preset.png', { type: 'image/png' });
+            }
+          } catch (error) {
+            // do nothing
           }
         }
         setFormData({
