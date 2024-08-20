@@ -1,8 +1,8 @@
 import copy
-import yaml
 from time import sleep
 from typing import Dict, List, Literal, Optional
 
+import yaml
 from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.baseinvocation import (
@@ -16,8 +16,14 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.services.model_records import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.model_manager.config import CheckpointConfigBase
+from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
+    BaseModelType,
+    CheckpointConfigBase,
+    ModelFormat,
+    ModelType,
+    SubModelType,
+)
 
 
 class ModelIdentifierField(BaseModel):
@@ -207,7 +213,7 @@ class FluxModelLoaderInvocation(BaseInvocation):
             clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], skipped_layers=0),
             t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder),
             vae=VAEField(vae=vae),
-            max_seq_len=flux_conf['max_seq_len']
+            max_seq_len=flux_conf["max_seq_len"],
         )
 
     def _get_model(self, context: InvocationContext, submodel: SubModelType) -> ModelIdentifierField:

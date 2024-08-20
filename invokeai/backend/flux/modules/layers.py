@@ -5,7 +5,7 @@ import torch
 from einops import rearrange
 from torch import Tensor, nn
 
-from ..math import attention, rope
+from invokeai.backend.flux.math import attention, rope
 
 
 class EmbedND(nn.Module):

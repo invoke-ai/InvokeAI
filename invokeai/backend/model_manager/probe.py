@@ -177,10 +177,10 @@ class ModelProbe(object):
             fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()
 
         # additional fields needed for main and controlnet models
-        if (
-            fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE]
-            and fields["format"] in [ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b]
-        ):
+        if fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE] and fields["format"] in [
+            ModelFormat.Checkpoint,
+            ModelFormat.BnbQuantizednf4b,
+        ]:
             ckpt_config_path = cls._get_checkpoint_config_path(
                 model_path,
                 model_type=fields["type"],
@@ -326,7 +326,7 @@ class ModelProbe(object):
                 # TODO: Decide between dev/schnell
                 checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
                 state_dict = checkpoint.get("state_dict") or checkpoint
-                if 'guidance_in.out_layer.weight' in state_dict:
+                if "guidance_in.out_layer.weight" in state_dict:
                     config_file = "flux/flux1-dev.yaml"
                 else:
                     config_file = "flux/flux1-schnell.yaml"

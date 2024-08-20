@@ -784,7 +784,7 @@ class ModelInstallService(ModelInstallServiceBase):
         if subfolder:
             top = Path(remote_files[0].path.parts[0])  # e.g. "sdxl-turbo/"
             path_to_remove = top / subfolder  # sdxl-turbo/vae/
-            subfolder_rename = subfolder.name.replace('/', '_').replace('\\', '_')
+            subfolder_rename = subfolder.name.replace("/", "_").replace("\\", "_")
             path_to_add = Path(f"{top}_{subfolder_rename}")
         else:
             path_to_remove = Path(".")

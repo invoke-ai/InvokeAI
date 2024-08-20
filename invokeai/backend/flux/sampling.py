@@ -6,8 +6,8 @@ from einops import rearrange, repeat
 from torch import Tensor
 from tqdm import tqdm
 
-from .model import Flux
-from .modules.conditioner import HFEncoder
+from invokeai.backend.flux.model import Flux
+from invokeai.backend.flux.modules.conditioner import HFEncoder
 
 
 def get_noise(
