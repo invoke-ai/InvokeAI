@@ -7,6 +7,7 @@ import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLaye
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
+import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import { getPrefixedId, konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
 import type {
@@ -201,6 +202,11 @@ export class CanvasObjectRenderer {
       this.konva.objectGroup.clearCache();
       this.konva.objectGroup.cache();
     }
+  };
+
+  updateTransparencyEffect = (withTransparencyEffect: boolean) => {
+    const filters = withTransparencyEffect ? [LightnessToAlphaFilter] : [];
+    this.konva.objectGroup.filters(filters);
   };
 
   updateCompositingRectFill = (fill: Fill) => {

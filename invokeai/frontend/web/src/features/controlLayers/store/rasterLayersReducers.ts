@@ -89,6 +89,7 @@ export const rasterLayersReducers = {
         id: newId,
         type: 'control_layer',
         controlAdapter,
+        withTransparencyEffect: true,
       };
 
       // Remove the raster layer
