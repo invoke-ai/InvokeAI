@@ -14,19 +14,13 @@ export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?
 
   switch (actionType) {
     case 'SET_CURRENT_IMAGE':
-      return payloadType === 'IMAGE_DTO';
     case 'SET_CA_IMAGE':
-      return payloadType === 'IMAGE_DTO';
     case 'SET_IPA_IMAGE':
-      return payloadType === 'IMAGE_DTO';
     case 'SET_RG_IP_ADAPTER_IMAGE':
-      return payloadType === 'IMAGE_DTO';
-    case 'ADD_LAYER_FROM_IMAGE':
-      return payloadType === 'IMAGE_DTO';
+    case 'ADD_RASTER_LAYER_FROM_IMAGE':
+    case 'ADD_CONTROL_LAYER_FROM_IMAGE':
     case 'SET_UPSCALE_INITIAL_IMAGE':
-      return payloadType === 'IMAGE_DTO';
     case 'SET_NODES_IMAGE':
-      return payloadType === 'IMAGE_DTO';
     case 'SELECT_FOR_COMPARE':
       return payloadType === 'IMAGE_DTO';
     case 'ADD_TO_BOARD': {

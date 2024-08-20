@@ -1,5 +1,4 @@
-import type { JSONObject } from 'common/types';
-import { parseify } from 'common/util/serialize';
+import type { JSONObject, SerializableObject } from 'common/types';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -35,10 +34,10 @@ export class CanvasFilter {
   }
 
   previewFilter = async () => {
-    const { config } = this.manager.stateApi.getFilterState();
+    const config = this.manager.stateApi.$filterConfig.get();
     this.log.trace({ config }, 'Previewing filter');
     const dispatch = this.manager.stateApi._store.dispatch;
-    const rect = this.parent.transformer.getRelativeRect()
+    const rect = this.parent.transformer.getRelativeRect();
     const imageDTO = await this.parent.renderer.rasterize(rect, false);
     // TODO(psyche): I can't get TS to be happy, it thinkgs `config` is `never` but it should be inferred from the generic... I'll just cast it for now
     const filterNode = IMAGE_FILTERS[config.type].buildNode(imageDTO, config as never);
@@ -66,22 +65,30 @@ export class CanvasFilter {
       if (event.origin !== this.id || event.invocation_source_id !== filterNode.id) {
         return;
       }
-      this.log.trace({ event: parseify(event) }, 'Handling filter processing completion');
+      this.manager.socket.off('invocation_complete', listener);
+
+      this.log.trace({ event } as SerializableObject, 'Handling filter processing completion');
+
       const { result } = event;
       assert(result.type === 'image_output', `Processor did not return an image output, got: ${result}`);
+
       const imageDTO = await getImageDTO(result.image.image_name);
       assert(imageDTO, "Failed to fetch processor output's image DTO");
+
       this.imageState = imageDTOToImageObject(imageDTO);
       this.parent.renderer.clearBuffer();
+
       await this.parent.renderer.setBuffer(this.imageState);
-      this.parent.renderer.hideObjects([this.imageState.id]);
-      this.manager.socket.off('invocation_complete', listener);
+
+      this.parent.renderer.hideObjects();
+      this.manager.stateApi.$isProcessingFilter.set(false);
     };
 
     this.manager.socket.on('invocation_complete', listener);
 
-    this.log.trace({ enqueueBatchArg: parseify(enqueueBatchArg) }, 'Enqueuing filter batch');
+    this.log.trace({ enqueueBatchArg } as SerializableObject, 'Enqueuing filter batch');
 
+    this.manager.stateApi.$isProcessingFilter.set(true);
     dispatch(
       queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, {
         fixedCacheKey: 'enqueueBatch',
@@ -119,6 +126,7 @@ export class CanvasFilter {
     this.parent.renderer.showObjects();
     this.manager.stateApi.$filteringEntity.set(null);
     this.imageState = null;
+    this.manager.stateApi.$isProcessingFilter.set(false);
   };
 
   destroy = () => {

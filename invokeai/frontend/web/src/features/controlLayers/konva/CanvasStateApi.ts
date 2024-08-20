@@ -4,9 +4,11 @@ import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLaye
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import {
+  $filterConfig,
   $filteringEntity,
   $isDrawing,
   $isMouseDown,
+  $isProcessingFilter,
   $lastAddedPoint,
   $lastCursorPos,
   $lastMouseDownPos,
@@ -161,9 +163,6 @@ export class CanvasStateApi {
   getIsSelected = (id: string) => {
     return this.getState().selectedEntityIdentifier?.id === id;
   };
-  getLogLevel = () => {
-    return this._store.getState().system.consoleLogLevel;
-  };
   getFilterState = () => {
     return this._store.getState().canvasV2.filter;
   };
@@ -234,6 +233,8 @@ export class CanvasStateApi {
 
   $transformingEntity = $transformingEntity;
   $filteringEntity = $filteringEntity;
+  $filterConfig = $filterConfig;
+  $isProcessingFilter = $isProcessingFilter;
 
   $toolState: WritableAtom<CanvasV2State['tool']> = atom();
   $currentFill: WritableAtom<RgbaColor> = atom();
