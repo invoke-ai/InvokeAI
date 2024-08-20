@@ -225,6 +225,14 @@ class T5EncoderConfig(T5EncoderConfigBase):
         return Tag(f"{ModelType.T5Encoder.value}.{ModelFormat.T5Encoder.value}")
 
 
+class T5Encoder8bConfig(T5EncoderConfigBase):
+    format: Literal[ModelFormat.T5Encoder8b] = ModelFormat.T5Encoder8b
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.T5Encoder.value}.{ModelFormat.T5Encoder8b.value}")
+
+
 class LoRALyCORISConfig(LoRAConfigBase):
     """Model config for LoRA/Lycoris models."""
 
@@ -460,6 +468,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRALyCORISConfig, LoRALyCORISConfig.get_tag()],
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
         Annotated[T5EncoderConfig, T5EncoderConfig.get_tag()],
+        Annotated[T5Encoder8bConfig, T5Encoder8bConfig.get_tag()],
         Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],
         Annotated[TextualInversionFolderConfig, TextualInversionFolderConfig.get_tag()],
         Annotated[IPAdapterInvokeAIConfig, IPAdapterInvokeAIConfig.get_tag()],
