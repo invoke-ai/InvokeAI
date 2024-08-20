@@ -44,8 +44,12 @@ export type RGIPAdapterImageDropData = BaseDropData & {
   };
 };
 
-export type AddLayerFromImageDropData = BaseDropData & {
-  actionType: 'ADD_LAYER_FROM_IMAGE';
+export type AddRasterLayerFromImageDropData = BaseDropData & {
+  actionType: 'ADD_RASTER_LAYER_FROM_IMAGE';
+};
+
+export type AddControlLayerFromImageDropData = BaseDropData & {
+  actionType: 'ADD_CONTROL_LAYER_FROM_IMAGE';
 };
 
 type UpscaleInitialImageDropData = BaseDropData & {
@@ -91,7 +95,8 @@ export type TypesafeDroppableData =
   | RGIPAdapterImageDropData
   | SelectForCompareDropData
   | UpscaleInitialImageDropData
-  | AddLayerFromImageDropData;
+  | AddRasterLayerFromImageDropData
+  | AddControlLayerFromImageDropData;
 
 type BaseDragData = {
   id: string;
