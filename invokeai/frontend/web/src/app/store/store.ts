@@ -22,7 +22,7 @@ import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
-import { defaultsDeep, keys, omit, pick } from 'lodash-es';
+import { isArray, keys, mergeWith, omit, pick } from 'lodash-es';
 import dynamicMiddlewares from 'redux-dynamic-middlewares';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { rememberEnhancer, rememberReducer } from 'redux-remember';
@@ -100,6 +100,14 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [stylePresetPersistConfig.name]: stylePresetPersistConfig,
 };
 
+function mergeWidthCustomizer(val: unknown) {
+  // If the value is an array, return the value as it is. Without this, lodash will merge individual array elements
+  // by index, causing data loss.
+  if (isArray(val)) {
+    return val;
+  }
+}
+
 const unserialize: UnserializeFunction = (data, key) => {
   const persistConfig = persistConfigs[key as keyof typeof persistConfigs];
   if (!persistConfig) {
@@ -114,7 +122,7 @@ const unserialize: UnserializeFunction = (data, key) => {
     // run (additive) migrations
     const migrated = migrate(stripped);
     // merge in initial state as default values, covering any missing keys
-    const transformed = defaultsDeep(migrated, initialState);
+    const transformed = mergeWith(migrated, initialState, mergeWidthCustomizer);
 
     log.debug(
       {
