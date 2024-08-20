@@ -658,8 +658,8 @@ export class CanvasTransformer {
           const { minX, minY, maxX, maxY } = extents;
           this.nodeRect = { ...rect };
           this.pixelRect = {
-            x: rect.x + minX,
-            y: rect.y + minY,
+            x: Math.round(rect.x) + minX,
+            y: Math.round(rect.y) + minY,
             width: maxX - minX,
             height: maxY - minY,
           };
