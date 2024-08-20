@@ -35,9 +35,9 @@ export const systemSlice = createSlice({
     },
     logNamespaceToggled: (state, action: PayloadAction<LogNamespace>) => {
       if (state.logNamespaces.includes(action.payload)) {
-        state.logNamespaces = uniq(state.logNamespaces.filter((n) => n !== action.payload));
+        state.logNamespaces = uniq(state.logNamespaces.filter((n) => n !== action.payload)).toSorted();
       } else {
-        state.logNamespaces = uniq([...state.logNamespaces, action.payload]);
+        state.logNamespaces = uniq([...state.logNamespaces, action.payload]).toSorted();
       }
     },
     shouldAntialiasProgressImageChanged: (state, action: PayloadAction<boolean>) => {

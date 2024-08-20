@@ -16,16 +16,16 @@ export const BASE_CONTEXT = {};
 export const $logger = atom<Logger>(Roarr.child(BASE_CONTEXT));
 
 export const zLogNamespace = z.enum([
-  'gallery',
-  'models',
-  'config',
   'canvas',
-  'generation',
-  'workflows',
-  'system',
+  'config',
   'events',
-  'queue',
+  'gallery',
+  'generation',
   'metadata',
+  'models',
+  'system',
+  'queue',
+  'workflows',
 ]);
 const zLogNamespacesArray = z.array(zLogNamespace);
 export type LogNamespace = z.infer<typeof zLogNamespace>;
