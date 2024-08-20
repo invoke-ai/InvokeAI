@@ -584,6 +584,7 @@ export const {
   controlLayerControlModeChanged,
   controlLayerWeightChanged,
   controlLayerBeginEndStepPctChanged,
+  controlLayerWithTransparencyEffectToggled,
   // IP Adapters
   ipaAdded,
   ipaRecalled,

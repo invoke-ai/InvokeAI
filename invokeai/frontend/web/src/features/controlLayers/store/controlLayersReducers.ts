@@ -36,6 +36,7 @@ export const controlLayersReducers = {
         name: null,
         type: 'control_layer',
         isEnabled: true,
+        withTransparencyEffect: true,
         objects: [],
         opacity: 1,
         position: { x: 0, y: 0 },
@@ -70,7 +71,7 @@ export const controlLayersReducers = {
 
       // Convert the raster layer to control layer
       const rasterLayerState: CanvasRasterLayerState = {
-        ...omit(deepClone(layer), ['type', 'controlAdapter']),
+        ...omit(deepClone(layer), ['type', 'controlAdapter', 'withTransparencyEffect']),
         id: newId,
         type: 'raster_layer',
       };
@@ -150,5 +151,13 @@ export const controlLayersReducers = {
       return;
     }
     layer.controlAdapter.beginEndStepPct = beginEndStepPct;
+  },
+  controlLayerWithTransparencyEffectToggled: (state, action: PayloadAction<{ id: string }>) => {
+    const { id } = action.payload;
+    const layer = selectControlLayer(state, id);
+    if (!layer) {
+      return;
+    }
+    layer.withTransparencyEffect = !layer.withTransparencyEffect;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;

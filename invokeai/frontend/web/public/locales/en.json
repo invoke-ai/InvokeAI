@@ -1699,6 +1699,8 @@
         "filter": "Filter",
         "convertToControlLayer": "Convert to Control Layer",
         "convertToRasterLayer": "Convert to Raster Layer",
+        "enableTransparencyEffect": "Enable Transparency Effect",
+        "disableTransparencyEffect": "Disable Transparency Effect",
         "fill": {
             "fillStyle": "Fill Style",
             "solid": "Solid",
