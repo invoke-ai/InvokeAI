@@ -400,33 +400,35 @@ export class CanvasObjectRenderer {
   /**
    * Commits the current buffer object, pushing the buffer object state back to the application state.
    */
-  commitBuffer = () => {
-    if (!this.bufferState) {
+  commitBuffer = (options?: { pushToState?: boolean }) => {
+    const { pushToState } = { ...options, pushToState: true };
+
+    if (!this.bufferState || !this.bufferRenderer) {
       this.log.trace('No buffer to commit');
       return;
     }
 
     this.log.trace('Committing buffer');
 
-    // We need to give the objects a fresh ID else they will be considered the same object when they are re-rendered as
-    // a non-buffer object, and we won't trigger things like bbox calculation
-    this.bufferState.id = getPrefixedId(this.bufferState.type);
+    // Move the buffer to the persistent objects group/renderers
+    this.bufferRenderer.konva.group.moveTo(this.konva.objectGroup);
+    this.renderers.set(this.bufferState.id, this.bufferRenderer);
 
-    if (this.bufferState.type === 'brush_line') {
-      this.manager.stateApi.addBrushLine({
-        entityIdentifier: this.parent.getEntityIdentifier(),
-        brushLine: this.bufferState,
-      });
-    } else if (this.bufferState.type === 'eraser_line') {
-      this.manager.stateApi.addEraserLine({
-        entityIdentifier: this.parent.getEntityIdentifier(),
-        eraserLine: this.bufferState,
-      });
-    } else if (this.bufferState.type === 'rect') {
-      this.manager.stateApi.addRect({ entityIdentifier: this.parent.getEntityIdentifier(), rect: this.bufferState });
-    } else {
-      this.log.warn({ buffer: this.bufferState }, 'Invalid buffer object type');
+    if (pushToState) {
+      const entityIdentifier = this.parent.getEntityIdentifier();
+      if (this.bufferState.type === 'brush_line') {
+        this.manager.stateApi.addBrushLine({ entityIdentifier, brushLine: this.bufferState });
+      } else if (this.bufferState.type === 'eraser_line') {
+        this.manager.stateApi.addEraserLine({ entityIdentifier, eraserLine: this.bufferState });
+      } else if (this.bufferState.type === 'rect') {
+        this.manager.stateApi.addRect({ entityIdentifier, rect: this.bufferState });
+      } else {
+        this.log.warn({ buffer: this.bufferState }, 'Invalid buffer object type');
+      }
     }
+
+    this.bufferRenderer = null;
+    this.bufferState = null;
   };
 
   hideObjects = (except: string[] = []) => {
@@ -509,8 +511,8 @@ export class CanvasObjectRenderer {
     imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const imageObject = imageDTOToImageObject(imageDTO);
     if (replaceObjects) {
-      this.bufferState = imageObject;
-      await this.renderBufferObject();
+      await this.setBuffer(imageObject);
+      this.commitBuffer({ pushToState: false });
     }
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.getEntityIdentifier(),
