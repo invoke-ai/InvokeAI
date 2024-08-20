@@ -23,7 +23,7 @@ export class CanvasBrushLineRenderer {
   };
 
   constructor(state: CanvasBrushLineState, parent: CanvasObjectRenderer) {
-    const { id, strokeWidth, clip, color, points } = state;
+    const { id, clip } = state;
     this.id = id;
     this.parent = parent;
     this.manager = parent.manager;
@@ -42,14 +42,10 @@ export class CanvasBrushLineRenderer {
         name: `${this.type}:line`,
         listening: false,
         shadowForStrokeEnabled: false,
-        strokeWidth,
         tension: 0.3,
         lineCap: 'round',
         lineJoin: 'round',
         globalCompositeOperation: 'source-over',
-        stroke: rgbaColorToString(color),
-        // A line with only one point will not be rendered, so we duplicate the points to make it visible
-        points: points.length === 2 ? [...points, ...points] : points,
       }),
     };
     this.konva.group.add(this.konva.line);
@@ -59,12 +55,11 @@ export class CanvasBrushLineRenderer {
   update(state: CanvasBrushLineState, force = false): boolean {
     if (force || this.state !== state) {
       this.log.trace({ state }, 'Updating brush line');
-      const { points, color, clip, strokeWidth } = state;
+      const { points, color, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
         points: points.length === 2 ? [...points, ...points] : points,
         stroke: rgbaColorToString(color),
-        clip,
         strokeWidth,
       });
       this.state = state;

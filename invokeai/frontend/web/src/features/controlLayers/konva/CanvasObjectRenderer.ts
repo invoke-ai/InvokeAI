@@ -1,6 +1,5 @@
 import type { JSONObject } from 'common/types';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import { deepClone } from 'common/util/deepClone';
 import { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
 import { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
 import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
@@ -67,8 +66,14 @@ export class CanvasObjectRenderer {
    * drawn in real-time, such as brush lines. The buffer object state only exists in this renderer and is not part of
    * the application state until it is committed.
    */
-  buffer: AnyObjectState | null = null;
+  bufferState: AnyObjectState | null = null;
 
+  /**
+   * The object renderer for the buffer object state. It is created when the buffer object state is set and destroyed
+   * when the buffer object state is cleared. This is separate from the other object renderers to allow the buffer to
+   * be rendered separately.
+   */
+  bufferRenderer: AnyObjectRenderer | null = null;
   /**
    * A map of object renderers, keyed by their ID.
    */
@@ -82,6 +87,10 @@ export class CanvasObjectRenderer {
      * A Konva Group that holds all the object renderers.
      */
     objectGroup: Konva.Group;
+    /**
+     * A Konva Group that holds the buffer object renderer.
+     */
+    bufferGroup: Konva.Group;
     /**
      * The compositing rect is used to draw the inpaint mask as a single shape with a given opacity.
      *
@@ -113,10 +122,12 @@ export class CanvasObjectRenderer {
 
     this.konva = {
       objectGroup: new Konva.Group({ name: `${this.type}:object_group`, listening: false }),
+      bufferGroup: new Konva.Group({ name: `${this.type}:buffer_group`, listening: false }),
       compositing: null,
     };
 
     this.parent.konva.layer.add(this.konva.objectGroup);
+    this.parent.konva.layer.add(this.konva.bufferGroup);
 
     if (this.parent.state.type === 'inpaint_mask' || this.parent.state.type === 'regional_guidance') {
       const rect = new Konva.Rect({
@@ -148,7 +159,6 @@ export class CanvasObjectRenderer {
     this.subscriptions.add(
       this.manager.stateApi.$stageAttrs.listen(() => {
         if (this.konva.compositing && this.parent.type === 'mask_adapter') {
-          this.updateCompositingRectFill(this.parent.state.fill);
           this.updateCompositingRectSize();
         }
       })
@@ -166,7 +176,7 @@ export class CanvasObjectRenderer {
     const objectIds = objectStates.map((objectState) => objectState.id);
 
     for (const renderer of this.renderers.values()) {
-      if (!objectIds.includes(renderer.id) && renderer.id !== this.buffer?.id) {
+      if (!objectIds.includes(renderer.id)) {
         this.renderers.delete(renderer.id);
         renderer.destroy();
         didRender = true;
@@ -175,10 +185,6 @@ export class CanvasObjectRenderer {
 
     for (const objectState of objectStates) {
       didRender = (await this.renderObject(objectState)) || didRender;
-    }
-
-    if (this.buffer) {
-      didRender = (await this.renderObject(this.buffer)) || didRender;
     }
 
     this.syncCache(didRender);
@@ -236,6 +242,7 @@ export class CanvasObjectRenderer {
       this.konva.compositing.group.opacity(opacity);
     } else {
       this.konva.objectGroup.opacity(opacity);
+      this.konva.bufferGroup.opacity(opacity);
     }
   };
 
@@ -253,10 +260,10 @@ export class CanvasObjectRenderer {
 
     let renderer = this.renderers.get(objectState.id);
 
-    const isFirstRender = renderer === undefined;
+    const isFirstRender = !renderer;
 
     if (objectState.type === 'brush_line') {
-      assert(renderer instanceof CanvasBrushLineRenderer || renderer === undefined);
+      assert(renderer instanceof CanvasBrushLineRenderer || !renderer);
 
       if (!renderer) {
         renderer = new CanvasBrushLineRenderer(objectState, this);
@@ -266,7 +273,7 @@ export class CanvasObjectRenderer {
 
       didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'eraser_line') {
-      assert(renderer instanceof CanvasEraserLineRenderer || renderer === undefined);
+      assert(renderer instanceof CanvasEraserLineRenderer || !renderer);
 
       if (!renderer) {
         renderer = new CanvasEraserLineRenderer(objectState, this);
@@ -276,7 +283,7 @@ export class CanvasObjectRenderer {
 
       didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'rect') {
-      assert(renderer instanceof CanvasRectRenderer || renderer === undefined);
+      assert(renderer instanceof CanvasRectRenderer || !renderer);
 
       if (!renderer) {
         renderer = new CanvasRectRenderer(objectState, this);
@@ -286,7 +293,7 @@ export class CanvasObjectRenderer {
 
       didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'image') {
-      assert(renderer instanceof CanvasImageRenderer || renderer === undefined);
+      assert(renderer instanceof CanvasImageRenderer || !renderer);
 
       if (!renderer) {
         renderer = new CanvasImageRenderer(objectState, this);
@@ -296,8 +303,63 @@ export class CanvasObjectRenderer {
       didRender = await renderer.update(objectState, force || isFirstRender);
     }
 
+    // We should always clear the buffer when rendering a "real" object
+    this.clearBuffer();
+
     if (didRender && this.konva.objectGroup.isCached()) {
       this.konva.objectGroup.clearCache();
+    }
+
+    return didRender;
+  };
+
+  /**
+   * Renders the buffer object. If the buffer renderer does not exist, it will be created and its Konva group added to the
+   * parent entity's buffer object group.
+   * @returns A promise that resolves to a boolean, indicating if the object was rendered.
+   */
+  renderBufferObject = async (): Promise<boolean> => {
+    let didRender = false;
+
+    if (!this.bufferState) {
+      return false;
+    }
+
+    if (this.bufferState.type === 'brush_line') {
+      assert(this.bufferRenderer instanceof CanvasBrushLineRenderer || !this.bufferRenderer);
+
+      if (!this.bufferRenderer) {
+        this.bufferRenderer = new CanvasBrushLineRenderer(this.bufferState, this);
+        this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
+      }
+
+      didRender = this.bufferRenderer.update(this.bufferState, true);
+    } else if (this.bufferState.type === 'eraser_line') {
+      assert(this.bufferRenderer instanceof CanvasEraserLineRenderer || !this.bufferRenderer);
+
+      if (!this.bufferRenderer) {
+        this.bufferRenderer = new CanvasEraserLineRenderer(this.bufferState, this);
+        this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
+      }
+
+      didRender = this.bufferRenderer.update(this.bufferState, true);
+    } else if (this.bufferState.type === 'rect') {
+      assert(this.bufferRenderer instanceof CanvasRectRenderer || !this.bufferRenderer);
+
+      if (!this.bufferRenderer) {
+        this.bufferRenderer = new CanvasRectRenderer(this.bufferState, this);
+        this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
+      }
+
+      didRender = this.bufferRenderer.update(this.bufferState, true);
+    } else if (this.bufferState.type === 'image') {
+      assert(this.bufferRenderer instanceof CanvasImageRenderer || !this.bufferRenderer);
+
+      if (!this.bufferRenderer) {
+        this.bufferRenderer = new CanvasImageRenderer(this.bufferState, this);
+        this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
+      }
+      didRender = await this.bufferRenderer.update(this.bufferState, true);
     }
 
     return didRender;
@@ -308,7 +370,7 @@ export class CanvasObjectRenderer {
    * @returns Whether the renderer has a buffer object to render.
    */
   hasBuffer = (): boolean => {
-    return this.buffer !== null;
+    return this.bufferState !== null || this.bufferRenderer !== null;
   };
 
   /**
@@ -319,33 +381,27 @@ export class CanvasObjectRenderer {
   setBuffer = async (objectState: AnyObjectState): Promise<boolean> => {
     this.log.trace('Setting buffer');
 
-    this.buffer = objectState;
-    return await this.renderObject(this.buffer, true);
+    this.bufferState = objectState;
+    return await this.renderBufferObject();
   };
 
   /**
    * Clears the buffer object state.
    */
   clearBuffer = () => {
-    this.log.trace('Clearing buffer');
-
-    if (this.buffer) {
-      const renderer = this.renderers.get(this.buffer.id);
-      if (renderer) {
-        this.log.trace('Destroying buffer object renderer');
-        renderer.destroy();
-        this.renderers.delete(renderer.id);
-      }
+    if (this.bufferState || this.bufferRenderer) {
+      this.log.trace('Clearing buffer');
+      this.bufferRenderer?.destroy();
+      this.bufferRenderer = null;
+      this.bufferState = null;
     }
-
-    this.buffer = null;
   };
 
   /**
    * Commits the current buffer object, pushing the buffer object state back to the application state.
    */
   commitBuffer = () => {
-    if (!this.buffer) {
+    if (!this.bufferState) {
       this.log.trace('No buffer to commit');
       return;
     }
@@ -354,25 +410,23 @@ export class CanvasObjectRenderer {
 
     // We need to give the objects a fresh ID else they will be considered the same object when they are re-rendered as
     // a non-buffer object, and we won't trigger things like bbox calculation
-    this.buffer.id = getPrefixedId(this.buffer.type);
+    this.bufferState.id = getPrefixedId(this.bufferState.type);
 
-    if (this.buffer.type === 'brush_line') {
+    if (this.bufferState.type === 'brush_line') {
       this.manager.stateApi.addBrushLine({
         entityIdentifier: this.parent.getEntityIdentifier(),
-        brushLine: this.buffer,
+        brushLine: this.bufferState,
       });
-    } else if (this.buffer.type === 'eraser_line') {
+    } else if (this.bufferState.type === 'eraser_line') {
       this.manager.stateApi.addEraserLine({
         entityIdentifier: this.parent.getEntityIdentifier(),
-        eraserLine: this.buffer,
+        eraserLine: this.bufferState,
       });
-    } else if (this.buffer.type === 'rect') {
-      this.manager.stateApi.addRect({ entityIdentifier: this.parent.getEntityIdentifier(), rect: this.buffer });
+    } else if (this.bufferState.type === 'rect') {
+      this.manager.stateApi.addRect({ entityIdentifier: this.parent.getEntityIdentifier(), rect: this.bufferState });
     } else {
-      this.log.warn({ buffer: this.buffer }, 'Invalid buffer object type');
+      this.log.warn({ buffer: this.bufferState }, 'Invalid buffer object type');
     }
-
-    this.buffer = null;
   };
 
   hideObjects = (except: string[] = []) => {
@@ -416,7 +470,7 @@ export class CanvasObjectRenderer {
    * @returns Whether the renderer has any objects to render.
    */
   hasObjects = (): boolean => {
-    return this.renderers.size > 0 || this.buffer !== null;
+    return this.renderers.size > 0 || this.bufferState !== null || this.bufferRenderer !== null;
   };
 
   getRasterizedImageCache = (rect: Rect): ImageCache | null => {
@@ -455,7 +509,8 @@ export class CanvasObjectRenderer {
     imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
     const imageObject = imageDTOToImageObject(imageDTO);
     if (replaceObjects) {
-      await this.renderObject(imageObject, true);
+      this.bufferState = imageObject;
+      await this.renderBufferObject();
     }
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.getEntityIdentifier(),
@@ -500,7 +555,7 @@ export class CanvasObjectRenderer {
       type: this.type,
       parent: this.parent.id,
       renderers: Array.from(this.renderers.values()).map((renderer) => renderer.repr()),
-      buffer: deepClone(this.buffer),
+      buffer: this.bufferRenderer?.repr(),
     };
   };
 
