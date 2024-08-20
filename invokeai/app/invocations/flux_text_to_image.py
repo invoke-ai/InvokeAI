@@ -25,7 +25,7 @@ from invokeai.backend.util.devices import TorchDevice
 @invocation(
     "flux_text_to_image",
     title="FLUX Text to Image",
-    tags=["image"],
+    tags=["image", "flux"],
     category="image",
     version="1.0.0",
 )

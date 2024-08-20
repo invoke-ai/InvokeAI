@@ -5798,7 +5798,10 @@ export type components = {
              */
             type: "flux_model_loader_output";
         };
-        /** FLUX Text Encoding */
+        /**
+         * FLUX Text Encoding
+         * @description Encodes and preps a prompt for a flux image.
+         */
         FluxTextEncoderInvocation: {
             /**
              * Id
