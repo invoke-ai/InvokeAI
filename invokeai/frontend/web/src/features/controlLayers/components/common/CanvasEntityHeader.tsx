@@ -53,7 +53,7 @@ export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
   return (
     <ContextMenu renderMenu={renderMenu}>
       {(ref) => (
-        <Flex ref={ref} gap={2} alignItems="center" p={2} {...rest} cursor="text">
+        <Flex ref={ref} gap={2} alignItems="center" p={2} {...rest}>
           {children}
         </Flex>
       )}
