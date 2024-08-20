@@ -25,7 +25,7 @@ import { assert } from 'tsafe';
 const matcher = isAnyOf(caImageChanged, caProcessedImageChanged, caProcessorConfigChanged, caModelChanged, caRecalled);
 
 const DEBOUNCE_MS = 300;
-const log = logger('session');
+const log = logger('queue');
 
 /**
  * Simple helper to cancel a batch and reset the pending batch ID

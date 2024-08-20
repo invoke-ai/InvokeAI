@@ -1,21 +1,17 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import {
-  loraDeleted,
-  modelChanged,
-  vaeSelected,
-} from 'features/controlLayers/store/canvasV2Slice';
+import { loraDeleted, modelChanged, vaeSelected } from 'features/controlLayers/store/canvasV2Slice';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 
+const log = logger('models');
+
 export const addModelSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: modelSelected,
     effect: (action, { getState, dispatch }) => {
-      const log = logger('models');
-
       const state = getState();
       const result = zParameterModel.safeParse(action.payload);
 

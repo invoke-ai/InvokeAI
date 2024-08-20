@@ -1,4 +1,4 @@
-import type { LogLevel } from 'app/logging/logger';
+import type { LogLevel, LogNamespace } from 'app/logging/logger';
 import { z } from 'zod';
 
 const zLanguage = z.enum([
@@ -31,12 +31,12 @@ export const isLanguage = (v: unknown): v is Language => zLanguage.safeParse(v).
 export interface SystemState {
   _version: 1;
   shouldConfirmOnDelete: boolean;
-  enableImageDebugging: boolean;
-  consoleLogLevel: LogLevel;
-  shouldLogToConsole: boolean;
   shouldAntialiasProgressImage: boolean;
   language: Language;
   shouldUseNSFWChecker: boolean;
   shouldUseWatermarker: boolean;
   shouldEnableInformationalPopovers: boolean;
+  logIsEnabled: boolean;
+  logLevel: LogLevel;
+  logNamespaces: LogNamespace[];
 }

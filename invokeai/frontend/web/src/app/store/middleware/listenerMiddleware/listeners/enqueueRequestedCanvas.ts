@@ -6,13 +6,15 @@ import { parseify } from 'common/util/serialize';
 import { canvasBatchIdAdded, stagingAreaInitialized } from 'features/canvas/store/canvasSlice';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
-import { blobToDataURL } from "features/controlLayers/konva/util";
+import { blobToDataURL } from 'features/controlLayers/konva/util';
 import { canvasGraphBuilt } from 'features/nodes/store/actions';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildCanvasGraph } from 'features/nodes/util/graph/canvas/buildCanvasGraph';
 import { imagesApi } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO } from 'services/api/types';
+
+const log = logger('queue');
 
 /**
  * This listener is responsible invoking the canvas. This involves a number of steps:
@@ -32,7 +34,6 @@ export const addEnqueueRequestedCanvasListener = (startAppListening: AppStartLis
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
       enqueueRequested.match(action) && action.payload.tabName === 'canvas',
     effect: async (action, { getState, dispatch }) => {
-      const log = logger('queue');
       const { prepend } = action.payload;
       const state = getState();
 

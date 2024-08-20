@@ -7,6 +7,8 @@ import { t } from 'i18next';
 import { truncate, upperFirst } from 'lodash-es';
 import { queueApi } from 'services/api/endpoints/queue';
 
+const log = logger('queue');
+
 export const addBatchEnqueuedListener = (startAppListening: AppStartListening) => {
   // success
   startAppListening({
@@ -14,7 +16,7 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
     effect: async (action) => {
       const response = action.payload;
       const arg = action.meta.arg.originalArgs;
-      logger('queue').debug({ enqueueResult: parseify(response) }, 'Batch enqueued');
+      log.debug({ enqueueResult: parseify(response) }, 'Batch enqueued');
 
       toast({
         id: 'QUEUE_BATCH_SUCCEEDED',
@@ -42,7 +44,7 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
           status: 'error',
           description: t('common.unknownError'),
         });
-        logger('queue').error({ batchConfig: parseify(arg), error: parseify(response) }, t('queue.batchFailedToQueue'));
+        log.error({ batchConfig: parseify(arg), error: parseify(response) }, t('queue.batchFailedToQueue'));
         return;
       }
 
@@ -68,7 +70,7 @@ export const addBatchEnqueuedListener = (startAppListening: AppStartListening) =
           description: t('common.unknownError'),
         });
       }
-      logger('queue').error({ batchConfig: parseify(arg), error: parseify(response) }, t('queue.batchFailedToQueue'));
+      log.error({ batchConfig: parseify(arg), error: parseify(response) }, t('queue.batchFailedToQueue'));
     },
   });
 };

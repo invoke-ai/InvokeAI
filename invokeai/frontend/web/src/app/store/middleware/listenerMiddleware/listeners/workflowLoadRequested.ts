@@ -16,6 +16,8 @@ import type { GraphAndWorkflowResponse, NonNullableGraph } from 'services/api/ty
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
+const log = logger('workflows');
+
 const getWorkflow = async (data: GraphAndWorkflowResponse, templates: Templates) => {
   if (data.workflow) {
     // Prefer to load the workflow if it's available - it has more information
@@ -35,7 +37,6 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
   startAppListening({
     actionCreator: workflowLoadRequested,
     effect: async (action, { dispatch }) => {
-      const log = logger('nodes');
       const { data, asCopy } = action.payload;
       const nodeTemplates = $templates.get();
 
