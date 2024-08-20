@@ -376,12 +376,12 @@ class CustomAttnProcessor:
         head_dim = attn.to_q.weight.shape[0] // attn.heads
 
         # batched execution on xformers slightly faster for small heads count
-        # 8 heads:
-        # xformers(dim3): 20.155955553054810 vram: 16483328
-        # xformers(dim4): 17.558132648468018 vram: 16483328
-        # 1 head:
-        # xformers(dim3):  5.660739183425903 vram:  9516032
-        # xformers(dim4):  6.114191055297852 vram:  9516032
+        # 8 heads, fp16 (100000 attention calls):
+        # xformers(dim3): 20.155955553054810s vram: 16483328b
+        # xformers(dim4): 17.558132648468018s vram: 16483328b
+        # 1 head, fp16 (100000 attention calls):
+        # xformers(dim3):  5.660739183425903s vram:  9516032b
+        # xformers(dim4):  6.114191055297852s vram:  9516032b
         if multihead is None:
             heads_count = query.shape[2] // head_dim
             multihead = heads_count >= 4
@@ -449,8 +449,9 @@ class CustomAttnProcessor:
 
         if multihead is None:
             # multihead extremely slow on old cuda gpu:
-            # torch-sdp(dim3): 30.07543110847473 vram: 23954432
-            # torch-sdp(dim4): 299.3908393383026 vram: 13861888
+            # fp16 (100000 attention calls):
+            # torch-sdp(dim3): 30.07543110847473s vram: 23954432b
+            # torch-sdp(dim4): 299.3908393383026s vram: 13861888b
             multihead = not self.is_old_cuda
 
         if multihead:
@@ -463,12 +464,12 @@ class CustomAttnProcessor:
                 # [B*H, 1, S_key] -> [B, H, 1, S_key]
                 attention_mask = attention_mask.view(batch_size, -1, attention_mask.shape[1], attention_mask.shape[2])
                 # mask alignment to 8 decreases memory consumption and increases speed
-                # fp16:
-                # torch-sdp(dim4, mask):          6.1701478958129880 vram:  7864320
-                # torch-sdp(dim4, aligned mask):  3.3127212524414062 vram:  2621440
-                # fp32:
-                # torch-sdp(dim4, mask):         23.0943229198455800 vram: 16121856
-                # torch-sdp(dim4, aligned mask): 17.3104763031005860 vram:  5636096
+                # fp16 (100000 attention calls):
+                # torch-sdp(dim4, mask):          6.1701478958129880s vram:  7864320b
+                # torch-sdp(dim4, aligned mask):  3.3127212524414062s vram:  2621440b
+                # fp32 (100000 attention calls):
+                # torch-sdp(dim4, mask):         23.0943229198455800s vram: 16121856b
+                # torch-sdp(dim4, aligned mask): 17.3104763031005860s vram:  5636096b
                 attention_mask = self._align_attention_mask_memory(attention_mask)
 
             hidden_states = F.scaled_dot_product_attention(
@@ -488,8 +489,9 @@ class CustomAttnProcessor:
 
             # attention mask already in shape [B*H, 1, S_key]/[B*H, S_query, S_key]
             # and there no noticable changes from memory alignment in batched run:
-            # torch-sdp(dim3, mask):          9.7391905784606930 vram: 12713984
-            # torch-sdp(dim3, aligned mask): 10.0090200901031500 vram: 12713984
+            # fp16 (100000 attention calls):
+            # torch-sdp(dim3, mask):          9.7391905784606930s vram: 12713984b
+            # torch-sdp(dim3, aligned mask): 10.0090200901031500s vram: 12713984b
 
             hidden_states = F.scaled_dot_product_attention(
                 query, key, value, attn_mask=attention_mask, dropout_p=0.0, is_causal=False, scale=attn.scale
