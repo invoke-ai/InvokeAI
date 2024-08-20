@@ -194,31 +194,36 @@ export class CanvasTool {
 
     const tool = toolState.selected;
 
-    const isDrawable = selectedEntity && isDrawableEntity(selectedEntity.state);
+    const isDrawable = selectedEntity && selectedEntity.state.isEnabled && isDrawableEntity(selectedEntity.state);
 
     // Update the stage's pointer style
-    if (tool === 'view') {
-      // View gets a hand
+    if (Boolean(this.manager.stateApi.$transformingEntity.get()) || renderedEntityCount === 0) {
+      // We are transforming and/or have no layers, so we should not render any tool
+      stage.container().style.cursor = 'default';
+    } else if (tool === 'view') {
+      // view tool gets a hand
       stage.container().style.cursor = isMouseDown ? 'grabbing' : 'grab';
-    } else if (renderedEntityCount === 0) {
-      // We have no layers, so we should not render any tool
-      stage.container().style.cursor = 'default';
-    } else if (!isDrawable) {
-      // Non-drawable layers don't have tools
-      stage.container().style.cursor = 'not-allowed';
-    } else if (tool === 'move' || Boolean(this.manager.stateApi.$transformingEntity.get())) {
-      // Move tool gets a pointer
-      stage.container().style.cursor = 'default';
-    } else if (tool === 'rect') {
-      // Rect gets a crosshair
-      stage.container().style.cursor = 'crosshair';
-    } else if (tool === 'brush' || tool === 'eraser') {
-      // Hide the native cursor and use the konva-rendered brush preview
-      stage.container().style.cursor = 'none';
+      // Bbox tool gets default
     } else if (tool === 'bbox') {
       stage.container().style.cursor = 'default';
     } else if (tool === 'eyeDropper') {
+      // Eyedropper gets none
       stage.container().style.cursor = 'none';
+    } else if (isDrawable) {
+      if (tool === 'move') {
+        // Move gets default arrow
+        stage.container().style.cursor = 'default';
+      } else if (tool === 'rect') {
+        // Rect gets a crosshair
+        stage.container().style.cursor = 'crosshair';
+      } else if (tool === 'brush' || tool === 'eraser') {
+        // Hide the native cursor and use the konva-rendered brush preview
+        stage.container().style.cursor = 'none';
+      }
+    } else {
+      // isDrawable === 'false'
+      // Non-drawable layers don't have tools
+      stage.container().style.cursor = 'not-allowed';
     }
 
     stage.draggable(tool === 'view');
