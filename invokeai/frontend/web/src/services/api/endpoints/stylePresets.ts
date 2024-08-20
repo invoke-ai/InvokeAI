@@ -94,7 +94,7 @@ export const stylePresetsApi = api.injectEndpoints({
     }),
     exportStylePresets: build.query<string, void>({
       query: () => ({
-        url: buildStylePresetsUrl('/export'),
+        url: buildStylePresetsUrl('export'),
         responseHandler: (response) => response.text(),
       }),
       providesTags: ['FetchOnReconnect', { type: 'StylePreset', id: LIST_TAG }],
