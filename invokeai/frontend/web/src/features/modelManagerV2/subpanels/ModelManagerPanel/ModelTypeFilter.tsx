@@ -19,6 +19,8 @@ export const ModelTypeFilter = memo(() => {
       controlnet: 'ControlNet',
       vae: 'VAE',
       t2i_adapter: t('common.t2iAdapter'),
+      t5_encoder: 'T5Encoder',
+      clip_embed: 'Clip Embed',
       ip_adapter: t('common.ipAdapter'),
       clip_vision: 'Clip Vision',
       spandrel_image_to_image: 'Image-to-Image',
