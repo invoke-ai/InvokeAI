@@ -566,7 +566,6 @@ const zCanvasImageState = z.object({
   id: zId,
   type: z.literal('image'),
   image: zImageWithDims,
-  filters: z.array(zLayerEffect),
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
 
@@ -806,7 +805,6 @@ export const imageDTOToImageObject = (imageDTO: ImageDTO, overrides?: Partial<Ca
   return {
     id: getObjectId('image'),
     type: 'image',
-    filters: [],
     image: {
       image_name,
       width,
