@@ -1,5 +1,4 @@
 import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
-import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -78,8 +77,6 @@ type EntityStateAndAdapter =
       adapter: CanvasMaskAdapter;
     };
 
-const log = logger('canvas');
-
 export class CanvasStateApi {
   _store: AppStore;
   manager: CanvasManager;
@@ -94,55 +91,42 @@ export class CanvasStateApi {
     return this._store.getState().canvasV2;
   };
   resetEntity = (arg: EntityIdentifierPayload) => {
-    log.trace(arg, 'Resetting entity');
     this._store.dispatch(entityReset(arg));
   };
   setEntityPosition = (arg: EntityMovedPayload) => {
-    log.trace(arg, 'Setting entity position');
     this._store.dispatch(entityMoved(arg));
   };
   addBrushLine = (arg: EntityBrushLineAddedPayload) => {
-    log.trace(arg, 'Adding brush line');
     this._store.dispatch(entityBrushLineAdded(arg));
   };
   addEraserLine = (arg: EntityEraserLineAddedPayload) => {
-    log.trace(arg, 'Adding eraser line');
     this._store.dispatch(entityEraserLineAdded(arg));
   };
   addRect = (arg: EntityRectAddedPayload) => {
-    log.trace(arg, 'Adding rect');
     this._store.dispatch(entityRectAdded(arg));
   };
   rasterizeEntity = (arg: EntityRasterizedPayload) => {
-    log.trace(arg, 'Rasterizing entity');
     this._store.dispatch(entityRasterized(arg));
   };
   compositeLayerRasterized = (arg: { imageName: string; rect: Rect }) => {
-    log.trace(arg, 'Composite layer rasterized');
     this._store.dispatch(rasterLayerCompositeRasterized(arg));
   };
   setSelectedEntity = (arg: EntityIdentifierPayload) => {
-    log.trace({ arg }, 'Setting selected entity');
     this._store.dispatch(entitySelected(arg));
   };
   setGenerationBbox = (bbox: Rect) => {
-    log.trace({ bbox }, 'Setting generation bbox');
     this._store.dispatch(bboxChanged(bbox));
   };
   setBrushWidth = (width: number) => {
-    log.trace({ width }, 'Setting brush width');
     this._store.dispatch(brushWidthChanged(width));
   };
   setEraserWidth = (width: number) => {
-    log.trace({ width }, 'Setting eraser width');
     this._store.dispatch(eraserWidthChanged(width));
   };
   setTool = (tool: Tool) => {
-    log.trace({ tool }, 'Setting tool');
     this._store.dispatch(toolChanged(tool));
   };
   setToolBuffer = (toolBuffer: Tool | null) => {
-    log.trace({ toolBuffer }, 'Setting tool buffer');
     this._store.dispatch(toolBufferChanged(toolBuffer));
   };
   setFill = (fill: RgbaColor) => {
@@ -240,8 +224,8 @@ export class CanvasStateApi {
   getBrushPreviewFill = (): RgbaColor => {
     const selectedEntity = this.getSelectedEntity();
     if (selectedEntity?.state.type === 'regional_guidance' || selectedEntity?.state.type === 'inpaint_mask') {
-      // The brush should use the mask opacity for these entity types
-      return selectedEntity.state.fill.color;
+      // The brush should use the mask opacity for these enktity types
+      return { ...selectedEntity.state.fill.color, a: 1 };
     } else {
       const state = this.getState();
       return state.tool.fill;
