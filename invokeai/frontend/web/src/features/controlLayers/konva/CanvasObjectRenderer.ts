@@ -309,9 +309,6 @@ export class CanvasObjectRenderer {
       didRender = await renderer.update(objectState, force || isFirstRender);
     }
 
-    // We should always clear the buffer when rendering a "real" object
-    this.clearBuffer();
-
     if (didRender && this.konva.objectGroup.isCached()) {
       this.konva.objectGroup.clearCache();
     }
