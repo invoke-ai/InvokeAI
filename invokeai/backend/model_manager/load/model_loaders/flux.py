@@ -27,15 +27,15 @@ from invokeai.backend.model_manager.config import (
     CLIPEmbedDiffusersConfig,
     MainBnbQuantized4bCheckpointConfig,
     MainCheckpointConfig,
-    T5EncoderConfig,
     T5Encoder8bConfig,
+    T5EncoderConfig,
     VAECheckpointConfig,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
-from invokeai.backend.util.silence_warnings import SilenceWarnings
 from invokeai.backend.quantization.fast_quantized_transformers_model import FastQuantizedTransformersModel
+from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 app_config = get_config()
 

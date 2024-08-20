@@ -1,5 +1,6 @@
-import torch
 from typing import Literal
+
+import torch
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation

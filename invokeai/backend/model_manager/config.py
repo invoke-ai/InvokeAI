@@ -194,7 +194,9 @@ class ModelConfigBase(BaseModel):
 class CheckpointConfigBase(ModelConfigBase):
     """Model config for checkpoint-style models."""
 
-    format: Literal[ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b] = Field(description="Format of the provided checkpoint model", default=ModelFormat.Checkpoint)
+    format: Literal[ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b] = Field(
+        description="Format of the provided checkpoint model", default=ModelFormat.Checkpoint
+    )
     config_path: str = Field(description="path to the checkpoint model config file")
     converted_at: Optional[float] = Field(
         description="When this model was last converted to diffusers", default_factory=time.time
