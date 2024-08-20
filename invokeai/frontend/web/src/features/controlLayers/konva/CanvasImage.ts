@@ -5,7 +5,6 @@ import type { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
-import { FILTER_MAP } from 'features/controlLayers/konva/filters';
 import { loadImage } from 'features/controlLayers/konva/util';
 import type { CanvasImageState } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
@@ -137,14 +136,6 @@ export class CanvasImageRenderer {
           this.konva.group.add(this.konva.image);
         }
 
-        if (this.state.filters.length > 0) {
-          this.konva.image.cache();
-          this.konva.image.filters(this.state.filters.map((f) => FILTER_MAP[f]));
-        } else {
-          this.konva.image.clearCache();
-          this.konva.image.filters([]);
-        }
-
         this.konva.placeholder.rect.setAttrs({ width, height });
         this.konva.placeholder.text.setAttrs({ width, height, fontSize: width / 16 });
 
@@ -161,19 +152,12 @@ export class CanvasImageRenderer {
     if (force || this.state !== state) {
       this.log.trace({ state }, 'Updating image');
 
-      const { image, filters } = state;
+      const { image } = state;
       const { width, height, image_name } = image;
       if (force || (this.state.image.image_name !== image_name && !this.isLoading)) {
         await this.updateImageSource(image_name);
       }
       this.konva.image?.setAttrs({ width, height });
-      if (filters.length > 0) {
-        this.konva.image?.cache();
-        this.konva.image?.filters(filters.map((f) => FILTER_MAP[f]));
-      } else {
-        this.konva.image?.clearCache();
-        this.konva.image?.filters([]);
-      }
       this.state = state;
       return true;
     }
