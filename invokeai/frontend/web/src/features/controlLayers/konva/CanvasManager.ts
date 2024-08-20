@@ -58,8 +58,8 @@ export class CanvasManager {
   socket: AppSocket;
 
   _store: AppStore;
-  _prevState: CanvasV2State;
-  _isFirstRender: boolean = true;
+  prevState: CanvasV2State;
+  isFirstRender: boolean = true;
   _isDebugging: boolean = false;
 
   _worker: Worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
@@ -74,7 +74,7 @@ export class CanvasManager {
     this.socket = socket;
     this.stateApi = new CanvasStateApi(this._store, this);
 
-    this._prevState = this.stateApi.getState();
+    this.prevState = this.stateApi.getState();
 
     this.log = logger('canvas').child((message) => {
       return {
@@ -301,19 +301,22 @@ export class CanvasManager {
   render = async () => {
     const state = this.stateApi.getState();
 
-    if (this._prevState === state && !this._isFirstRender) {
+    const isFirstRender = this.isFirstRender;
+    this.isFirstRender = false;
+
+    const prevState = this.prevState;
+    this.prevState = state;
+
+    if (prevState === state && !isFirstRender) {
       this.log.trace('No changes detected, skipping render');
       return;
     }
 
-    if (
-      this._isFirstRender ||
-      state.settings.canvasBackgroundStyle !== this._prevState.settings.canvasBackgroundStyle
-    ) {
+    if (isFirstRender || state.settings.canvasBackgroundStyle !== prevState.settings.canvasBackgroundStyle) {
       this.background.render();
     }
 
-    if (this._isFirstRender || state.rasterLayers.entities !== this._prevState.rasterLayers.entities) {
+    if (isFirstRender || state.rasterLayers.entities !== prevState.rasterLayers.entities) {
       this.log.debug('Rendering raster layers');
 
       for (const entityAdapter of this.rasterLayerAdapters.values()) {
@@ -338,7 +341,7 @@ export class CanvasManager {
       }
     }
 
-    if (this._isFirstRender || state.controlLayers.entities !== this._prevState.controlLayers.entities) {
+    if (isFirstRender || state.controlLayers.entities !== prevState.controlLayers.entities) {
       this.log.debug('Rendering control layers');
 
       for (const entityAdapter of this.controlLayerAdapters.values()) {
@@ -364,10 +367,10 @@ export class CanvasManager {
     }
 
     if (
-      this._isFirstRender ||
-      state.regions.entities !== this._prevState.regions.entities ||
-      state.tool.selected !== this._prevState.tool.selected ||
-      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
+      isFirstRender ||
+      state.regions.entities !== prevState.regions.entities ||
+      state.tool.selected !== prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Rendering regions');
 
@@ -395,10 +398,10 @@ export class CanvasManager {
     }
 
     if (
-      this._isFirstRender ||
-      state.inpaintMask !== this._prevState.inpaintMask ||
-      state.tool.selected !== this._prevState.tool.selected ||
-      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
+      isFirstRender ||
+      state.inpaintMask !== prevState.inpaintMask ||
+      state.tool.selected !== prevState.tool.selected ||
+      state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Rendering inpaint mask');
       await this.inpaintMaskAdapter.update({
@@ -413,35 +416,25 @@ export class CanvasManager {
     this.stateApi.$selectedEntity.set(this.stateApi.getSelectedEntity());
     this.stateApi.$currentFill.set(this.stateApi.getCurrentFill());
 
-    if (
-      this._isFirstRender ||
-      state.bbox !== this._prevState.bbox ||
-      state.tool.selected !== this._prevState.tool.selected
-    ) {
+    if (isFirstRender || state.bbox !== prevState.bbox || state.tool.selected !== prevState.tool.selected) {
       this.log.debug('Rendering generation bbox');
       await this.preview.bbox.render();
     }
 
-    if (this._isFirstRender || state.session !== this._prevState.session) {
+    if (isFirstRender || state.session !== prevState.session) {
       this.log.debug('Rendering staging area');
       await this.preview.stagingArea.render();
     }
 
     if (
-      this._isFirstRender ||
-      state.rasterLayers.entities !== this._prevState.rasterLayers.entities ||
-      state.regions.entities !== this._prevState.regions.entities ||
-      state.inpaintMask !== this._prevState.inpaintMask ||
-      state.selectedEntityIdentifier?.id !== this._prevState.selectedEntityIdentifier?.id
+      isFirstRender ||
+      state.rasterLayers.entities !== prevState.rasterLayers.entities ||
+      state.regions.entities !== prevState.regions.entities ||
+      state.inpaintMask !== prevState.inpaintMask ||
+      state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Arranging entities');
       await this.arrangeEntities();
-    }
-
-    this._prevState = state;
-
-    if (this._isFirstRender) {
-      this._isFirstRender = false;
     }
   };
 
@@ -460,8 +453,6 @@ export class CanvasManager {
     const unsubscribeRenderer = this._store.subscribe(this.render);
 
     this.log.debug('First render of konva stage');
-    this.preview.tool.render();
-    this.render();
 
     return () => {
       this.log.debug('Cleaning up konva renderer');
