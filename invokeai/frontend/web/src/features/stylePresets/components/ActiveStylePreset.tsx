@@ -1,4 +1,4 @@
-import { Badge, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Badge, Flex, IconButton, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/controlLayersSlice';
 import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
@@ -69,45 +69,40 @@ export const ActiveStylePreset = () => {
     );
   }
   return (
-    <Flex justifyContent="space-between" flexGrow={1} alignItems="center" gap={2} overflow="hidden">
+    <Flex w="full" alignItems="center" gap={2} minW={0}>
       <StylePresetImage imageWidth={25} presetImageUrl={activeStylePreset.image} />
-      <Flex flexDir="column" flexGrow={1} overflow="hidden">
-        <Flex>
-          <Badge colorScheme="invokeBlue" variant="subtle">
-            {activeStylePreset.name}
-          </Badge>
-        </Flex>
-      </Flex>
-      <Flex gap={1}>
-        <Tooltip label={t('stylePresets.toggleViewMode')}>
-          <IconButton
-            onClick={handleToggleViewMode}
-            variant="outline"
-            size="sm"
-            aria-label={t('stylePresets.toggleViewMode')}
-            colorScheme={viewMode ? 'invokeBlue' : 'base'}
-            icon={<PiEyeBold />}
-          />
-        </Tooltip>
-        <Tooltip label={t('stylePresets.flatten')}>
-          <IconButton
-            onClick={handleFlattenPrompts}
-            variant="outline"
-            size="sm"
-            aria-label={t('stylePresets.flatten')}
-            icon={<PiStackSimpleBold />}
-          />
-        </Tooltip>
-        <Tooltip label={t('stylePresets.clearTemplateSelection')}>
-          <IconButton
-            onClick={handleClearActiveStylePreset}
-            variant="outline"
-            size="sm"
-            aria-label={t('stylePresets.clearTemplateSelection')}
-            icon={<PiXBold />}
-          />
-        </Tooltip>
-      </Flex>
+      <Badge colorScheme="invokeBlue" variant="subtle" justifySelf="flex-start">
+        {activeStylePreset.name}
+      </Badge>
+      <Spacer />
+      <Tooltip label={t('stylePresets.toggleViewMode')}>
+        <IconButton
+          onClick={handleToggleViewMode}
+          variant="outline"
+          size="sm"
+          aria-label={t('stylePresets.toggleViewMode')}
+          colorScheme={viewMode ? 'invokeBlue' : 'base'}
+          icon={<PiEyeBold />}
+        />
+      </Tooltip>
+      <Tooltip label={t('stylePresets.flatten')}>
+        <IconButton
+          onClick={handleFlattenPrompts}
+          variant="outline"
+          size="sm"
+          aria-label={t('stylePresets.flatten')}
+          icon={<PiStackSimpleBold />}
+        />
+      </Tooltip>
+      <Tooltip label={t('stylePresets.clearTemplateSelection')}>
+        <IconButton
+          onClick={handleClearActiveStylePreset}
+          variant="outline"
+          size="sm"
+          aria-label={t('stylePresets.clearTemplateSelection')}
+          icon={<PiXBold />}
+        />
+      </Tooltip>
     </Flex>
   );
 };
