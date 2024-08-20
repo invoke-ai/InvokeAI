@@ -559,14 +559,14 @@ const zCanvasRectState = z.object({
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
-const zFilter = z.enum(['LightnessToAlphaFilter']);
-export type Filter = z.infer<typeof zFilter>;
+const zLayerEffect = z.enum(['LightnessToAlphaFilter']);
+export type LayerEffect = z.infer<typeof zLayerEffect>;
 
 const zCanvasImageState = z.object({
   id: zId,
   type: z.literal('image'),
   image: zImageWithDims,
-  filters: z.array(zFilter),
+  filters: z.array(zLayerEffect),
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
 
@@ -699,7 +699,7 @@ const zCanvasControlAdapterStateBase = z.object({
   isEnabled: z.boolean(),
   position: zCoordinate,
   opacity: zOpacity,
-  filters: z.array(zFilter),
+  filters: z.array(zLayerEffect),
   weight: z.number().gte(-1).lte(2),
   imageObject: zCanvasImageState.nullable(),
   processedImageObject: zCanvasImageState.nullable(),
@@ -755,6 +755,7 @@ export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 
 export const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
   type: z.literal('control_layer'),
+  withTransparencyEffect: z.boolean(),
   controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig]),
 });
 export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
