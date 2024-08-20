@@ -4,14 +4,8 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { isEqual, merge } from 'lodash-es';
 import { assert } from 'tsafe';
 
-import type {
-  CanvasControlLayerState,
-  CanvasRasterLayerState,
-  CanvasV2State,
-  ControlNetConfig,
-  Rect,
-  T2IAdapterConfig,
-} from './types';
+import type { CanvasControlLayerState, CanvasRasterLayerState, CanvasV2State, Rect } from './types';
+import { initialControlNetV2 } from './types';
 
 export const selectRasterLayer = (state: CanvasV2State, id: string) =>
   state.rasterLayers.entities.find((layer) => layer.id === id);
@@ -73,11 +67,8 @@ export const rasterLayersReducers = {
     state.rasterLayers.compositeRasterizationCache.push(action.payload);
   },
   rasterLayerConvertedToControlLayer: {
-    reducer: (
-      state,
-      action: PayloadAction<{ id: string; newId: string; controlAdapter: ControlNetConfig | T2IAdapterConfig }>
-    ) => {
-      const { id, newId, controlAdapter } = action.payload;
+    reducer: (state, action: PayloadAction<{ id: string; newId: string }>) => {
+      const { id, newId } = action.payload;
       const layer = selectRasterLayer(state, id);
       if (!layer) {
         return;
@@ -88,7 +79,7 @@ export const rasterLayersReducers = {
         ...deepClone(layer),
         id: newId,
         type: 'control_layer',
-        controlAdapter,
+        controlAdapter: deepClone(initialControlNetV2),
         withTransparencyEffect: true,
       };
 
@@ -103,7 +94,7 @@ export const rasterLayersReducers = {
 
       state.selectedEntityIdentifier = { type: controlLayerState.type, id: controlLayerState.id };
     },
-    prepare: (payload: { id: string; controlAdapter: ControlNetConfig | T2IAdapterConfig }) => ({
+    prepare: (payload: { id: string }) => ({
       payload: { ...payload, newId: getPrefixedId('control_layer') },
     }),
   },

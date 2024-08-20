@@ -4,7 +4,7 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { AddLayerButton } from 'features/controlLayers/components/AddLayerButton';
-import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
+import { CanvasEntityList } from 'features/controlLayers/components/CanvasEntityList';
 import { $isPreviewVisible } from 'features/controlLayers/store/canvasV2Slice';
 import { selectEntityCount } from 'features/controlLayers/store/selectors';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
@@ -115,7 +115,7 @@ const ParametersPanelTextToImage = () => {
                     </Flex>
                   </TabPanel>
                   <TabPanel p={0} w="full" h="full">
-                    <ControlLayersPanelContent />
+                    <CanvasEntityList />
                   </TabPanel>
                 </TabPanels>
               </Tabs>

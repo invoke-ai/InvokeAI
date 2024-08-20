@@ -1,9 +1,9 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { filterSelected } from 'features/controlLayers/store/canvasV2Slice';
+import type { FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS, isFilterType } from 'features/controlLayers/store/types';
 import { configSelector } from 'features/system/store/configSelectors';
 import { includes, map } from 'lodash-es';
@@ -16,10 +16,13 @@ const selectDisabledProcessors = createMemoizedSelector(
   (config) => config.sd.disabledControlNetProcessors
 );
 
-export const FilterTypeSelect = memo(() => {
+type Props = {
+  filterType: FilterConfig['type'];
+  onChange: (filterType: FilterConfig['type']) => void;
+};
+
+export const FilterTypeSelect = memo(({ filterType, onChange }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const filterType = useAppSelector((s) => s.canvasV2.filter.config.type);
   const disabledProcessors = useAppSelector(selectDisabledProcessors);
   const options = useMemo(() => {
     return map(IMAGE_FILTERS, ({ labelTKey }, type) => ({ value: type, label: t(labelTKey) })).filter(
@@ -33,9 +36,9 @@ export const FilterTypeSelect = memo(() => {
         return;
       }
       assert(isFilterType(v.value));
-      dispatch(filterSelected({ type: v.value }));
+      onChange(v.value);
     },
-    [dispatch]
+    [onChange]
   );
   const value = useMemo(() => options.find((o) => o.value === filterType) ?? null, [options, filterType]);
 
@@ -43,7 +46,7 @@ export const FilterTypeSelect = memo(() => {
     <Flex gap={2}>
       <FormControl>
         <InformationalPopover feature="controlNetProcessor">
-          <FormLabel m={0}>{t('controlLayers.filter')}</FormLabel>
+          <FormLabel m={0}>{t('controlLayers.filter.filterType')}</FormLabel>
         </InformationalPopover>
         <Combobox value={value} options={options} onChange={_onChange} isSearchable={false} isClearable={false} />
       </FormControl>

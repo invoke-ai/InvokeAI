@@ -6,10 +6,10 @@ import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/ap
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploadOverlay from 'common/components/ImageUploadOverlay';
+import { useScopeFocusWatcher } from 'common/hooks/interactionScopes';
 import { useClearStorage } from 'common/hooks/useClearStorage';
 import { useFullscreenDropzone } from 'common/hooks/useFullscreenDropzone';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
-import { useScopeFocusWatcher } from 'common/hooks/interactionScopes';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
