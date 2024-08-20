@@ -15,11 +15,12 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 @invocation(
     "flux_text_encoder",
     title="FLUX Text Encoding",
-    tags=["image"],
+    tags=["image", "flux"],
     category="image",
     version="1.0.0",
 )
 class FluxTextEncoderInvocation(BaseInvocation):
+    """Encodes and preps a prompt for a flux image."""
     clip: CLIPField = InputField(
         title="CLIP",
         description=FieldDescriptions.clip,
