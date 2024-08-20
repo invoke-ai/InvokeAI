@@ -4,6 +4,7 @@ import { logger } from 'app/logging/logger';
 import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import type { JSONObject } from 'common/types';
+import { deepClone } from 'common/util/deepClone';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import { canvasV2PersistConfig, canvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
@@ -109,7 +110,7 @@ const unserialize: UnserializeFunction = (data, key) => {
     const parsed = JSON.parse(data);
 
     // strip out old keys
-    const stripped = pick(parsed, keys(initialState));
+    const stripped = pick(deepClone(parsed), keys(initialState));
     // run (additive) migrations
     const migrated = migrate(stripped);
     // merge in initial state as default values, covering any missing keys
