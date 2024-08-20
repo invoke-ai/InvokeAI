@@ -8,7 +8,7 @@ import { $authToken } from 'app/store/nanostores/authToken';
  */
 
 export const convertImageUrlToBlob = async (url: string) =>
-  new Promise<Blob | null>((resolve) => {
+  new Promise<Blob | null>((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -17,17 +17,23 @@ export const convertImageUrlToBlob = async (url: string) =>
 
       const context = canvas.getContext('2d');
       if (!context) {
+        reject(new Error('Failed to get canvas context'));
         return;
       }
       context.drawImage(img, 0, 0);
-      resolve(
-        new Promise<Blob | null>((resolve) => {
-          canvas.toBlob(function (blob) {
-            resolve(blob);
-          }, 'image/png');
-        })
-      );
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error('Failed to convert image to blob'));
+        }
+      }, 'image/png');
     };
+
+    img.onerror = () => {
+      reject(new Error('Image failed to load. The URL may be invalid or the object may not exist.'));
+    };
+
     img.crossOrigin = $authToken.get() ? 'use-credentials' : 'anonymous';
     img.src = url;
   });
