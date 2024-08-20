@@ -96,7 +96,7 @@ const initialState: CanvasV2State = {
     showHUD: true,
     clipToBbox: false,
     cropToBboxOnSave: false,
-    canvasBackgroundStyle: 'dynamicGrid',
+    canvasBackgroundStyle: 'checkerboard',
   },
   compositing: {
     maskBlur: 16,
