@@ -20,8 +20,7 @@ export const useLogger = (namespace: LogNamespace) => {
       // Use a filter to show only logs of the given level
       let filter = `context.logLevel:>=${LOG_LEVEL_MAP[logLevel]}`;
       if (logNamespaces.length > 0) {
-        filter += ' AND ';
-        filter = `(${logNamespaces.map((ns) => `context.namespace:${ns}`).join(' OR ')})`;
+        filter += ` AND (${logNamespaces.map((ns) => `context.namespace:${ns}`).join(' OR ')})`;
       } else {
         filter += ' AND context.namespace:undefined';
       }
