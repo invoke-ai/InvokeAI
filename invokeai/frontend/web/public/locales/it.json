@@ -929,7 +929,7 @@
         "missingInvocationTemplate": "Modello di invocazione mancante",
         "missingFieldTemplate": "Modello di campo mancante",
         "singleFieldType": "{{name}} (Singola)",
-        "imageAccessError": "Impossibile trovare l'immagine {{image_name}}, ripristino delle impostazioni predefinite",
+        "imageAccessError": "Impossibile trovare l'immagine {{image_name}}, ripristino ai valori predefiniti",
         "boardAccessError": "Impossibile trovare la bacheca {{board_id}}, ripristino ai valori predefiniti",
         "modelAccessError": "Impossibile trovare il modello {{key}}, ripristino ai valori predefiniti"
     },
@@ -1782,6 +1782,13 @@
         "updatePromptTemplate": "Aggiorna il modello di prompt",
         "type": "Tipo",
         "promptTemplatesDesc2": "Utilizza la stringa segnaposto <Pre>{{placeholder}}</Pre> per specificare dove inserire il tuo prompt nel modello.",
-        "importTemplates": "Importa modelli di prompt"
+        "importTemplates": "Importa modelli di prompt (CSV/JSON)",
+        "exportDownloaded": "Esportazione completata",
+        "exportFailed": "Impossibile generare e scaricare il file CSV",
+        "exportPromptTemplates": "Esporta i miei modelli di prompt (CSV)",
+        "positivePromptColumn": "'prompt' o 'positive_prompt'",
+        "noTemplates": "Nessun modello",
+        "acceptedColumnsKeys": "Colonne/chiavi accettate:",
+        "templateActions": "Azioni modello"
     }
 }
