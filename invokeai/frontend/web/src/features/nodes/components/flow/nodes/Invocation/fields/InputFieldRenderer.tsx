@@ -72,7 +72,6 @@ type InputFieldProps = {
 const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   const fieldInstance = useFieldInputInstance(nodeId, fieldName);
   const fieldTemplate = useFieldInputTemplate(nodeId, fieldName);
-  window.console.log("Hit 0")
 
   if (isStringFieldInputInstance(fieldInstance) && isStringFieldInputTemplate(fieldTemplate)) {
     return <StringFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;

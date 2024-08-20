@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isClipEmbedModelConfig,
   isControlNetModelConfig,
   isControlNetOrT2IAdapterModelConfig,
   isFluxMainModelModelConfig,
@@ -14,6 +15,7 @@ import {
   isSDXLMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT2IAdapterModelConfig,
+  isT5EncoderModelConfig,
   isTIModelConfig,
   isVAEModelConfig,
 } from 'services/api/types';
@@ -42,6 +44,8 @@ export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlNetAndT2IAdapterModels = buildModelsHook(isControlNetOrT2IAdapterModelConfig);
 export const useControlNetModels = buildModelsHook(isControlNetModelConfig);
 export const useT2IAdapterModels = buildModelsHook(isT2IAdapterModelConfig);
+export const useT5EncoderModels = buildModelsHook(isT5EncoderModelConfig);
+export const useClipEmbedModels = buildModelsHook(isClipEmbedModelConfig);
 export const useSpandrelImageToImageModels = buildModelsHook(isSpandrelImageToImageModelConfig);
 export const useIPAdapterModels = buildModelsHook(isIPAdapterModelConfig);
 export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
