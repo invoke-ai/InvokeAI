@@ -44,7 +44,7 @@ export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
     }
 
     if (entityIdentifier.type === 'ip_adapter') {
-      return <MenuList>{/* <ControlLayerMenuItems /> */}</MenuList>;
+      return <MenuList>{/* no items for IP adapter yet */}</MenuList>;
     }
 
     assert(false, 'Unhandled entity type');
@@ -53,7 +53,7 @@ export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
   return (
     <ContextMenu renderMenu={renderMenu}>
       {(ref) => (
-        <Flex ref={ref} gap={2} alignItems="center" p={2} role="button" {...rest}>
+        <Flex ref={ref} gap={2} alignItems="center" p={2} {...rest} cursor="text">
           {children}
         </Flex>
       )}
