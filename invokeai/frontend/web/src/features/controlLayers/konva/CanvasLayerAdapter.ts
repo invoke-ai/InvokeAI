@@ -100,6 +100,12 @@ export class CanvasLayerAdapter {
     if (this.isFirstRender || opacity !== this.state.opacity) {
       this.renderer.updateOpacity(opacity);
     }
+
+    if (state.type === 'control_layer' && this.state.type === 'control_layer') {
+      if (this.isFirstRender || state.withTransparencyEffect !== this.state.withTransparencyEffect) {
+        this.renderer.updateTransparencyEffect(state.withTransparencyEffect);
+      }
+    }
     // this.transformer.syncInteractionState();
 
     if (this.isFirstRender) {
@@ -127,12 +133,6 @@ export class CanvasLayerAdapter {
     if (didUpdate) {
       this.transformer.requestRectCalculation();
     }
-  };
-
-  updateOpacity = (arg?: { opacity: number }) => {
-    this.log.trace('Updating opacity');
-    const opacity = get(arg, 'opacity', this.state.opacity);
-    this.renderer.konva.objectGroup.opacity(opacity);
   };
 
   repr = () => {
