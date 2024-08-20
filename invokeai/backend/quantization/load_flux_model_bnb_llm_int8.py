@@ -64,7 +64,7 @@ def main():
         with log_time("Load state dict into model"):
             # Load sharded state dict.
             files = list(model_path.glob("*.safetensors"))
-            state_dict = dict()
+            state_dict = {}
             for file in files:
                 sd = load_file(file)
                 state_dict.update(sd)
