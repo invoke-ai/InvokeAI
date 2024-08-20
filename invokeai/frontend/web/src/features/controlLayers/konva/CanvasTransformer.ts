@@ -5,6 +5,7 @@ import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskA
 import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { GroupConfig } from 'konva/lib/Group';
 import { debounce, get } from 'lodash-es';
 import type { Logger } from 'roarr';
 
@@ -543,6 +544,7 @@ export class CanvasTransformer {
       rotation: 0,
     };
     this.parent.renderer.konva.objectGroup.setAttrs(attrs);
+    this.parent.renderer.konva.bufferGroup.setAttrs(attrs);
     this.konva.outlineRect.setAttrs(attrs);
     this.konva.proxyRect.setAttrs(attrs);
   };
@@ -555,12 +557,14 @@ export class CanvasTransformer {
     this.log.trace('Updating position');
     const position = get(arg, 'position', this.parent.state.position);
 
-    this.parent.renderer.konva.objectGroup.setAttrs({
+    const groupAttrs: Partial<GroupConfig> = {
       x: position.x + this.pixelRect.x,
       y: position.y + this.pixelRect.y,
       offsetX: this.pixelRect.x,
       offsetY: this.pixelRect.y,
-    });
+    };
+    this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
+    this.parent.renderer.konva.bufferGroup.setAttrs(groupAttrs);
 
     this.update(position, this.pixelRect);
   };
@@ -609,12 +613,14 @@ export class CanvasTransformer {
 
     this.syncInteractionState();
     this.update(this.parent.state.position, this.pixelRect);
-    this.parent.renderer.konva.objectGroup.setAttrs({
+    const groupAttrs: Partial<GroupConfig> = {
       x: this.parent.state.position.x + this.pixelRect.x,
       y: this.parent.state.position.y + this.pixelRect.y,
       offsetX: this.pixelRect.x,
       offsetY: this.pixelRect.y,
-    });
+    };
+    this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
+    this.parent.renderer.konva.bufferGroup.setAttrs(groupAttrs);
   };
 
   calculateRect = debounce(() => {
