@@ -30,8 +30,8 @@ export const StylePresetForm = ({
   updatingStylePresetId: string | null;
   formData: StylePresetFormData | null;
 }) => {
-  const [createStylePreset] = useCreateStylePresetMutation();
-  const [updateStylePreset] = useUpdateStylePresetMutation();
+  const [createStylePreset, { isLoading: isCreating }] = useCreateStylePresetMutation();
+  const [updateStylePreset, { isLoading: isUpdating }] = useUpdateStylePresetMutation();
   const { t } = useTranslation();
   const allowPrivateStylePresets = useAppSelector((s) => s.config.allowPrivateStylePresets);
 
@@ -109,7 +109,11 @@ export const StylePresetForm = ({
 
       <Flex justifyContent="space-between" alignItems="flex-end" gap={10}>
         {allowPrivateStylePresets ? <StylePresetTypeField control={control} name="type" /> : <Spacer />}
-        <Button onClick={handleSubmit(handleClickSave)} isDisabled={!formState.isValid}>
+        <Button
+          onClick={handleSubmit(handleClickSave)}
+          isDisabled={!formState.isValid}
+          isLoading={isCreating || isUpdating}
+        >
           {t('common.save')}
         </Button>
       </Flex>
