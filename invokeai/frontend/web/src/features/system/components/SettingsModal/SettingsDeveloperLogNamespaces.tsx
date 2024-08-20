@@ -15,11 +15,11 @@ export const SettingsDeveloperLogNamespaces = memo(() => {
     if (s.system.logNamespaces.length === 0) {
       return EMPTY_ARRAY;
     } else {
-      return s.system.logNamespaces.toSorted();
+      return s.system.logNamespaces;
     }
   });
   const disabledLogNamespaces = useMemo(
-    () => difference(zLogNamespace.options, enabledLogNamespaces).toSorted(),
+    () => difference(zLogNamespace.options, enabledLogNamespaces),
     [enabledLogNamespaces]
   );
 
