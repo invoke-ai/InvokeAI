@@ -15,7 +15,6 @@ import type {
   RgbaColor,
   Tool,
 } from 'features/controlLayers/store/types';
-import { isDrawableEntity, isDrawableEntityAdapter } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
@@ -200,106 +199,101 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (color) {
         manager.stateApi.setFill(color);
       }
-    }
+      manager.preview.tool.render();
+    } else {
+      const isDrawable = selectedEntity?.state.isEnabled;
+      if (pos && isDrawable && !$spaceKey.get() && getIsPrimaryMouseDown(e)) {
+        $lastMouseDownPos.set(pos);
+        const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
 
-    if (
-      pos &&
-      selectedEntity &&
-      isDrawableEntity(selectedEntity.state) &&
-      !$spaceKey.get() &&
-      getIsPrimaryMouseDown(e)
-    ) {
-      $lastMouseDownPos.set(pos);
-      const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
+        if (toolState.selected === 'brush') {
+          const lastLinePoint = getLastPointOfLastLineOfEntity(selectedEntity.state, toolState.selected);
+          const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+          if (e.evt.shiftKey && lastLinePoint) {
+            // Create a straight line from the last line point
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
 
-      if (toolState.selected === 'brush') {
-        const lastLinePoint = getLastPointOfLastLineOfEntity(selectedEntity.state, toolState.selected);
-        const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
-        if (e.evt.shiftKey && lastLinePoint) {
-          // Create a straight line from the last line point
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getObjectId('brush_line', true),
+              type: 'brush_line',
+              points: [
+                // The last point of the last line is already normalized to the entity's coordinates
+                lastLinePoint.x,
+                lastLinePoint.y,
+                alignedPoint.x,
+                alignedPoint.y,
+              ],
+              strokeWidth: toolState.brush.width,
+              color: getCurrentFill(),
+              clip: getClip(selectedEntity.state),
+            });
+          } else {
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getObjectId('brush_line', true),
+              type: 'brush_line',
+              points: [alignedPoint.x, alignedPoint.y],
+              strokeWidth: toolState.brush.width,
+              color: getCurrentFill(),
+              clip: getClip(selectedEntity.state),
+            });
+          }
+          $lastAddedPoint.set(alignedPoint);
+        }
+
+        if (toolState.selected === 'eraser') {
+          const lastLinePoint = getLastPointOfLastLineOfEntity(selectedEntity.state, toolState.selected);
+          const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
+          if (e.evt.shiftKey && lastLinePoint) {
+            // Create a straight line from the last line point
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getObjectId('eraser_line', true),
+              type: 'eraser_line',
+              points: [
+                // The last point of the last line is already normalized to the entity's coordinates
+                lastLinePoint.x,
+                lastLinePoint.y,
+                alignedPoint.x,
+                alignedPoint.y,
+              ],
+              strokeWidth: toolState.eraser.width,
+              clip: getClip(selectedEntity.state),
+            });
+          } else {
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getObjectId('eraser_line', true),
+              type: 'eraser_line',
+              points: [alignedPoint.x, alignedPoint.y],
+              strokeWidth: toolState.eraser.width,
+              clip: getClip(selectedEntity.state),
+            });
+          }
+          $lastAddedPoint.set(alignedPoint);
+        }
+
+        if (toolState.selected === 'rect') {
           if (selectedEntity.adapter.renderer.bufferState) {
             selectedEntity.adapter.renderer.commitBuffer();
           }
-
           await selectedEntity.adapter.renderer.setBuffer({
-            id: getObjectId('brush_line', true),
-            type: 'brush_line',
-            points: [
-              // The last point of the last line is already normalized to the entity's coordinates
-              lastLinePoint.x,
-              lastLinePoint.y,
-              alignedPoint.x,
-              alignedPoint.y,
-            ],
-            strokeWidth: toolState.brush.width,
+            id: getObjectId('rect', true),
+            type: 'rect',
+            rect: { x: Math.round(normalizedPoint.x), y: Math.round(normalizedPoint.y), width: 0, height: 0 },
             color: getCurrentFill(),
-            clip: getClip(selectedEntity.state),
-          });
-        } else {
-          if (selectedEntity.adapter.renderer.bufferState) {
-            selectedEntity.adapter.renderer.commitBuffer();
-          }
-          await selectedEntity.adapter.renderer.setBuffer({
-            id: getObjectId('brush_line', true),
-            type: 'brush_line',
-            points: [alignedPoint.x, alignedPoint.y],
-            strokeWidth: toolState.brush.width,
-            color: getCurrentFill(),
-            clip: getClip(selectedEntity.state),
           });
         }
-        $lastAddedPoint.set(alignedPoint);
-      }
-
-      if (toolState.selected === 'eraser') {
-        const lastLinePoint = getLastPointOfLastLineOfEntity(selectedEntity.state, toolState.selected);
-        const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
-        if (e.evt.shiftKey && lastLinePoint) {
-          // Create a straight line from the last line point
-          if (selectedEntity.adapter.renderer.bufferState) {
-            selectedEntity.adapter.renderer.commitBuffer();
-          }
-          await selectedEntity.adapter.renderer.setBuffer({
-            id: getObjectId('eraser_line', true),
-            type: 'eraser_line',
-            points: [
-              // The last point of the last line is already normalized to the entity's coordinates
-              lastLinePoint.x,
-              lastLinePoint.y,
-              alignedPoint.x,
-              alignedPoint.y,
-            ],
-            strokeWidth: toolState.eraser.width,
-            clip: getClip(selectedEntity.state),
-          });
-        } else {
-          if (selectedEntity.adapter.renderer.bufferState) {
-            selectedEntity.adapter.renderer.commitBuffer();
-          }
-          await selectedEntity.adapter.renderer.setBuffer({
-            id: getObjectId('eraser_line', true),
-            type: 'eraser_line',
-            points: [alignedPoint.x, alignedPoint.y],
-            strokeWidth: toolState.eraser.width,
-            clip: getClip(selectedEntity.state),
-          });
-        }
-        $lastAddedPoint.set(alignedPoint);
-      }
-
-      if (toolState.selected === 'rect') {
-        if (selectedEntity.adapter.renderer.bufferState) {
-          selectedEntity.adapter.renderer.commitBuffer();
-        }
-        await selectedEntity.adapter.renderer.setBuffer({
-          id: getObjectId('rect', true),
-          type: 'rect',
-          rect: { x: Math.round(normalizedPoint.x), y: Math.round(normalizedPoint.y), width: 0, height: 0 },
-          color: getCurrentFill(),
-        });
       }
     }
-    manager.preview.tool.render();
   });
 
   //#region mouseup
@@ -307,8 +301,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     $isMouseDown.set(false);
     const pos = $lastCursorPos.get();
     const selectedEntity = getSelectedEntity();
-
-    if (pos && selectedEntity && isDrawableEntity(selectedEntity.state) && !$spaceKey.get()) {
+    const isDrawable = selectedEntity?.state.isEnabled;
+    if (pos && isDrawable && !$spaceKey.get()) {
       const toolState = getToolState();
 
       if (toolState.selected === 'brush') {
@@ -340,7 +334,6 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
 
       $lastMouseDownPos.set(null);
     }
-
     manager.preview.tool.render();
   });
 
@@ -353,104 +346,98 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     if (toolState.selected === 'eyeDropper') {
       const color = getColorUnderCursor(stage);
       manager.stateApi.$colorUnderCursor.set(color);
-    }
-
-    if (
-      pos &&
-      selectedEntity &&
-      isDrawableEntity(selectedEntity.state) &&
-      selectedEntity.adapter &&
-      isDrawableEntityAdapter(selectedEntity.adapter) &&
-      !$spaceKey.get() &&
-      getIsPrimaryMouseDown(e)
-    ) {
-      if (toolState.selected === 'brush') {
-        const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
-        if (drawingBuffer) {
-          if (drawingBuffer.type === 'brush_line') {
-            const lastPoint = getLastPointOfLine(drawingBuffer.points);
-            const nextPoint = getNextPoint(pos, toolState, lastPoint);
-            if (lastPoint && nextPoint) {
-              const normalizedPoint = offsetCoord(nextPoint, selectedEntity.state.position);
-              const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
-              // Do not add duplicate points
-              if (lastPoint.x !== alignedPoint.x || lastPoint.y !== alignedPoint.y) {
-                drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
-                await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
-                $lastAddedPoint.set(alignedPoint);
+    } else {
+      const isDrawable = selectedEntity?.state.isEnabled;
+      if (pos && isDrawable && !$spaceKey.get() && getIsPrimaryMouseDown(e)) {
+        if (toolState.selected === 'brush') {
+          const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
+          if (drawingBuffer) {
+            if (drawingBuffer.type === 'brush_line') {
+              const lastPoint = getLastPointOfLine(drawingBuffer.points);
+              const nextPoint = getNextPoint(pos, toolState, lastPoint);
+              if (lastPoint && nextPoint) {
+                const normalizedPoint = offsetCoord(nextPoint, selectedEntity.state.position);
+                const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+                // Do not add duplicate points
+                if (lastPoint.x !== alignedPoint.x || lastPoint.y !== alignedPoint.y) {
+                  drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
+                  await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+                  $lastAddedPoint.set(alignedPoint);
+                }
               }
+            } else {
+              selectedEntity.adapter.renderer.clearBuffer();
             }
           } else {
-            selectedEntity.adapter.renderer.clearBuffer();
-          }
-        } else {
-          if (selectedEntity.adapter.renderer.bufferState) {
-            selectedEntity.adapter.renderer.commitBuffer();
-          }
-          const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
-          const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
-          await selectedEntity.adapter.renderer.setBuffer({
-            id: getObjectId('brush_line', true),
-            type: 'brush_line',
-            points: [alignedPoint.x, alignedPoint.y],
-            strokeWidth: toolState.brush.width,
-            color: getCurrentFill(),
-            clip: getClip(selectedEntity.state),
-          });
-          $lastAddedPoint.set(alignedPoint);
-        }
-      }
-
-      if (toolState.selected === 'eraser') {
-        const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
-        if (drawingBuffer) {
-          if (drawingBuffer.type === 'eraser_line') {
-            const lastPoint = getLastPointOfLine(drawingBuffer.points);
-            const nextPoint = getNextPoint(pos, toolState, lastPoint);
-            if (lastPoint && nextPoint) {
-              const normalizedPoint = offsetCoord(nextPoint, selectedEntity.state.position);
-              const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
-              // Do not add duplicate points
-              if (lastPoint.x !== alignedPoint.x || lastPoint.y !== alignedPoint.y) {
-                drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
-                await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
-                $lastAddedPoint.set(alignedPoint);
-              }
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
             }
-          } else {
-            selectedEntity.adapter.renderer.clearBuffer();
-          }
-        } else {
-          if (selectedEntity.adapter.renderer.bufferState) {
-            selectedEntity.adapter.renderer.commitBuffer();
-          }
-          const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
-          const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
-          await selectedEntity.adapter.renderer.setBuffer({
-            id: getObjectId('eraser_line', true),
-            type: 'eraser_line',
-            points: [alignedPoint.x, alignedPoint.y],
-            strokeWidth: toolState.eraser.width,
-            clip: getClip(selectedEntity.state),
-          });
-          $lastAddedPoint.set(alignedPoint);
-        }
-      }
-
-      if (toolState.selected === 'rect') {
-        const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
-        if (drawingBuffer) {
-          if (drawingBuffer.type === 'rect') {
             const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
-            drawingBuffer.rect.width = Math.round(normalizedPoint.x - drawingBuffer.rect.x);
-            drawingBuffer.rect.height = Math.round(normalizedPoint.y - drawingBuffer.rect.y);
-            await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+            const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getObjectId('brush_line', true),
+              type: 'brush_line',
+              points: [alignedPoint.x, alignedPoint.y],
+              strokeWidth: toolState.brush.width,
+              color: getCurrentFill(),
+              clip: getClip(selectedEntity.state),
+            });
+            $lastAddedPoint.set(alignedPoint);
+          }
+        }
+
+        if (toolState.selected === 'eraser') {
+          const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
+          if (drawingBuffer) {
+            if (drawingBuffer.type === 'eraser_line') {
+              const lastPoint = getLastPointOfLine(drawingBuffer.points);
+              const nextPoint = getNextPoint(pos, toolState, lastPoint);
+              if (lastPoint && nextPoint) {
+                const normalizedPoint = offsetCoord(nextPoint, selectedEntity.state.position);
+                const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
+                // Do not add duplicate points
+                if (lastPoint.x !== alignedPoint.x || lastPoint.y !== alignedPoint.y) {
+                  drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
+                  await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+                  $lastAddedPoint.set(alignedPoint);
+                }
+              }
+            } else {
+              selectedEntity.adapter.renderer.clearBuffer();
+            }
           } else {
-            selectedEntity.adapter.renderer.clearBuffer();
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
+            const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
+            const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getObjectId('eraser_line', true),
+              type: 'eraser_line',
+              points: [alignedPoint.x, alignedPoint.y],
+              strokeWidth: toolState.eraser.width,
+              clip: getClip(selectedEntity.state),
+            });
+            $lastAddedPoint.set(alignedPoint);
+          }
+        }
+
+        if (toolState.selected === 'rect') {
+          const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
+          if (drawingBuffer) {
+            if (drawingBuffer.type === 'rect') {
+              const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
+              drawingBuffer.rect.width = Math.round(normalizedPoint.x - drawingBuffer.rect.x);
+              drawingBuffer.rect.height = Math.round(normalizedPoint.y - drawingBuffer.rect.y);
+              await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+            } else {
+              selectedEntity.adapter.renderer.clearBuffer();
+            }
           }
         }
       }
     }
+
     manager.preview.tool.render();
   });
 
@@ -461,14 +448,9 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     $lastMouseDownPos.set(null);
     const selectedEntity = getSelectedEntity();
     const toolState = getToolState();
+    const isDrawable = selectedEntity?.state.isEnabled;
 
-    if (
-      pos &&
-      selectedEntity &&
-      isDrawableEntity(selectedEntity.state) &&
-      !$spaceKey.get() &&
-      getIsPrimaryMouseDown(e)
-    ) {
+    if (pos && isDrawable && !$spaceKey.get() && getIsPrimaryMouseDown(e)) {
       const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
       const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
       if (toolState.selected === 'brush' && drawingBuffer?.type === 'brush_line') {
