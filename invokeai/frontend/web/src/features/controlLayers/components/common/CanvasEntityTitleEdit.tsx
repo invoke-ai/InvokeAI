@@ -1,21 +1,20 @@
 import { Input } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useBoolean } from 'common/hooks/useBoolean';
+import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityTitle } from 'features/controlLayers/hooks/useEntityTitle';
 import { entityNameChanged } from 'features/controlLayers/store/canvasV2Slice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
-type Props = {
-  onStopEditing: () => void;
-};
-
-export const CanvasEntityTitleEdit = memo(({ onStopEditing }: Props) => {
+export const CanvasEntityEditableTitle = memo(() => {
   const dispatch = useAppDispatch();
-  const ref = useRef<HTMLInputElement>(null);
   const entityIdentifier = useEntityIdentifierContext();
   const title = useEntityTitle(entityIdentifier);
+  const isEditing = useBoolean(false);
   const [localTitle, setLocalTitle] = useState(title);
+  const ref = useRef<HTMLInputElement>(null);
 
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setLocalTitle(e.target.value);
@@ -28,8 +27,8 @@ export const CanvasEntityTitleEdit = memo(({ onStopEditing }: Props) => {
     } else if (trimmedTitle !== title) {
       dispatch(entityNameChanged({ entityIdentifier, name: trimmedTitle }));
     }
-    onStopEditing();
-  }, [dispatch, entityIdentifier, localTitle, onStopEditing, title]);
+    isEditing.setFalse();
+  }, [dispatch, entityIdentifier, isEditing, localTitle, title]);
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -37,16 +36,22 @@ export const CanvasEntityTitleEdit = memo(({ onStopEditing }: Props) => {
         onBlur();
       } else if (e.key === 'Escape') {
         setLocalTitle(title);
-        onStopEditing();
+        isEditing.setFalse();
       }
     },
-    [onBlur, onStopEditing, title]
+    [isEditing, onBlur, title]
   );
 
   useEffect(() => {
-    ref.current?.focus();
-    ref.current?.select();
-  }, []);
+    if (isEditing.isTrue) {
+      ref.current?.focus();
+      ref.current?.select();
+    }
+  }, [isEditing.isTrue]);
+
+  if (!isEditing.isTrue) {
+    return <CanvasEntityTitle cursor="text" onDoubleClick={isEditing.setTrue} />;
+  }
 
   return (
     <Input
@@ -61,4 +66,4 @@ export const CanvasEntityTitleEdit = memo(({ onStopEditing }: Props) => {
   );
 });
 
-CanvasEntityTitleEdit.displayName = 'CanvasEntityTitleEdit';
+CanvasEntityEditableTitle.displayName = 'CanvasEntityTitleEdit';
