@@ -9,6 +9,8 @@ import { forEach } from 'lodash-es';
 import type { NonNullableGraph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
+const log = logger('workflows');
+
 /**
  * Converts a graph to a workflow. This is a best-effort conversion and may not be perfect.
  * For example, if a graph references an unknown node type, that node will be skipped.
@@ -43,7 +45,7 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
 
     // Skip missing node templates - this is a best-effort
     if (!template) {
-      logger('nodes').warn(`Node type ${node.type} not found in templates`);
+      log.warn(`Node type ${node.type} not found in templates`);
       return;
     }
 
@@ -60,7 +62,7 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
 
       // Skip missing input templates
       if (!inputTemplate) {
-        logger('nodes').warn(`Input ${key} not found in template for node type ${node.type}`);
+        log.warn(`Input ${key} not found in template for node type ${node.type}`);
         return;
       }
 

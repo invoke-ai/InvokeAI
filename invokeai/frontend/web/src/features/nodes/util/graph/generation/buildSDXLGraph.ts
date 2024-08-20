@@ -33,6 +33,7 @@ import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
+
 const log = logger('system');
 
 export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): Promise<Graph> => {
