@@ -41,6 +41,7 @@ export class CanvasEraserLineRenderer {
         name: `${this.type}:line`,
         listening: false,
         shadowForStrokeEnabled: false,
+        stroke: 'red', // Eraser lines use compositing, does not matter what color they have
         tension: 0.3,
         lineCap: 'round',
         lineJoin: 'round',
