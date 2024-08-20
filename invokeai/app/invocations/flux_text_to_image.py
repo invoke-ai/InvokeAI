@@ -17,9 +17,9 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.sampling import denoise, get_noise, get_schedule, unpack
+from invokeai.backend.model_manager.config import CheckpointConfigBase
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.model_manager.config import CheckpointConfigBase
 
 
 @invocation(
@@ -90,7 +90,11 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         img, img_ids = self._prepare_latent_img_patches(x)
 
         # HACK(ryand): Find a better way to determine if this is a schnell model or not.
-        is_schnell = "schnell" in transformer_info.config.config_path if transformer_info.config and isinstance(transformer_info.config, CheckpointConfigBase) else ""
+        is_schnell = (
+            "schnell" in transformer_info.config.config_path
+            if transformer_info.config and isinstance(transformer_info.config, CheckpointConfigBase)
+            else ""
+        )
         timesteps = get_schedule(
             num_steps=self.num_steps,
             image_seq_len=img.shape[1],
@@ -161,7 +165,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             latents.to(torch.float32)
             img = vae.decode(latents)
 
-        img.clamp(-1, 1)
+        img = img.clamp(-1, 1)
         img = rearrange(img[0], "c h w -> h w c")
         img_pil = Image.fromarray((127.5 * (img + 1.0)).byte().cpu().numpy())
 
