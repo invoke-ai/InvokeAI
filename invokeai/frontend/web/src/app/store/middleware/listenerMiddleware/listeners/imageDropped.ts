@@ -2,8 +2,13 @@ import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { parseify } from 'common/util/serialize';
-import { ipaImageChanged, rasterLayerAdded, rgIPAdapterImageChanged } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
+import {
+  controlLayerAdded,
+  ipaImageChanged,
+  rasterLayerAdded,
+  rgIPAdapterImageChanged,
+} from 'features/controlLayers/store/canvasV2Slice';
+import type { CanvasControlLayerState, CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
@@ -99,7 +104,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
        * Image dropped on Raster layer
        */
       if (
-        overData.actionType === 'ADD_LAYER_FROM_IMAGE' &&
+        overData.actionType === 'ADD_RASTER_LAYER_FROM_IMAGE' &&
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
@@ -110,6 +115,24 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
           position: { x, y },
         };
         dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+        return;
+      }
+
+      /**
+       * Image dropped on Raster layer
+       */
+      if (
+        overData.actionType === 'ADD_CONTROL_LAYER_FROM_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
+        const { x, y } = getState().canvasV2.bbox.rect;
+        const overrides: Partial<CanvasControlLayerState> = {
+          objects: [imageObject],
+          position: { x, y },
+        };
+        dispatch(controlLayerAdded({ overrides, isSelected: true }));
         return;
       }
 
