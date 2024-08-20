@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from diffusers.models.attention_processor import Attention
 from diffusers.utils.import_utils import is_xformers_available
 
+import invokeai.backend.util.logging as logger
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
 from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
@@ -77,12 +78,20 @@ class CustomAttnProcessor:
         if device.type == "mps":
             return "normal"
         elif device.type == "cuda":
+            # In testing on a Tesla P40 (Pascal architecture), torch-sdp is much slower than xformers
+            # (8.84 s/it vs. 1.81 s/it for SDXL). We have not tested extensively to find the precise GPU architecture or
+            # compute capability where this performance gap begins.
             # Flash Attention is supported from sm80 compute capability onwards in PyTorch
-            # https://pytorch.org/blog/accelerated-pytorch-2/
-            if self.is_old_cuda and xformers is not None:
-                return "xformers"
-            else:
-                return "torch-sdp"
+            # (https://pytorch.org/blog/accelerated-pytorch-2/). For now, we use this as the cutoff for selecting
+            # between xformers and torch-sdp.
+            if self.is_old_cuda:
+                if xformers is not None:
+                    return "xformers"
+                logger.warning(
+                    f"xFormers is not installed, but is recommended for best performance with GPU {torch.cuda.get_device_properties(device).name}"
+                )
+
+            return "torch-sdp"
         else:  # cpu
             return "torch-sdp"
 
@@ -478,7 +487,7 @@ class CustomAttnProcessor:
             value = self._head_to_batch_dim(value, head_dim)
 
             # attention mask already in shape [B*H, 1, S_key]/[B*H, S_query, S_key]
-            # and there no noticable changes from memory alignment:
+            # and there no noticable changes from memory alignment in batched run:
             # torch-sdp(dim3, mask):          9.7391905784606930 vram: 12713984
             # torch-sdp(dim3, aligned mask): 10.0090200901031500 vram: 12713984
 
