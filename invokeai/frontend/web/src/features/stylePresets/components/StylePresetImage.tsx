@@ -21,6 +21,7 @@ const StylePresetImage = ({ presetImageUrl, imageWidth }: { presetImageUrl: stri
           />
         )
       }
+      p={2}
     >
       <Image
         src={presetImageUrl || ''}
