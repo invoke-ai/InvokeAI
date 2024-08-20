@@ -930,10 +930,6 @@ export type CanvasV2State = {
     stagedImages: StagingAreaImage[];
     selectedStagedImageIndex: number;
   };
-  filter: {
-    autoProcess: boolean;
-    config: FilterConfig;
-  };
 };
 
 export type StageAttrs = {
