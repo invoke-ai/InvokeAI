@@ -1,15 +1,21 @@
-import { Button, ButtonGroup, Flex } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Heading } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { FilterSettings } from 'features/controlLayers/components/Filters/FilterSettings';
 import { FilterTypeSelect } from 'features/controlLayers/components/Filters/FilterTypeSelect';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { $filteringEntity } from 'features/controlLayers/store/canvasV2Slice';
+import { $filterConfig, $filteringEntity, $isProcessingFilter } from 'features/controlLayers/store/canvasV2Slice';
+import { type FilterConfig, IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PiCheckBold, PiShootingStarBold, PiXBold } from 'react-icons/pi';
 
 export const Filter = memo(() => {
+  const { t } = useTranslation();
   const filteringEntity = useStore($filteringEntity);
+  const filterConfig = useStore($filterConfig);
+  const isProcessingFilter = useStore($isProcessingFilter);
 
-  const preview = useCallback(() => {
+  const previewFilter = useCallback(() => {
     if (!filteringEntity) {
       return;
     }
@@ -24,7 +30,7 @@ export const Filter = memo(() => {
     entity.adapter.filter.previewFilter();
   }, [filteringEntity]);
 
-  const apply = useCallback(() => {
+  const applyFilter = useCallback(() => {
     if (!filteringEntity) {
       return;
     }
@@ -39,7 +45,7 @@ export const Filter = memo(() => {
     entity.adapter.filter.applyFilter();
   }, [filteringEntity]);
 
-  const cancel = useCallback(() => {
+  const cancelFilter = useCallback(() => {
     if (!filteringEntity) {
       return;
     }
@@ -54,21 +60,62 @@ export const Filter = memo(() => {
     entity.adapter.filter.cancelFilter();
   }, [filteringEntity]);
 
+  const onChangeFilterConfig = useCallback((filterConfig: FilterConfig) => {
+    $filterConfig.set(filterConfig);
+  }, []);
+
+  const onChangeFilterType = useCallback((filterType: FilterConfig['type']) => {
+    $filterConfig.set(IMAGE_FILTERS[filterType].buildDefaults());
+  }, []);
+
+  if (!filteringEntity || !filterConfig) {
+    return null;
+  }
+
   return (
-    <Flex flexDir="column" gap={3} w="full" h="full">
-      <FilterTypeSelect />
-      <ButtonGroup isAttached={false}>
-        <Button onClick={preview} isDisabled={!filteringEntity}>
-          Preview
+    <Flex
+      bg="base.800"
+      borderRadius="base"
+      p={4}
+      flexDir="column"
+      gap={4}
+      w={420}
+      h="auto"
+      shadow="dark-lg"
+      transitionProperty="height"
+      transitionDuration="normal"
+    >
+      <Heading size="md" color="base.300" userSelect="none">
+        {t('controlLayers.filter.filter')}
+      </Heading>
+      <FilterTypeSelect filterType={filterConfig.type} onChange={onChangeFilterType} />
+      <FilterSettings filterConfig={filterConfig} onChange={onChangeFilterConfig} />
+      <ButtonGroup isAttached={false} size="sm" alignSelf="self-end">
+        <Button
+          leftIcon={<PiShootingStarBold />}
+          onClick={previewFilter}
+          isLoading={isProcessingFilter}
+          loadingText={t('controlLayers.filter.preview')}
+        >
+          {t('controlLayers.filter.preview')}
         </Button>
-        <Button onClick={apply} isDisabled={!filteringEntity}>
-          Apply
+        <Button
+          leftIcon={<PiCheckBold />}
+          onClick={applyFilter}
+          isLoading={isProcessingFilter}
+          loadingText={t('controlLayers.filter.apply')}
+        >
+          {t('controlLayers.filter.apply')}
         </Button>
-        <Button onClick={cancel} isDisabled={!filteringEntity}>
-          Cancel
+        <Button
+          leftIcon={<PiXBold />}
+          onClick={cancelFilter}
+          isLoading={isProcessingFilter}
+          loadingText={t('controlLayers.filter.cancel')}
+        >
+          {t('controlLayers.filter.cancel')}
         </Button>
       </ButtonGroup>
-      <FilterSettings />
     </Flex>
   );
 });

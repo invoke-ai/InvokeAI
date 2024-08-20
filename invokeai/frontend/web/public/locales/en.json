@@ -1699,7 +1699,6 @@
         "objects_zero": "empty",
         "objects_one": "{{count}} object",
         "objects_other": "{{count}} objects",
-        "filter": "Filter",
         "convertToControlLayer": "Convert to Control Layer",
         "convertToRasterLayer": "Convert to Raster Layer",
         "enableTransparencyEffect": "Enable Transparency Effect",
@@ -1728,6 +1727,14 @@
             "solid": "Solid",
             "checkerboard": "Checkerboard",
             "dynamicGrid": "Dynamic Grid"
+        },
+        "filter": {
+            "filter": "Filter",
+            "filters": "Filters",
+            "filterType": "Filter Type",
+            "preview": "Preview",
+            "apply": "Apply",
+            "cancel": "Cancel"
         }
     },
     "upscaling": {
