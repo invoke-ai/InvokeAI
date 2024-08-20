@@ -104,9 +104,18 @@ def denoise(
     timesteps: list[float],
     guidance: float = 4.0,
 ):
+    dtype = model.txt_in.bias.dtype
+
+    # TODO(ryand): This shouldn't be necessary if we manage the dtypes properly in the caller.
+    img = img.to(dtype=dtype)
+    img_ids = img_ids.to(dtype=dtype)
+    txt = txt.to(dtype=dtype)
+    txt_ids = txt_ids.to(dtype=dtype)
+    vec = vec.to(dtype=dtype)
+
     # this is ignored for schnell
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
-    for t_curr, t_prev in zip(timesteps[:-1], timesteps[1:], strict=False):
+    for t_curr, t_prev in zip(timesteps[:-1], timesteps[1:], strict=True):
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
         pred = model(
             img=img,
