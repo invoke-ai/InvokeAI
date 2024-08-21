@@ -178,7 +178,7 @@ class FluxModelLoaderInvocation(BaseInvocation):
     )
 
     t5_encoder: ModelIdentifierField = InputField(
-        description=FieldDescriptions.t5Encoder,
+        description=FieldDescriptions.t5_encoder,
         ui_type=UIType.T5EncoderModel,
         input=Input.Direct,
     )
