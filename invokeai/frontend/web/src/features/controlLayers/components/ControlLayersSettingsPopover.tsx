@@ -14,11 +14,7 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { CanvasSettingsBackgroundStyle } from 'features/controlLayers/components/CanvasSettingsBackgroundStyle';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
-import {
-  clipToBboxChanged,
-  invertScrollChanged,
-  rasterizationCachesInvalidated,
-} from 'features/controlLayers/store/canvasV2Slice';
+import { clipToBboxChanged, invertScrollChanged } from 'features/controlLayers/store/canvasV2Slice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,23 +34,22 @@ const ControlLayersSettingsPopover = () => {
     (e: ChangeEvent<HTMLInputElement>) => dispatch(clipToBboxChanged(e.target.checked)),
     [dispatch]
   );
-  const invalidateRasterizationCaches = useCallback(() => {
-    dispatch(rasterizationCachesInvalidated());
-  }, [dispatch]);
+  const clearCaches = useCallback(() => {
+    canvasManager?.clearCaches();
+  }, [canvasManager]);
   const calculateBboxes = useCallback(() => {
     if (!canvasManager) {
       return;
     }
-    for (const adapter of canvasManager.rasterLayerAdapters.values()) {
+    const adapters = [
+      ...canvasManager.rasterLayerAdapters.values(),
+      ...canvasManager.controlLayerAdapters.values(),
+      ...canvasManager.regionalGuidanceAdapters.values(),
+      ...canvasManager.inpaintMaskAdapters.values(),
+    ];
+    for (const adapter of adapters) {
       adapter.transformer.requestRectCalculation();
     }
-    for (const adapter of canvasManager.controlLayerAdapters.values()) {
-      adapter.transformer.requestRectCalculation();
-    }
-    for (const adapter of canvasManager.regionalGuidanceAdapters.values()) {
-      adapter.transformer.requestRectCalculation();
-    }
-    canvasManager.inpaintMaskAdapters.transformer.requestRectCalculation();
   }, [canvasManager]);
   return (
     <Popover isLazy>
@@ -73,8 +68,8 @@ const ControlLayersSettingsPopover = () => {
               <Checkbox isChecked={clipToBbox} onChange={onChangeClipToBbox} />
             </FormControl>
             <CanvasSettingsBackgroundStyle />
-            <Button onClick={invalidateRasterizationCaches} size="sm">
-              Invalidate Rasterization Caches
+            <Button onClick={clearCaches} size="sm">
+              Clear Caches
             </Button>
             <Button onClick={calculateBboxes} size="sm">
               Calculate Bboxes

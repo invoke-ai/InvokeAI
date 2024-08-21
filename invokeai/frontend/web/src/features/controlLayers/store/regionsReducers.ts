@@ -75,7 +75,6 @@ export const regionsReducers = {
         positivePrompt: '',
         negativePrompt: null,
         ipAdapters: [],
-        rasterizationCache: {},
       };
       state.regions.entities.push(rg);
       state.selectedEntityIdentifier = { type: 'regional_guidance', id };
