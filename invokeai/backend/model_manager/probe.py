@@ -224,6 +224,7 @@ class ModelProbe(object):
 
         for key in [str(k) for k in ckpt.keys()]:
             if key.startswith(("cond_stage_model.", "first_stage_model.", "model.diffusion_model.", "double_blocks.")):
+                # Keys starting with double_blocks are associated with Flux models
                 return ModelType.Main
             elif key.startswith(("encoder.conv_in", "decoder.conv_in")):
                 return ModelType.VAE
