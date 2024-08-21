@@ -21,6 +21,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 )
 class FluxTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for a flux image."""
+
     clip: CLIPField = InputField(
         title="CLIP",
         description=FieldDescriptions.clip,
@@ -28,7 +29,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
     )
     t5_encoder: T5EncoderField = InputField(
         title="T5Encoder",
-        description=FieldDescriptions.t5Encoder,
+        description=FieldDescriptions.t5_encoder,
         input=Input.Connection,
     )
     max_seq_len: Literal[256, 512] = InputField(description="Max sequence length for the desired flux model")

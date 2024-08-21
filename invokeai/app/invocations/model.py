@@ -162,7 +162,7 @@ class FluxModelLoaderOutput(BaseInvocationOutput):
 
     transformer: TransformerField = OutputField(description=FieldDescriptions.transformer, title="Transformer")
     clip: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP")
-    t5_encoder: T5EncoderField = OutputField(description=FieldDescriptions.t5Encoder, title="T5 Encoder")
+    t5_encoder: T5EncoderField = OutputField(description=FieldDescriptions.t5_encoder, title="T5 Encoder")
     vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
     max_seq_len: Literal[256, 512] = OutputField(description=FieldDescriptions.vae, title="Max Seq Length")
 
