@@ -464,29 +464,6 @@ class ModelsInterface(InvocationContextInterface):
         """
         return self._services.model_manager.install.download_and_cache_model(source=source)
 
-    def import_local_model(
-        self,
-        model_path: Path,
-        config: Optional[ModelRecordChanges] = None,
-        inplace: Optional[bool] = False,
-    ):
-        """
-        Import the model file located at the given local file path and return its ModelInstallJob.
-
-        This can be used to single-file models or directories.
-
-        Args:
-            model_path: A pathlib.Path object pointing to a model file or directory
-            config: Optional ModelRecordChanges to define manual probe overrides
-            inplace: Optional boolean to declare whether or not to install the model in the models dir
-
-        Returns:
-            ModelInstallJob object defining the install job to be used in tracking the job
-        """
-        if not model_path.exists():
-            raise ValueError(f"Models provided to import_local_model must already exist on disk at {model_path.as_posix()}")
-        return self._services.model_manager.install.heuristic_import(str(model_path), config=config, inplace=inplace)
-
     def load_local_model(
         self,
         model_path: Path,
