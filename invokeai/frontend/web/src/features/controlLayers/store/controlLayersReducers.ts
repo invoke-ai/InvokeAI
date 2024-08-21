@@ -40,7 +40,6 @@ export const controlLayersReducers = {
         objects: [],
         opacity: 1,
         position: { x: 0, y: 0 },
-        rasterizationCache: {},
         controlAdapter: deepClone(initialControlNetV2),
       };
       merge(layer, overrides);
@@ -81,9 +80,6 @@ export const controlLayersReducers = {
 
       // Add the new raster layer
       state.rasterLayers.entities.push(rasterLayerState);
-
-      // The composite layer's image data will change when the control layer is converted to raster layer.
-      state.rasterLayers.compositeRasterizationCache = {};
 
       state.selectedEntityIdentifier = { type: rasterLayerState.type, id: rasterLayerState.id };
     },

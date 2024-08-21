@@ -1,4 +1,4 @@
-import type { JSONObject } from 'common/types';
+import type { JSONObject, SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
@@ -13,8 +13,9 @@ import type {
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
-import { get } from 'lodash-es';
+import { get, omit } from 'lodash-es';
 import type { Logger } from 'roarr';
+import stableHash from 'stable-hash';
 
 export class CanvasMaskAdapter {
   readonly type = 'mask_adapter';
@@ -143,9 +144,23 @@ export class CanvasMaskAdapter {
     };
   };
 
-  getCanvas = (rect: Rect): HTMLCanvasElement => {
+  getHashableState = (): SerializableObject => {
+    const keysToOmit: (keyof CanvasMaskAdapter['state'])[] = ['fill', 'name', 'opacity'];
+    return omit(this.state, keysToOmit);
+  };
+
+  hash = (extra?: SerializableObject): string => {
+    const arg = {
+      state: this.getHashableState(),
+      extra,
+    };
+    return stableHash(arg);
+  };
+
+  getCanvas = (rect?: Rect): HTMLCanvasElement => {
     // TODO(psyche): Cache this?
-    // Backend expects masks to be fully opaque
+    // The opacity may have been changed in response to user selecting a different entity category, and the mask regions
+    // should be fully opaque - set opacity to 1 before rendering the canvas
     const attrs: GroupConfig = { opacity: 1 };
     const canvas = this.renderer.getCanvas(rect, attrs);
     return canvas;

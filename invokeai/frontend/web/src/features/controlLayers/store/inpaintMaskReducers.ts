@@ -33,7 +33,6 @@ export const inpaintMaskReducers = {
         objects: [],
         opacity: 1,
         position: { x: 0, y: 0 },
-        rasterizationCache: {},
         fill: {
           style: 'diagonal',
           color: { r: 255, g: 122, b: 0 }, // some orange color
@@ -69,9 +68,5 @@ export const inpaintMaskReducers = {
       return;
     }
     entity.fill.style = style;
-  },
-  inpaintMaskCompositeRasterized: (state, action: PayloadAction<{ hash: string; imageName: string }>) => {
-    const { hash, imageName } = action.payload;
-    state.inpaintMasks.compositeRasterizationCache[hash] = imageName;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
