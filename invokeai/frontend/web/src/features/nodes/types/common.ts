@@ -74,6 +74,7 @@ const zModelType = z.enum([
   'clip_vision',
   'spandrel_image_to_image',
   't5_encoder',
+  'clip_embed',
 ]);
 const zSubModelType = z.enum([
   'unet',
