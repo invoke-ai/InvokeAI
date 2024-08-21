@@ -7,6 +7,7 @@ import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/c
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { ControlLayerControlAdapter } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapter';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { EntityLayerAdapterProviderGate } from 'features/controlLayers/hooks/useEntityLayerAdapter';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
@@ -19,17 +20,19 @@ export const ControlLayer = memo(({ id }: Props) => {
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <CanvasEntityContainer>
-        <CanvasEntityHeader>
-          <CanvasEntityEnabledToggle />
-          <CanvasEntityEditableTitle />
-          <Spacer />
-          <CanvasEntityDeleteButton />
-        </CanvasEntityHeader>
-        <CanvasEntitySettingsWrapper>
-          <ControlLayerControlAdapter />
-        </CanvasEntitySettingsWrapper>
-      </CanvasEntityContainer>
+      <EntityLayerAdapterProviderGate>
+        <CanvasEntityContainer>
+          <CanvasEntityHeader>
+            <CanvasEntityEnabledToggle />
+            <CanvasEntityEditableTitle />
+            <Spacer />
+            <CanvasEntityDeleteButton />
+          </CanvasEntityHeader>
+          <CanvasEntitySettingsWrapper>
+            <ControlLayerControlAdapter />
+          </CanvasEntitySettingsWrapper>
+        </CanvasEntityContainer>
+      </EntityLayerAdapterProviderGate>
     </EntityIdentifierContext.Provider>
   );
 });
