@@ -843,15 +843,19 @@ export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
   inpaintMasks: {
+    isHidden: boolean;
     entities: CanvasInpaintMaskState[];
   };
   rasterLayers: {
+    isHidden: boolean;
     entities: CanvasRasterLayerState[];
   };
   controlLayers: {
+    isHidden: boolean;
     entities: CanvasControlLayerState[];
   };
   regions: {
+    isHidden: boolean;
     entities: CanvasRegionalGuidanceState[];
   };
   ipAdapters: {

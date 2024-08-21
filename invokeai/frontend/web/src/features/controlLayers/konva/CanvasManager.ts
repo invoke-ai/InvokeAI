@@ -319,6 +319,12 @@ export class CanvasManager {
       this.background.render();
     }
 
+    if (isFirstRender || state.rasterLayers.isHidden !== prevState.rasterLayers.isHidden) {
+      for (const adapter of this.rasterLayerAdapters.values()) {
+        adapter.renderer.updateOpacity(state.rasterLayers.isHidden ? 0 : adapter.state.opacity);
+      }
+    }
+
     if (isFirstRender || state.rasterLayers.entities !== prevState.rasterLayers.entities) {
       this.log.debug('Rendering raster layers');
 
@@ -344,6 +350,12 @@ export class CanvasManager {
       }
     }
 
+    if (isFirstRender || state.controlLayers.isHidden !== prevState.controlLayers.isHidden) {
+      for (const adapter of this.controlLayerAdapters.values()) {
+        adapter.renderer.updateOpacity(state.controlLayers.isHidden ? 0 : adapter.state.opacity);
+      }
+    }
+
     if (isFirstRender || state.controlLayers.entities !== prevState.controlLayers.entities) {
       this.log.debug('Rendering control layers');
 
@@ -366,6 +378,12 @@ export class CanvasManager {
           toolState: state.tool,
           isSelected: state.selectedEntityIdentifier?.id === entityState.id,
         });
+      }
+    }
+
+    if (isFirstRender || state.regions.isHidden !== prevState.regions.isHidden) {
+      for (const adapter of this.regionalGuidanceAdapters.values()) {
+        adapter.renderer.updateOpacity(state.regions.isHidden ? 0 : adapter.state.opacity);
       }
     }
 
@@ -397,6 +415,12 @@ export class CanvasManager {
           toolState: state.tool,
           isSelected: state.selectedEntityIdentifier?.id === entityState.id,
         });
+      }
+    }
+
+    if (isFirstRender || state.inpaintMasks.isHidden !== prevState.inpaintMasks.isHidden) {
+      for (const adapter of this.inpaintMaskAdapters.values()) {
+        adapter.renderer.updateOpacity(state.inpaintMasks.isHidden ? 0 : adapter.state.opacity);
       }
     }
 
@@ -634,10 +658,10 @@ export class CanvasManager {
         this.log.warn({ id }, 'Raster layer adapter not found');
         continue;
       }
-        this.log.trace({ id }, 'Drawing raster layer to composite canvas');
-        const adapterCanvas = adapter.getCanvas(rect);
-        ctx.drawImage(adapterCanvas, 0, 0);
-      }
+      this.log.trace({ id }, 'Drawing raster layer to composite canvas');
+      const adapterCanvas = adapter.getCanvas(rect);
+      ctx.drawImage(adapterCanvas, 0, 0);
+    }
     this.canvasCache.set(hash, canvas);
     return canvas;
   };
@@ -666,10 +690,10 @@ export class CanvasManager {
         this.log.warn({ id }, 'Inpaint mask adapter not found');
         continue;
       }
-        this.log.trace({ id }, 'Drawing inpaint mask to composite canvas');
-        const adapterCanvas = adapter.getCanvas(rect);
-        ctx.drawImage(adapterCanvas, 0, 0);
-      }
+      this.log.trace({ id }, 'Drawing inpaint mask to composite canvas');
+      const adapterCanvas = adapter.getCanvas(rect);
+      ctx.drawImage(adapterCanvas, 0, 0);
+    }
     this.canvasCache.set(hash, canvas);
     return canvas;
   };
