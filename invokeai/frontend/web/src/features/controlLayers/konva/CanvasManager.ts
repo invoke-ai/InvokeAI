@@ -454,6 +454,10 @@ export class CanvasManager {
       this.log.debug('Arranging entities');
       await this.arrangeEntities();
     }
+
+    if (isFirstRender) {
+      $canvasManager.set(this);
+    }
   };
 
   initialize = () => {
