@@ -1,5 +1,3 @@
-import time
-from contextlib import contextmanager
 from pathlib import Path
 
 import accelerate
@@ -7,17 +5,7 @@ from diffusers.models.transformers.transformer_flux import FluxTransformer2DMode
 from safetensors.torch import load_file, save_file
 
 from invokeai.backend.quantization.bnb_llm_int8 import quantize_model_llm_int8
-
-
-@contextmanager
-def log_time(name: str):
-    """Helper context manager to log the time taken by a block of code."""
-    start = time.time()
-    try:
-        yield None
-    finally:
-        end = time.time()
-        print(f"'{name}' took {end - start:.4f} secs")
+from invokeai.backend.quantization.load_flux_model_bnb_nf4 import log_time
 
 
 def main():
