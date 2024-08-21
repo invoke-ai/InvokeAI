@@ -29,15 +29,15 @@ export const useEntityTitle = (entityIdentifier: CanvasEntityIdentifier) => {
 
     const parts: string[] = [];
     if (entityIdentifier.type === 'inpaint_mask') {
-      parts.push(t('controlLayers.inpaintMask'));
+      parts.push(t('controlLayers.inpaintMask', { count: 1 }));
     } else if (entityIdentifier.type === 'control_layer') {
-      parts.push(t('controlLayers.controlLayer'));
+      parts.push(t('controlLayers.controlLayer', { count: 1 }));
     } else if (entityIdentifier.type === 'raster_layer') {
-      parts.push(t('controlLayers.rasterLayer'));
+      parts.push(t('controlLayers.rasterLayer', { count: 1 }));
     } else if (entityIdentifier.type === 'ip_adapter') {
-      parts.push(t('common.ipAdapter'));
+      parts.push(t('common.ipAdapter', { count: 1 }));
     } else if (entityIdentifier.type === 'regional_guidance') {
-      parts.push(t('controlLayers.regionalGuidance'));
+      parts.push(t('controlLayers.regionalGuidance', { count: 1 }));
     } else {
       assert(false, 'Unexpected entity type');
     }
