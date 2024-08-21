@@ -41,6 +41,7 @@ import type {
 import { z } from 'zod';
 
 export const zId = z.string().min(1);
+export const zName = z.string().min(1).nullable();
 
 export const zImageWithDims = z.object({
   image_name: z.string(),
@@ -592,7 +593,7 @@ export type IPAdapterConfig = z.infer<typeof zIPAdapterConfig>;
 
 export const zCanvasIPAdapterState = z.object({
   id: zId,
-  name: z.string().nullable(),
+  name: zName,
   type: z.literal('ip_adapter'),
   isEnabled: z.boolean(),
   ipAdapter: zIPAdapterConfig,
@@ -665,7 +666,7 @@ export type RegionalGuidanceIPAdapterConfig = z.infer<typeof zRegionalGuidanceIP
 
 export const zCanvasRegionalGuidanceState = z.object({
   id: zId,
-  name: z.string().nullable(),
+  name: zName,
   type: z.literal('regional_guidance'),
   isEnabled: z.boolean(),
   position: zCoordinate,
@@ -681,7 +682,8 @@ export const zCanvasRegionalGuidanceState = z.object({
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
 
 const zCanvasInpaintMaskState = z.object({
-  id: z.literal('inpaint_mask'),
+  id: zId,
+  name: zName,
   type: z.literal('inpaint_mask'),
   isEnabled: z.boolean(),
   position: zCoordinate,
@@ -742,7 +744,7 @@ export type T2IAdapterConfig = z.infer<typeof zT2IAdapterConfig>;
 
 export const zCanvasRasterLayerState = z.object({
   id: zId,
-  name: z.string().nullable(),
+  name: zName,
   type: z.literal('raster_layer'),
   isEnabled: z.boolean(),
   position: zCoordinate,
@@ -848,7 +850,7 @@ export const isCanvasBackgroundStyle = (v: unknown): v is CanvasBackgroundStyle 
 export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
-  inpaintMask: CanvasInpaintMaskState;
+  inpaintMasks: { entities: CanvasInpaintMaskState[]; compositeRasterizationCache: ImageCache[] };
   rasterLayers: { entities: CanvasRasterLayerState[]; compositeRasterizationCache: ImageCache[] };
   controlLayers: { entities: CanvasControlLayerState[] };
   ipAdapters: { entities: CanvasIPAdapterState[] };

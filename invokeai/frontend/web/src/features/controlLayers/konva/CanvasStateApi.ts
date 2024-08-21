@@ -27,6 +27,7 @@ import {
   entitySelected,
   eraserWidthChanged,
   fillChanged,
+  inpaintMaskCompositeRasterized,
   rasterLayerCompositeRasterized,
   toolBufferChanged,
   toolChanged,
@@ -110,8 +111,11 @@ export class CanvasStateApi {
   rasterizeEntity = (arg: EntityRasterizedPayload) => {
     this._store.dispatch(entityRasterized(arg));
   };
-  compositeLayerRasterized = (arg: { imageName: string; rect: Rect }) => {
+  compositeRasterLayerRasterized = (arg: { imageName: string; rect: Rect }) => {
     this._store.dispatch(rasterLayerCompositeRasterized(arg));
+  };
+  compositeInpaintMaskRasterized = (arg: { imageName: string; rect: Rect }) => {
+    this._store.dispatch(inpaintMaskCompositeRasterized(arg));
   };
   setSelectedEntity = (arg: EntityIdentifierPayload) => {
     this._store.dispatch(entitySelected(arg));
@@ -154,8 +158,8 @@ export class CanvasStateApi {
   getControlLayersState = () => {
     return this.getState().controlLayers;
   };
-  getInpaintMaskState = () => {
-    return this.getState().inpaintMask;
+  getInpaintMasksState = () => {
+    return this.getState().inpaintMasks;
   };
   getSession = () => {
     return this.getState().session;
@@ -183,8 +187,8 @@ export class CanvasStateApi {
       entityState = state.regions.entities.find((i) => i.id === identifier.id) ?? null;
       entityAdapter = this.manager.regionalGuidanceAdapters.get(identifier.id) ?? null;
     } else if (identifier.type === 'inpaint_mask') {
-      entityState = state.inpaintMask;
-      entityAdapter = this.manager.inpaintMaskAdapter;
+      entityState = state.inpaintMasks.entities.find((i) => i.id === identifier.id) ?? null;
+      entityAdapter = this.manager.inpaintMaskAdapters.get(identifier.id) ?? null;
     }
 
     if (entityState && entityAdapter) {

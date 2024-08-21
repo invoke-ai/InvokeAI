@@ -1,13 +1,13 @@
 import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIColorPicker from 'common/components/IAIColorPicker';
+import RgbColorPicker from 'common/components/RgbColorPicker';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { stopPropagation } from 'common/util/stopPropagation';
 import { MaskFillStyle } from 'features/controlLayers/components/common/MaskFillStyle';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rgFillColorChanged, rgFillStyleChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { selectRegionalGuidanceEntityOrThrow } from 'features/controlLayers/store/regionsReducers';
-import type { FillStyle, RgbaColor } from 'features/controlLayers/store/types';
+import type { FillStyle, RgbColor } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,7 +17,7 @@ export const RegionalGuidanceMaskFillColorPicker = memo(() => {
   const dispatch = useAppDispatch();
   const fill = useAppSelector((s) => selectRegionalGuidanceEntityOrThrow(s.canvasV2, entityIdentifier.id).fill);
   const onChangeFillColor = useCallback(
-    (color: RgbaColor) => {
+    (color: RgbColor) => {
       dispatch(rgFillColorChanged({ id: entityIdentifier.id, color }));
     },
     [dispatch, entityIdentifier.id]
@@ -46,7 +46,7 @@ export const RegionalGuidanceMaskFillColorPicker = memo(() => {
       <PopoverContent>
         <PopoverBody minH={64}>
           <Flex flexDir="column" gap={4}>
-            <IAIColorPicker color={fill.color} onChange={onChangeFillColor} withNumberInput />
+            <RgbColorPicker color={fill.color} onChange={onChangeFillColor} withNumberInput />
             <MaskFillStyle style={fill.style} onChange={onChangeFillStyle} />
           </Flex>
         </PopoverBody>
