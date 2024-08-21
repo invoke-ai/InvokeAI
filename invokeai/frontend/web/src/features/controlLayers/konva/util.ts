@@ -3,7 +3,6 @@ import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
 import { customAlphabet } from 'nanoid';
-import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
 /**
@@ -399,5 +398,3 @@ export const getRectUnion = (...rects: Rect[]): Rect => {
   }, getEmptyRect());
   return rect;
 };
-
-export const getHash = stableHash;

@@ -1,4 +1,4 @@
-import type { JSONObject } from 'common/types';
+import type { JSONObject, SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
@@ -12,8 +12,11 @@ import type {
 } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import Konva from 'konva';
-import { get } from 'lodash-es';
+import type { GroupConfig } from 'konva/lib/Group';
+import { get, omit } from 'lodash-es';
 import type { Logger } from 'roarr';
+import stableHash from 'stable-hash';
+import { assert } from 'tsafe';
 
 export class CanvasLayerAdapter {
   readonly type = 'layer_adapter';
@@ -147,11 +150,34 @@ export class CanvasLayerAdapter {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 
-  getCanvas = (rect: Rect): HTMLCanvasElement => {
+  getCanvas = (rect?: Rect): HTMLCanvasElement => {
     // TODO(psyche) - cache this - maybe with package `memoizee`? Would require careful review of cache invalidation
     this.log.trace({ rect }, 'Getting canvas');
-    const canvas = this.renderer.getCanvas(rect);
+    // The opacity may have been changed in response to user selecting a different entity category, so we must restore
+    // the original opacity before rendering the canvas
+    const attrs: GroupConfig = { opacity: this.state.opacity };
+    const canvas = this.renderer.getCanvas(rect, attrs);
     return canvas;
+  };
+
+  getHashableState = (): SerializableObject => {
+    if (this.state.type === 'control_layer') {
+      const keysToOmit: (keyof CanvasControlLayerState)[] = ['name', 'controlAdapter', 'withTransparencyEffect'];
+      return omit(this.state, keysToOmit);
+    } else if (this.state.type === 'raster_layer') {
+      const keysToOmit: (keyof CanvasRasterLayerState)[] = ['name'];
+      return omit(this.state, keysToOmit);
+    } else {
+      assert(false, 'Unexpected layer type');
+    }
+  };
+
+  hash = (extra?: SerializableObject): string => {
+    const arg = {
+      state: this.getHashableState(),
+      extra,
+    };
+    return stableHash(arg);
   };
 
   logDebugInfo(msg = 'Debug info') {
