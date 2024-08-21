@@ -1678,6 +1678,7 @@
         "controlLayers_withCount": "Control Layers ({{count}})",
         "rasterLayers_withCount": "Raster Layers ({{count}})",
         "ipAdapters_withCount": "IP Adapters ({{count}})",
+        "inpaintMasks_withCount": "Inpaint Masks ({{count}})",
         "globalControlAdapter": "Global $t(controlnet.controlAdapter_one)",
         "globalControlAdapterLayer": "Global $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
         "globalIPAdapter": "Global $t(common.ipAdapter)",
