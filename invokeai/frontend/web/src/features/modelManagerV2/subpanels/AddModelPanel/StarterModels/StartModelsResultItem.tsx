@@ -12,10 +12,18 @@ type Props = {
 export const StarterModelsResultItem = memo(({ result }: Props) => {
   const { t } = useTranslation();
   const allSources = useMemo(() => {
-    const _allSources = [{ source: result.source, config: { name: result.name, description: result.description } }];
+    const _allSources = [
+      {
+        source: result.source,
+        config: { name: result.name, description: result.description, type: result.type, base: result.base },
+      },
+    ];
     if (result.dependencies) {
       for (const d of result.dependencies) {
-        _allSources.push({ source: d.source, config: { name: d.name, description: d.description } });
+        _allSources.push({
+          source: d.source,
+          config: { name: d.name, description: d.description, type: d.type, base: d.base },
+        });
       }
     }
     return _allSources;
