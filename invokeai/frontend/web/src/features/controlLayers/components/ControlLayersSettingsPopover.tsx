@@ -54,7 +54,7 @@ const ControlLayersSettingsPopover = () => {
     for (const adapter of canvasManager.regionalGuidanceAdapters.values()) {
       adapter.transformer.requestRectCalculation();
     }
-    canvasManager.inpaintMaskAdapter.transformer.requestRectCalculation();
+    canvasManager.inpaintMaskAdapters.transformer.requestRectCalculation();
   }, [canvasManager]);
   return (
     <Popover isLazy>

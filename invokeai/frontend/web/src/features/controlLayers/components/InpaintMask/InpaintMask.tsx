@@ -1,36 +1,32 @@
-import { Flex, Spacer } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+import { Spacer } from '@invoke-ai/ui-library';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
-import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
-import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
+import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import { InpaintMaskMaskFillColorPicker } from './InpaintMaskMaskFillColorPicker';
 
-export const InpaintMask = memo(() => {
-  const { t } = useTranslation();
-  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id: 'inpaint_mask', type: 'inpaint_mask' }), []);
-  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'inpaint_mask'));
+type Props = {
+  id: string;
+};
+
+export const InpaintMask = memo(({ id }: Props) => {
+  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'inpaint_mask' }), [id]);
 
   return (
-    <Flex flexDir="column" gap={2}>
-      <CanvasEntityGroupList title={t('controlLayers.inpaintMask')} isSelected={isSelected} type="inpaint_mask" />
-      <EntityIdentifierContext.Provider value={entityIdentifier}>
-        <CanvasEntityContainer>
-          <CanvasEntityHeader>
-            <CanvasEntityEnabledToggle />
-            <CanvasEntityTitle />
-            <Spacer />
-            <InpaintMaskMaskFillColorPicker />
-          </CanvasEntityHeader>
-        </CanvasEntityContainer>
-      </EntityIdentifierContext.Provider>
-    </Flex>
+    <EntityIdentifierContext.Provider value={entityIdentifier}>
+      <CanvasEntityContainer>
+        <CanvasEntityHeader>
+          <CanvasEntityEnabledToggle />
+          <CanvasEntityEditableTitle />
+          <Spacer />
+          <InpaintMaskMaskFillColorPicker />
+        </CanvasEntityHeader>
+      </CanvasEntityContainer>
+    </EntityIdentifierContext.Provider>
   );
 });
 
