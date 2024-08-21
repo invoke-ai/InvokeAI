@@ -33,7 +33,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Text-to-image generation using a FLUX model."""
 
     transformer: TransformerField = InputField(
-        description=FieldDescriptions.unet,
+        description=FieldDescriptions.flux_model,
         input=Input.Connection,
         title="Transformer",
     )
@@ -46,10 +46,12 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
-    num_steps: int = InputField(default=4, description="Number of diffusion steps.")
+    num_steps: int = InputField(
+        default=4, description="Number of diffusion steps. Recommend values are schnell: 4, dev: 50."
+    )
     guidance: float = InputField(
         default=4.0,
-        description="The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images.",
+        description="The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images. FLUX dev only, ignored for schnell.",
     )
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 

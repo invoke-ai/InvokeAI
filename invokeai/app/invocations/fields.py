@@ -135,7 +135,7 @@ class FieldDescriptions:
     vae_model = "VAE model to load"
     lora_model = "LoRA model to load"
     main_model = "Main model (UNet, VAE, CLIP) to load"
-    flux_model = "Flux model (Transformer, VAE, CLIP) to load"
+    flux_model = "Flux model (Transformer) to load"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
