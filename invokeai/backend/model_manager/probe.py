@@ -107,6 +107,7 @@ class ModelProbe(object):
         "ControlNetModel": ModelType.ControlNet,
         "CLIPVisionModelWithProjection": ModelType.CLIPVision,
         "T2IAdapter": ModelType.T2IAdapter,
+        "CLIPModel": ModelType.CLIPEmbed,
     }
 
     @classmethod
