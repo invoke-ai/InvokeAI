@@ -24,8 +24,6 @@ import {
   entitySelected,
   eraserWidthChanged,
   fillChanged,
-  inpaintMaskCompositeRasterized,
-  rasterLayerCompositeRasterized,
   toolBufferChanged,
   toolChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
@@ -107,12 +105,6 @@ export class CanvasStateApi {
   };
   rasterizeEntity = (arg: EntityRasterizedPayload) => {
     this._store.dispatch(entityRasterized(arg));
-  };
-  compositeRasterLayerRasterized = (arg: { hash: string; imageName: string }) => {
-    this._store.dispatch(rasterLayerCompositeRasterized(arg));
-  };
-  compositeInpaintMaskRasterized = (arg: { hash: string; imageName: string }) => {
-    this._store.dispatch(inpaintMaskCompositeRasterized(arg));
   };
   setSelectedEntity = (arg: EntityIdentifierPayload) => {
     this._store.dispatch(entitySelected(arg));

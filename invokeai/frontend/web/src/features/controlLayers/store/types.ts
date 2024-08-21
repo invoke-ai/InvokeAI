@@ -648,9 +648,6 @@ export const isFillStyle = (v: unknown): v is FillStyle => zFillStyle.safeParse(
 const zFill = z.object({ style: zFillStyle, color: zRgbColor });
 export type Fill = z.infer<typeof zFill>;
 
-const zImageCache = z.record(z.string()).default({});
-export type ImageCache = z.infer<typeof zImageCache>;
-
 const zRegionalGuidanceIPAdapterConfig = z.object({
   id: zId,
   image: zImageWithDims.nullable(),
@@ -675,7 +672,6 @@ export const zCanvasRegionalGuidanceState = z.object({
   negativePrompt: zParameterNegativePrompt.nullable(),
   ipAdapters: z.array(zRegionalGuidanceIPAdapterConfig),
   autoNegative: zAutoNegative,
-  rasterizationCache: zImageCache,
 });
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
 
@@ -688,7 +684,6 @@ const zCanvasInpaintMaskState = z.object({
   fill: zFill,
   opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
-  rasterizationCache: zImageCache,
 });
 export type CanvasInpaintMaskState = z.infer<typeof zCanvasInpaintMaskState>;
 
@@ -748,7 +743,6 @@ export const zCanvasRasterLayerState = z.object({
   position: zCoordinate,
   opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
-  rasterizationCache: zImageCache,
 });
 export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 
@@ -850,11 +844,9 @@ export type CanvasV2State = {
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
   inpaintMasks: {
     entities: CanvasInpaintMaskState[];
-    compositeRasterizationCache: ImageCache;
   };
   rasterLayers: {
     entities: CanvasRasterLayerState[];
-    compositeRasterizationCache: ImageCache;
   };
   controlLayers: {
     entities: CanvasControlLayerState[];
@@ -961,9 +953,8 @@ export type EntityBrushLineAddedPayload = EntityIdentifierPayload<{ brushLine: C
 export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{ eraserLine: CanvasEraserLineState }>;
 export type EntityRectAddedPayload = EntityIdentifierPayload<{ rect: CanvasRectState }>;
 export type EntityRasterizedPayload = EntityIdentifierPayload<{
-  hash: string;
   imageObject: CanvasImageState;
-  rect: Rect,
+  rect: Rect;
   replaceObjects: boolean;
 }>;
 export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: Coordinate };
