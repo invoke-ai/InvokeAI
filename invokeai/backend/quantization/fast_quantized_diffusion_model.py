@@ -14,7 +14,7 @@ from diffusers.utils import (
 from optimum.quanto.models import QuantizedDiffusersModel
 from optimum.quanto.models.shared_dict import ShardedStateDict
 
-from invokeai.backend.requantize import requantize
+from invokeai.backend.quantization.requantize import requantize
 
 
 class FastQuantizedDiffusersModel(QuantizedDiffusersModel):
