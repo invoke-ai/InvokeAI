@@ -4,13 +4,14 @@ import { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import {
-  type CanvasControlLayerState,
-  type CanvasEntityIdentifier,
-  type CanvasRasterLayerState,
-  type CanvasV2State,
-  getEntityIdentifier,
+import type {
+  CanvasControlLayerState,
+  CanvasEntityIdentifier,
+  CanvasRasterLayerState,
+  CanvasV2State,
+  Rect,
 } from 'features/controlLayers/store/types';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
@@ -147,6 +148,13 @@ export class CanvasLayerAdapter {
 
   getLoggingContext = (): JSONObject => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
+  };
+
+  getCanvas = (rect: Rect): HTMLCanvasElement => {
+    // TODO(psyche) - cache this - maybe with package `memoizee`? Would require careful review of cache invalidation
+    this.log.trace({ rect }, 'Getting canvas');
+    const canvas = this.renderer.getCanvas(rect);
+    return canvas;
   };
 
   logDebugInfo(msg = 'Debug info') {
