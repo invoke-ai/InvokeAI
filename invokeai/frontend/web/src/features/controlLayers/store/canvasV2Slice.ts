@@ -38,10 +38,9 @@ import type {
   EntityMovedPayload,
   EntityRasterizedPayload,
   EntityRectAddedPayload,
-  FilterConfig,
   StageAttrs,
 } from './types';
-import { getEntityIdentifier, IMAGE_FILTERS, isDrawableEntity } from './types';
+import { getEntityIdentifier, isDrawableEntity } from './types';
 
 const initialState: CanvasV2State = {
   _version: 3,
@@ -702,9 +701,6 @@ export const $lastMouseDownPos = atom<Coordinate | null>(null);
 export const $lastCursorPos = atom<Coordinate | null>(null);
 export const $spaceKey = atom<boolean>(false);
 export const $transformingEntity = atom<CanvasEntityIdentifier | null>(null);
-export const $filteringEntity = atom<CanvasEntityIdentifier | null>(null);
-export const $filterConfig = atom<FilterConfig>(IMAGE_FILTERS.canny_image_processor.buildDefaults());
-export const $isProcessingFilter = atom(false);
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   name: canvasV2Slice.name,
