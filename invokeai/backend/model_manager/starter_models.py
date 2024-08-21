@@ -51,10 +51,59 @@ cyberrealistic_negative = StarterModel(
     type=ModelType.TextualInversion,
 )
 
+t5_base_encoder = StarterModel(
+    name="t5_base_encoder",
+    base=BaseModelType.Any,
+    source="InvokeAI/flux_schnell::t5_xxl_encoder/base",
+    description="T5-XXL text encoder (used in FLUX pipelines). ~8GB",
+    type=ModelType.T5Encoder,
+)
+
+t5_8b_quantized_encoder = StarterModel(
+    name="t5_8b_quantized_encoder",
+    base=BaseModelType.Any,
+    source="invokeai/flux_schnell::t5_xxl_encoder/optimum_quanto_qfloat8",
+    description="T5-XXL text encoder with optimum-quanto qfloat8 quantization (used in FLUX pipelines). ~6GB",
+    type=ModelType.T5Encoder,
+)
+
+clip_l_encoder = StarterModel(
+    name="clip-vit-large-patch14",
+    base=BaseModelType.Any,
+    source="openai/clip-vit-large-patch14",
+    description="CLIP-L text encoder (used in FLUX pipelines). ~3GB",
+    type=ModelType.CLIPEmbed,
+)
+
+flux_vae = StarterModel(
+    name="FLUX.1-schnell_ae",
+    base=BaseModelType.Flux,
+    source="black-forest-labs/FLUX.1-schnell::ae.safetensors",
+    description="FLUX VAE compatible with both schnell and dev variants.",
+    type=ModelType.VAE,
+)
+
+
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
     # region: Main
+    StarterModel(
+        name="FLUX Schnell (Quantized)",
+        base=BaseModelType.Flux,
+        source="InvokeAI/flux_schnell::transformer/bnb_nf4/flux1-schnell-bnb_nf4.safetensors",
+        description="FLUX schnell transformer quantized to bitsandbytes NF4 format. Total size with dependencies: ~14GB",
+        type=ModelType.Main,
+        dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
+    ),
+    StarterModel(
+        name="FLUX Schnell",
+        base=BaseModelType.Flux,
+        source="InvokeAI/flux_schnell::transformer/base/flux1-schnell.safetensors",
+        description="FLUX schnell transformer in bfloat16. Total size with dependencies: ~33GB",
+        type=ModelType.Main,
+        dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+    ),
     StarterModel(
         name="CyberRealistic v4.1",
         base=BaseModelType.StableDiffusion1,
@@ -125,6 +174,7 @@ STARTER_MODELS: list[StarterModel] = [
     # endregion
     # region VAE
     sdxl_fp16_vae_fix,
+    flux_vae,
     # endregion
     # region LoRA
     StarterModel(
@@ -449,6 +499,11 @@ STARTER_MODELS: list[StarterModel] = [
         description="A SwinIR 4x upscaling model.",
         type=ModelType.SpandrelImageToImage,
     ),
+    # endregion
+    # region TextEncoders
+    t5_base_encoder,
+    t5_8b_quantized_encoder,
+    clip_l_encoder,
     # endregion
 ]
 
