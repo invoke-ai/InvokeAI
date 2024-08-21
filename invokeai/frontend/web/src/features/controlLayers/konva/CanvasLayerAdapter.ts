@@ -1,6 +1,5 @@
 import type { JSONObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
-import { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
@@ -31,7 +30,6 @@ export class CanvasLayerAdapter {
   };
   transformer: CanvasTransformer;
   renderer: CanvasObjectRenderer;
-  filter: CanvasFilter;
 
   isFirstRender: boolean = true;
 
@@ -56,7 +54,6 @@ export class CanvasLayerAdapter {
 
     this.renderer = new CanvasObjectRenderer(this);
     this.transformer = new CanvasTransformer(this);
-    this.filter = new CanvasFilter(this);
   }
 
   /**
