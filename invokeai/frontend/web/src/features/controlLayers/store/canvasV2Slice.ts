@@ -3,6 +3,7 @@ import { createAction, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
+import { exhaustiveCheck } from 'features/controlLayers/konva/util';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlLayersReducers } from 'features/controlLayers/store/controlLayersReducers';
@@ -24,12 +25,8 @@ import { atom } from 'nanostores';
 import { assert } from 'tsafe';
 
 import type {
-  CanvasControlLayerState,
   CanvasEntityIdentifier,
   CanvasEntityState,
-  CanvasInpaintMaskState,
-  CanvasRasterLayerState,
-  CanvasRegionalGuidanceState,
   CanvasV2State,
   Coordinate,
   EntityBrushLineAddedPayload,
@@ -46,15 +43,19 @@ const initialState: CanvasV2State = {
   _version: 3,
   selectedEntityIdentifier: null,
   rasterLayers: {
+    isHidden: false,
     entities: [],
   },
   controlLayers: {
+    isHidden: false,
     entities: [],
   },
   inpaintMasks: {
+    isHidden: false,
     entities: [],
   },
   regions: {
+    isHidden: false,
     entities: [],
   },
   loras: [],
@@ -408,35 +409,28 @@ export const canvasV2Slice = createSlice({
       }
       entity.opacity = opacity;
     },
-    allEntitiesOfTypeToggled: (state, action: PayloadAction<{ type: CanvasEntityIdentifier['type'] }>) => {
+    allEntitiesOfTypeIsHiddenToggled: (state, action: PayloadAction<{ type: CanvasEntityIdentifier['type'] }>) => {
       const { type } = action.payload;
-      let entities: (
-        | CanvasRasterLayerState
-        | CanvasControlLayerState
-        | CanvasInpaintMaskState
-        | CanvasRegionalGuidanceState
-      )[];
 
       switch (type) {
         case 'raster_layer':
-          entities = state.rasterLayers.entities;
+          state.rasterLayers.isHidden = !state.rasterLayers.isHidden;
           break;
         case 'control_layer':
-          entities = state.controlLayers.entities;
+          state.controlLayers.isHidden = !state.controlLayers.isHidden;
           break;
         case 'inpaint_mask':
-          entities = state.inpaintMasks.entities;
+          state.inpaintMasks.isHidden = !state.inpaintMasks.isHidden;
           break;
         case 'regional_guidance':
-          entities = state.regions.entities;
+          state.regions.isHidden = !state.regions.isHidden;
           break;
-        default:
-          assert(false, 'Not implemented');
-      }
-
-      const allEnabled = entities.every((entity) => entity.isEnabled);
-      for (const entity of entities) {
-        entity.isEnabled = !allEnabled;
+        case 'ip_adapter':
+          // no-op
+          break;
+        default: {
+          exhaustiveCheck(type);
+        }
       }
     },
     allEntitiesDeleted: (state) => {
@@ -496,7 +490,7 @@ export const {
   entityArrangedBackwardOne,
   entityArrangedToBack,
   entityOpacityChanged,
-  allEntitiesOfTypeToggled,
+  allEntitiesOfTypeIsHiddenToggled,
   // bbox
   bboxChanged,
   bboxScaledSizeChanged,

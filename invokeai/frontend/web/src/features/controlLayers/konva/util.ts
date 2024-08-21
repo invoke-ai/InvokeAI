@@ -398,3 +398,13 @@ export const getRectUnion = (...rects: Rect[]): Rect => {
   }, getEmptyRect());
   return rect;
 };
+
+/**
+ * Asserts that the value is never reached. Used for exhaustive checks in switch statements or conditional logic to ensure
+ * that all possible values are handled.
+ * @param value The value that should never be reached
+ * @throws An error with the value that was not handled
+ */
+export const exhaustiveCheck = (value: never): never => {
+  assert(false, `Unhandled value: ${value}`);
+};
