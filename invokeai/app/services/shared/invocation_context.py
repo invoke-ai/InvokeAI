@@ -484,7 +484,7 @@ class ModelsInterface(InvocationContextInterface):
             ModelInstallJob object defining the install job to be used in tracking the job
         """
         if not model_path.exists():
-            raise Exception("Models provided to import_local_model must already exist on disk")
+            raise ValueError(f"Models provided to import_local_model must already exist on disk at {model_path.as_posix()}")
         return self._services.model_manager.install.heuristic_import(str(model_path), config=config, inplace=inplace)
 
     def load_local_model(
