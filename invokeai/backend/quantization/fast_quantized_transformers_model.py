@@ -9,7 +9,7 @@ from transformers.modeling_utils import get_checkpoint_shard_files, load_state_d
 from transformers.models.auto import AutoModelForTextEncoding
 from transformers.utils import SAFE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_NAME, is_accelerate_available
 
-from invokeai.backend.requantize import requantize
+from invokeai.backend.quantization.requantize import requantize
 
 
 class FastQuantizedTransformersModel(QuantizedTransformersModel):
