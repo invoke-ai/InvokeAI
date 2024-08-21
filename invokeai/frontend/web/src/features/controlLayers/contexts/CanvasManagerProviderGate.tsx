@@ -6,12 +6,6 @@ import { assert } from 'tsafe';
 
 const CanvasManagerContext = createContext<CanvasManager | null>(null);
 
-export const useCanvasManager = (): CanvasManager => {
-  const canvasManager = useContext(CanvasManagerContext);
-  assert(canvasManager, 'useCanvasManagerContext must be used within a CanvasManagerContext');
-  return canvasManager;
-};
-
 export const CanvasManagerProviderGate = memo(({ children }: PropsWithChildren) => {
   const canvasManager = useStore($canvasManager);
 
@@ -23,3 +17,9 @@ export const CanvasManagerProviderGate = memo(({ children }: PropsWithChildren) 
 });
 
 CanvasManagerProviderGate.displayName = 'CanvasManagerProviderGate';
+
+export const useCanvasManager = (): CanvasManager => {
+  const canvasManager = useContext(CanvasManagerContext);
+  assert(canvasManager, 'useCanvasManagerContext must be used within a CanvasManagerProviderGate');
+  return canvasManager;
+};
