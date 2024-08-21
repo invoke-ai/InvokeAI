@@ -87,7 +87,9 @@ class ClipCheckpointModel(ModelLoader):
             case SubModelType.TextEncoder:
                 return CLIPTextModel.from_pretrained(config.path)
 
-        raise ValueError(f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}")
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.T5Encoder8b)
@@ -108,7 +110,9 @@ class T5Encoder8bCheckpointModel(ModelLoader):
             case SubModelType.TextEncoder2:
                 return FastQuantizedTransformersModel.from_pretrained(Path(config.path) / "text_encoder_2")
 
-        raise ValueError(f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}")
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.T5Encoder)
@@ -131,7 +135,9 @@ class T5EncoderCheckpointModel(ModelLoader):
                     Path(config.path) / "text_encoder_2"
                 )  # TODO: Fix hf subfolder install
 
-        raise ValueError(f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}")
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.Checkpoint)
@@ -154,7 +160,9 @@ class FluxCheckpointModel(ModelLoader):
             case SubModelType.Transformer:
                 return self._load_from_singlefile(config, flux_conf)
 
-        raise ValueError(f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}")
+        raise ValueError(
+            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
 
     def _load_from_singlefile(
         self,
@@ -194,7 +202,9 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
             case SubModelType.Transformer:
                 return self._load_from_singlefile(config, flux_conf)
 
-        raise ValueError(f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}")
+        raise ValueError(
+            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
 
     def _load_from_singlefile(
         self,
