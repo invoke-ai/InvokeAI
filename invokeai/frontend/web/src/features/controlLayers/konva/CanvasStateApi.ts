@@ -108,10 +108,10 @@ export class CanvasStateApi {
   rasterizeEntity = (arg: EntityRasterizedPayload) => {
     this._store.dispatch(entityRasterized(arg));
   };
-  compositeRasterLayerRasterized = (arg: { imageName: string; rect: Rect }) => {
+  compositeRasterLayerRasterized = (arg: { hash: string; imageName: string }) => {
     this._store.dispatch(rasterLayerCompositeRasterized(arg));
   };
-  compositeInpaintMaskRasterized = (arg: { imageName: string; rect: Rect }) => {
+  compositeInpaintMaskRasterized = (arg: { hash: string; imageName: string }) => {
     this._store.dispatch(inpaintMaskCompositeRasterized(arg));
   };
   setSelectedEntity = (arg: EntityIdentifierPayload) => {
