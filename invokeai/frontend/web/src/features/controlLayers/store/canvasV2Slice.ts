@@ -334,9 +334,9 @@ export const canvasV2Slice = createSlice({
       let selectedEntityIdentifier: CanvasEntityIdentifier = { type: state.inpaintMask.type, id: state.inpaintMask.id };
 
       if (entityIdentifier.type === 'raster_layer') {
-        // When deleting a raster layer, we need to invalidate the composite rasterization cache.
         const index = state.rasterLayers.entities.findIndex((layer) => layer.id === entityIdentifier.id);
         state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
+        // When deleting a raster layer, we need to invalidate the composite rasterization cache.
         state.rasterLayers.compositeRasterizationCache = [];
         const nextRasterLayer = state.rasterLayers.entities[index];
         if (nextRasterLayer) {
@@ -410,6 +410,7 @@ export const canvasV2Slice = createSlice({
       if (entity.type === 'raster_layer') {
         moveOneToStart(state.rasterLayers.entities, entity);
         // When arranging a raster layer, we need to invalidate the composite rasterization cache.
+        state.rasterLayers.compositeRasterizationCache = [];
       } else if (entity.type === 'control_layer') {
         moveOneToStart(state.controlLayers.entities, entity);
       } else if (entity.type === 'regional_guidance') {
@@ -423,6 +424,7 @@ export const canvasV2Slice = createSlice({
         return;
       }
       if (entity.type === 'raster_layer') {
+        // When arranging a raster layer, we need to invalidate the composite rasterization cache.
         moveToStart(state.rasterLayers.entities, entity);
         state.rasterLayers.compositeRasterizationCache = [];
       } else if (entity.type === 'control_layer') {
@@ -441,6 +443,7 @@ export const canvasV2Slice = createSlice({
         return;
       }
       entity.opacity = opacity;
+      invalidateRasterizationCaches(entity, state);
     },
     allEntitiesOfTypeToggled: (state, action: PayloadAction<{ type: CanvasEntityIdentifier['type'] }>) => {
       const { type } = action.payload;
