@@ -9,7 +9,7 @@ import {
   isFluxMainModelModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
-  isNonRefinerMainModelConfig,
+  isNonRefinerNonFluxMainModelConfig,
   isNonSDXLMainModelConfig,
   isRefinerMainModelModelConfig,
   isSDXLMainModelModelConfig,
@@ -35,7 +35,7 @@ const buildModelsHook =
     return [modelConfigs, result] as const;
   };
 
-export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
+export const useMainModels = buildModelsHook(isNonRefinerNonFluxMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
