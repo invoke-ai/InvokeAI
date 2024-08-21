@@ -5,6 +5,7 @@ import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/com
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { EntityLayerAdapterProviderGate } from 'features/controlLayers/hooks/useEntityLayerAdapter';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
@@ -17,14 +18,16 @@ export const RasterLayer = memo(({ id }: Props) => {
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <CanvasEntityContainer>
-        <CanvasEntityHeader>
-          <CanvasEntityEnabledToggle />
-          <CanvasEntityEditableTitle />
-          <Spacer />
-          <CanvasEntityDeleteButton />
-        </CanvasEntityHeader>
-      </CanvasEntityContainer>
+      <EntityLayerAdapterProviderGate>
+        <CanvasEntityContainer>
+          <CanvasEntityHeader>
+            <CanvasEntityEnabledToggle />
+            <CanvasEntityEditableTitle />
+            <Spacer />
+            <CanvasEntityDeleteButton />
+          </CanvasEntityHeader>
+        </CanvasEntityContainer>
+      </EntityLayerAdapterProviderGate>
     </EntityIdentifierContext.Provider>
   );
 });
