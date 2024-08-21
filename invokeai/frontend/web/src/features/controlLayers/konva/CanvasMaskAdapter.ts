@@ -3,14 +3,16 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
-import {
-  type CanvasEntityIdentifier,
-  type CanvasInpaintMaskState,
-  type CanvasRegionalGuidanceState,
-  type CanvasV2State,
-  getEntityIdentifier,
+import type {
+  CanvasEntityIdentifier,
+  CanvasInpaintMaskState,
+  CanvasRegionalGuidanceState,
+  CanvasV2State,
+  Rect,
 } from 'features/controlLayers/store/types';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { GroupConfig } from 'konva/lib/Group';
 import { get } from 'lodash-es';
 import type { Logger } from 'roarr';
 
@@ -141,6 +143,13 @@ export class CanvasMaskAdapter {
     };
   };
 
+  getCanvas = (rect: Rect): HTMLCanvasElement => {
+    // TODO(psyche): Cache this?
+    // Backend expects masks to be fully opaque
+    const attrs: GroupConfig = { opacity: 1 };
+    const canvas = this.renderer.getCanvas(rect, attrs);
+    return canvas;
+  };
   getLoggingContext = (): JSONObject => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
