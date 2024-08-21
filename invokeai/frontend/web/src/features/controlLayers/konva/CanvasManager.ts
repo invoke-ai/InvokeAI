@@ -48,7 +48,7 @@ export class CanvasManager {
   rasterLayerAdapters: Map<string, CanvasLayerAdapter> = new Map();
   controlLayerAdapters: Map<string, CanvasLayerAdapter> = new Map();
   regionalGuidanceAdapters: Map<string, CanvasMaskAdapter> = new Map();
-  inpaintMaskAdapter: CanvasMaskAdapter;
+  inpaintMaskAdapters: Map<string, CanvasMaskAdapter> = new Map();
   stateApi: CanvasStateApi;
   preview: CanvasPreview;
   background: CanvasBackground;
@@ -120,9 +120,6 @@ export class CanvasManager {
     this.stateApi.$selectedEntityIdentifier.set(this.stateApi.getState().selectedEntityIdentifier);
     this.stateApi.$currentFill.set(this.stateApi.getCurrentFill());
     this.stateApi.$selectedEntity.set(this.stateApi.getSelectedEntity());
-
-    this.inpaintMaskAdapter = new CanvasMaskAdapter(this.stateApi.getInpaintMaskState(), this);
-    this.stage.add(this.inpaintMaskAdapter.konva.layer);
   }
 
   enableDebugging() {
@@ -149,19 +146,21 @@ export class CanvasManager {
 
     this.background.konva.layer.zIndex(++zIndex);
 
-    for (const layer of this.stateApi.getRasterLayersState().entities) {
-      this.rasterLayerAdapters.get(layer.id)?.konva.layer.zIndex(++zIndex);
+    for (const { id } of this.stateApi.getRasterLayersState().entities) {
+      this.rasterLayerAdapters.get(id)?.konva.layer.zIndex(++zIndex);
     }
 
-    for (const layer of this.stateApi.getControlLayersState().entities) {
-      this.controlLayerAdapters.get(layer.id)?.konva.layer.zIndex(++zIndex);
+    for (const { id } of this.stateApi.getControlLayersState().entities) {
+      this.controlLayerAdapters.get(id)?.konva.layer.zIndex(++zIndex);
     }
 
-    for (const rg of this.stateApi.getRegionsState().entities) {
-      this.regionalGuidanceAdapters.get(rg.id)?.konva.layer.zIndex(++zIndex);
+    for (const { id } of this.stateApi.getRegionsState().entities) {
+      this.regionalGuidanceAdapters.get(id)?.konva.layer.zIndex(++zIndex);
     }
 
-    this.inpaintMaskAdapter.konva.layer.zIndex(++zIndex);
+    for (const { id } of this.stateApi.getInpaintMasksState().entities) {
+      this.inpaintMaskAdapters.get(id)?.konva.layer.zIndex(++zIndex);
+    }
 
     this.preview.getLayer().zIndex(++zIndex);
   }
@@ -181,8 +180,10 @@ export class CanvasManager {
   getVisibleRect = (): Rect => {
     const rects = [];
 
-    if (this.inpaintMaskAdapter.state.isEnabled) {
-      rects.push(this.inpaintMaskAdapter.transformer.getRelativeRect());
+    for (const adapter of this.inpaintMaskAdapters.values()) {
+      if (adapter.state.isEnabled) {
+        rects.push(adapter.transformer.getRelativeRect());
+      }
     }
 
     for (const adapter of this.rasterLayerAdapters.values()) {
@@ -241,7 +242,7 @@ export class CanvasManager {
     });
   }
 
-  getTransformingLayer() {
+  getTransformingLayer = (): CanvasLayerAdapter | CanvasMaskAdapter | null => {
     const transformingEntity = this.stateApi.$transformingEntity.get();
     if (!transformingEntity) {
       return null;
@@ -254,13 +255,13 @@ export class CanvasManager {
     } else if (type === 'control_layer') {
       return this.controlLayerAdapters.get(id) ?? null;
     } else if (type === 'inpaint_mask') {
-      return this.inpaintMaskAdapter;
+      return this.inpaintMaskAdapters.get(id) ?? null;
     } else if (type === 'regional_guidance') {
       return this.regionalGuidanceAdapters.get(id) ?? null;
     }
 
     return null;
-  }
+  };
 
   getIsTransforming() {
     return Boolean(this.stateApi.$transformingEntity.get());
@@ -397,16 +398,33 @@ export class CanvasManager {
 
     if (
       isFirstRender ||
-      state.inpaintMask !== prevState.inpaintMask ||
+      state.inpaintMasks.entities !== prevState.inpaintMasks.entities ||
       state.tool.selected !== prevState.tool.selected ||
       state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
     ) {
-      this.log.debug('Rendering inpaint mask');
-      await this.inpaintMaskAdapter.update({
-        state: state.inpaintMask,
-        toolState: state.tool,
-        isSelected: state.selectedEntityIdentifier?.id === state.inpaintMask.id,
-      });
+      this.log.debug('Rendering inpaint masks');
+
+      // Destroy the konva nodes for nonexistent entities
+      for (const adapter of this.inpaintMaskAdapters.values()) {
+        if (!state.inpaintMasks.entities.find((rg) => rg.id === adapter.id)) {
+          adapter.destroy();
+          this.inpaintMaskAdapters.delete(adapter.id);
+        }
+      }
+
+      for (const entityState of state.inpaintMasks.entities) {
+        let adapter = this.inpaintMaskAdapters.get(entityState.id);
+        if (!adapter) {
+          adapter = new CanvasMaskAdapter(entityState, this);
+          this.inpaintMaskAdapters.set(adapter.id, adapter);
+          this.stage.add(adapter.konva.layer);
+        }
+        await adapter.update({
+          state: entityState,
+          toolState: state.tool,
+          isSelected: state.selectedEntityIdentifier?.id === entityState.id,
+        });
+      }
     }
 
     this.stateApi.$toolState.set(state.tool);
@@ -427,8 +445,9 @@ export class CanvasManager {
     if (
       isFirstRender ||
       state.rasterLayers.entities !== prevState.rasterLayers.entities ||
+      state.controlLayers.entities !== prevState.controlLayers.entities ||
       state.regions.entities !== prevState.regions.entities ||
-      state.inpaintMask !== prevState.inpaintMask ||
+      state.inpaintMasks.entities !== prevState.inpaintMasks.entities ||
       state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
     ) {
       this.log.debug('Arranging entities');
@@ -454,14 +473,13 @@ export class CanvasManager {
 
     return () => {
       this.log.debug('Cleaning up konva renderer');
-      this.inpaintMaskAdapter.destroy();
-      for (const adapter of this.regionalGuidanceAdapters.values()) {
-        adapter.destroy();
-      }
-      for (const adapter of this.rasterLayerAdapters.values()) {
-        adapter.destroy();
-      }
-      for (const adapter of this.controlLayerAdapters.values()) {
+      const allAdapters = [
+        ...this.rasterLayerAdapters.values(),
+        ...this.controlLayerAdapters.values(),
+        ...this.inpaintMaskAdapters.values(),
+        ...this.regionalGuidanceAdapters.values(),
+      ];
+      for (const adapter of allAdapters) {
         adapter.destroy();
       }
       this.background.destroy();
@@ -558,7 +576,7 @@ export class CanvasManager {
     return pixels / this.getStageScale();
   }
 
-  getCompositeLayerStageClone = (): Konva.Stage => {
+  getCompositeRasterLayerStageClone = (): Konva.Stage => {
     const layersState = this.stateApi.getRasterLayersState();
     const stageClone = this.stage.clone();
 
@@ -580,58 +598,95 @@ export class CanvasManager {
     return stageClone;
   };
 
-  getCompositeLayerBlob = (rect?: Rect): Promise<Blob> => {
-    return konvaNodeToBlob(this.getCompositeLayerStageClone(), rect);
+  getCompositeInpaintMaskStageClone = (): Konva.Stage => {
+    const entities = this.stateApi.getInpaintMasksState().entities;
+    const validEntities = entities.filter((entity) => entity.isEnabled && entity.objects.length > 0);
+
+    const stageClone = this.stage.clone();
+
+    stageClone.scaleX(1);
+    stageClone.scaleY(1);
+    stageClone.x(0);
+    stageClone.y(0);
+
+    // getLayers() returns the internal `children` array of the stage directly - calling destroy on a layer will
+    // mutate that array. We need to clone the array to avoid mutating the original.
+    for (const konvaLayer of stageClone.getLayers().slice()) {
+      if (!validEntities.find((l) => l.id === konvaLayer.id())) {
+        konvaLayer.destroy();
+      }
+    }
+
+    return stageClone;
   };
 
-  getCompositeLayerImageData = (rect?: Rect): ImageData => {
-    return konvaNodeToImageData(this.getCompositeLayerStageClone(), rect);
-  };
-
-  getCompositeRasterizedImageCache = (rect: Rect): ImageCache | null => {
-    const layerState = this.stateApi.getRasterLayersState();
-    const imageCache = layerState.compositeRasterizationCache.find((cache) => isEqual(cache.rect, rect));
+  getCompositeInpaintMaskImageCache = (rect: Rect): ImageCache | null => {
+    const { compositeRasterizationCache } = this.stateApi.getInpaintMasksState();
+    const imageCache = compositeRasterizationCache.find((cache) => isEqual(cache.rect, rect));
     return imageCache ?? null;
   };
 
-  getCompositeLayerImageDTO = async (rect: Rect): Promise<ImageDTO> => {
+  getCompositeRasterLayerImageCache = (rect: Rect): ImageCache | null => {
+    const { compositeRasterizationCache } = this.stateApi.getRasterLayersState();
+    const imageCache = compositeRasterizationCache.find((cache) => isEqual(cache.rect, rect));
+    return imageCache ?? null;
+  };
+
+  getCompositeRasterLayerImageDTO = async (rect: Rect): Promise<ImageDTO> => {
     let imageDTO: ImageDTO | null = null;
-    const compositeRasterizedImageCache = this.getCompositeRasterizedImageCache(rect);
+    const compositeRasterizedImageCache = this.getCompositeRasterLayerImageCache(rect);
 
     if (compositeRasterizedImageCache) {
       imageDTO = await getImageDTO(compositeRasterizedImageCache.imageName);
       if (imageDTO) {
-        this.log.trace({ rect, compositeRasterizedImageCache, imageDTO }, 'Using cached composite rasterized image');
+        this.log.trace({ rect, compositeRasterizedImageCache, imageDTO }, 'Using cached composite raster layer image');
         return imageDTO;
       }
     }
 
-    this.log.trace({ rect }, 'Rasterizing composite layer');
+    this.log.trace({ rect }, 'Rasterizing composite raster layer');
 
-    const blob = await this.getCompositeLayerBlob(rect);
+    const blob = await konvaNodeToBlob(this.getCompositeRasterLayerStageClone(), rect);
 
     if (this._isDebugging) {
-      previewBlob(blob, 'Rasterized entity');
+      previewBlob(blob, 'Composite raster layer');
     }
 
-    imageDTO = await uploadImage(blob, 'composite-layer.png', 'general', true);
-    this.stateApi.compositeLayerRasterized({ imageName: imageDTO.image_name, rect });
+    imageDTO = await uploadImage(blob, 'composite-raster-layer.png', 'general', true);
+    this.stateApi.compositeRasterLayerRasterized({ imageName: imageDTO.image_name, rect });
     return imageDTO;
   };
 
-  getInpaintMaskBlob = (rect?: Rect): Promise<Blob> => {
-    return this.inpaintMaskAdapter.renderer.getBlob(rect);
-  };
+  getCompositeInpaintMaskImageDTO = async (rect: Rect): Promise<ImageDTO> => {
+    let imageDTO: ImageDTO | null = null;
+    const compositeRasterizedImageCache = this.getCompositeInpaintMaskImageCache(rect);
 
-  getInpaintMaskImageData = (rect?: Rect): ImageData => {
-    return this.inpaintMaskAdapter.renderer.getImageData(rect);
+    if (compositeRasterizedImageCache) {
+      imageDTO = await getImageDTO(compositeRasterizedImageCache.imageName);
+      if (imageDTO) {
+        this.log.trace({ rect, compositeRasterizedImageCache, imageDTO }, 'Using cached composite inpaint mask image');
+        return imageDTO;
+      }
+    }
+
+    this.log.trace({ rect }, 'Rasterizing composite inpaint mask');
+
+    const blob = await konvaNodeToBlob(this.getCompositeInpaintMaskStageClone(), rect);
+
+    if (this._isDebugging) {
+      previewBlob(blob, 'Composite inpaint mask');
+    }
+
+    imageDTO = await uploadImage(blob, 'composite-inpaint-mask.png', 'general', true);
+    this.stateApi.compositeInpaintMaskRasterized({ imageName: imageDTO.image_name, rect });
+    return imageDTO;
   };
 
   getGenerationMode(): GenerationMode {
     const { rect } = this.stateApi.getBbox();
-    const inpaintMaskImageData = this.getInpaintMaskImageData(rect);
+    const inpaintMaskImageData = konvaNodeToImageData(this.getCompositeInpaintMaskStageClone(), rect);
     const inpaintMaskTransparency = getImageDataTransparency(inpaintMaskImageData);
-    const compositeLayerImageData = this.getCompositeLayerImageData(rect);
+    const compositeLayerImageData = konvaNodeToImageData(this.getCompositeRasterLayerStageClone(), rect);
     const compositeLayerTransparency = getImageDataTransparency(compositeLayerImageData);
     if (compositeLayerTransparency === 'FULLY_TRANSPARENT') {
       // When the initial image is fully transparent, we are always doing txt2img
