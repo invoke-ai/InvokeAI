@@ -1,3 +1,5 @@
+# Initially pulled from https://github.com/black-forest-labs/flux
+
 import torch
 from einops import rearrange
 from torch import Tensor
