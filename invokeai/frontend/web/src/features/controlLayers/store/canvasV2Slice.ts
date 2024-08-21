@@ -45,12 +45,22 @@ import { getEntityIdentifier, isDrawableEntity } from './types';
 const initialState: CanvasV2State = {
   _version: 3,
   selectedEntityIdentifier: null,
-  rasterLayers: { entities: [], compositeRasterizationCache: [] },
-  controlLayers: { entities: [] },
-  ipAdapters: { entities: [] },
-  regions: { entities: [] },
+  rasterLayers: {
+    entities: [],
+    compositeRasterizationCache: {},
+  },
+  controlLayers: {
+    entities: [],
+  },
+  inpaintMasks: {
+    entities: [],
+    compositeRasterizationCache: {},
+  },
+  regions: {
+    entities: [],
+  },
   loras: [],
-  inpaintMasks: { entities: [], compositeRasterizationCache: [] },
+  ipAdapters: { entities: [] },
   tool: {
     selected: 'view',
     selectedBuffer: null,
@@ -170,16 +180,16 @@ const invalidateRasterizationCaches = (
   // cached rect.
 
   // Reset the entity's rasterization cache
-  entity.rasterizationCache = [];
+  entity.rasterizationCache = {};
 
   // When an individual layer has its cache reset, we must also reset the composite rasterization cache because the
   // layer's image data will contribute to the composite layer's image data.
   // If the layer is used as a control layer, it will not contribute to the composite layer, so we do not need to reset
   // its cache.
   if (entity.type === 'raster_layer') {
-    state.rasterLayers.compositeRasterizationCache = [];
+    state.rasterLayers.compositeRasterizationCache = {};
   } else if (entity.type === 'inpaint_mask') {
-    state.inpaintMasks.compositeRasterizationCache = [];
+    state.inpaintMasks.compositeRasterizationCache = {};
   }
 };
 
@@ -247,7 +257,7 @@ export const canvasV2Slice = createSlice({
       }
     },
     entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
-      const { entityIdentifier, imageObject, rect, replaceObjects } = action.payload;
+      const { entityIdentifier, imageObject, hash, rect, replaceObjects } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
@@ -256,8 +266,7 @@ export const canvasV2Slice = createSlice({
       if (isDrawableEntity(entity)) {
         // Remove the cache for the given rect. This should never happen, because we should never rasterize the same
         // rect twice. Just in case, we remove the old cache.
-        entity.rasterizationCache = entity.rasterizationCache.filter((cache) => !isEqual(cache.rect, rect));
-        entity.rasterizationCache.push({ imageName: imageObject.image.image_name, rect });
+        entity.rasterizationCache[hash] = imageObject.image.image_name;
 
         if (replaceObjects) {
           entity.objects = [imageObject];
@@ -323,7 +332,7 @@ export const canvasV2Slice = createSlice({
         const index = state.rasterLayers.entities.findIndex((layer) => layer.id === entityIdentifier.id);
         state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
         // When deleting a raster layer, we need to invalidate the composite rasterization cache.
-        state.rasterLayers.compositeRasterizationCache = [];
+        state.rasterLayers.compositeRasterizationCache = {};
         const nextRasterLayer = state.rasterLayers.entities[index];
         if (nextRasterLayer) {
           selectedEntityIdentifier = { type: nextRasterLayer.type, id: nextRasterLayer.id };
@@ -353,7 +362,7 @@ export const canvasV2Slice = createSlice({
         const index = state.inpaintMasks.entities.findIndex((layer) => layer.id === entityIdentifier.id);
         state.inpaintMasks.entities = state.inpaintMasks.entities.filter((rg) => rg.id !== entityIdentifier.id);
         // When deleting a inpaint mask, we need to invalidate the composite rasterization cache.
-        state.inpaintMasks.compositeRasterizationCache = [];
+        state.inpaintMasks.compositeRasterizationCache = {};
         const entity = state.inpaintMasks.entities[index];
         if (entity) {
           selectedEntityIdentifier = { type: entity.type, id: entity.id };
@@ -373,7 +382,7 @@ export const canvasV2Slice = createSlice({
       if (entity.type === 'raster_layer') {
         moveOneToEnd(state.rasterLayers.entities, entity);
         // When arranging a raster layer, we need to invalidate the composite rasterization cache.
-        state.rasterLayers.compositeRasterizationCache = [];
+        state.rasterLayers.compositeRasterizationCache = {};
       } else if (entity.type === 'control_layer') {
         moveOneToEnd(state.controlLayers.entities, entity);
       } else if (entity.type === 'regional_guidance') {
@@ -381,7 +390,7 @@ export const canvasV2Slice = createSlice({
       } else if (entity.type === 'inpaint_mask') {
         moveOneToEnd(state.inpaintMasks.entities, entity);
         // When arranging a inpaint mask, we need to invalidate the composite rasterization cache.
-        state.inpaintMasks.compositeRasterizationCache = [];
+        state.inpaintMasks.compositeRasterizationCache = {};
       }
     },
     entityArrangedToFront: (state, action: PayloadAction<EntityIdentifierPayload>) => {
@@ -393,7 +402,7 @@ export const canvasV2Slice = createSlice({
       if (entity.type === 'raster_layer') {
         moveToEnd(state.rasterLayers.entities, entity);
         // When arranging a raster layer, we need to invalidate the composite rasterization cache.
-        state.rasterLayers.compositeRasterizationCache = [];
+        state.rasterLayers.compositeRasterizationCache = {};
       } else if (entity.type === 'control_layer') {
         moveToEnd(state.controlLayers.entities, entity);
       } else if (entity.type === 'regional_guidance') {
@@ -401,7 +410,7 @@ export const canvasV2Slice = createSlice({
       } else if (entity.type === 'inpaint_mask') {
         moveToEnd(state.inpaintMasks.entities, entity);
         // When arranging a inpaint mask, we need to invalidate the composite rasterization cache.
-        state.inpaintMasks.compositeRasterizationCache = [];
+        state.inpaintMasks.compositeRasterizationCache = {};
       }
     },
     entityArrangedBackwardOne: (state, action: PayloadAction<EntityIdentifierPayload>) => {
@@ -413,7 +422,7 @@ export const canvasV2Slice = createSlice({
       if (entity.type === 'raster_layer') {
         moveOneToStart(state.rasterLayers.entities, entity);
         // When arranging a raster layer, we need to invalidate the composite rasterization cache.
-        state.rasterLayers.compositeRasterizationCache = [];
+        state.rasterLayers.compositeRasterizationCache = {};
       } else if (entity.type === 'control_layer') {
         moveOneToStart(state.controlLayers.entities, entity);
       } else if (entity.type === 'regional_guidance') {
@@ -421,7 +430,7 @@ export const canvasV2Slice = createSlice({
       } else if (entity.type === 'inpaint_mask') {
         moveOneToStart(state.inpaintMasks.entities, entity);
         // When arranging a inpaint mask, we need to invalidate the composite rasterization cache.
-        state.inpaintMasks.compositeRasterizationCache = [];
+        state.inpaintMasks.compositeRasterizationCache = {};
       }
     },
     entityArrangedToBack: (state, action: PayloadAction<EntityIdentifierPayload>) => {
@@ -433,7 +442,7 @@ export const canvasV2Slice = createSlice({
       if (entity.type === 'raster_layer') {
         moveToStart(state.rasterLayers.entities, entity);
         // When arranging a raster layer, we need to invalidate the composite rasterization cache.
-        state.rasterLayers.compositeRasterizationCache = [];
+        state.rasterLayers.compositeRasterizationCache = {};
       } else if (entity.type === 'control_layer') {
         moveToStart(state.controlLayers.entities, entity);
       } else if (entity.type === 'regional_guidance') {
@@ -441,7 +450,7 @@ export const canvasV2Slice = createSlice({
       } else if (entity.type === 'inpaint_mask') {
         moveToStart(state.inpaintMasks.entities, entity);
         // When arranging a inpaint mask, we need to invalidate the composite rasterization cache.
-        state.inpaintMasks.compositeRasterizationCache = [];
+        state.inpaintMasks.compositeRasterizationCache = {};
       }
     },
     entityOpacityChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ opacity: number }>>) => {
@@ -506,12 +515,12 @@ export const canvasV2Slice = createSlice({
       ];
 
       for (const entity of allEntities) {
-        entity.rasterizationCache = [];
+        entity.rasterizationCache = {};
       }
 
       // Also invalidate the composite rasterization caches.
-      state.rasterLayers.compositeRasterizationCache = [];
-      state.inpaintMasks.compositeRasterizationCache = [];
+      state.rasterLayers.compositeRasterizationCache = {};
+      state.inpaintMasks.compositeRasterizationCache = {};
     },
     canvasReset: (state) => {
       state.bbox = deepClone(initialState.bbox);

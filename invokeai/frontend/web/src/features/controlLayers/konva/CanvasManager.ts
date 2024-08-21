@@ -7,6 +7,7 @@ import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva
 import {
   canvasToBlob,
   canvasToImageData,
+  getHash,
   getImageDataTransparency,
   getPrefixedId,
   getRectUnion,
@@ -14,16 +15,9 @@ import {
   previewBlob,
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
-import type {
-  CanvasV2State,
-  Coordinate,
-  Dimensions,
-  GenerationMode,
-  ImageCache,
-  Rect,
-} from 'features/controlLayers/store/types';
+import type { CanvasV2State, Coordinate, Dimensions, GenerationMode, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
-import { clamp, isEqual } from 'lodash-es';
+import { clamp } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
@@ -635,26 +629,25 @@ export class CanvasManager {
     return canvas;
   };
 
-  getCompositeInpaintMaskImageCache = (rect: Rect): ImageCache | null => {
+  getCompositeInpaintMaskImageCache = (hash: string): string | null => {
     const { compositeRasterizationCache } = this.stateApi.getInpaintMasksState();
-    const imageCache = compositeRasterizationCache.find((cache) => isEqual(cache.rect, rect));
-    return imageCache ?? null;
+    return compositeRasterizationCache[hash] ?? null;
   };
 
-  getCompositeRasterLayerImageCache = (rect: Rect): ImageCache | null => {
+  getCompositeRasterLayerImageCache = (hash: string): string | null => {
     const { compositeRasterizationCache } = this.stateApi.getRasterLayersState();
-    const imageCache = compositeRasterizationCache.find((cache) => isEqual(cache.rect, rect));
-    return imageCache ?? null;
+    return compositeRasterizationCache[hash] ?? null;
   };
 
   getCompositeRasterLayerImageDTO = async (rect: Rect): Promise<ImageDTO> => {
     let imageDTO: ImageDTO | null = null;
-    const compositeRasterizedImageCache = this.getCompositeRasterLayerImageCache(rect);
+    const hash = getHash(rect);
+    const cachedImageName = this.getCompositeRasterLayerImageCache(hash);
 
-    if (compositeRasterizedImageCache) {
-      imageDTO = await getImageDTO(compositeRasterizedImageCache.imageName);
+    if (cachedImageName) {
+      imageDTO = await getImageDTO(cachedImageName);
       if (imageDTO) {
-        this.log.trace({ rect, compositeRasterizedImageCache, imageDTO }, 'Using cached composite raster layer image');
+        this.log.trace({ rect, imageName: cachedImageName, imageDTO }, 'Using cached composite raster layer image');
         return imageDTO;
       }
     }
@@ -668,18 +661,19 @@ export class CanvasManager {
     }
 
     imageDTO = await uploadImage(blob, 'composite-raster-layer.png', 'general', true);
-    this.stateApi.compositeRasterLayerRasterized({ imageName: imageDTO.image_name, rect });
+    this.stateApi.compositeRasterLayerRasterized({ imageName: imageDTO.image_name, hash });
     return imageDTO;
   };
 
   getCompositeInpaintMaskImageDTO = async (rect: Rect): Promise<ImageDTO> => {
     let imageDTO: ImageDTO | null = null;
-    const compositeRasterizedImageCache = this.getCompositeInpaintMaskImageCache(rect);
+    const hash = getHash(rect);
+    const cachedImageName = this.getCompositeInpaintMaskImageCache(hash);
 
-    if (compositeRasterizedImageCache) {
-      imageDTO = await getImageDTO(compositeRasterizedImageCache.imageName);
+    if (cachedImageName) {
+      imageDTO = await getImageDTO(cachedImageName);
       if (imageDTO) {
-        this.log.trace({ rect, compositeRasterizedImageCache, imageDTO }, 'Using cached composite inpaint mask image');
+        this.log.trace({ rect, cachedImageName, imageDTO }, 'Using cached composite inpaint mask image');
         return imageDTO;
       }
     }
@@ -693,7 +687,7 @@ export class CanvasManager {
     }
 
     imageDTO = await uploadImage(blob, 'composite-inpaint-mask.png', 'general', true);
-    this.stateApi.compositeInpaintMaskRasterized({ imageName: imageDTO.image_name, rect });
+    this.stateApi.compositeInpaintMaskRasterized({ imageName: imageDTO.image_name, hash });
     return imageDTO;
   };
 

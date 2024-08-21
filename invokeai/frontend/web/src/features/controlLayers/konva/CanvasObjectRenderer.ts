@@ -10,6 +10,7 @@ import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
+  getHash,
   getPrefixedId,
   konvaNodeToBlob,
   konvaNodeToCanvas,
@@ -22,13 +23,11 @@ import type {
   CanvasImageState,
   CanvasRectState,
   Fill,
-  ImageCache,
   Rect,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
-import { isEqual } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -485,9 +484,8 @@ export class CanvasObjectRenderer {
     return this.renderers.size > 0 || this.bufferState !== null || this.bufferRenderer !== null;
   };
 
-  getRasterizedImageCache = (rect: Rect): ImageCache | null => {
-    const imageCache = this.parent.state.rasterizationCache.find((cache) => isEqual(cache.rect, rect));
-    return imageCache ?? null;
+  getRasterizedImageCache = (hash: string): string | null => {
+    return this.parent.state.rasterizationCache[hash] ?? null;
   };
 
   /**
@@ -500,14 +498,15 @@ export class CanvasObjectRenderer {
    * @param rect The rect to rasterize. If omitted, the entity's full rect will be used.
    * @returns A promise that resolves to the rasterized image DTO.
    */
-  rasterize = async (rect: Rect, replaceObjects: boolean = false): Promise<ImageDTO> => {
+  rasterize = async (rect: Rect, replaceObjects: boolean = false, attrs?: GroupConfig): Promise<ImageDTO> => {
     let imageDTO: ImageDTO | null = null;
-    const rasterizedImageCache = this.getRasterizedImageCache(rect);
+    const hash = getHash({ rect, attrs });
+    const cachedImageName = this.getRasterizedImageCache(hash);
 
-    if (rasterizedImageCache) {
-      imageDTO = await getImageDTO(rasterizedImageCache.imageName);
+    if (cachedImageName) {
+      imageDTO = await getImageDTO(cachedImageName);
       if (imageDTO) {
-        this.log.trace({ rect, rasterizedImageCache, imageDTO }, 'Using cached rasterized image');
+        this.log.trace({ rect, cachedImageName, imageDTO }, 'Using cached rasterized image');
         return imageDTO;
       }
     }
@@ -527,6 +526,7 @@ export class CanvasObjectRenderer {
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.getEntityIdentifier(),
       imageObject,
+      hash,
       rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: imageDTO.width, height: imageDTO.height },
       replaceObjects,
     });
