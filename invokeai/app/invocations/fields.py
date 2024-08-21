@@ -126,7 +126,7 @@ class FieldDescriptions:
     negative_cond = "Negative conditioning tensor"
     noise = "Noise tensor"
     clip = "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count"
-    t5Encoder = "T5 tokenizer and text encoder"
+    t5_encoder = "T5 tokenizer and text encoder"
     unet = "UNet (scheduler, LoRAs)"
     transformer = "Transformer"
     vae = "VAE"
