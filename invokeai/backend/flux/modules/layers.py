@@ -1,3 +1,5 @@
+# Initially pulled from https://github.com/black-forest-labs/flux
+
 import math
 from dataclasses import dataclass
 

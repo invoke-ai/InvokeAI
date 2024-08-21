@@ -1,3 +1,5 @@
+# Initially pulled from https://github.com/black-forest-labs/flux
+
 from dataclasses import dataclass
 
 import torch
