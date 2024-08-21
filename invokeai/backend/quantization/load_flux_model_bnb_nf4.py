@@ -23,6 +23,11 @@ def log_time(name: str):
 
 
 def main():
+    """A script for quantizing a FLUX transformer model using the bitsandbytes NF4 quantization method.
+
+    This script is primarily intended for reference. The script params (e.g. the model_path, modules_to_not_convert,
+    etc.) are hardcoded and would need to be modified for other use cases.
+    """
     model_path = Path(
         "/data/invokeai/models/.download_cache/https__huggingface.co_black-forest-labs_flux.1-schnell_resolve_main_flux1-schnell.safetensors/flux1-schnell.safetensors"
     )

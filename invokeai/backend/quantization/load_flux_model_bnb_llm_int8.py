@@ -10,6 +10,11 @@ from invokeai.backend.quantization.load_flux_model_bnb_nf4 import log_time
 
 
 def main():
+    """A script for quantizing a FLUX transformer model using the bitsandbytes LLM.int8() quantization method.
+
+    This script is primarily intended for reference. The script params (e.g. the model_path, modules_to_not_convert,
+    etc.) are hardcoded and would need to be modified for other use cases.
+    """
     # Load the FLUX transformer model onto the meta device.
     model_path = Path(
         "/data/invokeai/models/.download_cache/https__huggingface.co_black-forest-labs_flux.1-schnell_resolve_main_flux1-schnell.safetensors/flux1-schnell.safetensors"
