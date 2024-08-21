@@ -147,6 +147,10 @@ const zSpandrelImageToImageModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SpandrelImageToImageModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zT5EncoderModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('T5EncoderModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
   originalType: zStatelessFieldType.optional(),
@@ -170,6 +174,7 @@ const zStatefulFieldType = z.union([
   zIPAdapterModelFieldType,
   zT2IAdapterModelFieldType,
   zSpandrelImageToImageModelFieldType,
+  zT5EncoderModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
 ]);
@@ -641,6 +646,29 @@ export const isSpandrelImageToImageModelFieldInputTemplate = (
   zSpandrelImageToImageModelFieldInputTemplate.safeParse(val).success;
 // #endregion
 
+// #region T5EncoderModelField
+
+export const zT5EncoderModelFieldValue = zModelIdentifierField.optional();
+const zT5EncoderModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zT5EncoderModelFieldValue,
+});
+const zT5EncoderModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zT5EncoderModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zT5EncoderModelFieldValue,
+});
+
+export type T5EncoderModelFieldValue = z.infer<typeof zT5EncoderModelFieldValue>;
+
+export type T5EncoderModelFieldInputInstance = z.infer<typeof zT5EncoderModelFieldInputInstance>;
+export type T5EncoderModelFieldInputTemplate = z.infer<typeof zT5EncoderModelFieldInputTemplate>;
+export const isT5EncoderModelFieldInputInstance = (val: unknown): val is T5EncoderModelFieldInputInstance =>
+  zT5EncoderModelFieldInputInstance.safeParse(val).success;
+export const isT5EncoderModelFieldInputTemplate = (val: unknown): val is T5EncoderModelFieldInputTemplate =>
+  zT5EncoderModelFieldInputTemplate.safeParse(val).success;
+
+// #endregio
+
 // #region SchedulerField
 
 export const zSchedulerFieldValue = zSchedulerField.optional();
@@ -729,6 +757,7 @@ export const zStatefulFieldValue = z.union([
   zIPAdapterModelFieldValue,
   zT2IAdapterModelFieldValue,
   zSpandrelImageToImageModelFieldValue,
+  zT5EncoderModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
 ]);
@@ -758,6 +787,7 @@ const zStatefulFieldInputInstance = z.union([
   zIPAdapterModelFieldInputInstance,
   zT2IAdapterModelFieldInputInstance,
   zSpandrelImageToImageModelFieldInputInstance,
+  zT5EncoderModelFieldInputInstance,
   zColorFieldInputInstance,
   zSchedulerFieldInputInstance,
 ]);
@@ -788,6 +818,7 @@ const zStatefulFieldInputTemplate = z.union([
   zIPAdapterModelFieldInputTemplate,
   zT2IAdapterModelFieldInputTemplate,
   zSpandrelImageToImageModelFieldInputTemplate,
+  zT5EncoderModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,

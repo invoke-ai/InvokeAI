@@ -23,6 +23,7 @@ import type {
   StatelessFieldInputTemplate,
   StringFieldInputTemplate,
   T2IAdapterModelFieldInputTemplate,
+  T5EncoderModelFieldInputTemplate,
   VAEModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import { isStatefulFieldType } from 'features/nodes/types/field';
@@ -223,6 +224,20 @@ const buildVAEModelFieldInputTemplate: FieldInputTemplateBuilder<VAEModelFieldIn
   return template;
 };
 
+const buildT5EncoderModelFieldInputTemplate: FieldInputTemplateBuilder<T5EncoderModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: T5EncoderModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildLoRAModelFieldInputTemplate: FieldInputTemplateBuilder<LoRAModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -407,6 +422,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   T2IAdapterModelField: buildT2IAdapterModelFieldInputTemplate,
   SpandrelImageToImageModelField: buildSpandrelImageToImageModelFieldInputTemplate,
   VAEModelField: buildVAEModelFieldInputTemplate,
+  T5EncoderModelField: buildT5EncoderModelFieldInputTemplate,
 } as const;
 
 export const buildFieldInputTemplate = (
