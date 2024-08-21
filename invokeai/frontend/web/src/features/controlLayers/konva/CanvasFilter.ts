@@ -2,8 +2,9 @@ import type { JSONObject, SerializableObject } from 'common/types';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasImageState } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CanvasImageState, FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/store/types';
+import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -18,27 +19,48 @@ export class CanvasFilter {
 
   id: string;
   path: string[];
-  parent: CanvasLayerAdapter;
   manager: CanvasManager;
   log: Logger;
 
   imageState: CanvasImageState | null = null;
 
-  constructor(parent: CanvasLayerAdapter) {
+  $adapter = atom<CanvasLayerAdapter | null>(null);
+  $isProcessing = atom<boolean>(false);
+  $config = atom<FilterConfig>(IMAGE_FILTERS.canny_image_processor.buildDefaults());
+
+  constructor(manager: CanvasManager) {
     this.id = getPrefixedId(this.type);
-    this.parent = parent;
-    this.manager = parent.manager;
-    this.path = this.parent.path.concat(this.id);
+    this.manager = manager;
+    this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.log.trace('Creating filter');
   }
 
+  initialize = (entityIdentifier: CanvasEntityIdentifier) => {
+    this.log.trace('Initializing filter');
+    const entity = this.manager.stateApi.getEntity(entityIdentifier);
+    if (!entity) {
+      this.log.warn({ entityIdentifier }, 'Unable to find entity');
+      return;
+    }
+    if (entity.type !== 'raster_layer' && entity.type !== 'control_layer') {
+      this.log.warn({ entityIdentifier }, 'Unsupported entity type');
+      return;
+    }
+    this.$adapter.set(entity.adapter);
+  };
+
   previewFilter = async () => {
-    const config = this.manager.stateApi.$filterConfig.get();
+    const adapter = this.$adapter.get();
+    if (!adapter) {
+      this.log.warn('Cannot preview filter without an adapter');
+      return;
+    }
+    const config = this.$config.get();
     this.log.trace({ config }, 'Previewing filter');
     const dispatch = this.manager.stateApi._store.dispatch;
-    const rect = this.parent.transformer.getRelativeRect();
-    const imageDTO = await this.parent.renderer.rasterize(rect, false);
+    const rect = adapter.transformer.getRelativeRect();
+    const imageDTO = await adapter.renderer.rasterize(rect, false);
     // TODO(psyche): I can't get TS to be happy, it thinkgs `config` is `never` but it should be inferred from the generic... I'll just cast it for now
     const filterNode = IMAGE_FILTERS[config.type].buildNode(imageDTO, config as never);
     const enqueueBatchArg: BatchConfig = {
@@ -76,19 +98,19 @@ export class CanvasFilter {
       assert(imageDTO, "Failed to fetch processor output's image DTO");
 
       this.imageState = imageDTOToImageObject(imageDTO);
-      this.parent.renderer.clearBuffer();
+      adapter.renderer.clearBuffer();
 
-      await this.parent.renderer.setBuffer(this.imageState);
+      await adapter.renderer.setBuffer(this.imageState);
 
-      this.parent.renderer.hideObjects();
-      this.manager.stateApi.$isProcessingFilter.set(false);
+      adapter.renderer.hideObjects();
+      this.$isProcessing.set(false);
     };
 
     this.manager.socket.on('invocation_complete', listener);
 
     this.log.trace({ enqueueBatchArg } as SerializableObject, 'Enqueuing filter batch');
 
-    this.manager.stateApi.$isProcessingFilter.set(true);
+    this.$isProcessing.set(true);
     dispatch(
       queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, {
         fixedCacheKey: 'enqueueBatch',
@@ -97,36 +119,47 @@ export class CanvasFilter {
   };
 
   applyFilter = () => {
-    this.log.trace('Applying filter');
-    if (!this.imageState) {
+    const imageState = this.imageState;
+    const adapter = this.$adapter.get();
+    if (!imageState) {
       this.log.warn('No image state to apply filter to');
       return;
     }
-    this.parent.renderer.commitBuffer();
-    const rect = this.parent.transformer.getRelativeRect();
+    if (!adapter) {
+      this.log.warn('Cannot apply filter without an adapter');
+      return;
+    }
+    this.log.trace('Applying filter');
+    adapter.renderer.commitBuffer();
+    const rect = adapter.transformer.getRelativeRect();
     this.manager.stateApi.rasterizeEntity({
-      entityIdentifier: this.parent.getEntityIdentifier(),
-      imageObject: this.imageState,
+      entityIdentifier: adapter.getEntityIdentifier(),
+      imageObject: imageState,
       rect: {
         x: Math.round(rect.x),
         y: Math.round(rect.y),
-        width: this.imageState.image.height,
-        height: this.imageState.image.width,
+        width: imageState.image.height,
+        height: imageState.image.width,
       },
       replaceObjects: true,
     });
-    this.parent.renderer.showObjects();
-    this.manager.stateApi.$filteringEntity.set(null);
+    adapter.renderer.showObjects();
     this.imageState = null;
+    this.$adapter.set(null);
   };
 
   cancelFilter = () => {
     this.log.trace('Cancelling filter');
-    this.parent.renderer.clearBuffer();
-    this.parent.renderer.showObjects();
-    this.manager.stateApi.$filteringEntity.set(null);
+
+    const adapter = this.$adapter.get();
+
+    if (adapter) {
+      adapter.renderer.clearBuffer();
+      adapter.renderer.showObjects();
+      this.$adapter.set(null);
+    }
     this.imageState = null;
-    this.manager.stateApi.$isProcessingFilter.set(false);
+    this.$isProcessing.set(false);
   };
 
   destroy = () => {
@@ -141,6 +174,6 @@ export class CanvasFilter {
   };
 
   getLoggingContext = (): JSONObject => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
+    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

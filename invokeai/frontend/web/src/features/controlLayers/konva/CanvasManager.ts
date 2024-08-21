@@ -2,6 +2,7 @@ import type { AppSocket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import type { JSONObject } from 'common/types';
+import { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
 import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva/constants';
 import {
   canvasToBlob,
@@ -53,6 +54,7 @@ export class CanvasManager {
   stateApi: CanvasStateApi;
   preview: CanvasPreview;
   background: CanvasBackground;
+  filter: CanvasFilter;
 
   log: Logger;
   socket: AppSocket;
@@ -91,6 +93,8 @@ export class CanvasManager {
 
     this.background = new CanvasBackground(this);
     this.stage.add(this.background.konva.layer);
+
+    this.filter = new CanvasFilter(this);
 
     this._worker.onmessage = (event: MessageEvent<ExtentsResult | WorkerLogMessage>) => {
       const { type, data } = event.data;
