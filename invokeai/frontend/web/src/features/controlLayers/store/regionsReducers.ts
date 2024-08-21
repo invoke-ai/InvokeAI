@@ -6,7 +6,7 @@ import type {
   FillStyle,
   IPMethodV2,
   RegionalGuidanceIPAdapterConfig,
-  RgbaColor,
+  RgbColor,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -33,17 +33,17 @@ export const selectRegionalGuidanceEntityOrThrow = (state: CanvasV2State, id: st
   return rg;
 };
 
-const DEFAULT_MASK_COLORS: RgbaColor[] = [
-  { r: 121, g: 157, b: 219, a: 0.5 }, // rgb(121, 157, 219)
-  { r: 131, g: 214, b: 131, a: 0.5 }, // rgb(131, 214, 131)
-  { r: 250, g: 225, b: 80, a: 0.5 }, // rgb(250, 225, 80)
-  { r: 220, g: 144, b: 101, a: 0.5 }, // rgb(220, 144, 101)
-  { r: 224, g: 117, b: 117, a: 0.5 }, // rgb(224, 117, 117)
-  { r: 213, g: 139, b: 202, a: 0.5 }, // rgb(213, 139, 202)
-  { r: 161, g: 120, b: 214, a: 0.5 }, // rgb(161, 120, 214)
+const DEFAULT_MASK_COLORS: RgbColor[] = [
+  { r: 121, g: 157, b: 219 }, // rgb(121, 157, 219)
+  { r: 131, g: 214, b: 131 }, // rgb(131, 214, 131)
+  { r: 250, g: 225, b: 80 }, // rgb(250, 225, 80)
+  { r: 220, g: 144, b: 101 }, // rgb(220, 144, 101)
+  { r: 224, g: 117, b: 117 }, // rgb(224, 117, 117)
+  { r: 213, g: 139, b: 202 }, // rgb(213, 139, 202)
+  { r: 161, g: 120, b: 214 }, // rgb(161, 120, 214)
 ];
 
-const getRGMaskFill = (state: CanvasV2State): RgbaColor => {
+const getRGMaskFill = (state: CanvasV2State): RgbColor => {
   const lastFill = state.regions.entities.slice(-1)[0]?.fill.color;
   let i = DEFAULT_MASK_COLORS.findIndex((c) => isEqual(c, lastFill));
   if (i === -1) {
@@ -69,6 +69,7 @@ export const regionsReducers = {
           style: 'solid',
           color: getRGMaskFill(state),
         },
+        opacity: 0.5,
         position: { x: 0, y: 0 },
         autoNegative: 'invert',
         positivePrompt: '',
@@ -105,7 +106,7 @@ export const regionsReducers = {
     }
     entity.negativePrompt = prompt;
   },
-  rgFillColorChanged: (state, action: PayloadAction<{ id: string; color: RgbaColor }>) => {
+  rgFillColorChanged: (state, action: PayloadAction<{ id: string; color: RgbColor }>) => {
     const { id, color } = action.payload;
     const entity = selectRegionalGuidanceEntity(state, id);
     if (!entity) {
