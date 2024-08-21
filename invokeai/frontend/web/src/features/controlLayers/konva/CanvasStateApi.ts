@@ -49,7 +49,7 @@ import type {
   RgbaColor,
   Tool,
 } from 'features/controlLayers/store/types';
-import { RGBA_RED } from 'features/controlLayers/store/types';
+import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
 import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
@@ -167,9 +167,6 @@ export class CanvasStateApi {
   getIsSelected = (id: string) => {
     return this.getState().selectedEntityIdentifier?.id === id;
   };
-  getFilterState = () => {
-    return this._store.getState().canvasV2.filter;
-  };
 
   getEntity(identifier: CanvasEntityIdentifier): EntityStateAndAdapter | null {
     const state = this.getState();
@@ -218,7 +215,7 @@ export class CanvasStateApi {
     if (selectedEntity) {
       // These two entity types use a compositing rect for opacity. Their fill is always a solid color.
       if (selectedEntity.state.type === 'regional_guidance' || selectedEntity.state.type === 'inpaint_mask') {
-        currentFill = RGBA_RED;
+        currentFill = RGBA_BLACK;
       }
     }
     return currentFill;

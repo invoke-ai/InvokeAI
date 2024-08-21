@@ -4,11 +4,11 @@ import type { AppStore } from 'app/store/store';
 import type { JSONObject } from 'common/types';
 import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva/constants';
 import {
+  canvasToBlob,
+  canvasToImageData,
   getImageDataTransparency,
   getPrefixedId,
   getRectUnion,
-  konvaNodeToBlob,
-  konvaNodeToImageData,
   nanoid,
   previewBlob,
 } from 'features/controlLayers/konva/util';
@@ -27,6 +27,7 @@ import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import { assert } from 'tsafe';
 
 import { CanvasBackground } from './CanvasBackground';
 import { CanvasLayerAdapter } from './CanvasLayerAdapter';
@@ -576,48 +577,54 @@ export class CanvasManager {
     return pixels / this.getStageScale();
   }
 
-  getCompositeRasterLayerStageClone = (): Konva.Stage => {
-    const layersState = this.stateApi.getRasterLayersState();
-    const stageClone = this.stage.clone();
+  getCompositeRasterLayerCanvas = (rect: Rect): HTMLCanvasElement => {
+    this.log.trace({ rect }, 'Building composite raster layer canvas');
 
-    stageClone.scaleX(1);
-    stageClone.scaleY(1);
-    stageClone.x(0);
-    stageClone.y(0);
+    const canvas = document.createElement('canvas');
+    canvas.width = rect.width;
+    canvas.height = rect.height;
 
-    const validLayers = layersState.entities.filter((entity) => entity.isEnabled && entity.objects.length > 0);
+    const ctx = canvas.getContext('2d');
+    assert(ctx !== null);
 
-    // getLayers() returns the internal `children` array of the stage directly - calling destroy on a layer will
-    // mutate that array. We need to clone the array to avoid mutating the original.
-    for (const konvaLayer of stageClone.getLayers().slice()) {
-      if (!validLayers.find((l) => l.id === konvaLayer.id())) {
-        konvaLayer.destroy();
+    for (const { id } of this.stateApi.getRasterLayersState().entities) {
+      const adapter = this.rasterLayerAdapters.get(id);
+      if (!adapter) {
+        this.log.warn({ id }, 'Raster layer adapter not found');
+        continue;
+      }
+      if (adapter.state.isEnabled && adapter.renderer.hasObjects()) {
+        this.log.trace({ id }, 'Drawing raster layer to composite canvas');
+        const adapterCanvas = adapter.getCanvas(rect);
+        ctx.drawImage(adapterCanvas, 0, 0);
       }
     }
-
-    return stageClone;
+    return canvas;
   };
 
-  getCompositeInpaintMaskStageClone = (): Konva.Stage => {
-    const entities = this.stateApi.getInpaintMasksState().entities;
-    const validEntities = entities.filter((entity) => entity.isEnabled && entity.objects.length > 0);
+  getCompositeInpaintMaskCanvas = (rect: Rect): HTMLCanvasElement => {
+    this.log.trace({ rect }, 'Building composite inpaint mask canvas');
 
-    const stageClone = this.stage.clone();
+    const canvas = document.createElement('canvas');
+    canvas.width = rect.width;
+    canvas.height = rect.height;
 
-    stageClone.scaleX(1);
-    stageClone.scaleY(1);
-    stageClone.x(0);
-    stageClone.y(0);
+    const ctx = canvas.getContext('2d');
+    assert(ctx !== null);
 
-    // getLayers() returns the internal `children` array of the stage directly - calling destroy on a layer will
-    // mutate that array. We need to clone the array to avoid mutating the original.
-    for (const konvaLayer of stageClone.getLayers().slice()) {
-      if (!validEntities.find((l) => l.id === konvaLayer.id())) {
-        konvaLayer.destroy();
+    for (const { id } of this.stateApi.getInpaintMasksState().entities) {
+      const adapter = this.inpaintMaskAdapters.get(id);
+      if (!adapter) {
+        this.log.warn({ id }, 'Inpaint mask adapter not found');
+        continue;
+      }
+      if (adapter.state.isEnabled && adapter.renderer.hasObjects()) {
+        this.log.trace({ id }, 'Drawing inpaint mask to composite canvas');
+        const adapterCanvas = adapter.getCanvas(rect);
+        ctx.drawImage(adapterCanvas, 0, 0);
       }
     }
-
-    return stageClone;
+    return canvas;
   };
 
   getCompositeInpaintMaskImageCache = (rect: Rect): ImageCache | null => {
@@ -646,10 +653,10 @@ export class CanvasManager {
 
     this.log.trace({ rect }, 'Rasterizing composite raster layer');
 
-    const blob = await konvaNodeToBlob(this.getCompositeRasterLayerStageClone(), rect);
-
+    const canvas = this.getCompositeRasterLayerCanvas(rect);
+    const blob = await canvasToBlob(canvas);
     if (this._isDebugging) {
-      previewBlob(blob, 'Composite raster layer');
+      previewBlob(blob, 'Composite raster layer canvas');
     }
 
     imageDTO = await uploadImage(blob, 'composite-raster-layer.png', 'general', true);
@@ -671,10 +678,10 @@ export class CanvasManager {
 
     this.log.trace({ rect }, 'Rasterizing composite inpaint mask');
 
-    const blob = await konvaNodeToBlob(this.getCompositeInpaintMaskStageClone(), rect);
-
+    const canvas = this.getCompositeInpaintMaskCanvas(rect);
+    const blob = await canvasToBlob(canvas);
     if (this._isDebugging) {
-      previewBlob(blob, 'Composite inpaint mask');
+      previewBlob(blob, 'Composite inpaint mask canvas');
     }
 
     imageDTO = await uploadImage(blob, 'composite-inpaint-mask.png', 'general', true);
@@ -684,9 +691,9 @@ export class CanvasManager {
 
   getGenerationMode(): GenerationMode {
     const { rect } = this.stateApi.getBbox();
-    const inpaintMaskImageData = konvaNodeToImageData(this.getCompositeInpaintMaskStageClone(), rect);
+    const inpaintMaskImageData = canvasToImageData(this.getCompositeInpaintMaskCanvas(rect));
     const inpaintMaskTransparency = getImageDataTransparency(inpaintMaskImageData);
-    const compositeLayerImageData = konvaNodeToImageData(this.getCompositeRasterLayerStageClone(), rect);
+    const compositeLayerImageData = canvasToImageData(this.getCompositeRasterLayerCanvas(rect));
     const compositeLayerTransparency = getImageDataTransparency(compositeLayerImageData);
     if (compositeLayerTransparency === 'FULLY_TRANSPARENT') {
       // When the initial image is fully transparent, we are always doing txt2img
