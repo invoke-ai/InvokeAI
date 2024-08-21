@@ -5,10 +5,9 @@ import type {
   CanvasV2State,
   EntityIdentifierPayload,
   FillStyle,
-  Rect,
   RgbColor,
 } from 'features/controlLayers/store/types';
-import { isEqual, merge } from 'lodash-es';
+import { merge } from 'lodash-es';
 import { assert } from 'tsafe';
 
 export const selectInpaintMaskEntity = (state: CanvasV2State, id: string) =>
@@ -34,7 +33,7 @@ export const inpaintMaskReducers = {
         objects: [],
         opacity: 1,
         position: { x: 0, y: 0 },
-        rasterizationCache: [],
+        rasterizationCache: {},
         fill: {
           style: 'diagonal',
           color: { r: 255, g: 122, b: 0 }, // some orange color
@@ -71,10 +70,8 @@ export const inpaintMaskReducers = {
     }
     entity.fill.style = style;
   },
-  inpaintMaskCompositeRasterized: (state, action: PayloadAction<{ imageName: string; rect: Rect }>) => {
-    state.inpaintMasks.compositeRasterizationCache = state.inpaintMasks.compositeRasterizationCache.filter(
-      (cache) => !isEqual(cache.rect, action.payload.rect)
-    );
-    state.inpaintMasks.compositeRasterizationCache.push(action.payload);
+  inpaintMaskCompositeRasterized: (state, action: PayloadAction<{ hash: string; imageName: string }>) => {
+    const { hash, imageName } = action.payload;
+    state.inpaintMasks.compositeRasterizationCache[hash] = imageName;
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
