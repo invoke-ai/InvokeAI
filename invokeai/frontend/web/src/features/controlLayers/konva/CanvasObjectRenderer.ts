@@ -10,7 +10,6 @@ import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
-  getHash,
   getPrefixedId,
   konvaNodeToBlob,
   konvaNodeToCanvas,
@@ -484,10 +483,6 @@ export class CanvasObjectRenderer {
     return this.renderers.size > 0 || this.bufferState !== null || this.bufferRenderer !== null;
   };
 
-  getRasterizedImageCache = (hash: string): string | null => {
-    return this.parent.state.rasterizationCache[hash] ?? null;
-  };
-
   /**
    * Rasterizes the parent entity. If the entity has a rasterization cache for the given rect, the cached image is
    * returned. Otherwise, the entity is rasterized and the image is uploaded to the server.
@@ -498,10 +493,11 @@ export class CanvasObjectRenderer {
    * @param rect The rect to rasterize. If omitted, the entity's full rect will be used.
    * @returns A promise that resolves to the rasterized image DTO.
    */
-  rasterize = async (rect: Rect, replaceObjects: boolean = false, attrs?: GroupConfig): Promise<ImageDTO> => {
+  rasterize = async (options: { rect: Rect; replaceObjects?: boolean; attrs?: GroupConfig }): Promise<ImageDTO> => {
+    const { rect, replaceObjects, attrs } = { replaceObjects: false, attrs: {}, ...options };
     let imageDTO: ImageDTO | null = null;
-    const hash = getHash({ rect, attrs });
-    const cachedImageName = this.getRasterizedImageCache(hash);
+    const hash = this.parent.hash({ rect, attrs });
+    const cachedImageName = this.manager.imageNameCache.get(hash);
 
     if (cachedImageName) {
       imageDTO = await getImageDTO(cachedImageName);
@@ -513,7 +509,7 @@ export class CanvasObjectRenderer {
 
     this.log.trace({ rect }, 'Rasterizing entity');
 
-    const blob = await this.getBlob(rect);
+    const blob = await this.getBlob(rect, attrs);
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Rasterized entity');
     }
@@ -526,10 +522,10 @@ export class CanvasObjectRenderer {
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.getEntityIdentifier(),
       imageObject,
-      hash,
       rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: imageDTO.width, height: imageDTO.height },
       replaceObjects,
     });
+    this.manager.imageNameCache.set(hash, imageDTO.image_name);
 
     return imageDTO;
   };
@@ -545,17 +541,23 @@ export class CanvasObjectRenderer {
 
   getCanvas = (rect?: Rect, attrs?: GroupConfig): HTMLCanvasElement => {
     const clone = this.cloneObjectGroup(attrs);
-    return konvaNodeToCanvas(clone, rect);
+    const canvas = konvaNodeToCanvas(clone, rect);
+    clone.destroy();
+    return canvas;
   };
 
-  getBlob = (rect?: Rect, attrs?: GroupConfig): Promise<Blob> => {
+  getBlob = async (rect?: Rect, attrs?: GroupConfig): Promise<Blob> => {
     const clone = this.cloneObjectGroup(attrs);
-    return konvaNodeToBlob(clone, rect);
+    const blob = await konvaNodeToBlob(clone, rect);
+    clone.destroy();
+    return blob;
   };
 
   getImageData = (rect?: Rect, attrs?: GroupConfig): ImageData => {
     const clone = this.cloneObjectGroup(attrs);
-    return konvaNodeToImageData(clone, rect);
+    const imageData = konvaNodeToImageData(clone, rect);
+    clone.destroy();
+    return imageData;
   };
 
   /**

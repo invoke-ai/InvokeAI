@@ -30,17 +30,11 @@ export const rasterLayersReducers = {
         objects: [],
         opacity: 1,
         position: { x: 0, y: 0 },
-        rasterizationCache: {},
       };
       merge(layer, overrides);
       state.rasterLayers.entities.push(layer);
       if (isSelected) {
         state.selectedEntityIdentifier = { type: 'raster_layer', id };
-      }
-
-      if (layer.objects.length > 0) {
-        // This new layer will change the composite layer's image data. Invalidate the cache.
-        state.rasterLayers.compositeRasterizationCache = {};
       }
     },
     prepare: (payload: { overrides?: Partial<CanvasRasterLayerState>; isSelected?: boolean }) => ({
@@ -51,18 +45,9 @@ export const rasterLayersReducers = {
     const { data } = action.payload;
     state.rasterLayers.entities.push(data);
     state.selectedEntityIdentifier = { type: 'raster_layer', id: data.id };
-    if (data.objects.length > 0) {
-      // This new layer will change the composite layer's image data. Invalidate the cache.
-      state.rasterLayers.compositeRasterizationCache = {};
-    }
   },
   rasterLayerAllDeleted: (state) => {
     state.rasterLayers.entities = [];
-    state.rasterLayers.compositeRasterizationCache = {};
-  },
-  rasterLayerCompositeRasterized: (state, action: PayloadAction<{ hash: string; imageName: string }>) => {
-    const { hash, imageName } = action.payload;
-    state.rasterLayers.compositeRasterizationCache[hash] = imageName;
   },
   rasterLayerConvertedToControlLayer: {
     reducer: (state, action: PayloadAction<{ id: string; newId: string }>) => {
@@ -86,9 +71,6 @@ export const rasterLayersReducers = {
 
       // Add the converted control layer
       state.controlLayers.entities.push(controlLayerState);
-
-      // The composite layer's image data will change when the raster layer is converted to control layer.
-      state.rasterLayers.compositeRasterizationCache = {};
 
       state.selectedEntityIdentifier = { type: controlLayerState.type, id: controlLayerState.id };
     },

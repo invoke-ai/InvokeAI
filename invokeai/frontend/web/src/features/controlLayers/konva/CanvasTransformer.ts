@@ -2,7 +2,7 @@ import type { JSONObject } from 'common/types';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
-import { getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
+import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
@@ -508,7 +508,7 @@ export class CanvasTransformer {
   applyTransform = async () => {
     this.log.debug('Applying transform');
     const rect = this.getRelativeRect();
-    await this.parent.renderer.rasterize(rect, true);
+    await this.parent.renderer.rasterize({ rect, replaceObjects: true });
     this.requestRectCalculation();
     this.stopTransform();
   };
@@ -649,14 +649,8 @@ export class CanvasTransformer {
     }
 
     // We have eraser strokes - we must calculate the bbox using pixel data
-
-    const clone = this.parent.renderer.konva.objectGroup.clone();
-    const canvas = clone.toCanvas();
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return;
-    }
-    const imageData = ctx.getImageData(0, 0, rect.width, rect.height);
+    const canvas = this.parent.renderer.getCanvas(undefined, { opacity: 1 });
+    const imageData = canvasToImageData(canvas);
     this.manager.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
       (extents) => {
@@ -676,7 +670,6 @@ export class CanvasTransformer {
         this.isPendingRectCalculation = false;
         this.log.trace({ nodeRect: this.nodeRect, pixelRect: this.pixelRect, extents }, `Got bbox from worker`);
         this.updateBbox();
-        clone.destroy();
       }
     );
   }, CanvasTransformer.RECT_CALC_DEBOUNCE_MS);
