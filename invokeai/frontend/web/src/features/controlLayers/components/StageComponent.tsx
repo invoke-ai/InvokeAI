@@ -5,7 +5,7 @@ import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
-import { $canvasManager, CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
 import Konva from 'konva';
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
@@ -38,7 +38,6 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     }
 
     const manager = new CanvasManager(stage, container, store, socket);
-    $canvasManager.set(manager);
     console.log(manager);
     const cleanup = manager.initialize();
     return cleanup;
