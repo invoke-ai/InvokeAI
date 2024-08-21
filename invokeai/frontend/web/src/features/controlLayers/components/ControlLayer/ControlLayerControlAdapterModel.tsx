@@ -1,8 +1,8 @@
 import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { $filterConfig, $filteringEntity } from 'features/controlLayers/store/canvasV2Slice';
 import { IMAGE_FILTERS, isFilterType } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ type Props = {
 export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onChangeModel }: Props) => {
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
+  const canvasManager = useCanvasManager();
   const currentBaseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
   const [modelConfigs, { isLoading }] = useControlNetAndT2IAdapterModels();
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
@@ -35,19 +36,21 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
         return;
       }
 
-      // Update the filter, preferring the model's default
-      if (isFilterType(modelConfig.default_settings?.preprocessor)) {
-        $filterConfig.set(IMAGE_FILTERS[modelConfig.default_settings.preprocessor].buildDefaults(modelConfig.base));
-      } else {
-        $filterConfig.set(IMAGE_FILTERS.canny_image_processor.buildDefaults(modelConfig.base));
-      }
-
       // Open the filter popup by setting this entity as the filtering entity
-      if (!$filteringEntity.get()) {
-        $filteringEntity.set(entityIdentifier);
+      if (!canvasManager.filter.$adapter.get()) {
+        // Update the filter, preferring the model's default
+        if (isFilterType(modelConfig.default_settings?.preprocessor)) {
+          canvasManager.filter.$config.set(
+            IMAGE_FILTERS[modelConfig.default_settings.preprocessor].buildDefaults(modelConfig.base)
+          );
+        } else {
+          canvasManager.filter.$config.set(IMAGE_FILTERS.canny_image_processor.buildDefaults(modelConfig.base));
+        }
+        canvasManager.filter.initialize(entityIdentifier);
+        canvasManager.filter.previewFilter();
       }
     },
-    [entityIdentifier, modelKey, onChangeModel]
+    [canvasManager.filter, entityIdentifier, modelKey, onChangeModel]
   );
 
   const getIsDisabled = useCallback(
