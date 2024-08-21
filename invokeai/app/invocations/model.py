@@ -183,7 +183,7 @@ class FluxModelLoaderInvocation(BaseInvocation):
         model_key = self.model.key
 
         if not context.models.exists(model_key):
-            raise Exception(f"Unknown model: {model_key}")
+            raise ValueError(f"Unknown model: {model_key}")
         transformer = self._get_model(context, SubModelType.Transformer)
         tokenizer = self._get_model(context, SubModelType.Tokenizer)
         tokenizer2 = self._get_model(context, SubModelType.Tokenizer2)
@@ -203,10 +203,7 @@ class FluxModelLoaderInvocation(BaseInvocation):
         legacy_config_path = context.config.get().legacy_conf_path / transformer_config.config_path
         config_path = legacy_config_path.as_posix()
         with open(config_path, "r") as stream:
-            try:
-                flux_conf = yaml.safe_load(stream)
-            except:
-                raise
+            flux_conf = yaml.safe_load(stream)
 
         return FluxModelLoaderOutput(
             transformer=TransformerField(transformer=transformer),
