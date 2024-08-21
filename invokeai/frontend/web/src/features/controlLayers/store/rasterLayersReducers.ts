@@ -1,10 +1,10 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { isEqual, merge } from 'lodash-es';
+import { merge } from 'lodash-es';
 import { assert } from 'tsafe';
 
-import type { CanvasControlLayerState, CanvasRasterLayerState, CanvasV2State, Rect } from './types';
+import type { CanvasControlLayerState, CanvasRasterLayerState, CanvasV2State } from './types';
 import { initialControlNetV2 } from './types';
 
 export const selectRasterLayer = (state: CanvasV2State, id: string) =>
@@ -30,7 +30,7 @@ export const rasterLayersReducers = {
         objects: [],
         opacity: 1,
         position: { x: 0, y: 0 },
-        rasterizationCache: [],
+        rasterizationCache: {},
       };
       merge(layer, overrides);
       state.rasterLayers.entities.push(layer);
@@ -40,7 +40,7 @@ export const rasterLayersReducers = {
 
       if (layer.objects.length > 0) {
         // This new layer will change the composite layer's image data. Invalidate the cache.
-        state.rasterLayers.compositeRasterizationCache = [];
+        state.rasterLayers.compositeRasterizationCache = {};
       }
     },
     prepare: (payload: { overrides?: Partial<CanvasRasterLayerState>; isSelected?: boolean }) => ({
@@ -53,18 +53,16 @@ export const rasterLayersReducers = {
     state.selectedEntityIdentifier = { type: 'raster_layer', id: data.id };
     if (data.objects.length > 0) {
       // This new layer will change the composite layer's image data. Invalidate the cache.
-      state.rasterLayers.compositeRasterizationCache = [];
+      state.rasterLayers.compositeRasterizationCache = {};
     }
   },
   rasterLayerAllDeleted: (state) => {
     state.rasterLayers.entities = [];
-    state.rasterLayers.compositeRasterizationCache = [];
+    state.rasterLayers.compositeRasterizationCache = {};
   },
-  rasterLayerCompositeRasterized: (state, action: PayloadAction<{ imageName: string; rect: Rect }>) => {
-    state.rasterLayers.compositeRasterizationCache = state.rasterLayers.compositeRasterizationCache.filter(
-      (cache) => !isEqual(cache.rect, action.payload.rect)
-    );
-    state.rasterLayers.compositeRasterizationCache.push(action.payload);
+  rasterLayerCompositeRasterized: (state, action: PayloadAction<{ hash: string; imageName: string }>) => {
+    const { hash, imageName } = action.payload;
+    state.rasterLayers.compositeRasterizationCache[hash] = imageName;
   },
   rasterLayerConvertedToControlLayer: {
     reducer: (state, action: PayloadAction<{ id: string; newId: string }>) => {
@@ -90,7 +88,7 @@ export const rasterLayersReducers = {
       state.controlLayers.entities.push(controlLayerState);
 
       // The composite layer's image data will change when the raster layer is converted to control layer.
-      state.rasterLayers.compositeRasterizationCache = [];
+      state.rasterLayers.compositeRasterizationCache = {};
 
       state.selectedEntityIdentifier = { type: controlLayerState.type, id: controlLayerState.id };
     },
