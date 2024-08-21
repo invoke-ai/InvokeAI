@@ -7,6 +7,7 @@ import { CanvasEntityEditableTitle } from 'features/controlLayers/components/com
 import { RegionalGuidanceBadges } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceBadges';
 import { RegionalGuidanceSettings } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceSettings';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { EntityMaskAdapterProviderGate } from 'features/controlLayers/hooks/useEntityMaskAdapter';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
@@ -22,18 +23,20 @@ export const RegionalGuidance = memo(({ id }: Props) => {
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <CanvasEntityContainer>
-        <CanvasEntityHeader>
-          <CanvasEntityEnabledToggle />
-          <CanvasEntityEditableTitle />
-          <Spacer />
-          <RegionalGuidanceBadges />
-          <RegionalGuidanceMaskFillColorPicker />
-          <RegionalGuidanceSettingsPopover />
-          <CanvasEntityDeleteButton />
-        </CanvasEntityHeader>
-        <RegionalGuidanceSettings />
-      </CanvasEntityContainer>
+      <EntityMaskAdapterProviderGate>
+        <CanvasEntityContainer>
+          <CanvasEntityHeader>
+            <CanvasEntityEnabledToggle />
+            <CanvasEntityEditableTitle />
+            <Spacer />
+            <RegionalGuidanceBadges />
+            <RegionalGuidanceMaskFillColorPicker />
+            <RegionalGuidanceSettingsPopover />
+            <CanvasEntityDeleteButton />
+          </CanvasEntityHeader>
+          <RegionalGuidanceSettings />
+        </CanvasEntityContainer>
+      </EntityMaskAdapterProviderGate>
     </EntityIdentifierContext.Provider>
   );
 });
