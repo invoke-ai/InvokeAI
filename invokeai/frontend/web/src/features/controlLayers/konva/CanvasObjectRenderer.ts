@@ -9,7 +9,13 @@ import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskA
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
-import { getPrefixedId, konvaNodeToBlob, konvaNodeToImageData, previewBlob } from 'features/controlLayers/konva/util';
+import {
+  getPrefixedId,
+  konvaNodeToBlob,
+  konvaNodeToCanvas,
+  konvaNodeToImageData,
+  previewBlob,
+} from 'features/controlLayers/konva/util';
 import type {
   CanvasBrushLineState,
   CanvasEraserLineState,
@@ -21,6 +27,7 @@ import type {
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { GroupConfig } from 'konva/lib/Group';
 import { isEqual } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
@@ -527,12 +534,28 @@ export class CanvasObjectRenderer {
     return imageDTO;
   };
 
-  getBlob = (rect?: Rect): Promise<Blob> => {
-    return konvaNodeToBlob(this.konva.objectGroup.clone(), rect);
+  cloneObjectGroup = (attrs?: GroupConfig): Konva.Group => {
+    const clone = this.konva.objectGroup.clone();
+    clone.cache();
+    if (attrs) {
+      clone.setAttrs(attrs);
+    }
+    return clone;
   };
 
-  getImageData = (rect?: Rect): ImageData => {
-    return konvaNodeToImageData(this.konva.objectGroup.clone(), rect);
+  getCanvas = (rect?: Rect, attrs?: GroupConfig): HTMLCanvasElement => {
+    const clone = this.cloneObjectGroup(attrs);
+    return konvaNodeToCanvas(clone, rect);
+  };
+
+  getBlob = (rect?: Rect, attrs?: GroupConfig): Promise<Blob> => {
+    const clone = this.cloneObjectGroup(attrs);
+    return konvaNodeToBlob(clone, rect);
+  };
+
+  getImageData = (rect?: Rect, attrs?: GroupConfig): ImageData => {
+    const clone = this.cloneObjectGroup(attrs);
+    return konvaNodeToImageData(clone, rect);
   };
 
   /**
