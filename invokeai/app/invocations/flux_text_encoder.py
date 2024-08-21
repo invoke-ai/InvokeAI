@@ -15,8 +15,8 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 @invocation(
     "flux_text_encoder",
     title="FLUX Text Encoding",
-    tags=["image", "flux"],
-    category="image",
+    tags=["prompt", "conditioning", "flux"],
+    category="conditioning",
     version="1.0.0",
 )
 class FluxTextEncoderInvocation(BaseInvocation):
@@ -32,7 +32,9 @@ class FluxTextEncoderInvocation(BaseInvocation):
         description=FieldDescriptions.t5_encoder,
         input=Input.Connection,
     )
-    max_seq_len: Literal[256, 512] = InputField(description="Max sequence length for the desired flux model")
+    t5_max_seq_len: Literal[256, 512] = InputField(
+        description="Max sequence length for the T5 encoder. Expected to be 256 for FLUX schnell models and 512 for FLUX dev models."
+    )
     positive_prompt: str = InputField(description="Positive prompt for text-to-image generation.")
 
     # TODO(ryand): Should we create a new return type for this invocation? This ConditioningOutput is clearly not
@@ -48,8 +50,6 @@ class FluxTextEncoderInvocation(BaseInvocation):
         return ConditioningOutput.build(conditioning_name)
 
     def _encode_prompt(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor]:
-        max_seq_len = self.max_seq_len
-
         # Load CLIP.
         clip_tokenizer_info = context.models.load(self.clip.tokenizer)
         clip_text_encoder_info = context.models.load(self.clip.text_encoder)
@@ -70,7 +70,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
             assert isinstance(t5_tokenizer, T5Tokenizer)
 
             clip_encoder = HFEncoder(clip_text_encoder, clip_tokenizer, True, 77)
-            t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, max_seq_len)
+            t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len)
 
             prompt = [self.positive_prompt]
             prompt_embeds = t5_encoder(prompt)
