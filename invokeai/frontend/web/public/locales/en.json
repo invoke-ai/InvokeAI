@@ -784,6 +784,7 @@
         "simpleModelPlaceholder": "URL or path to a local file or diffusers folder",
         "source": "Source",
         "starterModels": "Starter Models",
+        "starterModelsInModelManager": "Starter Models can be found in Model Manager",
         "syncModels": "Sync Models",
         "textualInversions": "Textual Inversions",
         "triggerPhrases": "Trigger Phrases",
