@@ -13,9 +13,6 @@ const createSelectName = (entityIdentifier: CanvasEntityIdentifier) =>
     if (!entity) {
       return null;
     }
-    if (entity.type === 'inpaint_mask') {
-      return null;
-    }
     return entity.name;
   });
 
