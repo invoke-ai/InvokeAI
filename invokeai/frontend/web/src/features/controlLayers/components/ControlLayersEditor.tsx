@@ -6,6 +6,7 @@ import { ControlLayersToolbar } from 'features/controlLayers/components/ControlL
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { StageComponent } from 'features/controlLayers/components/StageComponent';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { memo, useRef } from 'react';
 
 export const CanvasEditor = memo(() => {
@@ -33,7 +34,9 @@ export const CanvasEditor = memo(() => {
         <StagingAreaToolbar />
       </Flex>
       <Flex position="absolute" bottom={16}>
-        <Filter />
+        <CanvasManagerProviderGate>
+          <Filter />
+        </CanvasManagerProviderGate>
       </Flex>
       <CanvasDropArea />
     </Flex>
