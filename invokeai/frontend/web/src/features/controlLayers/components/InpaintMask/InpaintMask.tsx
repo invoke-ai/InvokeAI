@@ -4,6 +4,7 @@ import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/com
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { EntityMaskAdapterProviderGate } from 'features/controlLayers/hooks/useEntityMaskAdapter';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
@@ -18,14 +19,16 @@ export const InpaintMask = memo(({ id }: Props) => {
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <CanvasEntityContainer>
-        <CanvasEntityHeader>
-          <CanvasEntityEnabledToggle />
-          <CanvasEntityEditableTitle />
-          <Spacer />
-          <InpaintMaskMaskFillColorPicker />
-        </CanvasEntityHeader>
-      </CanvasEntityContainer>
+      <EntityMaskAdapterProviderGate>
+        <CanvasEntityContainer>
+          <CanvasEntityHeader>
+            <CanvasEntityEnabledToggle />
+            <CanvasEntityEditableTitle />
+            <Spacer />
+            <InpaintMaskMaskFillColorPicker />
+          </CanvasEntityHeader>
+        </CanvasEntityContainer>
+      </EntityMaskAdapterProviderGate>
     </EntityIdentifierContext.Provider>
   );
 });
