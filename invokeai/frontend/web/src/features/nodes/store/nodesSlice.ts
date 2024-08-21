@@ -23,6 +23,7 @@ import type {
   StatefulFieldValue,
   StringFieldValue,
   T2IAdapterModelFieldValue,
+  T5EncoderModelFieldValue,
   VAEModelFieldValue,
 } from 'features/nodes/types/field';
 import {
@@ -44,6 +45,7 @@ import {
   zStatefulFieldValue,
   zStringFieldValue,
   zT2IAdapterModelFieldValue,
+  zT5EncoderModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
 import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
@@ -341,6 +343,9 @@ export const nodesSlice = createSlice({
     ) => {
       fieldValueReducer(state, action, zSpandrelImageToImageModelFieldValue);
     },
+    fieldT5EncoderValueChanged: (state, action: FieldValueAction<T5EncoderModelFieldValue>) => {
+      fieldValueReducer(state, action, zT5EncoderModelFieldValue);
+    },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
       fieldValueReducer(state, action, zEnumFieldValue);
     },
@@ -402,6 +407,7 @@ export const {
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
+  fieldT5EncoderValueChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
@@ -514,6 +520,7 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
+  fieldT5EncoderValueChanged,
   nodesChanged,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,

@@ -40,6 +40,8 @@ import {
   isStringFieldInputTemplate,
   isT2IAdapterModelFieldInputInstance,
   isT2IAdapterModelFieldInputTemplate,
+  isT5EncoderModelFieldInputInstance,
+  isT5EncoderModelFieldInputTemplate,
   isVAEModelFieldInputInstance,
   isVAEModelFieldInputTemplate,
 } from 'features/nodes/types/field';
@@ -62,6 +64,7 @@ import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputCo
 import SpandrelImageToImageModelFieldInputComponent from './inputs/SpandrelImageToImageModelFieldInputComponent';
 import StringFieldInputComponent from './inputs/StringFieldInputComponent';
 import T2IAdapterModelFieldInputComponent from './inputs/T2IAdapterModelFieldInputComponent';
+import T5EncoderModelFieldInputComponent from './inputs/T5EncoderModelFieldInputComponent';
 import VAEModelFieldInputComponent from './inputs/VAEModelFieldInputComponent';
 
 type InputFieldProps = {
@@ -114,6 +117,10 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
 
   if (isVAEModelFieldInputInstance(fieldInstance) && isVAEModelFieldInputTemplate(fieldTemplate)) {
     return <VAEModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isT5EncoderModelFieldInputInstance(fieldInstance) && isT5EncoderModelFieldInputTemplate(fieldTemplate)) {
+    return <T5EncoderModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isLoRAModelFieldInputInstance(fieldInstance) && isLoRAModelFieldInputTemplate(fieldTemplate)) {

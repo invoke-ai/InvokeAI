@@ -5742,15 +5742,10 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /** @description Flux model (Transformer, VAE, CLIP) to load */
+            /** @description Flux model (Transformer) to load */
             model: components["schemas"]["ModelIdentifierField"];
-            /**
-             * T5 Encoder
-             * @description The T5 Encoder model to use.
-             * @default null
-             * @enum {string}
-             */
-            t5_encoder?: "base" | "8b_quantized";
+            /** @description T5 tokenizer and text encoder */
+            t5_encoder: components["schemas"]["ModelIdentifierField"];
             /**
              * type
              * @default flux_model_loader
@@ -5833,12 +5828,12 @@ export type components = {
              */
             t5_encoder?: components["schemas"]["T5EncoderField"];
             /**
-             * Max Seq Len
-             * @description Max sequence length for the desired flux model
+             * T5 Max Seq Len
+             * @description Max sequence length for the T5 encoder. Expected to be 256 for FLUX schnell models and 512 for FLUX dev models.
              * @default null
              * @enum {integer}
              */
-            max_seq_len?: 256 | 512;
+            t5_max_seq_len?: 256 | 512;
             /**
              * Positive Prompt
              * @description Positive prompt for text-to-image generation.
@@ -5887,7 +5882,7 @@ export type components = {
             use_cache?: boolean;
             /**
              * Transformer
-             * @description UNet (scheduler, LoRAs)
+             * @description Flux model (Transformer) to load
              * @default null
              */
             transformer?: components["schemas"]["TransformerField"];
@@ -5915,13 +5910,13 @@ export type components = {
             height?: number;
             /**
              * Num Steps
-             * @description Number of diffusion steps.
+             * @description Number of diffusion steps. Recommend values are schnell: 4, dev: 50.
              * @default 4
              */
             num_steps?: number;
             /**
              * Guidance
-             * @description The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images.
+             * @description The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images. FLUX dev only, ignored for schnell.
              * @default 4
              */
             guidance?: number;
@@ -15074,7 +15069,7 @@ export type components = {
          *     used, and the type will be ignored. They are included here for backwards compatibility.
          * @enum {string}
          */
-        UIType: "MainModelField" | "FluxMainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "T2IAdapterModelField" | "SpandrelImageToImageModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
+        UIType: "MainModelField" | "FluxMainModelField" | "SDXLMainModelField" | "SDXLRefinerModelField" | "ONNXModelField" | "VAEModelField" | "LoRAModelField" | "ControlNetModelField" | "IPAdapterModelField" | "T2IAdapterModelField" | "T5EncoderModelField" | "SpandrelImageToImageModelField" | "SchedulerField" | "AnyField" | "CollectionField" | "CollectionItemField" | "DEPRECATED_Boolean" | "DEPRECATED_Color" | "DEPRECATED_Conditioning" | "DEPRECATED_Control" | "DEPRECATED_Float" | "DEPRECATED_Image" | "DEPRECATED_Integer" | "DEPRECATED_Latents" | "DEPRECATED_String" | "DEPRECATED_BooleanCollection" | "DEPRECATED_ColorCollection" | "DEPRECATED_ConditioningCollection" | "DEPRECATED_ControlCollection" | "DEPRECATED_FloatCollection" | "DEPRECATED_ImageCollection" | "DEPRECATED_IntegerCollection" | "DEPRECATED_LatentsCollection" | "DEPRECATED_StringCollection" | "DEPRECATED_BooleanPolymorphic" | "DEPRECATED_ColorPolymorphic" | "DEPRECATED_ConditioningPolymorphic" | "DEPRECATED_ControlPolymorphic" | "DEPRECATED_FloatPolymorphic" | "DEPRECATED_ImagePolymorphic" | "DEPRECATED_IntegerPolymorphic" | "DEPRECATED_LatentsPolymorphic" | "DEPRECATED_StringPolymorphic" | "DEPRECATED_UNet" | "DEPRECATED_Vae" | "DEPRECATED_CLIP" | "DEPRECATED_Collection" | "DEPRECATED_CollectionItem" | "DEPRECATED_Enum" | "DEPRECATED_WorkflowField" | "DEPRECATED_IsIntermediate" | "DEPRECATED_BoardField" | "DEPRECATED_MetadataItem" | "DEPRECATED_MetadataItemCollection" | "DEPRECATED_MetadataItemPolymorphic" | "DEPRECATED_MetadataDict";
         /** UNetField */
         UNetField: {
             /** @description Info to load unet submodel */

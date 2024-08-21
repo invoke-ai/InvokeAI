@@ -73,6 +73,7 @@ const zModelType = z.enum([
   'onnx',
   'clip_vision',
   'spandrel_image_to_image',
+  't5_encoder',
 ]);
 const zSubModelType = z.enum([
   'unet',
