@@ -1,5 +1,5 @@
 {
-  "name": "Flux Text to Image",
+  "name": "FLUX Text to Image",
   "author": "InvokeAI",
   "description": "A simple text-to-image workflow using FLUX dev or schnell models. Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. These can be found in the starter models tab within your Model Manager.",
   "version": "1.0.0",
