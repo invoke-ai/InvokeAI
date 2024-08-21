@@ -22,6 +22,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   SpandrelImageToImageModelField: undefined,
   VAEModelField: undefined,
   ControlNetModelField: undefined,
+  T5EncoderModelField: undefined,
 };
 
 export const buildFieldInputInstance = (id: string, template: FieldInputTemplate): FieldInputInstance => {
