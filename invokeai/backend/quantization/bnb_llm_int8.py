@@ -22,7 +22,7 @@ class InvokeInt8Params(bnb.nn.Int8Params):
             return super().cuda(device)
         elif self.CB is not None and self.SCB is not None:
             self.data = self.data.cuda()
-            self.CB = self.CB.cuda()
+            self.CB = self.data
             self.SCB = self.SCB.cuda()
         else:
             # we store the 8-bit rows-major weight
