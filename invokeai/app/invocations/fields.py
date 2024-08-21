@@ -49,6 +49,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     ControlNetModel = "ControlNetModelField"
     IPAdapterModel = "IPAdapterModelField"
     T2IAdapterModel = "T2IAdapterModelField"
+    T5EncoderModel = "T5EncoderModelField"
     SpandrelImageToImageModel = "SpandrelImageToImageModelField"
     # endregion
 

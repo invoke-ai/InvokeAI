@@ -177,7 +177,11 @@ class FluxModelLoaderInvocation(BaseInvocation):
         input=Input.Direct,
     )
 
-    t5_encoder: T5_ENCODER_OPTIONS = InputField(description="The T5 Encoder model to use.")
+    t5_encoder: ModelIdentifierField = InputField(
+        description=FieldDescriptions.t5Encoder,
+        ui_type=UIType.T5EncoderModel,
+        input=Input.Direct,
+    )
 
     def invoke(self, context: InvocationContext) -> FluxModelLoaderOutput:
         model_key = self.model.key
@@ -231,9 +235,9 @@ class FluxModelLoaderInvocation(BaseInvocation):
                 return self._install_model(
                     context,
                     submodel,
-                    T5_ENCODER_MAP[self.t5_encoder]["name"],
-                    T5_ENCODER_MAP[self.t5_encoder]["repo"],
-                    ModelFormat(T5_ENCODER_MAP[self.t5_encoder]["format"]),
+                    self.t5_encoder.name,
+                    "",
+                    ModelFormat.T5Encoder,
                     ModelType.T5Encoder,
                     BaseModelType.Any,
                 )
