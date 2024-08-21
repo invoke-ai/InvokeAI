@@ -1,13 +1,12 @@
 import type { AppSocket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
-import type { JSONObject } from 'common/types';
+import type { JSONObject, SerializableObject } from 'common/types';
 import { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
 import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva/constants';
 import {
   canvasToBlob,
   canvasToImageData,
-  getHash,
   getImageDataTransparency,
   getPrefixedId,
   getRectUnion,
@@ -18,10 +17,12 @@ import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'feat
 import type { CanvasV2State, Coordinate, Dimensions, GenerationMode, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import { clamp } from 'lodash-es';
+import { LRUCache } from 'lru-cache';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
 import { CanvasBackground } from './CanvasBackground';
@@ -57,6 +58,10 @@ export class CanvasManager {
   prevState: CanvasV2State;
   isFirstRender: boolean = true;
   _isDebugging: boolean = false;
+
+  imageNameCache = new LRUCache<string, string>({ max: 100 });
+  canvasCache = new LRUCache<string, HTMLCanvasElement>({ max: 32 });
+  generationModeCache = new LRUCache<string, GenerationMode>({ max: 100 });
 
   _worker: Worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
   _tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }> = new Map();
@@ -579,7 +584,41 @@ export class CanvasManager {
     return pixels / this.getStageScale();
   }
 
+  clearCaches = () => {
+    this.canvasCache.clear();
+    this.imageNameCache.clear();
+    this.generationModeCache.clear();
+  };
+
+  getCompositeRasterLayerEntityIds = (): string[] => {
+    const ids = [];
+    for (const adapter of this.rasterLayerAdapters.values()) {
+      if (adapter.state.isEnabled && adapter.renderer.hasObjects()) {
+        ids.push(adapter.id);
+      }
+    }
+    return ids;
+  };
+
+  getCompositeInpaintMaskEntityIds = (): string[] => {
+    const ids = [];
+    for (const adapter of this.inpaintMaskAdapters.values()) {
+      if (adapter.state.isEnabled && adapter.renderer.hasObjects()) {
+        ids.push(adapter.id);
+      }
+    }
+    return ids;
+  };
+
   getCompositeRasterLayerCanvas = (rect: Rect): HTMLCanvasElement => {
+    const hash = this.getCompositeRasterLayerHash({ rect });
+    const cachedCanvas = this.canvasCache.get(hash);
+
+    if (cachedCanvas) {
+      this.log.trace({ rect }, 'Using cached composite inpaint mask canvas');
+      return cachedCanvas;
+    }
+
     this.log.trace({ rect }, 'Building composite raster layer canvas');
 
     const canvas = document.createElement('canvas');
@@ -589,22 +628,29 @@ export class CanvasManager {
     const ctx = canvas.getContext('2d');
     assert(ctx !== null);
 
-    for (const { id } of this.stateApi.getRasterLayersState().entities) {
+    for (const id of this.getCompositeRasterLayerEntityIds()) {
       const adapter = this.rasterLayerAdapters.get(id);
       if (!adapter) {
         this.log.warn({ id }, 'Raster layer adapter not found');
         continue;
       }
-      if (adapter.state.isEnabled && adapter.renderer.hasObjects()) {
         this.log.trace({ id }, 'Drawing raster layer to composite canvas');
         const adapterCanvas = adapter.getCanvas(rect);
         ctx.drawImage(adapterCanvas, 0, 0);
       }
-    }
+    this.canvasCache.set(hash, canvas);
     return canvas;
   };
 
   getCompositeInpaintMaskCanvas = (rect: Rect): HTMLCanvasElement => {
+    const hash = this.getCompositeInpaintMaskHash({ rect });
+    const cachedCanvas = this.canvasCache.get(hash);
+
+    if (cachedCanvas) {
+      this.log.trace({ rect }, 'Using cached composite inpaint mask canvas');
+      return cachedCanvas;
+    }
+
     this.log.trace({ rect }, 'Building composite inpaint mask canvas');
 
     const canvas = document.createElement('canvas');
@@ -614,35 +660,55 @@ export class CanvasManager {
     const ctx = canvas.getContext('2d');
     assert(ctx !== null);
 
-    for (const { id } of this.stateApi.getInpaintMasksState().entities) {
+    for (const id of this.getCompositeInpaintMaskEntityIds()) {
       const adapter = this.inpaintMaskAdapters.get(id);
       if (!adapter) {
         this.log.warn({ id }, 'Inpaint mask adapter not found');
         continue;
       }
-      if (adapter.state.isEnabled && adapter.renderer.hasObjects()) {
         this.log.trace({ id }, 'Drawing inpaint mask to composite canvas');
         const adapterCanvas = adapter.getCanvas(rect);
         ctx.drawImage(adapterCanvas, 0, 0);
       }
-    }
+    this.canvasCache.set(hash, canvas);
     return canvas;
   };
 
-  getCompositeInpaintMaskImageCache = (hash: string): string | null => {
-    const { compositeRasterizationCache } = this.stateApi.getInpaintMasksState();
-    return compositeRasterizationCache[hash] ?? null;
+  getCompositeRasterLayerHash = (extra: SerializableObject): string => {
+    const data: Record<string, SerializableObject> = {
+      extra,
+    };
+    for (const id of this.getCompositeRasterLayerEntityIds()) {
+      const adapter = this.rasterLayerAdapters.get(id);
+      if (!adapter) {
+        this.log.warn({ id }, 'Raster layer adapter not found');
+        continue;
+      }
+      data[id] = adapter.getHashableState();
+    }
+    return stableHash(data);
   };
 
-  getCompositeRasterLayerImageCache = (hash: string): string | null => {
-    const { compositeRasterizationCache } = this.stateApi.getRasterLayersState();
-    return compositeRasterizationCache[hash] ?? null;
+  getCompositeInpaintMaskHash = (extra: SerializableObject): string => {
+    const data: Record<string, SerializableObject> = {
+      extra,
+    };
+    for (const id of this.getCompositeInpaintMaskEntityIds()) {
+      const adapter = this.inpaintMaskAdapters.get(id);
+      if (!adapter) {
+        this.log.warn({ id }, 'Inpaint mask adapter not found');
+        continue;
+      }
+      data[id] = adapter.getHashableState();
+    }
+    return stableHash(data);
   };
 
   getCompositeRasterLayerImageDTO = async (rect: Rect): Promise<ImageDTO> => {
     let imageDTO: ImageDTO | null = null;
-    const hash = getHash(rect);
-    const cachedImageName = this.getCompositeRasterLayerImageCache(hash);
+
+    const hash = this.getCompositeRasterLayerHash({ rect });
+    const cachedImageName = this.imageNameCache.get(hash);
 
     if (cachedImageName) {
       imageDTO = await getImageDTO(cachedImageName);
@@ -661,14 +727,15 @@ export class CanvasManager {
     }
 
     imageDTO = await uploadImage(blob, 'composite-raster-layer.png', 'general', true);
-    this.stateApi.compositeRasterLayerRasterized({ imageName: imageDTO.image_name, hash });
+    this.imageNameCache.set(hash, imageDTO.image_name);
     return imageDTO;
   };
 
   getCompositeInpaintMaskImageDTO = async (rect: Rect): Promise<ImageDTO> => {
     let imageDTO: ImageDTO | null = null;
-    const hash = getHash(rect);
-    const cachedImageName = this.getCompositeInpaintMaskImageCache(hash);
+
+    const hash = this.getCompositeInpaintMaskHash({ rect });
+    const cachedImageName = this.imageNameCache.get(hash);
 
     if (cachedImageName) {
       imageDTO = await getImageDTO(cachedImageName);
@@ -687,30 +754,46 @@ export class CanvasManager {
     }
 
     imageDTO = await uploadImage(blob, 'composite-inpaint-mask.png', 'general', true);
-    this.stateApi.compositeInpaintMaskRasterized({ imageName: imageDTO.image_name, hash });
+    this.imageNameCache.set(hash, imageDTO.image_name);
     return imageDTO;
   };
 
   getGenerationMode(): GenerationMode {
     const { rect } = this.stateApi.getBbox();
+
+    const compositeInpaintMaskHash = this.getCompositeInpaintMaskHash({ rect });
+    const compositeRasterLayerHash = this.getCompositeRasterLayerHash({ rect });
+    const hash = stableHash({ rect, compositeInpaintMaskHash, compositeRasterLayerHash });
+    const cachedGenerationMode = this.generationModeCache.get(hash);
+
+    if (cachedGenerationMode) {
+      this.log.trace({ rect, cachedGenerationMode }, 'Using cached generation mode');
+      return cachedGenerationMode;
+    }
+
     const inpaintMaskImageData = canvasToImageData(this.getCompositeInpaintMaskCanvas(rect));
     const inpaintMaskTransparency = getImageDataTransparency(inpaintMaskImageData);
     const compositeLayerImageData = canvasToImageData(this.getCompositeRasterLayerCanvas(rect));
     const compositeLayerTransparency = getImageDataTransparency(compositeLayerImageData);
+
+    let generationMode: GenerationMode;
     if (compositeLayerTransparency === 'FULLY_TRANSPARENT') {
       // When the initial image is fully transparent, we are always doing txt2img
-      return 'txt2img';
+      generationMode = 'txt2img';
     } else if (compositeLayerTransparency === 'PARTIALLY_TRANSPARENT') {
       // When the initial image is partially transparent, we are always outpainting
-      return 'outpaint';
+      generationMode = 'outpaint';
     } else if (inpaintMaskTransparency === 'FULLY_TRANSPARENT') {
       // compositeLayerTransparency === 'OPAQUE'
       // When the inpaint mask is fully transparent, we are doing img2img
-      return 'img2img';
+      generationMode = 'img2img';
     } else {
       // Else at least some of the inpaint mask is opaque, so we are inpainting
-      return 'inpaint';
+      generationMode = 'inpaint';
     }
+
+    this.generationModeCache.set(hash, generationMode);
+    return generationMode;
   }
 
   getLoggingContext = (): JSONObject => {

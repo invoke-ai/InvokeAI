@@ -49,7 +49,7 @@ export const addRegions = async (
   for (const region of validRegions) {
     const adapter = manager.regionalGuidanceAdapters.get(region.id);
     assert(adapter, 'Adapter not found');
-    const imageDTO = await adapter.renderer.rasterize(bbox);
+    const imageDTO = await adapter.renderer.rasterize({ rect: bbox });
 
     // The main mask-to-tensor node
     const maskToTensor = g.addNode({

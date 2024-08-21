@@ -25,7 +25,7 @@ export const addControlAdapters = async (
   for (const layer of validControlLayers) {
     const adapter = manager.controlLayerAdapters.get(layer.id);
     assert(adapter, 'Adapter not found');
-    const imageDTO = await adapter.renderer.rasterize(bbox);
+    const imageDTO = await adapter.renderer.rasterize({ rect: bbox, attrs: { opacity: 1, filters: [] } });
     if (layer.controlAdapter.type === 'controlnet') {
       await addControlNetToGraph(g, layer, imageDTO, denoise);
     } else {
