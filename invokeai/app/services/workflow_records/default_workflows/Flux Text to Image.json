@@ -8,15 +8,15 @@
   "notes": "",
   "exposedFields": [
     {
-      "nodeId": "90701a55-0a0f-444d-ab7d-ea9b7361dd44",
+      "nodeId": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
       "fieldName": "model"
     },
     {
-      "nodeId": "90701a55-0a0f-444d-ab7d-ea9b7361dd44",
+      "nodeId": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
       "fieldName": "t5_encoder"
     },
     {
-      "nodeId": "7187b891-8b9e-41f2-bad0-579c14c92faf",
+      "nodeId": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
       "fieldName": "positive_prompt"
     }
   ],
@@ -24,7 +24,87 @@
     "version": "3.0.0",
     "category": "default"
   },
-  "nodes": [
+"nodes": [
+    {
+      "id": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
+      "type": "invocation",
+      "data": {
+        "id": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
+        "type": "flux_text_encoder",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "t5_encoder": {
+            "name": "t5_encoder",
+            "label": ""
+          },
+          "t5_max_seq_len": {
+            "name": "t5_max_seq_len",
+            "label": "",
+            "value": 256
+          },
+          "positive_prompt": {
+            "name": "positive_prompt",
+            "label": "",
+            "value": ""
+          }
+        }
+      },
+      "position": {
+        "x": 817.9049777916891,
+        "y": 137.19130248771572
+      }
+    },
+    {
+      "id": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+      "type": "invocation",
+      "data": {
+        "id": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+        "type": "flux_model_loader",
+        "version": "1.0.3",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "",
+            "value": {
+              "key": "a1deb125-2781-482c-8a71-9a22e76fd956",
+              "hash": "random:40bd0a5b8b2c6edf8f5611e049000329b952efc6a1a24b4f77ca4ae3dbecaf6a",
+              "name": "flux1-schnell-bnb_nf4",
+              "base": "flux",
+              "type": "main"
+            }
+          },
+          "t5_encoder": {
+            "name": "t5_encoder",
+            "label": "T5 Encoder (Model Manager -> Starter Models)",
+            "value": {
+              "key": "798baafd-63bd-4799-8600-5db43662f3aa",
+              "hash": "random:4495f3ac1650e9d5969c365e951a9cffee526573a15f9f4c997e1c63550444fd",
+              "name": "t5_8b_quantized_encoder",
+              "base": "any",
+              "type": "t5_encoder"
+            }
+          }
+        }
+      },
+      "position": {
+        "x": 343.41871407356723,
+        "y": -1.0211223664301414
+      }
+    },
     {
       "id": "4754c534-a5f3-4ad0-9382-7887985e668c",
       "type": "invocation",
@@ -119,83 +199,57 @@
         "x": 1216.3900791301849,
         "y": 5.500841807102248
       }
-    },
-    {
-      "id": "7187b891-8b9e-41f2-bad0-579c14c92faf",
-      "type": "invocation",
-      "data": {
-        "id": "7187b891-8b9e-41f2-bad0-579c14c92faf",
-        "type": "flux_text_encoder",
-        "version": "1.0.0",
-        "label": "",
-        "notes": "",
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": false,
-        "inputs": {
-          "clip": {
-            "name": "clip",
-            "label": ""
-          },
-          "t5_encoder": {
-            "name": "t5_encoder",
-            "label": ""
-          },
-          "max_seq_len": {
-            "name": "max_seq_len",
-            "label": "",
-            "value": 256
-          },
-          "positive_prompt": {
-            "name": "positive_prompt",
-            "label": "",
-            "value": "dog eating an ice cream cone while watching the TV"
-          }
-        }
-      },
-      "position": {
-        "x": 809.5428272455715,
-        "y": 111.5674004989348
-      }
-    },
-    {
-      "id": "90701a55-0a0f-444d-ab7d-ea9b7361dd44",
-      "type": "invocation",
-      "data": {
-        "id": "90701a55-0a0f-444d-ab7d-ea9b7361dd44",
-        "type": "flux_model_loader",
-        "version": "1.0.3",
-        "label": "",
-        "notes": "",
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": false,
-        "inputs": {
-          "model": {
-            "name": "model",
-            "label": "",
-            "value": {
-              "key": "a1deb125-2781-482c-8a71-9a22e76fd956",
-              "hash": "random:40bd0a5b8b2c6edf8f5611e049000329b952efc6a1a24b4f77ca4ae3dbecaf6a",
-              "name": "flux1-schnell-bnb_nf4",
-              "base": "flux",
-              "type": "main"
-            }
-          },
-          "t5_encoder": {
-            "name": "t5_encoder",
-            "label": "",
-            "value": "8b_quantized"
-          }
-        }
-      },
-      "position": {
-        "x": 407.297070550788,
-        "y": 37.50301331772734
-      }
     }
   ],
   "edges": [
+    {
+      "id": "reactflow__edge-0fa90f47-79cd-4d84-9445-f0b1065e0c3cconditioning-159bdf1b-79e7-4174-b86e-d40e646964c8positive_text_conditioning",
+      "type": "default",
+      "source": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
+      "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_text_conditioning"
+    },
+    {
+      "id": "reactflow__edge-fd1274a3-c56d-4a96-aa21-83d14c920f08max_seq_len-0fa90f47-79cd-4d84-9445-f0b1065e0c3ct5_max_seq_len",
+      "type": "default",
+      "source": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+      "target": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
+      "sourceHandle": "max_seq_len",
+      "targetHandle": "t5_max_seq_len"
+    },
+    {
+      "id": "reactflow__edge-fd1274a3-c56d-4a96-aa21-83d14c920f08t5_encoder-0fa90f47-79cd-4d84-9445-f0b1065e0c3ct5_encoder",
+      "type": "default",
+      "source": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+      "target": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
+      "sourceHandle": "t5_encoder",
+      "targetHandle": "t5_encoder"
+    },
+    {
+      "id": "reactflow__edge-fd1274a3-c56d-4a96-aa21-83d14c920f08clip-0fa90f47-79cd-4d84-9445-f0b1065e0c3cclip",
+      "type": "default",
+      "source": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+      "target": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
+      "sourceHandle": "clip",
+      "targetHandle": "clip"
+    },
+    {
+      "id": "reactflow__edge-fd1274a3-c56d-4a96-aa21-83d14c920f08vae-159bdf1b-79e7-4174-b86e-d40e646964c8vae",
+      "type": "default",
+      "source": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+      "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "reactflow__edge-fd1274a3-c56d-4a96-aa21-83d14c920f08transformer-159bdf1b-79e7-4174-b86e-d40e646964c8transformer",
+      "type": "default",
+      "source": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+      "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
     {
       "id": "reactflow__edge-4754c534-a5f3-4ad0-9382-7887985e668cvalue-159bdf1b-79e7-4174-b86e-d40e646964c8seed",
       "type": "default",
@@ -203,54 +257,6 @@
       "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
       "sourceHandle": "value",
       "targetHandle": "seed"
-    },
-    {
-      "id": "reactflow__edge-90701a55-0a0f-444d-ab7d-ea9b7361dd44vae-159bdf1b-79e7-4174-b86e-d40e646964c8vae",
-      "type": "default",
-      "source": "90701a55-0a0f-444d-ab7d-ea9b7361dd44",
-      "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
-      "sourceHandle": "vae",
-      "targetHandle": "vae"
-    },
-    {
-      "id": "reactflow__edge-90701a55-0a0f-444d-ab7d-ea9b7361dd44transformer-159bdf1b-79e7-4174-b86e-d40e646964c8transformer",
-      "type": "default",
-      "source": "90701a55-0a0f-444d-ab7d-ea9b7361dd44",
-      "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
-      "sourceHandle": "transformer",
-      "targetHandle": "transformer"
-    },
-    {
-      "id": "reactflow__edge-7187b891-8b9e-41f2-bad0-579c14c92fafconditioning-159bdf1b-79e7-4174-b86e-d40e646964c8positive_text_conditioning",
-      "type": "default",
-      "source": "7187b891-8b9e-41f2-bad0-579c14c92faf",
-      "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
-      "sourceHandle": "conditioning",
-      "targetHandle": "positive_text_conditioning"
-    },
-    {
-      "id": "reactflow__edge-90701a55-0a0f-444d-ab7d-ea9b7361dd44max_seq_len-7187b891-8b9e-41f2-bad0-579c14c92fafmax_seq_len",
-      "type": "default",
-      "source": "90701a55-0a0f-444d-ab7d-ea9b7361dd44",
-      "target": "7187b891-8b9e-41f2-bad0-579c14c92faf",
-      "sourceHandle": "max_seq_len",
-      "targetHandle": "max_seq_len"
-    },
-    {
-      "id": "reactflow__edge-90701a55-0a0f-444d-ab7d-ea9b7361dd44t5_encoder-7187b891-8b9e-41f2-bad0-579c14c92faft5_encoder",
-      "type": "default",
-      "source": "90701a55-0a0f-444d-ab7d-ea9b7361dd44",
-      "target": "7187b891-8b9e-41f2-bad0-579c14c92faf",
-      "sourceHandle": "t5_encoder",
-      "targetHandle": "t5_encoder"
-    },
-    {
-      "id": "reactflow__edge-90701a55-0a0f-444d-ab7d-ea9b7361dd44clip-7187b891-8b9e-41f2-bad0-579c14c92fafclip",
-      "type": "default",
-      "source": "90701a55-0a0f-444d-ab7d-ea9b7361dd44",
-      "target": "7187b891-8b9e-41f2-bad0-579c14c92faf",
-      "sourceHandle": "clip",
-      "targetHandle": "clip"
     }
   ]
 }
