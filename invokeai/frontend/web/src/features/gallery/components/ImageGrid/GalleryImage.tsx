@@ -12,7 +12,7 @@ import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
 import { imageToCompareChanged, isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
-import type { MouseEvent } from 'react';
+import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
@@ -40,8 +40,6 @@ interface HoverableImageProps {
 
 const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const shift = useShiftModifier();
-  const { t } = useTranslation();
   const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
   const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
   const isSelectedForCompare = useAppSelector((s) => s.gallery.imageToCompare?.image_name === imageDTO.image_name);
@@ -190,16 +188,7 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
               insetInlineEnd={1}
             />
 
-            {isHovered && shift && (
-              <IAIDndImageIcon
-                onClick={handleDelete}
-                icon={<PiTrashSimpleFill size="16px" />}
-                tooltip={t('gallery.deleteImage_one')}
-                position="absolute"
-                bottom={1}
-                insetInlineEnd={1}
-              />
-            )}
+            {isHovered && <DeleteIcon onClick={handleDelete} />}
           </>
         </IAIDndImage>
       </Flex>
@@ -208,3 +197,23 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
 };
 
 export default memo(GalleryImage);
+
+const DeleteIcon = ({ onClick }: { onClick: MouseEventHandler }) => {
+  const shift = useShiftModifier();
+  const { t } = useTranslation();
+
+  if (!shift) {
+    return null;
+  }
+
+  return (
+    <IAIDndImageIcon
+      onClick={onClick}
+      icon={<PiTrashSimpleFill size="16px" />}
+      tooltip={t('gallery.deleteImage_one')}
+      position="absolute"
+      bottom={1}
+      insetInlineEnd={1}
+    />
+  );
+};
