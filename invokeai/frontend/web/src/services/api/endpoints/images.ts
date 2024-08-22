@@ -580,8 +580,11 @@ export const getImageDTO = async (image_name: string, forceRefetch?: boolean): P
   };
   const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, options));
   try {
-    return await req.unwrap();
+    const imageDTO = await req.unwrap();
+    req.unsubscribe();
+    return imageDTO;
   } catch {
+    req.unsubscribe();
     return null;
   }
 };
