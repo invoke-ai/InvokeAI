@@ -89,61 +89,6 @@ export class CanvasManager {
     this._isDebugging = false;
   }
 
-  getTransformingLayer = (): CanvasLayerAdapter | CanvasMaskAdapter | null => {
-    const transformingEntity = this.stateApi.$transformingEntity.get();
-    if (!transformingEntity) {
-      return null;
-    }
-
-    const { id, type } = transformingEntity;
-
-    if (type === 'raster_layer') {
-      return this.rasterLayerAdapters.get(id) ?? null;
-    } else if (type === 'control_layer') {
-      return this.controlLayerAdapters.get(id) ?? null;
-    } else if (type === 'inpaint_mask') {
-      return this.inpaintMaskAdapters.get(id) ?? null;
-    } else if (type === 'regional_guidance') {
-      return this.regionalGuidanceAdapters.get(id) ?? null;
-    }
-
-    return null;
-  };
-
-  getIsTransforming() {
-    return Boolean(this.stateApi.$transformingEntity.get());
-  }
-
-  startTransform() {
-    if (this.getIsTransforming()) {
-      return;
-    }
-    const entity = this.stateApi.getSelectedEntity();
-    if (!entity) {
-      this.log.warn('No entity selected to transform');
-      return;
-    }
-    // TODO(psyche): Support other entity types
-    entity.adapter.transformer.startTransform();
-    this.stateApi.$transformingEntity.set({ id: entity.id, type: entity.type });
-  }
-
-  async applyTransform() {
-    const layer = this.getTransformingLayer();
-    if (layer) {
-      await layer.transformer.applyTransform();
-    }
-    this.stateApi.$transformingEntity.set(null);
-  }
-
-  cancelTransform() {
-    const layer = this.getTransformingLayer();
-    if (layer) {
-      layer.transformer.stopTransform();
-    }
-    this.stateApi.$transformingEntity.set(null);
-  }
-
   initialize = () => {
     this.log.debug('Initializing canvas manager');
 
