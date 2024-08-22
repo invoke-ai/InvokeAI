@@ -2,7 +2,7 @@ import torch
 from einops import rearrange, repeat
 from PIL import Image
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
     ConditioningField,
     FieldDescriptions,
@@ -28,6 +28,7 @@ from invokeai.backend.util.devices import TorchDevice
     tags=["image", "flux"],
     category="image",
     version="1.0.0",
+    classification=Classification.Prototype,
 )
 class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Text-to-image generation using a FLUX model."""
