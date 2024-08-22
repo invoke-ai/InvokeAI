@@ -60,7 +60,7 @@ jobs:
             extra-index-url: 'https://download.pytorch.org/whl/cpu'
             github-env: $GITHUB_ENV
           - platform: macos-default
-            os: macOS-12
+            os: macOS-14
             github-env: $GITHUB_ENV
           - platform: windows-cpu
             os: windows-2022
