@@ -132,6 +132,7 @@ const initialState: CanvasV2State = {
     refinerStart: 0.8,
   },
   session: {
+    mode: 'generate',
     isStaging: false,
     stagedImages: [],
     selectedStagedImageIndex: 0,
@@ -474,6 +475,7 @@ export const {
   clipToBboxChanged,
   canvasReset,
   settingsDynamicGridToggled,
+  settingsAutoSaveToggled,
   // All entities
   entitySelected,
   entityNameChanged,
@@ -601,6 +603,7 @@ export const {
   sessionStagingAreaReset,
   sessionNextStagedImageSelected,
   sessionPrevStagedImageSelected,
+  sessionModeChanged,
 } = canvasV2Slice.actions;
 
 export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;

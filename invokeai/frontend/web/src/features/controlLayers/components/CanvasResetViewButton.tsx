@@ -23,7 +23,7 @@ export const CanvasResetViewButton = memo(() => {
     if (!canvasManager) {
       return;
     }
-    canvasManager.stage.resetView();
+    canvasManager.stage.fitLayersToStage();
   }, [canvasManager]);
 
   const onReset = useCallback(() => {

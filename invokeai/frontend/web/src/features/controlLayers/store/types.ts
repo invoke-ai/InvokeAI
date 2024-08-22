@@ -834,6 +834,8 @@ export type StagingAreaImage = {
   offsetY: number;
 };
 
+export type SessionMode = 'generate' | 'compose';
+
 export type CanvasV2State = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
@@ -929,6 +931,7 @@ export type CanvasV2State = {
     refinerStart: number;
   };
   session: {
+    mode: SessionMode;
     isStaging: boolean;
     stagedImages: StagingAreaImage[];
     selectedStagedImageIndex: number;

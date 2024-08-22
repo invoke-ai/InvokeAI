@@ -1,6 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasModeSwitcher } from 'features/controlLayers/components/CanvasModeSwitcher';
 import { CanvasResetViewButton } from 'features/controlLayers/components/CanvasResetViewButton';
 import { CanvasScale } from 'features/controlLayers/components/CanvasScale';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
@@ -23,11 +24,12 @@ export const ControlLayersToolbar = memo(() => {
         <ToolChooser />
         {tool === 'brush' && <ToolBrushWidth />}
         {tool === 'eraser' && <ToolEraserWidth />}
+        <ToolFillColorPicker />
         <Spacer />
         <CanvasScale />
         <CanvasResetViewButton />
         <Spacer />
-        <ToolFillColorPicker />
+        <CanvasModeSwitcher />
         <UndoRedoButtonGroup />
         <CanvasSettingsPopover />
         <ViewerToggleMenu />

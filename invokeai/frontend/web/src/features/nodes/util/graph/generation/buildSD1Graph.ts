@@ -41,7 +41,7 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
   const generationMode = manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SD1/SD2 graph');
 
-  const { bbox, params } = state.canvasV2;
+  const { bbox, params, session, settings } = state.canvasV2;
 
   const {
     model,
@@ -249,10 +249,11 @@ export const buildSD1Graph = async (state: RootState, manager: CanvasManager): P
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  // This is the terminal node and must always save to gallery.
+  const shouldSaveToGallery = session.mode === 'generate' || settings.autoSave;
+
   g.updateNode(canvasOutput, {
     id: CANVAS_OUTPUT,
-    is_intermediate: false,
+    is_intermediate: !shouldSaveToGallery,
     use_cache: false,
     board: getBoardField(state),
   });
