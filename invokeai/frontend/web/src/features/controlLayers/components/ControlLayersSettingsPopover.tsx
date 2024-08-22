@@ -12,7 +12,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { CanvasSettingsBackgroundStyle } from 'features/controlLayers/components/CanvasSettingsBackgroundStyle';
+import { CanvasSettingsDynamicGridToggle } from 'features/controlLayers/components/CanvasSettingsDynamicGridToggle';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { clipToBboxChanged, invertScrollChanged } from 'features/controlLayers/store/canvasV2Slice';
 import type { ChangeEvent } from 'react';
@@ -67,7 +67,7 @@ const ControlLayersSettingsPopover = () => {
               <FormLabel flexGrow={1}>{t('unifiedCanvas.clipToBbox')}</FormLabel>
               <Checkbox isChecked={clipToBbox} onChange={onChangeClipToBbox} />
             </FormControl>
-            <CanvasSettingsBackgroundStyle />
+            <CanvasSettingsDynamicGridToggle />
             <Button onClick={clearCaches} size="sm">
               Clear Caches
             </Button>
