@@ -131,10 +131,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         vae_info = context.models.load(self.vae.vae)
         with vae_info as vae:
             assert isinstance(vae, AutoEncoder)
-            # TODO(ryand): Test that this works with both float16 and bfloat16.
-            # with torch.autocast(device_type=latents.device.type, dtype=torch.float32):
-            vae.to(torch.float32)
-            latents.to(torch.float32)
+            latents = latents.to(dtype=TorchDevice.choose_torch_dtype())
             img = vae.decode(latents)
 
         img = img.clamp(-1, 1)
