@@ -1650,6 +1650,11 @@
         "storeNotInitialized": "Store is not initialized"
     },
     "controlLayers": {
+        "generateMode": "Generate",
+        "generateModeDesc": "Create individual images. Generated images are added directly to the gallery.",
+        "composeMode": "Compose",
+        "composeModeDesc": "Compose your work iterative. Generated images are added back to the canvas.",
+        "autoSave": "Auto-save to Gallery",
         "resetCanvas": "Reset Canvas",
         "resetAll": "Reset All",
         "clearCaches": "Clear Caches",
