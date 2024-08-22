@@ -17,7 +17,7 @@ export const addImageToImage = async (
 ): Promise<Invocation<'img_resize' | 'l2i'>> => {
   denoise.denoising_start = denoising_start;
 
-  const { image_name } = await manager.getCompositeRasterLayerImageDTO(bbox.rect);
+  const { image_name } = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
 
   if (!isEqual(scaledSize, originalSize)) {
     // Resize the initial image to the scaled size, denoise, then resize back to the original size
