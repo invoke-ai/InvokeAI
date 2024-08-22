@@ -14,7 +14,7 @@ import {
   getPrefixedId,
   previewBlob,
 } from 'features/controlLayers/konva/util';
-import type { CanvasV2State, GenerationMode, Rect } from 'features/controlLayers/store/types';
+import type { GenerationMode, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -38,7 +38,9 @@ export class CanvasManager {
 
   id: string;
   path: string[];
-  container: HTMLDivElement;
+
+  store: AppStore;
+  socket: AppSocket;
 
   rasterLayerAdapters: Map<string, CanvasLayerAdapter> = new Map();
   controlLayerAdapters: Map<string, CanvasLayerAdapter> = new Map();
@@ -54,33 +56,14 @@ export class CanvasManager {
   cache: CanvasCacheModule;
   renderer: CanvasRenderingModule;
 
-  log: Logger;
-  socket: AppSocket;
-
-  _store: AppStore;
-  prevState: CanvasV2State;
-  isFirstRender: boolean = true;
   _isDebugging: boolean = false;
 
   constructor(stage: Konva.Stage, container: HTMLDivElement, store: AppStore, socket: AppSocket) {
     this.id = getPrefixedId(this.type);
     this.path = [this.id];
-    this.container = container;
-    this._store = store;
+    this.store = store;
     this.socket = socket;
-    this.stateApi = new CanvasStateApi(this._store, this);
-
-    this.prevState = this.stateApi.getState();
-
-    this.log = logger('canvas').child((message) => {
-      return {
-        ...message,
-        context: {
-          ...this.getLoggingContext(),
-          ...message.context,
-        },
-      };
-    });
+    this.stateApi = new CanvasStateApi(this.store, this);
 
     this.stage = new CanvasStageModule(stage, container, this);
     this.worker = new CanvasWorkerModule(this);
@@ -94,6 +77,16 @@ export class CanvasManager {
 
     this.filter = new CanvasFilter(this);
   }
+
+  log = logger('canvas').child((message) => {
+    return {
+      ...message,
+      context: {
+        ...this.getLoggingContext(),
+        ...message.context,
+      },
+    };
+  });
 
   enableDebugging() {
     this._isDebugging = true;
@@ -171,7 +164,7 @@ export class CanvasManager {
 
     const cleanupEventHandlers = setStageEventHandlers(this);
     const cleanupStage = this.stage.initialize();
-    const cleanupStore = this._store.subscribe(this.renderer.render);
+    const cleanupStore = this.store.subscribe(this.renderer.render);
 
     return () => {
       this.log.debug('Cleaning up canvas manager');
