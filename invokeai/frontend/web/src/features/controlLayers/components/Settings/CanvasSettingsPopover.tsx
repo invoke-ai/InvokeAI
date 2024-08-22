@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
   useShiftModifier,
 } from '@invoke-ai/ui-library';
+import { CanvasSettingsAutoSaveCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsAutoSaveCheckbox';
 import { CanvasSettingsClearCachesButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearCachesButton';
 import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsClipToBboxCheckbox';
 import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsDynamicGridSwitch';
@@ -30,6 +31,7 @@ export const CanvasSettingsPopover = memo(() => {
         <PopoverArrow />
         <PopoverBody>
           <Flex direction="column" gap={2}>
+            <CanvasSettingsAutoSaveCheckbox />
             <CanvasSettingsInvertScrollCheckbox />
             <CanvasSettingsClipToBboxCheckbox />
             <CanvasSettingsDynamicGridSwitch />
