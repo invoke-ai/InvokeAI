@@ -51,11 +51,7 @@ export class CanvasStagingArea {
     this.konva.group.position({ x, y });
 
     if (this.selectedImage) {
-      const {
-        imageDTO,
-        // offsetX, // TODO(psyche): restore the crop in the node?
-        // offsetY // TODO(psyche): restore the crop in the node?
-      } = this.selectedImage;
+      const { imageDTO } = this.selectedImage;
 
       if (!this.image) {
         const { image_name } = imageDTO;
@@ -63,7 +59,6 @@ export class CanvasStagingArea {
           {
             id: 'staging-area-image',
             type: 'image',
-            filters: [],
             image: {
               image_name: image_name,
               width,
