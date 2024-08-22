@@ -42,6 +42,7 @@ export class CanvasStagingArea {
   }
 
   render = async () => {
+    this.log.trace('Rendering staging area');
     const session = this.manager.stateApi.getSession();
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
     const shouldShowStagedImage = this.manager.stateApi.$shouldShowStagedImage.get();
@@ -75,7 +76,7 @@ export class CanvasStagingArea {
       }
 
       if (!this.image.isLoading && !this.image.isError) {
-        await this.image.update({...this.image.state, image: imageDTOToImageWithDims(imageDTO)}, true);
+        await this.image.update({ ...this.image.state, image: imageDTOToImageWithDims(imageDTO) }, true);
         this.manager.stateApi.$lastCanvasProgressEvent.set(null);
       }
       this.image.konva.group.visible(shouldShowStagedImage);
