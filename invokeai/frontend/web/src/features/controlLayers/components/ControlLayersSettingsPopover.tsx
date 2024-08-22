@@ -35,7 +35,7 @@ const ControlLayersSettingsPopover = () => {
     [dispatch]
   );
   const clearCaches = useCallback(() => {
-    canvasManager?.clearCaches();
+    canvasManager?.cache.clearAll();
   }, [canvasManager]);
   const calculateBboxes = useCallback(() => {
     if (!canvasManager) {
