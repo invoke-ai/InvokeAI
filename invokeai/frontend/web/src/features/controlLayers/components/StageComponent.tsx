@@ -53,7 +53,7 @@ type Props = {
 };
 
 export const StageComponent = memo(({ asPreview = false }: Props) => {
-  const canvasBackgroundStyle = useAppSelector((s) => s.canvasV2.settings.canvasBackgroundStyle);
+  const dynamicGrid = useAppSelector((s) => s.canvasV2.settings.dynamicGrid);
 
   const [stage] = useState(
     () =>
@@ -79,8 +79,8 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
   );
 
   return (
-    <Flex position="relative" w="full" h="full" bg={canvasBackgroundStyle === 'checkerboard' ? 'base.900' : 'base.850'}>
-      {canvasBackgroundStyle === 'checkerboard' && (
+    <Flex position="relative" w="full" h="full" bg={dynamicGrid ? 'base.850' : 'base.900'}>
+      {!dynamicGrid && (
         <Flex
           position="absolute"
           bgImage={TRANSPARENCY_CHECKER_PATTERN}
