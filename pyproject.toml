@@ -74,7 +74,8 @@ dependencies = [
   "easing-functions",
   "einops",
   "facexlib",
-  "matplotlib",       # needed for plotting of Penner easing functions
+  # Exclude 3.9.1 which has a problem on windows, see https://github.com/matplotlib/matplotlib/issues/28551
+  "matplotlib!=3.9.1",
   "npyscreen",
   "omegaconf",
   "picklescan",
@@ -89,7 +90,6 @@ dependencies = [
   "rich~=13.3",
   "scikit-image~=0.21.0",
   "semver~=3.0.1",
-  "send2trash",
   "test-tube~=0.7.5",
   "windows-curses; sys_platform=='win32'",
 ]
@@ -158,6 +158,10 @@ version = { attr = "invokeai.version.__version__" }
 [tool.setuptools.package-data]
 "invokeai.app.assets" = ["**/*.png"]
 "invokeai.app.services.workflow_records.default_workflows" = ["*.json"]
+"invokeai.app.services.style_preset_records" = ["*.json"]
+"invokeai.app.services.style_preset_images.default_style_preset_images" = [
+  "*.png",
+]
 "invokeai.assets.fonts" = ["**/*.ttf"]
 "invokeai.backend" = ["**.png"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
@@ -198,6 +202,7 @@ exclude = [
   "dist",
   "invokeai/frontend/web/node_modules/",
   ".venv*",
+  "*.ipynb",
 ]
 
 [tool.ruff.lint]

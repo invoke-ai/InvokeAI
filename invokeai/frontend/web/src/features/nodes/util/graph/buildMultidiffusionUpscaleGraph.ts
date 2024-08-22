@@ -22,11 +22,10 @@ import {
 } from './constants';
 import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
-import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
+import { getBoardField, getPresetModifiedPrompts } from './graphBuilderUtils';
 
 export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise<GraphType> => {
   const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
   const { upscaleModel, upscaleInitialImage, structure, creativity, tileControlnetModel, scale } = state.upscale;
 
   assert(model, 'No model found in state');
@@ -38,7 +37,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
 
   const upscaleNode = g.addNode({
     id: SPANDREL,
-    type: 'spandrel_image_to_image',
+    type: 'spandrel_image_to_image_autoscale',
     image: upscaleInitialImage,
     image_to_image_model: upscaleModel,
     fit_to_multiple_of_8: true,
@@ -99,7 +98,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   let modelNode;
 
   if (model.base === 'sdxl') {
-    const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
+    const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } =
+      getPresetModifiedPrompts(state);
 
     posCondNode = g.addNode({
       type: 'sdxl_compel_prompt',
@@ -125,21 +125,15 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     g.addEdge(modelNode, 'unet', tiledMultidiffusionNode, 'unet');
     addSDXLLoRas(state, g, tiledMultidiffusionNode, modelNode, null, posCondNode, negCondNode);
 
-    const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
-
     g.upsertMetadata({
-      cfg_scale,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
       positive_style_prompt: positiveStylePrompt,
       negative_style_prompt: negativeStylePrompt,
-      model: Graph.getModelMetadataField(modelConfig),
-      seed,
-      steps,
-      scheduler,
-      vae: vae ?? undefined,
     });
   } else {
+    const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
+
     posCondNode = g.addNode({
       type: 'compel',
       id: POSITIVE_CONDITIONING,
@@ -166,23 +160,32 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
     g.addEdge(modelNode, 'unet', tiledMultidiffusionNode, 'unet');
     addLoRAs(state, g, tiledMultidiffusionNode, modelNode, null, clipSkipNode, posCondNode, negCondNode);
 
-    const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
-    const upscaleModelConfig = await fetchModelConfigWithTypeGuard(upscaleModel.key, isSpandrelImageToImageModelConfig);
-
     g.upsertMetadata({
-      cfg_scale,
       positive_prompt: positivePrompt,
       negative_prompt: negativePrompt,
-      model: Graph.getModelMetadataField(modelConfig),
-      seed,
-      steps,
-      scheduler,
-      vae: vae ?? undefined,
-      upscale_model: Graph.getModelMetadataField(upscaleModelConfig),
-      creativity,
-      structure,
     });
   }
+
+  const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
+  const upscaleModelConfig = await fetchModelConfigWithTypeGuard(upscaleModel.key, isSpandrelImageToImageModelConfig);
+
+  g.upsertMetadata({
+    cfg_scale,
+    model: Graph.getModelMetadataField(modelConfig),
+    seed,
+    steps,
+    scheduler,
+    vae: vae ?? undefined,
+    upscale_model: Graph.getModelMetadataField(upscaleModelConfig),
+    creativity,
+    structure,
+    upscale_initial_image: {
+      image_name: upscaleInitialImage.image_name,
+      width: upscaleInitialImage.width,
+      height: upscaleInitialImage.height,
+    },
+    upscale_scale: scale,
+  });
 
   g.setMetadataReceivingNode(l2iNode);
   g.addEdgeToMetadata(upscaleNode, 'width', 'width');

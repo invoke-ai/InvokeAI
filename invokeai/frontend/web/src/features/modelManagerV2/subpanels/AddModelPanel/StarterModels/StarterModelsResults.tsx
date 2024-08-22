@@ -1,7 +1,7 @@
 import { Flex, IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { ChangeEventHandler } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
@@ -12,16 +12,23 @@ type StarterModelsResultsProps = {
   results: NonNullable<GetStarterModelsResponse>;
 };
 
-export const StarterModelsResults = ({ results }: StarterModelsResultsProps) => {
+export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
       const trimmedSearchTerm = searchTerm.trim().toLowerCase();
-      const matchStrings = [result.name.toLowerCase(), result.type.toLowerCase(), result.description.toLowerCase()];
+      const matchStrings = [
+        result.name.toLowerCase(),
+        result.type.toLowerCase().replaceAll('_', ' '),
+        result.description.toLowerCase(),
+      ];
       if (result.type === 'spandrel_image_to_image') {
         matchStrings.push('upscale');
+        matchStrings.push('post-processing');
+        matchStrings.push('postprocessing');
+        matchStrings.push('post processing');
       }
       return matchStrings.some((matchString) => matchString.includes(trimmedSearchTerm));
     });
@@ -72,4 +79,6 @@ export const StarterModelsResults = ({ results }: StarterModelsResultsProps) => 
       </Flex>
     </Flex>
   );
-};
+});
+
+StarterModelsResults.displayName = 'StarterModelsResults';

@@ -1,5 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { scaleChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +23,9 @@ export const UpscaleScaleSlider = memo(() => {
 
   return (
     <FormControl orientation="vertical" gap={0}>
-      <FormLabel m={0}>{t('upscaling.scale')}</FormLabel>
+      <InformationalPopover feature="scale">
+        <FormLabel m={0}>{t('upscaling.scale')}</FormLabel>
+      </InformationalPopover>
       <Flex w="full" gap={4}>
         <CompositeSlider
           min={2}

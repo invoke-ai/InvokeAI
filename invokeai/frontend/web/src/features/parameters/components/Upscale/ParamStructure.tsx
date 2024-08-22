@@ -1,5 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { structureChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,9 @@ const ParamStructure = () => {
 
   return (
     <FormControl>
-      <FormLabel>{t('upscaling.structure')}</FormLabel>
+      <InformationalPopover feature="structure">
+        <FormLabel>{t('upscaling.structure')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         value={structure}
         defaultValue={initial}

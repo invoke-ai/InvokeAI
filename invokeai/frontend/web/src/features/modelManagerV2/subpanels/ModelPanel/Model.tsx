@@ -1,120 +1,47 @@
-import { Button, Flex, Heading, Spacer, Text } from '@invoke-ai/ui-library';
-import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
-import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelConvertButton';
-import { ModelEditButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelEditButton';
-import { toast } from 'features/toast/toast';
-import { useCallback } from 'react';
-import type { SubmitHandler } from 'react-hook-form';
-import { useForm } from 'react-hook-form';
+import { useAppSelector } from 'app/store/storeHooks';
+import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCheckBold, PiXBold } from 'react-icons/pi';
-import type { UpdateModelArg } from 'services/api/endpoints/models';
-import { useGetModelConfigQuery, useUpdateModelMutation } from 'services/api/endpoints/models';
+import { PiExclamationMarkBold } from 'react-icons/pi';
+import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
 
-import ModelImageUpload from './Fields/ModelImageUpload';
 import { ModelEdit } from './ModelEdit';
 import { ModelView } from './ModelView';
 
-export const Model = () => {
+export const Model = memo(() => {
   const { t } = useTranslation();
   const selectedModelMode = useAppSelector((s) => s.modelmanagerV2.selectedModelMode);
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
-  const { data, isLoading } = useGetModelConfigQuery(selectedModelKey ?? skipToken);
-  const [updateModel, { isLoading: isSubmitting }] = useUpdateModelMutation();
-  const dispatch = useAppDispatch();
+  const { data: modelConfigs, isLoading } = useGetModelConfigsQuery();
+  const modelConfig = useMemo(() => {
+    if (!modelConfigs) {
+      return null;
+    }
+    if (selectedModelKey === null) {
+      return null;
+    }
+    const modelConfig = modelConfigsAdapterSelectors.selectById(modelConfigs, selectedModelKey);
 
-  const form = useForm<UpdateModelArg['body']>({
-    defaultValues: data,
-    mode: 'onChange',
-  });
+    if (!modelConfig) {
+      return null;
+    }
 
-  const onSubmit = useCallback<SubmitHandler<UpdateModelArg['body']>>(
-    (values) => {
-      if (!data?.key) {
-        return;
-      }
-
-      const responseBody: UpdateModelArg = {
-        key: data.key,
-        body: values,
-      };
-
-      updateModel(responseBody)
-        .unwrap()
-        .then((payload) => {
-          form.reset(payload, { keepDefaultValues: true });
-          dispatch(setSelectedModelMode('view'));
-          toast({
-            id: 'MODEL_UPDATED',
-            title: t('modelManager.modelUpdated'),
-            status: 'success',
-          });
-        })
-        .catch((_) => {
-          form.reset();
-          toast({
-            id: 'MODEL_UPDATE_FAILED',
-            title: t('modelManager.modelUpdateFailed'),
-            status: 'error',
-          });
-        });
-    },
-    [dispatch, data?.key, form, t, updateModel]
-  );
-
-  const handleClickCancel = useCallback(() => {
-    dispatch(setSelectedModelMode('view'));
-  }, [dispatch]);
+    return modelConfig;
+  }, [modelConfigs, selectedModelKey]);
 
   if (isLoading) {
-    return <Text>{t('common.loading')}</Text>;
+    return <IAINoContentFallbackWithSpinner label={t('common.loading')} />;
   }
 
-  if (!data) {
-    return <Text>{t('common.somethingWentWrong')}</Text>;
+  if (!modelConfig) {
+    return <IAINoContentFallback label={t('common.somethingWentWrong')} icon={PiExclamationMarkBold} />;
   }
 
-  return (
-    <Flex flexDir="column" gap={4}>
-      <Flex alignItems="flex-start" gap={4}>
-        <ModelImageUpload model_key={selectedModelKey} model_image={data.cover_image} />
-        <Flex flexDir="column" gap={1} flexGrow={1} minW={0}>
-          <Flex gap={2}>
-            <Heading as="h2" fontSize="lg" noOfLines={1} wordBreak="break-all">
-              {data.name}
-            </Heading>
-            <Spacer />
-            {selectedModelMode === 'view' && <ModelConvertButton modelKey={selectedModelKey} />}
-            {selectedModelMode === 'view' && <ModelEditButton />}
-            {selectedModelMode === 'edit' && (
-              <Button size="sm" onClick={handleClickCancel} leftIcon={<PiXBold />}>
-                {t('common.cancel')}
-              </Button>
-            )}
-            {selectedModelMode === 'edit' && (
-              <Button
-                size="sm"
-                colorScheme="invokeYellow"
-                leftIcon={<PiCheckBold />}
-                onClick={form.handleSubmit(onSubmit)}
-                isLoading={isSubmitting}
-                isDisabled={Boolean(Object.keys(form.formState.errors).length)}
-              >
-                {t('common.save')}
-              </Button>
-            )}
-          </Flex>
-          {data.source && (
-            <Text variant="subtext" noOfLines={1} wordBreak="break-all">
-              {t('modelManager.source')}: {data?.source}
-            </Text>
-          )}
-          <Text noOfLines={3}>{data.description}</Text>
-        </Flex>
-      </Flex>
-      {selectedModelMode === 'view' ? <ModelView /> : <ModelEdit form={form} onSubmit={onSubmit} />}
-    </Flex>
-  );
-};
+  if (selectedModelMode === 'view') {
+    return <ModelView modelConfig={modelConfig} />;
+  }
+
+  return <ModelEdit modelConfig={modelConfig} />;
+});
+
+Model.displayName = 'Model';

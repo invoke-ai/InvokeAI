@@ -109,7 +109,6 @@
         "drop": "ドロップ",
         "dropOrUpload": "$t(gallery.drop) またはアップロード",
         "deleteImage_other": "画像を削除",
-        "deleteImageBin": "削除された画像はOSのゴミ箱に送られます。",
         "deleteImagePermanent": "削除された画像は復元できません。",
         "download": "ダウンロード",
         "unableToLoad": "ギャラリーをロードできません",
@@ -198,10 +197,6 @@
         "restoreFaces": {
             "title": "顔の修復",
             "desc": "現在の画像を修復"
-        },
-        "upscale": {
-            "title": "アップスケール",
-            "desc": "現在の画像をアップスケール"
         },
         "showInfo": {
             "title": "情報を見る",
@@ -427,8 +422,6 @@
         "shuffle": "シャッフル",
         "strength": "強度",
         "upscaling": "アップスケーリング",
-        "upscale": "アップスケール",
-        "upscaleImage": "画像をアップスケール",
         "scale": "Scale",
         "scaleBeforeProcessing": "処理前のスケール",
         "scaledWidth": "幅のスケール",

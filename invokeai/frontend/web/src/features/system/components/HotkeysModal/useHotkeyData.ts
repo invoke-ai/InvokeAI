@@ -102,8 +102,8 @@ export const useHotkeyData = (): HotkeyGroup[] => {
           hotkeys: [['A']],
         },
         {
-          title: t('hotkeys.upscale.title'),
-          desc: t('hotkeys.upscale.desc'),
+          title: t('hotkeys.postProcess.title'),
+          desc: t('hotkeys.postProcess.desc'),
           hotkeys: [['Shift', 'U']],
         },
         {

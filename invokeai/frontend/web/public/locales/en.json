@@ -31,13 +31,16 @@
         "deleteBoard": "Delete Board",
         "deleteBoardAndImages": "Delete Board and Images",
         "deleteBoardOnly": "Delete Board Only",
-        "deletedBoardsCannotbeRestored": "Deleted boards cannot be restored",
+        "deletedBoardsCannotbeRestored": "Deleted boards cannot be restored. Selecting 'Delete Board Only' will move images to an uncategorized state.",
+        "deletedPrivateBoardsCannotbeRestored": "Deleted boards cannot be restored. Selecting 'Delete Board Only' will move images to a private uncategorized state for the image's creator.",
+        "hideBoards": "Hide Boards",
         "loading": "Loading...",
         "menuItemAutoAdd": "Auto-add to this Board",
         "move": "Move",
         "movingImagesToBoard_one": "Moving {{count}} image to board:",
         "movingImagesToBoard_other": "Moving {{count}} images to board:",
         "myBoard": "My Board",
+        "noBoards": "No {{boardType}} Boards",
         "noMatching": "No matching Boards",
         "private": "Private Boards",
         "searchBoard": "Search Boards...",
@@ -46,6 +49,7 @@
         "topMessage": "This board contains images used in the following features:",
         "unarchiveBoard": "Unarchive Board",
         "uncategorized": "Uncategorized",
+        "viewBoards": "View Boards",
         "downloadBoard": "Download Board",
         "imagesWithCount_one": "{{count}} image",
         "imagesWithCount_other": "{{count}} images",
@@ -102,6 +106,7 @@
         "negativePrompt": "Negative Prompt",
         "discordLabel": "Discord",
         "dontAskMeAgain": "Don't ask me again",
+        "dontShowMeThese": "Don't show me these",
         "editor": "Editor",
         "error": "Error",
         "file": "File",
@@ -195,6 +200,7 @@
         "delete": "Delete",
         "depthAnything": "Depth Anything",
         "depthAnythingDescription": "Depth map generation using the Depth Anything technique",
+        "depthAnythingSmallV2": "Small V2",
         "depthMidas": "Depth (Midas)",
         "depthMidasDescription": "Depth map generation using Midas",
         "depthZoe": "Depth (Zoe)",
@@ -368,15 +374,18 @@
         "dropToUpload": "$t(gallery.drop) to Upload",
         "deleteImage_one": "Delete Image",
         "deleteImage_other": "Delete {{count}} Images",
-        "deleteImageBin": "Deleted images will be sent to your operating system's Bin.",
         "deleteImagePermanent": "Deleted images cannot be restored.",
         "displayBoardSearch": "Display Board Search",
         "displaySearch": "Display Search",
         "download": "Download",
+        "exitBoardSearch": "Exit Board Search",
+        "exitSearch": "Exit Search",
         "featuresWillReset": "If you delete this image, those features will immediately be reset.",
         "galleryImageSize": "Image Size",
         "gallerySettings": "Gallery Settings",
+        "go": "Go",
         "image": "image",
+        "jump": "Jump",
         "loading": "Loading",
         "loadMore": "Load More",
         "newestFirst": "Newest First",
@@ -636,9 +645,9 @@
             "title": "Undo Stroke"
         },
         "unifiedCanvasHotkeys": "Unified Canvas",
-        "upscale": {
-            "desc": "Upscale the current image",
-            "title": "Upscale"
+        "postProcess": {
+            "desc": "Process the current image using the selected post-processing model",
+            "title": "Process Image"
         },
         "toggleViewer": {
             "desc": "Switches between the Image Viewer and workspace for the current tab.",
@@ -1035,8 +1044,8 @@
         "symmetry": "Symmetry",
         "tileSize": "Tile Size",
         "type": "Type",
-        "upscale": "Upscale (Shift + U)",
-        "upscaleImage": "Upscale Image",
+        "postProcessing": "Post-Processing (Shift + U)",
+        "processImage": "Process Image",
         "upscaling": "Upscaling",
         "useAll": "Use All",
         "useSize": "Use Size",
@@ -1044,11 +1053,7 @@
         "remixImage": "Remix Image",
         "usePrompt": "Use Prompt",
         "useSeed": "Use Seed",
-        "width": "Width",
-        "isAllowedToUpscale": {
-            "useX2Model": "Image is too large to upscale with x4 model, use x2 model",
-            "tooLarge": "Image is too large to upscale, select smaller image"
-        }
+        "width": "Width"
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Show Dynamic Prompts",
@@ -1092,6 +1097,8 @@
         "displayInProgress": "Display Progress Images",
         "enableImageDebugging": "Enable Image Debugging",
         "enableInformationalPopovers": "Enable Informational Popovers",
+        "informationalPopoversDisabled": "Informational Popovers Disabled",
+        "informationalPopoversDisabledDesc": "Informational popovers have been disabled. Enable them in Settings.",
         "enableInvisibleWatermark": "Enable Invisible Watermark",
         "enableNSFWChecker": "Enable NSFW Checker",
         "general": "General",
@@ -1134,6 +1141,8 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "importFailed": "Import Failed",
+        "importSuccessful": "Import Successful",
         "invalidUpload": "Invalid Upload",
         "loadedWithWarnings": "Workflow Loaded with Warnings",
         "maskSavedAssets": "Mask Saved to Assets",
@@ -1499,6 +1508,30 @@
         "seamlessTilingYAxis": {
             "heading": "Seamless Tiling Y Axis",
             "paragraphs": ["Seamlessly tile an image along the vertical axis."]
+        },
+        "upscaleModel": {
+            "heading": "Upscale Model",
+            "paragraphs": [
+                "The upscale model scales the image to the output size before details are added. Any supported upscale model may be used, but some are specialized for different kinds of images, like photos or line drawings."
+            ]
+        },
+        "scale": {
+            "heading": "Scale",
+            "paragraphs": [
+                "Scale controls the output image size, and is based on a multiple of the input image resolution. For example a 2x upscale on a 1024x1024 image would produce a 2048 x 2048 output."
+            ]
+        },
+        "creativity": {
+            "heading": "Creativity",
+            "paragraphs": [
+                "Creativity controls the amount of freedom granted to the model when adding details. Low creativity stays close to the original image, while high creativity allows for more change. When using a prompt, high creativity increases the influence of the prompt."
+            ]
+        },
+        "structure": {
+            "heading": "Structure",
+            "paragraphs": [
+                "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
+            ]
         }
     },
     "unifiedCanvas": {
@@ -1642,10 +1675,15 @@
         "layers_other": "Layers"
     },
     "upscaling": {
+        "upscale": "Upscale",
         "creativity": "Creativity",
+        "exceedsMaxSize": "Upscale settings exceed max size limit",
+        "exceedsMaxSizeDetails": "Max upscale limit is {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixels. Please try a smaller image or decrease your scale selection.",
         "structure": "Structure",
         "upscaleModel": "Upscale Model",
+        "postProcessingModel": "Post-Processing Model",
         "scale": "Scale",
+        "postProcessingMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",
         "tileControlNetModelDesc": "Tile ControlNet model for the chosen main model architecture",
@@ -1653,6 +1691,59 @@
         "missingUpscaleInitialImage": "Missing initial image for upscaling",
         "missingUpscaleModel": "Missing upscale model",
         "missingTileControlNetModel": "No valid tile ControlNet models installed"
+    },
+    "stylePresets": {
+        "active": "Active",
+        "choosePromptTemplate": "Choose Prompt Template",
+        "clearTemplateSelection": "Clear Template Selection",
+        "copyTemplate": "Copy Template",
+        "createPromptTemplate": "Create Prompt Template",
+        "defaultTemplates": "Default Templates",
+        "deleteImage": "Delete Image",
+        "deleteTemplate": "Delete Template",
+        "deleteTemplate2": "Are you sure you want to delete this template? This cannot be undone.",
+        "exportPromptTemplates": "Export My Prompt Templates (CSV)",
+        "editTemplate": "Edit Template",
+        "exportDownloaded": "Export Downloaded",
+        "exportFailed": "Unable to generate and download CSV",
+        "flatten": "Flatten selected template into current prompt",
+        "importTemplates": "Import Prompt Templates (CSV/JSON)",
+        "acceptedColumnsKeys": "Accepted columns/keys:",
+        "nameColumn": "'name'",
+        "positivePromptColumn": "'prompt' or 'positive_prompt'",
+        "negativePromptColumn": "'negative_prompt'",
+        "insertPlaceholder": "Insert placeholder",
+        "myTemplates": "My Templates",
+        "name": "Name",
+        "negativePrompt": "Negative Prompt",
+        "noTemplates": "No templates",
+        "noMatchingTemplates": "No matching templates",
+        "promptTemplatesDesc1": "Prompt templates add text to the prompts you write in the prompt box.",
+        "promptTemplatesDesc2": "Use the placeholder string <Pre>{{placeholder}}</Pre> to specify where your prompt should be included in the template.",
+        "promptTemplatesDesc3": "If you omit the placeholder, the template will be appended to the end of your prompt.",
+        "positivePrompt": "Positive Prompt",
+        "preview": "Preview",
+        "private": "Private",
+        "promptTemplateCleared": "Prompt Template Cleared",
+        "searchByName": "Search by name",
+        "shared": "Shared",
+        "sharedTemplates": "Shared Templates",
+        "templateActions": "Template Actions",
+        "templateDeleted": "Prompt template deleted",
+        "toggleViewMode": "Toggle View Mode",
+        "type": "Type",
+        "unableToDeleteTemplate": "Unable to delete prompt template",
+        "updatePromptTemplate": "Update Prompt Template",
+        "uploadImage": "Upload Image",
+        "useForTemplate": "Use For Prompt Template",
+        "viewList": "View Template List",
+        "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box."
+    },
+    "upsell": {
+        "inviteTeammates": "Invite Teammates",
+        "professional": "Professional",
+        "professionalUpsell": "Available in Invoke’s Professional Edition. Click here or visit invoke.com/pricing for more details.",
+        "shareAccess": "Share Access"
     },
     "ui": {
         "tabs": {

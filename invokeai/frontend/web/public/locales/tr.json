@@ -278,7 +278,6 @@
         "enable": "Aç"
     },
     "gallery": {
-        "deleteImageBin": "Silinen görseller işletim sisteminin çöp kutusuna gönderilir.",
         "deleteImagePermanent": "Silinen görseller geri getirilemez.",
         "assets": "Özkaynaklar",
         "autoAssignBoardOnClick": "Tıklanan Panoya Otomatik Atama",
@@ -415,10 +414,6 @@
         "toggleLayer": {
             "desc": "Maske/Taban katmanları arasında geçiş yapar",
             "title": "Katmanı Gizle-Göster"
-        },
-        "upscale": {
-            "title": "Büyüt",
-            "desc": "Seçili görseli büyüt"
         },
         "setSeed": {
             "title": "Tohumu Kullan",
@@ -626,10 +621,6 @@
         "controlNetControlMode": "Yönetim Kipi",
         "general": "Genel",
         "seamlessYAxis": "Dikişsiz Döşeme Y Ekseni",
-        "isAllowedToUpscale": {
-            "tooLarge": "Görsel, büyütme işlemi için çok büyük, daha küçük bir boyut seçin",
-            "useX2Model": "Görsel 4 kat büyütme işlemi için çok geniş, 2 kat büyütmeyi kullanın"
-        },
         "maskBlur": "Bulandırma",
         "images": "Görseller",
         "info": "Bilgi",
@@ -641,7 +632,6 @@
         "copyImage": "Görseli Kopyala",
         "height": "Boy",
         "width": "En",
-        "upscale": "Büyüt (Shift + U)",
         "useSize": "Boyutu Kullan",
         "symmetry": "Bakışım",
         "tileSize": "Döşeme Boyutu",
@@ -657,7 +647,6 @@
         "showOptionsPanel": "Yan Paneli Göster (O ya da T)",
         "shuffle": "Kar",
         "usePrompt": "İstemi Kullan",
-        "upscaleImage": "Görseli Büyüt",
         "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (çok küçük olabilir)",
         "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (çok büyük olabilir)",
         "cfgRescaleMultiplier": "CFG Rescale Çarpanı",

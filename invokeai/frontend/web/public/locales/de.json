@@ -91,7 +91,8 @@
         "viewingDesc": "Bilder in großer Galerie ansehen",
         "tab": "Tabulator",
         "enabled": "Aktiviert",
-        "disabled": "Ausgeschaltet"
+        "disabled": "Ausgeschaltet",
+        "dontShowMeThese": "Zeig mir diese nicht"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -106,7 +107,6 @@
         "download": "Runterladen",
         "setCurrentImage": "Setze aktuelle Bild",
         "featuresWillReset": "Wenn Sie dieses Bild löschen, werden diese Funktionen sofort zurückgesetzt.",
-        "deleteImageBin": "Gelöschte Bilder werden an den Papierkorb Ihres Betriebssystems gesendet.",
         "unableToLoad": "Galerie kann nicht geladen werden",
         "downloadSelection": "Auswahl herunterladen",
         "currentlyInUse": "Dieses Bild wird derzeit in den folgenden Funktionen verwendet:",
@@ -186,10 +186,6 @@
         "restoreFaces": {
             "title": "Gesicht restaurieren",
             "desc": "Das aktuelle Bild restaurieren"
-        },
-        "upscale": {
-            "title": "Hochskalieren",
-            "desc": "Das aktuelle Bild hochskalieren"
         },
         "showInfo": {
             "title": "Info anzeigen",
@@ -433,8 +429,6 @@
         "type": "Art",
         "strength": "Stärke",
         "upscaling": "Hochskalierung",
-        "upscale": "Hochskalieren (Shift + U)",
-        "upscaleImage": "Bild hochskalieren",
         "scale": "Maßstab",
         "imageFit": "Ausgangsbild an Ausgabegröße anpassen",
         "scaleBeforeProcessing": "Skalieren vor der Verarbeitung",
@@ -634,7 +628,10 @@
         "private": "Private Ordner",
         "shared": "Geteilte Ordner",
         "archiveBoard": "Ordner archivieren",
-        "archived": "Archiviert"
+        "archived": "Archiviert",
+        "noBoards": "Kein {boardType}} Ordner",
+        "hideBoards": "Ordner verstecken",
+        "viewBoards": "Ordner ansehen"
     },
     "controlnet": {
         "showAdvanced": "Zeige Erweitert",
@@ -948,6 +945,21 @@
         "imageFit": {
             "paragraphs": [
                 "Reduziert das Ausgangsbild auf die Breite und Höhe des Ausgangsbildes. Empfohlen zu aktivieren."
+            ]
+        },
+        "structure": {
+            "paragraphs": [
+                "Die Struktur steuert, wie genau sich das Ausgabebild an das Layout des Originals hält. Eine niedrige Struktur erlaubt größere Änderungen, während eine hohe Struktur die ursprüngliche Komposition und das Layout strikter beibehält."
+            ]
+        },
+        "creativity": {
+            "paragraphs": [
+                "Die Kreativität bestimmt den Grad der Freiheit, die dem Modell beim Hinzufügen von Details gewährt wird. Eine niedrige Kreativität hält sich eng an das Originalbild, während eine hohe Kreativität mehr Veränderungen zulässt. Bei der Verwendung eines Prompts erhöht eine hohe Kreativität den Einfluss des Prompts."
+            ]
+        },
+        "scale": {
+            "paragraphs": [
+                "Die Skalierung steuert die Größe des Ausgabebildes und basiert auf einem Vielfachen der Auflösung des Originalbildes. So würde z. B. eine 2-fache Hochskalierung eines 1024x1024px Bildes eine 2048x2048px große Ausgabe erzeugen."
             ]
         }
     },

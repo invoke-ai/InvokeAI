@@ -36,7 +36,7 @@ const zContentShuffleProcessorConfig = z.object({
 });
 export type ContentShuffleProcessorConfig = z.infer<typeof zContentShuffleProcessorConfig>;
 
-const zDepthAnythingModelSize = z.enum(['large', 'base', 'small']);
+const zDepthAnythingModelSize = z.enum(['large', 'base', 'small', 'small_v2']);
 export type DepthAnythingModelSize = z.infer<typeof zDepthAnythingModelSize>;
 export const isDepthAnythingModelSize = (v: unknown): v is DepthAnythingModelSize =>
   zDepthAnythingModelSize.safeParse(v).success;
@@ -298,7 +298,7 @@ export const CA_PROCESSOR_DATA: CAProcessorsData = {
     buildDefaults: () => ({
       id: 'depth_anything_image_processor',
       type: 'depth_anything_image_processor',
-      model_size: 'small',
+      model_size: 'small_v2',
     }),
     buildNode: (image, config) => ({
       ...config,
