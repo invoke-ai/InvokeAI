@@ -1,18 +1,18 @@
 import { Mutex } from 'async-mutex';
 import type { JSONObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { CanvasPreview } from 'features/controlLayers/konva/CanvasPreview';
+import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import { getPrefixedId, loadImage } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 import type { InvocationDenoiseProgressEvent } from 'services/events/types';
 
-export class CanvasProgressImage {
+export class CanvasProgressImageModule {
   readonly type = 'progress_image';
 
   id: string;
   path: string[];
-  parent: CanvasPreview;
+  parent: CanvasPreviewModule;
   manager: CanvasManager;
   log: Logger;
 
@@ -34,7 +34,7 @@ export class CanvasProgressImage {
 
   mutex: Mutex = new Mutex();
 
-  constructor(parent: CanvasPreview) {
+  constructor(parent: CanvasPreviewModule) {
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = parent.manager;
