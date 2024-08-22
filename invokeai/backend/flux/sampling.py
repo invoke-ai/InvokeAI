@@ -20,16 +20,19 @@ def get_noise(
     dtype: torch.dtype,
     seed: int,
 ):
+    # We always generate noise on the same device and dtype then cast to ensure consistency across devices/dtypes.
+    rand_device = "cpu"
+    rand_dtype = torch.float16
     return torch.randn(
         num_samples,
         16,
         # allow for packing
         2 * math.ceil(height / 16),
         2 * math.ceil(width / 16),
-        device=device,
-        dtype=dtype,
-        generator=torch.Generator(device=device).manual_seed(seed),
-    )
+        device=rand_device,
+        dtype=rand_dtype,
+        generator=torch.Generator(device=rand_device).manual_seed(seed),
+    ).to(device=device, dtype=dtype)
 
 
 def prepare(t5: HFEncoder, clip: HFEncoder, img: Tensor, prompt: str | list[str]) -> dict[str, Tensor]:
