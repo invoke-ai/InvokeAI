@@ -26,7 +26,7 @@ const matcher = isAnyOf(
   activeStylePresetIdChanged,
   stylePresetsApi.endpoints.deleteStylePreset.matchFulfilled,
   stylePresetsApi.endpoints.updateStylePreset.matchFulfilled,
-  stylePresetsApi.endpoints.listStylePresets.matchFulfilled,
+  stylePresetsApi.endpoints.listStylePresets.matchFulfilled
 );
 
 export const addDynamicPromptsListener = (startAppListening: AppStartListening) => {
