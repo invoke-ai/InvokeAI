@@ -62,7 +62,7 @@ export class CanvasRenderingModule {
   };
 
   renderBackground = (state: CanvasV2State, prevState: CanvasV2State | null) => {
-    if (!prevState || state.settings.canvasBackgroundStyle !== prevState.settings.canvasBackgroundStyle) {
+    if (!prevState || state.settings.dynamicGrid !== prevState.settings.dynamicGrid) {
       this.manager.background.render();
     }
   };

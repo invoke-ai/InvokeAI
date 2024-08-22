@@ -36,7 +36,7 @@ export class CanvasBackgroundModule {
   render() {
     const settings = this.manager.stateApi.getSettings();
 
-    if (settings.canvasBackgroundStyle !== 'dynamicGrid') {
+    if (!settings.dynamicGrid) {
       this.konva.layer.visible(false);
       return;
     }

@@ -1713,6 +1713,7 @@
         "disableTransparencyEffect": "Disable Transparency Effect",
         "hidingType": "Hiding {{type}}",
         "showingType": "Showing {{type}}",
+        "dynamicGrid": "Dynamic Grid",
         "fill": {
             "fillStyle": "Fill Style",
             "solid": "Solid",
@@ -1731,12 +1732,6 @@
             "view": "View",
             "transform": "Transform",
             "eyeDropper": "Eye Dropper"
-        },
-        "background": {
-            "backgroundStyle": "Background Style",
-            "solid": "Solid",
-            "checkerboard": "Checkerboard",
-            "dynamicGrid": "Dynamic Grid"
         },
         "filter": {
             "filter": "Filter",
