@@ -1,22 +1,20 @@
 import type { AppSocket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
-import type { JSONObject, SerializableObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
-import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva/constants';
+import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import {
   canvasToBlob,
   canvasToImageData,
   getImageDataTransparency,
   getPrefixedId,
-  getRectUnion,
   nanoid,
   previewBlob,
 } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
-import type { CanvasV2State, Coordinate, Dimensions, GenerationMode, Rect } from 'features/controlLayers/store/types';
+import type { CanvasV2State, GenerationMode, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
-import { clamp } from 'lodash-es';
 import { LRUCache } from 'lru-cache';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -40,7 +38,6 @@ export class CanvasManager {
 
   id: string;
   path: string[];
-  stage: Konva.Stage;
   container: HTMLDivElement;
   rasterLayerAdapters: Map<string, CanvasLayerAdapter> = new Map();
   controlLayerAdapters: Map<string, CanvasLayerAdapter> = new Map();
@@ -50,6 +47,7 @@ export class CanvasManager {
   preview: CanvasPreview;
   background: CanvasBackground;
   filter: CanvasFilter;
+  stage: CanvasStageModule;
 
   log: Logger;
   socket: AppSocket;
@@ -69,7 +67,6 @@ export class CanvasManager {
   constructor(stage: Konva.Stage, container: HTMLDivElement, store: AppStore, socket: AppSocket) {
     this.id = getPrefixedId(this.type);
     this.path = [this.id];
-    this.stage = stage;
     this.container = container;
     this._store = store;
     this.socket = socket;
@@ -87,11 +84,13 @@ export class CanvasManager {
       };
     });
 
+    this.stage = new CanvasStageModule(stage, container, this);
+
     this.preview = new CanvasPreview(this);
-    this.stage.add(this.preview.getLayer());
+    this.stage.addLayer(this.preview.getLayer());
 
     this.background = new CanvasBackground(this);
-    this.stage.add(this.background.konva.layer);
+    this.stage.addLayer(this.background.konva.layer);
 
     this.filter = new CanvasFilter(this);
 
@@ -169,83 +168,6 @@ export class CanvasManager {
     this.preview.getLayer().zIndex(++zIndex);
   }
 
-  fitStageToContainer() {
-    this.stage.width(this.container.offsetWidth);
-    this.stage.height(this.container.offsetHeight);
-    this.stateApi.$stageAttrs.set({
-      x: this.stage.x(),
-      y: this.stage.y(),
-      width: this.stage.width(),
-      height: this.stage.height(),
-      scale: this.stage.scaleX(),
-    });
-  }
-
-  getVisibleRect = (): Rect => {
-    const rects = [];
-
-    for (const adapter of this.inpaintMaskAdapters.values()) {
-      if (adapter.state.isEnabled) {
-        rects.push(adapter.transformer.getRelativeRect());
-      }
-    }
-
-    for (const adapter of this.rasterLayerAdapters.values()) {
-      if (adapter.state.isEnabled) {
-        rects.push(adapter.transformer.getRelativeRect());
-      }
-    }
-
-    for (const adapter of this.controlLayerAdapters.values()) {
-      if (adapter.state.isEnabled) {
-        rects.push(adapter.transformer.getRelativeRect());
-      }
-    }
-
-    for (const adapter of this.regionalGuidanceAdapters.values()) {
-      if (adapter.state.isEnabled) {
-        rects.push(adapter.transformer.getRelativeRect());
-      }
-    }
-
-    const rectUnion = getRectUnion(...rects);
-
-    if (rectUnion.width === 0 || rectUnion.height === 0) {
-      // fall back to the bbox if there is no content
-      return this.stateApi.getBbox().rect;
-    } else {
-      return rectUnion;
-    }
-  };
-
-  resetView() {
-    const { width, height } = this.getStageSize();
-    const rect = this.getVisibleRect();
-
-    const padding = 20; // Padding in absolute pixels
-
-    const availableWidth = width - padding * 2;
-    const availableHeight = height - padding * 2;
-
-    const scale = Math.min(Math.min(availableWidth / rect.width, availableHeight / rect.height), 1);
-    const x = -rect.x * scale + padding + (availableWidth - rect.width * scale) / 2;
-    const y = -rect.y * scale + padding + (availableHeight - rect.height * scale) / 2;
-
-    this.stage.setAttrs({
-      x,
-      y,
-      scaleX: scale,
-      scaleY: scale,
-    });
-
-    this.stateApi.$stageAttrs.set({
-      ...this.stateApi.$stageAttrs.get(),
-      x,
-      y,
-      scale,
-    });
-  }
-
   getTransformingLayer = (): CanvasLayerAdapter | CanvasMaskAdapter | null => {
     const transformingEntity = this.stateApi.$transformingEntity.get();
     if (!transformingEntity) {
@@ -307,6 +229,10 @@ export class CanvasManager {
     const isFirstRender = this.isFirstRender;
     this.isFirstRender = false;
 
+    if (isFirstRender) {
+      this.log.trace('First render');
+    }
+
     const prevState = this.prevState;
     this.prevState = state;
 
@@ -340,7 +266,7 @@ export class CanvasManager {
         if (!adapter) {
           adapter = new CanvasLayerAdapter(entityState, this);
           this.rasterLayerAdapters.set(adapter.id, adapter);
-          this.stage.add(adapter.konva.layer);
+          this.stage.addLayer(adapter.konva.layer);
         }
         await adapter.update({
           state: entityState,
@@ -371,7 +297,7 @@ export class CanvasManager {
         if (!adapter) {
           adapter = new CanvasLayerAdapter(entityState, this);
           this.controlLayerAdapters.set(adapter.id, adapter);
-          this.stage.add(adapter.konva.layer);
+          this.stage.addLayer(adapter.konva.layer);
         }
         await adapter.update({
           state: entityState,
@@ -408,7 +334,7 @@ export class CanvasManager {
         if (!adapter) {
           adapter = new CanvasMaskAdapter(entityState, this);
           this.regionalGuidanceAdapters.set(adapter.id, adapter);
-          this.stage.add(adapter.konva.layer);
+          this.stage.addLayer(adapter.konva.layer);
         }
         await adapter.update({
           state: entityState,
@@ -445,7 +371,7 @@ export class CanvasManager {
         if (!adapter) {
           adapter = new CanvasMaskAdapter(entityState, this);
           this.inpaintMaskAdapters.set(adapter.id, adapter);
-          this.stage.add(adapter.konva.layer);
+          this.stage.addLayer(adapter.konva.layer);
         }
         await adapter.update({
           state: entityState,
@@ -488,23 +414,15 @@ export class CanvasManager {
   };
 
   initialize = () => {
-    this.log.debug('Initializing renderer');
-    this.stage.container(this.container);
+    this.log.debug('Initializing canvas manager');
 
     const unsubscribeListeners = setStageEventHandlers(this);
 
-    // We can use a resize observer to ensure the stage always fits the container. We also need to re-render the bg and
-    // document bounds overlay when the stage is resized.
-    const resizeObserver = new ResizeObserver(this.fitStageToContainer.bind(this));
-    resizeObserver.observe(this.container);
-    this.fitStageToContainer();
-
+    const cleanupStage = this.stage.initialize();
     const unsubscribeRenderer = this._store.subscribe(this.render);
 
-    this.log.debug('First render of konva stage');
-
     return () => {
-      this.log.debug('Cleaning up konva renderer');
+      this.log.debug('Cleaning up canvas manager');
       const allAdapters = [
         ...this.rasterLayerAdapters.values(),
         ...this.controlLayerAdapters.values(),
@@ -518,95 +436,9 @@ export class CanvasManager {
       this.preview.destroy();
       unsubscribeRenderer();
       unsubscribeListeners();
-      resizeObserver.disconnect();
+      cleanupStage();
     };
   };
-
-  /**
-   * Gets the center of the stage in either absolute or relative coordinates
-   * @param absolute Whether to return the center in absolute coordinates
-   */
-  getStageCenter(absolute = false): Coordinate {
-    const scale = this.getStageScale();
-    const { x, y } = this.getStagePosition();
-    const { width, height } = this.getStageSize();
-
-    const center = {
-      x: (width / 2 - x) / scale,
-      y: (height / 2 - y) / scale,
-    };
-
-    if (!absolute) {
-      return center;
-    }
-
-    return this.stage.getAbsoluteTransform().point(center);
-  }
-
-  /**
-   * Sets the scale of the stage. If center is provided, the stage will zoom in/out on that point.
-   * @param scale The new scale to set
-   * @param center The center of the stage to zoom in/out on
-   */
-  setStageScale(scale: number, center: Coordinate = this.getStageCenter(true)) {
-    const newScale = clamp(Math.round(scale * 100) / 100, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
-
-    const { x, y } = this.getStagePosition();
-    const oldScale = this.getStageScale();
-
-    const deltaX = (center.x - x) / oldScale;
-    const deltaY = (center.y - y) / oldScale;
-
-    const newX = center.x - deltaX * newScale;
-    const newY = center.y - deltaY * newScale;
-
-    this.stage.setAttrs({
-      x: newX,
-      y: newY,
-      scaleX: newScale,
-      scaleY: newScale,
-    });
-
-    this.stateApi.$stageAttrs.set({
-      x: Math.floor(this.stage.x()),
-      y: Math.floor(this.stage.y()),
-      width: this.stage.width(),
-      height: this.stage.height(),
-      scale: this.stage.scaleX(),
-    });
-  }
-
-  /**
-   * Gets the scale of the stage. The stage is always scaled uniformly in x and y.
-   */
-  getStageScale(): number {
-    // The stage is never scaled differently in x and y
-    return this.stage.scaleX();
-  }
-
-  /**
-   * Gets the position of the stage.
-   */
-  getStagePosition(): Coordinate {
-    return this.stage.position();
-  }
-
-  /**
-   * Gets the size of the stage.
-   */
-  getStageSize(): Dimensions {
-    return this.stage.size();
-  }
-
-  /**
-   * Scales a number of pixels by the current stage scale. For example, if the stage is scaled by 5, then 10 pixels
-   * would be scaled to 10px / 5 = 2 pixels.
-   * @param pixels The number of pixels to scale
-   * @returns The number of pixels scaled by the current stage scale
-   */
-  getScaledPixels(pixels: number): number {
-    return pixels / this.getStageScale();
-  }
 
   clearCaches = () => {
     this.canvasCache.clear();
@@ -820,13 +652,13 @@ export class CanvasManager {
     return generationMode;
   }
 
-  getLoggingContext = (): JSONObject => {
+  getLoggingContext = (): SerializableObject => {
     return {
       path: this.path.join('.'),
     };
   };
 
-  buildLogger = (getContext: () => JSONObject): Logger => {
+  buildLogger = (getContext: () => SerializableObject): Logger => {
     return this.log.child((message) => {
       return {
         ...message,
