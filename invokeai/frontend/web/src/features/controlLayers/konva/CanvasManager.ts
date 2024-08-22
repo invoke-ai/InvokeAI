@@ -4,15 +4,14 @@ import type { AppStore } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
+import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import {
   canvasToBlob,
   canvasToImageData,
   getImageDataTransparency,
   getPrefixedId,
-  nanoid,
   previewBlob,
 } from 'features/controlLayers/konva/util';
-import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import type { CanvasV2State, GenerationMode, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import { LRUCache } from 'lru-cache';
@@ -48,6 +47,7 @@ export class CanvasManager {
   background: CanvasBackground;
   filter: CanvasFilter;
   stage: CanvasStageModule;
+  worker: CanvasWorkerModule;
 
   log: Logger;
   socket: AppSocket;
@@ -60,9 +60,6 @@ export class CanvasManager {
   imageNameCache = new LRUCache<string, string>({ max: 100 });
   canvasCache = new LRUCache<string, HTMLCanvasElement>({ max: 32 });
   generationModeCache = new LRUCache<string, GenerationMode>({ max: 100 });
-
-  _worker: Worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
-  _tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }> = new Map();
 
   constructor(stage: Konva.Stage, container: HTMLDivElement, store: AppStore, socket: AppSocket) {
     this.id = getPrefixedId(this.type);
@@ -85,6 +82,7 @@ export class CanvasManager {
     });
 
     this.stage = new CanvasStageModule(stage, container, this);
+    this.worker = new CanvasWorkerModule(this);
 
     this.preview = new CanvasPreview(this);
     this.stage.addLayer(this.preview.getLayer());
@@ -93,30 +91,6 @@ export class CanvasManager {
     this.stage.addLayer(this.background.konva.layer);
 
     this.filter = new CanvasFilter(this);
-
-    this._worker.onmessage = (event: MessageEvent<ExtentsResult | WorkerLogMessage>) => {
-      const { type, data } = event.data;
-      if (type === 'log') {
-        if (data.ctx) {
-          this.log[data.level](data.ctx, data.message);
-        } else {
-          this.log[data.level](data.message);
-        }
-      } else if (type === 'extents') {
-        const task = this._tasks.get(data.id);
-        if (!task) {
-          return;
-        }
-        task.onComplete(data.extents);
-        this._tasks.delete(data.id);
-      }
-    };
-    this._worker.onerror = (event) => {
-      this.log.error({ message: event.message }, 'Worker error');
-    };
-    this._worker.onmessageerror = () => {
-      this.log.error('Worker message error');
-    };
 
     this.stateApi.$transformingEntity.set(null);
     this.stateApi.$toolState.set(this.stateApi.getToolState());
@@ -132,16 +106,6 @@ export class CanvasManager {
 
   disableDebugging() {
     this._isDebugging = false;
-  }
-
-  requestBbox(data: Omit<GetBboxTask['data'], 'id'>, onComplete: (extents: Extents | null) => void) {
-    const id = nanoid();
-    const task: GetBboxTask = {
-      type: 'get_bbox',
-      data: { ...data, id },
-    };
-    this._tasks.set(id, { task, onComplete });
-    this._worker.postMessage(task, [data.buffer]);
   }
 
   arrangeEntities() {
