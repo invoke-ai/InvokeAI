@@ -86,8 +86,19 @@ export const useImageActions = (image_name?: string) => {
 
   const createAsPreset = useCallback(async () => {
     if (image_name && metadata && imageDTO) {
-      const positivePrompt = await handlers.positivePrompt.parse(metadata);
-      const negativePrompt = await handlers.negativePrompt.parse(metadata);
+      let positivePrompt;
+      let negativePrompt;
+
+      try {
+        positivePrompt = await handlers.positivePrompt.parse(metadata);
+      } catch (error) {
+        positivePrompt = ""
+      }
+      try {
+        negativePrompt = await handlers.negativePrompt.parse(metadata);
+      } catch (error) {
+        negativePrompt = ""
+      }
 
       $stylePresetModalState.set({
         prefilledFormData: {
