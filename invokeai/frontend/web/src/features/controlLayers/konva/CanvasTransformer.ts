@@ -651,7 +651,7 @@ export class CanvasTransformer {
     // We have eraser strokes - we must calculate the bbox using pixel data
     const canvas = this.parent.renderer.getCanvas(undefined, { opacity: 1 });
     const imageData = canvasToImageData(canvas);
-    this.manager.requestBbox(
+    this.manager.worker.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
       (extents) => {
         if (extents) {
