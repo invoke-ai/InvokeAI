@@ -6,23 +6,20 @@ import { InpaintMaskList } from 'features/controlLayers/components/InpaintMask/I
 import { IPAdapterList } from 'features/controlLayers/components/IPAdapter/IPAdapterList';
 import { RasterLayerEntityList } from 'features/controlLayers/components/RasterLayer/RasterLayerEntityList';
 import { RegionalGuidanceEntityList } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceEntityList';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { memo } from 'react';
 
 export const CanvasEntityList = memo(() => {
   return (
-    <CanvasManagerProviderGate>
-      <ScrollableContent>
-        <Flex flexDir="column" gap={4} pt={2} data-testid="control-layers-layer-list">
-          <CanvasEntityOpacity />
-          <InpaintMaskList />
-          <RegionalGuidanceEntityList />
-          <IPAdapterList />
-          <ControlLayerEntityList />
-          <RasterLayerEntityList />
-        </Flex>
-      </ScrollableContent>
-    </CanvasManagerProviderGate>
+    <ScrollableContent>
+      <Flex flexDir="column" gap={4} pt={2} data-testid="control-layers-layer-list">
+        <CanvasEntityOpacity />
+        <InpaintMaskList />
+        <RegionalGuidanceEntityList />
+        <IPAdapterList />
+        <ControlLayerEntityList />
+        <RasterLayerEntityList />
+      </Flex>
+    </ScrollableContent>
   );
 });
 
