@@ -1,4 +1,4 @@
-import { useEntityCount } from 'features/controlLayers/hooks/useEntityCount';
+import { useEntityTypeCount } from 'features/controlLayers/hooks/useEntityTypeCount';
 import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
@@ -8,7 +8,7 @@ export const useEntityTypeTitle = (type: CanvasEntityIdentifier['type']): string
   const { t } = useTranslation();
 
   const isHidden = useEntityTypeIsHidden(type);
-  const count = useEntityCount(type);
+  const count = useEntityTypeCount(type);
 
   const title = useMemo(() => {
     const context = isHidden ? 'hidden' : 'visible';

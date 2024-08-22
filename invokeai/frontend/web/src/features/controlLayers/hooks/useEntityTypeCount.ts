@@ -4,7 +4,7 @@ import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice'
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
 
-export const useEntityCount = (type: CanvasEntityIdentifier['type']): number => {
+export const useEntityTypeCount = (type: CanvasEntityIdentifier['type']): number => {
   const selectEntityCount = useMemo(
     () =>
       createSelector(selectCanvasV2Slice, (canvasV2) => {
