@@ -3,7 +3,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 
-export class CanvasBackground {
+export class CanvasBackgroundModule {
   readonly type = 'background_grid';
 
   static GRID_LINE_COLOR_COARSE = getArbitraryBaseColor(27);
@@ -44,12 +44,10 @@ export class CanvasBackground {
     this.konva.layer.visible(true);
 
     this.konva.layer.zIndex(0);
-    const scale = this.manager.stage.scaleX();
-    const gridSpacing = CanvasBackground.getGridSpacing(scale);
-    const x = this.manager.stage.x();
-    const y = this.manager.stage.y();
-    const width = this.manager.stage.width();
-    const height = this.manager.stage.height();
+    const scale = this.manager.stage.getScale();
+    const { x, y } = this.manager.stage.getPosition();
+    const { width, height } = this.manager.stage.getSize();
+    const gridSpacing = this.getGridSpacing(scale);
     const stageRect = {
       x1: 0,
       y1: 0,
@@ -96,7 +94,7 @@ export class CanvasBackground {
           x: _x,
           y: gridFullRect.y1,
           points: [0, 0, 0, ySize],
-          stroke: _x % 64 ? CanvasBackground.GRID_LINE_COLOR_FINE : CanvasBackground.GRID_LINE_COLOR_COARSE,
+          stroke: _x % 64 ? CanvasBackgroundModule.GRID_LINE_COLOR_FINE : CanvasBackgroundModule.GRID_LINE_COLOR_COARSE,
           strokeWidth,
           listening: false,
         })
@@ -109,7 +107,7 @@ export class CanvasBackground {
           x: gridFullRect.x1,
           y: _y,
           points: [0, 0, xSize, 0],
-          stroke: _y % 64 ? CanvasBackground.GRID_LINE_COLOR_FINE : CanvasBackground.GRID_LINE_COLOR_COARSE,
+          stroke: _y % 64 ? CanvasBackgroundModule.GRID_LINE_COLOR_FINE : CanvasBackgroundModule.GRID_LINE_COLOR_COARSE,
           strokeWidth,
           listening: false,
         })
@@ -129,7 +127,7 @@ export class CanvasBackground {
    * @param scale The stage scale
    * @returns The grid spacing based on the stage scale
    */
-  static getGridSpacing = (scale: number): number => {
+  getGridSpacing = (scale: number): number => {
     if (scale >= 2) {
       return 8;
     }

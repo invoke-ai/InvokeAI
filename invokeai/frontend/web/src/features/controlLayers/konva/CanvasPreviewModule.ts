@@ -1,22 +1,22 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasProgressImage } from 'features/controlLayers/konva/CanvasProgressImage';
+import { CanvasProgressImageModule } from 'features/controlLayers/konva/CanvasProgressImageModule';
 import Konva from 'konva';
 
-import { CanvasBbox } from './CanvasBbox';
-import { CanvasStagingArea } from './CanvasStagingArea';
-import { CanvasTool } from './CanvasTool';
+import { CanvasBboxModule } from './CanvasBboxModule';
+import { CanvasStagingAreaModule } from './CanvasStagingAreaModule';
+import { CanvasToolModule } from './CanvasToolModule';
 
-export class CanvasPreview {
+export class CanvasPreviewModule {
   manager: CanvasManager;
 
   konva: {
     layer: Konva.Layer;
   };
 
-  tool: CanvasTool;
-  bbox: CanvasBbox;
-  stagingArea: CanvasStagingArea;
-  progressImage: CanvasProgressImage;
+  tool: CanvasToolModule;
+  bbox: CanvasBboxModule;
+  stagingArea: CanvasStagingAreaModule;
+  progressImage: CanvasProgressImageModule;
 
   constructor(manager: CanvasManager) {
     this.manager = manager;
@@ -24,16 +24,16 @@ export class CanvasPreview {
       layer: new Konva.Layer({ listening: false, imageSmoothingEnabled: false }),
     };
 
-    this.stagingArea = new CanvasStagingArea(this);
+    this.stagingArea = new CanvasStagingAreaModule(this);
     this.konva.layer.add(...this.stagingArea.getNodes());
 
-    this.progressImage = new CanvasProgressImage(this);
+    this.progressImage = new CanvasProgressImageModule(this);
     this.konva.layer.add(...this.progressImage.getNodes());
 
-    this.bbox = new CanvasBbox(this);
+    this.bbox = new CanvasBboxModule(this);
     this.konva.layer.add(this.bbox.konva.group);
 
-    this.tool = new CanvasTool(this);
+    this.tool = new CanvasToolModule(this);
     this.konva.layer.add(this.tool.konva.group);
   }
 

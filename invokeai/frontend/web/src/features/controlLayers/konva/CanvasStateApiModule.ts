@@ -77,7 +77,7 @@ type EntityStateAndAdapter =
       adapter: CanvasMaskAdapter;
     };
 
-export class CanvasStateApi {
+export class CanvasStateApiModule {
   store: AppStore;
   manager: CanvasManager;
 

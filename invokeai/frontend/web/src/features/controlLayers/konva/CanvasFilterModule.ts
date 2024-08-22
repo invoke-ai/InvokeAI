@@ -13,7 +13,7 @@ import { assert } from 'tsafe';
 
 const TYPE = 'entity_filter_preview';
 
-export class CanvasFilter {
+export class CanvasFilterModule {
   readonly type = TYPE;
 
   id: string;
