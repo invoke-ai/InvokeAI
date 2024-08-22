@@ -40,7 +40,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
   const generationMode = manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SDXL graph');
 
-  const { bbox, params } = state.canvasV2;
+  const { bbox, params, session, settings } = state.canvasV2;
 
   const {
     model,
@@ -246,10 +246,11 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  // This is the terminal node and must always save to gallery.
+  const shouldSaveToGallery = session.mode === 'generate' || settings.autoSave;
+
   g.updateNode(canvasOutput, {
     id: CANVAS_OUTPUT,
-    is_intermediate: false,
+    is_intermediate: !shouldSaveToGallery,
     use_cache: false,
     board: getBoardField(state),
   });

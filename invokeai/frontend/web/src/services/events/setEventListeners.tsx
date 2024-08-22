@@ -7,8 +7,6 @@ import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
-import { sessionImageStaged } from 'features/controlLayers/store/canvasV2Slice';
-import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/ErrorToastDescription';
@@ -17,11 +15,9 @@ import { t } from 'i18next';
 import { forEach } from 'lodash-es';
 import { atom, computed } from 'nanostores';
 import { api, LIST_TAG } from 'services/api';
-import { boardsApi } from 'services/api/endpoints/boards';
-import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
-import { getCategories, getListImagesUrl } from 'services/api/util';
+import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import type { ClientToServerEvents, InvocationDenoiseProgressEvent, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 
@@ -147,116 +143,14 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
     }
   });
 
-  socket.on('invocation_complete', async (data) => {
-    log.debug(
-      { data } as SerializableObject,
-      `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
-    );
-
-    const { result, invocation_source_id } = data;
-
-    if (data.origin === 'workflows') {
-      const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-      if (nes) {
-        nes.status = zNodeStatus.enum.COMPLETED;
-        if (nes.progress !== null) {
-          nes.progress = 1;
-        }
-        nes.outputs.push(result);
-        upsertExecutionState(nes.nodeId, nes);
-      }
-    }
-
-    // This complete event has an associated image output
-    if (
-      (data.result.type === 'image_output' || data.result.type === 'canvas_v2_mask_and_crop_output') &&
-      !nodeTypeDenylist.includes(data.invocation.type)
-    ) {
-      const { image_name } = data.result.image;
-      const { gallery, canvasV2 } = getState();
-
-      // This populates the `getImageDTO` cache
-      const imageDTORequest = dispatch(
-        imagesApi.endpoints.getImageDTO.initiate(image_name, {
-          forceRefetch: true,
-        })
-      );
-
-      const imageDTO = await imageDTORequest.unwrap();
-      imageDTORequest.unsubscribe();
-
-      // handle tab-specific logic
-      if (data.origin === 'canvas' && data.invocation_source_id === 'canvas_output') {
-        if (data.result.type === 'canvas_v2_mask_and_crop_output') {
-          const { offset_x, offset_y } = data.result;
-          if (canvasV2.session.isStaging) {
-            dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
-          }
-        } else if (data.result.type === 'image_output') {
-          if (canvasV2.session.isStaging) {
-            dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
-          }
-        }
-      }
-
-      if (!imageDTO.is_intermediate) {
-        // update the total images for the board
-        dispatch(
-          boardsApi.util.updateQueryData('getBoardImagesTotal', imageDTO.board_id ?? 'none', (draft) => {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            draft.total += 1;
-          })
-        );
-
-        dispatch(
-          imagesApi.util.invalidateTags([
-            { type: 'Board', id: imageDTO.board_id ?? 'none' },
-            {
-              type: 'ImageList',
-              id: getListImagesUrl({
-                board_id: imageDTO.board_id ?? 'none',
-                categories: getCategories(imageDTO),
-              }),
-            },
-          ])
-        );
-
-        const { shouldAutoSwitch } = gallery;
-
-        // If auto-switch is enabled, select the new image
-        if (shouldAutoSwitch) {
-          // if auto-add is enabled, switch the gallery view and board if needed as the image comes in
-          if (gallery.galleryView !== 'images') {
-            dispatch(galleryViewChanged('images'));
-          }
-
-          if (imageDTO.board_id && imageDTO.board_id !== gallery.selectedBoardId) {
-            dispatch(
-              boardIdSelected({
-                boardId: imageDTO.board_id,
-                selectedImageName: imageDTO.image_name,
-              })
-            );
-          }
-
-          dispatch(offsetChanged({ offset: 0 }));
-
-          if (!imageDTO.board_id && gallery.selectedBoardId !== 'none') {
-            dispatch(
-              boardIdSelected({
-                boardId: 'none',
-                selectedImageName: imageDTO.image_name,
-              })
-            );
-          }
-
-          dispatch(imageSelected(imageDTO));
-        }
-      }
-    }
-
-    $lastProgressEvent.set(null);
-  });
+  const onInvocationComplete = buildOnInvocationComplete(
+    getState,
+    dispatch,
+    nodeTypeDenylist,
+    $lastProgressEvent.set,
+    $lastCanvasProgressEvent.set
+  );
+  socket.on('invocation_complete', onInvocationComplete);
 
   socket.on('model_load_started', (data) => {
     const { config, submodel_type } = data;

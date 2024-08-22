@@ -21,7 +21,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       assert(manager, 'No model found in state');
 
       let didStartStaging = false;
-      if (!state.canvasV2.session.isStaging) {
+      if (!state.canvasV2.session.isStaging && state.canvasV2.session.mode === 'compose') {
         dispatch(sessionStartedStaging());
         didStartStaging = true;
       }
@@ -50,7 +50,6 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         req.reset();
         await req.unwrap();
       } catch (error) {
-        console.log('Error in enqueueRequestedLinear', error);
         if (didStartStaging && getState().canvasV2.session.isStaging) {
           dispatch(sessionStagingAreaReset());
         }
