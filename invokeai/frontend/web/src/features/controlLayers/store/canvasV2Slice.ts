@@ -89,7 +89,7 @@ const initialState: CanvasV2State = {
     showHUD: true,
     clipToBbox: false,
     cropToBboxOnSave: false,
-    canvasBackgroundStyle: 'checkerboard',
+    dynamicGrid: false,
   },
   compositing: {
     maskBlur: 16,
@@ -473,7 +473,7 @@ export const {
   allEntitiesDeleted,
   clipToBboxChanged,
   canvasReset,
-  canvasBackgroundStyleChanged,
+  settingsDynamicGridToggled,
   // All entities
   entitySelected,
   entityNameChanged,
