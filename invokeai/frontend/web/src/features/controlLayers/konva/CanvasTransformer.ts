@@ -174,8 +174,8 @@ export class CanvasTransformer {
           // We need to snap the anchor to the nearest pixel, but the positions provided to this callback are absolute,
           // scaled coordinates. They need to be converted to stage coordinates, snapped, then converted back to absolute
           // before returning them.
-          const stageScale = this.manager.getStageScale();
-          const stagePos = this.manager.getStagePosition();
+          const stageScale = this.manager.stage.getScale();
+          const stagePos = this.manager.stage.getPosition();
 
           // Unscale and round the target position to the nearest pixel.
           const targetX = Math.round(newPos.x / stageScale);
@@ -335,8 +335,8 @@ export class CanvasTransformer {
       // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
       // and border
       this.konva.outlineRect.setAttrs({
-        x: this.konva.proxyRect.x() - this.manager.getScaledPixels(CanvasTransformer.OUTLINE_PADDING),
-        y: this.konva.proxyRect.y() - this.manager.getScaledPixels(CanvasTransformer.OUTLINE_PADDING),
+        x: this.konva.proxyRect.x() - this.manager.stage.getScaledPixels(CanvasTransformer.OUTLINE_PADDING),
+        y: this.konva.proxyRect.y() - this.manager.stage.getScaledPixels(CanvasTransformer.OUTLINE_PADDING),
       });
 
       // The object group is translated by the difference between the interaction rect's new and old positions (which is
@@ -407,8 +407,8 @@ export class CanvasTransformer {
    * @param bbox The bounding box of the parent entity
    */
   update = (position: Coordinate, bbox: Rect) => {
-    const onePixel = this.manager.getScaledPixels(1);
-    const bboxPadding = this.manager.getScaledPixels(CanvasTransformer.OUTLINE_PADDING);
+    const onePixel = this.manager.stage.getScaledPixels(1);
+    const bboxPadding = this.manager.stage.getScaledPixels(CanvasTransformer.OUTLINE_PADDING);
 
     this.konva.outlineRect.setAttrs({
       x: position.x + bbox.x - bboxPadding,
@@ -474,8 +474,8 @@ export class CanvasTransformer {
    * Updates the transformer's scale. This is called when the stage is scaled.
    */
   syncScale = () => {
-    const onePixel = this.manager.getScaledPixels(1);
-    const bboxPadding = this.manager.getScaledPixels(CanvasTransformer.OUTLINE_PADDING);
+    const onePixel = this.manager.stage.getScaledPixels(1);
+    const bboxPadding = this.manager.stage.getScaledPixels(CanvasTransformer.OUTLINE_PADDING);
 
     this.konva.outlineRect.setAttrs({
       x: this.konva.proxyRect.x() - bboxPadding,
