@@ -16,14 +16,14 @@ export const CanvasResetViewButton = memo(() => {
     if (!canvasManager) {
       return;
     }
-    canvasManager.setStageScale(1);
+    canvasManager.stage.setScale(1);
   }, [canvasManager]);
 
   const resetView = useCallback(() => {
     if (!canvasManager) {
       return;
     }
-    canvasManager.resetView();
+    canvasManager.stage.resetView();
   }, [canvasManager]);
 
   const onReset = useCallback(() => {
