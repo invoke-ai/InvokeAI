@@ -7,8 +7,7 @@ import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/sto
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
-import { queueApi } from 'services/api/endpoints/queue';
-import type { BatchConfig } from 'services/api/types';
+import type { BatchConfig, ImageDTO } from 'services/api/types';
 import type { InvocationCompleteEvent } from 'services/events/types';
 import { assert } from 'tsafe';
 
@@ -58,33 +57,14 @@ export class CanvasFilter {
     }
     const config = this.$config.get();
     this.log.trace({ config }, 'Previewing filter');
-    const dispatch = this.manager.stateApi._store.dispatch;
     const rect = adapter.transformer.getRelativeRect();
     const imageDTO = await adapter.renderer.rasterize({ rect });
-    // TODO(psyche): I can't get TS to be happy, it thinkgs `config` is `never` but it should be inferred from the generic... I'll just cast it for now
-    const filterNode = IMAGE_FILTERS[config.type].buildNode(imageDTO, config as never);
-    const enqueueBatchArg: BatchConfig = {
-      prepend: true,
-      batch: {
-        graph: {
-          nodes: {
-            [filterNode.id]: {
-              ...filterNode,
-              // Control images are always intermediate - do not save to gallery
-              // is_intermediate: true,
-              is_intermediate: false, // false for testing
-            },
-          },
-          edges: [],
-        },
-        origin: this.id,
-        runs: 1,
-      },
-    };
+    const nodeId = getPrefixedId('filter_node');
+    const batch = this.buildBatchConfig(imageDTO, config, nodeId);
 
     // Listen for the filter processing completion event
     const listener = async (event: InvocationCompleteEvent) => {
-      if (event.origin !== this.id || event.invocation_source_id !== filterNode.id) {
+      if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
         return;
       }
       this.manager.socket.off('invocation_complete', listener);
@@ -108,14 +88,10 @@ export class CanvasFilter {
 
     this.manager.socket.on('invocation_complete', listener);
 
-    this.log.trace({ enqueueBatchArg } as SerializableObject, 'Enqueuing filter batch');
+    this.log.trace({ batch } as SerializableObject, 'Enqueuing filter batch');
 
     this.$isProcessing.set(true);
-    dispatch(
-      queueApi.endpoints.enqueueBatch.initiate(enqueueBatchArg, {
-        fixedCacheKey: 'enqueueBatch',
-      })
-    );
+    this.manager.stateApi.enqueueBatch(batch);
   };
 
   applyFilter = () => {
@@ -160,6 +136,32 @@ export class CanvasFilter {
     }
     this.imageState = null;
     this.$isProcessing.set(false);
+  };
+
+  buildBatchConfig = (imageDTO: ImageDTO, config: FilterConfig, id: string): BatchConfig => {
+    // TODO(psyche): I can't get TS to be happy, it thinkgs `config` is `never` but it should be inferred from the generic... I'll just cast it for now
+    const node = IMAGE_FILTERS[config.type].buildNode(imageDTO, config as never);
+    node.id = id;
+    const batch: BatchConfig = {
+      prepend: true,
+      batch: {
+        graph: {
+          nodes: {
+            [node.id]: {
+              ...node,
+              // Control images are always intermediate - do not save to gallery
+              // is_intermediate: true,
+              is_intermediate: false, // false for testing
+            },
+          },
+          edges: [],
+        },
+        origin: this.id,
+        runs: 1,
+      },
+    };
+
+    return batch;
   };
 
   destroy = () => {
