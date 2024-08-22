@@ -231,6 +231,8 @@ export class CanvasBbox {
   }
 
   render() {
+    this.log.trace('Rendering generation bbox');
+
     const bbox = this.manager.stateApi.getBbox();
     const toolState = this.manager.stateApi.getToolState();
 
