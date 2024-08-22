@@ -4,7 +4,7 @@ import { settingsDynamicGridToggled } from 'features/controlLayers/store/canvasV
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const CanvasSettingsDynamicGridToggle = memo(() => {
+export const CanvasSettingsDynamicGridSwitch = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const dynamicGrid = useAppSelector((s) => s.canvasV2.settings.dynamicGrid);
@@ -22,4 +22,4 @@ export const CanvasSettingsDynamicGridToggle = memo(() => {
   );
 });
 
-CanvasSettingsDynamicGridToggle.displayName = 'CanvasSettingsDynamicGridToggle';
+CanvasSettingsDynamicGridSwitch.displayName = 'CanvasSettingsDynamicGridSwitch';
