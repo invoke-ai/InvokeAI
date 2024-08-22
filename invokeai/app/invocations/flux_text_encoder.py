@@ -36,7 +36,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
     t5_max_seq_len: Literal[256, 512] = InputField(
         description="Max sequence length for the T5 encoder. Expected to be 256 for FLUX schnell models and 512 for FLUX dev models."
     )
-    positive_prompt: str = InputField(description="Positive prompt for text-to-image generation.")
+    prompt: str = InputField(description="Text prompt to encode.")
 
     # TODO(ryand): Should we create a new return type for this invocation? This ConditioningOutput is clearly not
     # compatible with other ConditioningOutputs.
@@ -73,7 +73,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
             clip_encoder = HFEncoder(clip_text_encoder, clip_tokenizer, True, 77)
             t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len)
 
-            prompt = [self.positive_prompt]
+            prompt = [self.prompt]
             prompt_embeds = t5_encoder(prompt)
 
             pooled_prompt_embeds = clip_encoder(prompt)
