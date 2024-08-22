@@ -38,7 +38,7 @@ import { addRegions } from './addRegions';
 const log = logger('system');
 
 export const buildSD1Graph = async (state: RootState, manager: CanvasManager): Promise<Graph> => {
-  const generationMode = manager.getGenerationMode();
+  const generationMode = manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SD1/SD2 graph');
 
   const { bbox, params } = state.canvasV2;
