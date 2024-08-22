@@ -79,8 +79,6 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         inference_dtype = torch.bfloat16
 
         # Prepare input noise.
-        # TODO(ryand): Does the seed behave the same on different devices? Should we re-implement this to always use a
-        # CPU RNG?
         x = get_noise(
             num_samples=1,
             height=self.height,
