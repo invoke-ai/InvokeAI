@@ -37,7 +37,7 @@ import { addRegions } from './addRegions';
 const log = logger('system');
 
 export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): Promise<Graph> => {
-  const generationMode = manager.getGenerationMode();
+  const generationMode = manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SDXL graph');
 
   const { bbox, params } = state.canvasV2;
