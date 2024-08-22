@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig } from 'app/store/store';
+import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 
 import type { StylePresetState } from './types';
 
@@ -23,6 +24,26 @@ export const stylePresetSlice = createSlice({
     viewModeChanged: (state, action: PayloadAction<boolean>) => {
       state.viewMode = action.payload;
     },
+  },
+  extraReducers(builder) {
+    builder.addMatcher(stylePresetsApi.endpoints.deleteStylePreset.matchFulfilled, (state, action) => {
+      if (state.activeStylePresetId === null) {
+        return;
+      }
+      const deletedId = action.meta.arg.originalArgs;
+      if (state.activeStylePresetId === deletedId) {
+        state.activeStylePresetId = null;
+      }
+    });
+    builder.addMatcher(stylePresetsApi.endpoints.listStylePresets.matchFulfilled, (state, action) => {
+      if (state.activeStylePresetId === null) {
+        return;
+      }
+      const ids = action.payload.map((preset) => preset.id);
+      if (!ids.includes(state.activeStylePresetId)) {
+        state.activeStylePresetId = null;
+      }
+    });
   },
 });
 
