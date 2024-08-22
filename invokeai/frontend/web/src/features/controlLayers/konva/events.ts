@@ -135,7 +135,7 @@ const getColorUnderCursor = (stage: Konva.Stage): RgbaColor | null => {
 };
 
 export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
-  const { stage, stateApi } = manager;
+  const stage = manager.stage.konva.stage;
   const {
     getToolState,
     setTool,
@@ -152,7 +152,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     setEraserWidth,
     getCurrentFill,
     getSelectedEntity,
-  } = stateApi;
+  } = manager.stateApi;
 
   function getIsPrimaryMouseDown(e: KonvaEventObject<MouseEvent>) {
     return e.evt.buttons === 1;
@@ -496,8 +496,8 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
       if (cursorPos) {
         // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
         const delta = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
-        const scale = manager.getStageScale() * CANVAS_SCALE_BY ** delta;
-        manager.setStageScale(scale, cursorPos);
+        const scale = manager.stage.getScale() * CANVAS_SCALE_BY ** delta;
+        manager.stage.setScale(scale, cursorPos);
       }
     }
     manager.preview.tool.render();

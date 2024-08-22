@@ -91,7 +91,7 @@ export const CanvasScale = memo(() => {
         snappedScale = snapToNearest(scale, snapCandidates, 2);
       }
       const mappedScale = mapSliderValueToScale(snappedScale);
-      canvasManager.setStageScale(mappedScale / 100);
+      canvasManager.stage.setScale(mappedScale / 100);
     },
     [canvasManager]
   );
@@ -101,11 +101,11 @@ export const CanvasScale = memo(() => {
       return;
     }
     if (isNaN(Number(localScale))) {
-      canvasManager.setStageScale(1);
+      canvasManager.stage.setScale(1);
       setLocalScale(100);
       return;
     }
-    canvasManager.setStageScale(clamp(localScale / 100, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE));
+    canvasManager.stage.setScale(clamp(localScale / 100, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE));
   }, [canvasManager, localScale]);
 
   const onChangeNumberInput = useCallback((valueAsString: string, valueAsNumber: number) => {

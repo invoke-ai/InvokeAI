@@ -159,7 +159,7 @@ export class CanvasTool {
 
   scaleTool = () => {
     const toolState = this.manager.stateApi.getToolState();
-    const scale = this.manager.stage.scaleX();
+    const scale = this.manager.stage.getScale();
 
     const brushRadius = toolState.brush.width / 2;
     this.konva.brush.innerBorderCircle.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
@@ -199,34 +199,34 @@ export class CanvasTool {
     // Update the stage's pointer style
     if (Boolean(this.manager.stateApi.$transformingEntity.get()) || renderedEntityCount === 0) {
       // We are transforming and/or have no layers, so we should not render any tool
-      stage.container().style.cursor = 'default';
+      stage.container.style.cursor = 'default';
     } else if (tool === 'view') {
       // view tool gets a hand
-      stage.container().style.cursor = isMouseDown ? 'grabbing' : 'grab';
+      stage.container.style.cursor = isMouseDown ? 'grabbing' : 'grab';
       // Bbox tool gets default
     } else if (tool === 'bbox') {
-      stage.container().style.cursor = 'default';
+      stage.container.style.cursor = 'default';
     } else if (tool === 'eyeDropper') {
       // Eyedropper gets none
-      stage.container().style.cursor = 'none';
+      stage.container.style.cursor = 'none';
     } else if (isDrawable) {
       if (tool === 'move') {
         // Move gets default arrow
-        stage.container().style.cursor = 'default';
+        stage.container.style.cursor = 'default';
       } else if (tool === 'rect') {
         // Rect gets a crosshair
-        stage.container().style.cursor = 'crosshair';
+        stage.container.style.cursor = 'crosshair';
       } else if (tool === 'brush' || tool === 'eraser') {
         // Hide the native cursor and use the konva-rendered brush preview
-        stage.container().style.cursor = 'none';
+        stage.container.style.cursor = 'none';
       }
     } else {
       // isDrawable === 'false'
       // Non-drawable layers don't have tools
-      stage.container().style.cursor = 'not-allowed';
+      stage.container.style.cursor = 'not-allowed';
     }
 
-    stage.draggable(tool === 'view');
+    stage.setIsDraggable(tool === 'view');
 
     if (!cursorPos || renderedEntityCount === 0 || !isDrawable) {
       // We can bail early if the mouse isn't over the stage or there are no layers
@@ -238,7 +238,7 @@ export class CanvasTool {
       if (cursorPos && tool === 'brush') {
         const brushPreviewFill = this.manager.stateApi.getBrushPreviewFill();
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.brush.width);
-        const scale = stage.scaleX();
+        const scale = stage.getScale();
         // Update the fill circle
         const radius = toolState.brush.width / 2;
 
@@ -261,7 +261,7 @@ export class CanvasTool {
       } else if (cursorPos && tool === 'eraser') {
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.eraser.width);
 
-        const scale = stage.scaleX();
+        const scale = stage.getScale();
         // Update the fill circle
         const radius = toolState.eraser.width / 2;
         this.konva.eraser.fillCircle.setAttrs({
