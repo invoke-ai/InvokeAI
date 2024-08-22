@@ -47,6 +47,8 @@ import type {
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
+import { queueApi } from 'services/api/endpoints/queue';
+import type { BatchConfig } from 'services/api/types';
 import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
 
 type EntityStateAndAdapter =
@@ -76,58 +78,64 @@ type EntityStateAndAdapter =
     };
 
 export class CanvasStateApi {
-  _store: AppStore;
+  store: AppStore;
   manager: CanvasManager;
 
   constructor(store: AppStore, manager: CanvasManager) {
-    this._store = store;
+    this.store = store;
     this.manager = manager;
   }
 
   // Reminder - use arrow functions to avoid binding issues
   getState = () => {
-    return this._store.getState().canvasV2;
+    return this.store.getState().canvasV2;
   };
   resetEntity = (arg: EntityIdentifierPayload) => {
-    this._store.dispatch(entityReset(arg));
+    this.store.dispatch(entityReset(arg));
   };
   setEntityPosition = (arg: EntityMovedPayload) => {
-    this._store.dispatch(entityMoved(arg));
+    this.store.dispatch(entityMoved(arg));
   };
   addBrushLine = (arg: EntityBrushLineAddedPayload) => {
-    this._store.dispatch(entityBrushLineAdded(arg));
+    this.store.dispatch(entityBrushLineAdded(arg));
   };
   addEraserLine = (arg: EntityEraserLineAddedPayload) => {
-    this._store.dispatch(entityEraserLineAdded(arg));
+    this.store.dispatch(entityEraserLineAdded(arg));
   };
   addRect = (arg: EntityRectAddedPayload) => {
-    this._store.dispatch(entityRectAdded(arg));
+    this.store.dispatch(entityRectAdded(arg));
   };
   rasterizeEntity = (arg: EntityRasterizedPayload) => {
-    this._store.dispatch(entityRasterized(arg));
+    this.store.dispatch(entityRasterized(arg));
   };
   setSelectedEntity = (arg: EntityIdentifierPayload) => {
-    this._store.dispatch(entitySelected(arg));
+    this.store.dispatch(entitySelected(arg));
   };
   setGenerationBbox = (bbox: Rect) => {
-    this._store.dispatch(bboxChanged(bbox));
+    this.store.dispatch(bboxChanged(bbox));
   };
   setBrushWidth = (width: number) => {
-    this._store.dispatch(brushWidthChanged(width));
+    this.store.dispatch(brushWidthChanged(width));
   };
   setEraserWidth = (width: number) => {
-    this._store.dispatch(eraserWidthChanged(width));
+    this.store.dispatch(eraserWidthChanged(width));
   };
   setTool = (tool: Tool) => {
-    this._store.dispatch(toolChanged(tool));
+    this.store.dispatch(toolChanged(tool));
   };
   setToolBuffer = (toolBuffer: Tool | null) => {
-    this._store.dispatch(toolBufferChanged(toolBuffer));
+    this.store.dispatch(toolBufferChanged(toolBuffer));
   };
   setFill = (fill: RgbaColor) => {
-    return this._store.dispatch(fillChanged(fill));
+    return this.store.dispatch(fillChanged(fill));
   };
-
+  enqueueBatch = (batch: BatchConfig) => {
+    this.store.dispatch(
+      queueApi.endpoints.enqueueBatch.initiate(batch, {
+        fixedCacheKey: 'enqueueBatch',
+      })
+    );
+  };
   getBbox = () => {
     return this.getState().bbox;
   };
