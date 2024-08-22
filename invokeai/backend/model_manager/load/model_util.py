@@ -57,6 +57,9 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
             T5Tokenizer,
         ),
     ):
+        # HACK(ryand): len(model) just returns the vocabulary size, so this is blatantly wrong. It should be small
+        # relative to the text encoder that it's used with, so shouldn't matter too much, but we should fix this at some
+        # point.
         return len(model)
     else:
         # TODO(ryand): Promote this from a log to an exception once we are confident that we are handling all of the
