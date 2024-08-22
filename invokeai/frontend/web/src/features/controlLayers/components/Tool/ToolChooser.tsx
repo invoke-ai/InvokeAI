@@ -1,5 +1,4 @@
 import { ButtonGroup } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { ToolBboxButton } from 'features/controlLayers/components/Tool/ToolBboxButton';
 import { ToolBrushButton } from 'features/controlLayers/components/Tool/ToolBrushButton';
 import { ToolEyeDropperButton } from 'features/controlLayers/components/Tool/ToolEyeDropperButton';
@@ -9,17 +8,15 @@ import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanv
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
 
 import { ToolEraserButton } from './ToolEraserButton';
-import { ToolTransformButton } from './ToolTransformButton';
 import { ToolViewButton } from './ToolViewButton';
 
 export const ToolChooser: React.FC = () => {
   useCanvasResetLayerHotkey();
   useCanvasDeleteLayerHotkey();
-  const isTransforming = useAppSelector((s) => s.canvasV2.tool.isTransforming);
 
   return (
     <>
-      <ButtonGroup isAttached isDisabled={isTransforming}>
+      <ButtonGroup isAttached>
         <ToolBrushButton />
         <ToolEraserButton />
         <ToolRectButton />
@@ -28,7 +25,6 @@ export const ToolChooser: React.FC = () => {
         <ToolBboxButton />
         <ToolEyeDropperButton />
       </ButtonGroup>
-      <ToolTransformButton />
     </>
   );
 };

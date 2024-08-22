@@ -7,6 +7,7 @@ import type { Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import { debounce, get } from 'lodash-es';
+import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 
 /**
@@ -88,6 +89,8 @@ export class CanvasTransformer {
    * Whether transforming is enabled. Transforming is enabled only in 'all' interaction mode.
    */
   isTransformEnabled: boolean = false;
+
+  $isProcessing = atom(false);
 
   konva: {
     transformer: Konva.Transformer;
@@ -493,13 +496,14 @@ export class CanvasTransformer {
   startTransform = () => {
     this.log.debug('Starting transform');
     this.isTransforming = true;
-
+    this.manager.stateApi.setTool('move')
     // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
     // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
     // when the view tool is selected
     const shouldListen = this.manager.stateApi.getToolState().selected !== 'view';
     this.parent.konva.layer.listening(shouldListen);
     this.setInteractionMode('all');
+    this.manager.stateApi.$transformingEntity.set(this.parent.getEntityIdentifier());
   };
 
   /**
@@ -507,6 +511,7 @@ export class CanvasTransformer {
    */
   applyTransform = async () => {
     this.log.debug('Applying transform');
+    this.$isProcessing.set(true);
     const rect = this.getRelativeRect();
     await this.parent.renderer.rasterize({ rect, replaceObjects: true });
     this.requestRectCalculation();
@@ -530,6 +535,8 @@ export class CanvasTransformer {
     this.updatePosition();
     this.updateBbox();
     this.syncInteractionState();
+    this.manager.stateApi.$transformingEntity.set(null);
+    this.$isProcessing.set(false);
   };
 
   /**
