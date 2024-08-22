@@ -147,3 +147,28 @@ def unpack(x: Tensor, height: int, width: int) -> Tensor:
         ph=2,
         pw=2,
     )
+
+
+def prepare_latent_img_patches(latent_img: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Convert an input image in latent space to patches for diffusion.
+
+    This implementation was extracted from:
+    https://github.com/black-forest-labs/flux/blob/c00d7c60b085fce8058b9df845e036090873f2ce/src/flux/sampling.py#L32
+
+    Returns:
+        tuple[Tensor, Tensor]: (img, img_ids), as defined in the original flux repo.
+    """
+    bs, c, h, w = latent_img.shape
+
+    # Pixel unshuffle with a scale of 2, and flatten the height/width dimensions to get an array of patches.
+    img = rearrange(latent_img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
+    if img.shape[0] == 1 and bs > 1:
+        img = repeat(img, "1 ... -> bs ...", bs=bs)
+
+    # Generate patch position ids.
+    img_ids = torch.zeros(h // 2, w // 2, 3, device=img.device)
+    img_ids[..., 1] = img_ids[..., 1] + torch.arange(h // 2, device=img.device)[:, None]
+    img_ids[..., 2] = img_ids[..., 2] + torch.arange(w // 2, device=img.device)[None, :]
+    img_ids = repeat(img_ids, "h w c -> b (h w) c", b=bs)
+
+    return img, img_ids
