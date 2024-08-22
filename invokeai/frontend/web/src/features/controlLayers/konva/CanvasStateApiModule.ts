@@ -6,6 +6,7 @@ import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskA
 import {
   $isDrawing,
   $isMouseDown,
+  $isProcessingTransform,
   $lastAddedPoint,
   $lastCursorPos,
   $lastMouseDownPos,
@@ -230,6 +231,7 @@ export class CanvasStateApiModule {
   };
 
   $transformingEntity = $transformingEntity;
+  $isProcessingTransform = $isProcessingTransform;
 
   $toolState: WritableAtom<CanvasV2State['tool']> = atom();
   $currentFill: WritableAtom<RgbaColor> = atom();

@@ -1,7 +1,8 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useIsTransforming } from 'features/controlLayers/hooks/useIsTransforming';
 import { toolChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiHandBold } from 'react-icons/pi';
@@ -9,13 +10,17 @@ import { PiHandBold } from 'react-icons/pi';
 export const ToolViewButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const isTransforming = useIsTransforming();
+  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
   const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'view');
-  const isDisabled = useAppSelector((s) => s.canvasV2.session.isStaging || s.canvasV2.tool.isTransforming);
+  const isDisabled = useMemo(() => {
+    return isTransforming || isStaging;
+  }, [isStaging, isTransforming]);
   const onClick = useCallback(() => {
     dispatch(toolChanged('view'));
   }, [dispatch]);
 
-  useHotkeys('h', onClick, { enabled: !isDisabled }, [onClick]);
+  useHotkeys('h', onClick, { enabled: !isDisabled || isSelected }, [onClick, isSelected, isDisabled]);
 
   return (
     <IconButton
