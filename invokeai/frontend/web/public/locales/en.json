@@ -1646,7 +1646,11 @@
         "storeNotInitialized": "Store is not initialized"
     },
     "controlLayers": {
+        "resetCanvas": "Reset Canvas",
         "resetAll": "Reset All",
+        "clearCaches": "Clear Caches",
+        "recalculateRects": "Recalculate Rects",
+        "clipToBbox": "Clip Strokes to Bbox",
         "addLayer": "Add Layer",
         "moveToFront": "Move to Front",
         "moveToBack": "Move to Back",
