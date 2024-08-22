@@ -65,6 +65,7 @@ class FluxVAELoader(ModelLoader):
             model = AutoEncoder(params)
             sd = load_file(model_path)
             model.load_state_dict(sd, assign=True)
+            model.to(dtype=self._torch_dtype)
 
         return model
 
