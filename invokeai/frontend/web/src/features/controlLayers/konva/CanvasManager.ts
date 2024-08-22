@@ -2,6 +2,7 @@ import type { AppSocket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
+import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
@@ -14,7 +15,6 @@ import {
 } from 'features/controlLayers/konva/util';
 import type { CanvasV2State, GenerationMode, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
-import { LRUCache } from 'lru-cache';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
@@ -48,6 +48,7 @@ export class CanvasManager {
   filter: CanvasFilter;
   stage: CanvasStageModule;
   worker: CanvasWorkerModule;
+  cache: CanvasCacheModule;
 
   log: Logger;
   socket: AppSocket;
@@ -56,10 +57,6 @@ export class CanvasManager {
   prevState: CanvasV2State;
   isFirstRender: boolean = true;
   _isDebugging: boolean = false;
-
-  imageNameCache = new LRUCache<string, string>({ max: 100 });
-  canvasCache = new LRUCache<string, HTMLCanvasElement>({ max: 32 });
-  generationModeCache = new LRUCache<string, GenerationMode>({ max: 100 });
 
   constructor(stage: Konva.Stage, container: HTMLDivElement, store: AppStore, socket: AppSocket) {
     this.id = getPrefixedId(this.type);
@@ -83,6 +80,7 @@ export class CanvasManager {
 
     this.stage = new CanvasStageModule(stage, container, this);
     this.worker = new CanvasWorkerModule(this);
+    this.cache = new CanvasCacheModule(this);
 
     this.preview = new CanvasPreview(this);
     this.stage.addLayer(this.preview.getLayer());
@@ -404,12 +402,6 @@ export class CanvasManager {
     };
   };
 
-  clearCaches = () => {
-    this.canvasCache.clear();
-    this.imageNameCache.clear();
-    this.generationModeCache.clear();
-  };
-
   getCompositeRasterLayerEntityIds = (): string[] => {
     const ids = [];
     for (const adapter of this.rasterLayerAdapters.values()) {
@@ -432,7 +424,7 @@ export class CanvasManager {
 
   getCompositeRasterLayerCanvas = (rect: Rect): HTMLCanvasElement => {
     const hash = this.getCompositeRasterLayerHash({ rect });
-    const cachedCanvas = this.canvasCache.get(hash);
+    const cachedCanvas = this.cache.canvasElementCache.get(hash);
 
     if (cachedCanvas) {
       this.log.trace({ rect }, 'Using cached composite inpaint mask canvas');
@@ -458,13 +450,13 @@ export class CanvasManager {
       const adapterCanvas = adapter.getCanvas(rect);
       ctx.drawImage(adapterCanvas, 0, 0);
     }
-    this.canvasCache.set(hash, canvas);
+    this.cache.canvasElementCache.set(hash, canvas);
     return canvas;
   };
 
   getCompositeInpaintMaskCanvas = (rect: Rect): HTMLCanvasElement => {
     const hash = this.getCompositeInpaintMaskHash({ rect });
-    const cachedCanvas = this.canvasCache.get(hash);
+    const cachedCanvas = this.cache.canvasElementCache.get(hash);
 
     if (cachedCanvas) {
       this.log.trace({ rect }, 'Using cached composite inpaint mask canvas');
@@ -490,7 +482,7 @@ export class CanvasManager {
       const adapterCanvas = adapter.getCanvas(rect);
       ctx.drawImage(adapterCanvas, 0, 0);
     }
-    this.canvasCache.set(hash, canvas);
+    this.cache.canvasElementCache.set(hash, canvas);
     return canvas;
   };
 
@@ -528,7 +520,7 @@ export class CanvasManager {
     let imageDTO: ImageDTO | null = null;
 
     const hash = this.getCompositeRasterLayerHash({ rect });
-    const cachedImageName = this.imageNameCache.get(hash);
+    const cachedImageName = this.cache.imageNameCache.get(hash);
 
     if (cachedImageName) {
       imageDTO = await getImageDTO(cachedImageName);
@@ -547,7 +539,7 @@ export class CanvasManager {
     }
 
     imageDTO = await uploadImage(blob, 'composite-raster-layer.png', 'general', true);
-    this.imageNameCache.set(hash, imageDTO.image_name);
+    this.cache.imageNameCache.set(hash, imageDTO.image_name);
     return imageDTO;
   };
 
@@ -555,7 +547,7 @@ export class CanvasManager {
     let imageDTO: ImageDTO | null = null;
 
     const hash = this.getCompositeInpaintMaskHash({ rect });
-    const cachedImageName = this.imageNameCache.get(hash);
+    const cachedImageName = this.cache.imageNameCache.get(hash);
 
     if (cachedImageName) {
       imageDTO = await getImageDTO(cachedImageName);
@@ -574,7 +566,7 @@ export class CanvasManager {
     }
 
     imageDTO = await uploadImage(blob, 'composite-inpaint-mask.png', 'general', true);
-    this.imageNameCache.set(hash, imageDTO.image_name);
+    this.cache.imageNameCache.set(hash, imageDTO.image_name);
     return imageDTO;
   };
 
@@ -584,7 +576,7 @@ export class CanvasManager {
     const compositeInpaintMaskHash = this.getCompositeInpaintMaskHash({ rect });
     const compositeRasterLayerHash = this.getCompositeRasterLayerHash({ rect });
     const hash = stableHash({ rect, compositeInpaintMaskHash, compositeRasterLayerHash });
-    const cachedGenerationMode = this.generationModeCache.get(hash);
+    const cachedGenerationMode = this.cache.generationModeCache.get(hash);
 
     if (cachedGenerationMode) {
       this.log.trace({ rect, cachedGenerationMode }, 'Using cached generation mode');
@@ -612,7 +604,7 @@ export class CanvasManager {
       generationMode = 'inpaint';
     }
 
-    this.generationModeCache.set(hash, generationMode);
+    this.cache.generationModeCache.set(hash, generationMode);
     return generationMode;
   }
 
