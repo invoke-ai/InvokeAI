@@ -1,7 +1,7 @@
 import type { JSONObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { CanvasPreview } from 'features/controlLayers/konva/CanvasPreview';
+import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import {
   BRUSH_BORDER_INNER_COLOR,
   BRUSH_BORDER_OUTER_COLOR,
@@ -13,12 +13,12 @@ import { isDrawableEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasTool {
+export class CanvasToolModule {
   readonly type = 'tool_preview';
 
   id: string;
   path: string[];
-  parent: CanvasPreview;
+  parent: CanvasPreviewModule;
   manager: CanvasManager;
   log: Logger;
 
@@ -48,7 +48,7 @@ export class CanvasTool {
    */
   subscriptions: Set<() => void> = new Set();
 
-  constructor(parent: CanvasPreview) {
+  constructor(parent: CanvasPreviewModule) {
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = this.parent.manager;
