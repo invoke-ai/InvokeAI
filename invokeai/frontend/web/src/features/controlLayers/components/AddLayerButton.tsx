@@ -41,13 +41,14 @@ export const AddLayerButton = memo(() => {
         icon={<PiPlusBold />}
         variant="link"
         data-testid="control-layers-add-layer-menu-button"
+        alignSelf="stretch"
       />
       <MenuList>
-        <MenuItem onClick={addInpaintMask}>{t('controlLayers.inpaintMask')}</MenuItem>
-        <MenuItem onClick={addRegionalGuidance}>{t('controlLayers.regionalGuidance')}</MenuItem>
-        <MenuItem onClick={addRasterLayer}>{t('controlLayers.rasterLayer')}</MenuItem>
-        <MenuItem onClick={addControlLayer}>{t('controlLayers.controlLayer')}</MenuItem>
-        <MenuItem onClick={addIPAdapter}>{t('controlLayers.globalIPAdapterLayer')}</MenuItem>
+        <MenuItem onClick={addInpaintMask}>{t('controlLayers.inpaintMask', { count: 1 })}</MenuItem>
+        <MenuItem onClick={addRegionalGuidance}>{t('controlLayers.regionalGuidance', { count: 1 })}</MenuItem>
+        <MenuItem onClick={addRasterLayer}>{t('controlLayers.rasterLayer', { count: 1 })}</MenuItem>
+        <MenuItem onClick={addControlLayer}>{t('controlLayers.controlLayer', { count: 1 })}</MenuItem>
+        <MenuItem onClick={addIPAdapter}>{t('controlLayers.ipAdapter', { count: 1 })}</MenuItem>
       </MenuList>
     </Menu>
   );
