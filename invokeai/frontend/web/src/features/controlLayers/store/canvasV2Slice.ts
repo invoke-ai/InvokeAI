@@ -630,6 +630,7 @@ export const $lastMouseDownPos = atom<Coordinate | null>(null);
 export const $lastCursorPos = atom<Coordinate | null>(null);
 export const $spaceKey = atom<boolean>(false);
 export const $transformingEntity = atom<CanvasEntityIdentifier | null>(null);
+export const $isProcessingTransform = atom<boolean>(false);
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   name: canvasV2Slice.name,
