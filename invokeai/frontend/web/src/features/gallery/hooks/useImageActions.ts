@@ -92,12 +92,12 @@ export const useImageActions = (image_name?: string) => {
       try {
         positivePrompt = await handlers.positivePrompt.parse(metadata);
       } catch (error) {
-        positivePrompt = ""
+        positivePrompt = '';
       }
       try {
         negativePrompt = await handlers.negativePrompt.parse(metadata);
       } catch (error) {
-        negativePrompt = ""
+        negativePrompt = '';
       }
 
       $stylePresetModalState.set({
