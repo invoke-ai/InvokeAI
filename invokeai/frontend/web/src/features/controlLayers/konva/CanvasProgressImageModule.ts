@@ -70,13 +70,6 @@ export class CanvasProgressImageModule {
       return;
     }
 
-    const { isStaging } = this.manager.stateApi.getSession();
-
-    if (!isStaging) {
-      release();
-      return;
-    }
-
     this.isLoading = true;
 
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;

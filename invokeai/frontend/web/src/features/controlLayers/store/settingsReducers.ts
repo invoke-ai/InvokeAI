@@ -8,4 +8,7 @@ export const settingsReducers = {
   settingsDynamicGridToggled: (state) => {
     state.settings.dynamicGrid = !state.settings.dynamicGrid;
   },
+  settingsAutoSaveToggled: (state) => {
+    state.settings.autoSave = !state.settings.autoSave;
+  },
 } satisfies SliceCaseReducers<CanvasV2State>;

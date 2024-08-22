@@ -33,6 +33,7 @@ export class CanvasStageModule {
     const resizeObserver = new ResizeObserver(this.fitStageToContainer);
     resizeObserver.observe(this.container);
     this.fitStageToContainer();
+    this.fitLayersToStage();
 
     return () => {
       this.log.debug('Destroying stage');
@@ -91,10 +92,20 @@ export class CanvasStageModule {
     }
   };
 
-  resetView() {
-    this.log.trace('Resetting view');
-    const { width, height } = this.getSize();
+  fitBboxToStage = () => {
+    this.log.trace('Fitting bbox to stage');
+    const bbox = this.manager.stateApi.getBbox();
+    this.fitRect(bbox.rect);
+  };
+
+  fitLayersToStage() {
+    this.log.trace('Fitting layers to stage');
     const rect = this.getVisibleRect();
+    this.fitRect(rect);
+  }
+
+  fitRect = (rect: Rect) => {
+    const { width, height } = this.getSize();
 
     const padding = 20; // Padding in absolute pixels
 
@@ -118,7 +129,7 @@ export class CanvasStageModule {
       y,
       scale,
     });
-  }
+  };
 
   /**
    * Gets the center of the stage in either absolute or relative coordinates
