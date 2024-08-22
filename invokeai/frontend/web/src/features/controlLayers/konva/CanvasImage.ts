@@ -1,10 +1,10 @@
 import { Mutex } from 'async-mutex';
 import type { JSONObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
-import type { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
+import type { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
-import type { CanvasStagingArea } from 'features/controlLayers/konva/CanvasStagingArea';
+import type { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
 import { loadImage } from 'features/controlLayers/konva/util';
 import type { CanvasImageState } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
@@ -17,7 +17,7 @@ export class CanvasImageRenderer {
 
   id: string;
   path: string[];
-  parent: CanvasObjectRenderer | CanvasStagingArea | CanvasFilter;
+  parent: CanvasObjectRenderer | CanvasStagingAreaModule | CanvasFilterModule;
   manager: CanvasManager;
   log: Logger;
 
@@ -32,7 +32,7 @@ export class CanvasImageRenderer {
   isError: boolean = false;
   mutex = new Mutex();
 
-  constructor(state: CanvasImageState, parent: CanvasObjectRenderer | CanvasStagingArea | CanvasFilter) {
+  constructor(state: CanvasImageState, parent: CanvasObjectRenderer | CanvasStagingAreaModule | CanvasFilterModule) {
     const { id, image } = state;
     const { width, height } = image;
     this.id = id;

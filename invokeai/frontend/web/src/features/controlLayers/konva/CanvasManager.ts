@@ -4,7 +4,7 @@ import type { AppStore } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import { CanvasCompositorModule } from 'features/controlLayers/konva/CanvasCompositorModule';
-import { CanvasFilter } from 'features/controlLayers/konva/CanvasFilter';
+import { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
 import { CanvasRenderingModule } from 'features/controlLayers/konva/CanvasRenderingModule';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
@@ -13,11 +13,11 @@ import type Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 
-import { CanvasBackground } from './CanvasBackground';
+import { CanvasBackgroundModule } from './CanvasBackgroundModule';
 import type { CanvasLayerAdapter } from './CanvasLayerAdapter';
 import type { CanvasMaskAdapter } from './CanvasMaskAdapter';
-import { CanvasPreview } from './CanvasPreview';
-import { CanvasStateApi } from './CanvasStateApi';
+import { CanvasPreviewModule } from './CanvasPreviewModule';
+import { CanvasStateApiModule } from './CanvasStateApiModule';
 import { setStageEventHandlers } from './events';
 
 export const $canvasManager = atom<CanvasManager | null>(null);
@@ -37,10 +37,10 @@ export class CanvasManager {
   regionalGuidanceAdapters: Map<string, CanvasMaskAdapter> = new Map();
   inpaintMaskAdapters: Map<string, CanvasMaskAdapter> = new Map();
 
-  stateApi: CanvasStateApi;
-  preview: CanvasPreview;
-  background: CanvasBackground;
-  filter: CanvasFilter;
+  stateApi: CanvasStateApiModule;
+  preview: CanvasPreviewModule;
+  background: CanvasBackgroundModule;
+  filter: CanvasFilterModule;
   stage: CanvasStageModule;
   worker: CanvasWorkerModule;
   cache: CanvasCacheModule;
@@ -54,20 +54,20 @@ export class CanvasManager {
     this.path = [this.id];
     this.store = store;
     this.socket = socket;
-    this.stateApi = new CanvasStateApi(this.store, this);
 
+    this.stateApi = new CanvasStateApiModule(this.store, this);
     this.stage = new CanvasStageModule(stage, container, this);
     this.worker = new CanvasWorkerModule(this);
     this.cache = new CanvasCacheModule(this);
     this.renderer = new CanvasRenderingModule(this);
-    this.preview = new CanvasPreview(this);
+    this.preview = new CanvasPreviewModule(this);
+    this.filter = new CanvasFilterModule(this);
+
     this.compositor = new CanvasCompositorModule(this);
     this.stage.addLayer(this.preview.getLayer());
 
-    this.background = new CanvasBackground(this);
+    this.background = new CanvasBackgroundModule(this);
     this.stage.addLayer(this.background.konva.layer);
-
-    this.filter = new CanvasFilter(this);
   }
 
   log = logger('canvas').child((message) => {
