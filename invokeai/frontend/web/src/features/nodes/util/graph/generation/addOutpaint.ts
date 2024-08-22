@@ -22,8 +22,8 @@ export const addOutpaint = async (
 ): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
   denoise.denoising_start = denoising_start;
 
-  const initialImage = await manager.getCompositeRasterLayerImageDTO(bbox.rect);
-  const maskImage = await manager.getCompositeInpaintMaskImageDTO(bbox.rect);
+  const initialImage = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
+  const maskImage = await manager.compositor.getCompositeInpaintMaskImageDTO(bbox.rect);
   const infill = getInfill(g, compositing);
 
   if (!isEqual(scaledSize, originalSize)) {
