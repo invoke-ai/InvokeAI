@@ -22,13 +22,14 @@ export const ControlLayersToolbar = memo(() => {
       <Flex w="full" gap={2} alignItems="center">
         <ToggleProgressButton />
         <ToolChooser />
+        <Spacer />
         {tool === 'brush' && <ToolBrushWidth />}
         {tool === 'eraser' && <ToolEraserWidth />}
-        <ToolFillColorPicker />
         <Spacer />
         <CanvasScale />
         <CanvasResetViewButton />
         <Spacer />
+        <ToolFillColorPicker />
         <CanvasModeSwitcher />
         <UndoRedoButtonGroup />
         <CanvasSettingsPopover />
