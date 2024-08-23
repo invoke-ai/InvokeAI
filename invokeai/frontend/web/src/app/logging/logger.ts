@@ -27,9 +27,7 @@ export const zLogNamespace = z.enum([
   'queue',
   'workflows',
 ]);
-const zLogNamespacesArray = z.array(zLogNamespace);
 export type LogNamespace = z.infer<typeof zLogNamespace>;
-export const isLogNamespaceArray = (v: unknown): v is LogNamespace[] => zLogNamespacesArray.safeParse(v).success;
 
 export const logger = (namespace: LogNamespace) => $logger.get().child({ namespace });
 

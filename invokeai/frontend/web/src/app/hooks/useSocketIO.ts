@@ -10,7 +10,6 @@ import { setEventListeners } from 'services/events/setEventListeners';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
 import { io } from 'socket.io-client';
-import { assert } from 'tsafe';
 
 // Inject socket options and url into window for debugging
 declare global {
@@ -22,11 +21,6 @@ declare global {
 export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 export const $socket = atom<AppSocket | null>(null);
-export const getSocket = () => {
-  const socket = $socket.get();
-  assert(socket !== null, 'Socket is not initialized');
-  return socket;
-};
 export const $socketOptions = map<Partial<ManagerOptions & SocketOptions>>({});
 
 const $isSocketInitialized = atom<boolean>(false);
