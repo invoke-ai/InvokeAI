@@ -57,9 +57,6 @@ export const controlLayersReducers = {
     state.controlLayers.entities.push(data);
     state.selectedEntityIdentifier = { type: 'control_layer', id: data.id };
   },
-  controlLayerAllDeleted: (state) => {
-    state.controlLayers.entities = [];
-  },
   controlLayerConvertedToRasterLayer: {
     reducer: (state, action: PayloadAction<{ id: string; newId: string }>) => {
       const { id, newId } = action.payload;

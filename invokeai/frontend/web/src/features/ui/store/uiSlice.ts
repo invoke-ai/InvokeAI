@@ -4,7 +4,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { atom } from 'nanostores';
 
-import type { InvokeTabName } from './tabMap';
+import type { TabName } from "./uiTypes";
 import type { UIState } from './uiTypes';
 
 const initialUIState: UIState = {
@@ -21,7 +21,7 @@ export const uiSlice = createSlice({
   name: 'ui',
   initialState: initialUIState,
   reducers: {
-    setActiveTab: (state, action: PayloadAction<InvokeTabName>) => {
+    setActiveTab: (state, action: PayloadAction<TabName>) => {
       state.activeTab = action.payload;
     },
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {

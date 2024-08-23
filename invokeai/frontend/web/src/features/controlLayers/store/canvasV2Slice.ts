@@ -156,7 +156,7 @@ export function selectEntity(state: CanvasV2State, { id, type }: CanvasEntityIde
   }
 }
 
-export function selectAllEntitiesOfType(state: CanvasV2State, type: CanvasEntityState['type']): CanvasEntityState[] {
+function selectAllEntitiesOfType(state: CanvasV2State, type: CanvasEntityState['type']): CanvasEntityState[] {
   if (type === 'raster_layer') {
     return state.rasterLayers.entities;
   } else if (type === 'control_layer') {
@@ -474,12 +474,10 @@ export const {
   // Raster layers
   rasterLayerAdded,
   rasterLayerRecalled,
-  rasterLayerAllDeleted,
   rasterLayerConvertedToControlLayer,
   // Control layers
   controlLayerAdded,
   controlLayerRecalled,
-  controlLayerAllDeleted,
   controlLayerConvertedToRasterLayer,
   controlLayerModelChanged,
   controlLayerControlModeChanged,
@@ -489,9 +487,6 @@ export const {
   // IP Adapters
   ipaAdded,
   ipaRecalled,
-  ipaIsEnabledToggled,
-  ipaDeleted,
-  ipaAllDeleted,
   ipaImageChanged,
   ipaMethodChanged,
   ipaModelChanged,
@@ -501,7 +496,6 @@ export const {
   // Regions
   rgAdded,
   rgRecalled,
-  rgAllDeleted,
   rgPositivePromptChanged,
   rgNegativePromptChanged,
   rgFillColorChanged,
@@ -607,10 +601,6 @@ export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   persistDenylist: [],
 };
 
-export const sessionRequested = createAction(`${canvasV2Slice.name}/sessionRequested`);
 export const sessionStagingAreaImageAccepted = createAction<{ index: number }>(
   `${canvasV2Slice.name}/sessionStagingAreaImageAccepted`
-);
-export const transformationApplied = createAction<CanvasEntityIdentifier>(
-  `${canvasV2Slice.name}/transformationApplied`
 );

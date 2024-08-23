@@ -2,7 +2,6 @@ import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import type { CanvasV2State, LoRA } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { LoRAModelConfig } from 'services/api/types';
-import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
 export const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
@@ -10,12 +9,7 @@ export const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
   isEnabled: true,
 };
 
-export const selectLoRA = (state: CanvasV2State, id: string) => state.loras.find((lora) => lora.id === id);
-export const selectLoRAOrThrow = (state: CanvasV2State, id: string) => {
-  const lora = selectLoRA(state, id);
-  assert(lora, `LoRA with id ${id} not found`);
-  return lora;
-};
+const selectLoRA = (state: CanvasV2State, id: string) => state.loras.find((lora) => lora.id === id);
 
 export const lorasReducers = {
   loraAdded: {

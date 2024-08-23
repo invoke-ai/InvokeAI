@@ -10,7 +10,7 @@ import type {
 import { merge } from 'lodash-es';
 import { assert } from 'tsafe';
 
-export const selectInpaintMaskEntity = (state: CanvasV2State, id: string) =>
+const selectInpaintMaskEntity = (state: CanvasV2State, id: string) =>
   state.inpaintMasks.entities.find((layer) => layer.id === id);
 export const selectInpaintMaskEntityOrThrow = (state: CanvasV2State, id: string) => {
   const entity = selectInpaintMaskEntity(state, id);
