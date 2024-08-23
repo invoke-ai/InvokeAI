@@ -5,7 +5,7 @@ import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPre
 import { getPrefixedId, loadImage } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
-import type { InvocationDenoiseProgressEvent } from 'services/events/types';
+import type { S } from 'services/api/types';
 
 export class CanvasProgressImageModule {
   readonly type = 'progress_image';
@@ -30,7 +30,7 @@ export class CanvasProgressImageModule {
   isError: boolean = false;
   imageElement: HTMLImageElement | null = null;
 
-  lastProgressEvent: InvocationDenoiseProgressEvent | null = null;
+  lastProgressEvent: S['InvocationDenoiseProgressEvent'] | null = null;
 
   mutex: Mutex = new Mutex();
 
