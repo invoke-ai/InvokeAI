@@ -17,9 +17,6 @@ const QueueControls = () => {
         <InvokeQueueBackButton />
         <Spacer />
         <QueueActionsMenuButton />
-        {/* <CancelCurrentQueueItemButton asIconButton />
-        {isResumeEnabled && <ResumeProcessorButton asIconButton />}
-        {isPauseEnabled && <PauseProcessorButton asIconButton />} */}
         <ClearQueueIconButton />
       </ButtonGroup>
       <ProgressBar />

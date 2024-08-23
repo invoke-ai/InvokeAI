@@ -1,6 +1,6 @@
 import type { ButtonProps } from '@invoke-ai/ui-library';
-import { Button, useDisclosure } from '@invoke-ai/ui-library';
-import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { Button } from '@invoke-ai/ui-library';
+import { useClearQueueConfirmationAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +10,7 @@ type Props = ButtonProps;
 
 const ClearQueueButton = (props: Props) => {
   const { t } = useTranslation();
-  const disclosure = useDisclosure();
+  const dialogState = useClearQueueConfirmationAlertDialog();
   const { isLoading, isDisabled } = useClearQueue();
 
   return (
@@ -21,13 +21,12 @@ const ClearQueueButton = (props: Props) => {
         tooltip={t('queue.clearTooltip')}
         leftIcon={<PiTrashSimpleFill />}
         colorScheme="error"
-        onClick={disclosure.onOpen}
+        onClick={dialogState.setTrue}
         data-testid={t('queue.clear')}
         {...props}
       >
         {t('queue.clear')}
       </Button>
-      <ClearQueueConfirmationAlertDialog disclosure={disclosure} />
     </>
   );
 };
