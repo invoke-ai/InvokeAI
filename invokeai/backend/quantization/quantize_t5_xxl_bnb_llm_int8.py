@@ -20,11 +20,12 @@ def load_state_dict_into_t5(model: T5EncoderModel, state_dict: dict):
 
 
 def main():
-    # Load the FLUX transformer model onto the meta device.
-    model_path = Path(
-        # "/data/invokeai/models/.download_cache/black-forest-labs_flux.1-schnell/FLUX.1-schnell/text_encoder_2"
-        "/data/misc/text_encoder_2"
-    )
+    """A script for quantizing a T5 text encoder model using the bitsandbytes LLM.int8() quantization method.
+
+    This script is primarily intended for reference. The script params (e.g. the model_path, modules_to_not_convert,
+    etc.) are hardcoded and would need to be modified for other use cases.
+    """
+    model_path = Path("/data/misc/text_encoder_2")
 
     with log_time("Intialize T5 on meta device"):
         model_config = AutoConfig.from_pretrained(model_path)
