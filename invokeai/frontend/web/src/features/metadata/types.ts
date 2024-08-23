@@ -148,7 +148,3 @@ export type BuildMetadataHandlers = <TValue, TItem>(
 export type ControlNetConfigMetadata = O.NonNullable<ControlNetConfig, 'model'>;
 export type T2IAdapterConfigMetadata = O.NonNullable<T2IAdapterConfig, 'model'>;
 export type IPAdapterConfigMetadata = O.NonNullable<IPAdapterConfig, 'model'>;
-export type AnyControlAdapterConfigMetadata =
-  | ControlNetConfigMetadata
-  | T2IAdapterConfigMetadata
-  | IPAdapterConfigMetadata;

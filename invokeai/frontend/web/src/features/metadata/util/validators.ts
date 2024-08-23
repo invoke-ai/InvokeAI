@@ -1,5 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
-import type { CanvasRasterLayerState, LoRA } from 'features/controlLayers/store/types';
+import type { LoRA } from 'features/controlLayers/store/types';
 import type {
   ControlNetConfigMetadata,
   IPAdapterConfigMetadata,
@@ -9,7 +9,6 @@ import type {
 import { InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
 import type { ParameterSDXLRefinerModel, ParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import type { BaseModelType } from 'services/api/types';
-import { assert } from 'tsafe';
 
 /**
  * Checks the given base model type against the currently-selected model's base type and throws an error if they are
@@ -21,7 +20,7 @@ const validateBaseCompatibility = (base?: BaseModelType, message?: string) => {
   if (!base) {
     throw new InvalidModelConfigError(message || 'Missing base');
   }
-  const currentBase = getStore().getState().params.model?.base;
+  const currentBase = getStore().getState().canvasV2.params.model?.base;
   if (currentBase && base !== currentBase) {
     throw new InvalidModelConfigError(message || `Incompatible base models: ${base} and ${currentBase}`);
   }
@@ -129,43 +128,6 @@ const validateIPAdapters: MetadataValidateFunc<IPAdapterConfigMetadata[]> = (ipA
   });
 };
 
-const validateLayer: MetadataValidateFunc<CanvasRasterLayerState> = (layer) => {
-  if (layer.type === 'control_adapter_layer') {
-    const model = layer.controlAdapter.model;
-    assert(model, 'Control Adapter layer missing model');
-    validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
-  }
-  if (layer.type === 'ip_adapter_layer') {
-    const model = layer.ipAdapter.model;
-    assert(model, 'IP Adapter layer missing model');
-    validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
-  }
-  if (layer.type === 'regional_guidance_layer') {
-    for (const ipa of layer.ipAdapters) {
-      const model = ipa.model;
-      assert(model, 'IP Adapter layer missing model');
-      validateBaseCompatibility(model.base, 'Layer incompatible with currently-selected model');
-    }
-  }
-
-  return layer;
-};
-
-const validateLayers: MetadataValidateFunc<CanvasRasterLayerState[]> = async (layers) => {
-  const validatedLayers: CanvasRasterLayerState[] = [];
-  for (const l of layers) {
-    try {
-      const validated = await validateLayer(l);
-      validatedLayers.push(validated);
-    } catch {
-      // This is a no-op - we want to continue validating the rest of the layers, and an empty list is valid.
-    }
-  }
-  return new Promise((resolve) => {
-    resolve(validatedLayers);
-  });
-};
-
 export const validators = {
   refinerModel: validateRefinerModel,
   vaeModel: validateVAEModel,
@@ -177,6 +139,4 @@ export const validators = {
   t2iAdapters: validateT2IAdapters,
   ipAdapter: validateIPAdapter,
   ipAdapters: validateIPAdapters,
-  layer: validateLayer,
-  layers: validateLayers,
 } as const;
