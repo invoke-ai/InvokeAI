@@ -19,7 +19,3 @@ export const LightnessToAlphaFilter = (imageData: ImageData): void => {
     imageData.data[i * 4 + 3] = (cMin + cMax) / 2;
   }
 };
-
-export const FILTER_MAP = {
-  LightnessToAlphaFilter: LightnessToAlphaFilter,
-} as const;
