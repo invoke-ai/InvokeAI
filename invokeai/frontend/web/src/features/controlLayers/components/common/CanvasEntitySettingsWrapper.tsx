@@ -4,7 +4,7 @@ import { memo } from 'react';
 
 export const CanvasEntitySettingsWrapper = memo(({ children }: PropsWithChildren) => {
   return (
-    <Flex flexDir="column" gap={3} px={3} pb={3}>
+    <Flex flexDir="column" gap={2} px={2} pb={2}>
       {children}
     </Flex>
   );

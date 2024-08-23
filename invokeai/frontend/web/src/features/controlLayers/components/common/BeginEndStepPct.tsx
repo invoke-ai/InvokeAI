@@ -18,7 +18,7 @@ export const BeginEndStepPct = memo(({ beginEndStepPct, onChange }: Props) => {
   }, [onChange]);
 
   return (
-    <FormControl orientation="horizontal">
+    <FormControl orientation="horizontal" pe={1}>
       <InformationalPopover feature="controlNetBeginEnd">
         <FormLabel m={0}>{t('controlnet.beginEndStepPercentShort')}</FormLabel>
       </InformationalPopover>

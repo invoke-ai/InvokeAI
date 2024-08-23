@@ -1,11 +1,11 @@
 import { Spacer } from '@invoke-ai/ui-library';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
-import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
+import { ControlLayerBadges } from 'features/controlLayers/components/ControlLayer/ControlLayerBadges';
 import { ControlLayerControlAdapter } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapter';
 import { EntityLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -25,10 +25,10 @@ export const ControlLayer = memo(({ id }: Props) => {
         <CanvasEntityContainer>
           <CanvasEntityHeader>
             <CanvasEntityPreviewImage />
-            <CanvasEntityEnabledToggle />
             <CanvasEntityEditableTitle />
             <Spacer />
-            <CanvasEntityDeleteButton />
+            <ControlLayerBadges />
+            <CanvasEntityEnabledToggle />
           </CanvasEntityHeader>
           <CanvasEntitySettingsWrapper>
             <ControlLayerControlAdapter />
