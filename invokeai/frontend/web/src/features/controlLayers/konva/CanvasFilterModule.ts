@@ -79,7 +79,7 @@ export class CanvasFilterModule {
       this.imageState = imageDTOToImageObject(imageDTO);
       adapter.renderer.clearBuffer();
 
-      await adapter.renderer.setBuffer(this.imageState);
+      await adapter.renderer.setBuffer(this.imageState, true);
 
       adapter.renderer.hideObjects();
       this.$isProcessing.set(false);
@@ -131,6 +131,7 @@ export class CanvasFilterModule {
     if (adapter) {
       adapter.renderer.clearBuffer();
       adapter.renderer.showObjects();
+      adapter.transformer.updatePosition();
       this.$adapter.set(null);
     }
     this.imageState = null;
