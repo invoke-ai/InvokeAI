@@ -8,12 +8,9 @@ import { ParamSDXLNegativeStylePrompt } from 'features/sdxl/components/SDXLPromp
 import { ParamSDXLPositiveStylePrompt } from 'features/sdxl/components/SDXLPrompts/ParamSDXLPositiveStylePrompt';
 import { memo } from 'react';
 
-const concatPromptsSelector = createSelector(
-  [selectCanvasV2Slice],
-  (canvasV2) => {
-    return canvasV2.params.model?.base !== 'sdxl' || canvasV2.params.shouldConcatPrompts;
-  }
-);
+const concatPromptsSelector = createSelector([selectCanvasV2Slice], (canvasV2) => {
+  return canvasV2.params.model?.base !== 'sdxl' || canvasV2.params.shouldConcatPrompts;
+});
 
 export const Prompts = memo(() => {
   const shouldConcatPrompts = useAppSelector(concatPromptsSelector);

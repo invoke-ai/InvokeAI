@@ -1,9 +1,5 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
-import type {
-  CanvasV2State,
-  SessionMode,
-  StagingAreaImage,
-} from 'features/controlLayers/store/types';
+import type { CanvasV2State, SessionMode, StagingAreaImage } from 'features/controlLayers/store/types';
 
 export const sessionReducers = {
   sessionStartedStaging: (state) => {
