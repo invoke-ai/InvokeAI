@@ -2,6 +2,7 @@ import type { FlexProps } from '@invoke-ai/ui-library';
 import { ContextMenu, Flex, MenuList } from '@invoke-ai/ui-library';
 import { ControlLayerMenuItems } from 'features/controlLayers/components/ControlLayer/ControlLayerMenuItems';
 import { InpaintMaskMenuItems } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItems';
+import { IPAdapterMenuItems } from 'features/controlLayers/components/IPAdapter/IPAdapterMenuItems';
 import { RasterLayerMenuItems } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItems';
 import { RegionalGuidanceMenuItems } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItems';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -44,7 +45,11 @@ export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
     }
 
     if (entityIdentifier.type === 'ip_adapter') {
-      return <MenuList>{/* no items for IP adapter yet */}</MenuList>;
+      return (
+        <MenuList>
+          <IPAdapterMenuItems />
+        </MenuList>
+      );
     }
 
     assert(false, 'Unhandled entity type');
@@ -53,7 +58,7 @@ export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
   return (
     <ContextMenu renderMenu={renderMenu}>
       {(ref) => (
-        <Flex ref={ref} h={16} gap={2} alignItems="center" p={2} {...rest}>
+        <Flex ref={ref} gap={2} alignItems="center" p={2} {...rest}>
           {children}
         </Flex>
       )}

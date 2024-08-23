@@ -1,6 +1,5 @@
 import { Spacer } from '@invoke-ai/ui-library';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
-import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
@@ -19,11 +18,10 @@ export const IPAdapter = memo(({ id }: Props) => {
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <CanvasEntityContainer>
-        <CanvasEntityHeader>
-          <CanvasEntityEnabledToggle />
+        <CanvasEntityHeader ps={4}>
           <CanvasEntityEditableTitle />
           <Spacer />
-          <CanvasEntityDeleteButton />
+          <CanvasEntityEnabledToggle />
         </CanvasEntityHeader>
         <IPAdapterSettings />
       </CanvasEntityContainer>
