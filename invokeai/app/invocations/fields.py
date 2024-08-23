@@ -236,6 +236,12 @@ class ColorField(BaseModel):
         return (self.r, self.g, self.b, self.a)
 
 
+class FluxConditioningField(BaseModel):
+    """A conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
 class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
