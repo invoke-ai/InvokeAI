@@ -36,7 +36,7 @@ export class CanvasToolModule {
       innerBorderCircle: Konva.Circle;
       outerBorderCircle: Konva.Circle;
     };
-    eyeDropper: {
+    colorPicker: {
       group: Konva.Group;
       fillCircle: Konva.Circle;
       transparentCenterCircle: Konva.Circle;
@@ -102,10 +102,10 @@ export class CanvasToolModule {
           strokeEnabled: true,
         }),
       },
-      eyeDropper: {
-        group: new Konva.Group({ name: `${this.type}:eyeDropper_group`, listening: false }),
+      colorPicker: {
+        group: new Konva.Group({ name: `${this.type}:color_picker_group`, listening: false }),
         fillCircle: new Konva.Circle({
-          name: `${this.type}:eyeDropper_fill_circle`,
+          name: `${this.type}:color_picker_fill_circle`,
           listening: false,
           fill: '',
           radius: 20,
@@ -114,7 +114,7 @@ export class CanvasToolModule {
           strokeScaleEnabled: false,
         }),
         transparentCenterCircle: new Konva.Circle({
-          name: `${this.type}:eyeDropper_fill_circle`,
+          name: `${this.type}:color_picker_fill_circle`,
           listening: false,
           strokeEnabled: false,
           fill: 'white',
@@ -133,9 +133,9 @@ export class CanvasToolModule {
     this.konva.eraser.group.add(this.konva.eraser.outerBorderCircle);
     this.konva.group.add(this.konva.eraser.group);
 
-    this.konva.eyeDropper.group.add(this.konva.eyeDropper.fillCircle);
-    this.konva.eyeDropper.group.add(this.konva.eyeDropper.transparentCenterCircle);
-    this.konva.group.add(this.konva.eyeDropper.group);
+    this.konva.colorPicker.group.add(this.konva.colorPicker.fillCircle);
+    this.konva.colorPicker.group.add(this.konva.colorPicker.transparentCenterCircle);
+    this.konva.group.add(this.konva.colorPicker.group);
 
     this.subscriptions.add(
       this.manager.stateApi.$stageAttrs.listen(() => {
@@ -179,7 +179,7 @@ export class CanvasToolModule {
   setToolVisibility = (tool: Tool) => {
     this.konva.brush.group.visible(tool === 'brush');
     this.konva.eraser.group.visible(tool === 'eraser');
-    this.konva.eyeDropper.group.visible(tool === 'eyeDropper');
+    this.konva.colorPicker.group.visible(tool === 'colorPicker');
   };
 
   render() {
@@ -206,8 +206,8 @@ export class CanvasToolModule {
       // Bbox tool gets default
     } else if (tool === 'bbox') {
       stage.container.style.cursor = 'default';
-    } else if (tool === 'eyeDropper') {
-      // Eyedropper gets none
+    } else if (tool === 'colorPicker') {
+      // Color picker gets none
       stage.container.style.cursor = 'none';
     } else if (isDrawable) {
       if (tool === 'move') {
@@ -281,12 +281,12 @@ export class CanvasToolModule {
           radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
         });
       } else if (cursorPos && colorUnderCursor) {
-        this.konva.eyeDropper.fillCircle.setAttrs({
+        this.konva.colorPicker.fillCircle.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
           fill: rgbaColorToString(colorUnderCursor),
         });
-        this.konva.eyeDropper.transparentCenterCircle.setAttrs({
+        this.konva.colorPicker.transparentCenterCircle.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
         });

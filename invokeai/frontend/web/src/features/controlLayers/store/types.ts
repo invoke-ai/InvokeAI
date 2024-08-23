@@ -456,7 +456,7 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
   },
 } as const;
 
-const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox', 'eyeDropper']);
+const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox', 'colorPicker']);
 export type Tool = z.infer<typeof zTool>;
 
 const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
