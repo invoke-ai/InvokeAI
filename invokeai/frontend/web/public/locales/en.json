@@ -1652,6 +1652,7 @@
         "autoSave": "Auto-save to Gallery",
         "resetCanvas": "Reset Canvas",
         "resetAll": "Reset All",
+        "deleteAll": "Delete All",
         "clearCaches": "Clear Caches",
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
