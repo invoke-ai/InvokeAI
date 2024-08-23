@@ -3,11 +3,15 @@ import { generateSeeds } from 'common/util/generateSeeds';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { range } from 'lodash-es';
 import type { components } from 'services/api/schema';
-import type { Batch, BatchConfig } from 'services/api/types';
+import type { Batch, BatchConfig, Invocation } from 'services/api/types';
 
-import { NOISE, POSITIVE_CONDITIONING } from './constants';
-
-export const prepareLinearUIBatch = (state: RootState, g: Graph, prepend: boolean): BatchConfig => {
+export const prepareLinearUIBatch = (
+  state: RootState,
+  g: Graph,
+  prepend: boolean,
+  noise: Invocation<'noise'>,
+  posCond: Invocation<'compel' | 'sdxl_compel_prompt'>
+): BatchConfig => {
   const { iterations, model, shouldRandomizeSeed, seed, shouldConcatPrompts } = state.canvasV2.params;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
@@ -22,13 +26,11 @@ export const prepareLinearUIBatch = (state: RootState, g: Graph, prepend: boolea
       start: shouldRandomizeSeed ? undefined : seed,
     });
 
-    if (g.hasNode(NOISE)) {
-      firstBatchDatumList.push({
-        node_path: NOISE,
-        field_name: 'seed',
-        items: seeds,
-      });
-    }
+    firstBatchDatumList.push({
+      node_path: noise.id,
+      field_name: 'seed',
+      items: seeds,
+    });
 
     // add to metadata
     g.removeMetadata(['seed']);
@@ -44,13 +46,11 @@ export const prepareLinearUIBatch = (state: RootState, g: Graph, prepend: boolea
       start: shouldRandomizeSeed ? undefined : seed,
     });
 
-    if (g.hasNode(NOISE)) {
-      secondBatchDatumList.push({
-        node_path: NOISE,
-        field_name: 'seed',
-        items: seeds,
-      });
-    }
+    secondBatchDatumList.push({
+      node_path: noise.id,
+      field_name: 'seed',
+      items: seeds,
+    });
 
     // add to metadata
     g.removeMetadata(['seed']);
@@ -65,13 +65,11 @@ export const prepareLinearUIBatch = (state: RootState, g: Graph, prepend: boolea
   const extendedPrompts = seedBehaviour === 'PER_PROMPT' ? range(iterations).flatMap(() => prompts) : prompts;
 
   // zipped batch of prompts
-  if (g.hasNode(POSITIVE_CONDITIONING)) {
-    firstBatchDatumList.push({
-      node_path: POSITIVE_CONDITIONING,
-      field_name: 'prompt',
-      items: extendedPrompts,
-    });
-  }
+  firstBatchDatumList.push({
+    node_path: posCond.id,
+    field_name: 'prompt',
+    items: extendedPrompts,
+  });
 
   // add to metadata
   g.removeMetadata(['positive_prompt']);
@@ -82,13 +80,11 @@ export const prepareLinearUIBatch = (state: RootState, g: Graph, prepend: boolea
   });
 
   if (shouldConcatPrompts && model?.base === 'sdxl') {
-    if (g.hasNode(POSITIVE_CONDITIONING)) {
-      firstBatchDatumList.push({
-        node_path: POSITIVE_CONDITIONING,
-        field_name: 'style',
-        items: extendedPrompts,
-      });
-    }
+    firstBatchDatumList.push({
+      node_path: posCond.id,
+      field_name: 'style',
+      items: extendedPrompts,
+    });
 
     // add to metadata
     g.removeMetadata(['positive_style_prompt']);
