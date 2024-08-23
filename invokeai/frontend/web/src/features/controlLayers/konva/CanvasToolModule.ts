@@ -1,4 +1,4 @@
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
@@ -297,7 +297,7 @@ export class CanvasToolModule {
     }
   }
 
-  getLoggingContext = (): JSONObject => {
+  getLoggingContext = (): SerializableObject => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

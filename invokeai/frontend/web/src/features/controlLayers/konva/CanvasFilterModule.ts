@@ -1,4 +1,4 @@
-import type { JSONObject, SerializableObject } from 'common/types';
+import type { SerializableObject, SerializableObject } from 'common/types';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -175,7 +175,7 @@ export class CanvasFilterModule {
     };
   };
 
-  getLoggingContext = (): JSONObject => {
+  getLoggingContext = (): SerializableObject => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

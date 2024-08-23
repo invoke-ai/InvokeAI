@@ -1,4 +1,4 @@
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import { parseify } from 'common/util/serialize';
 import type { Templates } from 'features/nodes/store/types';
 import {
@@ -17,7 +17,7 @@ import { parseAndMigrateWorkflow } from './migrations';
 type WorkflowWarning = {
   message: string;
   issues?: string[];
-  data: JSONObject;
+  data: SerializableObject;
 };
 
 type ValidateWorkflowResult = {

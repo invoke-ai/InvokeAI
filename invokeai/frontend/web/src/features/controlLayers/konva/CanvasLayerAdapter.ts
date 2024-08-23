@@ -1,4 +1,4 @@
-import type { JSONObject, SerializableObject } from 'common/types';
+import type { SerializableObject, SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
@@ -146,7 +146,7 @@ export class CanvasLayerAdapter {
     };
   };
 
-  getLoggingContext = (): JSONObject => {
+  getLoggingContext = (): SerializableObject => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 

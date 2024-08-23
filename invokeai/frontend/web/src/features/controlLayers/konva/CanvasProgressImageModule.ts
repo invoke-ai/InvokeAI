@@ -1,5 +1,5 @@
 import { Mutex } from 'async-mutex';
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import { getPrefixedId, loadImage } from 'features/controlLayers/konva/util';
@@ -113,7 +113,7 @@ export class CanvasProgressImageModule {
     this.konva.group.destroy();
   };
 
-  getLoggingContext = (): JSONObject => {
+  getLoggingContext = (): SerializableObject => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

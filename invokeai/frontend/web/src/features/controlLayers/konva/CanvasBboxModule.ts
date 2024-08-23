@@ -1,4 +1,4 @@
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
@@ -254,7 +254,7 @@ export class CanvasBboxModule {
     });
   }
 
-  getLoggingContext = (): JSONObject => {
+  getLoggingContext = (): SerializableObject => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

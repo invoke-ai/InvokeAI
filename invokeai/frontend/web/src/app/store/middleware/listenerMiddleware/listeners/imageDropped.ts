@@ -1,7 +1,6 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { parseify } from 'common/util/serialize';
 import {
   controlLayerAdded,
   ipaImageChanged,
@@ -43,7 +42,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       } else if (activeData.payloadType === 'GALLERY_SELECTION') {
         log.debug({ activeData, overData }, `Images (${getState().gallery.selection.length}) dropped`);
       } else if (activeData.payloadType === 'NODE_FIELD') {
-        log.debug({ activeData: parseify(activeData), overData: parseify(overData) }, 'Node field dropped');
+        log.debug({ activeData, overData }, 'Node field dropped');
       } else {
         log.debug({ activeData, overData }, `Unknown payload dropped`);
       }
