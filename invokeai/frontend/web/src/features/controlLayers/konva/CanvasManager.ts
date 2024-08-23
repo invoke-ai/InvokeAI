@@ -9,6 +9,7 @@ import { CanvasRenderingModule } from 'features/controlLayers/konva/CanvasRender
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import type Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -32,10 +33,20 @@ export class CanvasManager {
   store: AppStore;
   socket: AppSocket;
 
-  rasterLayerAdapters: Map<string, CanvasLayerAdapter> = new Map();
-  controlLayerAdapters: Map<string, CanvasLayerAdapter> = new Map();
-  regionalGuidanceAdapters: Map<string, CanvasMaskAdapter> = new Map();
-  inpaintMaskAdapters: Map<string, CanvasMaskAdapter> = new Map();
+  adapters = {
+    rasterLayers: new SyncableMap<string, CanvasLayerAdapter>(),
+    controlLayers: new SyncableMap<string, CanvasLayerAdapter>(),
+    regionMasks: new SyncableMap<string, CanvasMaskAdapter>(),
+    inpaintMasks: new SyncableMap<string, CanvasMaskAdapter>(),
+    getAll: (): (CanvasLayerAdapter | CanvasMaskAdapter)[] => {
+      return [
+        ...this.adapters.rasterLayers.values(),
+        ...this.adapters.controlLayers.values(),
+        ...this.adapters.regionMasks.values(),
+        ...this.adapters.inpaintMasks.values(),
+      ];
+    },
+  };
 
   stateApi: CanvasStateApiModule;
   preview: CanvasPreviewModule;
@@ -105,13 +116,7 @@ export class CanvasManager {
 
     return () => {
       this.log.debug('Cleaning up canvas manager');
-      const allAdapters = [
-        ...this.rasterLayerAdapters.values(),
-        ...this.controlLayerAdapters.values(),
-        ...this.inpaintMaskAdapters.values(),
-        ...this.regionalGuidanceAdapters.values(),
-      ];
-      for (const adapter of allAdapters) {
+      for (const adapter of this.adapters.getAll()) {
         adapter.destroy();
       }
       this.background.destroy();
@@ -148,9 +153,9 @@ export class CanvasManager {
   logDebugInfo() {
     // eslint-disable-next-line no-console
     console.log(this);
-    for (const layer of this.rasterLayerAdapters.values()) {
+    for (const adapter of this.adapters.getAll()) {
       // eslint-disable-next-line no-console
-      console.log(layer);
+      console.log(adapter);
     }
   }
 

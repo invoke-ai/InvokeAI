@@ -3,11 +3,12 @@ import { CanvasEntityContainer } from 'features/controlLayers/components/common/
 import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
+import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { ControlLayerControlAdapter } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapter';
+import { EntityLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { EntityLayerAdapterProviderGate } from 'features/controlLayers/hooks/useEntityLayerAdapter';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
@@ -20,9 +21,10 @@ export const ControlLayer = memo(({ id }: Props) => {
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <EntityLayerAdapterProviderGate>
+      <EntityLayerAdapterGate>
         <CanvasEntityContainer>
           <CanvasEntityHeader>
+            <CanvasEntityPreviewImage />
             <CanvasEntityEnabledToggle />
             <CanvasEntityEditableTitle />
             <Spacer />
@@ -32,7 +34,7 @@ export const ControlLayer = memo(({ id }: Props) => {
             <ControlLayerControlAdapter />
           </CanvasEntitySettingsWrapper>
         </CanvasEntityContainer>
-      </EntityLayerAdapterProviderGate>
+      </EntityLayerAdapterGate>
     </EntityIdentifierContext.Provider>
   );
 });
