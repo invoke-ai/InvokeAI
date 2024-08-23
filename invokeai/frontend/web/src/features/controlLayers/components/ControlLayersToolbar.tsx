@@ -10,16 +10,17 @@ import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser'
 import { ToolEraserWidth } from 'features/controlLayers/components/Tool/ToolEraserWidth';
 import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { UndoRedoButtonGroup } from 'features/controlLayers/components/UndoRedoButtonGroup';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { CanvasManagerProviderGate, useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
 import { ViewerToggleMenu } from 'features/gallery/components/ImageViewer/ViewerToggleMenu';
-import { memo } from 'react';
+import { memo, useSyncExternalStore } from 'react';
 
 export const ControlLayersToolbar = memo(() => {
   const tool = useAppSelector((s) => s.canvasV2.tool.selected);
   return (
     <CanvasManagerProviderGate>
       <Flex w="full" gap={2} alignItems="center">
+        <ReactiveTest />
         <ToggleProgressButton />
         <ToolChooser />
         <Spacer />
@@ -40,3 +41,15 @@ export const ControlLayersToolbar = memo(() => {
 });
 
 ControlLayersToolbar.displayName = 'ControlLayersToolbar';
+
+const ReactiveTest = () => {
+  const canvasManager = useCanvasManager();
+  const adapters = useSyncExternalStore(
+    canvasManager.adapters.rasterLayers.subscribe,
+    canvasManager.adapters.rasterLayers.getSnapshot
+  );
+
+  console.log(adapters);
+
+  return null;
+};
