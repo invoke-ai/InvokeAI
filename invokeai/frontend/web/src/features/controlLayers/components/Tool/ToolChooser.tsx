@@ -1,7 +1,7 @@
 import { ButtonGroup } from '@invoke-ai/ui-library';
 import { ToolBboxButton } from 'features/controlLayers/components/Tool/ToolBboxButton';
 import { ToolBrushButton } from 'features/controlLayers/components/Tool/ToolBrushButton';
-import { ToolEyeDropperButton } from 'features/controlLayers/components/Tool/ToolEyeDropperButton';
+import { ToolColorPickerButton } from 'features/controlLayers/components/Tool/ToolEyeDropperButton';
 import { ToolMoveButton } from 'features/controlLayers/components/Tool/ToolMoveButton';
 import { ToolRectButton } from 'features/controlLayers/components/Tool/ToolRectButton';
 import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanvasDeleteLayerHotkey';
@@ -23,7 +23,7 @@ export const ToolChooser: React.FC = () => {
         <ToolMoveButton />
         <ToolViewButton />
         <ToolBboxButton />
-        <ToolEyeDropperButton />
+        <ToolColorPickerButton />
       </ButtonGroup>
     </>
   );
