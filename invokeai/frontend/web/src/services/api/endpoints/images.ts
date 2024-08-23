@@ -1,5 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
@@ -75,7 +75,7 @@ export const imagesApi = api.injectEndpoints({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}`) }),
       providesTags: (result, error, image_name) => [{ type: 'Image', id: image_name }],
     }),
-    getImageMetadata: build.query<JSONObject | undefined, string>({
+    getImageMetadata: build.query<SerializableObject | undefined, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/metadata`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageMetadata', id: image_name }],
     }),
@@ -270,7 +270,7 @@ export const imagesApi = api.injectEndpoints({
         session_id?: string;
         board_id?: string;
         crop_visible?: boolean;
-        metadata?: JSONObject;
+        metadata?: SerializableObject;
       }
     >({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
