@@ -29,17 +29,23 @@ const validateBaseCompatibility = (base?: BaseModelType, message?: string) => {
 
 const validateRefinerModel: MetadataValidateFunc<ParameterSDXLRefinerModel> = (refinerModel) => {
   validateBaseCompatibility('sdxl', 'Refiner incompatible with currently-selected model');
-  return new Promise((resolve) => resolve(refinerModel));
+  return new Promise((resolve) => {
+    resolve(refinerModel);
+  });
 };
 
 const validateVAEModel: MetadataValidateFunc<ParameterVAEModel> = (vaeModel) => {
   validateBaseCompatibility(vaeModel.base, 'VAE incompatible with currently-selected model');
-  return new Promise((resolve) => resolve(vaeModel));
+  return new Promise((resolve) => {
+    resolve(vaeModel);
+  });
 };
 
 const validateLoRA: MetadataValidateFunc<LoRA> = (lora) => {
   validateBaseCompatibility(lora.model.base, 'LoRA incompatible with currently-selected model');
-  return new Promise((resolve) => resolve(lora));
+  return new Promise((resolve) => {
+    resolve(lora);
+  });
 };
 
 const validateLoRAs: MetadataValidateFunc<LoRA[]> = (loras) => {
@@ -52,12 +58,16 @@ const validateLoRAs: MetadataValidateFunc<LoRA[]> = (loras) => {
       // This is a no-op - we want to continue validating the rest of the LoRAs, and an empty list is valid.
     }
   });
-  return new Promise((resolve) => resolve(validatedLoRAs));
+  return new Promise((resolve) => {
+    resolve(validatedLoRAs);
+  });
 };
 
 const validateControlNet: MetadataValidateFunc<ControlNetConfigMetadata> = (controlNet) => {
   validateBaseCompatibility(controlNet.model?.base, 'ControlNet incompatible with currently-selected model');
-  return new Promise((resolve) => resolve(controlNet));
+  return new Promise((resolve) => {
+    resolve(controlNet);
+  });
 };
 
 const validateControlNets: MetadataValidateFunc<ControlNetConfigMetadata[]> = (controlNets) => {
@@ -70,12 +80,16 @@ const validateControlNets: MetadataValidateFunc<ControlNetConfigMetadata[]> = (c
       // This is a no-op - we want to continue validating the rest of the ControlNets, and an empty list is valid.
     }
   });
-  return new Promise((resolve) => resolve(validatedControlNets));
+  return new Promise((resolve) => {
+    resolve(validatedControlNets);
+  });
 };
 
 const validateT2IAdapter: MetadataValidateFunc<T2IAdapterConfigMetadata> = (t2iAdapter) => {
   validateBaseCompatibility(t2iAdapter.model?.base, 'T2I Adapter incompatible with currently-selected model');
-  return new Promise((resolve) => resolve(t2iAdapter));
+  return new Promise((resolve) => {
+    resolve(t2iAdapter);
+  });
 };
 
 const validateT2IAdapters: MetadataValidateFunc<T2IAdapterConfigMetadata[]> = (t2iAdapters) => {
@@ -88,12 +102,16 @@ const validateT2IAdapters: MetadataValidateFunc<T2IAdapterConfigMetadata[]> = (t
       // This is a no-op - we want to continue validating the rest of the T2I Adapters, and an empty list is valid.
     }
   });
-  return new Promise((resolve) => resolve(validatedT2IAdapters));
+  return new Promise((resolve) => {
+    resolve(validatedT2IAdapters);
+  });
 };
 
 const validateIPAdapter: MetadataValidateFunc<IPAdapterConfigMetadata> = (ipAdapter) => {
   validateBaseCompatibility(ipAdapter.model?.base, 'IP Adapter incompatible with currently-selected model');
-  return new Promise((resolve) => resolve(ipAdapter));
+  return new Promise((resolve) => {
+    resolve(ipAdapter);
+  });
 };
 
 const validateIPAdapters: MetadataValidateFunc<IPAdapterConfigMetadata[]> = (ipAdapters) => {
@@ -106,10 +124,12 @@ const validateIPAdapters: MetadataValidateFunc<IPAdapterConfigMetadata[]> = (ipA
       // This is a no-op - we want to continue validating the rest of the IP Adapters, and an empty list is valid.
     }
   });
-  return new Promise((resolve) => resolve(validatedIPAdapters));
+  return new Promise((resolve) => {
+    resolve(validatedIPAdapters);
+  });
 };
 
-const validateLayer: MetadataValidateFunc<CanvasRasterLayerState> = async (layer) => {
+const validateLayer: MetadataValidateFunc<CanvasRasterLayerState> = (layer) => {
   if (layer.type === 'control_adapter_layer') {
     const model = layer.controlAdapter.model;
     assert(model, 'Control Adapter layer missing model');
@@ -141,7 +161,9 @@ const validateLayers: MetadataValidateFunc<CanvasRasterLayerState[]> = async (la
       // This is a no-op - we want to continue validating the rest of the layers, and an empty list is valid.
     }
   }
-  return new Promise((resolve) => resolve(validatedLayers));
+  return new Promise((resolve) => {
+    resolve(validatedLayers);
+  });
 };
 
 export const validators = {

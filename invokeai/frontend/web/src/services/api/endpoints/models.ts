@@ -245,7 +245,7 @@ export const modelsApi = api.injectEndpoints({
       transformResponse: (response: GetModelConfigsResponse) => {
         return modelConfigsAdapter.setAll(modelConfigsAdapter.getInitialState(), response.models);
       },
-      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+      onQueryStarted: (_, { dispatch, queryFulfilled }) => {
         queryFulfilled.then(({ data }) => {
           modelConfigsAdapterSelectors.selectAll(data).forEach((modelConfig) => {
             dispatch(modelsApi.util.upsertQueryData('getModelConfig', modelConfig.key, modelConfig));

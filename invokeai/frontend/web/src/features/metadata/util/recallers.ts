@@ -3,18 +3,14 @@ import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import {
   getBrushLineId,
-  getCAId,
   getEraserLineId,
   getImageObjectId,
-  getIPAId,
   getRectShapeId,
   getRGId,
 } from 'features/controlLayers/konva/naming';
 import {
   bboxHeightChanged,
   bboxWidthChanged,
-  // caRecalled,
-  ipaRecalled,
   loraAllDeleted,
   loraRecalled,
   negativePrompt2Changed,
@@ -23,7 +19,6 @@ import {
   positivePromptChanged,
   rasterLayerRecalled,
   refinerModelChanged,
-  rgRecalled,
   setCfgRescaleMultiplier,
   setCfgScale,
   setImg2imgStrength,
@@ -39,9 +34,7 @@ import {
   vaeSelected,
 } from 'features/controlLayers/store/canvasV2Slice';
 import type {
-  CanvasIPAdapterState,
   CanvasRasterLayerState,
-  CanvasRegionalGuidanceState,
   LoRA,
 } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
@@ -51,7 +44,6 @@ import type {
   MetadataRecallFunc,
   T2IAdapterConfigMetadata,
 } from 'features/metadata/types';
-import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
 import { modelSelected } from 'features/parameters/store/actions';
 import type {
   ParameterCFGRescaleMultiplier,
@@ -246,86 +238,86 @@ const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapt
   });
 };
 
-const recallCA: MetadataRecallFunc<CanvasControlAdapterState> = async (ca) => {
-  const { dispatch } = getStore();
-  const clone = deepClone(ca);
-  if (clone.image) {
-    const imageDTO = await getImageDTO(clone.image.name);
-    if (!imageDTO) {
-      clone.image = null;
-    }
-  }
-  if (clone.processedImage) {
-    const imageDTO = await getImageDTO(clone.processedImage.name);
-    if (!imageDTO) {
-      clone.processedImage = null;
-    }
-  }
-  if (clone.model) {
-    try {
-      await fetchModelConfigByIdentifier(clone.model);
-    } catch {
-      // MODEL SMITED!
-      clone.model = null;
-    }
-  }
-  // No clobber
-  clone.id = getCAId(uuidv4());
-  // dispatch(caRecalled({ data: clone }));
-  return;
-};
+// const recallCA: MetadataRecallFunc<CanvasControlAdapterState> = async (ca) => {
+//   const { dispatch } = getStore();
+//   const clone = deepClone(ca);
+//   if (clone.image) {
+//     const imageDTO = await getImageDTO(clone.image.name);
+//     if (!imageDTO) {
+//       clone.image = null;
+//     }
+//   }
+//   if (clone.processedImage) {
+//     const imageDTO = await getImageDTO(clone.processedImage.name);
+//     if (!imageDTO) {
+//       clone.processedImage = null;
+//     }
+//   }
+//   if (clone.model) {
+//     try {
+//       await fetchModelConfigByIdentifier(clone.model);
+//     } catch {
+//       // MODEL SMITED!
+//       clone.model = null;
+//     }
+//   }
+//   // No clobber
+//   clone.id = getCAId(uuidv4());
+//   // dispatch(caRecalled({ data: clone }));
+//   return;
+// };
 
-const recallIPA: MetadataRecallFunc<CanvasIPAdapterState> = async (ipa) => {
-  const { dispatch } = getStore();
-  const clone = deepClone(ipa);
-  if (clone.imageObject) {
-    const imageDTO = await getImageDTO(clone.imageObject.name);
-    if (!imageDTO) {
-      clone.imageObject = null;
-    }
-  }
-  if (clone.model) {
-    try {
-      await fetchModelConfigByIdentifier(clone.model);
-    } catch {
-      // MODEL SMITED!
-      clone.model = null;
-    }
-  }
-  // No clobber
-  clone.id = getIPAId(uuidv4());
-  dispatch(ipaRecalled({ data: clone }));
-  return;
-};
+// const recallIPA: MetadataRecallFunc<CanvasIPAdapterState> = async (ipa) => {
+//   const { dispatch } = getStore();
+//   const clone = deepClone(ipa);
+//   if (clone.imageObject) {
+//     const imageDTO = await getImageDTO(clone.imageObject.name);
+//     if (!imageDTO) {
+//       clone.imageObject = null;
+//     }
+//   }
+//   if (clone.model) {
+//     try {
+//       await fetchModelConfigByIdentifier(clone.model);
+//     } catch {
+//       // MODEL SMITED!
+//       clone.model = null;
+//     }
+//   }
+//   // No clobber
+//   clone.id = getIPAId(uuidv4());
+//   dispatch(ipaRecalled({ data: clone }));
+//   return;
+// };
 
-const recallRG: MetadataRecallFunc<CanvasRegionalGuidanceState> = async (rg) => {
-  const { dispatch } = getStore();
-  const clone = deepClone(rg);
-  // Strip out the uploaded mask image property - this is an intermediate image
-  clone.imageCache = null;
+// const recallRG: MetadataRecallFunc<CanvasRegionalGuidanceState> = async (rg) => {
+//   const { dispatch } = getStore();
+//   const clone = deepClone(rg);
+//   // Strip out the uploaded mask image property - this is an intermediate image
+//   clone.imageCache = null;
 
-  for (const ipAdapter of clone.ipAdapters) {
-    if (ipAdapter.imageObject) {
-      const imageDTO = await getImageDTO(ipAdapter.imageObject.name);
-      if (!imageDTO) {
-        ipAdapter.imageObject = null;
-      }
-    }
-    if (ipAdapter.model) {
-      try {
-        await fetchModelConfigByIdentifier(ipAdapter.model);
-      } catch {
-        // MODEL SMITED!
-        ipAdapter.model = null;
-      }
-    }
-    // No clobber
-    ipAdapter.id = uuidv4();
-  }
-  clone.id = getRGId(uuidv4());
-  dispatch(rgRecalled({ data: clone }));
-  return;
-};
+//   for (const ipAdapter of clone.ipAdapters) {
+//     if (ipAdapter.imageObject) {
+//       const imageDTO = await getImageDTO(ipAdapter.imageObject.name);
+//       if (!imageDTO) {
+//         ipAdapter.imageObject = null;
+//       }
+//     }
+//     if (ipAdapter.model) {
+//       try {
+//         await fetchModelConfigByIdentifier(ipAdapter.model);
+//       } catch {
+//         // MODEL SMITED!
+//         ipAdapter.model = null;
+//       }
+//     }
+//     // No clobber
+//     ipAdapter.id = uuidv4();
+//   }
+//   clone.id = getRGId(uuidv4());
+//   dispatch(rgRecalled({ data: clone }));
+//   return;
+// };
 
 //#region Control Layers
 const recallLayer: MetadataRecallFunc<CanvasRasterLayerState> = async (layer) => {

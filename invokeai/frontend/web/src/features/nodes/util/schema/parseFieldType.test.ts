@@ -267,7 +267,7 @@ const specialCases: ParseFieldTypeTestCase[] = [
   },
 ];
 
-describe('refObjectToSchemaName', async () => {
+describe('refObjectToSchemaName', () => {
   it('parses ref object 1', () => {
     expect(
       refObjectToSchemaName({
@@ -284,7 +284,7 @@ describe('refObjectToSchemaName', async () => {
   });
 });
 
-describe.concurrent('parseFieldType', async () => {
+describe.concurrent('parseFieldType', () => {
   it.each(primitiveTypes)('parses primitive types ($name)', ({ schema, expected }: ParseFieldTypeTestCase) => {
     expect(parseFieldType(schema)).toEqual(expected);
   });

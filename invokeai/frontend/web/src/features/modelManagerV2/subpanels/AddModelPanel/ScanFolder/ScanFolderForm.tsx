@@ -16,7 +16,7 @@ export const ScanModelsForm = memo(() => {
 
   const [_scanFolder, { isLoading, data }] = useLazyScanFolderQuery();
 
-  const scanFolder = useCallback(async () => {
+  const scanFolder = useCallback(() => {
     _scanFolder({ scan_path: scanPath })
       .unwrap()
       .catch((error) => {

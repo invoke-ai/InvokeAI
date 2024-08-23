@@ -22,7 +22,7 @@ const NodeTitle = ({ nodeId, title }: Props) => {
 
   const [localTitle, setLocalTitle] = useState('');
   const handleSubmit = useCallback(
-    async (newTitle: string) => {
+    (newTitle: string) => {
       dispatch(nodeLabelChanged({ nodeId, label: newTitle }));
       setLocalTitle(label || title || templateTitle || t('nodes.problemSettingTitle'));
     },
