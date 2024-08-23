@@ -2,6 +2,7 @@ import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch } from 'app/store/store';
+import type { SerializableObject } from 'common/types';
 import { parseify } from 'common/util/serialize';
 import {
   caImageChanged,
@@ -125,7 +126,7 @@ export const addControlAdapterPreprocessor = (startAppListening: AppStartListeni
         // TODO(psyche): Update the pydantic models, pretty sure we will _always_ have a batch_id here, but the model says it's optional
         assert(enqueueResult.batch.batch_id, 'Batch ID not returned from queue');
         dispatch(caProcessorPendingBatchIdChanged({ id, batchId: enqueueResult.batch.batch_id }));
-        log.debug({ enqueueResult: parseify(enqueueResult) }, t('queue.graphQueued'));
+        log.debug({ enqueueResult } as SerializableObject, t('queue.graphQueued'));
 
         // Wait for the processor node to complete
         const [invocationCompleteAction] = await take(

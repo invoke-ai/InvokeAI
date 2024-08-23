@@ -2,7 +2,6 @@ import { MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { logger } from 'app/logging/logger';
 import { dndDropped } from 'app/store/middleware/listenerMiddleware/listeners/imageDropped';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { parseify } from 'common/util/serialize';
 import DndOverlay from 'features/dnd/components/DndOverlay';
 import type { DragEndEvent, DragStartEvent, TypesafeDraggableData } from 'features/dnd/types';
 import { customPointerWithin } from 'features/dnd/util/customPointerWithin';
@@ -19,7 +18,7 @@ const AppDndContext = (props: PropsWithChildren) => {
   const dispatch = useAppDispatch();
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    log.trace({ dragData: parseify(event.active.data.current) }, 'Drag started');
+    log.trace({ dragData: event.active.data.current }, 'Drag started');
     const activeData = event.active.data.current;
     if (!activeData) {
       return;
@@ -29,7 +28,7 @@ const AppDndContext = (props: PropsWithChildren) => {
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      log.trace({ dragData: parseify(event.active.data.current) }, 'Drag ended');
+      log.trace({ dragData: event.active.data.current }, 'Drag ended');
       const overData = event.over?.data.current;
       if (!activeDragData || !overData) {
         return;

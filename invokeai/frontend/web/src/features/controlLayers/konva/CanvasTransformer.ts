@@ -1,4 +1,4 @@
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
@@ -161,9 +161,6 @@ export class CanvasTransformer {
             context.fillStrokeShape(anchor);
           });
         },
-        // TODO(psyche): The konva Vector2D type is is apparently not compatible with the JSONObject type that the log
-        // function expects. The in-house Coordinate type is functionally the same - `{x: number; y: number}` - and
-        // TypeScript is happy with it.
         anchorDragBoundFunc: (oldPos: Coordinate, newPos: Coordinate) => {
           // The anchorDragBoundFunc callback puts constraints on the movement of the transformer anchors, which in
           // turn constrain the transformation. It is called on every anchor move. We'll use this to snap the anchors
@@ -755,7 +752,7 @@ export class CanvasTransformer {
     this.konva.proxyRect.destroy();
   };
 
-  getLoggingContext = (): JSONObject => {
+  getLoggingContext = (): SerializableObject => {
     return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

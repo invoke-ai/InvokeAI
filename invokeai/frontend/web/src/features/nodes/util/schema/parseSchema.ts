@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
 import type { Templates } from 'features/nodes/store/types';
@@ -87,7 +88,10 @@ export const parseSchema = (
       schema.properties,
       (inputsAccumulator: Record<string, FieldInputTemplate>, property, propertyName) => {
         if (isReservedInputField(type, propertyName)) {
-          log.trace({ node: type, field: propertyName, schema: parseify(property) }, 'Skipped reserved input field');
+          log.trace(
+            { node: type, field: propertyName, schema: property } as SerializableObject,
+            'Skipped reserved input field'
+          );
           return inputsAccumulator;
         }
 
