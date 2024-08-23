@@ -5,7 +5,7 @@ from safetensors.torch import load_file, save_file
 from transformers import AutoConfig, AutoModelForTextEncoding, T5EncoderModel
 
 from invokeai.backend.quantization.bnb_llm_int8 import quantize_model_llm_int8
-from invokeai.backend.quantization.load_flux_model_bnb_nf4 import log_time
+from invokeai.backend.quantization.scripts.load_flux_model_bnb_nf4 import log_time
 
 
 def load_state_dict_into_t5(model: T5EncoderModel, state_dict: dict):
