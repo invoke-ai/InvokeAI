@@ -1,4 +1,4 @@
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
 import { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
@@ -613,7 +613,7 @@ export class CanvasObjectRenderer {
     };
   };
 
-  getLoggingContext = (): JSONObject => {
+  getLoggingContext = (): SerializableObject => {
     return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }
