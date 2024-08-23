@@ -4,7 +4,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, CanvasImageState, FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/store/types';
-import { atom } from 'nanostores';
+import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
 import type { BatchConfig, ImageDTO, S } from 'services/api/types';
@@ -23,6 +23,7 @@ export class CanvasFilterModule {
   imageState: CanvasImageState | null = null;
 
   $adapter = atom<CanvasLayerAdapter | null>(null);
+  $isFiltering = computed(this.$adapter, (adapter) => Boolean(adapter));
   $isProcessing = atom<boolean>(false);
   $config = atom<FilterConfig>(IMAGE_FILTERS.canny_image_processor.buildDefaults());
 
@@ -46,6 +47,7 @@ export class CanvasFilterModule {
       return;
     }
     this.$adapter.set(entity.adapter);
+    this.manager.stateApi.setTool('view');
   };
 
   previewFilter = async () => {

@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useIsFiltering } from 'features/controlLayers/hooks/useIsFiltering';
 import { useIsTransforming } from 'features/controlLayers/hooks/useIsTransforming';
 import { toolChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { memo, useCallback, useMemo } from 'react';
@@ -10,13 +11,14 @@ import { PiEyedropperBold } from 'react-icons/pi';
 export const ToolColorPickerButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const isFiltering = useIsFiltering();
   const isTransforming = useIsTransforming();
   const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'colorPicker');
   const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
 
   const isDisabled = useMemo(() => {
-    return isTransforming || isStaging;
-  }, [isStaging, isTransforming]);
+    return isTransforming || isFiltering || isStaging;
+  }, [isFiltering, isStaging, isTransforming]);
 
   const onClick = useCallback(() => {
     dispatch(toolChanged('colorPicker'));

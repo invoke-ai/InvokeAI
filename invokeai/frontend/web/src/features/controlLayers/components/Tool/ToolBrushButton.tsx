@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useIsFiltering } from 'features/controlLayers/hooks/useIsFiltering';
 import { useIsTransforming } from 'features/controlLayers/hooks/useIsTransforming';
 import { toolChanged } from 'features/controlLayers/store/canvasV2Slice';
 import { isDrawableEntityType } from 'features/controlLayers/store/types';
@@ -11,6 +12,7 @@ import { PiPaintBrushBold } from 'react-icons/pi';
 export const ToolBrushButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const isFiltering = useIsFiltering();
   const isTransforming = useIsTransforming();
   const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
   const isSelected = useAppSelector((s) => s.canvasV2.tool.selected === 'brush');
@@ -22,8 +24,8 @@ export const ToolBrushButton = memo(() => {
   });
 
   const isDisabled = useMemo(() => {
-    return isTransforming || isStaging || !isDrawingToolAllowed;
-  }, [isDrawingToolAllowed, isStaging, isTransforming]);
+    return isTransforming || isFiltering || isStaging || !isDrawingToolAllowed;
+  }, [isDrawingToolAllowed, isFiltering, isStaging, isTransforming]);
 
   const onClick = useCallback(() => {
     dispatch(toolChanged('brush'));
