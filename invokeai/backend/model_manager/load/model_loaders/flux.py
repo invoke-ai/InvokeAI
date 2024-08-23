@@ -90,9 +90,9 @@ class ClipCheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer:
-                return CLIPTokenizer.from_pretrained(config.path)
+                return CLIPTokenizer.from_pretrained(Path(config.path) / "tokenizer")
             case SubModelType.TextEncoder:
-                return CLIPTextModel.from_pretrained(config.path)
+                return CLIPTextModel.from_pretrained(Path(config.path) / "text_encoder")
 
         raise ValueError(
             f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
