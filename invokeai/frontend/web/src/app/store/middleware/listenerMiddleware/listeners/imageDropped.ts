@@ -11,12 +11,7 @@ import type { CanvasControlLayerState, CanvasRasterLayerState } from 'features/c
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
-import {
-  imageSelected,
-  imageToCompareChanged,
-  isImageViewerOpenChanged,
-  selectionChanged,
-} from 'features/gallery/store/gallerySlice';
+import { imageToCompareChanged, isImageViewerOpenChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -46,32 +41,6 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       } else {
         log.debug({ activeData, overData }, `Unknown payload dropped`);
       }
-
-      /**
-       * Image dropped on current image
-       */
-      if (
-        overData.actionType === 'SET_CURRENT_IMAGE' &&
-        activeData.payloadType === 'IMAGE_DTO' &&
-        activeData.payload.imageDTO
-      ) {
-        dispatch(imageSelected(activeData.payload.imageDTO));
-        dispatch(isImageViewerOpenChanged(true));
-        return;
-      }
-
-      // /**
-      //  * Image dropped on Control Adapter Layer
-      //  */
-      // if (
-      //   overData.actionType === 'SET_CA_IMAGE' &&
-      //   activeData.payloadType === 'IMAGE_DTO' &&
-      //   activeData.payload.imageDTO
-      // ) {
-      //   const { id } = overData.context;
-      //   dispatch(caImageChanged({ id, imageDTO: activeData.payload.imageDTO }));
-      //   return;
-      // }
 
       /**
        * Image dropped on IP Adapter Layer
