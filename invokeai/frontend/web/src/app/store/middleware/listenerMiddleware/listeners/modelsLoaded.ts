@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch, RootState } from 'app/store/store';
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import {
   bboxHeightChanged,
   bboxWidthChanged,
@@ -58,7 +58,7 @@ type ModelHandler = (
   models: AnyModelConfig[],
   state: RootState,
   dispatch: AppDispatch,
-  log: Logger<JSONObject>
+  log: Logger<SerializableObject>
 ) => undefined;
 
 const handleMainModels: ModelHandler = (models, state, dispatch, log) => {

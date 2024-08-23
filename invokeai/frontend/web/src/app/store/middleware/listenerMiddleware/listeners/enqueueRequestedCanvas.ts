@@ -1,8 +1,8 @@
 import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { SerializableObject } from 'common/types';
 import openBase64ImageInTab from 'common/util/openBase64ImageInTab';
-import { parseify } from 'common/util/serialize';
 import { canvasBatchIdAdded, stagingAreaInitialized } from 'features/canvas/store/canvasSlice';
 import { getCanvasData } from 'features/canvas/util/getCanvasData';
 import { getCanvasGenerationMode } from 'features/canvas/util/getCanvasGenerationMode';
@@ -104,7 +104,7 @@ export const addEnqueueRequestedCanvasListener = (startAppListening: AppStartLis
 
       const graph = await buildCanvasGraph(state, generationMode, canvasInitImage, canvasMaskImage);
 
-      log.debug({ graph: parseify(graph) }, `Canvas graph built`);
+      log.debug({ graph } as SerializableObject, `Canvas graph built`);
 
       // currently this action is just listened to for logging
       dispatch(canvasGraphBuilt(graph));
