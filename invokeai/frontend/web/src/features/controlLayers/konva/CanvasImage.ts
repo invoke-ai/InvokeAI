@@ -1,5 +1,5 @@
 import { Mutex } from 'async-mutex';
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -186,7 +186,7 @@ export class CanvasImageRenderer {
     };
   };
 
-  getLoggingContext = (): JSONObject => {
+  getLoggingContext = (): SerializableObject => {
     return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }
