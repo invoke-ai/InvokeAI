@@ -38,7 +38,7 @@ async function generateTypes(schema) {
   process.stdout.write(`\nOK!\r\n`);
 }
 
-async function main() {
+function main() {
   const encoding = 'utf-8';
 
   if (process.stdin.isTTY) {

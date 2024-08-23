@@ -46,7 +46,7 @@ export const useFullscreenDropzone = () => {
   );
 
   const fileAcceptedCallback = useCallback(
-    async (file: File) => {
+    (file: File) => {
       uploadImage({
         file,
         image_category: 'user',
@@ -96,7 +96,7 @@ export const useFullscreenDropzone = () => {
 
   useEffect(() => {
     // This is a hack to allow pasting images into the uploader
-    const handlePaste = async (e: ClipboardEvent) => {
+    const handlePaste = (e: ClipboardEvent) => {
       if (!dropzone.inputRef.current) {
         return;
       }
