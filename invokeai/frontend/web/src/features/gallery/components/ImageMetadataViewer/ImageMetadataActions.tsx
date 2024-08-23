@@ -1,10 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { MetadataControlNets } from 'features/metadata/components/MetadataControlNets';
-import { MetadataIPAdapters } from 'features/metadata/components/MetadataIPAdapters';
 import { MetadataItem } from 'features/metadata/components/MetadataItem';
-import { MetadataLayers } from 'features/metadata/components/MetadataLayers';
 import { MetadataLoRAs } from 'features/metadata/components/MetadataLoRAs';
-import { MetadataT2IAdapters } from 'features/metadata/components/MetadataT2IAdapters';
 import { handlers } from 'features/metadata/util/handlers';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
@@ -49,10 +45,6 @@ const ImageMetadataActions = (props: Props) => {
       <MetadataItem metadata={metadata} handlers={handlers.refinerStart} />
       <MetadataItem metadata={metadata} handlers={handlers.refinerSteps} />
       <MetadataLoRAs metadata={metadata} />
-      {activeTabName === 'generation' && <MetadataLayers metadata={metadata} />}
-      {activeTabName !== 'generation' && <MetadataControlNets metadata={metadata} />}
-      {activeTabName !== 'generation' && <MetadataT2IAdapters metadata={metadata} />}
-      {activeTabName !== 'generation' && <MetadataIPAdapters metadata={metadata} />}
     </>
   );
 };
