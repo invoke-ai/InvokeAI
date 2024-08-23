@@ -1,3 +1,4 @@
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isEqual } from 'lodash-es';
@@ -12,7 +13,7 @@ export const addTextToImage = (
   if (!isEqual(scaledSize, originalSize)) {
     // We need to resize the output image back to the original size
     const resizeImageToOriginalSize = g.addNode({
-      id: 'resize_image_to_original_size',
+      id: getPrefixedId('resize_image_to_original_size'),
       type: 'img_resize',
       ...originalSize,
     });
