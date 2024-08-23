@@ -1,4 +1,5 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { ParameterPrecision } from 'features/parameters/types/parameterSchemas';
@@ -26,36 +27,36 @@ export const addInpaint = async (
 
   if (!isEqual(scaledSize, originalSize)) {
     // Scale before processing requires some resizing
-    const i2l = g.addNode({ id: 'i2l', type: 'i2l' });
+    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l' });
     const resizeImageToScaledSize = g.addNode({
-      id: 'resize_image_to_scaled_size',
       type: 'img_resize',
+      id: getPrefixedId('resize_image_to_scaled_size'),
       image: { image_name: initialImage.image_name },
       ...scaledSize,
     });
     const alphaToMask = g.addNode({
-      id: 'alpha_to_mask',
+      id: getPrefixedId('alpha_to_mask'),
       type: 'tomask',
       image: { image_name: maskImage.image_name },
       invert: true,
     });
     const resizeMaskToScaledSize = g.addNode({
-      id: 'resize_mask_to_scaled_size',
+      id: getPrefixedId('resize_mask_to_scaled_size'),
       type: 'img_resize',
       ...scaledSize,
     });
     const resizeImageToOriginalSize = g.addNode({
-      id: 'resize_image_to_original_size',
+      id: getPrefixedId('resize_image_to_original_size'),
       type: 'img_resize',
       ...originalSize,
     });
     const resizeMaskToOriginalSize = g.addNode({
-      id: 'resize_mask_to_original_size',
+      id: getPrefixedId('resize_mask_to_original_size'),
       type: 'img_resize',
       ...originalSize,
     });
     const createGradientMask = g.addNode({
-      id: 'create_gradient_mask',
+      id: getPrefixedId('create_gradient_mask'),
       type: 'create_gradient_mask',
       coherence_mode: compositing.canvasCoherenceMode,
       minimum_denoise: compositing.canvasCoherenceMinDenoise,
@@ -63,7 +64,7 @@ export const addInpaint = async (
       fp32: vaePrecision === 'fp32',
     });
     const canvasPasteBack = g.addNode({
-      id: 'canvas_v2_mask_and_crop',
+      id: getPrefixedId('canvas_v2_mask_and_crop'),
       type: 'canvas_v2_mask_and_crop',
       mask_blur: compositing.maskBlur,
     });
@@ -92,15 +93,15 @@ export const addInpaint = async (
     return canvasPasteBack;
   } else {
     // No scale before processing, much simpler
-    const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name: initialImage.image_name } });
+    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', image: { image_name: initialImage.image_name } });
     const alphaToMask = g.addNode({
-      id: 'alpha_to_mask',
+      id: getPrefixedId('alpha_to_mask'),
       type: 'tomask',
       image: { image_name: maskImage.image_name },
       invert: true,
     });
     const createGradientMask = g.addNode({
-      id: 'create_gradient_mask',
+      id: getPrefixedId('create_gradient_mask'),
       type: 'create_gradient_mask',
       coherence_mode: compositing.canvasCoherenceMode,
       minimum_denoise: compositing.canvasCoherenceMinDenoise,
@@ -109,7 +110,7 @@ export const addInpaint = async (
       image: { image_name: initialImage.image_name },
     });
     const canvasPasteBack = g.addNode({
-      id: 'canvas_v2_mask_and_crop',
+      id: getPrefixedId('canvas_v2_mask_and_crop'),
       type: 'canvas_v2_mask_and_crop',
       mask_blur: compositing.maskBlur,
     });

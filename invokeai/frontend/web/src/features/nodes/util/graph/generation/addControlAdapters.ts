@@ -5,66 +5,87 @@ import type {
   Rect,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
-import { CONTROL_NET_COLLECT, T2I_ADAPTER_COLLECT } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { BaseModelType, ImageDTO, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
-export const addControlAdapters = async (
+type AddControlNetsResult = {
+  addedControlNets: number;
+};
+
+export const addControlNets = async (
   manager: CanvasManager,
   layers: CanvasControlLayerState[],
   g: Graph,
   bbox: Rect,
-  denoise: Invocation<'denoise_latents'>,
+  collector: Invocation<'collect'>,
   base: BaseModelType
-): Promise<CanvasControlLayerState[]> => {
+): Promise<AddControlNetsResult> => {
   const validControlLayers = layers
     .filter((layer) => layer.isEnabled)
-    .filter((layer) => isValidControlAdapter(layer.controlAdapter, base));
+    .filter((layer) => isValidControlAdapter(layer.controlAdapter, base))
+    .filter((layer) => layer.controlAdapter.type === 'controlnet');
+
+  const result: AddControlNetsResult = {
+    addedControlNets: 0,
+  };
 
   for (const layer of validControlLayers) {
+    result.addedControlNets++;
+
     const adapter = manager.adapters.controlLayers.get(layer.id);
     assert(adapter, 'Adapter not found');
     const imageDTO = await adapter.renderer.rasterize({ rect: bbox, attrs: { opacity: 1, filters: [] } });
-    if (layer.controlAdapter.type === 'controlnet') {
-      await addControlNetToGraph(g, layer, imageDTO, denoise);
-    } else {
-      await addT2IAdapterToGraph(g, layer, imageDTO, denoise);
-    }
+    await addControlNetToGraph(g, layer, imageDTO, collector);
   }
-  return validControlLayers;
+
+  return result;
 };
 
-const addControlNetCollectorSafe = (g: Graph, denoise: Invocation<'denoise_latents'>): Invocation<'collect'> => {
-  try {
-    // Attempt to retrieve the collector
-    const controlNetCollect = g.getNode(CONTROL_NET_COLLECT);
-    assert(controlNetCollect.type === 'collect');
-    return controlNetCollect;
-  } catch {
-    // Add the ControlNet collector
-    const controlNetCollect = g.addNode({
-      id: CONTROL_NET_COLLECT,
-      type: 'collect',
-    });
-    g.addEdge(controlNetCollect, 'collection', denoise, 'control');
-    return controlNetCollect;
+type AddT2IAdaptersResult = {
+  addedT2IAdapters: number;
+};
+
+export const addT2IAdapters = async (
+  manager: CanvasManager,
+  layers: CanvasControlLayerState[],
+  g: Graph,
+  bbox: Rect,
+  collector: Invocation<'collect'>,
+  base: BaseModelType
+): Promise<AddT2IAdaptersResult> => {
+  const validControlLayers = layers
+    .filter((layer) => layer.isEnabled)
+    .filter((layer) => isValidControlAdapter(layer.controlAdapter, base))
+    .filter((layer) => layer.controlAdapter.type === 't2i_adapter');
+
+  const result: AddT2IAdaptersResult = {
+    addedT2IAdapters: 0,
+  };
+
+  for (const layer of validControlLayers) {
+    result.addedT2IAdapters++;
+
+    const adapter = manager.adapters.controlLayers.get(layer.id);
+    assert(adapter, 'Adapter not found');
+    const imageDTO = await adapter.renderer.rasterize({ rect: bbox, attrs: { opacity: 1, filters: [] } });
+    await addT2IAdapterToGraph(g, layer, imageDTO, collector);
   }
+
+  return result;
 };
 
 const addControlNetToGraph = (
   g: Graph,
   layer: CanvasControlLayerState,
   imageDTO: ImageDTO,
-  denoise: Invocation<'denoise_latents'>
+  collector: Invocation<'collect'>
 ) => {
   const { id, controlAdapter } = layer;
   assert(controlAdapter.type === 'controlnet');
   const { beginEndStepPct, model, weight, controlMode } = controlAdapter;
   assert(model !== null);
   const { image_name } = imageDTO;
-
-  const controlNetCollect = addControlNetCollectorSafe(g, denoise);
 
   const controlNet = g.addNode({
     id: `control_net_${id}`,
@@ -77,40 +98,20 @@ const addControlNetToGraph = (
     control_weight: weight,
     image: { image_name },
   });
-  g.addEdge(controlNet, 'control', controlNetCollect, 'item');
-};
-
-const addT2IAdapterCollectorSafe = (g: Graph, denoise: Invocation<'denoise_latents'>): Invocation<'collect'> => {
-  try {
-    // You see, we've already got one!
-    const t2iAdapterCollect = g.getNode(T2I_ADAPTER_COLLECT);
-    assert(t2iAdapterCollect.type === 'collect');
-    return t2iAdapterCollect;
-  } catch {
-    const t2iAdapterCollect = g.addNode({
-      id: T2I_ADAPTER_COLLECT,
-      type: 'collect',
-    });
-
-    g.addEdge(t2iAdapterCollect, 'collection', denoise, 't2i_adapter');
-
-    return t2iAdapterCollect;
-  }
+  g.addEdge(controlNet, 'control', collector, 'item');
 };
 
 const addT2IAdapterToGraph = (
   g: Graph,
   layer: CanvasControlLayerState,
   imageDTO: ImageDTO,
-  denoise: Invocation<'denoise_latents'>
+  collector: Invocation<'collect'>
 ) => {
   const { id, controlAdapter } = layer;
   assert(controlAdapter.type === 't2i_adapter');
   const { beginEndStepPct, model, weight } = controlAdapter;
   assert(model !== null);
   const { image_name } = imageDTO;
-
-  const t2iAdapterCollect = addT2IAdapterCollectorSafe(g, denoise);
 
   const t2iAdapter = g.addNode({
     id: `t2i_adapter_${id}`,
@@ -123,7 +124,7 @@ const addT2IAdapterToGraph = (
     image: { image_name },
   });
 
-  g.addEdge(t2iAdapter, 't2i_adapter', t2iAdapterCollect, 'item');
+  g.addEdge(t2iAdapter, 't2i_adapter', collector, 'item');
 };
 
 const isValidControlAdapter = (controlAdapter: ControlNetConfig | T2IAdapterConfig, base: BaseModelType): boolean => {
