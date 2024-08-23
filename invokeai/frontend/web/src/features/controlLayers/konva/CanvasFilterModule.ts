@@ -1,4 +1,4 @@
-import type { SerializableObject, SerializableObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -7,8 +7,7 @@ import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/sto
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
-import type { BatchConfig, ImageDTO } from 'services/api/types';
-import type { InvocationCompleteEvent } from 'services/events/types';
+import type { BatchConfig, ImageDTO, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const TYPE = 'entity_filter_preview';
@@ -63,7 +62,7 @@ export class CanvasFilterModule {
     const batch = this.buildBatchConfig(imageDTO, config, nodeId);
 
     // Listen for the filter processing completion event
-    const listener = async (event: InvocationCompleteEvent) => {
+    const listener = async (event: S['InvocationCompleteEvent']) => {
       if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
         return;
       }
