@@ -239,7 +239,7 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
 
 export const useIsReadyToEnqueue = () => {
   const templates = useStore($templates);
-  const isConnected = useStore($isConnected)
+  const isConnected = useStore($isConnected);
   const selector = useMemo(() => createSelector(templates, isConnected), [templates, isConnected]);
   const value = useAppSelector(selector);
   return value;

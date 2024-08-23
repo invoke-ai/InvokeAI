@@ -1,4 +1,3 @@
-
 export type TabName = 'generation' | 'upscaling' | 'workflows' | 'models' | 'queue';
 
 export interface UIState {

@@ -33,10 +33,7 @@ import {
   setSteps,
   vaeSelected,
 } from 'features/controlLayers/store/canvasV2Slice';
-import type {
-  CanvasRasterLayerState,
-  LoRA,
-} from 'features/controlLayers/store/types';
+import type { CanvasRasterLayerState, LoRA } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type {
   ControlNetConfigMetadata,
