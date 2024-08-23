@@ -30,7 +30,7 @@ export class CanvasCompositorModule {
 
   getCompositeRasterLayerEntityIds = (): string[] => {
     const ids = [];
-    for (const adapter of this.manager.rasterLayerAdapters.values()) {
+    for (const adapter of this.manager.adapters.rasterLayers.values()) {
       if (adapter.state.isEnabled && adapter.renderer.hasObjects()) {
         ids.push(adapter.id);
       }
@@ -40,7 +40,7 @@ export class CanvasCompositorModule {
 
   getCompositeInpaintMaskEntityIds = (): string[] => {
     const ids = [];
-    for (const adapter of this.manager.inpaintMaskAdapters.values()) {
+    for (const adapter of this.manager.adapters.inpaintMasks.values()) {
       if (adapter.state.isEnabled && adapter.renderer.hasObjects()) {
         ids.push(adapter.id);
       }
@@ -67,7 +67,7 @@ export class CanvasCompositorModule {
     assert(ctx !== null, 'Canvas 2D context is null');
 
     for (const id of this.getCompositeRasterLayerEntityIds()) {
-      const adapter = this.manager.rasterLayerAdapters.get(id);
+      const adapter = this.manager.adapters.rasterLayers.get(id);
       if (!adapter) {
         this.log.warn({ id }, 'Raster layer adapter not found');
         continue;
@@ -99,7 +99,7 @@ export class CanvasCompositorModule {
     assert(ctx !== null);
 
     for (const id of this.getCompositeInpaintMaskEntityIds()) {
-      const adapter = this.manager.inpaintMaskAdapters.get(id);
+      const adapter = this.manager.adapters.inpaintMasks.get(id);
       if (!adapter) {
         this.log.warn({ id }, 'Inpaint mask adapter not found');
         continue;
@@ -117,7 +117,7 @@ export class CanvasCompositorModule {
       extra,
     };
     for (const id of this.getCompositeRasterLayerEntityIds()) {
-      const adapter = this.manager.rasterLayerAdapters.get(id);
+      const adapter = this.manager.adapters.rasterLayers.get(id);
       if (!adapter) {
         this.log.warn({ id }, 'Raster layer adapter not found');
         continue;
@@ -132,7 +132,7 @@ export class CanvasCompositorModule {
       extra,
     };
     for (const id of this.getCompositeInpaintMaskEntityIds()) {
-      const adapter = this.manager.inpaintMaskAdapters.get(id);
+      const adapter = this.manager.adapters.inpaintMasks.get(id);
       if (!adapter) {
         this.log.warn({ id }, 'Inpaint mask adapter not found');
         continue;

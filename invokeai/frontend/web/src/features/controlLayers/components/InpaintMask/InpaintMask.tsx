@@ -3,9 +3,10 @@ import { CanvasEntityContainer } from 'features/controlLayers/components/common/
 import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
+import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
+import { EntityMaskAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { EntityMaskAdapterProviderGate } from 'features/controlLayers/hooks/useEntityMaskAdapter';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
@@ -20,9 +21,10 @@ export const InpaintMask = memo(({ id }: Props) => {
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <EntityMaskAdapterProviderGate>
+      <EntityMaskAdapterGate>
         <CanvasEntityContainer>
           <CanvasEntityHeader>
+            <CanvasEntityPreviewImage />
             <CanvasEntityEnabledToggle />
             <CanvasEntityEditableTitle />
             <Spacer />
@@ -30,7 +32,7 @@ export const InpaintMask = memo(({ id }: Props) => {
             <CanvasEntityDeleteButton />
           </CanvasEntityHeader>
         </CanvasEntityContainer>
-      </EntityMaskAdapterProviderGate>
+      </EntityMaskAdapterGate>
     </EntityIdentifierContext.Provider>
   );
 });
