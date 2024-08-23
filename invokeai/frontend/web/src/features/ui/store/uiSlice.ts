@@ -4,7 +4,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { atom } from 'nanostores';
 
-import type { TabName , UIState } from "./uiTypes";
+import type { TabName, UIState } from './uiTypes';
 
 const initialUIState: UIState = {
   _version: 2,

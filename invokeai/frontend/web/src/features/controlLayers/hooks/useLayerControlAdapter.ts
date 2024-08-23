@@ -35,8 +35,7 @@ export const useDefaultControlAdapter = (): ControlNetConfig | T2IAdapterConfig 
   const defaultControlAdapter = useMemo(() => {
     const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));
     const model = compatibleModels[0] ?? modelConfigs[0] ?? null;
-    const controlAdapter =
-      model?.type === 't2i_adapter' ? deepClone(initialT2IAdapter) : deepClone(initialControlNet);
+    const controlAdapter = model?.type === 't2i_adapter' ? deepClone(initialT2IAdapter) : deepClone(initialControlNet);
 
     if (model) {
       controlAdapter.model = zModelIdentifierField.parse(model);
