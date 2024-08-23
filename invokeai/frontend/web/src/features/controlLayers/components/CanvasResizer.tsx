@@ -1,5 +1,4 @@
 import { Flex, Grid, GridItem, IconButton } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { memo, useCallback, useState } from 'react';
 import {
   PiArrowDownBold,
@@ -25,7 +24,6 @@ type ResizeDirection =
   | 'down-right';
 
 export const CanvasResizer = memo(() => {
-  const bbox = useAppSelector((s) => s.canvasV2.bbox);
   const [resizeDirection, setResizeDirection] = useState<ResizeDirection>('center-out');
 
   const setDirUpLeft = useCallback(() => {

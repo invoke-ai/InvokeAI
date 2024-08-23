@@ -16,7 +16,7 @@ type UseLoadWorkflowFromFile = (options: useLoadWorkflowFromFileOptions) => (fil
 
 export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({ resetRef, onSuccess }) => {
   const dispatch = useAppDispatch();
-  const logger = useLogger('nodes');
+  const logger = useLogger('workflows');
   const { t } = useTranslation();
   const loadWorkflowFromFile = useCallback(
     (file: File | null) => {
@@ -24,7 +24,7 @@ export const useLoadWorkflowFromFile: UseLoadWorkflowFromFile = ({ resetRef, onS
         return;
       }
       const reader = new FileReader();
-      reader.onload = async () => {
+      reader.onload = () => {
         const rawJSON = reader.result;
 
         try {

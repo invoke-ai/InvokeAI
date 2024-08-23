@@ -13,7 +13,7 @@ const SaveWorkflowButton = () => {
   const { onOpen } = useSaveWorkflowAsDialog();
   const { saveWorkflow } = useSaveLibraryWorkflow();
 
-  const handleClickSave = useCallback(async () => {
+  const handleClickSave = useCallback(() => {
     const builtWorkflow = $builtWorkflow.get();
     if (!builtWorkflow) {
       return;
