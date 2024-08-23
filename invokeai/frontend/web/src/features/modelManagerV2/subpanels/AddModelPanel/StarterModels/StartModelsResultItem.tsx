@@ -15,14 +15,14 @@ export const StarterModelsResultItem = memo(({ result }: Props) => {
     const _allSources = [
       {
         source: result.source,
-        config: { name: result.name, description: result.description, type: result.type, base: result.base },
+        config: { name: result.name, description: result.description, type: result.type, base: result.base, format: result.format },
       },
     ];
     if (result.dependencies) {
       for (const d of result.dependencies) {
         _allSources.push({
           source: d.source,
-          config: { name: d.name, description: d.description, type: d.type, base: d.base },
+          config: { name: d.name, description: d.description, type: d.type, base: d.base, format: d.format },
         });
       }
     }
