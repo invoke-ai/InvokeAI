@@ -1,6 +1,5 @@
 import { Spacer } from '@invoke-ai/ui-library';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
-import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
@@ -13,7 +12,6 @@ import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types'
 import { memo, useMemo } from 'react';
 
 import { RegionalGuidanceMaskFillColorPicker } from './RegionalGuidanceMaskFillColorPicker';
-import { RegionalGuidanceSettingsPopover } from './RegionalGuidanceSettingsPopover';
 
 type Props = {
   id: string;
@@ -28,13 +26,11 @@ export const RegionalGuidance = memo(({ id }: Props) => {
         <CanvasEntityContainer>
           <CanvasEntityHeader>
             <CanvasEntityPreviewImage />
-            <CanvasEntityEnabledToggle />
             <CanvasEntityEditableTitle />
             <Spacer />
             <RegionalGuidanceBadges />
             <RegionalGuidanceMaskFillColorPicker />
-            <RegionalGuidanceSettingsPopover />
-            <CanvasEntityDeleteButton />
+            <CanvasEntityEnabledToggle />
           </CanvasEntityHeader>
           <RegionalGuidanceSettings />
         </CanvasEntityContainer>

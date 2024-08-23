@@ -1,8 +1,9 @@
 import { MenuDivider } from '@invoke-ai/ui-library';
 import { CanvasEntityMenuItemsArrange } from 'features/controlLayers/components/common/CanvasEntityMenuItemsArrange';
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
-import { CanvasEntityMenuItemsReset } from 'features/controlLayers/components/common/CanvasEntityMenuItemsReset';
+import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
 import { RegionalGuidanceMenuItemsAddPromptsAndIPAdapter } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItemsAddPromptsAndIPAdapter';
+import { RegionalGuidanceMenuItemsAutoNegative } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItemsAutoNegative';
 import { memo } from 'react';
 
 export const RegionalGuidanceMenuItems = memo(() => {
@@ -10,9 +11,11 @@ export const RegionalGuidanceMenuItems = memo(() => {
     <>
       <RegionalGuidanceMenuItemsAddPromptsAndIPAdapter />
       <MenuDivider />
+      <CanvasEntityMenuItemsTransform />
+      <RegionalGuidanceMenuItemsAutoNegative />
+      <MenuDivider />
       <CanvasEntityMenuItemsArrange />
       <MenuDivider />
-      <CanvasEntityMenuItemsReset />
       <CanvasEntityMenuItemsDelete />
     </>
   );

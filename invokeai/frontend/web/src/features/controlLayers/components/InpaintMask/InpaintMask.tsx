@@ -1,6 +1,5 @@
 import { Spacer } from '@invoke-ai/ui-library';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
-import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
@@ -25,11 +24,10 @@ export const InpaintMask = memo(({ id }: Props) => {
         <CanvasEntityContainer>
           <CanvasEntityHeader>
             <CanvasEntityPreviewImage />
-            <CanvasEntityEnabledToggle />
             <CanvasEntityEditableTitle />
             <Spacer />
             <InpaintMaskMaskFillColorPicker />
-            <CanvasEntityDeleteButton />
+            <CanvasEntityEnabledToggle />
           </CanvasEntityHeader>
         </CanvasEntityContainer>
       </EntityMaskAdapterGate>

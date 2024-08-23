@@ -26,7 +26,6 @@ export const CanvasEntityEnabledToggle = memo(() => {
       variant="outline"
       icon={isEnabled ? <PiCheckBold /> : undefined}
       onClick={onClick}
-      colorScheme={isEnabled ? 'invokeBlue' : 'base'}
       onDoubleClick={stopPropagation} // double click expands the layer
     />
   );
