@@ -19,7 +19,7 @@ import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import { $isGalleryPanelOpen, $isParametersPanelOpen } from 'features/ui/store/uiSlice';
-import type { TabName } from "features/ui/store/uiTypes";
+import type { TabName } from 'features/ui/store/uiTypes';
 import type { CSSProperties } from 'react';
 import { memo, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';

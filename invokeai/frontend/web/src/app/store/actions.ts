@@ -1,5 +1,5 @@
 import { createAction } from '@reduxjs/toolkit';
-import type { TabName } from "features/ui/store/uiTypes";
+import type { TabName } from 'features/ui/store/uiTypes';
 
 export const enqueueRequested = createAction<{
   tabName: TabName;

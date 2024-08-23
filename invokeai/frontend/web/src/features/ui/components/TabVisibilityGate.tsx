@@ -1,6 +1,6 @@
 import { Box } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import type { TabName } from "features/ui/store/uiTypes";
+import type { TabName } from 'features/ui/store/uiTypes';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 
