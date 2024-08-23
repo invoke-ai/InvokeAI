@@ -162,7 +162,7 @@ export const imagesApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, { imageDTO }) => {
         const categories = getCategories(imageDTO);
-        const boardId = imageDTO.board_id ?? undefined;
+        const boardId = imageDTO.board_id ?? 'none';
 
         return [
           { type: 'Image', id: imageDTO.image_name },
@@ -557,8 +557,6 @@ export const {
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
-  useAddImageToBoardMutation,
-  useRemoveImageFromBoardMutation,
   useChangeImageIsIntermediateMutation,
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
