@@ -18,6 +18,13 @@ type AddedRegionResult = {
   addedIPAdapters: number;
 };
 
+const isValidRegion = (rg: CanvasRegionalGuidanceState, base: BaseModelType) => {
+  const isEnabled = rg.isEnabled;
+  const hasTextPrompt = Boolean(rg.positivePrompt || rg.negativePrompt);
+  const hasIPAdapter = rg.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base)).length > 0;
+  return isEnabled && (hasTextPrompt || hasIPAdapter);
+};
+
 /**
  * Adds regional guidance to the graph
  * @param regions Array of regions to add
@@ -226,11 +233,4 @@ export const addRegions = async (
   g.upsertMetadata({ regions: validRegions });
 
   return results;
-};
-
-export const isValidRegion = (rg: CanvasRegionalGuidanceState, base: BaseModelType) => {
-  const isEnabled = rg.isEnabled;
-  const hasTextPrompt = Boolean(rg.positivePrompt || rg.negativePrompt);
-  const hasIPAdapter = rg.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base)).length > 0;
-  return isEnabled && (hasTextPrompt || hasIPAdapter);
 };
