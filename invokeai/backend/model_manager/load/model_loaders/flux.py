@@ -27,22 +27,21 @@ from invokeai.backend.model_manager.config import (
     CLIPEmbedDiffusersConfig,
     MainBnbQuantized4bCheckpointConfig,
     MainCheckpointConfig,
-    T5Encoder8bConfig,
+    T5EncoderBnbQuantizedLlmInt8bConfig,
     T5EncoderConfig,
     VAECheckpointConfig,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.quantization.bnb_llm_int8 import quantize_model_llm_int8
-from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 try:
+    from invokeai.backend.quantization.bnb_llm_int8 import quantize_model_llm_int8
     from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 
-    bnb_nf4_available = True
+    bnb_available = True
 except ImportError:
-    bnb_nf4_available = False
+    bnb_available = False
 
 app_config = get_config()
 
@@ -100,8 +99,8 @@ class ClipCheckpointModel(ModelLoader):
         )
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.T5Encoder8b)
-class T5Encoder8bCheckpointModel(ModelLoader):
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.BnbQuantizedLlmInt8b)
+class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
     """Class to load main models."""
 
     def _load_model(
@@ -109,9 +108,12 @@ class T5Encoder8bCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, T5Encoder8bConfig):
-            raise ValueError("Only T5Encoder8bConfig models are currently supported here.")
-
+        if not isinstance(config, T5EncoderBnbQuantizedLlmInt8bConfig):
+            raise ValueError("Only T5EncoderBnbQuantizedLlmInt8bConfig models are currently supported here.")
+        if not bnb_available:
+            raise ImportError(
+                "The bnb modules are not available. Please install bitsandbytes if available on your platform."
+            )
         match submodel_type:
             case SubModelType.Tokenizer2:
                 return T5Tokenizer.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
@@ -241,9 +243,9 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
         flux_conf: Any,
     ) -> AnyModel:
         assert isinstance(config, MainBnbQuantized4bCheckpointConfig)
-        if not bnb_nf4_available:
+        if not bnb_available:
             raise ImportError(
-                "The bnb_nf4 module is not available. Please install bitsandbytes if available on your platform."
+                "The bnb modules are not available. Please install bitsandbytes if available on your platform."
             )
         model_path = Path(config.path)
         dataclass_fields = {f.name for f in fields(FluxParams)}

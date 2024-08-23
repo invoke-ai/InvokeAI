@@ -66,7 +66,7 @@ t5_8b_quantized_encoder = StarterModel(
     source="InvokeAI/t5-v1_1-xxl::bnb_llm_int8",
     description="T5-XXL text encoder with bitsandbytes LLM.int8() quantization (used in FLUX pipelines). ~5GB",
     type=ModelType.T5Encoder,
-    format=ModelFormat.T5Encoder8b,
+    format=ModelFormat.BnbQuantizedLlmInt8b,
 )
 
 clip_l_encoder = StarterModel(

@@ -109,8 +109,7 @@ class ModelFormat(str, Enum):
     EmbeddingFolder = "embedding_folder"
     InvokeAI = "invokeai"
     T5Encoder = "t5_encoder"
-    T5Encoder8b = "t5_encoder_8b"
-    T5Encoder4b = "t5_encoder_4b"
+    BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
 
 
@@ -227,12 +226,12 @@ class T5EncoderConfig(T5EncoderConfigBase):
         return Tag(f"{ModelType.T5Encoder.value}.{ModelFormat.T5Encoder.value}")
 
 
-class T5Encoder8bConfig(T5EncoderConfigBase):
-    format: Literal[ModelFormat.T5Encoder8b] = ModelFormat.T5Encoder8b
+class T5EncoderBnbQuantizedLlmInt8bConfig(T5EncoderConfigBase):
+    format: Literal[ModelFormat.BnbQuantizedLlmInt8b] = ModelFormat.BnbQuantizedLlmInt8b
 
     @staticmethod
     def get_tag() -> Tag:
-        return Tag(f"{ModelType.T5Encoder.value}.{ModelFormat.T5Encoder8b.value}")
+        return Tag(f"{ModelType.T5Encoder.value}.{ModelFormat.BnbQuantizedLlmInt8b.value}")
 
 
 class LoRALyCORISConfig(LoRAConfigBase):
@@ -470,7 +469,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRALyCORISConfig, LoRALyCORISConfig.get_tag()],
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
         Annotated[T5EncoderConfig, T5EncoderConfig.get_tag()],
-        Annotated[T5Encoder8bConfig, T5Encoder8bConfig.get_tag()],
+        Annotated[T5EncoderBnbQuantizedLlmInt8bConfig, T5EncoderBnbQuantizedLlmInt8bConfig.get_tag()],
         Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],
         Annotated[TextualInversionFolderConfig, TextualInversionFolderConfig.get_tag()],
         Annotated[IPAdapterInvokeAIConfig, IPAdapterInvokeAIConfig.get_tag()],
