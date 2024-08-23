@@ -1,7 +1,7 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import type { IPMethodV2} from 'features/controlLayers/store/types';
+import type { IPMethodV2 } from 'features/controlLayers/store/types';
 import { isIPMethodV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

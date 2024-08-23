@@ -195,7 +195,7 @@ const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
       </MenuItem>
       <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToUpscale} id="send-to-upscale">
         {t('parameters.sendToUpscale')}
-        </MenuItem>
+      </MenuItem>
       <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToCanvas} id="send-to-canvas">
         {t('parameters.sendToUnifiedCanvas')}
       </MenuItem>
