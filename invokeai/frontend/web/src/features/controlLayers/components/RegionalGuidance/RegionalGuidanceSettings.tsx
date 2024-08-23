@@ -1,7 +1,7 @@
 import { Divider } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { AddPromptButtons } from 'features/controlLayers/components/AddPromptButtons';
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
+import { RegionalGuidanceAddPromptsIPAdapterButtons } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceAddPromptsIPAdapterButtons';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { selectRegionalGuidanceEntityOrThrow } from 'features/controlLayers/store/regionsReducers';
 import { memo } from 'react';
@@ -24,7 +24,9 @@ export const RegionalGuidanceSettings = memo(() => {
 
   return (
     <CanvasEntitySettingsWrapper>
-      {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <AddPromptButtons id={id} />}
+      {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && (
+        <RegionalGuidanceAddPromptsIPAdapterButtons id={id} />
+      )}
       {hasPositivePrompt && (
         <>
           <RegionalGuidancePositivePrompt id={id} />
