@@ -1715,8 +1715,6 @@ export type components = {
              * @default null
              */
             origin: string | null;
-            /** @constant */
-            __event_name__: "batch_enqueued";
         };
         /** BatchStatus */
         BatchStatus: {
@@ -2419,8 +2417,6 @@ export type components = {
              * @description The name of the bulk image download item
              */
             bulk_download_item_name: string;
-            /** @constant */
-            __event_name__: "bulk_download_complete";
         };
         /**
          * BulkDownloadErrorEvent
@@ -2452,8 +2448,6 @@ export type components = {
              * @description The error message
              */
             error: string;
-            /** @constant */
-            __event_name__: "bulk_download_error";
         };
         /**
          * BulkDownloadStartedEvent
@@ -2480,8 +2474,6 @@ export type components = {
              * @description The name of the bulk image download item
              */
             bulk_download_item_name: string;
-            /** @constant */
-            __event_name__: "bulk_download_started";
         };
         /** CLIPField */
         CLIPField: {
@@ -4894,8 +4886,6 @@ export type components = {
              * @description The source of the download
              */
             source: string;
-            /** @constant */
-            __event_name__: "download_cancelled";
         };
         /**
          * DownloadCompleteEvent
@@ -4922,8 +4912,6 @@ export type components = {
              * @description The total number of bytes downloaded
              */
             total_bytes: number;
-            /** @constant */
-            __event_name__: "download_complete";
         };
         /**
          * DownloadErrorEvent
@@ -4950,8 +4938,6 @@ export type components = {
              * @description The error message
              */
             error: string;
-            /** @constant */
-            __event_name__: "download_error";
         };
         /**
          * DownloadJob
@@ -5071,8 +5057,6 @@ export type components = {
              * @description The total number of bytes to be downloaded
              */
             total_bytes: number;
-            /** @constant */
-            __event_name__: "download_progress";
         };
         /**
          * DownloadStartedEvent
@@ -5094,8 +5078,6 @@ export type components = {
              * @description The local path where the download is saved
              */
             download_path: string;
-            /** @constant */
-            __event_name__: "download_started";
         };
         /**
          * Dynamic Prompt
@@ -8380,8 +8362,6 @@ export type components = {
              * @description The result of the invocation
              */
             result: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CanvasV2MaskAndCropOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"];
-            /** @constant */
-            __event_name__: "invocation_complete";
         };
         /**
          * InvocationDenoiseProgressEvent
@@ -8451,8 +8431,6 @@ export type components = {
              * @description The percentage of completion of the invocation
              */
             percentage: number;
-            /** @constant */
-            __event_name__: "invocation_denoise_progress";
         };
         /**
          * InvocationErrorEvent
@@ -8527,8 +8505,6 @@ export type components = {
              * @default null
              */
             project_id: string | null;
-            /** @constant */
-            __event_name__: "invocation_error";
         };
         InvocationOutputMap: {
             add: components["schemas"]["IntegerOutput"];
@@ -8724,8 +8700,6 @@ export type components = {
              * @description The ID of the prepared invocation's source node
              */
             invocation_source_id: string;
-            /** @constant */
-            __event_name__: "invocation_started";
         };
         /**
          * IterateInvocation
@@ -10688,8 +10662,6 @@ export type components = {
              * @description Source of the model; local path, repo_id or url
              */
             source: string;
-            /** @constant */
-            __event_name__: "model_install_cancelled";
         };
         /**
          * ModelInstallCompleteEvent
@@ -10721,8 +10693,6 @@ export type components = {
              * @description Size of the model (may be None for installation of a local path)
              */
             total_bytes: number | null;
-            /** @constant */
-            __event_name__: "model_install_complete";
         };
         /**
          * ModelInstallDownloadProgressEvent
@@ -10766,8 +10736,6 @@ export type components = {
             parts: {
                 [key: string]: number | string;
             }[];
-            /** @constant */
-            __event_name__: "model_install_download_progress";
         };
         /**
          * ModelInstallDownloadStartedEvent
@@ -10811,8 +10779,6 @@ export type components = {
             parts: {
                 [key: string]: number | string;
             }[];
-            /** @constant */
-            __event_name__: "model_install_download_started";
         };
         /**
          * ModelInstallDownloadsCompleteEvent
@@ -10834,8 +10800,6 @@ export type components = {
              * @description Source of the model; local path, repo_id or url
              */
             source: string;
-            /** @constant */
-            __event_name__: "model_install_downloads_complete";
         };
         /**
          * ModelInstallErrorEvent
@@ -10867,8 +10831,6 @@ export type components = {
              * @description A text description of the exception
              */
             error: string;
-            /** @constant */
-            __event_name__: "model_install_error";
         };
         /**
          * ModelInstallJob
@@ -10967,8 +10929,6 @@ export type components = {
              * @description Source of the model; local path, repo_id or url
              */
             source: string;
-            /** @constant */
-            __event_name__: "model_install_started";
         };
         /**
          * ModelLoadCompleteEvent
@@ -10990,8 +10950,6 @@ export type components = {
              * @default null
              */
             submodel_type: components["schemas"]["SubModelType"] | null;
-            /** @constant */
-            __event_name__: "model_load_complete";
         };
         /**
          * ModelLoadStartedEvent
@@ -11013,8 +10971,6 @@ export type components = {
              * @default null
              */
             submodel_type: components["schemas"]["SubModelType"] | null;
-            /** @constant */
-            __event_name__: "model_load_started";
         };
         /**
          * ModelLoaderOutput
@@ -11676,15 +11632,7 @@ export type components = {
              * @description The ID of the queue
              */
             queue_id: string;
-            /** @constant */
-            __event_name__: "queue_cleared";
         };
-        /**
-         * QueueItemOrigin
-         * @description The origin of a batch. For example, a batch can be created from the canvas or workflows tab.
-         * @enum {string}
-         */
-        QueueItemOrigin: "canvas" | "workflows";
         /**
          * QueueItemStatusChangedEvent
          * @description Event model for queue_item_status_changed
@@ -11773,8 +11721,6 @@ export type components = {
              * @description The ID of the session (aka graph execution state)
              */
             session_id: string;
-            /** @constant */
-            __event_name__: "queue_item_status_changed";
         };
         /**
          * Random Float
@@ -17727,7 +17673,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description The origin to cancel all queue items for */
-                origin: components["schemas"]["QueueItemOrigin"];
+                origin: string;
             };
             header?: never;
             path: {
