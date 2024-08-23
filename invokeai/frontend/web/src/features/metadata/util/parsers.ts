@@ -1,6 +1,11 @@
 import { getCAId, getImageObjectId, getIPAId, getLayerId } from 'features/controlLayers/konva/naming';
 import { defaultLoRAConfig } from 'features/controlLayers/store/lorasReducers';
-import type { CanvasControlAdapterState, CanvasIPAdapterState, CanvasRasterLayerState, LoRA } from 'features/controlLayers/store/types';
+import type {
+  CanvasControlAdapterState,
+  CanvasIPAdapterState,
+  CanvasRasterLayerState,
+  LoRA,
+} from 'features/controlLayers/store/types';
 import {
   IMAGE_FILTERS,
   imageDTOToImageWithDims,
@@ -424,7 +429,8 @@ const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (
 };
 
 //#region Control Layers
-const parseLayer: MetadataParseFunc<CanvasRasterLayerState> = async (metadataItem) => zCanvasRasterLayerState.parseAsync(metadataItem);
+const parseLayer: MetadataParseFunc<CanvasRasterLayerState> = (metadataItem) =>
+  zCanvasRasterLayerState.parseAsync(metadataItem);
 
 const parseLayers: MetadataParseFunc<CanvasRasterLayerState[]> = async (metadata) => {
   // We need to support recalling pre-Control Layers metadata into Control Layers. A separate set of parsers handles
@@ -559,9 +565,7 @@ const parseControlNetToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapt
     .parse(await getProperty(metadataItem, 'control_mode'));
 
   const defaultPreprocessor = controlNetModel.default_settings?.preprocessor;
-  const processorConfig = isFilterType(defaultPreprocessor)
-    ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults()
-    : null;
+  const processorConfig = isFilterType(defaultPreprocessor) ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults() : null;
   const beginEndStepPct: [number, number] = [
     begin_step_percent ?? initialControlNet.beginEndStepPct[0],
     end_step_percent ?? initialControlNet.beginEndStepPct[1],
@@ -620,9 +624,7 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapt
     .parse(await getProperty(metadataItem, 'end_step_percent'));
 
   const defaultPreprocessor = t2iAdapterModel.default_settings?.preprocessor;
-  const processorConfig = isFilterType(defaultPreprocessor)
-    ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults()
-    : null;
+  const processorConfig = isFilterType(defaultPreprocessor) ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults() : null;
   const beginEndStepPct: [number, number] = [
     begin_step_percent ?? initialT2IAdapter.beginEndStepPct[0],
     end_step_percent ?? initialT2IAdapter.beginEndStepPct[1],

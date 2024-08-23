@@ -16,7 +16,7 @@ export const HuggingFaceForm = memo(() => {
   const [_getHuggingFaceModels, { isLoading, data }] = useLazyGetHuggingFaceModelsQuery();
   const [installModel] = useInstallModel();
 
-  const getModels = useCallback(async () => {
+  const getModels = useCallback(() => {
     _getHuggingFaceModels(huggingFaceRepo)
       .unwrap()
       .then((response) => {
