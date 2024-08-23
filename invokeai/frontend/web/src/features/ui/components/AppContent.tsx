@@ -18,8 +18,8 @@ import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { $isGalleryPanelOpen, $isParametersPanelOpen } from 'features/ui/store/uiSlice';
+import type { TabName } from "features/ui/store/uiTypes";
 import type { CSSProperties } from 'react';
 import { memo, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -29,8 +29,8 @@ import { Panel, PanelGroup } from 'react-resizable-panels';
 import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 import ResizeHandle from './tabs/ResizeHandle';
 
-const TABS_WITH_GALLERY_PANEL: InvokeTabName[] = ['generation', 'upscaling', 'workflows'] as const;
-const TABS_WITH_OPTIONS_PANEL: InvokeTabName[] = ['generation', 'upscaling', 'workflows'] as const;
+const TABS_WITH_GALLERY_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
+const TABS_WITH_OPTIONS_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%' };
 const GALLERY_MIN_SIZE_PX = 310;
@@ -38,8 +38,8 @@ const GALLERY_MIN_SIZE_PCT = 20;
 const OPTIONS_PANEL_MIN_SIZE_PX = 430;
 const OPTIONS_PANEL_MIN_SIZE_PCT = 20;
 
-export const onGalleryPanelCollapse = (isCollapsed: boolean) => $isGalleryPanelOpen.set(!isCollapsed);
-export const onParametersPanelCollapse = (isCollapsed: boolean) => $isParametersPanelOpen.set(!isCollapsed);
+const onGalleryPanelCollapse = (isCollapsed: boolean) => $isGalleryPanelOpen.set(!isCollapsed);
+const onParametersPanelCollapse = (isCollapsed: boolean) => $isParametersPanelOpen.set(!isCollapsed);
 
 export const AppContent = memo(() => {
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);

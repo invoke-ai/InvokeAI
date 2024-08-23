@@ -19,8 +19,8 @@ import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePre
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
 import { setActiveTab } from 'features/ui/store/uiSlice';
+import type { TabName } from 'features/ui/store/uiTypes';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
@@ -42,7 +42,7 @@ interface Props {
   };
   selectedWorkflowId?: string;
   selectedStylePresetId?: string;
-  destination?: InvokeTabName | undefined;
+  destination?: TabName;
 }
 
 const App = ({
