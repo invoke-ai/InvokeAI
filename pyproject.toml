@@ -38,8 +38,7 @@ dependencies = [
   "clip_anytorch==2.6.0",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
-  # TODO(ryand): Bump this once the next diffusers release is ready.
-  "diffusers[torch] @ git+https://github.com/huggingface/diffusers.git@4c6152c2fb0ade468aadb417102605a07a8635d3",
+  "diffusers[torch]==0.27.2",
   "flux @ git+https://github.com/black-forest-labs/flux.git@c23ae247225daba30fbd56058d247cc1b1fc20a3",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.7",          # needed for "mediapipeface" controlnet model
@@ -47,7 +46,6 @@ dependencies = [
   "onnx==1.15.0",
   "onnxruntime==1.16.3",
   "opencv-python==4.9.0.80",
-  "optimum-quanto==0.2.4",
   "pytorch-lightning==2.1.3",
   "safetensors==0.4.3",
   # sentencepiece is required to load T5TokenizerFast (used by FLUX).
