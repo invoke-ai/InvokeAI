@@ -35,13 +35,12 @@ export const EntityLayerAdapterGate = memo(({ children }: PropsWithChildren) => 
 
 EntityLayerAdapterGate.displayName = 'EntityLayerAdapterGate';
 
-/** @knipignore */
-export const useEntityLayerAdapter = (): CanvasLayerAdapter => {
-  const adapter = useContext(EntityAdapterContext);
-  assert(adapter, 'useEntityLayerAdapter must be used within a EntityLayerAdapterGate');
-  assert(adapter.type === 'layer_adapter', 'useEntityLayerAdapter must be used with a layer adapter');
-  return adapter;
-};
+// export const useEntityLayerAdapter = (): CanvasLayerAdapter => {
+//   const adapter = useContext(EntityAdapterContext);
+//   assert(adapter, 'useEntityLayerAdapter must be used within a EntityLayerAdapterGate');
+//   assert(adapter.type === 'layer_adapter', 'useEntityLayerAdapter must be used with a layer adapter');
+//   return adapter;
+// };
 
 export const EntityMaskAdapterGate = memo(({ children }: PropsWithChildren) => {
   const canvasManager = useCanvasManager();
@@ -69,13 +68,12 @@ export const EntityMaskAdapterGate = memo(({ children }: PropsWithChildren) => {
 
 EntityMaskAdapterGate.displayName = 'EntityMaskAdapterGate';
 
-/** @knipignore */
-export const useEntityMaskAdapter = (): CanvasMaskAdapter => {
-  const adapter = useContext(EntityAdapterContext);
-  assert(adapter, 'useEntityMaskAdapter must be used within a CanvasMaskAdapterGate');
-  assert(adapter.type === 'mask_adapter', 'useEntityMaskAdapter must be used with a mask adapter');
-  return adapter;
-};
+// export const useEntityMaskAdapter = (): CanvasMaskAdapter => {
+//   const adapter = useContext(EntityAdapterContext);
+//   assert(adapter, 'useEntityMaskAdapter must be used within a CanvasMaskAdapterGate');
+//   assert(adapter.type === 'mask_adapter', 'useEntityMaskAdapter must be used with a mask adapter');
+//   return adapter;
+// };
 
 export const useEntityAdapter = (): CanvasLayerAdapter | CanvasMaskAdapter => {
   const adapter = useContext(EntityAdapterContext);
