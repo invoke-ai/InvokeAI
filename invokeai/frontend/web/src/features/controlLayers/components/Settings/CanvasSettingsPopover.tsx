@@ -14,6 +14,7 @@ import { CanvasSettingsClearCachesButton } from 'features/controlLayers/componen
 import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsClipToBboxCheckbox';
 import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsDynamicGridSwitch';
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
+import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsResetButton } from 'features/controlLayers/components/Settings/CanvasSettingsResetButton';
 import { memo } from 'react';
@@ -58,6 +59,7 @@ const DebugSettings = () => {
       <Divider />
       <CanvasSettingsClearCachesButton />
       <CanvasSettingsRecalculateRectsButton />
+      <CanvasSettingsLogDebugInfoButton />
     </>
   );
 };
