@@ -12038,12 +12038,6 @@ export type components = {
             queue_id: string;
         };
         /**
-         * QueueItemOrigin
-         * @description The origin of a batch. For example, a batch can be created from the canvas or workflows tab.
-         * @enum {string}
-         */
-        QueueItemOrigin: "canvas" | "workflows";
-        /**
          * QueueItemStatusChangedEvent
          * @description Event model for queue_item_status_changed
          */
@@ -18219,7 +18213,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description The origin to cancel all queue items for */
-                origin: components["schemas"]["QueueItemOrigin"];
+                origin: string;
             };
             header?: never;
             path: {
