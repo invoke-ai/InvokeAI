@@ -341,15 +341,7 @@ export const canvasV2Slice = createSlice({
       if (!entity) {
         return;
       }
-      if (entity.type === 'raster_layer') {
-        moveOneToEnd(state.rasterLayers.entities, entity);
-      } else if (entity.type === 'control_layer') {
-        moveOneToEnd(state.controlLayers.entities, entity);
-      } else if (entity.type === 'regional_guidance') {
-        moveOneToEnd(state.regions.entities, entity);
-      } else if (entity.type === 'inpaint_mask') {
-        moveOneToEnd(state.inpaintMasks.entities, entity);
-      }
+      moveOneToEnd(selectAllEntitiesOfType(state, entity.type), entity);
     },
     entityArrangedToFront: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
@@ -357,15 +349,7 @@ export const canvasV2Slice = createSlice({
       if (!entity) {
         return;
       }
-      if (entity.type === 'raster_layer') {
-        moveToEnd(state.rasterLayers.entities, entity);
-      } else if (entity.type === 'control_layer') {
-        moveToEnd(state.controlLayers.entities, entity);
-      } else if (entity.type === 'regional_guidance') {
-        moveToEnd(state.regions.entities, entity);
-      } else if (entity.type === 'inpaint_mask') {
-        moveToEnd(state.inpaintMasks.entities, entity);
-      }
+      moveToEnd(selectAllEntitiesOfType(state, entity.type), entity);
     },
     entityArrangedBackwardOne: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
@@ -373,15 +357,7 @@ export const canvasV2Slice = createSlice({
       if (!entity) {
         return;
       }
-      if (entity.type === 'raster_layer') {
-        moveOneToStart(state.rasterLayers.entities, entity);
-      } else if (entity.type === 'control_layer') {
-        moveOneToStart(state.controlLayers.entities, entity);
-      } else if (entity.type === 'regional_guidance') {
-        moveOneToStart(state.regions.entities, entity);
-      } else if (entity.type === 'inpaint_mask') {
-        moveOneToStart(state.inpaintMasks.entities, entity);
-      }
+      moveOneToStart(selectAllEntitiesOfType(state, entity.type), entity);
     },
     entityArrangedToBack: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
@@ -389,15 +365,7 @@ export const canvasV2Slice = createSlice({
       if (!entity) {
         return;
       }
-      if (entity.type === 'raster_layer') {
-        moveToStart(state.rasterLayers.entities, entity);
-      } else if (entity.type === 'control_layer') {
-        moveToStart(state.controlLayers.entities, entity);
-      } else if (entity.type === 'regional_guidance') {
-        moveToStart(state.regions.entities, entity);
-      } else if (entity.type === 'inpaint_mask') {
-        moveToStart(state.inpaintMasks.entities, entity);
-      }
+      moveToStart(selectAllEntitiesOfType(state, entity.type), entity);
     },
     entityOpacityChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ opacity: number }>>) => {
       const { entityIdentifier, opacity } = action.payload;
@@ -538,7 +506,7 @@ export const {
   rgNegativePromptChanged,
   rgFillColorChanged,
   rgFillStyleChanged,
-  rgAutoNegativeChanged,
+  rgAutoNegativeToggled,
   rgIPAdapterAdded,
   rgIPAdapterDeleted,
   rgIPAdapterImageChanged,

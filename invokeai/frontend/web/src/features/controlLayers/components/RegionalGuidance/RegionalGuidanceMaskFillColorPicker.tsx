@@ -2,7 +2,6 @@ import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@inv
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/RgbColorPicker';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import { stopPropagation } from 'common/util/stopPropagation';
 import { MaskFillStyle } from 'features/controlLayers/components/common/MaskFillStyle';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rgFillColorChanged, rgFillStyleChanged } from 'features/controlLayers/store/canvasV2Slice';
@@ -37,10 +36,9 @@ export const RegionalGuidanceMaskFillColorPicker = memo(() => {
           borderRadius="full"
           borderWidth={1}
           bg={rgbColorToString(fill.color)}
-          w={8}
-          h={8}
+          w="22px"
+          h="22px"
           tabIndex={-1}
-          onDoubleClick={stopPropagation} // double click expands the layer
         />
       </PopoverTrigger>
       <PopoverContent>
