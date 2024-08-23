@@ -11,8 +11,8 @@ import { PiCheckBold, PiShootingStarBold, PiXBold } from 'react-icons/pi';
 export const Filter = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
-  const adapter = useStore(canvasManager.filter.$adapter);
   const config = useStore(canvasManager.filter.$config);
+  const isFiltering = useStore(canvasManager.filter.$isFiltering);
   const isProcessing = useStore(canvasManager.filter.$isProcessing);
 
   const previewFilter = useCallback(() => {
@@ -41,7 +41,7 @@ export const Filter = memo(() => {
     [canvasManager.filter.$config]
   );
 
-  if (!adapter) {
+  if (!isFiltering) {
     return null;
   }
 
