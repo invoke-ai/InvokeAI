@@ -10,7 +10,7 @@ import {
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import ClearQueueConfirmationAlertDialog from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { useClearQueueConfirmationAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
@@ -26,7 +26,7 @@ export const QueueActionsMenuButton = memo(() => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const clearQueueDisclosure = useDisclosure();
+  const dialogState = useClearQueueConfirmationAlertDialog();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
   const { queueSize } = useGetQueueStatusQuery(undefined, {
@@ -51,15 +51,13 @@ export const QueueActionsMenuButton = memo(() => {
 
   return (
     <Box pos="relative">
-      <ClearQueueConfirmationAlertDialog disclosure={clearQueueDisclosure} />
-
       <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose} placement="bottom-end">
         <MenuButton as={IconButton} aria-label="Queue Actions Menu" icon={<RiListCheck />} />
         <MenuList>
           <MenuItem
             isDestructive
             icon={<PiTrashSimpleBold size="16px" />}
-            onClick={clearQueueDisclosure.onOpen}
+            onClick={dialogState.setTrue}
             isLoading={isLoadingClearQueue}
             isDisabled={isDisabledClearQueue}
           >
