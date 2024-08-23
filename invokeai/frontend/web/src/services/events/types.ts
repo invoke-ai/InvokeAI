@@ -1,35 +1,34 @@
 import type { S } from 'services/api/types';
 
-export type ModelLoadStartedEvent = S['ModelLoadStartedEvent'];
-export type ModelLoadCompleteEvent = S['ModelLoadCompleteEvent'];
+type ModelLoadStartedEvent = S['ModelLoadStartedEvent'];
+type ModelLoadCompleteEvent = S['ModelLoadCompleteEvent'];
 
-export type InvocationStartedEvent = S['InvocationStartedEvent'];
-export type InvocationDenoiseProgressEvent = S['InvocationDenoiseProgressEvent'];
-export type InvocationCompleteEvent = S['InvocationCompleteEvent'];
-export type InvocationErrorEvent = S['InvocationErrorEvent'];
-export type ProgressImage = InvocationDenoiseProgressEvent['progress_image'];
+type InvocationStartedEvent = S['InvocationStartedEvent'];
+type InvocationDenoiseProgressEvent = S['InvocationDenoiseProgressEvent'];
+type InvocationCompleteEvent = S['InvocationCompleteEvent'];
+type InvocationErrorEvent = S['InvocationErrorEvent'];
 
-export type ModelInstallDownloadStartedEvent = S['ModelInstallDownloadStartedEvent'];
-export type ModelInstallDownloadProgressEvent = S['ModelInstallDownloadProgressEvent'];
-export type ModelInstallDownloadsCompleteEvent = S['ModelInstallDownloadsCompleteEvent'];
-export type ModelInstallCompleteEvent = S['ModelInstallCompleteEvent'];
-export type ModelInstallErrorEvent = S['ModelInstallErrorEvent'];
-export type ModelInstallStartedEvent = S['ModelInstallStartedEvent'];
-export type ModelInstallCancelledEvent = S['ModelInstallCancelledEvent'];
+type ModelInstallDownloadStartedEvent = S['ModelInstallDownloadStartedEvent'];
+type ModelInstallDownloadProgressEvent = S['ModelInstallDownloadProgressEvent'];
+type ModelInstallDownloadsCompleteEvent = S['ModelInstallDownloadsCompleteEvent'];
+type ModelInstallCompleteEvent = S['ModelInstallCompleteEvent'];
+type ModelInstallErrorEvent = S['ModelInstallErrorEvent'];
+type ModelInstallStartedEvent = S['ModelInstallStartedEvent'];
+type ModelInstallCancelledEvent = S['ModelInstallCancelledEvent'];
 
-export type DownloadStartedEvent = S['DownloadStartedEvent'];
-export type DownloadProgressEvent = S['DownloadProgressEvent'];
-export type DownloadCompleteEvent = S['DownloadCompleteEvent'];
-export type DownloadCancelledEvent = S['DownloadCancelledEvent'];
-export type DownloadErrorEvent = S['DownloadErrorEvent'];
+type DownloadStartedEvent = S['DownloadStartedEvent'];
+type DownloadProgressEvent = S['DownloadProgressEvent'];
+type DownloadCompleteEvent = S['DownloadCompleteEvent'];
+type DownloadCancelledEvent = S['DownloadCancelledEvent'];
+type DownloadErrorEvent = S['DownloadErrorEvent'];
 
-export type QueueItemStatusChangedEvent = S['QueueItemStatusChangedEvent'];
-export type QueueClearedEvent = S['QueueClearedEvent'];
-export type BatchEnqueuedEvent = S['BatchEnqueuedEvent'];
+type QueueItemStatusChangedEvent = S['QueueItemStatusChangedEvent'];
+type QueueClearedEvent = S['QueueClearedEvent'];
+type BatchEnqueuedEvent = S['BatchEnqueuedEvent'];
 
-export type BulkDownloadStartedEvent = S['BulkDownloadStartedEvent'];
-export type BulkDownloadCompleteEvent = S['BulkDownloadCompleteEvent'];
-export type BulkDownloadFailedEvent = S['BulkDownloadErrorEvent'];
+type BulkDownloadStartedEvent = S['BulkDownloadStartedEvent'];
+type BulkDownloadCompleteEvent = S['BulkDownloadCompleteEvent'];
+type BulkDownloadFailedEvent = S['BulkDownloadErrorEvent'];
 
 type ClientEmitSubscribeQueue = {
   queue_id: string;
