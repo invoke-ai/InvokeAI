@@ -6,7 +6,7 @@ import { appInfoApi } from 'services/api/endpoints/appInfo';
 export const addAppConfigReceivedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: appInfoApi.endpoints.getAppConfig.matchFulfilled,
-    effect: async (action, { getState, dispatch }) => {
+    effect: (action, { getState, dispatch }) => {
       const { infill_methods = [], nsfw_methods = [], watermarking_methods = [] } = action.payload;
       const infillMethod = getState().canvasV2.compositing.infillMethod;
 

@@ -6,7 +6,7 @@ import { imagesToDeleteSelected, isModalOpenChanged } from 'features/deleteImage
 export const addImageToDeleteSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: imagesToDeleteSelected,
-    effect: async (action, { dispatch, getState }) => {
+    effect: (action, { dispatch, getState }) => {
       const imageDTOs = action.payload;
       const state = getState();
       const { shouldConfirmOnDelete } = state.system;

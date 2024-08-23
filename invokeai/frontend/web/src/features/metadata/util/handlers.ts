@@ -48,7 +48,7 @@ const renderControlAdapterValue: MetadataRenderValueFunc<AnyControlAdapterConfig
     return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
   }
 };
-const renderLayerValue: MetadataRenderValueFunc<CanvasRasterLayerState> = async (layer) => {
+const renderLayerValue: MetadataRenderValueFunc<CanvasRasterLayerState> = (layer) => {
   if (layer.type === 'initial_image_layer') {
     let rendered = t('controlLayers.globalInitialImageLayer');
     if (layer.image) {
@@ -88,7 +88,7 @@ const renderLayerValue: MetadataRenderValueFunc<CanvasRasterLayerState> = async 
   }
   assert(false, 'Unknown layer type');
 };
-const renderLayersValue: MetadataRenderValueFunc<CanvasRasterLayerState[]> = async (layers) => {
+const renderLayersValue: MetadataRenderValueFunc<CanvasRasterLayerState[]> = (layers) => {
   return `${layers.length} ${t('controlLayers.layers', { count: layers.length })}`;
 };
 
@@ -178,7 +178,10 @@ const buildRecallItem =
     }
   };
 
-const resolveToString = (value: unknown) => new Promise<string>((resolve) => resolve(String(value)));
+const resolveToString = (value: unknown) =>
+  new Promise<string>((resolve) => {
+    resolve(String(value));
+  });
 
 const buildHandlers: BuildMetadataHandlers = ({
   getLabel,
@@ -395,7 +398,7 @@ export const parseAndRecallPrompts = async (metadata: unknown) => {
   }
 };
 
-export const parseAndRecallImageDimensions = async (metadata: unknown) => {
+export const parseAndRecallImageDimensions = (metadata: unknown) => {
   const recalled = recallKeys(['width', 'height'], metadata);
   if (size(recalled) > 0) {
     parameterSetToast(t('metadata.imageDimensions'));

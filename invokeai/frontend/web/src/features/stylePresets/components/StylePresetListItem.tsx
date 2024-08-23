@@ -41,7 +41,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
     [preset]
   );
 
-  const handleClickApply = useCallback(async () => {
+  const handleClickApply = useCallback(() => {
     dispatch(activeStylePresetIdChanged(preset.id));
     $isMenuOpen.set(false);
   }, [dispatch, preset.id]);

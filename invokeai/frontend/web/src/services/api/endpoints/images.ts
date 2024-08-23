@@ -52,7 +52,7 @@ export const imagesApi = api.injectEndpoints({
           'FetchOnReconnect',
         ];
       },
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+      onQueryStarted(_, { dispatch, queryFulfilled }) {
         // Populate the getImageDTO cache with these images. This makes image selection smoother, because it doesn't
         // need to re-fetch image data when the user selects an image. The getImageDTO cache keeps data for the default
         // of 60s, so this data won't stick around too long.

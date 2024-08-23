@@ -78,8 +78,14 @@ describe('validateWorkflow', () => {
     ],
     edges: [],
   };
-  const resolveTrue = async (): Promise<boolean> => new Promise((resolve) => resolve(true));
-  const resolveFalse = async (): Promise<boolean> => new Promise((resolve) => resolve(false));
+  const resolveTrue = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      resolve(true);
+    });
+  const resolveFalse = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      resolve(false);
+    });
   it('should reset images that are inaccessible', async () => {
     const validationResult = await validateWorkflow(
       workflow,
