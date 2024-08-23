@@ -174,16 +174,16 @@ export class CanvasStateApiModule {
 
     if (identifier.type === 'raster_layer') {
       entityState = state.rasterLayers.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.manager.rasterLayerAdapters.get(identifier.id) ?? null;
+      entityAdapter = this.manager.adapters.rasterLayers.get(identifier.id) ?? null;
     } else if (identifier.type === 'control_layer') {
       entityState = state.controlLayers.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.manager.controlLayerAdapters.get(identifier.id) ?? null;
+      entityAdapter = this.manager.adapters.controlLayers.get(identifier.id) ?? null;
     } else if (identifier.type === 'regional_guidance') {
       entityState = state.regions.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.manager.regionalGuidanceAdapters.get(identifier.id) ?? null;
+      entityAdapter = this.manager.adapters.regionMasks.get(identifier.id) ?? null;
     } else if (identifier.type === 'inpaint_mask') {
       entityState = state.inpaintMasks.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.manager.inpaintMaskAdapters.get(identifier.id) ?? null;
+      entityAdapter = this.manager.adapters.inpaintMasks.get(identifier.id) ?? null;
     }
 
     if (entityState && entityAdapter) {

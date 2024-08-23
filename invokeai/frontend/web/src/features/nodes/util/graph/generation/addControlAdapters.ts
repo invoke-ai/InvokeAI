@@ -23,7 +23,7 @@ export const addControlAdapters = async (
     .filter((layer) => isValidControlAdapter(layer.controlAdapter, base));
 
   for (const layer of validControlLayers) {
-    const adapter = manager.controlLayerAdapters.get(layer.id);
+    const adapter = manager.adapters.controlLayers.get(layer.id);
     assert(adapter, 'Adapter not found');
     const imageDTO = await adapter.renderer.rasterize({ rect: bbox, attrs: { opacity: 1, filters: [] } });
     if (layer.controlAdapter.type === 'controlnet') {
