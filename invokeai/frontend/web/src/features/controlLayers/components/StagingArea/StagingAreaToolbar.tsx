@@ -1,7 +1,7 @@
 import { Button, ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
+import { INTERACTION_SCOPES, useScopeOnMount } from 'common/hooks/interactionScopes';
 import {
   $shouldShowStagedImage,
   sessionNextStagedImageSelected,
@@ -35,6 +35,7 @@ export const StagingAreaToolbar = memo(() => {
   }, [images, session.selectedStagedImageIndex]);
   const isCanvasActive = useStore(INTERACTION_SCOPES.canvas.$isActive);
   const [changeIsImageIntermediate] = useChangeImageIsIntermediateMutation();
+  useScopeOnMount('stagingArea');
 
   const { t } = useTranslation();
 

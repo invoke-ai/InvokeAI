@@ -12,12 +12,12 @@ import { useListImagesQuery } from 'services/api/endpoints/images';
 
 const $leftRightHotkeysEnabled = computed($activeScopes, (activeScopes) => {
   // The left and right hotkeys can be used when the gallery is focused and the canvas is not focused, OR when the image viewer is focused.
-  return (!activeScopes.has('staging-area') && !activeScopes.has('canvas')) || activeScopes.has('imageViewer');
+  return !activeScopes.has('canvas') || activeScopes.has('imageViewer');
 });
 
 const $upDownHotkeysEnabled = computed([$activeScopes, $isGalleryPanelOpen], (activeScopes, isGalleryPanelOpen) => {
   // The up and down hotkeys can be used when the gallery is focused and the canvas is not focused, and the gallery panel is open.
-  return !activeScopes.has('staging-area') && !activeScopes.has('canvas') && isGalleryPanelOpen;
+  return !activeScopes.has('canvas') && isGalleryPanelOpen;
 });
 
 /**

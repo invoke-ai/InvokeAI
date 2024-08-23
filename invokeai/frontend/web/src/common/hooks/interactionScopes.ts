@@ -9,7 +9,7 @@ import { useEffect, useMemo } from 'react';
 
 const log = logger('system');
 
-const _INTERACTION_SCOPES = ['gallery', 'canvas', 'workflows', 'imageViewer'] as const;
+const _INTERACTION_SCOPES = ['gallery', 'canvas', 'stagingArea', 'workflows', 'imageViewer'] as const;
 
 type InteractionScope = (typeof _INTERACTION_SCOPES)[number];
 
