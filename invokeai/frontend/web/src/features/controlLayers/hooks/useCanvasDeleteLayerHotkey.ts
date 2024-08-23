@@ -28,5 +28,8 @@ export function useCanvasDeleteLayerHotkey() {
     [selectedEntityIdentifier, isStaging]
   );
 
-  useHotkeys('shift+d', deleteSelectedLayer, { enabled: isDeleteEnabled }, [isDeleteEnabled, deleteSelectedLayer]);
+  useHotkeys(['delete', 'backspace'], deleteSelectedLayer, { enabled: isDeleteEnabled }, [
+    isDeleteEnabled,
+    deleteSelectedLayer,
+  ]);
 }

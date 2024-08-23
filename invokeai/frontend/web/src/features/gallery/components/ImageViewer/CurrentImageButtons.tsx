@@ -101,7 +101,7 @@ const CurrentImageButtons = () => {
     [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected, isImageViewerActive]
   );
 
-  useHotkeys('delete', handleDelete, { enabled: isImageViewerActive }, [imageDTO, isImageViewerActive]);
+  useHotkeys(['delete', 'backspace'], handleDelete, { enabled: isImageViewerActive }, [imageDTO, isImageViewerActive]);
 
   return (
     <>
