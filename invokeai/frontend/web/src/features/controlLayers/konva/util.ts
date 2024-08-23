@@ -208,7 +208,7 @@ export const downloadBlob = (blob: Blob, fileName: string) => {
 /**
  * Gets an ImageData object from an image dataURL by drawing it to a canvas.
  */
-export const dataURLToImageData = async (dataURL: string, width: number, height: number): Promise<ImageData> => {
+export const dataURLToImageData = (dataURL: string, width: number, height: number): Promise<ImageData> => {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
     canvas.width = width;

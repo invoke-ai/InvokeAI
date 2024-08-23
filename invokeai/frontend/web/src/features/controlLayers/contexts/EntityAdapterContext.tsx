@@ -35,6 +35,7 @@ export const EntityLayerAdapterGate = memo(({ children }: PropsWithChildren) => 
 
 EntityLayerAdapterGate.displayName = 'EntityLayerAdapterGate';
 
+/** @knipignore */
 export const useEntityLayerAdapter = (): CanvasLayerAdapter => {
   const adapter = useContext(EntityAdapterContext);
   assert(adapter, 'useEntityLayerAdapter must be used within a EntityLayerAdapterGate');
@@ -68,6 +69,7 @@ export const EntityMaskAdapterGate = memo(({ children }: PropsWithChildren) => {
 
 EntityMaskAdapterGate.displayName = 'EntityMaskAdapterGate';
 
+/** @knipignore */
 export const useEntityMaskAdapter = (): CanvasMaskAdapter => {
   const adapter = useContext(EntityAdapterContext);
   assert(adapter, 'useEntityMaskAdapter must be used within a CanvasMaskAdapterGate');
