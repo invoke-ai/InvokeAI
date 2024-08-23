@@ -4,8 +4,8 @@ from PIL import Image
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
-    ConditioningField,
     FieldDescriptions,
+    FluxConditioningField,
     Input,
     InputField,
     WithBoard,
@@ -41,7 +41,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.vae,
         input=Input.Connection,
     )
-    positive_text_conditioning: ConditioningField = InputField(
+    positive_text_conditioning: FluxConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")

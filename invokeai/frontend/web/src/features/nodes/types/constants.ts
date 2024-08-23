@@ -52,6 +52,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   CLIPField: 'green.500',
   ColorField: 'pink.300',
   ConditioningField: 'cyan.500',
+  FluxConditioningField: 'cyan.500',
   ControlField: 'teal.500',
   ControlNetModelField: 'teal.500',
   EnumField: 'blue.500',
