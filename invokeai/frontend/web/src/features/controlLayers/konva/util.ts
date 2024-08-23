@@ -1,5 +1,5 @@
-import type { Coordinate, Rect, RgbaColor } from 'features/controlLayers/store/types';
-import Konva from 'konva';
+import type { Coordinate, Rect } from 'features/controlLayers/store/types';
+import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
 import { customAlphabet } from 'nanoid';
@@ -277,30 +277,6 @@ export const konvaNodeToImageData = (node: Konva.Node, bbox?: Rect): ImageData =
 export const konvaNodeToBlob = (node: Konva.Node, bbox?: Rect): Promise<Blob> => {
   const canvas = konvaNodeToCanvas(node, bbox);
   return canvasToBlob(canvas);
-};
-
-/**
- * Gets the pixel under the cursor on the stage, or null if the cursor is not over the stage.
- * @param stage The konva stage
- */
-export const getPixelUnderCursor = (stage: Konva.Stage): RgbaColor | null => {
-  const cursorPos = stage.getPointerPosition();
-  const pixelRatio = Konva.pixelRatio;
-  if (!cursorPos) {
-    return null;
-  }
-  const ctx = stage.toCanvas().getContext('2d');
-
-  if (!ctx) {
-    return null;
-  }
-  const [r, g, b, a] = ctx.getImageData(cursorPos.x * pixelRatio, cursorPos.y * pixelRatio, 1, 1).data;
-
-  if (r === undefined || g === undefined || b === undefined || a === undefined) {
-    return null;
-  }
-
-  return { r, g, b, a };
 };
 
 export const previewBlob = (blob: Blob, label?: string) => {

@@ -1,44 +1,38 @@
 import type { CanvasIPAdapterState, IPAdapterConfig } from 'features/controlLayers/store/types';
-import { IP_ADAPTER_COLLECT } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
 
+type AddIPAdaptersResult = {
+  addedIPAdapters: number;
+};
+
 export const addIPAdapters = (
   ipAdapters: CanvasIPAdapterState[],
   g: Graph,
-  denoise: Invocation<'denoise_latents'>,
+  collector: Invocation<'collect'>,
   base: BaseModelType
-): CanvasIPAdapterState[] => {
+): AddIPAdaptersResult => {
   const validIPAdapters = ipAdapters.filter((entity) => isValidIPAdapter(entity.ipAdapter, base));
+
+  const result: AddIPAdaptersResult = {
+    addedIPAdapters: 0,
+  };
+
   for (const ipa of validIPAdapters) {
-    addIPAdapter(ipa, g, denoise);
+    result.addedIPAdapters++;
+
+    addIPAdapter(ipa, g, collector);
   }
-  return validIPAdapters;
+
+  return result;
 };
 
-export const addIPAdapterCollectorSafe = (g: Graph, denoise: Invocation<'denoise_latents'>): Invocation<'collect'> => {
-  try {
-    // You see, we've already got one!
-    const ipAdapterCollect = g.getNode(IP_ADAPTER_COLLECT);
-    assert(ipAdapterCollect.type === 'collect');
-    return ipAdapterCollect;
-  } catch {
-    const ipAdapterCollect = g.addNode({
-      id: IP_ADAPTER_COLLECT,
-      type: 'collect',
-    });
-    g.addEdge(ipAdapterCollect, 'collection', denoise, 'ip_adapter');
-    return ipAdapterCollect;
-  }
-};
-
-const addIPAdapter = (entity: CanvasIPAdapterState, g: Graph, denoise: Invocation<'denoise_latents'>) => {
+const addIPAdapter = (entity: CanvasIPAdapterState, g: Graph, collector: Invocation<'collect'>) => {
   const { id, ipAdapter } = entity;
   const { weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
   assert(image, 'IP Adapter image is required');
   assert(model, 'IP Adapter model is required');
-  const ipAdapterCollect = addIPAdapterCollectorSafe(g, denoise);
 
   const ipAdapterNode = g.addNode({
     id: `ip_adapter_${id}`,
@@ -53,7 +47,7 @@ const addIPAdapter = (entity: CanvasIPAdapterState, g: Graph, denoise: Invocatio
       image_name: image.image_name,
     },
   });
-  g.addEdge(ipAdapterNode, 'ip_adapter', ipAdapterCollect, 'item');
+  g.addEdge(ipAdapterNode, 'ip_adapter', collector, 'item');
 };
 
 export const isValidIPAdapter = (ipAdapter: IPAdapterConfig, base: BaseModelType): boolean => {

@@ -1,6 +1,6 @@
 import type { RootState } from 'app/store/store';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { LORA_LOADER } from 'features/nodes/util/graph/constants';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation, S } from 'services/api/types';
 
@@ -28,12 +28,12 @@ export const addLoRAs = (
   // We will collect LoRAs into a single collection node, then pass them to the LoRA collection loader, which applies
   // each LoRA to the UNet and CLIP.
   const loraCollector = g.addNode({
-    id: `${LORA_LOADER}_collect`,
     type: 'collect',
+    id: getPrefixedId('lora_collector'),
   });
   const loraCollectionLoader = g.addNode({
-    id: LORA_LOADER,
     type: 'lora_collection_loader',
+    id: getPrefixedId('lora_collection_loader'),
   });
 
   g.addEdge(loraCollector, 'collection', loraCollectionLoader, 'loras');
@@ -50,12 +50,11 @@ export const addLoRAs = (
 
   for (const lora of enabledLoRAs) {
     const { weight } = lora;
-    const { key } = lora.model;
     const parsedModel = zModelIdentifierField.parse(lora.model);
 
     const loraSelector = g.addNode({
       type: 'lora_selector',
-      id: `${LORA_LOADER}_${key}`,
+      id: getPrefixedId('lora_selector'),
       lora: parsedModel,
       weight,
     });

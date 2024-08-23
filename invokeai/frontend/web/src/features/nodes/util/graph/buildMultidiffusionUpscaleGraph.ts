@@ -1,25 +1,11 @@
 import type { RootState } from 'app/store/store';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addSDXLLoRAs } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isNonRefinerMainModelConfig, isSpandrelImageToImageModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
-import {
-  CLIP_SKIP,
-  CONTROL_NET_COLLECT,
-  IMAGE_TO_LATENTS,
-  LATENTS_TO_IMAGE,
-  MAIN_MODEL_LOADER,
-  NEGATIVE_CONDITIONING,
-  NOISE,
-  POSITIVE_CONDITIONING,
-  SDXL_MODEL_LOADER,
-  SPANDREL,
-  TILED_MULTI_DIFFUSION_DENOISE_LATENTS,
-  UNSHARP_MASK,
-  VAE_LOADER,
-} from './constants';
 import { addLoRAs } from './generation/addLoRAs';
 import { getBoardField, getPresetModifiedPrompts } from './graphBuilderUtils';
 
@@ -35,8 +21,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   const g = new Graph();
 
   const upscaleNode = g.addNode({
-    id: SPANDREL,
     type: 'spandrel_image_to_image_autoscale',
+    id: getPrefixedId('spandrel_autoscale'),
     image: upscaleInitialImage,
     image_to_image_model: upscaleModel,
     fit_to_multiple_of_8: true,
@@ -44,8 +30,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   });
 
   const unsharpMaskNode2 = g.addNode({
-    id: `${UNSHARP_MASK}_2`,
     type: 'unsharp_mask',
+    id: getPrefixedId('unsharp_2'),
     radius: 2,
     strength: 60,
   });
@@ -53,8 +39,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   g.addEdge(upscaleNode, 'image', unsharpMaskNode2, 'image');
 
   const noiseNode = g.addNode({
-    id: NOISE,
     type: 'noise',
+    id: getPrefixedId('noise'),
     seed,
   });
 
@@ -62,8 +48,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   g.addEdge(unsharpMaskNode2, 'height', noiseNode, 'height');
 
   const i2lNode = g.addNode({
-    id: IMAGE_TO_LATENTS,
     type: 'i2l',
+    id: getPrefixedId('i2l'),
     fp32: vaePrecision === 'fp32',
     tiled: true,
   });
@@ -72,7 +58,7 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
 
   const l2iNode = g.addNode({
     type: 'l2i',
-    id: LATENTS_TO_IMAGE,
+    id: getPrefixedId('l2i'),
     fp32: vaePrecision === 'fp32',
     tiled: true,
     board: getBoardField(state),
@@ -80,8 +66,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   });
 
   const tiledMultidiffusionNode = g.addNode({
-    id: TILED_MULTI_DIFFUSION_DENOISE_LATENTS,
     type: 'tiled_multi_diffusion_denoise_latents',
+    id: getPrefixedId('tiled_multidiffusion_denoise_latents'),
     tile_height: 1024, // is this dependent on base model
     tile_width: 1024, // is this dependent on base model
     tile_overlap: 128,
@@ -102,19 +88,19 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
 
     posCondNode = g.addNode({
       type: 'sdxl_compel_prompt',
-      id: POSITIVE_CONDITIONING,
+      id: getPrefixedId('pos_cond'),
       prompt: positivePrompt,
       style: positiveStylePrompt,
     });
     negCondNode = g.addNode({
       type: 'sdxl_compel_prompt',
-      id: NEGATIVE_CONDITIONING,
+      id: getPrefixedId('neg_cond'),
       prompt: negativePrompt,
       style: negativeStylePrompt,
     });
     modelNode = g.addNode({
       type: 'sdxl_model_loader',
-      id: SDXL_MODEL_LOADER,
+      id: getPrefixedId('sdxl_model_loader'),
       model,
     });
     g.addEdge(modelNode, 'clip', posCondNode, 'clip');
@@ -135,22 +121,22 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
 
     posCondNode = g.addNode({
       type: 'compel',
-      id: POSITIVE_CONDITIONING,
+      id: getPrefixedId('pos_cond'),
       prompt: positivePrompt,
     });
     negCondNode = g.addNode({
       type: 'compel',
-      id: NEGATIVE_CONDITIONING,
+      id: getPrefixedId('neg_cond'),
       prompt: negativePrompt,
     });
     modelNode = g.addNode({
       type: 'main_model_loader',
-      id: MAIN_MODEL_LOADER,
+      id: getPrefixedId('sd1_model_loader'),
       model,
     });
     const clipSkipNode = g.addNode({
       type: 'clip_skip',
-      id: CLIP_SKIP,
+      id: getPrefixedId('clip_skip'),
     });
 
     g.addEdge(modelNode, 'clip', clipSkipNode, 'clip');
@@ -193,8 +179,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   let vaeNode;
   if (vae) {
     vaeNode = g.addNode({
-      id: VAE_LOADER,
       type: 'vae_loader',
+      id: getPrefixedId('vae'),
       vae_model: vae,
     });
   }
@@ -236,8 +222,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   g.addEdge(unsharpMaskNode2, 'image', controlnetNode2, 'image');
 
   const collectNode = g.addNode({
-    id: CONTROL_NET_COLLECT,
     type: 'collect',
+    id: getPrefixedId('controlnet_collector'),
   });
   g.addEdge(controlnetNode1, 'control', collectNode, 'item');
   g.addEdge(controlnetNode2, 'control', collectNode, 'item');
