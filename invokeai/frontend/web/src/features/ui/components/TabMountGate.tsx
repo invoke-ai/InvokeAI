@@ -1,11 +1,11 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectConfigSlice } from 'features/system/store/configSlice';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
+import type { TabName } from "../store/uiTypes";
 import type { PropsWithChildren } from 'react';
 import { memo, useMemo } from 'react';
 
-export const TabMountGate = memo(({ tab, children }: PropsWithChildren<{ tab: InvokeTabName }>) => {
+export const TabMountGate = memo(({ tab, children }: PropsWithChildren<{ tab: TabName }>) => {
   const selectIsTabEnabled = useMemo(
     () => createSelector(selectConfigSlice, (config) => !config.disabledTabs.includes(tab)),
     [tab]

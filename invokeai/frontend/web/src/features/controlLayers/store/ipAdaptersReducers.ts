@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { CanvasIPAdapterState, CanvasV2State, CLIPVisionModelV2, IPAdapterConfig, IPMethodV2 } from './types';
 import { imageDTOToImageWithDims } from './types';
 
-export const selectIPAdapterEntity = (state: CanvasV2State, id: string) =>
+const selectIPAdapterEntity = (state: CanvasV2State, id: string) =>
   state.ipAdapters.entities.find((ipa) => ipa.id === id);
 export const selectIPAdapterEntityOrThrow = (state: CanvasV2State, id: string) => {
   const entity = selectIPAdapterEntity(state, id);
@@ -35,20 +35,6 @@ export const ipAdaptersReducers = {
     const { data } = action.payload;
     state.ipAdapters.entities.push(data);
     state.selectedEntityIdentifier = { type: 'ip_adapter', id: data.id };
-  },
-  ipaIsEnabledToggled: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const ipa = selectIPAdapterEntity(state, id);
-    if (ipa) {
-      ipa.isEnabled = !ipa.isEnabled;
-    }
-  },
-  ipaDeleted: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    state.ipAdapters.entities = state.ipAdapters.entities.filter((ipa) => ipa.id !== id);
-  },
-  ipaAllDeleted: (state) => {
-    state.ipAdapters.entities = [];
   },
   ipaImageChanged: {
     reducer: (state, action: PayloadAction<{ id: string; imageDTO: ImageDTO | null }>) => {
