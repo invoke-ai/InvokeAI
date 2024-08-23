@@ -2,7 +2,7 @@ import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import type { CLIPVisionModelV2} from 'features/controlLayers/store/types';
+import type { CLIPVisionModelV2 } from 'features/controlLayers/store/types';
 import { isCLIPVisionModelV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -2,7 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { AppFeature, SDFeature } from 'app/types/invokeai';
 import { selectConfigSlice } from 'features/system/store/configSlice';
-import type { TabName } from "features/ui/store/uiTypes";
+import type { TabName } from 'features/ui/store/uiTypes';
 import { useMemo } from 'react';
 
 export const useFeatureStatus = (feature: AppFeature | SDFeature | TabName) => {

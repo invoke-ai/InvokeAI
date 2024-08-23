@@ -55,7 +55,10 @@ export const ControlLayerControlAdapter = memo(() => {
       <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
       <BeginEndStepPct beginEndStepPct={controlAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
       {controlAdapter.type === 'controlnet' && (
-        <ControlLayerControlAdapterControlMode controlMode={controlAdapter.controlMode} onChange={onChangeControlMode} />
+        <ControlLayerControlAdapterControlMode
+          controlMode={controlAdapter.controlMode}
+          onChange={onChangeControlMode}
+        />
       )}
     </Flex>
   );

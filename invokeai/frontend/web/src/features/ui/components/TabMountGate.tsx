@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectConfigSlice } from 'features/system/store/configSlice';
-import type { TabName } from "features/ui/store/uiTypes";
+import type { TabName } from 'features/ui/store/uiTypes';
 import type { PropsWithChildren } from 'react';
 import { memo, useMemo } from 'react';
 

@@ -19,7 +19,7 @@ import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
 import { setActiveTab } from 'features/ui/store/uiSlice';
-import type { TabName } from "features/ui/store/uiTypes";
+import type { TabName } from 'features/ui/store/uiTypes';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
