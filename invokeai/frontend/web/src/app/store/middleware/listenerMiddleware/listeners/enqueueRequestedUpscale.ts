@@ -14,9 +14,9 @@ export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening)
       const { shouldShowProgressInViewer } = state.ui;
       const { prepend } = action.payload;
 
-      const graph = await buildMultidiffusionUpscaleGraph(state);
+      const { g, noise, posCond } = await buildMultidiffusionUpscaleGraph(state);
 
-      const batchConfig = prepareLinearUIBatch(state, graph, prepend);
+      const batchConfig = prepareLinearUIBatch(state, g, prepend, noise, posCond);
 
       const req = dispatch(
         queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
