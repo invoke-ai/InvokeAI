@@ -439,7 +439,6 @@ export const {
   invertScrollChanged,
   toolChanged,
   toolBufferChanged,
-  allEntitiesDeleted,
   clipToBboxChanged,
   canvasReset,
   settingsDynamicGridToggled,
@@ -460,6 +459,7 @@ export const {
   entityArrangedBackwardOne,
   entityArrangedToBack,
   entityOpacityChanged,
+  allEntitiesDeleted,
   allEntitiesOfTypeIsHiddenToggled,
   // bbox
   bboxChanged,
