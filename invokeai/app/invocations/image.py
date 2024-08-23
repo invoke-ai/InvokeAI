@@ -1027,6 +1027,7 @@ class CanvasV2MaskAndCropOutput(ImageOutput):
     tags=["image", "mask", "id"],
     category="image",
     version="1.0.0",
+    classification=Classification.Prototype,
 )
 class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Handles Canvas V2 image output masking and cropping"""

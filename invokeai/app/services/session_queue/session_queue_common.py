@@ -1,6 +1,5 @@
 import datetime
 import json
-from enum import Enum
 from itertools import chain, product
 from typing import Generator, Iterable, Literal, NamedTuple, Optional, TypeAlias, Union, cast
 
@@ -22,7 +21,6 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowWithoutID,
     WorkflowWithoutIDValidator,
 )
-from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import uuid_string
 
 # region Errors
@@ -58,13 +56,6 @@ BatchDataType = Union[
     float,
     int,
 ]
-
-
-class QueueItemOrigin(str, Enum, metaclass=MetaEnum):
-    """The origin of a batch. For example, a batch can be created from the canvas or workflows tab."""
-
-    CANVAS = "canvas"
-    WORKFLOWS = "workflows"
 
 
 class NodeFieldValue(BaseModel):
