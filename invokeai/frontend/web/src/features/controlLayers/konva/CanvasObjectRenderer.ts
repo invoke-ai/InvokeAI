@@ -390,12 +390,18 @@ export class CanvasObjectRenderer {
   /**
    * Sets the buffer object state to render.
    * @param objectState The object state to set as the buffer.
+   * @param resetBufferOffset Whether to reset the buffer's offset to 0,0. This is necessary when previewing filters.
+   * When previewing a filter, the buffer object is an image of the same size as the entity, so it should be rendered
+   * at the top-left corner of the entity.
    * @returns A promise that resolves to a boolean, indicating if the object was rendered.
    */
-  setBuffer = async (objectState: AnyObjectState): Promise<boolean> => {
+  setBuffer = async (objectState: AnyObjectState, resetBufferOffset: boolean = false): Promise<boolean> => {
     this.log.trace('Setting buffer');
 
     this.bufferState = objectState;
+    if (resetBufferOffset) {
+      this.konva.bufferGroup.offset({ x: 0, y: 0 });
+    }
     return await this.renderBufferObject();
   };
 
