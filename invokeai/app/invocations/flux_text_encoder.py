@@ -6,7 +6,7 @@ from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokeniz
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
-from invokeai.app.invocations.primitives import ConditioningOutput
+from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.conditioner import HFEncoder
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
@@ -38,17 +38,15 @@ class FluxTextEncoderInvocation(BaseInvocation):
     )
     prompt: str = InputField(description="Text prompt to encode.")
 
-    # TODO(ryand): Should we create a new return type for this invocation? This ConditioningOutput is clearly not
-    # compatible with other ConditioningOutputs.
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> ConditioningOutput:
+    def invoke(self, context: InvocationContext) -> FluxConditioningOutput:
         t5_embeddings, clip_embeddings = self._encode_prompt(context)
         conditioning_data = ConditioningFieldData(
             conditionings=[FLUXConditioningInfo(clip_embeds=clip_embeddings, t5_embeds=t5_embeddings)]
         )
 
         conditioning_name = context.conditioning.save(conditioning_data)
-        return ConditioningOutput.build(conditioning_name)
+        return FluxConditioningOutput.build(conditioning_name)
 
     def _encode_prompt(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor]:
         # Load CLIP.
