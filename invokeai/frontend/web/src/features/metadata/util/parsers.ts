@@ -1,18 +1,18 @@
-import { getCAId, getImageObjectId, getIPAId, getLayerId } from 'features/controlLayers/konva/naming';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { defaultLoRAConfig } from 'features/controlLayers/store/lorasReducers';
 import type {
-  CanvasControlAdapterState,
+  CanvasControlLayerState,
+  CanvasInpaintMaskState,
   CanvasIPAdapterState,
   CanvasRasterLayerState,
+  CanvasRegionalGuidanceState,
   LoRA,
 } from 'features/controlLayers/store/types';
 import {
-  IMAGE_FILTERS,
   imageDTOToImageWithDims,
   initialControlNet,
   initialIPAdapter,
   initialT2IAdapter,
-  isFilterType,
   zCanvasRasterLayerState,
 } from 'features/controlLayers/store/types';
 import type {
@@ -76,8 +76,6 @@ import {
   isT2IAdapterModelConfig,
   isVAEModelConfig,
 } from 'services/api/types';
-import { assert } from 'tsafe';
-import { v4 as uuidv4 } from 'uuid';
 
 export const MetadataParsePendingToken = Symbol('pending');
 export const MetadataParseFailedToken = Symbol('failed');
@@ -222,6 +220,7 @@ const parseLoRA: MetadataParseFunc<LoRA> = async (metadataItem) => {
   const loraModelConfig = await fetchModelConfigWithTypeGuard(key, isLoRAModelConfig);
 
   return {
+    id: getPrefixedId('lora'),
     model: zModelIdentifierField.parse(loraModelConfig),
     weight: isParameterLoRAWeight(weight) ? weight : defaultLoRAConfig.weight,
     isEnabled: true,
@@ -245,14 +244,6 @@ const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (meta
   const control_model = await getProperty(metadataItem, 'control_model');
   const key = await getModelKey(control_model, 'controlnet');
   const controlNetModel = await fetchModelConfigWithTypeGuard(key, isControlNetModelConfig);
-  const image = zControlField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'image'));
-  const processedImage = zControlField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'processed_image'));
   const control_weight = zControlField.shape.control_weight
     .nullish()
     .catch(null)
@@ -269,28 +260,16 @@ const parseControlNet: MetadataParseFunc<ControlNetConfigMetadata> = async (meta
     .nullish()
     .catch(null)
     .parse(await getProperty(metadataItem, 'control_mode'));
-  const resize_mode = zControlField.shape.resize_mode
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'resize_mode'));
-
-  const { processorType, processorNode } = buildControlAdapterProcessor(controlNetModel);
 
   const controlNet: ControlNetConfigMetadata = {
     type: 'controlnet',
-    isEnabled: true,
     model: zModelIdentifierField.parse(controlNetModel),
     weight: typeof control_weight === 'number' ? control_weight : initialControlNet.weight,
-    beginStepPct: begin_step_percent ?? initialControlNet.beginStepPct,
-    endStepPct: end_step_percent ?? initialControlNet.endStepPct,
+    beginEndStepPct: [
+      begin_step_percent ?? initialControlNet.beginEndStepPct[0],
+      end_step_percent ?? initialControlNet.beginEndStepPct[1],
+    ],
     controlMode: control_mode ?? initialControlNet.controlMode,
-    resizeMode: resize_mode ?? initialControlNet.resizeMode,
-    controlImage: image?.image_name ?? null,
-    processedControlImage: processedImage?.image_name ?? null,
-    processorType,
-    processorNode,
-    shouldAutoConfig: true,
-    id: uuidv4(),
   };
 
   return controlNet;
@@ -314,14 +293,6 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (meta
   const key = await getModelKey(t2i_adapter_model, 't2i_adapter');
   const t2iAdapterModel = await fetchModelConfigWithTypeGuard(key, isT2IAdapterModelConfig);
 
-  const image = zT2IAdapterField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'image'));
-  const processedImage = zT2IAdapterField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'processed_image'));
   const weight = zT2IAdapterField.shape.weight
     .nullish()
     .catch(null)
@@ -334,27 +305,15 @@ const parseT2IAdapter: MetadataParseFunc<T2IAdapterConfigMetadata> = async (meta
     .nullish()
     .catch(null)
     .parse(await getProperty(metadataItem, 'end_step_percent'));
-  const resize_mode = zT2IAdapterField.shape.resize_mode
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'resize_mode'));
-
-  const { processorType, processorNode } = buildControlAdapterProcessor(t2iAdapterModel);
 
   const t2iAdapter: T2IAdapterConfigMetadata = {
     type: 't2i_adapter',
-    isEnabled: true,
     model: zModelIdentifierField.parse(t2iAdapterModel),
     weight: typeof weight === 'number' ? weight : initialT2IAdapter.weight,
-    beginStepPct: begin_step_percent ?? initialT2IAdapter.beginStepPct,
-    endStepPct: end_step_percent ?? initialT2IAdapter.endStepPct,
-    resizeMode: resize_mode ?? initialT2IAdapter.resizeMode,
-    controlImage: image?.image_name ?? null,
-    processedControlImage: processedImage?.image_name ?? null,
-    processorType,
-    processorNode,
-    shouldAutoConfig: true,
-    id: uuidv4(),
+    beginEndStepPct: [
+      begin_step_percent ?? initialT2IAdapter.beginEndStepPct[0],
+      end_step_percent ?? initialT2IAdapter.beginEndStepPct[1],
+    ],
   };
 
   return t2iAdapter;
@@ -378,10 +337,10 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
   const key = await getModelKey(ip_adapter_model, 'ip_adapter');
   const ipAdapterModel = await fetchModelConfigWithTypeGuard(key, isIPAdapterModelConfig);
 
-  const image = zIPAdapterField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'image'));
+  // const image = zIPAdapterField.shape.image
+  //   .nullish()
+  //   .catch(null)
+  //   .parse(await getProperty(metadataItem, 'image'));
   const weight = zIPAdapterField.shape.weight
     .nullish()
     .catch(null)
@@ -400,16 +359,15 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
     .parse(await getProperty(metadataItem, 'end_step_percent'));
 
   const ipAdapter: IPAdapterConfigMetadata = {
-    id: uuidv4(),
-    type: 'ip_adapter',
-    isEnabled: true,
     model: zModelIdentifierField.parse(ipAdapterModel),
     clipVisionModel: 'ViT-H',
-    controlImage: image?.image_name ?? null,
+    image: null, //TODO(psyche): need an ImageWithDims
     weight: weight ?? initialIPAdapter.weight,
     method: method ?? initialIPAdapter.method,
-    beginStepPct: begin_step_percent ?? initialIPAdapter.beginStepPct,
-    endStepPct: end_step_percent ?? initialIPAdapter.endStepPct,
+    beginEndStepPct: [
+      begin_step_percent ?? initialIPAdapter.beginEndStepPct[0],
+      end_step_percent ?? initialIPAdapter.beginEndStepPct[1],
+    ],
   };
 
   return ipAdapter;
@@ -429,16 +387,35 @@ const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (
 };
 
 //#region Control Layers
-const parseLayer: MetadataParseFunc<CanvasRasterLayerState> = (metadataItem) =>
-  zCanvasRasterLayerState.parseAsync(metadataItem);
+const parseLayer: MetadataParseFunc<
+  | CanvasRasterLayerState
+  | CanvasControlLayerState
+  | CanvasIPAdapterState
+  | CanvasRegionalGuidanceState
+  | CanvasInpaintMaskState
+> = (metadataItem) => zCanvasRasterLayerState.parseAsync(metadataItem);
 
-const parseLayers: MetadataParseFunc<CanvasRasterLayerState[]> = async (metadata) => {
+const parseLayers: MetadataParseFunc<
+  (
+    | CanvasRasterLayerState
+    | CanvasControlLayerState
+    | CanvasIPAdapterState
+    | CanvasRegionalGuidanceState
+    | CanvasInpaintMaskState
+  )[]
+> = async (metadata) => {
   // We need to support recalling pre-Control Layers metadata into Control Layers. A separate set of parsers handles
   // taking pre-CL metadata and parsing it into layers. It doesn't always map 1-to-1, so this is best-effort. For
   // example, CL Control Adapters don't support resize mode, so we simply omit that property.
 
   try {
-    const layers: CanvasRasterLayerState[] = [];
+    const layers: (
+      | CanvasRasterLayerState
+      | CanvasControlLayerState
+      | CanvasIPAdapterState
+      | CanvasRegionalGuidanceState
+      | CanvasInpaintMaskState
+    )[] = [];
 
     try {
       const control_layers = await getProperty(metadata, 'control_layers');
@@ -458,7 +435,7 @@ const parseLayers: MetadataParseFunc<CanvasRasterLayerState[]> = async (metadata
         controlNetsRaw.map(async (cn) => await parseControlNetToControlAdapterLayer(cn))
       );
       const controlNetsAsLayers = controlNetsParseResults
-        .filter((result): result is PromiseFulfilledResult<CanvasControlAdapterState> => result.status === 'fulfilled')
+        .filter((result): result is PromiseFulfilledResult<CanvasControlLayerState> => result.status === 'fulfilled')
         .map((result) => result.value);
       layers.push(...controlNetsAsLayers);
     } catch {
@@ -471,7 +448,7 @@ const parseLayers: MetadataParseFunc<CanvasRasterLayerState[]> = async (metadata
         t2iAdaptersRaw.map(async (cn) => await parseT2IAdapterToControlAdapterLayer(cn))
       );
       const t2iAdaptersAsLayers = t2iAdaptersParseResults
-        .filter((result): result is PromiseFulfilledResult<CanvasControlAdapterState> => result.status === 'fulfilled')
+        .filter((result): result is PromiseFulfilledResult<CanvasControlLayerState> => result.status === 'fulfilled')
         .map((result) => result.value);
       layers.push(...t2iAdaptersAsLayers);
     } catch {
@@ -491,62 +468,16 @@ const parseLayers: MetadataParseFunc<CanvasRasterLayerState[]> = async (metadata
       // no-op
     }
 
-    try {
-      const initialImageLayer = await parseInitialImageToInitialImageLayer(metadata);
-      layers.push(initialImageLayer);
-    } catch {
-      // no-op
-    }
-
     return layers;
   } catch {
     return [];
   }
 };
 
-const parseInitialImageToInitialImageLayer: MetadataParseFunc<CanvasRasterLayerState> = async (metadata) => {
-  // TODO(psyche): recall denoise strength
-  // const denoisingStrength = await getProperty(metadata, 'strength', isParameterStrength);
-  const imageName = await getProperty(metadata, 'init_image', isString);
-  const imageDTO = await getImageDTO(imageName);
-  assert(imageDTO, 'ImageDTO is null');
-  const id = getLayerId(uuidv4());
-  const layer: CanvasRasterLayerState = {
-    id,
-    type: 'raster_layer',
-    bbox: null,
-    bboxNeedsUpdate: true,
-    x: 0,
-    y: 0,
-    isEnabled: true,
-    opacity: 1,
-    objects: [
-      {
-        type: 'image',
-        id: getImageObjectId(id, imageDTO.image_name),
-        width: imageDTO.width,
-        height: imageDTO.height,
-        image: imageDTOToImageWithDims(imageDTO),
-        x: 0,
-        y: 0,
-      },
-    ],
-  };
-  return layer;
-};
-
-const parseControlNetToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapterState> = async (metadataItem) => {
+const parseControlNetToControlAdapterLayer: MetadataParseFunc<CanvasControlLayerState> = async (metadataItem) => {
   const control_model = await getProperty(metadataItem, 'control_model');
   const key = await getModelKey(control_model, 'controlnet');
   const controlNetModel = await fetchModelConfigWithTypeGuard(key, isControlNetModelConfig);
-  const image = zControlField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'image'));
-  const processedImage = zControlField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'processed_image'));
   const control_weight = zControlField.shape.control_weight
     .nullish()
     .catch(null)
@@ -564,52 +495,37 @@ const parseControlNetToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapt
     .catch(null)
     .parse(await getProperty(metadataItem, 'control_mode'));
 
-  const defaultPreprocessor = controlNetModel.default_settings?.preprocessor;
-  const processorConfig = isFilterType(defaultPreprocessor) ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults() : null;
   const beginEndStepPct: [number, number] = [
     begin_step_percent ?? initialControlNet.beginEndStepPct[0],
     end_step_percent ?? initialControlNet.beginEndStepPct[1],
   ];
-  const imageDTO = image ? await getImageDTO(image.image_name) : null;
-  const processedImageDTO = processedImage ? await getImageDTO(processedImage.image_name) : null;
 
-  const layer: CanvasControlAdapterState = {
-    id: getCAId(uuidv4()),
-    type: 'control_adapter',
-    bbox: null,
-    bboxNeedsUpdate: true,
+  const layer: CanvasControlLayerState = {
+    id: getPrefixedId('control_layer'),
+    type: 'control_layer',
     isEnabled: true,
     opacity: 1,
-    filter: 'LightnessToAlphaFilter',
-    x: 0,
-    y: 0,
-    adapterType: 'controlnet',
-    model: zModelIdentifierField.parse(controlNetModel),
-    weight: typeof control_weight === 'number' ? control_weight : initialControlNet.weight,
-    beginEndStepPct,
-    controlMode: control_mode ?? initialControlNet.controlMode,
-    image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
-    processedImage: processedImageDTO ? imageDTOToImageWithDims(processedImageDTO) : null,
-    processorConfig,
-    processorPendingBatchId: null,
+    name: null,
+    objects: [],
+    position: { x: 0, y: 0 },
+    withTransparencyEffect: false,
+    controlAdapter: {
+      type: 'controlnet',
+      model: zModelIdentifierField.parse(controlNetModel),
+      weight: typeof control_weight === 'number' ? control_weight : initialControlNet.weight,
+      beginEndStepPct,
+      controlMode: control_mode ?? initialControlNet.controlMode,
+    },
   };
 
   return layer;
 };
 
-const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapterState> = async (metadataItem) => {
+const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<CanvasControlLayerState> = async (metadataItem) => {
   const t2i_adapter_model = await getProperty(metadataItem, 't2i_adapter_model');
   const key = await getModelKey(t2i_adapter_model, 't2i_adapter');
   const t2iAdapterModel = await fetchModelConfigWithTypeGuard(key, isT2IAdapterModelConfig);
 
-  const image = zT2IAdapterField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'image'));
-  const processedImage = zT2IAdapterField.shape.image
-    .nullish()
-    .catch(null)
-    .parse(await getProperty(metadataItem, 'processed_image'));
   const weight = zT2IAdapterField.shape.weight
     .nullish()
     .catch(null)
@@ -623,33 +539,26 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapt
     .catch(null)
     .parse(await getProperty(metadataItem, 'end_step_percent'));
 
-  const defaultPreprocessor = t2iAdapterModel.default_settings?.preprocessor;
-  const processorConfig = isFilterType(defaultPreprocessor) ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults() : null;
   const beginEndStepPct: [number, number] = [
     begin_step_percent ?? initialT2IAdapter.beginEndStepPct[0],
     end_step_percent ?? initialT2IAdapter.beginEndStepPct[1],
   ];
-  const imageDTO = image ? await getImageDTO(image.image_name) : null;
-  const processedImageDTO = processedImage ? await getImageDTO(processedImage.image_name) : null;
 
-  const layer: CanvasControlAdapterState = {
-    id: getCAId(uuidv4()),
-    bbox: null,
-    bboxNeedsUpdate: true,
+  const layer: CanvasControlLayerState = {
+    id: getPrefixedId('control_layer'),
+    type: 'control_layer',
     isEnabled: true,
-    filter: 'LightnessToAlphaFilter',
     opacity: 1,
-    type: 'control_adapter',
-    x: 0,
-    y: 0,
-    adapterType: 't2i_adapter',
-    model: zModelIdentifierField.parse(t2iAdapterModel),
-    weight: typeof weight === 'number' ? weight : initialT2IAdapter.weight,
-    beginEndStepPct,
-    image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
-    processedImage: processedImageDTO ? imageDTOToImageWithDims(processedImageDTO) : null,
-    processorConfig,
-    processorPendingBatchId: null,
+    position: { x: 0, y: 0 },
+    controlAdapter: {
+      type: 't2i_adapter',
+      model: zModelIdentifierField.parse(t2iAdapterModel),
+      weight: typeof weight === 'number' ? weight : initialT2IAdapter.weight,
+      beginEndStepPct,
+    },
+    name: null,
+    objects: [],
+    withTransparencyEffect: false,
   };
 
   return layer;
@@ -688,15 +597,18 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasIPAdapterState> = 
   const imageDTO = image ? await getImageDTO(image.image_name) : null;
 
   const layer: CanvasIPAdapterState = {
-    id: getIPAId(uuidv4()),
+    id: getPrefixedId('ip_adapter'),
     type: 'ip_adapter',
     isEnabled: true,
-    model: zModelIdentifierField.parse(ipAdapterModel),
-    weight: typeof weight === 'number' ? weight : initialIPAdapter.weight,
-    beginEndStepPct,
-    imageObject: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
-    clipVisionModel: initialIPAdapter.clipVisionModel, // TODO: This needs to be added to the zIPAdapterField...
-    method: method ?? initialIPAdapter.method,
+    name: null,
+    ipAdapter: {
+      model: zModelIdentifierField.parse(ipAdapterModel),
+      weight: typeof weight === 'number' ? weight : initialIPAdapter.weight,
+      beginEndStepPct,
+      clipVisionModel: initialIPAdapter.clipVisionModel, // TODO: This needs to be added to the zIPAdapterField...
+      method: method ?? initialIPAdapter.method,
+      image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
+    },
   };
 
   return layer;

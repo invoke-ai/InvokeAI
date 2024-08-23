@@ -463,11 +463,11 @@ export const {
   bboxSizeOptimized,
   // Raster layers
   rasterLayerAdded,
-  rasterLayerRecalled,
+  // rasterLayerRecalled,
   rasterLayerConvertedToControlLayer,
   // Control layers
   controlLayerAdded,
-  controlLayerRecalled,
+  // controlLayerRecalled,
   controlLayerConvertedToRasterLayer,
   controlLayerModelChanged,
   controlLayerControlModeChanged,
@@ -476,7 +476,7 @@ export const {
   controlLayerWithTransparencyEffectToggled,
   // IP Adapters
   ipaAdded,
-  ipaRecalled,
+  // ipaRecalled,
   ipaImageChanged,
   ipaMethodChanged,
   ipaModelChanged,
@@ -485,7 +485,7 @@ export const {
   ipaBeginEndStepPctChanged,
   // Regions
   rgAdded,
-  rgRecalled,
+  // rgRecalled,
   rgPositivePromptChanged,
   rgNegativePromptChanged,
   rgFillColorChanged,
@@ -545,7 +545,7 @@ export const {
   loraAllDeleted,
   // Inpaint mask
   inpaintMaskAdded,
-  inpaintMaskRecalled,
+  // inpaintMaskRecalled,
   inpaintMaskFillColorChanged,
   inpaintMaskFillStyleChanged,
   // Staging

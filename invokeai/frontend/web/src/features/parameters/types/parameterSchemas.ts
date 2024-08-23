@@ -111,21 +111,6 @@ const zParameterLoRAModel = zModelIdentifierField;
 export type ParameterLoRAModel = z.infer<typeof zParameterLoRAModel>;
 // #endregion
 
-// #region ControlNet Model
-const zParameterControlNetModel = zModelIdentifierField;
-export type ParameterControlNetModel = z.infer<typeof zParameterControlNetModel>;
-// #endregion
-
-// #region IP Adapter Model
-const zParameterIPAdapterModel = zModelIdentifierField;
-export type ParameterIPAdapterModel = z.infer<typeof zParameterIPAdapterModel>;
-// #endregion
-
-// #region T2I Adapter Model
-const zParameterT2IAdapterModel = zModelIdentifierField;
-export type ParameterT2IAdapterModel = z.infer<typeof zParameterT2IAdapterModel>;
-// #endregion
-
 // #region VAE Model
 const zParameterSpandrelImageToImageModel = zModelIdentifierField;
 export type ParameterSpandrelImageToImageModel = z.infer<typeof zParameterSpandrelImageToImageModel>;
