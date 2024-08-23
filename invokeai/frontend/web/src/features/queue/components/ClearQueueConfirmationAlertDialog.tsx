@@ -1,21 +1,24 @@
-import type { UseDisclosureReturn } from '@invoke-ai/ui-library';
 import { ConfirmationAlertDialog, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { useClearQueue } from 'features/queue/hooks/useClearQueue';
+import { atom } from 'nanostores';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type Props = {
-  disclosure: UseDisclosureReturn;
-};
+const $boolean = atom(false);
+export const useClearQueueConfirmationAlertDialog = buildUseBoolean($boolean);
 
-const ClearQueueButton = ({ disclosure }: Props) => {
+export const ClearQueueConfirmationsAlertDialog = memo(() => {
   const { t } = useTranslation();
+  const dialogState = useClearQueueConfirmationAlertDialog();
+  const isOpen = useStore(dialogState.$boolean);
   const { clearQueue } = useClearQueue();
 
   return (
     <ConfirmationAlertDialog
-      isOpen={disclosure.isOpen}
-      onClose={disclosure.onClose}
+      isOpen={isOpen}
+      onClose={dialogState.setFalse}
       title={t('queue.clearTooltip')}
       acceptCallback={clearQueue}
       acceptButtonText={t('queue.clear')}
@@ -25,6 +28,6 @@ const ClearQueueButton = ({ disclosure }: Props) => {
       <Text>{t('queue.clearQueueAlertDialog2')}</Text>
     </ConfirmationAlertDialog>
   );
-};
+});
 
-export default memo(ClearQueueButton);
+ClearQueueConfirmationsAlertDialog.displayName = 'ClearQueueConfirmationsAlertDialog';
