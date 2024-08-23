@@ -27,6 +27,7 @@ import type {
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
+import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -118,6 +119,8 @@ export class CanvasObjectRenderer {
     } | null;
   };
 
+  $canvasCache = atom<{ canvas: HTMLCanvasElement; rect: Rect } | null>(null);
+
   constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
     this.id = getPrefixedId(this.type);
     this.parent = parent;
@@ -205,7 +208,10 @@ export class CanvasObjectRenderer {
     } else if (force || !this.konva.objectGroup.isCached()) {
       this.log.trace('Caching object group');
       this.konva.objectGroup.clearCache();
-      this.konva.objectGroup.cache();
+      this.konva.objectGroup.cache({ pixelRatio: 1 });
+      if (!this.parent.transformer.isPendingRectCalculation) {
+        this.parent.renderer.updatePreviewCanvas();
+      }
     }
   };
 
@@ -528,6 +534,24 @@ export class CanvasObjectRenderer {
     this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
 
     return imageDTO;
+  };
+
+  updatePreviewCanvas = () => {
+    if (this.parent.transformer.pixelRect.width === 0 || this.parent.transformer.pixelRect.height === 0) {
+      return;
+    }
+    const canvas = this.konva.objectGroup._getCachedSceneCanvas()._canvas as HTMLCanvasElement | undefined | null;
+    if (canvas) {
+      const nodeRect = this.parent.transformer.nodeRect;
+      const pixelRect = this.parent.transformer.pixelRect;
+      const rect = {
+        x: pixelRect.x - nodeRect.x,
+        y: pixelRect.y - nodeRect.y,
+        width: pixelRect.width,
+        height: pixelRect.height,
+      };
+      this.$canvasCache.set({ rect, canvas });
+    }
   };
 
   cloneObjectGroup = (attrs?: GroupConfig): Konva.Group => {

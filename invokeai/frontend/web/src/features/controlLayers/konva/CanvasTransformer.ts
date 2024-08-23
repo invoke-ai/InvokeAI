@@ -496,7 +496,7 @@ export class CanvasTransformer {
   startTransform = () => {
     this.log.debug('Starting transform');
     this.isTransforming = true;
-    this.manager.stateApi.setTool('move')
+    this.manager.stateApi.setTool('move');
     // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
     // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
     // when the view tool is selected
@@ -605,6 +605,7 @@ export class CanvasTransformer {
 
     if (this.isPendingRectCalculation) {
       this.syncInteractionState();
+      this.parent.renderer.updatePreviewCanvas();
       return;
     }
 
@@ -615,6 +616,7 @@ export class CanvasTransformer {
       // The layer is fully transparent but has objects - reset it
       this.manager.stateApi.resetEntity({ entityIdentifier: this.parent.getEntityIdentifier() });
       this.syncInteractionState();
+      this.parent.renderer.updatePreviewCanvas();
       return;
     }
 
@@ -628,6 +630,7 @@ export class CanvasTransformer {
     };
     this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
     this.parent.renderer.konva.bufferGroup.setAttrs(groupAttrs);
+    this.parent.renderer.updatePreviewCanvas();
   };
 
   calculateRect = debounce(() => {

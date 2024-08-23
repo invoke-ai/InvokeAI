@@ -12,7 +12,7 @@ export const useEntityAdapter = (entityIdentifier: CanvasEntityIdentifier): Canv
     const entity = canvasManager.stateApi.getEntity(entityIdentifier);
     assert(entity, 'Entity adapter not found');
     return entity.adapter;
-  }, [canvasManager, entityIdentifier]);
+  }, [canvasManager.stateApi, entityIdentifier]);
 
   return adapter;
 };

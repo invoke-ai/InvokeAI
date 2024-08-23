@@ -7,13 +7,7 @@ export const CanvasSettingsRecalculateRectsButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const onClick = useCallback(() => {
-    const adapters = [
-      ...canvasManager.rasterLayerAdapters.values(),
-      ...canvasManager.controlLayerAdapters.values(),
-      ...canvasManager.regionalGuidanceAdapters.values(),
-      ...canvasManager.inpaintMaskAdapters.values(),
-    ];
-    for (const adapter of adapters) {
+    for (const adapter of canvasManager.adapters.getAll()) {
       adapter.transformer.requestRectCalculation();
     }
   }, [canvasManager]);

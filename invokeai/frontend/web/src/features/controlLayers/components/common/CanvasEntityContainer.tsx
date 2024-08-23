@@ -21,7 +21,6 @@ export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
 
   return (
     <Flex
-      position="relative" // necessary for drop overlay
       flexDir="column"
       w="full"
       bg={isSelected ? 'base.800' : 'base.850'}

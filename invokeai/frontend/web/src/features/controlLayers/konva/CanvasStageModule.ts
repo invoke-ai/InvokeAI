@@ -58,25 +58,7 @@ export class CanvasStageModule {
   getVisibleRect = (): Rect => {
     const rects = [];
 
-    for (const adapter of this.manager.inpaintMaskAdapters.values()) {
-      if (adapter.state.isEnabled) {
-        rects.push(adapter.transformer.getRelativeRect());
-      }
-    }
-
-    for (const adapter of this.manager.rasterLayerAdapters.values()) {
-      if (adapter.state.isEnabled) {
-        rects.push(adapter.transformer.getRelativeRect());
-      }
-    }
-
-    for (const adapter of this.manager.controlLayerAdapters.values()) {
-      if (adapter.state.isEnabled) {
-        rects.push(adapter.transformer.getRelativeRect());
-      }
-    }
-
-    for (const adapter of this.manager.regionalGuidanceAdapters.values()) {
+    for (const adapter of this.manager.adapters.getAll()) {
       if (adapter.state.isEnabled) {
         rects.push(adapter.transformer.getRelativeRect());
       }
