@@ -14,6 +14,7 @@ import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardMo
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
+import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
@@ -118,6 +119,7 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflowId, desti
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <StylePresetModal />
+      <ClearQueueConfirmationsAlertDialog />
       <PreselectedImage selectedImage={selectedImage} />
     </ErrorBoundary>
   );
