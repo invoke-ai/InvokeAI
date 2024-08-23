@@ -1750,7 +1750,7 @@
             "move": "Move",
             "view": "View",
             "transform": "Transform",
-            "eyeDropper": "Eye Dropper"
+            "colorPicker": "Color Picker"
         },
         "filter": {
             "filter": "Filter",

@@ -193,7 +193,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     const pos = updateLastCursorPos(stage, $lastCursorPos.set);
     const selectedEntity = getSelectedEntity();
 
-    if (toolState.selected === 'eyeDropper') {
+    if (toolState.selected === 'colorPicker') {
       const color = getColorUnderCursor(stage);
       manager.stateApi.$colorUnderCursor.set(color);
       if (color) {
@@ -343,7 +343,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
     const pos = updateLastCursorPos(stage, $lastCursorPos.set);
     const selectedEntity = getSelectedEntity();
 
-    if (toolState.selected === 'eyeDropper') {
+    if (toolState.selected === 'colorPicker') {
       const color = getColorUnderCursor(stage);
       manager.stateApi.$colorUnderCursor.set(color);
     } else {
