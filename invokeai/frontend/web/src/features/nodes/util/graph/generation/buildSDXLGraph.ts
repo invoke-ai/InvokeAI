@@ -207,7 +207,7 @@ export const buildSDXLGraph = async (
     );
   }
 
-  const controlNetCollector = g.createNode({
+  const controlNetCollector = g.addNode({
     type: 'collect',
     id: getPrefixedId('control_net_collector'),
   });
@@ -220,11 +220,12 @@ export const buildSDXLGraph = async (
     modelConfig.base
   );
   if (controlNetResult.addedControlNets > 0) {
-    g.addNode(controlNetCollector);
     g.addEdge(controlNetCollector, 'collection', denoise, 'control');
+  } else {
+    g.deleteNode(controlNetCollector.id);
   }
 
-  const t2iAdapterCollector = g.createNode({
+  const t2iAdapterCollector = g.addNode({
     type: 'collect',
     id: getPrefixedId('t2i_adapter_collector'),
   });
@@ -237,11 +238,12 @@ export const buildSDXLGraph = async (
     modelConfig.base
   );
   if (t2iAdapterResult.addedT2IAdapters > 0) {
-    g.addNode(t2iAdapterCollector);
     g.addEdge(t2iAdapterCollector, 'collection', denoise, 't2i_adapter');
+  } else {
+    g.deleteNode(t2iAdapterCollector.id);
   }
 
-  const ipAdapterCollector = g.createNode({
+  const ipAdapterCollector = g.addNode({
     type: 'collect',
     id: getPrefixedId('ip_adapter_collector'),
   });
@@ -264,8 +266,9 @@ export const buildSDXLGraph = async (
   const totalIPAdaptersAdded =
     ipAdapterResult.addedIPAdapters + regionsResult.reduce((acc, r) => acc + r.addedIPAdapters, 0);
   if (totalIPAdaptersAdded > 0) {
-    g.addNode(ipAdapterCollector);
     g.addEdge(ipAdapterCollector, 'collection', denoise, 'ip_adapter');
+  } else {
+    g.deleteNode(ipAdapterCollector.id);
   }
 
   if (state.system.shouldUseNSFWChecker) {
