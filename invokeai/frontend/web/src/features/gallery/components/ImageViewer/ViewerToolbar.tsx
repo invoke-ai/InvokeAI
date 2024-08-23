@@ -2,7 +2,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ToggleMetadataViewerButton } from 'features/gallery/components/ImageViewer/ToggleMetadataViewerButton';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 import CurrentImageButtons from './CurrentImageButtons';
@@ -10,7 +10,7 @@ import { ViewerToggleMenu } from './ViewerToggleMenu';
 
 export const ViewerToolbar = memo(() => {
   const showToggle = useAppSelector((s) => {
-    const tab = activeTabNameSelector(s);
+    const tab = selectActiveTab(s);
     if (tab === 'upscaling' || tab === 'workflows') {
       return false;
     }

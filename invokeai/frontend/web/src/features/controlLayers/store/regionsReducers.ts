@@ -16,10 +16,10 @@ import { assert } from 'tsafe';
 
 import type { CanvasRegionalGuidanceState } from './types';
 
-export const selectRegionalGuidanceEntity = (state: CanvasV2State, id: string) => {
+const selectRegionalGuidanceEntity = (state: CanvasV2State, id: string) => {
   return state.regions.entities.find((rg) => rg.id === id);
 };
-export const selectRegionalGuidanceIPAdapter = (state: CanvasV2State, id: string, ipAdapterId: string) => {
+const selectRegionalGuidanceIPAdapter = (state: CanvasV2State, id: string, ipAdapterId: string) => {
   const entity = state.regions.entities.find((rg) => rg.id === id);
   if (!entity) {
     return;
@@ -84,9 +84,6 @@ export const regionsReducers = {
     const { data } = action.payload;
     state.regions.entities.push(data);
     state.selectedEntityIdentifier = { type: 'regional_guidance', id: data.id };
-  },
-  rgAllDeleted: (state) => {
-    state.regions.entities = [];
   },
   rgPositivePromptChanged: (state, action: PayloadAction<{ id: string; prompt: string | null }>) => {
     const { id, prompt } = action.payload;

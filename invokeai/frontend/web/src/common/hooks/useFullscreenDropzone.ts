@@ -1,7 +1,7 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { toast } from 'features/toast/toast';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
 import type { Accept, FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
@@ -14,7 +14,7 @@ const accept: Accept = {
   'image/jpeg': ['.jpg', '.jpeg', '.png'],
 };
 
-const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (activeTabName) => {
+const selectPostUploadAction = createMemoizedSelector(selectActiveTab, (activeTabName) => {
   let postUploadAction: PostUploadAction = { type: 'TOAST' };
 
   if (activeTabName === 'upscaling') {

@@ -18,7 +18,7 @@ import { StylePresetModal } from 'features/stylePresets/components/StylePresetFo
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
+import type { TabName } from "features/ui/store/uiTypes";
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import { AnimatePresence } from 'framer-motion';
@@ -40,7 +40,7 @@ interface Props {
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
   selectedWorkflowId?: string;
-  destination?: InvokeTabName | undefined;
+  destination?: TabName | undefined;
 }
 
 const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflowId, destination }: Props) => {

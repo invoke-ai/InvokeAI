@@ -19,7 +19,7 @@ import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
 import AppDndContext from 'features/dnd/components/AppDndContext';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
+import type { TabName } from "features/ui/store/uiTypes";
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
@@ -45,7 +45,7 @@ interface Props extends PropsWithChildren {
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
   selectedWorkflowId?: string;
-  destination?: InvokeTabName;
+  destination?: TabName;
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
