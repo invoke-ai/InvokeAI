@@ -12,6 +12,8 @@ import type {
   DepthAnythingModelSize,
   DepthAnythingProcessorConfig,
   DWOpenposeProcessorConfig,
+  FilterConfig,
+  FilterType,
   HedProcessorConfig,
   IPMethodV2,
   LineartAnimeProcessorConfig,
@@ -21,8 +23,6 @@ import type {
   MlsdProcessorConfig,
   NormalbaeProcessorConfig,
   PidiProcessorConfig,
-  FilterConfig,
-  FilterType,
   ZoeDepthProcessorConfig,
 } from './types';
 

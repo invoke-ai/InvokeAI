@@ -38,7 +38,6 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     }
 
     const manager = new CanvasManager(stage, container, store, socket);
-    console.log(manager);
     const cleanup = manager.initialize();
     return cleanup;
   }, [asPreview, container, socket, stage, store]);

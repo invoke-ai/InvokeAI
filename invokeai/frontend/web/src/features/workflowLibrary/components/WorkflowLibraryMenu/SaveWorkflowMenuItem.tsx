@@ -13,7 +13,7 @@ const SaveWorkflowMenuItem = () => {
   const { onOpen } = useSaveWorkflowAsDialog();
   const isTouched = useAppSelector((s) => s.workflow.isTouched);
 
-  const handleClickSave = useCallback(async () => {
+  const handleClickSave = useCallback(() => {
     const builtWorkflow = $builtWorkflow.get();
     if (!builtWorkflow) {
       return;

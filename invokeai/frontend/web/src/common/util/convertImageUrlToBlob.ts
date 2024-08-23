@@ -7,7 +7,7 @@ import { $authToken } from 'app/store/nanostores/authToken';
  * @returns A function that takes a URL and returns a Promise that resolves with a Blob
  */
 
-export const convertImageUrlToBlob = async (url: string) =>
+export const convertImageUrlToBlob = (url: string) =>
   new Promise<Blob | null>((resolve, reject) => {
     const img = new Image();
     img.onload = () => {

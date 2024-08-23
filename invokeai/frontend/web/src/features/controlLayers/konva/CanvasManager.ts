@@ -2,6 +2,7 @@ import type { AppSocket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
+import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import { CanvasCompositorModule } from 'features/controlLayers/konva/CanvasCompositorModule';
 import { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
@@ -9,7 +10,6 @@ import { CanvasRenderingModule } from 'features/controlLayers/konva/CanvasRender
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import type Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';

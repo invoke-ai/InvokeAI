@@ -6,7 +6,7 @@ import type { ImageDTO } from 'services/api/types';
 export const addImagesUnstarredListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: imagesApi.endpoints.unstarImages.matchFulfilled,
-    effect: async (action, { dispatch, getState }) => {
+    effect: (action, { dispatch, getState }) => {
       const { updated_image_names: unstarredImages } = action.payload;
 
       const state = getState();
