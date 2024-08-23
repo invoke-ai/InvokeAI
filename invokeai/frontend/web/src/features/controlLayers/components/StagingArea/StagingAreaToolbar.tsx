@@ -25,18 +25,6 @@ import {
 } from 'react-icons/pi';
 
 export const StagingAreaToolbar = memo(() => {
-  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
-
-  if (!isStaging) {
-    return null;
-  }
-
-  return <StagingAreaToolbarContent />;
-});
-
-StagingAreaToolbar.displayName = 'StagingAreaToolbar';
-
-export const StagingAreaToolbarContent = memo(() => {
   const dispatch = useAppDispatch();
   const session = useAppSelector((s) => s.canvasV2.session);
   const shouldShowStagedImage = useStore($shouldShowStagedImage);
@@ -204,4 +192,4 @@ export const StagingAreaToolbarContent = memo(() => {
   );
 });
 
-StagingAreaToolbarContent.displayName = 'StagingAreaToolbarContent';
+StagingAreaToolbar.displayName = 'StagingAreaToolbar';
