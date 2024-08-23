@@ -17,7 +17,7 @@ type AddPromptButtonProps = {
   id: string;
 };
 
-export const AddPromptButtons = ({ id }: AddPromptButtonProps) => {
+export const RegionalGuidanceAddPromptsIPAdapterButtons = ({ id }: AddPromptButtonProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useDefaultIPAdapter();
