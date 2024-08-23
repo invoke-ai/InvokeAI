@@ -152,10 +152,10 @@ export class CanvasManager {
 
   logDebugInfo() {
     // eslint-disable-next-line no-console
-    console.log(this);
+    console.log('Canvas manager', this);
     for (const adapter of this.adapters.getAll()) {
       // eslint-disable-next-line no-console
-      console.log(adapter);
+      console.log(adapter.id, adapter);
     }
   }
 
