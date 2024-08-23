@@ -26,9 +26,9 @@ export const MetadataControlNets = ({ metadata }: Props) => {
 
   return (
     <>
-      {controlNets.map((controlNet) => (
+      {controlNets.map((controlNet, i) => (
         <MetadataViewControlNet
-          key={controlNet.id}
+          key={`${controlNet.model.key}-${i}`}
           label={label}
           controlNet={controlNet}
           handlers={handlers.controlNets}
