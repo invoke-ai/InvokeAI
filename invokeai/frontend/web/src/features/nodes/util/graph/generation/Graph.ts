@@ -1,5 +1,5 @@
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { type ModelIdentifierField, zModelIdentifierField } from 'features/nodes/types/common';
-import { METADATA } from 'features/nodes/util/graph/constants';
 import { forEach, groupBy, isEqual, unset, values } from 'lodash-es';
 import type {
   AnyInvocation,
@@ -31,6 +31,7 @@ export type GraphType = { id: string; nodes: Record<string, AnyInvocation>; edge
 
 export class Graph {
   _graph: GraphType;
+  _metadataNodeId = getPrefixedId('core_metadata');
 
   constructor(id?: string) {
     this._graph = {
@@ -361,11 +362,11 @@ export class Graph {
    */
   getMetadataNode(): S['CoreMetadataInvocation'] {
     try {
-      const node = this.getNode(METADATA) as AnyInvocationIncMetadata;
+      const node = this.getNode(this._metadataNodeId) as AnyInvocationIncMetadata;
       assert(node.type === 'core_metadata');
       return node;
     } catch {
-      const node: S['CoreMetadataInvocation'] = { id: METADATA, type: 'core_metadata' };
+      const node: S['CoreMetadataInvocation'] = { id: this._metadataNodeId, type: 'core_metadata' };
       // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
       return this.addNode(node);
     }

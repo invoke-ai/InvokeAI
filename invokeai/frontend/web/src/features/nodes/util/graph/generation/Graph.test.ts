@@ -549,7 +549,7 @@ describe('Graph', () => {
       it("should get the metadata node, creating it if it doesn't exist", () => {
         const g = new Graph();
         const metadata = g.getMetadataNode();
-        expect(metadata.id).toBe('core_metadata');
+        expect(metadata.id).toBe(g._metadataNodeId);
         expect(metadata.type).toBe('core_metadata');
         g.upsertMetadata({ test: 'test' });
         const metadata2 = g.getMetadataNode();
