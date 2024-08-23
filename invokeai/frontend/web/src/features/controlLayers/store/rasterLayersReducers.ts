@@ -5,7 +5,7 @@ import { merge } from 'lodash-es';
 import { assert } from 'tsafe';
 
 import type { CanvasControlLayerState, CanvasRasterLayerState, CanvasV2State } from './types';
-import { initialControlNetV2 } from './types';
+import { initialControlNet } from './types';
 
 export const selectRasterLayer = (state: CanvasV2State, id: string) =>
   state.rasterLayers.entities.find((layer) => layer.id === id);
@@ -62,7 +62,7 @@ export const rasterLayersReducers = {
         ...deepClone(layer),
         id: newId,
         type: 'control_layer',
-        controlAdapter: deepClone(initialControlNetV2),
+        controlAdapter: deepClone(initialControlNet),
         withTransparencyEffect: true,
       };
 

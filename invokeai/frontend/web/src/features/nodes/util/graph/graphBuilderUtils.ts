@@ -3,7 +3,6 @@ import type { CanvasV2State } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { pick } from 'lodash-es';
 import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 import type { Invocation } from 'services/api/types';
@@ -61,17 +60,6 @@ export const getPresetModifiedPrompts = (
     positiveStylePrompt: shouldConcatPrompts ? positivePrompt : positivePrompt2,
     negativeStylePrompt: shouldConcatPrompts ? negativePrompt : negativePrompt2,
   };
-};
-
-/**
- * Gets the is_intermediate field, based on the active tab and shouldAutoSave setting.
- */
-export const getIsIntermediate = (state: RootState) => {
-  const activeTabName = activeTabNameSelector(state);
-  if (activeTabName === 'canvas') {
-    return !state.canvas.shouldAutoSave;
-  }
-  return false;
 };
 
 export const getSizes = (bboxState: CanvasV2State['bbox']) => {

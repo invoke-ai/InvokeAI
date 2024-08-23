@@ -1,7 +1,7 @@
 import { Badge } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectControlLayerOrThrow } from 'features/controlLayers/store/controlLayersReducers';
+import { selectControlLayerEntityOrThrow } from 'features/controlLayers/store/controlLayersReducers';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,7 +9,7 @@ export const ControlLayerBadges = memo(() => {
   const { id } = useEntityIdentifierContext();
   const { t } = useTranslation();
   const withTransparencyEffect = useAppSelector(
-    (s) => selectControlLayerOrThrow(s.canvasV2, id).withTransparencyEffect
+    (s) => selectControlLayerEntityOrThrow(s.canvasV2, id).withTransparencyEffect
   );
 
   return (
