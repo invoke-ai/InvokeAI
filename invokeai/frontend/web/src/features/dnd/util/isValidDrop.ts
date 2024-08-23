@@ -13,8 +13,6 @@ export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?
   }
 
   switch (actionType) {
-    case 'SET_CURRENT_IMAGE':
-    case 'SET_CA_IMAGE':
     case 'SET_IPA_IMAGE':
     case 'SET_RG_IP_ADAPTER_IMAGE':
     case 'ADD_RASTER_LAYER_FROM_IMAGE':
