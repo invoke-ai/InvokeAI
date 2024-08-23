@@ -1,5 +1,5 @@
 import type { RootState } from 'app/store/store';
-import { SEAMLESS } from 'features/nodes/util/graph/constants';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation } from 'services/api/types';
 
@@ -28,8 +28,8 @@ export const addSeamless = (
   }
 
   const seamless = g.addNode({
-    id: SEAMLESS,
     type: 'seamless',
+    id: getPrefixedId('seamless'),
     seamless_x,
     seamless_y,
   });

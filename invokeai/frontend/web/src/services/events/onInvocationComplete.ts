@@ -8,18 +8,21 @@ import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
-import type { ImageDTO } from 'services/api/types';
+import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
-import type { InvocationCompleteEvent, InvocationDenoiseProgressEvent } from 'services/events/types';
 
 const log = logger('events');
+
+const isCanvasOutput = (data: S['InvocationCompleteEvent']) => {
+  return data.invocation_source_id.split(':')[0] === 'canvas_output';
+};
 
 export const buildOnInvocationComplete = (
   getState: () => RootState,
   dispatch: AppDispatch,
   nodeTypeDenylist: string[],
-  setLastProgressEvent: (event: InvocationDenoiseProgressEvent | null) => void,
-  setLastCanvasProgressEvent: (event: InvocationDenoiseProgressEvent | null) => void
+  setLastProgressEvent: (event: S['InvocationDenoiseProgressEvent'] | null) => void,
+  setLastCanvasProgressEvent: (event: S['InvocationDenoiseProgressEvent'] | null) => void
 ) => {
   const addImageToGallery = (imageDTO: ImageDTO) => {
     if (imageDTO.is_intermediate) {
@@ -80,64 +83,87 @@ export const buildOnInvocationComplete = (
     }
   };
 
-  return async (data: InvocationCompleteEvent) => {
+  const getResultImageDTO = (data: S['InvocationCompleteEvent']) => {
+    const { result } = data;
+    if (result.type === 'image_output') {
+      return getImageDTO(result.image.image_name);
+    } else if (result.type === 'canvas_v2_mask_and_crop_output') {
+      return getImageDTO(result.image.image_name);
+    }
+    return null;
+  };
+
+  const handleOriginWorkflows = async (data: S['InvocationCompleteEvent']) => {
+    const { result, invocation_source_id } = data;
+
+    const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
+    if (nes) {
+      nes.status = zNodeStatus.enum.COMPLETED;
+      if (nes.progress !== null) {
+        nes.progress = 1;
+      }
+      nes.outputs.push(result);
+      upsertExecutionState(nes.nodeId, nes);
+    }
+
+    const imageDTO = await getResultImageDTO(data);
+
+    if (imageDTO) {
+      addImageToGallery(imageDTO);
+    }
+  };
+
+  const handleOriginCanvas = async (data: S['InvocationCompleteEvent']) => {
+    const session = getState().canvasV2.session;
+
+    const imageDTO = await getResultImageDTO(data);
+
+    if (!imageDTO) {
+      return;
+    }
+
+    if (session.mode === 'compose') {
+      if (session.isStaging && isCanvasOutput(data)) {
+        if (data.result.type === 'canvas_v2_mask_and_crop_output') {
+          const { offset_x, offset_y } = data.result;
+          if (session.isStaging) {
+            dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
+          }
+        } else if (data.result.type === 'image_output') {
+          if (session.isStaging) {
+            dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
+          }
+        }
+      }
+    } else {
+      // session.mode === 'generate'
+      setLastCanvasProgressEvent(null);
+    }
+
+    addImageToGallery(imageDTO);
+  };
+
+  const handleOriginOther = async (data: S['InvocationCompleteEvent']) => {
+    const imageDTO = await getResultImageDTO(data);
+
+    if (imageDTO) {
+      addImageToGallery(imageDTO);
+    }
+  };
+
+  return async (data: S['InvocationCompleteEvent']) => {
     log.debug(
       { data } as SerializableObject,
       `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
     );
 
-    const { result, invocation_source_id } = data;
-
     // Update the node execution states - the image output is handled below
     if (data.origin === 'workflows') {
-      const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-      if (nes) {
-        nes.status = zNodeStatus.enum.COMPLETED;
-        if (nes.progress !== null) {
-          nes.progress = 1;
-        }
-        nes.outputs.push(result);
-        upsertExecutionState(nes.nodeId, nes);
-      }
-    }
-
-    // This complete event has an associated image output
-    if (
-      (data.result.type === 'image_output' || data.result.type === 'canvas_v2_mask_and_crop_output') &&
-      !nodeTypeDenylist.includes(data.invocation.type)
-    ) {
-      const { image_name } = data.result.image;
-      const { session } = getState().canvasV2;
-
-      const imageDTO = await getImageDTO(image_name);
-
-      if (!imageDTO) {
-        log.error({ data } as SerializableObject, 'Failed to fetch image DTO after generation');
-        return;
-      }
-
-      if (data.origin === 'canvas') {
-        if (data.invocation_source_id !== 'canvas_output') {
-          // Not a canvas output image - ignore
-          return;
-        }
-        if (session.mode === 'compose' && session.isStaging) {
-          if (data.result.type === 'canvas_v2_mask_and_crop_output') {
-            const { offset_x, offset_y } = data.result;
-            if (session.isStaging) {
-              dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
-            }
-          } else if (data.result.type === 'image_output') {
-            if (session.isStaging) {
-              dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
-            }
-          }
-          addImageToGallery(imageDTO);
-        } else {
-          addImageToGallery(imageDTO);
-          setLastCanvasProgressEvent(null);
-        }
-      }
+      await handleOriginWorkflows(data);
+    } else if (data.origin === 'canvas') {
+      await handleOriginCanvas(data);
+    } else {
+      await handleOriginOther(data);
     }
 
     setLastProgressEvent(null);

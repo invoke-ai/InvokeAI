@@ -1,3 +1,4 @@
+import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -5,8 +6,13 @@ import { sessionStagingAreaReset, sessionStartedStaging } from 'features/control
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { serializeError } from 'serialize-error';
 import { queueApi } from 'services/api/endpoints/queue';
+import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
+
+const log = logger('generation');
 
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -27,20 +33,28 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       }
 
       try {
-        let g;
+        let g: Graph;
+        let noise: Invocation<'noise'>;
+        let posCond: Invocation<'compel' | 'sdxl_compel_prompt'>;
 
         assert(model, 'No model found in state');
         const base = model.base;
 
         if (base === 'sdxl') {
-          g = await buildSDXLGraph(state, manager);
+          const result = await buildSDXLGraph(state, manager);
+          g = result.g;
+          noise = result.noise;
+          posCond = result.posCond;
         } else if (base === 'sd-1' || base === 'sd-2') {
-          g = await buildSD1Graph(state, manager);
+          const result = await buildSD1Graph(state, manager);
+          g = result.g;
+          noise = result.noise;
+          posCond = result.posCond;
         } else {
           assert(false, `No graph builders for base ${base}`);
         }
 
-        const batchConfig = prepareLinearUIBatch(state, g, prepend);
+        const batchConfig = prepareLinearUIBatch(state, g, prepend, noise, posCond);
 
         const req = dispatch(
           queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
@@ -50,6 +64,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         req.reset();
         await req.unwrap();
       } catch (error) {
+        log.error({ error: serializeError(error) }, 'Failed to enqueue batch');
         if (didStartStaging && getState().canvasV2.session.isStaging) {
           dispatch(sessionStagingAreaReset());
         }

@@ -1,4 +1,5 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isEqual } from 'lodash-es';
@@ -22,15 +23,15 @@ export const addImageToImage = async (
   if (!isEqual(scaledSize, originalSize)) {
     // Resize the initial image to the scaled size, denoise, then resize back to the original size
     const resizeImageToScaledSize = g.addNode({
-      id: 'initial_image_resize_in',
       type: 'img_resize',
+      id: getPrefixedId('initial_image_resize_in'),
       image: { image_name },
       ...scaledSize,
     });
     const i2l = g.addNode({ id: 'i2l', type: 'i2l' });
     const resizeImageToOriginalSize = g.addNode({
-      id: 'initial_image_resize_out',
       type: 'img_resize',
+      id: getPrefixedId('initial_image_resize_out'),
       ...originalSize,
     });
 
