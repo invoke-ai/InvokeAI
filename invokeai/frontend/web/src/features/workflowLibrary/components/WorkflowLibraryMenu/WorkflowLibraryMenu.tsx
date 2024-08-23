@@ -25,7 +25,7 @@ const WorkflowLibraryMenu = () => {
   const shift = useShiftModifier();
   useGlobalMenuClose(onClose);
   return (
-    <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
+    <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose} isLazy>
       <MenuButton
         as={IconButton}
         aria-label={t('workflows.workflowEditorMenu')}

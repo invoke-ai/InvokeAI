@@ -1,3 +1,4 @@
+import type { WritableAtom } from 'nanostores';
 import { useCallback, useMemo, useState } from 'react';
 
 export const useBoolean = (initialValue: boolean) => {
@@ -18,4 +19,34 @@ export const useBoolean = (initialValue: boolean) => {
   );
 
   return api;
+};
+
+export const buildUseBoolean = ($boolean: WritableAtom<boolean>) => {
+  return () => {
+    const setTrue = useCallback(() => {
+      $boolean.set(true);
+    }, []);
+    const setFalse = useCallback(() => {
+      $boolean.set(false);
+    }, []);
+    const set = useCallback((value: boolean) => {
+      $boolean.set(value);
+    }, []);
+    const toggle = useCallback(() => {
+      $boolean.set(!$boolean.get());
+    }, []);
+
+    const api = useMemo(
+      () => ({
+        setTrue,
+        setFalse,
+        set,
+        toggle,
+        $boolean,
+      }),
+      [set, setFalse, setTrue, toggle]
+    );
+
+    return api;
+  };
 };
