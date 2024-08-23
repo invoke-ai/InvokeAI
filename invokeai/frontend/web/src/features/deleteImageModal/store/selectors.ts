@@ -9,28 +9,22 @@ import { isInvocationNode } from 'features/nodes/types/invocation';
 import { some } from 'lodash-es';
 
 import type { ImageUsage } from './types';
-
+// TODO(psyche): handle image deletion (canvas sessions?)
 export const getImageUsage = (nodes: NodesState, canvasV2: CanvasV2State, image_name: string) => {
-  const isLayerImage = canvasV2.rasterLayers.entities.some((layer) =>
-    layer.objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
-  );
-
   const isNodesImage = nodes.nodes
     .filter(isInvocationNode)
     .some((node) =>
       some(node.data.inputs, (input) => isImageFieldInputInstance(input) && input.value?.image_name === image_name)
     );
 
-  const isControlAdapterImage = canvasV2.controlLayers.entities.some(
-    (ca) => ca.imageObject?.image.image_name === image_name || ca.processedImageObject?.image.image_name === image_name
+  const isIPAdapterImage = canvasV2.ipAdapters.entities.some(
+    ({ ipAdapter }) => ipAdapter.image?.image_name === image_name
   );
 
-  const isIPAdapterImage = canvasV2.ipAdapters.entities.some((ipa) => ipa.imageObject?.image.image_name === image_name);
-
   const imageUsage: ImageUsage = {
-    isLayerImage,
+    isLayerImage: false,
     isNodesImage,
-    isControlAdapterImage,
+    isControlAdapterImage: false,
     isIPAdapterImage,
   };
 

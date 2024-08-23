@@ -15,6 +15,8 @@ import type { ImageDTO } from 'services/api/types';
 
 const log = logger('gallery');
 
+//TODO(psyche): handle image deletion (canvas sessions?)
+
 // Some utils to delete images from different parts of the app
 const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   state.nodes.present.nodes.forEach((node) => {
@@ -49,8 +51,8 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
 // };
 
 const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.canvasV2.ipAdapters.entities.forEach(({ id, imageObject }) => {
-    if (imageObject?.image.image_name === imageDTO.image_name) {
+  state.canvasV2.ipAdapters.entities.forEach(({ id, ipAdapter }) => {
+    if (ipAdapter.image?.image_name === imageDTO.image_name) {
       dispatch(ipaImageChanged({ id, imageDTO: null }));
     }
   });
