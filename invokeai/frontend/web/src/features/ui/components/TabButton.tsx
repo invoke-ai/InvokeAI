@@ -1,13 +1,13 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import type { TabName } from "../store/uiTypes";
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, type ReactElement, useCallback } from 'react';
 
-export const TabButton = memo(({ tab, icon, label }: { tab: InvokeTabName; icon: ReactElement; label: string }) => {
+export const TabButton = memo(({ tab, icon, label }: { tab: TabName; icon: ReactElement; label: string }) => {
   const dispatch = useAppDispatch();
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const activeTabName = useAppSelector(selectActiveTab);
   const onClick = useCallback(() => {
     dispatch(setActiveTab(tab));
   }, [dispatch, tab]);

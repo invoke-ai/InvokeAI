@@ -94,12 +94,6 @@ export const isSpandrelImageToImageModelConfig = (
   return config.type === 'spandrel_image_to_image';
 };
 
-export const isControlAdapterModelConfig = (
-  config: AnyModelConfig
-): config is ControlNetModelConfig | T2IAdapterModelConfig | IPAdapterModelConfig => {
-  return isControlNetModelConfig(config) || isT2IAdapterModelConfig(config) || isIPAdapterModelConfig(config);
-};
-
 export const isControlNetOrT2IAdapterModelConfig = (
   config: AnyModelConfig
 ): config is ControlNetModelConfig | T2IAdapterModelConfig => {
@@ -167,11 +161,6 @@ export type OutputFields<T extends AnyInvocation> = Extract<
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
 
-export type CAImagePostUploadAction = {
-  type: 'SET_CA_IMAGE';
-  id: string;
-};
-
 export type IPALayerImagePostUploadAction = {
   type: 'SET_IPA_IMAGE';
   id: string;
@@ -206,7 +195,6 @@ export type PostUploadAction =
   | NodesAction
   | ToastAction
   | AddToBatchAction
-  | CAImagePostUploadAction
   | IPALayerImagePostUploadAction
   | RGIPAdapterImagePostUploadAction
   | UpscaleInitialImageAction;

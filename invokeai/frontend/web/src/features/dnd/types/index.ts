@@ -18,17 +18,6 @@ type BaseDropData = {
   id: string;
 };
 
-export type CurrentImageDropData = BaseDropData & {
-  actionType: 'SET_CURRENT_IMAGE';
-};
-
-export type CAImageDropData = BaseDropData & {
-  actionType: 'SET_CA_IMAGE';
-  context: {
-    id: string;
-  };
-};
-
 export type IPAImageDropData = BaseDropData & {
   actionType: 'SET_IPA_IMAGE';
   context: {
@@ -54,10 +43,6 @@ export type AddControlLayerFromImageDropData = BaseDropData & {
 
 type UpscaleInitialImageDropData = BaseDropData & {
   actionType: 'SET_UPSCALE_INITIAL_IMAGE';
-};
-
-export type InitialImageDropData = BaseDropData & {
-  actionType: 'SET_INITIAL_IMAGE';
 };
 
 type NodesImageDropData = BaseDropData & {
@@ -86,11 +71,9 @@ export type SelectForCompareDropData = BaseDropData & {
 };
 
 export type TypesafeDroppableData =
-  | CurrentImageDropData
   | NodesImageDropData
   | AddToBoardDropData
   | RemoveFromBoardDropData
-  | CAImageDropData
   | IPAImageDropData
   | RGIPAdapterImageDropData
   | SelectForCompareDropData

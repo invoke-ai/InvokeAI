@@ -524,9 +524,6 @@ const zCanvasRectState = z.object({
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
-const zLayerEffect = z.enum(['LightnessToAlphaFilter']);
-export type LayerEffect = z.infer<typeof zLayerEffect>;
-
 const zCanvasImageState = z.object({
   id: zId,
   type: z.literal('image'),
@@ -540,7 +537,6 @@ const zCanvasObjectState = z.discriminatedUnion('type', [
   zCanvasEraserLineState,
   zCanvasRectState,
 ]);
-export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
 
 const zIPAdapterConfig = z.object({
   image: zImageWithDims.nullable(),
@@ -822,9 +818,6 @@ export type StageAttrs = {
   height: Dimensions['height'];
   scale: number;
 };
-export type PositionChangedArg = { id: string; position: Coordinate };
-export type ScaleChangedArg = { id: string; scale: Coordinate; position: Coordinate };
-export type BboxChangedArg = { id: string; bbox: Rect | null };
 
 export type EntityIdentifierPayload<T = object> = { entityIdentifier: CanvasEntityIdentifier } & T;
 export type EntityMovedPayload = EntityIdentifierPayload<{ position: Coordinate }>;
@@ -836,7 +829,6 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
   rect: Rect;
   replaceObjects: boolean;
 }>;
-export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: Coordinate };
 
 /**
  * A helper type to remove `[index: string]: any;` from a type.
@@ -845,9 +837,9 @@ export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: C
  * `RectConfig`, `ImageConfig`, etc all include `[index: string]: any;` in their type signature.
  * TODO(psyche): Fix this upstream.
  */
-export type RemoveIndexString<T> = {
-  [K in keyof T as string extends K ? never : K]: T[K];
-};
+// export type RemoveIndexString<T> = {
+//   [K in keyof T as string extends K ? never : K]: T[K];
+// };
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 

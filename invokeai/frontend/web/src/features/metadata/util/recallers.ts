@@ -21,7 +21,6 @@ import {
   negativePromptChanged,
   positivePrompt2Changed,
   positivePromptChanged,
-  rasterLayerAllDeleted,
   rasterLayerRecalled,
   refinerModelChanged,
   rgRecalled,
@@ -40,7 +39,6 @@ import {
   vaeSelected,
 } from 'features/controlLayers/store/canvasV2Slice';
 import type {
-  CanvasControlAdapterState,
   CanvasIPAdapterState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,

@@ -2,18 +2,12 @@ import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { merge } from 'lodash-es';
-import { assert } from 'tsafe';
 
 import type { CanvasControlLayerState, CanvasRasterLayerState, CanvasV2State } from './types';
 import { initialControlNet } from './types';
 
-export const selectRasterLayer = (state: CanvasV2State, id: string) =>
+const selectRasterLayerEntity = (state: CanvasV2State, id: string) =>
   state.rasterLayers.entities.find((layer) => layer.id === id);
-export const selectLayerOrThrow = (state: CanvasV2State, id: string) => {
-  const layer = selectRasterLayer(state, id);
-  assert(layer, `Layer with id ${id} not found`);
-  return layer;
-};
 
 export const rasterLayersReducers = {
   rasterLayerAdded: {
@@ -46,13 +40,10 @@ export const rasterLayersReducers = {
     state.rasterLayers.entities.push(data);
     state.selectedEntityIdentifier = { type: 'raster_layer', id: data.id };
   },
-  rasterLayerAllDeleted: (state) => {
-    state.rasterLayers.entities = [];
-  },
   rasterLayerConvertedToControlLayer: {
     reducer: (state, action: PayloadAction<{ id: string; newId: string }>) => {
       const { id, newId } = action.payload;
-      const layer = selectRasterLayer(state, id);
+      const layer = selectRasterLayerEntity(state, id);
       if (!layer) {
         return;
       }

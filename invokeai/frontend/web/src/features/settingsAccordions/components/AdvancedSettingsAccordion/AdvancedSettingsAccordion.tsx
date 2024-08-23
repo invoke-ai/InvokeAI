@@ -14,7 +14,7 @@ import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedS
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
@@ -30,7 +30,7 @@ const formLabelProps2: FormLabelProps = {
 export const AdvancedSettingsAccordion = memo(() => {
   const vaeKey = useAppSelector((state) => state.canvasV2.params.vae?.key);
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const activeTabName = useAppSelector(selectActiveTab);
 
   const selectBadges = useMemo(
     () =>
