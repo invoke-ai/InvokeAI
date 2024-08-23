@@ -14,12 +14,12 @@ import type {
   ControlNetConfig,
   T2IAdapterConfig,
 } from './types';
-import { initialControlNetV2 } from './types';
+import { initialControlNet } from './types';
 
-export const selectControlLayer = (state: CanvasV2State, id: string) =>
-  state.controlLayers.entities.find((layer) => layer.id === id);
-export const selectControlLayerOrThrow = (state: CanvasV2State, id: string) => {
-  const layer = selectControlLayer(state, id);
+const selectControlLayerEntity = (state: CanvasV2State, id: string) =>
+  state.controlLayers.entities.find((entity) => entity.id === id);
+export const selectControlLayerEntityOrThrow = (state: CanvasV2State, id: string) => {
+  const layer = selectControlLayerEntity(state, id);
   assert(layer, `Layer with id ${id} not found`);
   return layer;
 };
@@ -40,7 +40,7 @@ export const controlLayersReducers = {
         objects: [],
         opacity: 1,
         position: { x: 0, y: 0 },
-        controlAdapter: deepClone(initialControlNetV2),
+        controlAdapter: deepClone(initialControlNet),
       };
       merge(layer, overrides);
       state.controlLayers.entities.push(layer);
@@ -63,7 +63,7 @@ export const controlLayersReducers = {
   controlLayerConvertedToRasterLayer: {
     reducer: (state, action: PayloadAction<{ id: string; newId: string }>) => {
       const { id, newId } = action.payload;
-      const layer = selectControlLayer(state, id);
+      const layer = selectControlLayerEntity(state, id);
       if (!layer) {
         return;
       }
@@ -95,7 +95,7 @@ export const controlLayersReducers = {
     }>
   ) => {
     const { id, modelConfig } = action.payload;
-    const layer = selectControlLayer(state, id);
+    const layer = selectControlLayerEntity(state, id);
     if (!layer || !layer.controlAdapter) {
       return;
     }
@@ -123,7 +123,7 @@ export const controlLayersReducers = {
   },
   controlLayerControlModeChanged: (state, action: PayloadAction<{ id: string; controlMode: ControlModeV2 }>) => {
     const { id, controlMode } = action.payload;
-    const layer = selectControlLayer(state, id);
+    const layer = selectControlLayerEntity(state, id);
     if (!layer || !layer.controlAdapter || layer.controlAdapter.type !== 'controlnet') {
       return;
     }
@@ -131,7 +131,7 @@ export const controlLayersReducers = {
   },
   controlLayerWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
     const { id, weight } = action.payload;
-    const layer = selectControlLayer(state, id);
+    const layer = selectControlLayerEntity(state, id);
     if (!layer || !layer.controlAdapter) {
       return;
     }
@@ -142,7 +142,7 @@ export const controlLayersReducers = {
     action: PayloadAction<{ id: string; beginEndStepPct: [number, number] }>
   ) => {
     const { id, beginEndStepPct } = action.payload;
-    const layer = selectControlLayer(state, id);
+    const layer = selectControlLayerEntity(state, id);
     if (!layer || !layer.controlAdapter) {
       return;
     }
@@ -150,7 +150,7 @@ export const controlLayersReducers = {
   },
   controlLayerWithTransparencyEffectToggled: (state, action: PayloadAction<{ id: string }>) => {
     const { id } = action.payload;
-    const layer = selectControlLayer(state, id);
+    const layer = selectControlLayerEntity(state, id);
     if (!layer) {
       return;
     }

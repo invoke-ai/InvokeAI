@@ -4,9 +4,9 @@ import type { CanvasControlAdapterState, CanvasIPAdapterState, CanvasRasterLayer
 import {
   IMAGE_FILTERS,
   imageDTOToImageWithDims,
-  initialControlNetV2,
-  initialIPAdapterV2,
-  initialT2IAdapterV2,
+  initialControlNet,
+  initialIPAdapter,
+  initialT2IAdapter,
   isFilterType,
   zCanvasRasterLayerState,
 } from 'features/controlLayers/store/types';
@@ -563,8 +563,8 @@ const parseControlNetToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapt
     ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults()
     : null;
   const beginEndStepPct: [number, number] = [
-    begin_step_percent ?? initialControlNetV2.beginEndStepPct[0],
-    end_step_percent ?? initialControlNetV2.beginEndStepPct[1],
+    begin_step_percent ?? initialControlNet.beginEndStepPct[0],
+    end_step_percent ?? initialControlNet.beginEndStepPct[1],
   ];
   const imageDTO = image ? await getImageDTO(image.image_name) : null;
   const processedImageDTO = processedImage ? await getImageDTO(processedImage.image_name) : null;
@@ -581,9 +581,9 @@ const parseControlNetToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapt
     y: 0,
     adapterType: 'controlnet',
     model: zModelIdentifierField.parse(controlNetModel),
-    weight: typeof control_weight === 'number' ? control_weight : initialControlNetV2.weight,
+    weight: typeof control_weight === 'number' ? control_weight : initialControlNet.weight,
     beginEndStepPct,
-    controlMode: control_mode ?? initialControlNetV2.controlMode,
+    controlMode: control_mode ?? initialControlNet.controlMode,
     image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
     processedImage: processedImageDTO ? imageDTOToImageWithDims(processedImageDTO) : null,
     processorConfig,
@@ -624,8 +624,8 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapt
     ? IMAGE_FILTERS[defaultPreprocessor].buildDefaults()
     : null;
   const beginEndStepPct: [number, number] = [
-    begin_step_percent ?? initialT2IAdapterV2.beginEndStepPct[0],
-    end_step_percent ?? initialT2IAdapterV2.beginEndStepPct[1],
+    begin_step_percent ?? initialT2IAdapter.beginEndStepPct[0],
+    end_step_percent ?? initialT2IAdapter.beginEndStepPct[1],
   ];
   const imageDTO = image ? await getImageDTO(image.image_name) : null;
   const processedImageDTO = processedImage ? await getImageDTO(processedImage.image_name) : null;
@@ -642,7 +642,7 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<CanvasControlAdapt
     y: 0,
     adapterType: 't2i_adapter',
     model: zModelIdentifierField.parse(t2iAdapterModel),
-    weight: typeof weight === 'number' ? weight : initialT2IAdapterV2.weight,
+    weight: typeof weight === 'number' ? weight : initialT2IAdapter.weight,
     beginEndStepPct,
     image: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
     processedImage: processedImageDTO ? imageDTOToImageWithDims(processedImageDTO) : null,
@@ -680,8 +680,8 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasIPAdapterState> = 
     .parse(await getProperty(metadataItem, 'end_step_percent'));
 
   const beginEndStepPct: [number, number] = [
-    begin_step_percent ?? initialIPAdapterV2.beginEndStepPct[0],
-    end_step_percent ?? initialIPAdapterV2.beginEndStepPct[1],
+    begin_step_percent ?? initialIPAdapter.beginEndStepPct[0],
+    end_step_percent ?? initialIPAdapter.beginEndStepPct[1],
   ];
   const imageDTO = image ? await getImageDTO(image.image_name) : null;
 
@@ -690,11 +690,11 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasIPAdapterState> = 
     type: 'ip_adapter',
     isEnabled: true,
     model: zModelIdentifierField.parse(ipAdapterModel),
-    weight: typeof weight === 'number' ? weight : initialIPAdapterV2.weight,
+    weight: typeof weight === 'number' ? weight : initialIPAdapter.weight,
     beginEndStepPct,
     imageObject: imageDTO ? imageDTOToImageWithDims(imageDTO) : null,
-    clipVisionModel: initialIPAdapterV2.clipVisionModel, // TODO: This needs to be added to the zIPAdapterField...
-    method: method ?? initialIPAdapterV2.method,
+    clipVisionModel: initialIPAdapter.clipVisionModel, // TODO: This needs to be added to the zIPAdapterField...
+    method: method ?? initialIPAdapter.method,
   };
 
   return layer;

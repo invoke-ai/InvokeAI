@@ -5,6 +5,7 @@ import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea
 import { ControlLayersToolbar } from 'features/controlLayers/components/ControlLayersToolbar';
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { StageComponent } from 'features/controlLayers/components/StageComponent';
+import { StagingAreaIsStagingGate } from 'features/controlLayers/components/StagingArea/StagingAreaIsStagingGate';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
 import { Transform } from 'features/controlLayers/components/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -32,7 +33,9 @@ export const CanvasEditor = memo(() => {
       <ControlLayersToolbar />
       <StageComponent />
       <Flex position="absolute" bottom={2} gap={2} align="center" justify="center">
-        <StagingAreaToolbar />
+        <StagingAreaIsStagingGate>
+          <StagingAreaToolbar />
+        </StagingAreaIsStagingGate>
       </Flex>
       <Flex position="absolute" bottom={16}>
         <CanvasManagerProviderGate>
