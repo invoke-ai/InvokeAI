@@ -66,11 +66,6 @@ export const setScopes = (scopes: InteractionScope[]) => {
   log.trace(`Set scopes: ${formatScopes($activeScopes.get())}`);
 };
 
-export const clearScopes = () => {
-  $activeScopes.set(new Set());
-  log.trace(`Cleared scopes`);
-};
-
 export const useScopeOnFocus = (scope: InteractionScope, ref: RefObject<HTMLElement>) => {
   useEffect(() => {
     const element = ref.current;
