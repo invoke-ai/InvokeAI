@@ -266,6 +266,8 @@ export const canvasV2Slice = createSlice({
         assert(false, `Cannot add a brush line to a non-drawable entity of type ${entity.type}`);
       }
 
+      // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
+      // re-render it (reference equality check). I don't like this behaviour.
       entity.objects.push({ ...brushLine, points: simplifyFlatNumbersArray(brushLine.points) });
     },
     entityEraserLineAdded: (state, action: PayloadAction<EntityEraserLineAddedPayload>) => {
@@ -279,6 +281,8 @@ export const canvasV2Slice = createSlice({
         assert(false, `Cannot add a eraser line to a non-drawable entity of type ${entity.type}`);
       }
 
+      // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
+      // re-render it (reference equality check). I don't like this behaviour.
       entity.objects.push({ ...eraserLine, points: simplifyFlatNumbersArray(eraserLine.points) });
     },
     entityRectAdded: (state, action: PayloadAction<EntityRectAddedPayload>) => {
@@ -292,7 +296,9 @@ export const canvasV2Slice = createSlice({
         assert(false, `Cannot add a rect to a non-drawable entity of type ${entity.type}`);
       }
 
-      entity.objects.push(rect);
+      // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
+      // re-render it (reference equality check). I don't like this behaviour.
+      entity.objects.push({ ...rect });
     },
     entityDeleted: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
