@@ -1,21 +1,22 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
   CanvasRegionalGuidanceState,
   Rect,
   RegionalGuidanceIPAdapterConfig,
 } from 'features/controlLayers/store/types';
-import {
-  PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX,
-  PROMPT_REGION_MASK_TO_TENSOR_PREFIX,
-  PROMPT_REGION_NEGATIVE_COND_PREFIX,
-  PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX,
-  PROMPT_REGION_POSITIVE_COND_PREFIX,
-} from 'features/nodes/util/graph/constants';
-import { addIPAdapterCollectorSafe, isValidIPAdapter } from 'features/nodes/util/graph/generation/addIPAdapters';
+import { isValidIPAdapter } from 'features/nodes/util/graph/generation/addIPAdapters';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
+
+type AddedRegionResult = {
+  addedPositivePrompt: boolean;
+  addedNegativePrompt: boolean;
+  addedAutoNegativePositivePrompt: boolean;
+  addedIPAdapters: number;
+};
 
 /**
  * Adds regional guidance to the graph
@@ -27,6 +28,7 @@ import { assert } from 'tsafe';
  * @param negCond The negative conditioning node
  * @param posCondCollect The positive conditioning collector
  * @param negCondCollect The negative conditioning collector
+ * @param ipAdapterCollect The IP adapter collector
  * @returns A promise that resolves to the regions that were successfully added to the graph
  */
 
@@ -40,21 +42,29 @@ export const addRegions = async (
   posCond: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'>,
   negCond: Invocation<'compel'> | Invocation<'sdxl_compel_prompt'>,
   posCondCollect: Invocation<'collect'>,
-  negCondCollect: Invocation<'collect'>
-): Promise<CanvasRegionalGuidanceState[]> => {
+  negCondCollect: Invocation<'collect'>,
+  ipAdapterCollect: Invocation<'collect'>
+): Promise<AddedRegionResult[]> => {
   const isSDXL = base === 'sdxl';
 
   const validRegions = regions.filter((rg) => isValidRegion(rg, base));
+  const results: AddedRegionResult[] = [];
 
   for (const region of validRegions) {
+    const result: AddedRegionResult = {
+      addedPositivePrompt: false,
+      addedNegativePrompt: false,
+      addedAutoNegativePositivePrompt: false,
+      addedIPAdapters: 0,
+    };
     const adapter = manager.adapters.regionMasks.get(region.id);
     assert(adapter, 'Adapter not found');
     const imageDTO = await adapter.renderer.rasterize({ rect: bbox });
 
     // The main mask-to-tensor node
     const maskToTensor = g.addNode({
-      id: `${PROMPT_REGION_MASK_TO_TENSOR_PREFIX}_${region.id}`,
       type: 'alpha_mask_to_tensor',
+      id: getPrefixedId('prompt_region_mask_to_tensor'),
       image: {
         image_name: imageDTO.image_name,
       },
@@ -62,17 +72,18 @@ export const addRegions = async (
 
     if (region.positivePrompt) {
       // The main positive conditioning node
+      result.addedPositivePrompt = true;
       const regionalPosCond = g.addNode(
         isSDXL
           ? {
               type: 'sdxl_compel_prompt',
-              id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${region.id}`,
+              id: getPrefixedId('prompt_region_positive_cond'),
               prompt: region.positivePrompt,
               style: region.positivePrompt, // TODO: Should we put the positive prompt in both fields?
             }
           : {
               type: 'compel',
-              id: `${PROMPT_REGION_POSITIVE_COND_PREFIX}_${region.id}`,
+              id: getPrefixedId('prompt_region_positive_cond'),
               prompt: region.positivePrompt,
             }
       );
@@ -99,18 +110,19 @@ export const addRegions = async (
     }
 
     if (region.negativePrompt) {
+      result.addedNegativePrompt = true;
       // The main negative conditioning node
       const regionalNegCond = g.addNode(
         isSDXL
           ? {
               type: 'sdxl_compel_prompt',
-              id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${region.id}`,
+              id: getPrefixedId('prompt_region_negative_cond'),
               prompt: region.negativePrompt,
               style: region.negativePrompt,
             }
           : {
               type: 'compel',
-              id: `${PROMPT_REGION_NEGATIVE_COND_PREFIX}_${region.id}`,
+              id: getPrefixedId('prompt_region_negative_cond'),
               prompt: region.negativePrompt,
             }
       );
@@ -135,10 +147,11 @@ export const addRegions = async (
     }
 
     // If we are using the "invert" auto-negative setting, we need to add an additional negative conditioning node
-    if (region.autoNegative === 'invert' && region.positivePrompt) {
+    if (region.autoNegative && region.positivePrompt) {
+      result.addedAutoNegativePositivePrompt = true;
       // We re-use the mask image, but invert it when converting to tensor
       const invertTensorMask = g.addNode({
-        id: `${PROMPT_REGION_INVERT_TENSOR_MASK_PREFIX}_${region.id}`,
+        id: getPrefixedId('prompt_region_invert_tensor_mask'),
         type: 'invert_tensor_mask',
       });
       // Connect the OG mask image to the inverted mask-to-tensor node
@@ -148,13 +161,13 @@ export const addRegions = async (
         isSDXL
           ? {
               type: 'sdxl_compel_prompt',
-              id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${region.id}`,
+              id: getPrefixedId('prompt_region_positive_cond_inverted'),
               prompt: region.positivePrompt,
               style: region.positivePrompt,
             }
           : {
               type: 'compel',
-              id: `${PROMPT_REGION_POSITIVE_COND_INVERTED_PREFIX}_${region.id}`,
+              id: getPrefixedId('prompt_region_positive_cond_inverted'),
               prompt: region.positivePrompt,
             }
       );
@@ -183,7 +196,7 @@ export const addRegions = async (
     );
 
     for (const ipa of validRGIPAdapters) {
-      const ipAdapterCollect = addIPAdapterCollectorSafe(g, denoise);
+      result.addedIPAdapters++;
       const { id, weight, model, clipVisionModel, method, beginEndStepPct, image } = ipa;
       assert(model, 'IP Adapter model is required');
       assert(image, 'IP Adapter image is required');
@@ -206,14 +219,18 @@ export const addRegions = async (
       g.addEdge(maskToTensor, 'mask', ipAdapter, 'mask');
       g.addEdge(ipAdapter, 'ip_adapter', ipAdapterCollect, 'item');
     }
+
+    results.push(result);
   }
 
   g.upsertMetadata({ regions: validRegions });
-  return validRegions;
+
+  return results;
 };
 
 export const isValidRegion = (rg: CanvasRegionalGuidanceState, base: BaseModelType) => {
+  const isEnabled = rg.isEnabled;
   const hasTextPrompt = Boolean(rg.positivePrompt || rg.negativePrompt);
   const hasIPAdapter = rg.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base)).length > 0;
-  return hasTextPrompt || hasIPAdapter;
+  return isEnabled && (hasTextPrompt || hasIPAdapter);
 };

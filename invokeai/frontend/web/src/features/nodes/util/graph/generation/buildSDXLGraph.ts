@@ -1,21 +1,9 @@
 import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
-import {
-  CANVAS_OUTPUT,
-  LATENTS_TO_IMAGE,
-  NEGATIVE_CONDITIONING,
-  NEGATIVE_CONDITIONING_COLLECT,
-  NOISE,
-  POSITIVE_CONDITIONING,
-  POSITIVE_CONDITIONING_COLLECT,
-  SDXL_CONTROL_LAYERS_GRAPH,
-  SDXL_DENOISE_LATENTS,
-  SDXL_MODEL_LOADER,
-  VAE_LOADER,
-} from 'features/nodes/util/graph/constants';
-import { addControlAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
+import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addIPAdapters } from 'features/nodes/util/graph/generation/addIPAdapters';
@@ -36,7 +24,10 @@ import { addRegions } from './addRegions';
 
 const log = logger('system');
 
-export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): Promise<Graph> => {
+export const buildSDXLGraph = async (
+  state: RootState,
+  manager: CanvasManager
+): Promise<{ g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'sdxl_compel_prompt'> }> => {
   const generationMode = manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SDXL graph');
 
@@ -62,35 +53,35 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
 
   const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
 
-  const g = new Graph(SDXL_CONTROL_LAYERS_GRAPH);
+  const g = new Graph(getPrefixedId('sdxl_graph'));
   const modelLoader = g.addNode({
     type: 'sdxl_model_loader',
-    id: SDXL_MODEL_LOADER,
+    id: getPrefixedId('sdxl_model_loader'),
     model,
   });
   const posCond = g.addNode({
     type: 'sdxl_compel_prompt',
-    id: POSITIVE_CONDITIONING,
+    id: getPrefixedId('pos_cond'),
     prompt: positivePrompt,
     style: positiveStylePrompt,
   });
   const posCondCollect = g.addNode({
     type: 'collect',
-    id: POSITIVE_CONDITIONING_COLLECT,
+    id: getPrefixedId('pos_cond_collect'),
   });
   const negCond = g.addNode({
     type: 'sdxl_compel_prompt',
-    id: NEGATIVE_CONDITIONING,
+    id: getPrefixedId('neg_cond'),
     prompt: negativePrompt,
     style: negativeStylePrompt,
   });
   const negCondCollect = g.addNode({
     type: 'collect',
-    id: NEGATIVE_CONDITIONING_COLLECT,
+    id: getPrefixedId('neg_cond_collect'),
   });
   const noise = g.addNode({
     type: 'noise',
-    id: NOISE,
+    id: getPrefixedId('noise'),
     seed,
     width: scaledSize.width,
     height: scaledSize.height,
@@ -98,7 +89,7 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
   });
   const denoise = g.addNode({
     type: 'denoise_latents',
-    id: SDXL_DENOISE_LATENTS,
+    id: getPrefixedId('denoise_latents'),
     cfg_scale,
     cfg_rescale_multiplier,
     scheduler,
@@ -108,14 +99,14 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
   });
   const l2i = g.addNode({
     type: 'l2i',
-    id: LATENTS_TO_IMAGE,
+    id: getPrefixedId('l2i'),
     fp32: vaePrecision === 'fp32',
   });
   const vaeLoader =
     vae?.base === model.base
       ? g.addNode({
           type: 'vae_loader',
-          id: VAE_LOADER,
+          id: getPrefixedId('vae'),
           vae_model: vae,
         })
       : null;
@@ -216,16 +207,47 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
     );
   }
 
-  const _addedCAs = await addControlAdapters(
+  const controlNetCollector = g.createNode({
+    type: 'collect',
+    id: getPrefixedId('control_net_collector'),
+  });
+  const controlNetResult = await addControlNets(
     manager,
     state.canvasV2.controlLayers.entities,
     g,
     state.canvasV2.bbox.rect,
-    denoise,
+    controlNetCollector,
     modelConfig.base
   );
-  const _addedIPAs = addIPAdapters(state.canvasV2.ipAdapters.entities, g, denoise, modelConfig.base);
-  const _addedRegions = await addRegions(
+  if (controlNetResult.addedControlNets > 0) {
+    g.addNode(controlNetCollector);
+    g.addEdge(controlNetCollector, 'collection', denoise, 'control');
+  }
+
+  const t2iAdapterCollector = g.createNode({
+    type: 'collect',
+    id: getPrefixedId('t2i_adapter_collector'),
+  });
+  const t2iAdapterResult = await addT2IAdapters(
+    manager,
+    state.canvasV2.controlLayers.entities,
+    g,
+    state.canvasV2.bbox.rect,
+    controlNetCollector,
+    modelConfig.base
+  );
+  if (t2iAdapterResult.addedT2IAdapters > 0) {
+    g.addNode(t2iAdapterCollector);
+    g.addEdge(t2iAdapterCollector, 'collection', denoise, 't2i_adapter');
+  }
+
+  const ipAdapterCollector = g.createNode({
+    type: 'collect',
+    id: getPrefixedId('ip_adapter_collector'),
+  });
+  const ipAdapterResult = addIPAdapters(state.canvasV2.ipAdapters.entities, g, ipAdapterCollector, modelConfig.base);
+
+  const regionsResult = await addRegions(
     manager,
     state.canvasV2.regions.entities,
     g,
@@ -235,8 +257,16 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
     posCond,
     negCond,
     posCondCollect,
-    negCondCollect
+    negCondCollect,
+    ipAdapterCollector
   );
+
+  const totalIPAdaptersAdded =
+    ipAdapterResult.addedIPAdapters + regionsResult.reduce((acc, r) => acc + r.addedIPAdapters, 0);
+  if (totalIPAdaptersAdded > 0) {
+    g.addNode(ipAdapterCollector);
+    g.addEdge(ipAdapterCollector, 'collection', denoise, 'ip_adapter');
+  }
 
   if (state.system.shouldUseNSFWChecker) {
     canvasOutput = addNSFWChecker(g, canvasOutput);
@@ -249,12 +279,12 @@ export const buildSDXLGraph = async (state: RootState, manager: CanvasManager): 
   const shouldSaveToGallery = session.mode === 'generate' || settings.autoSave;
 
   g.updateNode(canvasOutput, {
-    id: CANVAS_OUTPUT,
+    id: getPrefixedId('canvas_output'),
     is_intermediate: !shouldSaveToGallery,
     use_cache: false,
     board: getBoardField(state),
   });
 
   g.setMetadataReceivingNode(canvasOutput);
-  return g;
+  return { g, noise, posCond };
 };

@@ -17,8 +17,9 @@ import { atom, computed } from 'nanostores';
 import { api, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
+import type { S } from 'services/api/types';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
-import type { ClientToServerEvents, InvocationDenoiseProgressEvent, ServerToClientEvents } from 'services/events/types';
+import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 
 export const socketConnected = createAction('socket/connected');
@@ -34,8 +35,8 @@ type SetEventListenersArg = {
 
 const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 const nodeTypeDenylist = ['load_image', 'image'];
-export const $lastProgressEvent = atom<InvocationDenoiseProgressEvent | null>(null);
-export const $lastCanvasProgressEvent = atom<InvocationDenoiseProgressEvent | null>(null);
+export const $lastProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
+export const $lastCanvasProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
 export const $hasProgress = computed($lastProgressEvent, (val) => Boolean(val));
 export const $progressImage = computed($lastProgressEvent, (val) => val?.progress_image ?? null);
 const cancellations = new Set<string>();
