@@ -3,14 +3,14 @@ import { getEventCoordinates } from '@dnd-kit/utilities';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $viewport } from 'features/nodes/store/nodesSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback } from 'react';
 
 /**
  * Applies scaling to the drag transform (if on node editor tab) and centers it on cursor.
  */
 export const useScaledModifer = () => {
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const activeTabName = useAppSelector(selectActiveTab);
   const workflowsViewport = useStore($viewport);
   const modifier: Modifier = useCallback(
     ({ activatorEvent, draggingNodeRect, transform }) => {

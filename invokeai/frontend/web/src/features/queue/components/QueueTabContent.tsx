@@ -1,7 +1,7 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 import InvocationCacheStatus from './InvocationCacheStatus';
@@ -11,7 +11,7 @@ import QueueTabQueueControls from './QueueTabQueueControls';
 
 const QueueTabContent = () => {
   const isInvocationCacheEnabled = useFeatureStatus('invocationCache');
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const activeTabName = useAppSelector(selectActiveTab);
 
   return (
     <Flex

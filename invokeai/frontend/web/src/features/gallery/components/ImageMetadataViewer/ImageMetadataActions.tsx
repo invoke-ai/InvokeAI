@@ -6,7 +6,7 @@ import { MetadataLayers } from 'features/metadata/components/MetadataLayers';
 import { MetadataLoRAs } from 'features/metadata/components/MetadataLoRAs';
 import { MetadataT2IAdapters } from 'features/metadata/components/MetadataT2IAdapters';
 import { handlers } from 'features/metadata/util/handlers';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 type Props = {
@@ -14,7 +14,7 @@ type Props = {
 };
 
 const ImageMetadataActions = (props: Props) => {
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const activeTabName = useAppSelector(selectActiveTab);
   const { metadata } = props;
 
   if (!metadata || Object.keys(metadata).length === 0) {

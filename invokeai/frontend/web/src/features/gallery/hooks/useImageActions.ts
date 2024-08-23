@@ -4,7 +4,7 @@ import { handlers, parseAndRecallAllMetadata, parseAndRecallPrompts } from 'feat
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -13,8 +13,8 @@ import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 export const useImageActions = (image_name?: string) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const activeTabName = useAppSelector(activeTabNameSelector);
   const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
+  const activeTabName = useAppSelector(selectActiveTab);
   const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(image_name);
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasSeed, setHasSeed] = useState(false);

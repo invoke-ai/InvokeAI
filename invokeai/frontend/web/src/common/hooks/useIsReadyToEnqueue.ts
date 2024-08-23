@@ -12,7 +12,7 @@ import { isInvocationNode } from 'features/nodes/types/invocation';
 import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
@@ -36,7 +36,7 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
       selectCanvasV2Slice,
       selectUpscalelice,
       selectConfigSlice,
-      activeTabNameSelector,
+      selectActiveTab,
     ],
     (system, nodes, workflowSettings, dynamicPrompts, canvasV2, upscale, config, activeTabName) => {
       const { bbox } = canvasV2;
