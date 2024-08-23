@@ -17,7 +17,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     IsEmptyResult,
     IsFullResult,
     PruneResult,
-    QueueItemOrigin,
     SessionQueueItem,
     SessionQueueItemDTO,
     SessionQueueItemNotFoundError,
@@ -427,7 +426,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         return CancelByBatchIDsResult(canceled=count)
 
-    def cancel_by_origin(self, queue_id: str, origin: QueueItemOrigin) -> CancelByOriginResult:
+    def cancel_by_origin(self, queue_id: str, origin: str) -> CancelByOriginResult:
         try:
             current_queue_item = self.get_current(queue_id)
             self.__lock.acquire()
