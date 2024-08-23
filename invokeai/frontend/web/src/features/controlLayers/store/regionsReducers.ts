@@ -10,7 +10,6 @@ import type {
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import type { ParameterAutoNegative } from 'features/parameters/types/parameterSchemas';
 import { isEqual } from 'lodash-es';
 import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -71,7 +70,7 @@ export const regionsReducers = {
         },
         opacity: 0.5,
         position: { x: 0, y: 0 },
-        autoNegative: 'invert',
+        autoNegative: true,
         positivePrompt: '',
         negativePrompt: null,
         ipAdapters: [],
@@ -122,13 +121,13 @@ export const regionsReducers = {
     entity.fill.style = style;
   },
 
-  rgAutoNegativeChanged: (state, action: PayloadAction<{ id: string; autoNegative: ParameterAutoNegative }>) => {
-    const { id, autoNegative } = action.payload;
+  rgAutoNegativeToggled: (state, action: PayloadAction<{ id: string }>) => {
+    const { id } = action.payload;
     const rg = selectRegionalGuidanceEntity(state, id);
     if (!rg) {
       return;
     }
-    rg.autoNegative = autoNegative;
+    rg.autoNegative = !rg.autoNegative;
   },
   rgIPAdapterAdded: (state, action: PayloadAction<{ id: string; ipAdapter: RegionalGuidanceIPAdapterConfig }>) => {
     const { id, ipAdapter } = action.payload;

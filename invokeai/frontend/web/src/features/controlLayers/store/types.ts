@@ -26,7 +26,6 @@ import type {
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import {
-  zAutoNegative,
   zParameterNegativePrompt,
   zParameterPositivePrompt,
 } from 'features/parameters/types/parameterSchemas';
@@ -671,7 +670,7 @@ export const zCanvasRegionalGuidanceState = z.object({
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
   ipAdapters: z.array(zRegionalGuidanceIPAdapterConfig),
-  autoNegative: zAutoNegative,
+  autoNegative: z.boolean(),
 });
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
 

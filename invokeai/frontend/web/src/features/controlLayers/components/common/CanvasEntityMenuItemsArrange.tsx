@@ -33,6 +33,16 @@ const getIndexAndCount = (
       index: canvasV2.regions.entities.findIndex((entity) => entity.id === id),
       count: canvasV2.regions.entities.length,
     };
+  } else if (type === 'inpaint_mask') {
+    return {
+      index: canvasV2.inpaintMasks.entities.findIndex((entity) => entity.id === id),
+      count: canvasV2.inpaintMasks.entities.length,
+    };
+  } else if (type === 'ip_adapter') {
+    return {
+      index: canvasV2.ipAdapters.entities.findIndex((entity) => entity.id === id),
+      count: canvasV2.ipAdapters.entities.length,
+    };
   } else {
     return {
       index: -1,

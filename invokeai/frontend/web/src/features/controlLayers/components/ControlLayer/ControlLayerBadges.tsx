@@ -1,24 +1,26 @@
 import { Badge } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectRegionalGuidanceEntityOrThrow } from 'features/controlLayers/store/regionsReducers';
+import { selectControlLayerOrThrow } from 'features/controlLayers/store/controlLayersReducers';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const RegionalGuidanceBadges = memo(() => {
+export const ControlLayerBadges = memo(() => {
   const { id } = useEntityIdentifierContext();
   const { t } = useTranslation();
-  const autoNegative = useAppSelector((s) => selectRegionalGuidanceEntityOrThrow(s.canvasV2, id).autoNegative);
+  const withTransparencyEffect = useAppSelector(
+    (s) => selectControlLayerOrThrow(s.canvasV2, id).withTransparencyEffect
+  );
 
   return (
     <>
-      {autoNegative && (
+      {withTransparencyEffect && (
         <Badge color="base.300" bg="transparent" borderWidth={1} userSelect="none">
-          {t('controlLayers.autoNegative')}
+          {t('controlLayers.transparency')}
         </Badge>
       )}
     </>
   );
 });
 
-RegionalGuidanceBadges.displayName = 'RegionalGuidanceBadges';
+ControlLayerBadges.displayName = 'ControlLayerBadges';
