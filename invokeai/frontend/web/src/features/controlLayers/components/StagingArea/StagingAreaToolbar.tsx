@@ -23,6 +23,7 @@ import {
   PiTrashSimpleBold,
   PiXBold,
 } from 'react-icons/pi';
+import { useChangeImageIsIntermediateMutation } from 'services/api/endpoints/images';
 
 export const StagingAreaToolbar = memo(() => {
   const dispatch = useAppDispatch();
@@ -33,7 +34,7 @@ export const StagingAreaToolbar = memo(() => {
     return images[session.selectedStagedImageIndex] ?? null;
   }, [images, session.selectedStagedImageIndex]);
   const isCanvasActive = useStore(INTERACTION_SCOPES.canvas.$isActive);
-  // const [changeIsImageIntermediate] = useChangeImageIsIntermediateMutation();
+  const [changeIsImageIntermediate] = useChangeImageIsIntermediateMutation();
 
   const { t } = useTranslation();
 
@@ -71,18 +72,12 @@ export const StagingAreaToolbar = memo(() => {
     $shouldShowStagedImage.set(!shouldShowStagedImage);
   }, [shouldShowStagedImage]);
 
-  const onSaveStagingImage = useCallback(
-    () => {
-      // if (!imageDTO) {
-      //   return;
-      // }
-      // changeIsImageIntermediate({ imageDTO, is_intermediate: false });
-    },
-    [
-      // changeIsImageIntermediate,
-      // imageDTO
-    ]
-  );
+  const onSaveStagingImage = useCallback(() => {
+    if (!selectedImage) {
+      return;
+    }
+    changeIsImageIntermediate({ imageDTO: selectedImage.imageDTO, is_intermediate: false });
+  }, [changeIsImageIntermediate, selectedImage]);
 
   useHotkeys(
     ['left'],
