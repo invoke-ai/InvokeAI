@@ -72,8 +72,8 @@ t5_8b_quantized_encoder = StarterModel(
 clip_l_encoder = StarterModel(
     name="clip-vit-large-patch14",
     base=BaseModelType.Any,
-    source="openai/clip-vit-large-patch14",
-    description="CLIP-L text encoder (used in FLUX pipelines). ~3GB",
+    source="InvokeAI/clip-vit-large-patch14-text-encoder::bfloat16",
+    description="CLIP-L text encoder (used in FLUX pipelines). ~250MB",
     type=ModelType.CLIPEmbed,
 )
 
