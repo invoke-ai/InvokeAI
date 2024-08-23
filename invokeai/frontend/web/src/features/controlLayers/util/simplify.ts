@@ -131,7 +131,7 @@ type SimplifyOptions = {
 };
 
 // both algorithms combined for awesome performance
-export function simplifyCoords(points: Coordinate[], options?: SimplifyOptions): Coordinate[] {
+function simplifyCoords(points: Coordinate[], options?: SimplifyOptions): Coordinate[] {
   const { tolerance, highestQuality } = { ...options, tolerance: 1, highestQuality: false };
 
   if (points.length <= 2) {
@@ -146,11 +146,11 @@ export function simplifyCoords(points: Coordinate[], options?: SimplifyOptions):
   return secondPassPoints;
 }
 
-export function coordsToFlatNumbersArray(coords: Coordinate[]): number[] {
+function coordsToFlatNumbersArray(coords: Coordinate[]): number[] {
   return coords.flatMap((coord) => [coord.x, coord.y]);
 }
 
-export function flatNumbersArrayToCoords(array: number[]): Coordinate[] {
+function flatNumbersArrayToCoords(array: number[]): Coordinate[] {
   assert(array.length % 2 === 0, 'Array length must be even');
   const coords: Coordinate[] = [];
   for (let i = 0; i < array.length; i += 2) {

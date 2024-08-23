@@ -1,6 +1,3 @@
-import type { CanvasControlAdapter } from 'features/controlLayers/konva/CanvasControlAdapter';
-import { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
-import { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/DocumentSize/types';
@@ -25,45 +22,35 @@ import type {
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
-import {
-  zParameterNegativePrompt,
-  zParameterPositivePrompt,
-} from 'features/parameters/types/parameterSchemas';
-import type {
-  AnyInvocation,
-  BaseModelType,
-  ControlNetModelConfig,
-  ImageDTO,
-  S,
-  T2IAdapterModelConfig,
-} from 'services/api/types';
+import { zParameterNegativePrompt, zParameterPositivePrompt } from 'features/parameters/types/parameterSchemas';
+import type { AnyInvocation, BaseModelType, ImageDTO, S } from 'services/api/types';
 import { z } from 'zod';
 
-export const zId = z.string().min(1);
-export const zName = z.string().min(1).nullable();
+const zId = z.string().min(1);
+const zName = z.string().min(1).nullable();
 
-export const zImageWithDims = z.object({
+const zImageWithDims = z.object({
   image_name: z.string(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
 });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
 
-export const zBeginEndStepPct = z
+const zBeginEndStepPct = z
   .tuple([z.number().gte(0).lte(1), z.number().gte(0).lte(1)])
   .refine(([begin, end]) => begin < end, {
     message: 'Begin must be less than end',
   });
 
-export const zControlModeV2 = z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']);
+const zControlModeV2 = z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']);
 export type ControlModeV2 = z.infer<typeof zControlModeV2>;
 export const isControlModeV2 = (v: unknown): v is ControlModeV2 => zControlModeV2.safeParse(v).success;
 
-export const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G']);
+const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G']);
 export type CLIPVisionModelV2 = z.infer<typeof zCLIPVisionModelV2>;
 export const isCLIPVisionModelV2 = (v: unknown): v is CLIPVisionModelV2 => zCLIPVisionModelV2.safeParse(v).success;
 
-export const zIPMethodV2 = z.enum(['full', 'style', 'composition']);
+const zIPMethodV2 = z.enum(['full', 'style', 'composition']);
 export type IPMethodV2 = z.infer<typeof zIPMethodV2>;
 export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safeParse(v).success;
 
@@ -175,7 +162,7 @@ const zZoeDepthProcessorConfig = z.object({
 });
 export type ZoeDepthProcessorConfig = z.infer<typeof zZoeDepthProcessorConfig>;
 
-export const zFilterConfig = z.discriminatedUnion('type', [
+const zFilterConfig = z.discriminatedUnion('type', [
   zCannyProcessorConfig,
   zColorMapProcessorConfig,
   zContentShuffleProcessorConfig,
@@ -471,30 +458,9 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
 
 const zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox', 'eyeDropper']);
 export type Tool = z.infer<typeof zTool>;
-export function isDrawingTool(tool: Tool): tool is 'brush' | 'eraser' | 'rect' {
-  return tool === 'brush' || tool === 'eraser' || tool === 'rect';
-}
-
-const zDrawingTool = zTool.extract(['brush', 'eraser']);
 
 const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
   message: 'Must have an even number of points',
-});
-const zOLD_VectorMaskLine = z.object({
-  id: zId,
-  type: z.literal('vector_mask_line'),
-  tool: zDrawingTool,
-  strokeWidth: z.number().min(1),
-  points: zPoints,
-});
-
-const zOLD_VectorMaskRect = z.object({
-  id: zId,
-  type: z.literal('vector_mask_rect'),
-  x: z.number(),
-  y: z.number(),
-  width: z.number().min(1),
-  height: z.number().min(1),
 });
 
 const zRgbColor = z.object({
@@ -507,9 +473,7 @@ const zRgbaColor = zRgbColor.extend({
   a: z.number().min(0).max(1),
 });
 export type RgbaColor = z.infer<typeof zRgbaColor>;
-export const RGBA_RED: RgbaColor = { r: 255, g: 0, b: 0, a: 1 };
 export const RGBA_BLACK: RgbaColor = { r: 0, g: 0, b: 0, a: 1 };
-export const RGBA_WHITE: RgbaColor = { r: 255, g: 255, b: 255, a: 1 };
 
 const zOpacity = z.number().gte(0).lte(1);
 
@@ -577,9 +541,6 @@ const zCanvasObjectState = z.discriminatedUnion('type', [
   zCanvasRectState,
 ]);
 export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
-export function isCanvasBrushLineState(obj: CanvasObjectState): obj is CanvasBrushLineState {
-  return obj.type === 'brush_line';
-}
 
 const zIPAdapterConfig = z.object({
   image: zImageWithDims.nullable(),
@@ -591,7 +552,7 @@ const zIPAdapterConfig = z.object({
 });
 export type IPAdapterConfig = z.infer<typeof zIPAdapterConfig>;
 
-export const zCanvasIPAdapterState = z.object({
+const zCanvasIPAdapterState = z.object({
   id: zId,
   name: zName,
   type: z.literal('ip_adapter'),
@@ -599,47 +560,6 @@ export const zCanvasIPAdapterState = z.object({
   ipAdapter: zIPAdapterConfig,
 });
 export type CanvasIPAdapterState = z.infer<typeof zCanvasIPAdapterState>;
-
-const zMaskObject = z
-  .discriminatedUnion('type', [
-    zOLD_VectorMaskLine,
-    zOLD_VectorMaskRect,
-    zCanvasBrushLineState,
-    zCanvasEraserLineState,
-    zCanvasRectState,
-  ])
-  .transform((val) => {
-    // Migrate old vector mask objects to new format
-    if (val.type === 'vector_mask_line') {
-      const { tool, ...rest } = val;
-      if (tool === 'brush') {
-        const asBrushline: CanvasBrushLineState = {
-          ...rest,
-          type: 'brush_line',
-          color: { r: 255, g: 255, b: 255, a: 1 },
-          clip: null,
-        };
-        return asBrushline;
-      } else if (tool === 'eraser') {
-        const asEraserLine: CanvasEraserLineState = {
-          ...rest,
-          type: 'eraser_line',
-          clip: null,
-        };
-        return asEraserLine;
-      }
-    } else if (val.type === 'vector_mask_rect') {
-      const asRectShape: CanvasRectState = {
-        ...val,
-        type: 'rect',
-        color: { r: 255, g: 255, b: 255, a: 1 },
-      };
-      return asRectShape;
-    } else {
-      return val;
-    }
-  })
-  .pipe(z.discriminatedUnion('type', [zCanvasBrushLineState, zCanvasEraserLineState, zCanvasRectState]));
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -658,7 +578,7 @@ const zRegionalGuidanceIPAdapterConfig = z.object({
 });
 export type RegionalGuidanceIPAdapterConfig = z.infer<typeof zRegionalGuidanceIPAdapterConfig>;
 
-export const zCanvasRegionalGuidanceState = z.object({
+const zCanvasRegionalGuidanceState = z.object({
   id: zId,
   name: zName,
   type: z.literal('regional_guidance'),
@@ -685,37 +605,6 @@ const zCanvasInpaintMaskState = z.object({
   objects: z.array(zCanvasObjectState),
 });
 export type CanvasInpaintMaskState = z.infer<typeof zCanvasInpaintMaskState>;
-
-const zCanvasControlAdapterStateBase = z.object({
-  id: zId,
-  type: z.literal('control_adapter'),
-  isEnabled: z.boolean(),
-  position: zCoordinate,
-  opacity: zOpacity,
-  filters: z.array(zLayerEffect),
-  weight: z.number().gte(-1).lte(2),
-  imageObject: zCanvasImageState.nullable(),
-  processedImageObject: zCanvasImageState.nullable(),
-  processorConfig: zFilterConfig.nullable(),
-  processorPendingBatchId: z.string().nullable().default(null),
-  beginEndStepPct: zBeginEndStepPct,
-  model: zModelIdentifierField.nullable(),
-});
-const zCanvasControlNetState = zCanvasControlAdapterStateBase.extend({
-  adapterType: z.literal('controlnet'),
-  controlMode: zControlModeV2,
-});
-export type CanvasControlNetState = z.infer<typeof zCanvasControlNetState>;
-const zCanvasT2IAdapteState = zCanvasControlAdapterStateBase.extend({
-  adapterType: z.literal('t2i_adapter'),
-});
-export type CanvasT2IAdapterState = z.infer<typeof zCanvasT2IAdapteState>;
-
-export const zCanvasControlAdapterState = z.discriminatedUnion('adapterType', [
-  zCanvasControlNetState,
-  zCanvasT2IAdapteState,
-]);
-export type CanvasControlAdapterState = z.infer<typeof zCanvasControlAdapterState>;
 
 const zControlNetConfig = z.object({
   type: z.literal('controlnet'),
@@ -745,14 +634,14 @@ export const zCanvasRasterLayerState = z.object({
 });
 export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 
-export const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
+const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
   type: z.literal('control_layer'),
   withTransparencyEffect: z.boolean(),
   controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig]),
 });
 export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
 
-export const initialControlNetV2: ControlNetConfig = {
+export const initialControlNet: ControlNetConfig = {
   type: 'controlnet',
   model: null,
   weight: 1,
@@ -760,31 +649,20 @@ export const initialControlNetV2: ControlNetConfig = {
   controlMode: 'balanced',
 };
 
-export const initialT2IAdapterV2: T2IAdapterConfig = {
+export const initialT2IAdapter: T2IAdapterConfig = {
   type: 't2i_adapter',
   model: null,
   weight: 1,
   beginEndStepPct: [0, 1],
 };
 
-export const initialIPAdapterV2: IPAdapterConfig = {
+export const initialIPAdapter: IPAdapterConfig = {
   image: null,
   model: null,
   beginEndStepPct: [0, 1],
   method: 'full',
   clipVisionModel: 'ViT-H',
   weight: 1,
-};
-
-export const buildControlAdapterProcessorV2 = (
-  modelConfig: ControlNetModelConfig | T2IAdapterModelConfig
-): FilterConfig | null => {
-  const defaultPreprocessor = modelConfig.default_settings?.preprocessor;
-  if (!isFilterType(defaultPreprocessor)) {
-    return null;
-  }
-  const processorConfig = IMAGE_FILTERS[defaultPreprocessor].buildDefaults(modelConfig.base);
-  return processorConfig;
 };
 
 export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO): ImageWithDims => ({
@@ -960,11 +838,6 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
 }>;
 export type ImageObjectAddedArg = { id: string; imageDTO: ImageDTO; position?: Coordinate };
 
-//#region Type guards
-export const isLine = (obj: CanvasObjectState): obj is CanvasBrushLineState | CanvasEraserLineState => {
-  return obj.type === 'brush_line' || obj.type === 'eraser_line';
-};
-
 /**
  * A helper type to remove `[index: string]: any;` from a type.
  * This is useful for some Konva types that include `[index: string]: any;` in addition to statically named
@@ -991,12 +864,6 @@ export function isDrawableEntity(
   entity: CanvasEntityState
 ): entity is CanvasRasterLayerState | CanvasControlLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState {
   return isDrawableEntityType(entity.type);
-}
-
-export function isDrawableEntityAdapter(
-  adapter: CanvasLayerAdapter | CanvasControlAdapter | CanvasMaskAdapter
-): adapter is CanvasLayerAdapter | CanvasMaskAdapter {
-  return adapter instanceof CanvasLayerAdapter || adapter instanceof CanvasMaskAdapter;
 }
 
 export const getEntityIdentifier = (entity: CanvasEntityState): CanvasEntityIdentifier => {

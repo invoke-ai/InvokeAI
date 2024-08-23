@@ -6,7 +6,7 @@ import {
   controlLayerWithTransparencyEffectToggled,
   selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
-import { selectControlLayerOrThrow } from 'features/controlLayers/store/controlLayersReducers';
+import { selectControlLayerEntityOrThrow } from 'features/controlLayers/store/controlLayersReducers';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDropHalfBold } from 'react-icons/pi';
@@ -18,7 +18,7 @@ export const ControlLayerMenuItemsTransparencyEffect = memo(() => {
   const selectWithTransparencyEffect = useMemo(
     () =>
       createSelector(selectCanvasV2Slice, (canvasV2) => {
-        const entity = selectControlLayerOrThrow(canvasV2, entityIdentifier.id);
+        const entity = selectControlLayerEntityOrThrow(canvasV2, entityIdentifier.id);
         return entity.withTransparencyEffect;
       }),
     [entityIdentifier.id]
