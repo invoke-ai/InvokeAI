@@ -1,13 +1,4 @@
-import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
-import { deepClone } from 'common/util/deepClone';
-import {
-  getBrushLineId,
-  getEraserLineId,
-  getImageObjectId,
-  getRectShapeId,
-  getRGId,
-} from 'features/controlLayers/konva/naming';
 import {
   bboxHeightChanged,
   bboxWidthChanged,
@@ -17,7 +8,6 @@ import {
   negativePromptChanged,
   positivePrompt2Changed,
   positivePromptChanged,
-  rasterLayerRecalled,
   refinerModelChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
@@ -33,14 +23,9 @@ import {
   setSteps,
   vaeSelected,
 } from 'features/controlLayers/store/canvasV2Slice';
-import type { CanvasRasterLayerState, LoRA } from 'features/controlLayers/store/types';
+import type { LoRA } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
-import type {
-  ControlNetConfigMetadata,
-  IPAdapterConfigMetadata,
-  MetadataRecallFunc,
-  T2IAdapterConfigMetadata,
-} from 'features/metadata/types';
+import type { MetadataRecallFunc } from 'features/metadata/types';
 import { modelSelected } from 'features/parameters/store/actions';
 import type {
   ParameterCFGRescaleMultiplier,
@@ -64,10 +49,6 @@ import type {
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
-import { getImageDTO } from 'services/api/endpoints/images';
-import { v4 as uuidv4 } from 'uuid';
-
-const log = logger('metadata');
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
   getStore().dispatch(positivePromptChanged(positivePrompt));
@@ -190,172 +171,6 @@ const recallAllLoRAs: MetadataRecallFunc<LoRA[]> = (loras) => {
   });
 };
 
-const recallControlNet: MetadataRecallFunc<ControlNetConfigMetadata> = (controlNet) => {
-  getStore().dispatch(controlAdapterRecalled(controlNet));
-};
-
-const recallControlNets: MetadataRecallFunc<ControlNetConfigMetadata[]> = (controlNets) => {
-  const { dispatch } = getStore();
-  dispatch(controlNetsReset());
-  if (!controlNets.length) {
-    return;
-  }
-  controlNets.forEach((controlNet) => {
-    dispatch(controlAdapterRecalled(controlNet));
-  });
-};
-
-const recallT2IAdapter: MetadataRecallFunc<T2IAdapterConfigMetadata> = (t2iAdapter) => {
-  getStore().dispatch(controlAdapterRecalled(t2iAdapter));
-};
-
-const recallT2IAdapters: MetadataRecallFunc<T2IAdapterConfigMetadata[]> = (t2iAdapters) => {
-  const { dispatch } = getStore();
-  dispatch(t2iAdaptersReset());
-  if (!t2iAdapters.length) {
-    return;
-  }
-  t2iAdapters.forEach((t2iAdapter) => {
-    dispatch(controlAdapterRecalled(t2iAdapter));
-  });
-};
-
-const recallIPAdapter: MetadataRecallFunc<IPAdapterConfigMetadata> = (ipAdapter) => {
-  getStore().dispatch(controlAdapterRecalled(ipAdapter));
-};
-
-const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapters) => {
-  const { dispatch } = getStore();
-  dispatch(ipAdaptersReset());
-  if (!ipAdapters.length) {
-    return;
-  }
-  ipAdapters.forEach((ipAdapter) => {
-    dispatch(controlAdapterRecalled(ipAdapter));
-  });
-};
-
-// const recallCA: MetadataRecallFunc<CanvasControlAdapterState> = async (ca) => {
-//   const { dispatch } = getStore();
-//   const clone = deepClone(ca);
-//   if (clone.image) {
-//     const imageDTO = await getImageDTO(clone.image.name);
-//     if (!imageDTO) {
-//       clone.image = null;
-//     }
-//   }
-//   if (clone.processedImage) {
-//     const imageDTO = await getImageDTO(clone.processedImage.name);
-//     if (!imageDTO) {
-//       clone.processedImage = null;
-//     }
-//   }
-//   if (clone.model) {
-//     try {
-//       await fetchModelConfigByIdentifier(clone.model);
-//     } catch {
-//       // MODEL SMITED!
-//       clone.model = null;
-//     }
-//   }
-//   // No clobber
-//   clone.id = getCAId(uuidv4());
-//   // dispatch(caRecalled({ data: clone }));
-//   return;
-// };
-
-// const recallIPA: MetadataRecallFunc<CanvasIPAdapterState> = async (ipa) => {
-//   const { dispatch } = getStore();
-//   const clone = deepClone(ipa);
-//   if (clone.imageObject) {
-//     const imageDTO = await getImageDTO(clone.imageObject.name);
-//     if (!imageDTO) {
-//       clone.imageObject = null;
-//     }
-//   }
-//   if (clone.model) {
-//     try {
-//       await fetchModelConfigByIdentifier(clone.model);
-//     } catch {
-//       // MODEL SMITED!
-//       clone.model = null;
-//     }
-//   }
-//   // No clobber
-//   clone.id = getIPAId(uuidv4());
-//   dispatch(ipaRecalled({ data: clone }));
-//   return;
-// };
-
-// const recallRG: MetadataRecallFunc<CanvasRegionalGuidanceState> = async (rg) => {
-//   const { dispatch } = getStore();
-//   const clone = deepClone(rg);
-//   // Strip out the uploaded mask image property - this is an intermediate image
-//   clone.imageCache = null;
-
-//   for (const ipAdapter of clone.ipAdapters) {
-//     if (ipAdapter.imageObject) {
-//       const imageDTO = await getImageDTO(ipAdapter.imageObject.name);
-//       if (!imageDTO) {
-//         ipAdapter.imageObject = null;
-//       }
-//     }
-//     if (ipAdapter.model) {
-//       try {
-//         await fetchModelConfigByIdentifier(ipAdapter.model);
-//       } catch {
-//         // MODEL SMITED!
-//         ipAdapter.model = null;
-//       }
-//     }
-//     // No clobber
-//     ipAdapter.id = uuidv4();
-//   }
-//   clone.id = getRGId(uuidv4());
-//   dispatch(rgRecalled({ data: clone }));
-//   return;
-// };
-
-//#region Control Layers
-const recallLayer: MetadataRecallFunc<CanvasRasterLayerState> = async (layer) => {
-  const { dispatch } = getStore();
-  const clone = deepClone(layer);
-  const invalidObjects: string[] = [];
-  for (const obj of clone.objects) {
-    if (obj.type === 'image') {
-      const imageDTO = await getImageDTO(obj.image.image_name);
-      if (!imageDTO) {
-        invalidObjects.push(obj.id);
-      }
-    }
-  }
-  clone.objects = clone.objects.filter(({ id }) => !invalidObjects.includes(id));
-  for (const obj of clone.objects) {
-    if (obj.type === 'brush_line') {
-      obj.id = getBrushLineId(clone.id, uuidv4());
-    } else if (obj.type === 'eraser_line') {
-      obj.id = getEraserLineId(clone.id, uuidv4());
-    } else if (obj.type === 'image') {
-      obj.id = getImageObjectId(clone.id, uuidv4());
-    } else if (obj.type === 'rect') {
-      obj.id = getRectShapeId(clone.id, uuidv4());
-    } else {
-      log.error(`Unknown object type ${obj.type}`);
-    }
-  }
-  clone.id = getRGId(uuidv4());
-  dispatch(rasterLayerRecalled({ data: clone }));
-  return;
-};
-
-const recallLayers: MetadataRecallFunc<CanvasRasterLayerState[]> = (layers) => {
-  const { dispatch } = getStore();
-  dispatch(rasterLayerAllDeleted());
-  for (const l of layers) {
-    recallLayer(l);
-  }
-};
-
 export const recallers = {
   positivePrompt: recallPositivePrompt,
   negativePrompt: recallNegativePrompt,
@@ -383,12 +198,4 @@ export const recallers = {
   vae: recallVAE,
   lora: recallLoRA,
   loras: recallAllLoRAs,
-  controlNets: recallControlNets,
-  controlNet: recallControlNet,
-  t2iAdapters: recallT2IAdapters,
-  t2iAdapter: recallT2IAdapter,
-  ipAdapters: recallIPAdapters,
-  ipAdapter: recallIPAdapter,
-  layer: recallLayer,
-  layers: recallLayers,
 } as const;
