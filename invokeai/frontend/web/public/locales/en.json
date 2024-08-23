@@ -1726,6 +1726,7 @@
         "hidingType": "Hiding {{type}}",
         "showingType": "Showing {{type}}",
         "dynamicGrid": "Dynamic Grid",
+        "logDebugInfo": "Log Debug Info",
         "fill": {
             "fillStyle": "Fill Style",
             "solid": "Solid",
