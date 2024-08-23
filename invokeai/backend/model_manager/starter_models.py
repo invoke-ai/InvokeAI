@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from invokeai.backend.model_manager.config import BaseModelType, ModelType
+from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType
 
 
 class StarterModelWithoutDependencies(BaseModel):
@@ -11,6 +11,7 @@ class StarterModelWithoutDependencies(BaseModel):
     name: str
     base: BaseModelType
     type: ModelType
+    format: Optional[ModelFormat] = None
     is_installed: bool = False
 
 
@@ -54,17 +55,18 @@ cyberrealistic_negative = StarterModel(
 t5_base_encoder = StarterModel(
     name="t5_base_encoder",
     base=BaseModelType.Any,
-    source="InvokeAI/flux_schnell::t5_xxl_encoder/base",
+    source="InvokeAI/t5-v1_1-xxl::bfloat16",
     description="T5-XXL text encoder (used in FLUX pipelines). ~8GB",
     type=ModelType.T5Encoder,
 )
 
 t5_8b_quantized_encoder = StarterModel(
-    name="t5_8b_quantized_encoder",
+    name="t5_bnb_int8_quantized_encoder",
     base=BaseModelType.Any,
-    source="invokeai/flux_schnell::t5_xxl_encoder/optimum_quanto_qfloat8",
-    description="T5-XXL text encoder with optimum-quanto qfloat8 quantization (used in FLUX pipelines). ~6GB",
+    source="InvokeAI/t5-v1_1-xxl::bnb_llm_int8",
+    description="T5-XXL text encoder with bitsandbytes LLM.int8() quantization (used in FLUX pipelines). ~5GB",
     type=ModelType.T5Encoder,
+    format=ModelFormat.T5Encoder8b,
 )
 
 clip_l_encoder = StarterModel(

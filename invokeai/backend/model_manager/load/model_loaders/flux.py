@@ -9,7 +9,7 @@ import accelerate
 import torch
 import yaml
 from safetensors.torch import load_file
-from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
+from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.flux.model import Flux, FluxParams
@@ -33,7 +33,8 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.quantization.fast_quantized_transformers_model import FastQuantizedTransformersModel
+from invokeai.backend.quantization.bnb_llm_int8 import quantize_model_llm_int8
+from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 try:
@@ -115,11 +116,32 @@ class T5Encoder8bCheckpointModel(ModelLoader):
             case SubModelType.Tokenizer2:
                 return T5Tokenizer.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
             case SubModelType.TextEncoder2:
-                return FastQuantizedTransformersModel.from_pretrained(Path(config.path) / "text_encoder_2")
+                te2_model_path = Path(config.path) / "text_encoder_2"
+                model_config = AutoConfig.from_pretrained(te2_model_path)
+                with accelerate.init_empty_weights():
+                    model = AutoModelForTextEncoding.from_config(model_config)
+                    model = quantize_model_llm_int8(model, modules_to_not_convert=set())
+
+                state_dict_path = te2_model_path / "bnb_llm_int8_model.safetensors"
+                state_dict = load_file(state_dict_path)
+                self._load_state_dict_into_t5(model, state_dict)
+
+                return model
 
         raise ValueError(
             f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+    @classmethod
+    def _load_state_dict_into_t5(cls, model: T5EncoderModel, state_dict: dict[str, torch.Tensor]):
+        # There is a shared reference to a single weight tensor in the model.
+        # Both "encoder.embed_tokens.weight" and "shared.weight" refer to the same tensor, so only the latter should
+        # be present in the state_dict.
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False, assign=True)
+        assert len(unexpected_keys) == 0
+        assert set(missing_keys) == {"encoder.embed_tokens.weight"}
+        # Assert that the layers we expect to be shared are actually shared.
+        assert model.encoder.embed_tokens.weight is model.shared.weight
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.T5Encoder)
