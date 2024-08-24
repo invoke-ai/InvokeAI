@@ -1,4 +1,5 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
+import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
   CanvasV2State,
@@ -8,7 +9,7 @@ import type {
   RegionalGuidanceIPAdapterConfig,
   RgbColor,
 } from 'features/controlLayers/store/types';
-import { getEntityIdentifier, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
+import { getEntityIdentifier, imageDTOToImageWithDims, initialIPAdapter } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { isEqual, merge } from 'lodash-es';
 import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
@@ -134,13 +135,23 @@ export const regionsReducers = {
     }
     rg.autoNegative = !rg.autoNegative;
   },
-  rgIPAdapterAdded: (state, action: PayloadAction<{ id: string; ipAdapter: RegionalGuidanceIPAdapterConfig }>) => {
-    const { id, ipAdapter } = action.payload;
-    const entity = selectRegionalGuidanceEntity(state, id);
-    if (!entity) {
-      return;
-    }
-    entity.ipAdapters.push(ipAdapter);
+  rgIPAdapterAdded: {
+    reducer: (
+      state,
+      action: PayloadAction<{ id: string; ipAdapterId: string; overrides?: Partial<RegionalGuidanceIPAdapterConfig> }>
+    ) => {
+      const { id, overrides, ipAdapterId } = action.payload;
+      const entity = selectRegionalGuidanceEntity(state, id);
+      if (!entity) {
+        return;
+      }
+      const ipAdapter = { ...deepClone(initialIPAdapter), id: ipAdapterId };
+      merge(ipAdapter, overrides);
+      entity.ipAdapters.push(ipAdapter);
+    },
+    prepare: (payload: { id: string; overrides?: Partial<RegionalGuidanceIPAdapterConfig> }) => ({
+      payload: { ...payload, ipAdapterId: getPrefixedId('regional_guidance_ip_adapter') },
+    }),
   },
   rgIPAdapterDeleted: (state, action: PayloadAction<{ id: string; ipAdapterId: string }>) => {
     const { id, ipAdapterId } = action.payload;
