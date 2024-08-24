@@ -2,8 +2,6 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useDefaultIPAdapter } from 'features/controlLayers/hooks/useLayerControlAdapter';
-import { nanoid } from 'features/controlLayers/konva/util';
 import {
   rgIPAdapterAdded,
   rgNegativePromptChanged,
@@ -17,7 +15,6 @@ export const RegionalGuidanceMenuItemsAddPromptsAndIPAdapter = memo(() => {
   const { id } = useEntityIdentifierContext();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const defaultIPAdapter = useDefaultIPAdapter();
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
@@ -37,8 +34,8 @@ export const RegionalGuidanceMenuItemsAddPromptsAndIPAdapter = memo(() => {
     dispatch(rgNegativePromptChanged({ id: id, prompt: '' }));
   }, [dispatch, id]);
   const addIPAdapter = useCallback(() => {
-    dispatch(rgIPAdapterAdded({ id, ipAdapter: { ...defaultIPAdapter, id: nanoid() } }));
-  }, [defaultIPAdapter, dispatch, id]);
+    dispatch(rgIPAdapterAdded({ id }));
+  }, [dispatch, id]);
 
   return (
     <>
