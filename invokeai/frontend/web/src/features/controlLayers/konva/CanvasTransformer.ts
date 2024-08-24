@@ -602,7 +602,6 @@ export class CanvasTransformer {
 
     if (this.isPendingRectCalculation) {
       this.syncInteractionState();
-      this.parent.renderer.updatePreviewCanvas();
       return;
     }
 
@@ -613,20 +612,19 @@ export class CanvasTransformer {
       // The layer is fully transparent but has objects - reset it
       this.manager.stateApi.resetEntity({ entityIdentifier: this.parent.getEntityIdentifier() });
       this.syncInteractionState();
-      this.parent.renderer.updatePreviewCanvas();
-      return;
+    } else {
+      this.syncInteractionState();
+      this.update(this.parent.state.position, this.pixelRect);
+      const groupAttrs: Partial<GroupConfig> = {
+        x: this.parent.state.position.x + this.pixelRect.x,
+        y: this.parent.state.position.y + this.pixelRect.y,
+        offsetX: this.pixelRect.x,
+        offsetY: this.pixelRect.y,
+      };
+      this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
+      this.parent.renderer.konva.bufferGroup.setAttrs(groupAttrs);
     }
 
-    this.syncInteractionState();
-    this.update(this.parent.state.position, this.pixelRect);
-    const groupAttrs: Partial<GroupConfig> = {
-      x: this.parent.state.position.x + this.pixelRect.x,
-      y: this.parent.state.position.y + this.pixelRect.y,
-      offsetX: this.pixelRect.x,
-      offsetY: this.pixelRect.y,
-    };
-    this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
-    this.parent.renderer.konva.bufferGroup.setAttrs(groupAttrs);
     this.parent.renderer.updatePreviewCanvas();
   };
 
@@ -649,8 +647,8 @@ export class CanvasTransformer {
     if (!this.parent.renderer.needsPixelBbox()) {
       this.nodeRect = { ...rect };
       this.pixelRect = { ...rect };
-      this.isPendingRectCalculation = false;
       this.log.trace({ nodeRect: this.nodeRect, pixelRect: this.pixelRect }, 'Got bbox from client rect');
+      this.isPendingRectCalculation = false;
       this.updateBbox();
       return;
     }
@@ -674,8 +672,8 @@ export class CanvasTransformer {
           this.nodeRect = getEmptyRect();
           this.pixelRect = getEmptyRect();
         }
-        this.isPendingRectCalculation = false;
         this.log.trace({ nodeRect: this.nodeRect, pixelRect: this.pixelRect, extents }, `Got bbox from worker`);
+        this.isPendingRectCalculation = false;
         this.updateBbox();
       }
     );
