@@ -14,7 +14,8 @@ export const addImageToImage = async (
   originalSize: Dimensions,
   scaledSize: Dimensions,
   bbox: CanvasV2State['bbox'],
-  denoising_start: number
+  denoising_start: number,
+  fp32: boolean
 ): Promise<Invocation<'img_resize' | 'l2i'>> => {
   denoise.denoising_start = denoising_start;
 
@@ -28,7 +29,7 @@ export const addImageToImage = async (
       image: { image_name },
       ...scaledSize,
     });
-    const i2l = g.addNode({ id: 'i2l', type: 'i2l' });
+    const i2l = g.addNode({ id: 'i2l', type: 'i2l', fp32 });
     const resizeImageToOriginalSize = g.addNode({
       type: 'img_resize',
       id: getPrefixedId('initial_image_resize_out'),
@@ -43,8 +44,8 @@ export const addImageToImage = async (
     // This is the new output node
     return resizeImageToOriginalSize;
   } else {
-    // No need to resize, just denoise
-    const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name } });
+    // No need to resize, just decode
+    const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name }, fp32 });
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
     return l2i;

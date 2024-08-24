@@ -49,8 +49,8 @@ export const buildSDXLGraph = async (
 
   assert(model, 'No model found in state');
 
+  const fp32 = vaePrecision === 'fp32';
   const { originalSize, scaledSize } = getSizes(bbox);
-
   const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('sdxl_graph'));
@@ -100,7 +100,7 @@ export const buildSDXLGraph = async (
   const l2i = g.addNode({
     type: 'l2i',
     id: getPrefixedId('l2i'),
-    fp32: vaePrecision === 'fp32',
+    fp32,
   });
   const vaeLoader =
     vae?.base === model.base
@@ -171,7 +171,8 @@ export const buildSDXLGraph = async (
       originalSize,
       scaledSize,
       bbox,
-      refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength
+      refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength,
+      fp32
     );
   } else if (generationMode === 'inpaint') {
     const { compositing } = state.canvasV2;
@@ -188,7 +189,7 @@ export const buildSDXLGraph = async (
       bbox,
       compositing,
       refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength,
-      vaePrecision
+      fp32
     );
   } else if (generationMode === 'outpaint') {
     const { compositing } = state.canvasV2;
@@ -205,7 +206,7 @@ export const buildSDXLGraph = async (
       bbox,
       compositing,
       refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength,
-      vaePrecision
+      fp32
     );
   }
 
