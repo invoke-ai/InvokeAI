@@ -3,6 +3,7 @@ import { createAction, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlLayersReducers } from 'features/controlLayers/store/controlLayersReducers';
@@ -237,6 +238,42 @@ export const canvasV2Slice = createSlice({
         assert(false, 'Not implemented');
       }
     },
+    entityDuplicated: (state, action: PayloadAction<EntityIdentifierPayload>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+
+      const newEntity = deepClone(entity);
+      if (newEntity.name) {
+        newEntity.name = `${newEntity.name} (Copy)`;
+      }
+      switch (newEntity.type) {
+        case 'raster_layer':
+          newEntity.id = getPrefixedId('raster_layer');
+          state.rasterLayers.entities.push(newEntity);
+          break;
+        case 'control_layer':
+          newEntity.id = getPrefixedId('control_layer');
+          state.controlLayers.entities.push(newEntity);
+          break;
+        case 'regional_guidance':
+          newEntity.id = getPrefixedId('regional_guidance');
+          state.regions.entities.push(newEntity);
+          break;
+        case 'ip_adapter':
+          newEntity.id = getPrefixedId('ip_adapter');
+          state.ipAdapters.entities.push(newEntity);
+          break;
+        case 'inpaint_mask':
+          newEntity.id = getPrefixedId('inpaint_mask');
+          state.inpaintMasks.entities.push(newEntity);
+          break;
+      }
+
+      state.selectedEntityIdentifier = getEntityIdentifier(newEntity);
+    },
     entityIsEnabledToggled: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -460,6 +497,7 @@ export const {
   entityReset,
   entityIsEnabledToggled,
   entityMoved,
+  entityDuplicated,
   entityRasterized,
   entityBrushLineAdded,
   entityEraserLineAdded,
