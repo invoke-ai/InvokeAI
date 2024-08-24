@@ -8,9 +8,9 @@ import type {
   RegionalGuidanceIPAdapterConfig,
   RgbColor,
 } from 'features/controlLayers/store/types';
-import { imageDTOToImageWithDims } from 'features/controlLayers/store/types';
+import { getEntityIdentifier, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { isEqual } from 'lodash-es';
+import { isEqual, merge } from 'lodash-es';
 import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -56,9 +56,12 @@ const getRGMaskFill = (state: CanvasV2State): RgbColor => {
 
 export const regionsReducers = {
   rgAdded: {
-    reducer: (state, action: PayloadAction<{ id: string }>) => {
-      const { id } = action.payload;
-      const rg: CanvasRegionalGuidanceState = {
+    reducer: (
+      state,
+      action: PayloadAction<{ id: string; overrides?: Partial<CanvasRegionalGuidanceState>; isSelected?: boolean }>
+    ) => {
+      const { id, overrides, isSelected } = action.payload;
+      const entity: CanvasRegionalGuidanceState = {
         id,
         name: null,
         type: 'regional_guidance',
@@ -75,10 +78,15 @@ export const regionsReducers = {
         negativePrompt: null,
         ipAdapters: [],
       };
-      state.regions.entities.push(rg);
-      state.selectedEntityIdentifier = { type: 'regional_guidance', id };
+      merge(entity, overrides);
+      state.regions.entities.push(entity);
+      if (isSelected) {
+        state.selectedEntityIdentifier = getEntityIdentifier(entity);
+      }
     },
-    prepare: () => ({ payload: { id: getPrefixedId('regional_guidance') } }),
+    prepare: (payload?: { overrides?: Partial<CanvasRegionalGuidanceState>; isSelected?: boolean }) => ({
+      payload: { ...payload, id: getPrefixedId('regional_guidance') },
+    }),
   },
   rgRecalled: (state, action: PayloadAction<{ data: CanvasRegionalGuidanceState }>) => {
     const { data } = action.payload;

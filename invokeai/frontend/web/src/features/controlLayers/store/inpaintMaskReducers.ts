@@ -1,11 +1,12 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type {
-  CanvasInpaintMaskState,
-  CanvasV2State,
-  EntityIdentifierPayload,
-  FillStyle,
-  RgbColor,
+import {
+  type CanvasInpaintMaskState,
+  type CanvasV2State,
+  type EntityIdentifierPayload,
+  type FillStyle,
+  getEntityIdentifier,
+  type RgbColor,
 } from 'features/controlLayers/store/types';
 import { merge } from 'lodash-es';
 import { assert } from 'tsafe';
@@ -41,7 +42,7 @@ export const inpaintMaskReducers = {
       merge(entity, overrides);
       state.inpaintMasks.entities.push(entity);
       if (isSelected) {
-        state.selectedEntityIdentifier = { type: 'inpaint_mask', id };
+        state.selectedEntityIdentifier = getEntityIdentifier(entity);
       }
     },
     prepare: (payload?: { overrides?: Partial<CanvasInpaintMaskState>; isSelected?: boolean }) => ({

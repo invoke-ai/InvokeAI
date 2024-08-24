@@ -4,7 +4,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { merge } from 'lodash-es';
 
 import type { CanvasControlLayerState, CanvasRasterLayerState, CanvasV2State } from './types';
-import { initialControlNet } from './types';
+import { getEntityIdentifier, initialControlNet } from './types';
 
 const selectRasterLayerEntity = (state: CanvasV2State, id: string) =>
   state.rasterLayers.entities.find((layer) => layer.id === id);
@@ -16,7 +16,7 @@ export const rasterLayersReducers = {
       action: PayloadAction<{ id: string; overrides?: Partial<CanvasRasterLayerState>; isSelected?: boolean }>
     ) => {
       const { id, overrides, isSelected } = action.payload;
-      const layer: CanvasRasterLayerState = {
+      const entity: CanvasRasterLayerState = {
         id,
         name: null,
         type: 'raster_layer',
@@ -25,10 +25,10 @@ export const rasterLayersReducers = {
         opacity: 1,
         position: { x: 0, y: 0 },
       };
-      merge(layer, overrides);
-      state.rasterLayers.entities.push(layer);
+      merge(entity, overrides);
+      state.rasterLayers.entities.push(entity);
       if (isSelected) {
-        state.selectedEntityIdentifier = { type: 'raster_layer', id };
+        state.selectedEntityIdentifier = getEntityIdentifier(entity);
       }
     },
     prepare: (payload: { overrides?: Partial<CanvasRasterLayerState>; isSelected?: boolean }) => ({
