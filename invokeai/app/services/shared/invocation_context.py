@@ -14,6 +14,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.session_processor.session_processor_common import CanceledException, ProgressImage
 from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
@@ -24,7 +25,6 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
-from invokeai.app.services.session_processor.session_processor_common import ProgressImage, CanceledException
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation

@@ -64,10 +64,12 @@ class EventServiceBase:
         step: int,
         total_steps: int,
         order: int,
-        progress_image: "ProgressImage", # TODO: could it be None?
+        progress_image: "ProgressImage",  # TODO: could it be None?
     ) -> None:
         """Emitted at each step during denoising of an invocation."""
-        self.dispatch(InvocationDenoiseProgressEvent.build(queue_item, invocation, step, total_steps, order, progress_image))
+        self.dispatch(
+            InvocationDenoiseProgressEvent.build(queue_item, invocation, step, total_steps, order, progress_image)
+        )
 
     def emit_invocation_complete(
         self, queue_item: "SessionQueueItem", invocation: "BaseInvocation", output: "BaseInvocationOutput"

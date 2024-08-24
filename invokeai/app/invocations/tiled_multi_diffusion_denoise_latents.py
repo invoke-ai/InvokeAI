@@ -1,6 +1,6 @@
 import copy
 from contextlib import ExitStack
-from typing import Iterator, Tuple, Optional
+from typing import Iterator, Optional, Tuple
 
 import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
@@ -19,13 +19,13 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     UIType,
 )
-from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.app.invocations.model import UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData
+from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.multi_diffusion_pipeline import (
     MultiDiffusionPipeline,
     MultiDiffusionRegionConditioning,
