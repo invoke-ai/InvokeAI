@@ -3,7 +3,6 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
-import type { ParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
@@ -20,7 +19,7 @@ export const addInpaint = async (
   bbox: CanvasV2State['bbox'],
   compositing: CanvasV2State['compositing'],
   denoising_start: number,
-  vaePrecision: ParameterPrecision
+  fp32: boolean
 ): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
   denoise.denoising_start = denoising_start;
 
@@ -30,7 +29,7 @@ export const addInpaint = async (
 
   if (!isEqual(scaledSize, originalSize)) {
     // Scale before processing requires some resizing
-    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l' });
+    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', fp32 });
     const resizeImageToScaledSize = g.addNode({
       type: 'img_resize',
       id: getPrefixedId('resize_image_to_scaled_size'),
@@ -64,7 +63,7 @@ export const addInpaint = async (
       coherence_mode: compositing.canvasCoherenceMode,
       minimum_denoise: compositing.canvasCoherenceMinDenoise,
       edge_radius: compositing.canvasCoherenceEdgeSize,
-      fp32: vaePrecision === 'fp32',
+      fp32,
     });
     const canvasPasteBack = g.addNode({
       id: getPrefixedId('canvas_v2_mask_and_crop'),
@@ -100,7 +99,12 @@ export const addInpaint = async (
     return canvasPasteBack;
   } else {
     // No scale before processing, much simpler
-    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', image: { image_name: initialImage.image_name } });
+    const i2l = g.addNode({
+      id: getPrefixedId('i2l'),
+      type: 'i2l',
+      image: { image_name: initialImage.image_name },
+      fp32,
+    });
     const alphaToMask = g.addNode({
       id: getPrefixedId('alpha_to_mask'),
       type: 'tomask',
@@ -113,7 +117,7 @@ export const addInpaint = async (
       coherence_mode: compositing.canvasCoherenceMode,
       minimum_denoise: compositing.canvasCoherenceMinDenoise,
       edge_radius: compositing.canvasCoherenceEdgeSize,
-      fp32: vaePrecision === 'fp32',
+      fp32,
       image: { image_name: initialImage.image_name },
     });
     const canvasPasteBack = g.addNode({

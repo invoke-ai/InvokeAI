@@ -4,7 +4,6 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { getInfill } from 'features/nodes/util/graph/graphBuilderUtils';
-import type { ParameterPrecision } from 'features/parameters/types/parameterSchemas';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
@@ -21,7 +20,7 @@ export const addOutpaint = async (
   bbox: CanvasV2State['bbox'],
   compositing: CanvasV2State['compositing'],
   denoising_start: number,
-  vaePrecision: ParameterPrecision
+  fp32: boolean
 ): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
   denoise.denoising_start = denoising_start;
 
@@ -76,7 +75,7 @@ export const addOutpaint = async (
       coherence_mode: compositing.canvasCoherenceMode,
       minimum_denoise: compositing.canvasCoherenceMinDenoise,
       edge_radius: compositing.canvasCoherenceEdgeSize,
-      fp32: vaePrecision === 'fp32',
+      fp32,
     });
     g.addEdge(infill, 'image', createGradientMask, 'image');
     g.addEdge(resizeInputMaskToScaledSize, 'image', createGradientMask, 'mask');
@@ -85,7 +84,7 @@ export const addOutpaint = async (
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
 
     // Decode infilled image and connect to denoise
-    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l' });
+    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', fp32 });
     g.addEdge(infill, 'image', i2l, 'image');
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
@@ -125,7 +124,7 @@ export const addOutpaint = async (
   } else {
     infill.image = { image_name: initialImage.image_name };
     // No scale before processing, much simpler
-    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l' });
+    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', fp32 });
     const maskAlphaToMask = g.addNode({
       id: getPrefixedId('mask_alpha_to_mask'),
       type: 'tomask',
@@ -147,7 +146,7 @@ export const addOutpaint = async (
       coherence_mode: compositing.canvasCoherenceMode,
       minimum_denoise: compositing.canvasCoherenceMinDenoise,
       edge_radius: compositing.canvasCoherenceEdgeSize,
-      fp32: vaePrecision === 'fp32',
+      fp32,
       image: { image_name: initialImage.image_name },
     });
     const canvasPasteBack = g.addNode({
