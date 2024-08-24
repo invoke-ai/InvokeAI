@@ -1,5 +1,5 @@
 import type { SerializableObject } from 'common/types';
-import { rgbaColorToString } from 'common/util/colorCodeTransformers';
+import { rgbaColorToString, rgbColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import { BRUSH_BORDER_INNER_COLOR, BRUSH_BORDER_OUTER_COLOR } from 'features/controlLayers/konva/constants';
@@ -225,7 +225,6 @@ export class CanvasToolModule {
     const cursorPos = this.manager.stateApi.$lastCursorPos.get();
     const isDrawing = this.manager.stateApi.$isDrawing.get();
     const isMouseDown = this.manager.stateApi.$isMouseDown.get();
-    const colorUnderCursor = this.manager.stateApi.$colorUnderCursor.get();
 
     const tool = toolState.selected;
 
@@ -297,16 +296,18 @@ export class CanvasToolModule {
         });
         this.konva.eraser.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
         this.konva.eraser.outerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
-      } else if (cursorPos && colorUnderCursor) {
+      } else if (cursorPos && tool === 'colorPicker') {
+        const colorUnderCursor = this.manager.stateApi.$colorUnderCursor.get();
+
         this.konva.colorPicker.newColor.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
-          fill: rgbaColorToString(colorUnderCursor),
+          fill: rgbColorToString(colorUnderCursor),
         });
         this.konva.colorPicker.oldColor.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
-          fill: rgbaColorToString(toolState.fill),
+          fill: rgbColorToString(toolState.fill),
         });
         this.konva.colorPicker.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
         this.konva.colorPicker.outerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });

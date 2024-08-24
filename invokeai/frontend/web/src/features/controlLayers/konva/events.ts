@@ -12,7 +12,7 @@ import type {
   CanvasRegionalGuidanceState,
   CanvasV2State,
   Coordinate,
-  RgbaColor,
+  RgbColor,
   Tool,
 } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
@@ -115,7 +115,7 @@ const getLastPointOfLastLineOfEntity = (
   return { x, y };
 };
 
-const getColorUnderCursor = (stage: Konva.Stage): RgbaColor | null => {
+const getColorUnderCursor = (stage: Konva.Stage): RgbColor | null => {
   const pos = stage.getPointerPosition();
   if (!pos) {
     return null;
@@ -126,12 +126,12 @@ const getColorUnderCursor = (stage: Konva.Stage): RgbaColor | null => {
   if (!ctx) {
     return null;
   }
-  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-  if (r === undefined || g === undefined || b === undefined || a === undefined) {
+  const [r, g, b, _a] = ctx.getImageData(0, 0, 1, 1).data;
+  if (r === undefined || g === undefined || b === undefined) {
     return null;
   }
 
-  return { r, g, b, a };
+  return { r, g, b };
 };
 
 export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
@@ -195,9 +195,11 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
 
     if (toolState.selected === 'colorPicker') {
       const color = getColorUnderCursor(stage);
-      manager.stateApi.$colorUnderCursor.set(color);
       if (color) {
-        manager.stateApi.setFill(color);
+        manager.stateApi.$colorUnderCursor.set(color);
+      }
+      if (color) {
+        manager.stateApi.setFill({ ...color, a: 1 });
       }
       manager.preview.tool.render();
     } else {
@@ -345,7 +347,9 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
 
     if (toolState.selected === 'colorPicker') {
       const color = getColorUnderCursor(stage);
-      manager.stateApi.$colorUnderCursor.set(color);
+      if (color) {
+        manager.stateApi.$colorUnderCursor.set(color);
+      }
     } else {
       const isDrawable = selectedEntity?.state.isEnabled;
       if (pos && isDrawable && !$spaceKey.get() && getIsPrimaryMouseDown(e)) {
