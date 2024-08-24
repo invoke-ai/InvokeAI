@@ -44,6 +44,7 @@ import type {
   EntityRectAddedPayload,
   Rect,
   RgbaColor,
+  RgbColor,
   Tool,
 } from 'features/controlLayers/store/types';
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
@@ -249,7 +250,7 @@ export class CanvasStateApiModule {
   $currentFill: WritableAtom<RgbaColor> = atom();
   $selectedEntity: WritableAtom<EntityStateAndAdapter | null> = atom();
   $selectedEntityIdentifier: WritableAtom<CanvasEntityIdentifier | null> = atom();
-  $colorUnderCursor: WritableAtom<RgbaColor | null> = atom();
+  $colorUnderCursor: WritableAtom<RgbColor> = atom(RGBA_BLACK);
 
   // Read-write state, ephemeral interaction state
   $isDrawing = $isDrawing;
