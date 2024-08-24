@@ -1658,6 +1658,7 @@
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
         "addLayer": "Add Layer",
+        "duplicate": "Duplicate",
         "moveToFront": "Move to Front",
         "moveToBack": "Move to Back",
         "moveForward": "Move Forward",
