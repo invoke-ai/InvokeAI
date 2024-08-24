@@ -219,7 +219,7 @@ export class CanvasToolModule {
 
   render() {
     const stage = this.manager.stage;
-    const renderedEntityCount: number = 1; // TODO(psyche): this.manager should be renderable entity count
+    const renderedEntityCount = this.manager.stateApi.getRenderedEntityCount();
     const toolState = this.manager.stateApi.getToolState();
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
     const cursorPos = this.manager.stateApi.$lastCursorPos.get();
