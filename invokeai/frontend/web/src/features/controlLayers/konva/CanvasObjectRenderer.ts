@@ -27,6 +27,7 @@ import type {
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
+import { debounce } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
@@ -209,9 +210,7 @@ export class CanvasObjectRenderer {
       this.log.trace('Caching object group');
       this.konva.objectGroup.clearCache();
       this.konva.objectGroup.cache({ pixelRatio: 1 });
-      if (!this.parent.transformer.isPendingRectCalculation) {
-        this.parent.renderer.updatePreviewCanvas();
-      }
+      this.parent.renderer.updatePreviewCanvas();
     }
   };
 
@@ -542,7 +541,10 @@ export class CanvasObjectRenderer {
     return imageDTO;
   };
 
-  updatePreviewCanvas = () => {
+  updatePreviewCanvas = debounce(() => {
+    if (this.parent.transformer.isPendingRectCalculation) {
+      return;
+    }
     if (this.parent.transformer.pixelRect.width === 0 || this.parent.transformer.pixelRect.height === 0) {
       return;
     }
@@ -558,7 +560,7 @@ export class CanvasObjectRenderer {
       };
       this.$canvasCache.set({ rect, canvas });
     }
-  };
+  }, 300);
 
   cloneObjectGroup = (attrs?: GroupConfig): Konva.Group => {
     const clone = this.konva.objectGroup.clone();
