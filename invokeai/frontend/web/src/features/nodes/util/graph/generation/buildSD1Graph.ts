@@ -48,8 +48,8 @@ export const buildSD1Graph = async (
 
   assert(model, 'No model found in state');
 
+  const fp32 = vaePrecision === 'fp32';
   const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
-
   const { originalSize, scaledSize } = getSizes(bbox);
 
   const g = new Graph(getPrefixedId('sd1_graph'));
@@ -102,7 +102,7 @@ export const buildSD1Graph = async (
   const l2i = g.addNode({
     type: 'l2i',
     id: getPrefixedId('l2i'),
-    fp32: vaePrecision === 'fp32',
+    fp32,
   });
   const vaeLoader =
     vae?.base === model.base
@@ -168,7 +168,8 @@ export const buildSD1Graph = async (
       originalSize,
       scaledSize,
       bbox,
-      1 - params.img2imgStrength
+      1 - params.img2imgStrength,
+      vaePrecision === 'fp32'
     );
   } else if (generationMode === 'inpaint') {
     const { compositing } = state.canvasV2;
@@ -185,7 +186,7 @@ export const buildSD1Graph = async (
       bbox,
       compositing,
       1 - params.img2imgStrength,
-      vaePrecision
+      vaePrecision === 'fp32'
     );
   } else if (generationMode === 'outpaint') {
     const { compositing } = state.canvasV2;
@@ -202,7 +203,7 @@ export const buildSD1Graph = async (
       bbox,
       compositing,
       1 - params.img2imgStrength,
-      vaePrecision
+      fp32
     );
   }
 
