@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from einops import rearrange
 from PIL import Image
@@ -13,12 +14,15 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.services.session_processor.session_processor_common import CanceledException, ProgressImage
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.step_callback import PipelineIntermediateState
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.sampling import denoise, get_noise, get_schedule, prepare_latent_img_patches, unpack
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.util import image_to_dataURL
 
 
 @invocation(
@@ -108,6 +112,35 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         with transformer_info as transformer:
             assert isinstance(transformer, Flux)
 
+            def step_callback(img: torch.Tensor, state: PipelineIntermediateState) -> None:
+                if context.util.is_canceled():
+                    raise CanceledException
+
+                # TODO: Make this look like the image
+                latent_image = unpack(img.float(), self.height, self.width)
+                latent_image = latent_image.squeeze()  # Remove unnecessary dimensions
+                flattened_tensor = latent_image.reshape(-1)  # Flatten to shape [48*128*128]
+
+                # Create a new tensor of the required shape [255, 255, 3]
+                latent_image = flattened_tensor[: 255 * 255 * 3].reshape(255, 255, 3)  # Reshape to RGB format
+
+                # Convert to a NumPy array and then to a PIL Image
+                image = Image.fromarray(latent_image.cpu().numpy().astype(np.uint8))
+
+                (width, height) = image.size
+                width *= 8
+                height *= 8
+
+                dataURL = image_to_dataURL(image, image_format="JPEG")
+
+                # TODO: move this whole function to invocation context to properly reference these variables
+                context._services.events.emit_invocation_denoise_progress(
+                    context._data.queue_item,
+                    context._data.invocation,
+                    state,
+                    ProgressImage(dataURL=dataURL, width=width, height=height),
+                )
+
             x = denoise(
                 model=transformer,
                 img=img,
@@ -116,6 +149,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 txt_ids=txt_ids,
                 vec=clip_embeddings,
                 timesteps=timesteps,
+                step_callback=step_callback,
                 guidance=self.guidance,
             )
 
