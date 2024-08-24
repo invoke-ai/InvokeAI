@@ -236,7 +236,7 @@ export const buildSDXLGraph = async (
     state.canvasV2.controlLayers.entities,
     g,
     state.canvasV2.bbox.rect,
-    controlNetCollector,
+    t2iAdapterCollector,
     modelConfig.base
   );
   if (t2iAdapterResult.addedT2IAdapters > 0) {
