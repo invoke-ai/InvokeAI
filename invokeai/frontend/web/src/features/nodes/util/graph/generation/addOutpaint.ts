@@ -1,3 +1,4 @@
+import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
@@ -8,6 +9,7 @@ import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
 export const addOutpaint = async (
+  state: RootState,
   g: Graph,
   manager: CanvasManager,
   l2i: Invocation<'l2i'>,
@@ -23,6 +25,7 @@ export const addOutpaint = async (
 ): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
   denoise.denoising_start = denoising_start;
 
+  const mode = state.canvasV2.session.mode;
   const initialImage = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
   const maskImage = await manager.compositor.getCompositeInpaintMaskImageDTO(bbox.rect);
   const infill = getInfill(g, compositing);
@@ -111,8 +114,12 @@ export const addOutpaint = async (
     g.addEdge(createGradientMask, 'expanded_mask_area', resizeOutputMaskToOriginalSize, 'image');
 
     // Finally, paste the generated masked image back onto the original image
-    g.addEdge(resizeOutputImageToOriginalSize, 'image', canvasPasteBack, 'image');
+    g.addEdge(resizeOutputImageToOriginalSize, 'image', canvasPasteBack, 'generated_image');
     g.addEdge(resizeOutputMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
+
+    if (mode === 'generate') {
+      canvasPasteBack.source_image = { image_name: initialImage.image_name };
+    }
 
     return canvasPasteBack;
   } else {
@@ -158,7 +165,11 @@ export const addOutpaint = async (
     g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
     g.addEdge(createGradientMask, 'expanded_mask_area', canvasPasteBack, 'mask');
-    g.addEdge(l2i, 'image', canvasPasteBack, 'image');
+    g.addEdge(l2i, 'image', canvasPasteBack, 'generated_image');
+
+    if (mode === 'generate') {
+      canvasPasteBack.source_image = { image_name: initialImage.image_name };
+    }
 
     return canvasPasteBack;
   }
