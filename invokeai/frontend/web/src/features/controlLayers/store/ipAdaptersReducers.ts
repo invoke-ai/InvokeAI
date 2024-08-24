@@ -1,11 +1,14 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
+import { deepClone } from 'common/util/deepClone';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import { merge } from 'lodash-es';
 import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { CanvasIPAdapterState, CanvasV2State, CLIPVisionModelV2, IPAdapterConfig, IPMethodV2 } from './types';
-import { imageDTOToImageWithDims } from './types';
+import type { CanvasIPAdapterState, CanvasV2State, CLIPVisionModelV2, IPMethodV2 } from './types';
+import { getEntityIdentifier, imageDTOToImageWithDims, initialIPAdapter } from './types';
 
 const selectIPAdapterEntity = (state: CanvasV2State, id: string) =>
   state.ipAdapters.entities.find((ipa) => ipa.id === id);
@@ -17,19 +20,27 @@ export const selectIPAdapterEntityOrThrow = (state: CanvasV2State, id: string) =
 
 export const ipAdaptersReducers = {
   ipaAdded: {
-    reducer: (state, action: PayloadAction<{ id: string; ipAdapter: IPAdapterConfig }>) => {
-      const { id, ipAdapter } = action.payload;
-      const layer: CanvasIPAdapterState = {
+    reducer: (
+      state,
+      action: PayloadAction<{ id: string; overrides?: Partial<CanvasIPAdapterState>; isSelected?: boolean }>
+    ) => {
+      const { id, overrides, isSelected } = action.payload;
+      const entity: CanvasIPAdapterState = {
         id,
         type: 'ip_adapter',
         name: null,
         isEnabled: true,
-        ipAdapter,
+        ipAdapter: deepClone(initialIPAdapter),
       };
-      state.ipAdapters.entities.push(layer);
-      state.selectedEntityIdentifier = { type: 'ip_adapter', id };
+      merge(entity, overrides);
+      state.ipAdapters.entities.push(entity);
+      if (isSelected) {
+        state.selectedEntityIdentifier = getEntityIdentifier(entity);
+      }
     },
-    prepare: (payload: { ipAdapter: IPAdapterConfig }) => ({ payload: { id: uuidv4(), ...payload } }),
+    prepare: (payload?: { overrides?: Partial<CanvasIPAdapterState>; isSelected?: boolean }) => ({
+      payload: { ...payload, id: getPrefixedId('ip_adapter') },
+    }),
   },
   ipaRecalled: (state, action: PayloadAction<{ data: CanvasIPAdapterState }>) => {
     const { data } = action.payload;
