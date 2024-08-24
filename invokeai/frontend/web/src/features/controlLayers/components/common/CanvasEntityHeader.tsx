@@ -56,7 +56,7 @@ export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
   }, [entityIdentifier]);
 
   return (
-    <ContextMenu renderMenu={renderMenu}>
+    <ContextMenu renderMenu={renderMenu} stopImmediatePropagation>
       {(ref) => (
         <Flex ref={ref} gap={2} alignItems="center" p={2} {...rest}>
           {children}
