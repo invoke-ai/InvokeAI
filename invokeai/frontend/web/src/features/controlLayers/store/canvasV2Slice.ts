@@ -24,8 +24,12 @@ import { atom } from 'nanostores';
 import { assert } from 'tsafe';
 
 import type {
+  CanvasControlLayerState,
   CanvasEntityIdentifier,
   CanvasEntityState,
+  CanvasInpaintMaskState,
+  CanvasRasterLayerState,
+  CanvasRegionalGuidanceState,
   CanvasV2State,
   Coordinate,
   EntityBrushLineAddedPayload,
@@ -170,7 +174,7 @@ function selectAllEntitiesOfType(state: CanvasV2State, type: CanvasEntityState['
   }
 }
 
-function selectAllEntities(state: CanvasV2State): CanvasEntityState[] {
+export function selectAllEntities(state: CanvasV2State): CanvasEntityState[] {
   // These are in the same order as they are displayed in the list!
   return [
     ...state.inpaintMasks.entities.toReversed(),
@@ -178,6 +182,17 @@ function selectAllEntities(state: CanvasV2State): CanvasEntityState[] {
     ...state.ipAdapters.entities.toReversed(),
     ...state.controlLayers.entities.toReversed(),
     ...state.rasterLayers.entities.toReversed(),
+  ];
+}
+
+export function selectAllRenderableEntities(
+  state: CanvasV2State
+): (CanvasRasterLayerState | CanvasControlLayerState | CanvasInpaintMaskState | CanvasRegionalGuidanceState)[] {
+  return [
+    ...state.rasterLayers.entities,
+    ...state.controlLayers.entities,
+    ...state.inpaintMasks.entities,
+    ...state.regions.entities,
   ];
 }
 
