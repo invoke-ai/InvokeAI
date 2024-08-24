@@ -23,7 +23,6 @@ from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetIPAdapterData
-from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState
 from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
@@ -265,7 +264,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         seed: int,
         timesteps: torch.Tensor,
         init_timestep: torch.Tensor,
-        callback: Callable[[PipelineIntermediateState], None],
+        callback: Callable[[...], None],
         control_data: list[ControlNetData] | None = None,
         ip_adapter_data: Optional[list[IPAdapterData]] = None,
         t2i_adapter_data: Optional[list[T2IAdapterData]] = None,
@@ -365,13 +364,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         with attn_ctx:
             callback(
-                PipelineIntermediateState(
-                    step=-1,
-                    order=self.scheduler.order,
-                    total_steps=len(timesteps),
-                    timestep=self.scheduler.config.num_train_timesteps,
-                    latents=latents,
-                )
+                step=-1,
+                order=self.scheduler.order,
+                total_steps=len(timesteps),
+                timestep=self.scheduler.config.num_train_timesteps,
+                latents=latents,
             )
 
             for i, t in enumerate(self.progress_bar(timesteps)):
@@ -394,14 +391,12 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
                 predicted_original = getattr(step_output, "pred_original_sample", None)
 
                 callback(
-                    PipelineIntermediateState(
-                        step=i,
-                        order=self.scheduler.order,
-                        total_steps=len(timesteps),
-                        timestep=int(t),
-                        latents=latents,
-                        predicted_original=predicted_original,
-                    )
+                    step=i,
+                    order=self.scheduler.order,
+                    total_steps=len(timesteps),
+                    timestep=int(t),
+                    latents=latents,
+                    predicted_original=predicted_original,
                 )
 
         # restore unmasked part after the last step is completed

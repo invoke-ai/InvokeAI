@@ -9,7 +9,6 @@ from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
-    PipelineIntermediateState,
     StableDiffusionGeneratorPipeline,
 )
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import TextConditioningData
@@ -45,7 +44,7 @@ class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
         noise: Optional[torch.Tensor],
         timesteps: torch.Tensor,
         init_timestep: torch.Tensor,
-        callback: Callable[[PipelineIntermediateState], None],
+        callback: Callable[[...], None],
     ) -> torch.Tensor:
         self._check_regional_prompting(multi_diffusion_conditioning)
 
@@ -80,13 +79,11 @@ class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
         ]
 
         callback(
-            PipelineIntermediateState(
-                step=-1,
-                order=self.scheduler.order,
-                total_steps=len(timesteps),
-                timestep=self.scheduler.config.num_train_timesteps,
-                latents=latents,
-            )
+            step=-1,
+            order=self.scheduler.order,
+            total_steps=len(timesteps),
+            timestep=self.scheduler.config.num_train_timesteps,
+            latents=latents,
         )
 
         for i, t in enumerate(self.progress_bar(timesteps)):
@@ -181,14 +178,12 @@ class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
                 )
 
             callback(
-                PipelineIntermediateState(
-                    step=i,
-                    order=self.scheduler.order,
-                    total_steps=len(timesteps),
-                    timestep=int(t),
-                    latents=latents,
-                    predicted_original=predicted_original,
-                )
+                step=i,
+                order=self.scheduler.order,
+                total_steps=len(timesteps),
+                timestep=int(t),
+                latents=latents,
+                predicted_original=predicted_original,
             )
 
         return latents

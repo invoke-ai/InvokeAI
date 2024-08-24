@@ -1,6 +1,6 @@
 import copy
 from contextlib import ExitStack
-from typing import Iterator, Tuple
+from typing import Iterator, Tuple, Optional
 
 import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
@@ -19,12 +19,13 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     UIType,
 )
+from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.app.invocations.model import UNetField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData, PipelineIntermediateState
+from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData
 from invokeai.backend.stable_diffusion.multi_diffusion_pipeline import (
     MultiDiffusionPipeline,
     MultiDiffusionRegionConditioning,
@@ -187,11 +188,33 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             min_overlap=latent_tile_overlap,
         )
 
-        # Get the unet's config so that we can pass the base to sd_step_callback().
+        # Get the unet's config so that we can pass the base to preview logic.
         unet_config = context.models.get_config(self.unet.unet.key)
 
-        def step_callback(state: PipelineIntermediateState) -> None:
-            context.util.sd_step_callback(state, unet_config.base)
+        def step_callback(
+            step: int,
+            order: int,
+            total_steps: int,
+            timestep: int,
+            latents: torch.Tensor,
+            predicted_original: Optional[torch.Tensor] = None,
+        ) -> None:
+            # Some schedulers report not only the noisy latents at the current timestep,
+            # but also their estimate so far of what the de-noised latents will be. Use
+            # that estimate if it is available.
+            sample = latents
+            if predicted_original is not None:
+                sample = predicted_original
+
+            context.util.preview_callback(
+                step=step,
+                total_steps=total_steps,
+                order=order,
+                progress_image=PreviewExt.gen_latents_preview(
+                    sample=sample,
+                    base_model=unet_config.base,
+                ),
+            )
 
         # Prepare an iterator that yields the UNet's LoRA models and their weights.
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:

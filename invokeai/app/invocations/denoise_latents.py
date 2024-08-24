@@ -39,7 +39,6 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, ModelVariantType
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.stable_diffusion import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     ControlNetData,
@@ -829,14 +828,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
             denoising_end=self.denoising_end,
         )
 
-        # get the unet's config so that we can pass the base to sd_step_callback()
+        # get the unet's config so that we can pass the base to preview extension
         unet_config = context.models.get_config(self.unet.unet.key)
 
         ### preview
-        def step_callback(state: PipelineIntermediateState) -> None:
-            context.util.sd_step_callback(state, unet_config.base)
-
-        ext_manager.add_extension(PreviewExt(step_callback))
+        ext_manager.add_extension(PreviewExt(context, unet_config.base))
 
         ### cfg rescale
         if self.cfg_rescale_multiplier > 0:
@@ -957,11 +953,33 @@ class DenoiseLatentsInvocation(BaseInvocation):
         # The image prompts are then passed to prep_ip_adapter_data().
         image_prompts = self.prep_ip_adapter_image_prompts(context=context, ip_adapters=ip_adapters)
 
-        # get the unet's config so that we can pass the base to sd_step_callback()
+        # get the unet's config so that we can pass the base to preview logic
         unet_config = context.models.get_config(self.unet.unet.key)
 
-        def step_callback(state: PipelineIntermediateState) -> None:
-            context.util.sd_step_callback(state, unet_config.base)
+        def step_callback(
+            step: int,
+            order: int,
+            total_steps: int,
+            timestep: int,
+            latents: torch.Tensor,
+            predicted_original: Optional[torch.Tensor] = None,
+        ) -> None:
+            # Some schedulers report not only the noisy latents at the current timestep,
+            # but also their estimate so far of what the de-noised latents will be. Use
+            # that estimate if it is available.
+            sample = latents
+            if predicted_original is not None:
+                sample = predicted_original
+
+            context.util.preview_callback(
+                step=step,
+                total_steps=total_steps,
+                order=order,
+                progress_image=PreviewExt.gen_latents_preview(
+                    sample=sample,
+                    base_model=unet_config.base,
+                ),
+            )
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.unet.loras:

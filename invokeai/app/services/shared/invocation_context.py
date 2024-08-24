@@ -14,7 +14,6 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
-from invokeai.app.util.step_callback import stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
@@ -24,7 +23,6 @@ from invokeai.backend.model_manager.config import (
     SubModelType,
 )
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage, CanceledException
 
@@ -537,32 +535,6 @@ class UtilInterface(InvocationContextInterface):
             True if the current session has been canceled, False if not.
         """
         return self._is_canceled()
-
-    def sd_step_callback(self, intermediate_state: PipelineIntermediateState, base_model: BaseModelType) -> None:
-        """
-        The step callback emits a progress event with the current step, the total number of
-        steps, a preview image, and some other internal metadata.
-
-        This should be called after each denoising step.
-
-        Args:
-            intermediate_state: The intermediate state of the diffusion pipeline.
-            base_model: The base model for the current denoising step.
-        """
-        if self.is_canceled():
-            raise CanceledException
-
-        sd_progress_image = stable_diffusion_step_callback(
-            context_data=self._data,
-            intermediate_state=intermediate_state,
-            base_model=base_model,
-        )
-        self.preview_callback(
-            step=intermediate_state.step,
-            total_steps=intermediate_state.total_steps,
-            order=intermediate_state.order,
-            progress_image=sd_progress_image,
-        )
 
     def preview_callback(self, step: int, total_steps: int, order: int, progress_image: "ProgressImage"):
         if self.is_canceled():
