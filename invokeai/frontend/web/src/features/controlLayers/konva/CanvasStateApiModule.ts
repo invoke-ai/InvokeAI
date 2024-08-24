@@ -25,6 +25,7 @@ import {
   entitySelected,
   eraserWidthChanged,
   fillChanged,
+  selectAllRenderableEntities,
   toolBufferChanged,
   toolChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
@@ -197,6 +198,17 @@ export class CanvasStateApiModule {
 
     return null;
   }
+
+  getRenderedEntityCount = () => {
+    const renderableEntities = selectAllRenderableEntities(this.getState());
+    let count = 0;
+    for (const entity of renderableEntities) {
+      if (entity.isEnabled) {
+        count++;
+      }
+    }
+    return count;
+  };
 
   getSelectedEntity = () => {
     const state = this.getState();
