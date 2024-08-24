@@ -13,6 +13,10 @@ export class CanvasToolModule {
   readonly type = 'tool_preview';
   static readonly COLOR_PICKER_RADIUS = 25;
   static readonly COLOR_PICKER_THICKNESS = 15;
+  static readonly COLOR_PICKER_CROSSHAIR_SPACE = 5;
+  static readonly COLOR_PICKER_CROSSHAIR_INNER_THICKNESS = 1.5;
+  static readonly COLOR_PICKER_CROSSHAIR_OUTER_THICKNESS = 3;
+  static readonly COLOR_PICKER_CROSSHAIR_SIZE = 10;
 
   id: string;
   path: string[];
@@ -40,6 +44,14 @@ export class CanvasToolModule {
       oldColor: Konva.Arc;
       innerBorder: Konva.Ring;
       outerBorder: Konva.Ring;
+      crosshairNorthInner: Konva.Line;
+      crosshairNorthOuter: Konva.Line;
+      crosshairEastInner: Konva.Line;
+      crosshairEastOuter: Konva.Line;
+      crosshairSouthInner: Konva.Line;
+      crosshairSouthOuter: Konva.Line;
+      crosshairWestInner: Konva.Line;
+      crosshairWestOuter: Konva.Line;
     };
   };
 
@@ -135,6 +147,38 @@ export class CanvasToolModule {
           fill: BRUSH_BORDER_OUTER_COLOR,
           strokeEnabled: false,
         }),
+        crosshairNorthInner: new Konva.Line({
+          name: `${this.type}:color_picker_crosshair_north1_line`,
+          stroke: BRUSH_BORDER_INNER_COLOR,
+        }),
+        crosshairNorthOuter: new Konva.Line({
+          name: `${this.type}:color_picker_crosshair_north2_line`,
+          stroke: BRUSH_BORDER_OUTER_COLOR,
+        }),
+        crosshairEastInner: new Konva.Line({
+          name: `${this.type}:color_picker_crosshair_east1_line`,
+          stroke: BRUSH_BORDER_INNER_COLOR,
+        }),
+        crosshairEastOuter: new Konva.Line({
+          name: `${this.type}:color_picker_crosshair_east2_line`,
+          stroke: BRUSH_BORDER_OUTER_COLOR,
+        }),
+        crosshairSouthInner: new Konva.Line({
+          name: `${this.type}:color_picker_crosshair_south1_line`,
+          stroke: BRUSH_BORDER_INNER_COLOR,
+        }),
+        crosshairSouthOuter: new Konva.Line({
+          name: `${this.type}:color_picker_crosshair_south2_line`,
+          stroke: BRUSH_BORDER_OUTER_COLOR,
+        }),
+        crosshairWestInner: new Konva.Line({
+          name: `${this.type}:color_picker_crosshair_west1_line`,
+          stroke: BRUSH_BORDER_INNER_COLOR,
+        }),
+        crosshairWestOuter: new Konva.Line({
+          name: `${this.type}:color_picker_crosshair_west2_line`,
+          stroke: BRUSH_BORDER_OUTER_COLOR,
+        }),
       },
     };
     this.konva.brush.group.add(this.konva.brush.fillCircle, this.konva.brush.innerBorder, this.konva.brush.outerBorder);
@@ -151,7 +195,15 @@ export class CanvasToolModule {
       this.konva.colorPicker.newColor,
       this.konva.colorPicker.oldColor,
       this.konva.colorPicker.innerBorder,
-      this.konva.colorPicker.outerBorder
+      this.konva.colorPicker.outerBorder,
+      this.konva.colorPicker.crosshairNorthOuter,
+      this.konva.colorPicker.crosshairNorthInner,
+      this.konva.colorPicker.crosshairEastOuter,
+      this.konva.colorPicker.crosshairEastInner,
+      this.konva.colorPicker.crosshairSouthOuter,
+      this.konva.colorPicker.crosshairSouthInner,
+      this.konva.colorPicker.crosshairWestOuter,
+      this.konva.colorPicker.crosshairWestInner
     );
     this.konva.group.add(this.konva.colorPicker.group);
 
@@ -175,42 +227,6 @@ export class CanvasToolModule {
     this.konva.group.destroy();
   };
 
-  scaleTool = () => {
-    const toolState = this.manager.stateApi.getToolState();
-    const onePixel = this.manager.stage.getScaledPixels(1);
-    const twoPixels = this.manager.stage.getScaledPixels(2);
-
-    const brushRadius = toolState.brush.width / 2;
-    this.konva.brush.innerBorder.innerRadius(brushRadius);
-    this.konva.brush.innerBorder.outerRadius(brushRadius + onePixel);
-
-    this.konva.brush.outerBorder.innerRadius(brushRadius + onePixel);
-    this.konva.brush.outerBorder.outerRadius(brushRadius + twoPixels);
-
-    const eraserRadius = toolState.eraser.width / 2;
-    this.konva.eraser.innerBorder.innerRadius(eraserRadius);
-    this.konva.eraser.innerBorder.outerRadius(eraserRadius + onePixel);
-
-    this.konva.eraser.outerBorder.innerRadius(eraserRadius + onePixel);
-    this.konva.eraser.outerBorder.outerRadius(eraserRadius + twoPixels);
-
-    const colorPickerInnerRadius = this.manager.stage.getScaledPixels(CanvasToolModule.COLOR_PICKER_RADIUS);
-    const colorPickerOuterRadius = this.manager.stage.getScaledPixels(
-      CanvasToolModule.COLOR_PICKER_RADIUS + CanvasToolModule.COLOR_PICKER_THICKNESS
-    );
-    this.konva.colorPicker.oldColor.innerRadius(colorPickerInnerRadius);
-    this.konva.colorPicker.oldColor.outerRadius(colorPickerOuterRadius);
-
-    this.konva.colorPicker.newColor.innerRadius(colorPickerInnerRadius);
-    this.konva.colorPicker.newColor.outerRadius(colorPickerOuterRadius);
-
-    this.konva.colorPicker.innerBorder.innerRadius(colorPickerOuterRadius);
-    this.konva.colorPicker.innerBorder.outerRadius(colorPickerOuterRadius + onePixel);
-
-    this.konva.colorPicker.outerBorder.innerRadius(colorPickerOuterRadius + onePixel);
-    this.konva.colorPicker.outerBorder.outerRadius(colorPickerOuterRadius + twoPixels);
-  };
-
   setToolVisibility = (tool: Tool) => {
     this.konva.brush.group.visible(tool === 'brush');
     this.konva.eraser.group.visible(tool === 'eraser');
@@ -223,7 +239,6 @@ export class CanvasToolModule {
     const toolState = this.manager.stateApi.getToolState();
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
     const cursorPos = this.manager.stateApi.$lastCursorPos.get();
-    const isDrawing = this.manager.stateApi.$isDrawing.get();
     const isMouseDown = this.manager.stateApi.$isMouseDown.get();
 
     const tool = toolState.selected;
@@ -272,48 +287,136 @@ export class CanvasToolModule {
       if (cursorPos && tool === 'brush') {
         const brushPreviewFill = this.manager.stateApi.getBrushPreviewFill();
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.brush.width);
-
-        // Update the fill circle
+        const onePixel = this.manager.stage.getScaledPixels(1);
+        const twoPixels = this.manager.stage.getScaledPixels(2);
         const radius = toolState.brush.width / 2;
 
+        // The circle is scaled
         this.konva.brush.fillCircle.setAttrs({
           x: alignedCursorPos.x,
           y: alignedCursorPos.y,
           radius,
-          fill: isDrawing ? '' : rgbaColorToString(brushPreviewFill),
+          fill: rgbaColorToString(brushPreviewFill),
         });
-        this.konva.brush.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
-        this.konva.brush.outerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
+
+        // But the borders are in screen-pixels
+        this.konva.brush.innerBorder.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          innerRadius: radius,
+          outerRadius: radius + onePixel,
+        });
+        this.konva.brush.outerBorder.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          innerRadius: radius + onePixel,
+          outerRadius: radius + twoPixels,
+        });
       } else if (cursorPos && tool === 'eraser') {
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.eraser.width);
-        // Update the fill circle
+        const onePixel = this.manager.stage.getScaledPixels(1);
+        const twoPixels = this.manager.stage.getScaledPixels(2);
         const radius = toolState.eraser.width / 2;
+
+        // The circle is scaled
         this.konva.eraser.fillCircle.setAttrs({
           x: alignedCursorPos.x,
           y: alignedCursorPos.y,
           radius,
           fill: 'white',
         });
-        this.konva.eraser.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
-        this.konva.eraser.outerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
+
+        // But the borders are in screen-pixels
+        this.konva.eraser.innerBorder.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          innerRadius: radius,
+          outerRadius: radius + onePixel,
+        });
+        this.konva.eraser.outerBorder.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          innerRadius: radius + onePixel,
+          outerRadius: radius + twoPixels,
+        });
       } else if (cursorPos && tool === 'colorPicker') {
         const colorUnderCursor = this.manager.stateApi.$colorUnderCursor.get();
+        const colorPickerInnerRadius = this.manager.stage.getScaledPixels(CanvasToolModule.COLOR_PICKER_RADIUS);
+        const colorPickerOuterRadius = this.manager.stage.getScaledPixels(
+          CanvasToolModule.COLOR_PICKER_RADIUS + CanvasToolModule.COLOR_PICKER_THICKNESS
+        );
+        const onePixel = this.manager.stage.getScaledPixels(1);
+        const twoPixels = this.manager.stage.getScaledPixels(2);
 
         this.konva.colorPicker.newColor.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
           fill: rgbColorToString(colorUnderCursor),
+          innerRadius: colorPickerInnerRadius,
+          outerRadius: colorPickerOuterRadius,
         });
         this.konva.colorPicker.oldColor.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
           fill: rgbColorToString(toolState.fill),
+          innerRadius: colorPickerInnerRadius,
+          outerRadius: colorPickerOuterRadius,
         });
-        this.konva.colorPicker.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
-        this.konva.colorPicker.outerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
+        this.konva.colorPicker.innerBorder.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          innerRadius: colorPickerOuterRadius,
+          outerRadius: colorPickerOuterRadius + onePixel,
+        });
+        this.konva.colorPicker.outerBorder.setAttrs({
+          x: cursorPos.x,
+          y: cursorPos.y,
+          innerRadius: colorPickerOuterRadius + onePixel,
+          outerRadius: colorPickerOuterRadius + twoPixels,
+        });
+
+        const size = this.manager.stage.getScaledPixels(CanvasToolModule.COLOR_PICKER_CROSSHAIR_SIZE);
+        const space = this.manager.stage.getScaledPixels(CanvasToolModule.COLOR_PICKER_CROSSHAIR_SPACE);
+        const innerThickness = this.manager.stage.getScaledPixels(
+          CanvasToolModule.COLOR_PICKER_CROSSHAIR_INNER_THICKNESS
+        );
+        const outerThickness = this.manager.stage.getScaledPixels(
+          CanvasToolModule.COLOR_PICKER_CROSSHAIR_OUTER_THICKNESS
+        );
+        this.konva.colorPicker.crosshairNorthOuter.setAttrs({
+          strokeWidth: outerThickness,
+          points: [cursorPos.x, cursorPos.y - size, cursorPos.x, cursorPos.y - space],
+        });
+        this.konva.colorPicker.crosshairNorthInner.setAttrs({
+          strokeWidth: innerThickness,
+          points: [cursorPos.x, cursorPos.y - size, cursorPos.x, cursorPos.y - space],
+        });
+        this.konva.colorPicker.crosshairEastOuter.setAttrs({
+          strokeWidth: outerThickness,
+          points: [cursorPos.x + space, cursorPos.y, cursorPos.x + size, cursorPos.y],
+        });
+        this.konva.colorPicker.crosshairEastInner.setAttrs({
+          strokeWidth: innerThickness,
+          points: [cursorPos.x + space, cursorPos.y, cursorPos.x + size, cursorPos.y],
+        });
+        this.konva.colorPicker.crosshairSouthOuter.setAttrs({
+          strokeWidth: outerThickness,
+          points: [cursorPos.x, cursorPos.y + space, cursorPos.x, cursorPos.y + size],
+        });
+        this.konva.colorPicker.crosshairSouthInner.setAttrs({
+          strokeWidth: innerThickness,
+          points: [cursorPos.x, cursorPos.y + space, cursorPos.x, cursorPos.y + size],
+        });
+        this.konva.colorPicker.crosshairWestOuter.setAttrs({
+          strokeWidth: outerThickness,
+          points: [cursorPos.x - space, cursorPos.y, cursorPos.x - size, cursorPos.y],
+        });
+        this.konva.colorPicker.crosshairWestInner.setAttrs({
+          strokeWidth: innerThickness,
+          points: [cursorPos.x - space, cursorPos.y, cursorPos.x - size, cursorPos.y],
+        });
       }
 
-      this.scaleTool();
       this.setToolVisibility(tool);
     }
   }
