@@ -176,6 +176,7 @@ export const buildSDXLGraph = async (
   } else if (generationMode === 'inpaint') {
     const { compositing } = state.canvasV2;
     canvasOutput = await addInpaint(
+      state,
       g,
       manager,
       l2i,
@@ -192,6 +193,7 @@ export const buildSDXLGraph = async (
   } else if (generationMode === 'outpaint') {
     const { compositing } = state.canvasV2;
     canvasOutput = await addOutpaint(
+      state,
       g,
       manager,
       l2i,
