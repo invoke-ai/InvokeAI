@@ -1,4 +1,4 @@
-import type { Coordinate, Rect } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, Coordinate, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -335,7 +335,7 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
  */
 export const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 10);
 
-export function getPrefixedId(prefix: string): string {
+export function getPrefixedId(prefix: CanvasEntityIdentifier['type'] | (string & Record<never, never>)): string {
   return `${prefix}:${nanoid()}`;
 }
 
