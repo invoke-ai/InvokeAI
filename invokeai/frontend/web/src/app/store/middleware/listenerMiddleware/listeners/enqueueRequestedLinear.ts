@@ -1,6 +1,9 @@
 import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { SerializableObject } from 'common/types';
+import type { Result } from 'common/util/result';
+import { isErr, withResult, withResultAsync } from 'common/util/result';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { sessionStagingAreaReset, sessionStartedStaging } from 'features/controlLayers/store/canvasV2Slice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
@@ -27,48 +30,70 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       assert(manager, 'No model found in state');
 
       let didStartStaging = false;
+
       if (!state.canvasV2.session.isStaging && state.canvasV2.session.mode === 'compose') {
         dispatch(sessionStartedStaging());
         didStartStaging = true;
       }
 
-      try {
-        let g: Graph;
-        let noise: Invocation<'noise'>;
-        let posCond: Invocation<'compel' | 'sdxl_compel_prompt'>;
-
-        assert(model, 'No model found in state');
-        const base = model.base;
-
-        if (base === 'sdxl') {
-          const result = await buildSDXLGraph(state, manager);
-          g = result.g;
-          noise = result.noise;
-          posCond = result.posCond;
-        } else if (base === 'sd-1' || base === 'sd-2') {
-          const result = await buildSD1Graph(state, manager);
-          g = result.g;
-          noise = result.noise;
-          posCond = result.posCond;
-        } else {
-          assert(false, `No graph builders for base ${base}`);
-        }
-
-        const batchConfig = prepareLinearUIBatch(state, g, prepend, noise, posCond);
-
-        const req = dispatch(
-          queueApi.endpoints.enqueueBatch.initiate(batchConfig, {
-            fixedCacheKey: 'enqueueBatch',
-          })
-        );
-        req.reset();
-        await req.unwrap();
-      } catch (error) {
-        log.error({ error: serializeError(error) }, 'Failed to enqueue batch');
+      const abortStaging = () => {
         if (didStartStaging && getState().canvasV2.session.isStaging) {
           dispatch(sessionStagingAreaReset());
         }
+      };
+
+      let buildGraphResult: Result<
+        { g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'compel' | 'sdxl_compel_prompt'> },
+        Error
+      >;
+
+      assert(model, 'No model found in state');
+      const base = model.base;
+
+      switch (base) {
+        case 'sdxl':
+          buildGraphResult = await withResultAsync(() => buildSDXLGraph(state, manager));
+          break;
+        case 'sd-1':
+        case `sd-2`:
+          buildGraphResult = await withResultAsync(() => buildSD1Graph(state, manager));
+          break;
+        default:
+          assert(false, `No graph builders for base ${base}`);
       }
+
+      if (isErr(buildGraphResult)) {
+        log.error({ error: serializeError(buildGraphResult.error) }, 'Failed to build graph');
+        abortStaging();
+        return;
+      }
+
+      const { g, noise, posCond } = buildGraphResult.value;
+
+      const prepareBatchResult = withResult(() => prepareLinearUIBatch(state, g, prepend, noise, posCond));
+
+      if (isErr(prepareBatchResult)) {
+        log.error({ error: serializeError(prepareBatchResult.error) }, 'Failed to prepare batch');
+        abortStaging();
+        return;
+      }
+
+      const req = dispatch(
+        queueApi.endpoints.enqueueBatch.initiate(prepareBatchResult.value, {
+          fixedCacheKey: 'enqueueBatch',
+        })
+      );
+      req.reset();
+
+      const enqueueResult = await withResultAsync(() => req.unwrap());
+
+      if (isErr(enqueueResult)) {
+        log.error({ error: serializeError(enqueueResult.error) }, 'Failed to enqueue batch');
+        abortStaging();
+        return;
+      }
+
+      log.debug({ batchConfig: prepareBatchResult.value } as SerializableObject, 'Enqueued batch');
     },
   });
 };
