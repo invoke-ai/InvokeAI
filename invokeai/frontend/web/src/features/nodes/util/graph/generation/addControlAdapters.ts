@@ -36,7 +36,7 @@ export const addControlNets = async (
     const adapter = manager.adapters.controlLayers.get(layer.id);
     assert(adapter, 'Adapter not found');
     const imageDTO = await adapter.renderer.rasterize({ rect: bbox, attrs: { opacity: 1, filters: [] } });
-    await addControlNetToGraph(g, layer, imageDTO, collector);
+    addControlNetToGraph(g, layer, imageDTO, collector);
   }
 
   return result;
@@ -69,7 +69,7 @@ export const addT2IAdapters = async (
     const adapter = manager.adapters.controlLayers.get(layer.id);
     assert(adapter, 'Adapter not found');
     const imageDTO = await adapter.renderer.rasterize({ rect: bbox, attrs: { opacity: 1, filters: [] } });
-    await addT2IAdapterToGraph(g, layer, imageDTO, collector);
+    addT2IAdapterToGraph(g, layer, imageDTO, collector);
   }
 
   return result;
