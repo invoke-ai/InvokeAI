@@ -1,6 +1,5 @@
 import { IconButton, Menu, MenuButton, MenuDivider, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useDefaultControlAdapter, useDefaultIPAdapter } from 'features/controlLayers/hooks/useLayerControlAdapter';
 import {
   allEntitiesDeleted,
   controlLayerAdded,
@@ -21,23 +20,21 @@ export const CanvasEntityListMenu = memo(() => {
     const count = selectEntityCount(s);
     return count > 0;
   });
-  const defaultControlAdapter = useDefaultControlAdapter();
-  const defaultIPAdapter = useDefaultIPAdapter();
   const addInpaintMask = useCallback(() => {
-    dispatch(inpaintMaskAdded());
+    dispatch(inpaintMaskAdded({ isSelected: true }));
   }, [dispatch]);
   const addRegionalGuidance = useCallback(() => {
-    dispatch(rgAdded());
+    dispatch(rgAdded({ isSelected: true }));
   }, [dispatch]);
   const addRasterLayer = useCallback(() => {
     dispatch(rasterLayerAdded({ isSelected: true }));
   }, [dispatch]);
   const addControlLayer = useCallback(() => {
-    dispatch(controlLayerAdded({ isSelected: true, overrides: { controlAdapter: defaultControlAdapter } }));
-  }, [defaultControlAdapter, dispatch]);
+    dispatch(controlLayerAdded({ isSelected: true }));
+  }, [dispatch]);
   const addIPAdapter = useCallback(() => {
-    dispatch(ipaAdded({ ipAdapter: defaultIPAdapter }));
-  }, [defaultIPAdapter, dispatch]);
+    dispatch(ipaAdded({ isSelected: true }));
+  }, [dispatch]);
   const deleteAll = useCallback(() => {
     dispatch(allEntitiesDeleted());
   }, [dispatch]);
