@@ -2,11 +2,7 @@ import type { SerializableObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
-import {
-  BRUSH_BORDER_INNER_COLOR,
-  BRUSH_BORDER_OUTER_COLOR,
-  BRUSH_ERASER_BORDER_WIDTH,
-} from 'features/controlLayers/konva/constants';
+import { BRUSH_BORDER_INNER_COLOR, BRUSH_BORDER_OUTER_COLOR } from 'features/controlLayers/konva/constants';
 import { alignCoordForTool, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Tool } from 'features/controlLayers/store/types';
 import { isDrawableEntity } from 'features/controlLayers/store/types';
@@ -15,6 +11,8 @@ import type { Logger } from 'roarr';
 
 export class CanvasToolModule {
   readonly type = 'tool_preview';
+  static readonly COLOR_PICKER_RADIUS = 25;
+  static readonly COLOR_PICKER_THICKNESS = 15;
 
   id: string;
   path: string[];
@@ -27,19 +25,21 @@ export class CanvasToolModule {
     brush: {
       group: Konva.Group;
       fillCircle: Konva.Circle;
-      innerBorderCircle: Konva.Circle;
-      outerBorderCircle: Konva.Circle;
+      innerBorder: Konva.Ring;
+      outerBorder: Konva.Ring;
     };
     eraser: {
       group: Konva.Group;
       fillCircle: Konva.Circle;
-      innerBorderCircle: Konva.Circle;
-      outerBorderCircle: Konva.Circle;
+      innerBorder: Konva.Ring;
+      outerBorder: Konva.Ring;
     };
     colorPicker: {
       group: Konva.Group;
-      fillCircle: Konva.Circle;
-      transparentCenterCircle: Konva.Circle;
+      newColor: Konva.Ring;
+      oldColor: Konva.Arc;
+      innerBorder: Konva.Ring;
+      outerBorder: Konva.Ring;
     };
   };
 
@@ -63,19 +63,21 @@ export class CanvasToolModule {
           listening: false,
           strokeEnabled: false,
         }),
-        innerBorderCircle: new Konva.Circle({
-          name: `${this.type}:brush_inner_border_circle`,
+        innerBorder: new Konva.Ring({
+          name: `${this.type}:brush_inner_border_ring`,
           listening: false,
-          stroke: BRUSH_BORDER_INNER_COLOR,
-          strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
-          strokeEnabled: true,
+          innerRadius: 0,
+          outerRadius: 0,
+          fill: BRUSH_BORDER_INNER_COLOR,
+          strokeEnabled: false,
         }),
-        outerBorderCircle: new Konva.Circle({
-          name: `${this.type}:brush_outer_border_circle`,
+        outerBorder: new Konva.Ring({
+          name: `${this.type}:brush_outer_border_ring`,
           listening: false,
-          stroke: BRUSH_BORDER_OUTER_COLOR,
-          strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
-          strokeEnabled: true,
+          innerRadius: 0,
+          outerRadius: 0,
+          fill: BRUSH_BORDER_OUTER_COLOR,
+          strokeEnabled: false,
         }),
       },
       eraser: {
@@ -87,54 +89,70 @@ export class CanvasToolModule {
           fill: 'white',
           globalCompositeOperation: 'destination-out',
         }),
-        innerBorderCircle: new Konva.Circle({
-          name: `${this.type}:eraser_inner_border_circle`,
+        innerBorder: new Konva.Ring({
+          name: `${this.type}:eraser_inner_border_ring`,
           listening: false,
-          stroke: BRUSH_BORDER_INNER_COLOR,
-          strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
-          strokeEnabled: true,
+          innerRadius: 0,
+          outerRadius: 0,
+          fill: BRUSH_BORDER_INNER_COLOR,
+          strokeEnabled: false,
         }),
-        outerBorderCircle: new Konva.Circle({
-          name: `${this.type}:eraser_outer_border_circle`,
-          listening: false,
-          stroke: BRUSH_BORDER_OUTER_COLOR,
-          strokeWidth: BRUSH_ERASER_BORDER_WIDTH,
-          strokeEnabled: true,
+        outerBorder: new Konva.Ring({
+          name: `${this.type}:eraser_outer_border_ring`,
+          innerRadius: 0,
+          outerRadius: 0,
+          fill: BRUSH_BORDER_OUTER_COLOR,
+          strokeEnabled: false,
         }),
       },
       colorPicker: {
         group: new Konva.Group({ name: `${this.type}:color_picker_group`, listening: false }),
-        fillCircle: new Konva.Circle({
-          name: `${this.type}:color_picker_fill_circle`,
-          listening: false,
-          fill: '',
-          radius: 20,
-          strokeWidth: 1,
-          stroke: 'black',
-          strokeScaleEnabled: false,
-        }),
-        transparentCenterCircle: new Konva.Circle({
-          name: `${this.type}:color_picker_fill_circle`,
-          listening: false,
+        newColor: new Konva.Ring({
+          name: `${this.type}:color_picker_new_color_ring`,
+          innerRadius: 0,
+          outerRadius: 0,
           strokeEnabled: false,
-          fill: 'white',
-          radius: 5,
-          globalCompositeOperation: 'destination-out',
+        }),
+        oldColor: new Konva.Arc({
+          name: `${this.type}:color_picker_old_color_arc`,
+          innerRadius: 0,
+          outerRadius: 0,
+          angle: 180,
+          strokeEnabled: false,
+        }),
+        innerBorder: new Konva.Ring({
+          name: `${this.type}:color_picker_inner_border_ring`,
+          listening: false,
+          innerRadius: 0,
+          outerRadius: 0,
+          fill: BRUSH_BORDER_INNER_COLOR,
+          strokeEnabled: false,
+        }),
+        outerBorder: new Konva.Ring({
+          name: `${this.type}:color_picker_outer_border_ring`,
+          innerRadius: 0,
+          outerRadius: 0,
+          fill: BRUSH_BORDER_OUTER_COLOR,
+          strokeEnabled: false,
         }),
       },
     };
-    this.konva.brush.group.add(this.konva.brush.fillCircle);
-    this.konva.brush.group.add(this.konva.brush.innerBorderCircle);
-    this.konva.brush.group.add(this.konva.brush.outerBorderCircle);
+    this.konva.brush.group.add(this.konva.brush.fillCircle, this.konva.brush.innerBorder, this.konva.brush.outerBorder);
     this.konva.group.add(this.konva.brush.group);
 
-    this.konva.eraser.group.add(this.konva.eraser.fillCircle);
-    this.konva.eraser.group.add(this.konva.eraser.innerBorderCircle);
-    this.konva.eraser.group.add(this.konva.eraser.outerBorderCircle);
+    this.konva.eraser.group.add(
+      this.konva.eraser.fillCircle,
+      this.konva.eraser.innerBorder,
+      this.konva.eraser.outerBorder
+    );
     this.konva.group.add(this.konva.eraser.group);
 
-    this.konva.colorPicker.group.add(this.konva.colorPicker.fillCircle);
-    this.konva.colorPicker.group.add(this.konva.colorPicker.transparentCenterCircle);
+    this.konva.colorPicker.group.add(
+      this.konva.colorPicker.newColor,
+      this.konva.colorPicker.oldColor,
+      this.konva.colorPicker.innerBorder,
+      this.konva.colorPicker.outerBorder
+    );
     this.konva.group.add(this.konva.colorPicker.group);
 
     this.subscriptions.add(
@@ -159,21 +177,38 @@ export class CanvasToolModule {
 
   scaleTool = () => {
     const toolState = this.manager.stateApi.getToolState();
-    const scale = this.manager.stage.getScale();
+    const onePixel = this.manager.stage.getScaledPixels(1);
+    const twoPixels = this.manager.stage.getScaledPixels(2);
 
     const brushRadius = toolState.brush.width / 2;
-    this.konva.brush.innerBorderCircle.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
-    this.konva.brush.outerBorderCircle.setAttrs({
-      strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
-      radius: brushRadius + BRUSH_ERASER_BORDER_WIDTH / scale,
-    });
+    this.konva.brush.innerBorder.innerRadius(brushRadius);
+    this.konva.brush.innerBorder.outerRadius(brushRadius + onePixel);
+
+    this.konva.brush.outerBorder.innerRadius(brushRadius + onePixel);
+    this.konva.brush.outerBorder.outerRadius(brushRadius + twoPixels);
 
     const eraserRadius = toolState.eraser.width / 2;
-    this.konva.eraser.innerBorderCircle.strokeWidth(BRUSH_ERASER_BORDER_WIDTH / scale);
-    this.konva.eraser.outerBorderCircle.setAttrs({
-      strokeWidth: BRUSH_ERASER_BORDER_WIDTH / scale,
-      radius: eraserRadius + BRUSH_ERASER_BORDER_WIDTH / scale,
-    });
+    this.konva.eraser.innerBorder.innerRadius(eraserRadius);
+    this.konva.eraser.innerBorder.outerRadius(eraserRadius + onePixel);
+
+    this.konva.eraser.outerBorder.innerRadius(eraserRadius + onePixel);
+    this.konva.eraser.outerBorder.outerRadius(eraserRadius + twoPixels);
+
+    const colorPickerInnerRadius = this.manager.stage.getScaledPixels(CanvasToolModule.COLOR_PICKER_RADIUS);
+    const colorPickerOuterRadius = this.manager.stage.getScaledPixels(
+      CanvasToolModule.COLOR_PICKER_RADIUS + CanvasToolModule.COLOR_PICKER_THICKNESS
+    );
+    this.konva.colorPicker.oldColor.innerRadius(colorPickerInnerRadius);
+    this.konva.colorPicker.oldColor.outerRadius(colorPickerOuterRadius);
+
+    this.konva.colorPicker.newColor.innerRadius(colorPickerInnerRadius);
+    this.konva.colorPicker.newColor.outerRadius(colorPickerOuterRadius);
+
+    this.konva.colorPicker.innerBorder.innerRadius(colorPickerOuterRadius);
+    this.konva.colorPicker.innerBorder.outerRadius(colorPickerOuterRadius + onePixel);
+
+    this.konva.colorPicker.outerBorder.innerRadius(colorPickerOuterRadius + onePixel);
+    this.konva.colorPicker.outerBorder.outerRadius(colorPickerOuterRadius + twoPixels);
   };
 
   setToolVisibility = (tool: Tool) => {
@@ -238,7 +273,7 @@ export class CanvasToolModule {
       if (cursorPos && tool === 'brush') {
         const brushPreviewFill = this.manager.stateApi.getBrushPreviewFill();
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.brush.width);
-        const scale = stage.getScale();
+
         // Update the fill circle
         const radius = toolState.brush.width / 2;
 
@@ -248,20 +283,10 @@ export class CanvasToolModule {
           radius,
           fill: isDrawing ? '' : rgbaColorToString(brushPreviewFill),
         });
-
-        // Update the inner border of the brush preview
-        this.konva.brush.innerBorderCircle.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
-
-        // Update the outer border of the brush preview
-        this.konva.brush.outerBorderCircle.setAttrs({
-          x: cursorPos.x,
-          y: cursorPos.y,
-          radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
-        });
+        this.konva.brush.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
+        this.konva.brush.outerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
       } else if (cursorPos && tool === 'eraser') {
         const alignedCursorPos = alignCoordForTool(cursorPos, toolState.eraser.width);
-
-        const scale = stage.getScale();
         // Update the fill circle
         const radius = toolState.eraser.width / 2;
         this.konva.eraser.fillCircle.setAttrs({
@@ -270,26 +295,21 @@ export class CanvasToolModule {
           radius,
           fill: 'white',
         });
-
-        // Update the inner border of the eraser preview
-        this.konva.eraser.innerBorderCircle.setAttrs({ x: cursorPos.x, y: cursorPos.y, radius });
-
-        // Update the outer border of the eraser preview
-        this.konva.eraser.outerBorderCircle.setAttrs({
-          x: cursorPos.x,
-          y: cursorPos.y,
-          radius: radius + BRUSH_ERASER_BORDER_WIDTH / scale,
-        });
+        this.konva.eraser.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
+        this.konva.eraser.outerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
       } else if (cursorPos && colorUnderCursor) {
-        this.konva.colorPicker.fillCircle.setAttrs({
+        this.konva.colorPicker.newColor.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
           fill: rgbaColorToString(colorUnderCursor),
         });
-        this.konva.colorPicker.transparentCenterCircle.setAttrs({
+        this.konva.colorPicker.oldColor.setAttrs({
           x: cursorPos.x,
           y: cursorPos.y,
+          fill: rgbaColorToString(toolState.fill),
         });
+        this.konva.colorPicker.innerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
+        this.konva.colorPicker.outerBorder.setAttrs({ x: cursorPos.x, y: cursorPos.y });
       }
 
       this.scaleTool();
