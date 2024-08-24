@@ -3062,10 +3062,15 @@ export type components = {
              */
             use_cache?: boolean;
             /**
+             * @description The source image onto which the masked generated image is pasted. If omitted, the masked generated image is returned with transparency.
+             * @default null
+             */
+            source_image?: components["schemas"]["ImageField"] | null;
+            /**
              * @description The image to apply the mask to
              * @default null
              */
-            image?: components["schemas"]["ImageField"];
+            generated_image?: components["schemas"]["ImageField"];
             /**
              * @description The mask to apply
              * @default null
