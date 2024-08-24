@@ -14,7 +14,7 @@ import type {
   ControlNetConfig,
   T2IAdapterConfig,
 } from './types';
-import { initialControlNet } from './types';
+import { getEntityIdentifier, initialControlNet } from './types';
 
 const selectControlLayerEntity = (state: CanvasV2State, id: string) =>
   state.controlLayers.entities.find((entity) => entity.id === id);
@@ -31,7 +31,7 @@ export const controlLayersReducers = {
       action: PayloadAction<{ id: string; overrides?: Partial<CanvasControlLayerState>; isSelected?: boolean }>
     ) => {
       const { id, overrides, isSelected } = action.payload;
-      const layer: CanvasControlLayerState = {
+      const entity: CanvasControlLayerState = {
         id,
         name: null,
         type: 'control_layer',
@@ -42,10 +42,10 @@ export const controlLayersReducers = {
         position: { x: 0, y: 0 },
         controlAdapter: deepClone(initialControlNet),
       };
-      merge(layer, overrides);
-      state.controlLayers.entities.push(layer);
+      merge(entity, overrides);
+      state.controlLayers.entities.push(entity);
       if (isSelected) {
-        state.selectedEntityIdentifier = { type: 'control_layer', id };
+        state.selectedEntityIdentifier = getEntityIdentifier(entity);
       }
     },
     prepare: (payload: { overrides?: Partial<CanvasControlLayerState>; isSelected?: boolean }) => ({
