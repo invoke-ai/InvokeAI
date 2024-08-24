@@ -1,3 +1,4 @@
+import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
@@ -7,6 +8,7 @@ import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
 export const addInpaint = async (
+  state: RootState,
   g: Graph,
   manager: CanvasManager,
   l2i: Invocation<'l2i'>,
@@ -22,6 +24,7 @@ export const addInpaint = async (
 ): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
   denoise.denoising_start = denoising_start;
 
+  const mode = state.canvasV2.session.mode;
   const initialImage = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
   const maskImage = await manager.compositor.getCompositeInpaintMaskImageDTO(bbox.rect);
 
@@ -87,8 +90,12 @@ export const addInpaint = async (
     g.addEdge(createGradientMask, 'expanded_mask_area', resizeMaskToOriginalSize, 'image');
 
     // Finally, paste the generated masked image back onto the original image
-    g.addEdge(resizeImageToOriginalSize, 'image', canvasPasteBack, 'image');
+    g.addEdge(resizeImageToOriginalSize, 'image', canvasPasteBack, 'generated_image');
     g.addEdge(resizeMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
+
+    if (mode === 'generate') {
+      canvasPasteBack.source_image = { image_name: initialImage.image_name };
+    }
 
     return canvasPasteBack;
   } else {
@@ -114,6 +121,7 @@ export const addInpaint = async (
       type: 'canvas_v2_mask_and_crop',
       mask_blur: compositing.maskBlur,
     });
+
     g.addEdge(alphaToMask, 'image', createGradientMask, 'mask');
     g.addEdge(i2l, 'latents', denoise, 'latents');
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
@@ -122,7 +130,11 @@ export const addInpaint = async (
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
     g.addEdge(createGradientMask, 'expanded_mask_area', canvasPasteBack, 'mask');
 
-    g.addEdge(l2i, 'image', canvasPasteBack, 'image');
+    g.addEdge(l2i, 'image', canvasPasteBack, 'generated_image');
+
+    if (mode === 'generate') {
+      canvasPasteBack.source_image = { image_name: initialImage.image_name };
+    }
 
     return canvasPasteBack;
   }
