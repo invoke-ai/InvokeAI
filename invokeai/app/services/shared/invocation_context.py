@@ -25,6 +25,7 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
+from invokeai.backend.util.util import image_to_dataURL
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
@@ -536,7 +537,7 @@ class UtilInterface(InvocationContextInterface):
         """
         return self._is_canceled()
 
-    def preview_callback(self, step: int, total_steps: int, order: int, progress_image: "ProgressImage"):
+    def preview_callback(self, step: int, total_steps: int, order: int, image: Image, scale: int = 1):
         if self.is_canceled():
             raise CanceledException
 
@@ -546,7 +547,11 @@ class UtilInterface(InvocationContextInterface):
             step=step,
             total_steps=total_steps,
             order=order,
-            progress_image=progress_image,
+            progress_image=ProgressImage(
+                dataURL=image_to_dataURL(image, image_format="JPEG"),
+                width=image.width * scale,
+                height=image.height * scale,
+            ),
         )
 
 

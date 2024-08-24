@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import torch
 from PIL import Image
 
-from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.backend.model_manager import BaseModelType
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, callback
-from invokeai.backend.util.util import image_to_dataURL
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -51,12 +49,13 @@ class PreviewExt(ExtensionBase):
     # do last so that all other changes shown
     @callback(ExtensionCallbackType.PRE_DENOISE_LOOP, order=1000)
     def initial_preview(self, ctx: DenoiseContext):
-        progress_image = self.gen_latents_preview(ctx.latents, self.base_model)
+        image, scale = self.gen_latents_preview(ctx.latents, self.base_model)
         self.node_context.util.preview_callback(
             step=-1,
             total_steps=len(ctx.inputs.timesteps),
             order=ctx.scheduler.order,
-            progress_image=progress_image,
+            image=image,
+            scale=scale,
         )
 
     # do last so that all other changes shown
@@ -69,12 +68,13 @@ class PreviewExt(ExtensionBase):
         else:
             predicted_original = ctx.step_output.prev_sample
 
-        progress_image = self.gen_latents_preview(predicted_original, self.base_model)
+        image, scale = self.gen_latents_preview(predicted_original, self.base_model)
         self.node_context.util.preview_callback(
             step=ctx.step_index,
             total_steps=len(ctx.inputs.timesteps),
             order=ctx.scheduler.order,
-            progress_image=progress_image,
+            image=image,
+            scale=scale,
         )
 
     @classmethod
@@ -99,7 +99,7 @@ class PreviewExt(ExtensionBase):
         cls,
         sample: torch.Tensor,
         base_model: BaseModelType,
-    ) -> ProgressImage:
+    ) -> Tuple[Image, int]:
         if base_model in [BaseModelType.StableDiffusionXL, BaseModelType.StableDiffusionXLRefiner]:
             sdxl_latent_rgb_factors = torch.tensor(SDXL_LATENT_RGB_FACTORS, dtype=sample.dtype, device=sample.device)
             sdxl_smooth_matrix = torch.tensor(SDXL_SMOOTH_MATRIX, dtype=sample.dtype, device=sample.device)
@@ -108,10 +108,4 @@ class PreviewExt(ExtensionBase):
             v1_5_latent_rgb_factors = torch.tensor(SD1_5_LATENT_RGB_FACTORS, dtype=sample.dtype, device=sample.device)
             image = cls._sample_to_lowres_estimated_image(sample, v1_5_latent_rgb_factors)
 
-        (width, height) = image.size
-        width *= 8
-        height *= 8
-
-        dataURL = image_to_dataURL(image, image_format="JPEG")
-
-        return ProgressImage(dataURL=dataURL, width=width, height=height)
+        return image, 8

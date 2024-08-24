@@ -971,14 +971,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if predicted_original is not None:
                 sample = predicted_original
 
+            image, scale = PreviewExt.gen_latents_preview(sample, unet_config.base)
             context.util.preview_callback(
                 step=step,
                 total_steps=total_steps,
                 order=order,
-                progress_image=PreviewExt.gen_latents_preview(
-                    sample=sample,
-                    base_model=unet_config.base,
-                ),
+                image=image,
+                scale=scale,
             )
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
