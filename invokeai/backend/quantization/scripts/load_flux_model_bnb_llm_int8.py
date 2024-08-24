@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import accelerate
-from flux.model import Flux
-from flux.util import configs as flux_configs
+from invokeai.backend.flux.model import Flux
+from invokeai.backend.flux.util import configs as flux_configs
 from safetensors.torch import load_file, save_file
 
 from invokeai.backend.quantization.bnb_llm_int8 import quantize_model_llm_int8
