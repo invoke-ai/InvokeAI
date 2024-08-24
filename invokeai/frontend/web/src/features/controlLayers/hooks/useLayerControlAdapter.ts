@@ -27,6 +27,7 @@ export const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIden
   return controlAdapter;
 };
 
+/** @knipignore */
 export const useDefaultControlAdapter = (): ControlNetConfig | T2IAdapterConfig => {
   const [modelConfigs] = useControlNetAndT2IAdapterModels();
 
@@ -47,6 +48,7 @@ export const useDefaultControlAdapter = (): ControlNetConfig | T2IAdapterConfig 
   return defaultControlAdapter;
 };
 
+/** @knipignore */
 export const useDefaultIPAdapter = (): IPAdapterConfig => {
   const [modelConfigs] = useIPAdapterModels();
 

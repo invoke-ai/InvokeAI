@@ -175,7 +175,7 @@ function selectAllEntitiesOfType(state: CanvasV2State, type: CanvasEntityState['
   }
 }
 
-export function selectAllEntities(state: CanvasV2State): CanvasEntityState[] {
+function selectAllEntities(state: CanvasV2State): CanvasEntityState[] {
   // These are in the same order as they are displayed in the list!
   return [
     ...state.inpaintMasks.entities.toReversed(),
