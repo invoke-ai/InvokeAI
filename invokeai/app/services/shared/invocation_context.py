@@ -26,6 +26,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage, CanceledException
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
@@ -548,13 +549,32 @@ class UtilInterface(InvocationContextInterface):
             intermediate_state: The intermediate state of the diffusion pipeline.
             base_model: The base model for the current denoising step.
         """
+        if self.is_canceled():
+            raise CanceledException
 
-        stable_diffusion_step_callback(
+        sd_progress_image = stable_diffusion_step_callback(
             context_data=self._data,
             intermediate_state=intermediate_state,
             base_model=base_model,
-            events=self._services.events,
-            is_canceled=self.is_canceled,
+        )
+        self.preview_callback(
+            step=intermediate_state.step,
+            total_steps=intermediate_state.total_steps,
+            order=intermediate_state.order,
+            progress_image=sd_progress_image,
+        )
+
+    def preview_callback(self, step: int, total_steps: int, order: int, progress_image: "ProgressImage"):
+        if self.is_canceled():
+            raise CanceledException
+
+        self._services.events.emit_invocation_denoise_progress(
+            self._data.queue_item,
+            self._data.invocation,
+            step=step,
+            total_steps=total_steps,
+            order=order,
+            progress_image=progress_image,
         )
 
 

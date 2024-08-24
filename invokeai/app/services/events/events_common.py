@@ -16,7 +16,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
 from invokeai.app.services.shared.graph import AnyInvocation, AnyInvocationOutput
 from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob
@@ -137,12 +136,11 @@ class InvocationDenoiseProgressEvent(InvocationEventBase):
         cls,
         queue_item: SessionQueueItem,
         invocation: AnyInvocation,
-        intermediate_state: PipelineIntermediateState,
+        step: int,
+        total_steps: int,
+        order: int,
         progress_image: ProgressImage,
     ) -> "InvocationDenoiseProgressEvent":
-        step = intermediate_state.step
-        total_steps = intermediate_state.total_steps
-        order = intermediate_state.order
         return cls(
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,

@@ -3,13 +3,12 @@ from typing import TYPE_CHECKING, Callable, Optional
 import torch
 from PIL import Image
 
-from invokeai.app.services.session_processor.session_processor_common import CanceledException, ProgressImage
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.backend.model_manager.config import BaseModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.util.util import image_to_dataURL
 
 if TYPE_CHECKING:
-    from invokeai.app.services.events.events_base import EventServiceBase
     from invokeai.app.services.shared.invocation_context import InvocationContextData
 
 # fast latents preview matrix for sdxl
@@ -60,12 +59,7 @@ def stable_diffusion_step_callback(
     context_data: "InvocationContextData",
     intermediate_state: PipelineIntermediateState,
     base_model: BaseModelType,
-    events: "EventServiceBase",
-    is_canceled: Callable[[], bool],
-) -> None:
-    if is_canceled():
-        raise CanceledException
-
+) -> ProgressImage:
     # Some schedulers report not only the noisy latents at the current timestep,
     # but also their estimate so far of what the de-noised latents will be. Use
     # that estimate if it is available.
@@ -88,9 +82,4 @@ def stable_diffusion_step_callback(
 
     dataURL = image_to_dataURL(image, image_format="JPEG")
 
-    events.emit_invocation_denoise_progress(
-        context_data.queue_item,
-        context_data.invocation,
-        intermediate_state,
-        ProgressImage(dataURL=dataURL, width=width, height=height),
-    )
+    return ProgressImage(dataURL=dataURL, width=width, height=height)
