@@ -3,7 +3,7 @@ import { Box, Flex, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@inv
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { CanvasEntityListMenu } from 'features/controlLayers/components/CanvasEntityListMenu';
+import { CanvasEntityListMenuButton } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityListMenuButton';
 import { CanvasPanelContent } from 'features/controlLayers/components/CanvasPanelContent';
 import { $isPreviewVisible } from 'features/controlLayers/store/canvasV2Slice';
 import { selectEntityCount } from 'features/controlLayers/store/selectors';
@@ -102,7 +102,7 @@ const ParametersPanelTextToImage = () => {
                     {controlLayersTitle}
                   </Tab>
                   <Spacer />
-                  <CanvasEntityListMenu />
+                  <CanvasEntityListMenuButton />
                 </TabList>
                 <TabPanels w="full" h="full">
                   <TabPanel p={0} w="full" h="full">
