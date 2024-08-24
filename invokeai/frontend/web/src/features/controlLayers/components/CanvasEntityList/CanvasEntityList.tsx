@@ -11,7 +11,7 @@ import { memo } from 'react';
 export const CanvasEntityList = memo(() => {
   return (
     <ScrollableContent>
-      <Flex flexDir="column" gap={4} pt={2} data-testid="control-layers-layer-list">
+      <Flex flexDir="column" gap={4} pt={2} data-testid="control-layers-layer-list" w="full" h="full">
         <CanvasEntityOpacity />
         <InpaintMaskList />
         <RegionalGuidanceEntityList />
