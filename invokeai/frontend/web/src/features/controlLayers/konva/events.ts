@@ -199,7 +199,7 @@ export const setStageEventHandlers = (manager: CanvasManager): (() => void) => {
         manager.stateApi.$colorUnderCursor.set(color);
       }
       if (color) {
-        manager.stateApi.setFill({ ...color, a: 1 });
+        manager.stateApi.setFill({ ...toolState.fill, ...color });
       }
       manager.preview.tool.render();
     } else {
