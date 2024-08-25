@@ -15,7 +15,8 @@ const ModelImage = ({ image_url }: Props) => {
       <Flex
         height={MODEL_IMAGE_THUMBNAIL_SIZE}
         minWidth={MODEL_IMAGE_THUMBNAIL_SIZE}
-        bg="base.650"
+        bg="transparent"
+        borderWidth={1}
         borderRadius="base"
         alignItems="center"
         justifyContent="center"

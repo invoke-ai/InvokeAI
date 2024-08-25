@@ -18,7 +18,7 @@ type Props = {
 export const ModelView = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
   return (
-    <Flex flexDir="column" gap={4}>
+    <Flex flexDir="column" gap={4} layerStyle="first" p={2} borderRadius="base">
       <ModelHeader modelConfig={modelConfig}>
         {modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />

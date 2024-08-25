@@ -20,14 +20,14 @@ export const InstallModels = memo(() => {
   }, []);
 
   return (
-    <Flex layerStyle="first" borderRadius="base" w="full" h="full" flexDir="column" gap={4}>
+    <Flex layerStyle="body" w="full" h="full" flexDir="column" gap={4}>
       <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
-      <Tabs variant="collapse" height="50%" display="flex" flexDir="column" index={index} onChange={onChange}>
+      <Tabs borderRadius="base" bg="base.850" size="lg" isFitted variant="line" height="50%" display="flex" flexDir="column" index={index} onChange={onChange}>
         <TabList>
-          <Tab>{t('modelManager.urlOrLocalPath')}</Tab>
-          <Tab>{t('modelManager.huggingFace')}</Tab>
-          <Tab>{t('modelManager.scanFolder')}</Tab>
-          <Tab>{t('modelManager.starterModels')}</Tab>
+          <Tab py={2}>{t('modelManager.urlOrLocalPath')}</Tab>
+          <Tab py={2}>{t('modelManager.huggingFace')}</Tab>
+          <Tab py={2}>{t('modelManager.scanFolder')}</Tab>
+          <Tab py={2}>{t('modelManager.starterModels')}</Tab>
         </TabList>
         <TabPanels p={3} height="100%">
           <TabPanel>
@@ -44,7 +44,7 @@ export const InstallModels = memo(() => {
           </TabPanel>
         </TabPanels>
       </Tabs>
-      <Box layerStyle="second" borderRadius="base" h="50%">
+      <Box layerStyle="first" borderRadius="base" h="50%">
         <ModelInstallQueue />
       </Box>
     </Flex>

@@ -16,14 +16,14 @@ export const ModelManager = memo(() => {
   }, [dispatch]);
 
   return (
-    <Flex flexDir="column" layerStyle="first" p={4} gap={4} borderRadius="base" w="50%" h="full">
+    <Flex flexDir="column" layerStyle="body" pt={4} gap={4} borderRadius="base" w="50%" h="full">
       <Flex w="full" gap={4} justifyContent="space-between" alignItems="center">
         <Heading fontSize="xl">{t('common.modelManager')}</Heading>
         <Button size="sm" colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
           {t('modelManager.addModels')}
         </Button>
       </Flex>
-      <Flex flexDir="column" layerStyle="second" p={4} gap={4} borderRadius="base" w="full" h="full">
+      <Flex flexDir="column" layerStyle="first" p={2} gap={4} borderRadius="base" w="full" h="full">
         <ModelListNavigation />
         <ModelList />
       </Flex>

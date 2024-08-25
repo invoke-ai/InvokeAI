@@ -12,7 +12,7 @@ type ModelListWrapperProps = {
 export const ModelListWrapper = memo((props: ModelListWrapperProps) => {
   const { title, modelList } = props;
   return (
-    <StickyScrollable title={title} contentSx={{ gap: 1, p: 2 }}>
+    <StickyScrollable title={title} contentSx={{ gap: 0, p: 0, bg: "base.800", borderRadius: "base", overflow: "hidden" }} headingSx={{ bg: "base.850" }}>
       {modelList.map((model) => (
         <ModelListItem key={model.key} model={model} />
       ))}

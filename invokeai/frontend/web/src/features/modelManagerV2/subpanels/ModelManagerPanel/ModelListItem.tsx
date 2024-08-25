@@ -20,7 +20,7 @@ type ModelListItemProps = {
 };
 
 const sx: SystemStyleObject = {
-  _hover: { bg: 'base.700' },
+  _hover: { bg: 'base.750' },
   "&[aria-selected='true']": { bg: 'base.700' },
 };
 
@@ -78,7 +78,6 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
       aria-selected={isSelected}
       justifyContent="flex-start"
       p={2}
-      borderRadius="base"
       w="full"
       alignItems="center"
       gap={2}
