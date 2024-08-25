@@ -329,9 +329,9 @@ class ModelProbe(object):
                 checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
                 state_dict = checkpoint.get("state_dict") or checkpoint
                 if "guidance_in.out_layer.weight" in state_dict:
-                    config_file = "flux/flux1-dev.yaml"
+                    config_file = "flux-dev"
                 else:
-                    config_file = "flux/flux1-schnell.yaml"
+                    config_file = "flux-schnell"
             else:
                 config_file = LEGACY_CONFIGS[base_type][variant_type]
                 if isinstance(config_file, dict):  # need another tier for sd-2.x models

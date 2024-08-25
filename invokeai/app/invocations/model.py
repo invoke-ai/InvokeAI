@@ -11,6 +11,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
+from invokeai.backend.flux.util import max_seq_lengths
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
@@ -188,17 +189,13 @@ class FluxModelLoaderInvocation(BaseInvocation):
         vae = self._get_model(context, SubModelType.VAE)
         transformer_config = context.models.get_config(transformer)
         assert isinstance(transformer_config, CheckpointConfigBase)
-        legacy_config_path = context.config.get().legacy_conf_path / transformer_config.config_path
-        config_path = legacy_config_path.as_posix()
-        with open(config_path, "r") as stream:
-            flux_conf = yaml.safe_load(stream)
 
         return FluxModelLoaderOutput(
             transformer=TransformerField(transformer=transformer),
             clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], skipped_layers=0),
             t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder),
             vae=VAEField(vae=vae),
-            max_seq_len=flux_conf["max_seq_len"],
+            max_seq_len=max_seq_lengths[transformer_config.config_path],
         )
 
     def _get_model(self, context: InvocationContext, submodel: SubModelType) -> ModelIdentifierField:

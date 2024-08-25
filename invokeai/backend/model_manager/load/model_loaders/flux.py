@@ -1,19 +1,18 @@
 # Copyright (c) 2024, Brandon W. Rising and the InvokeAI Development Team
 """Class for Flux model loading in InvokeAI."""
 
-from dataclasses import fields
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import accelerate
 import torch
-import yaml
 from safetensors.torch import load_file
 from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.flux.model import Flux, FluxParams
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder, AutoEncoderParams
+from invokeai.backend.flux.model import Flux
+from invokeai.backend.flux.util import configs, ae_params
+from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -58,17 +57,9 @@ class FluxVAELoader(ModelLoader):
         if not isinstance(config, VAECheckpointConfig):
             raise ValueError("Only VAECheckpointConfig models are currently supported here.")
         model_path = Path(config.path)
-        legacy_config_path = app_config.legacy_conf_path / config.config_path
-        config_path = legacy_config_path.as_posix()
-        with open(config_path, "r") as stream:
-            flux_conf = yaml.safe_load(stream)
-
-        dataclass_fields = {f.name for f in fields(AutoEncoderParams)}
-        filtered_data = {k: v for k, v in flux_conf["params"].items() if k in dataclass_fields}
-        params = AutoEncoderParams(**filtered_data)
 
         with SilenceWarnings():
-            model = AutoEncoder(params)
+            model = AutoEncoder(ae_params)
             sd = load_file(model_path)
             model.load_state_dict(sd, assign=True)
             model.to(dtype=self._torch_dtype)
@@ -182,14 +173,10 @@ class FluxCheckpointModel(ModelLoader):
     ) -> AnyModel:
         if not isinstance(config, CheckpointConfigBase):
             raise ValueError("Only CheckpointConfigBase models are currently supported here.")
-        legacy_config_path = app_config.legacy_conf_path / config.config_path
-        config_path = legacy_config_path.as_posix()
-        with open(config_path, "r") as stream:
-            flux_conf = yaml.safe_load(stream)
 
         match submodel_type:
             case SubModelType.Transformer:
-                return self._load_from_singlefile(config, flux_conf)
+                return self._load_from_singlefile(config)
 
         raise ValueError(
             f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
@@ -198,16 +185,12 @@ class FluxCheckpointModel(ModelLoader):
     def _load_from_singlefile(
         self,
         config: AnyModelConfig,
-        flux_conf: Any,
     ) -> AnyModel:
         assert isinstance(config, MainCheckpointConfig)
         model_path = Path(config.path)
-        dataclass_fields = {f.name for f in fields(FluxParams)}
-        filtered_data = {k: v for k, v in flux_conf["params"].items() if k in dataclass_fields}
-        params = FluxParams(**filtered_data)
 
         with SilenceWarnings():
-            model = Flux(params)
+            model = Flux(configs[config.config_path].params)
             sd = load_file(model_path)
             model.load_state_dict(sd, assign=True)
         return model
@@ -224,14 +207,10 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
     ) -> AnyModel:
         if not isinstance(config, CheckpointConfigBase):
             raise ValueError("Only CheckpointConfigBase models are currently supported here.")
-        legacy_config_path = app_config.legacy_conf_path / config.config_path
-        config_path = legacy_config_path.as_posix()
-        with open(config_path, "r") as stream:
-            flux_conf = yaml.safe_load(stream)
 
         match submodel_type:
             case SubModelType.Transformer:
-                return self._load_from_singlefile(config, flux_conf)
+                return self._load_from_singlefile(config)
 
         raise ValueError(
             f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
@@ -240,7 +219,6 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
     def _load_from_singlefile(
         self,
         config: AnyModelConfig,
-        flux_conf: Any,
     ) -> AnyModel:
         assert isinstance(config, MainBnbQuantized4bCheckpointConfig)
         if not bnb_available:
@@ -248,13 +226,10 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
                 "The bnb modules are not available. Please install bitsandbytes if available on your platform."
             )
         model_path = Path(config.path)
-        dataclass_fields = {f.name for f in fields(FluxParams)}
-        filtered_data = {k: v for k, v in flux_conf["params"].items() if k in dataclass_fields}
-        params = FluxParams(**filtered_data)
 
         with SilenceWarnings():
             with accelerate.init_empty_weights():
-                model = Flux(params)
+                model = Flux(configs[config.config_path].params)
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=torch.bfloat16)
             sd = load_file(model_path)
             model.load_state_dict(sd, assign=True)
