@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import dataclass
+from typing import Dict, Literal
 
 from invokeai.backend.flux.model import FluxParams
 from invokeai.backend.flux.modules.autoencoder import AutoEncoderParams
@@ -16,6 +17,25 @@ class ModelSpec:
     repo_id: str | None
     repo_flow: str | None
     repo_ae: str | None
+
+
+max_seq_lengths: Dict[str, Literal[256, 512]] = {
+    "flux-dev": 512,
+    "flux-schnell": 256,
+}
+
+
+ae_params=AutoEncoderParams(
+    resolution=256,
+    in_channels=3,
+    ch=128,
+    out_ch=3,
+    ch_mult=[1, 2, 4, 4],
+    num_res_blocks=2,
+    z_channels=16,
+    scale_factor=0.3611,
+    shift_factor=0.1159,
+)
 
 
 configs = {
