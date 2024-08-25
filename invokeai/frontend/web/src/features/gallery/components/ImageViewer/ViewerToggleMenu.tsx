@@ -2,68 +2,74 @@ import {
   Button,
   Flex,
   Icon,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverContent,
-  PopoverTrigger,
   Text,
+  Tooltip,
 } from '@invoke-ai/ui-library';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { useCallback } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiCaretDownBold, PiCheckBold, PiEyeBold, PiPencilBold } from 'react-icons/pi';
+import { PiEyeBold, PiPencilBold } from 'react-icons/pi';
 
 export const ViewerToggleMenu = () => {
   const { t } = useTranslation();
-  const imageViewer = useImageViewer();
-  useHotkeys('z', imageViewer.onToggle, [imageViewer]);
-  useHotkeys('esc', imageViewer.onClose, [imageViewer]);
+  const { isOpen, onToggle, onClose, onOpen } = useImageViewer();
+
+  const handleOpen = useCallback(() => onOpen(), [onOpen]);
+  const handleClose = useCallback(() => onClose(), [onClose]);
+
+  useHotkeys('z', onToggle, [onToggle]);
+  useHotkeys('esc', onClose, [onClose]);
 
   return (
-    <Popover isLazy>
-      <PopoverTrigger>
-        <Button variant="outline" data-testid="toggle-viewer-menu-button" pointerEvents="auto">
-          <Flex gap={3} w="full" alignItems="center">
-            {imageViewer.isOpen ? <Icon as={PiEyeBold} /> : <Icon as={PiPencilBold} />}
-            <Text fontSize="md">{imageViewer.isOpen ? t('common.viewing') : t('common.editing')}</Text>
-            <Icon as={PiCaretDownBold} />
-          </Flex>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent p={2} pointerEvents="auto">
-        <PopoverArrow />
-        <PopoverBody>
-          <Flex flexDir="column">
-            <Button onClick={imageViewer.onOpen} variant="ghost" h="auto" w="auto" p={2}>
-              <Flex gap={2} w="full">
-                <Icon as={PiCheckBold} visibility={imageViewer.isOpen ? 'visible' : 'hidden'} />
-                <Flex flexDir="column" gap={2} alignItems="flex-start">
-                  <Text fontWeight="semibold" color="base.100">
-                    {t('common.viewing')}
-                  </Text>
-                  <Text fontWeight="normal" color="base.300">
-                    {t('common.viewingDesc')}
-                  </Text>
-                </Flex>
-              </Flex>
-            </Button>
-            <Button onClick={imageViewer.onClose} variant="ghost" h="auto" w="auto" p={2}>
-              <Flex gap={2} w="full">
-                <Icon as={PiCheckBold} visibility={imageViewer.isOpen ? 'hidden' : 'visible'} />
-                <Flex flexDir="column" gap={2} alignItems="flex-start">
-                  <Text fontWeight="semibold" color="base.100">
-                    {t('common.editing')}
-                  </Text>
-                  <Text fontWeight="normal" color="base.300">
-                    {t('common.editingDesc')}
-                  </Text>
-                </Flex>
-              </Flex>
-            </Button>
-          </Flex>
-        </PopoverBody>
-      </PopoverContent>
-    </Popover>
+    <Flex
+      gap={4}
+      alignItems="center"
+      justifyContent="center"
+    >
+      <Text>{isOpen ? t('common.viewing') : t('common.editing')}</Text>
+      <Flex
+        gap={1}
+        alignItems="center"
+        borderWidth={1}
+        borderRadius="md"
+        padding={1}
+      >
+        <Tooltip
+          hasArrow
+          label={<Flex flexDir="column">
+            <Text fontWeight="semibold">{t('common.viewing')}</Text>
+            <Text fontWeight="normal">{t('common.viewingDesc')}</Text>
+          </Flex>}
+        >
+          <Button
+            onClick={handleOpen}
+            variant={isOpen ? 'solid' : 'ghost'}
+            colorScheme="invokeBlue"
+            size="sm"
+            aria-label={t('common.viewing')}
+          >
+            <Icon as={PiEyeBold} boxSize="0.95rem" />
+          </Button>
+        </Tooltip>
+        <Tooltip
+          hasArrow
+          label={<Flex flexDir="column">
+            <Text fontWeight="semibold">{t('common.editing')}</Text>
+            <Text fontWeight="normal">{t('common.editingDesc')}</Text>
+          </Flex>}
+        >
+          <Button
+            onClick={handleClose}
+            variant={!isOpen ? 'solid' : 'ghost'}
+            colorScheme="invokeBlue"
+            size="sm"
+            aria-label={t('common.editing')}
+          >
+            <Icon as={PiPencilBold} boxSize="0.95rem" />
+          </Button>
+        </Tooltip>
+      </Flex>
+    </Flex>
   );
 };
