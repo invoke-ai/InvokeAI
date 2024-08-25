@@ -8,7 +8,14 @@ import { ASPECT_RATIO_MAP, initialAspectRatioState } from 'features/parameters/c
 import type { AspectRatioID } from 'features/parameters/components/DocumentSize/types';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
-import { pick } from 'lodash-es';
+
+const syncScaledSize = (state: CanvasV2State) => {
+  if (state.bbox.scaleMethod === 'auto') {
+    const optimalDimension = getOptimalDimension(state.params.model);
+    const { width, height } = state.bbox.rect;
+    state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, optimalDimension);
+  }
+};
 
 export const bboxReducers = {
   bboxScaledSizeChanged: (state, action: PayloadAction<Partial<Dimensions>>) => {
@@ -16,21 +23,11 @@ export const bboxReducers = {
   },
   bboxScaleMethodChanged: (state, action: PayloadAction<BoundingBoxScaleMethod>) => {
     state.bbox.scaleMethod = action.payload;
-
-    if (action.payload === 'auto') {
-      const optimalDimension = getOptimalDimension(state.params.model);
-      const size = pick(state.bbox.rect, 'width', 'height');
-      state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, optimalDimension);
-    }
+    syncScaledSize(state);
   },
   bboxChanged: (state, action: PayloadAction<IRect>) => {
     state.bbox.rect = action.payload;
-
-    if (state.bbox.scaleMethod === 'auto') {
-      const optimalDimension = getOptimalDimension(state.params.model);
-      const size = pick(state.bbox.rect, 'width', 'height');
-      state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, optimalDimension);
-    }
+    syncScaledSize(state);
   },
   bboxWidthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
     const { width, updateAspectRatio, clamp } = action.payload;
@@ -45,6 +42,8 @@ export const bboxReducers = {
       state.bbox.aspectRatio.id = 'Free';
       state.bbox.aspectRatio.isLocked = false;
     }
+
+    syncScaledSize(state);
   },
   bboxHeightChanged: (
     state,
@@ -63,6 +62,8 @@ export const bboxReducers = {
       state.bbox.aspectRatio.id = 'Free';
       state.bbox.aspectRatio.isLocked = false;
     }
+
+    syncScaledSize(state);
   },
   bboxAspectRatioLockToggled: (state) => {
     state.bbox.aspectRatio.isLocked = !state.bbox.aspectRatio.isLocked;
@@ -82,6 +83,8 @@ export const bboxReducers = {
       state.bbox.rect.width = width;
       state.bbox.rect.height = height;
     }
+
+    syncScaledSize(state);
   },
   bboxDimensionsSwapped: (state) => {
     state.bbox.aspectRatio.value = 1 / state.bbox.aspectRatio.value;
@@ -99,6 +102,8 @@ export const bboxReducers = {
       state.bbox.rect.height = height;
       state.bbox.aspectRatio.id = ASPECT_RATIO_MAP[state.bbox.aspectRatio.id].inverseID;
     }
+
+    syncScaledSize(state);
   },
   bboxSizeOptimized: (state) => {
     const optimalDimension = getOptimalDimension(state.params.model);
@@ -111,5 +116,7 @@ export const bboxReducers = {
       state.bbox.rect.width = optimalDimension;
       state.bbox.rect.height = optimalDimension;
     }
+
+    syncScaledSize(state);
   },
 } satisfies SliceCaseReducers<CanvasV2State>;
