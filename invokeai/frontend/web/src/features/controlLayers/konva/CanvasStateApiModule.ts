@@ -165,7 +165,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     return this.getCanvasState().inpaintMasks;
   };
   getSession = () => {
-    return this.getCanvasState().session;
+    return this.store.getState().canvasSession;
   };
   getIsSelected = (id: string) => {
     return this.getCanvasState().selectedEntityIdentifier?.id === id;

@@ -3,7 +3,7 @@ import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 
 export const StagingAreaIsStagingGate = memo((props: PropsWithChildren) => {
-  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
 
   if (!isStaging) {
     return null;

@@ -1,10 +1,10 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
-  rasterLayerAdded,
   sessionStagingAreaImageAccepted,
   sessionStagingAreaReset,
-} from 'features/controlLayers/store/canvasV2Slice';
+} from 'features/controlLayers/store/canvasSessionSlice';
+import { rasterLayerAdded } from 'features/controlLayers/store/canvasV2Slice';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
@@ -55,7 +55,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
     effect: (action, api) => {
       const { index } = action.payload;
       const state = api.getState();
-      const stagingAreaImage = state.canvasV2.session.stagedImages[index];
+      const stagingAreaImage = state.canvasSession.stagedImages[index];
 
       assert(stagingAreaImage, 'No staged image found to accept');
       const { x, y } = state.canvasV2.bbox.rect;

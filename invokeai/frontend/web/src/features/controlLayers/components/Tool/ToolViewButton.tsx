@@ -12,7 +12,7 @@ export const ToolViewButton = memo(() => {
   const { t } = useTranslation();
   const isTransforming = useIsTransforming();
   const isFiltering = useIsFiltering();
-  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
   const selectView = useSelectTool('view');
   const isSelected = useToolIsSelected('view');
   const isDisabled = useMemo(() => {

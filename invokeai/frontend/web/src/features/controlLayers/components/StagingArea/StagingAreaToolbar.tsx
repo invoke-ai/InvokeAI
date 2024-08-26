@@ -9,7 +9,7 @@ import {
   sessionStagedImageDiscarded,
   sessionStagingAreaImageAccepted,
   sessionStagingAreaReset,
-} from 'features/controlLayers/store/canvasV2Slice';
+} from 'features/controlLayers/store/canvasSessionSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +27,7 @@ import { useChangeImageIsIntermediateMutation } from 'services/api/endpoints/ima
 
 export const StagingAreaToolbar = memo(() => {
   const dispatch = useAppDispatch();
-  const session = useAppSelector((s) => s.canvasV2.session);
+  const session = useAppSelector((s) => s.canvasSession);
   const canvasManager = useCanvasManager();
   const shouldShowStagedImage = useStore(canvasManager.stateApi.$shouldShowStagedImage);
   const images = useMemo(() => session.stagedImages, [session]);
