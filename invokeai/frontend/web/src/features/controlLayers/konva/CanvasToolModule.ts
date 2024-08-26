@@ -2,11 +2,33 @@ import type { SerializableObject } from 'common/types';
 import { rgbaColorToString, rgbColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
-import { BRUSH_BORDER_INNER_COLOR, BRUSH_BORDER_OUTER_COLOR } from 'features/controlLayers/konva/constants';
-import { alignCoordForTool, getPrefixedId } from 'features/controlLayers/konva/util';
-import type { Tool } from 'features/controlLayers/store/types';
+import {
+  BRUSH_BORDER_INNER_COLOR,
+  BRUSH_BORDER_OUTER_COLOR,
+  BRUSH_SPACING_TARGET_SCALE,
+} from 'features/controlLayers/konva/constants';
+import {
+  alignCoordForTool,
+  calculateNewBrushSizeFromWheelDelta,
+  getIsPrimaryMouseDown,
+  getLastPointOfLine,
+  getPrefixedId,
+  getScaledCursorPosition,
+  offsetCoord,
+  validateCandidatePoint,
+} from 'features/controlLayers/konva/util';
+import type {
+  CanvasControlLayerState,
+  CanvasInpaintMaskState,
+  CanvasRasterLayerState,
+  CanvasRegionalGuidanceState,
+  Coordinate,
+  RgbColor,
+  Tool,
+} from 'features/controlLayers/store/types';
 import { isDrawableEntity } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
 
 export class CanvasToolModule {
@@ -25,6 +47,7 @@ export class CanvasToolModule {
   log: Logger;
 
   konva: {
+    stage: Konva.Stage;
     group: Konva.Group;
     brush: {
       group: Konva.Group;
@@ -67,6 +90,7 @@ export class CanvasToolModule {
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
     this.konva = {
+      stage: this.manager.stage.konva.stage,
       group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
       brush: {
         group: new Konva.Group({ name: `${this.type}:brush_group`, listening: false }),
@@ -218,6 +242,10 @@ export class CanvasToolModule {
         this.render();
       })
     );
+
+    const cleanupListeners = this.setEventListeners();
+
+    this.subscriptions.add(cleanupListeners);
   }
 
   destroy = () => {
@@ -277,7 +305,7 @@ export class CanvasToolModule {
 
     stage.setIsDraggable(tool === 'view');
 
-    if (!cursorPos || renderedEntityCount === 0 || !isDrawable) {
+    if (!cursorPos || renderedEntityCount === 0) {
       // We can bail early if the mouse isn't over the stage or there are no layers
       this.konva.group.visible(false);
     } else {
@@ -420,6 +448,445 @@ export class CanvasToolModule {
       this.setToolVisibility(tool);
     }
   }
+
+  syncLastCursorPos = (): Coordinate | null => {
+    const pos = getScaledCursorPosition(this.konva.stage);
+    if (!pos) {
+      return null;
+    }
+    this.manager.stateApi.$lastCursorPos.set(pos);
+    return pos;
+  };
+
+  getColorUnderCursor = (): RgbColor | null => {
+    const pos = this.konva.stage.getPointerPosition();
+    if (!pos) {
+      return null;
+    }
+    const ctx = this.konva.stage
+      .toCanvas({ x: pos.x, y: pos.y, width: 1, height: 1, imageSmoothingEnabled: false })
+      .getContext('2d');
+
+    if (!ctx) {
+      return null;
+    }
+
+    const [r, g, b, _a] = ctx.getImageData(0, 0, 1, 1).data;
+
+    if (r === undefined || g === undefined || b === undefined) {
+      return null;
+    }
+
+    return { r, g, b };
+  };
+
+  getClip(
+    entity: CanvasRegionalGuidanceState | CanvasControlLayerState | CanvasRasterLayerState | CanvasInpaintMaskState
+  ) {
+    const settings = this.manager.stateApi.getSettings();
+
+    if (settings.clipToBbox) {
+      const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
+      return {
+        x: x - entity.position.x,
+        y: y - entity.position.y,
+        width,
+        height,
+      };
+    } else {
+      const { x, y } = this.manager.stage.getPosition();
+      const scale = this.manager.stage.getScale();
+      const { width, height } = this.manager.stage.getSize();
+      return {
+        x: -x / scale - entity.position.x,
+        y: -y / scale - entity.position.y,
+        width: width / scale,
+        height: height / scale,
+      };
+    }
+  }
+
+  setEventListeners = (): (() => void) => {
+    this.konva.stage.on('mouseenter', this.onStageMouseEnter);
+    this.konva.stage.on('mousedown', this.onStageMouseDown);
+    this.konva.stage.on('mouseup', this.onStageMouseUp);
+    this.konva.stage.on('mousemove', this.onStageMouseMove);
+    this.konva.stage.on('mouseleave', this.onStageMouseLeave);
+    this.konva.stage.on('wheel', this.onStageMouseWheel);
+
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+
+    return () => {
+      this.konva.stage.off('mouseenter', this.onStageMouseEnter);
+      this.konva.stage.off('mousedown', this.onStageMouseDown);
+      this.konva.stage.off('mouseup', this.onStageMouseUp);
+      this.konva.stage.off('mousemove', this.onStageMouseMove);
+      this.konva.stage.off('mouseleave', this.onStageMouseLeave);
+
+      this.konva.stage.off('wheel', this.onStageMouseWheel);
+      window.removeEventListener('keydown', this.onKeyDown);
+      window.removeEventListener('keyup', this.onKeyUp);
+    };
+  };
+
+  onStageMouseEnter = (_: KonvaEventObject<MouseEvent>) => {
+    this.render();
+  };
+
+  onStageMouseDown = async (e: KonvaEventObject<MouseEvent>) => {
+    this.manager.stateApi.$isMouseDown.set(true);
+    const toolState = this.manager.stateApi.getToolState();
+    const pos = this.syncLastCursorPos();
+    const selectedEntity = this.manager.stateApi.getSelectedEntity();
+
+    if (toolState.selected === 'colorPicker') {
+      const color = this.getColorUnderCursor();
+      if (color) {
+        this.manager.stateApi.$colorUnderCursor.set(color);
+      }
+      if (color) {
+        this.manager.stateApi.setFill({ ...toolState.fill, ...color });
+      }
+      this.render();
+    } else {
+      const isDrawable = selectedEntity?.state.isEnabled;
+      if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get() && getIsPrimaryMouseDown(e)) {
+        this.manager.stateApi.$lastMouseDownPos.set(pos);
+        const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
+
+        if (toolState.selected === 'brush') {
+          const lastLinePoint = selectedEntity.adapter.getLastPointOfLastLine('brush_line');
+          const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+          if (e.evt.shiftKey && lastLinePoint) {
+            // Create a straight line from the last line point
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
+
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getPrefixedId('brush_line'),
+              type: 'brush_line',
+              points: [
+                // The last point of the last line is already normalized to the entity's coordinates
+                lastLinePoint.x,
+                lastLinePoint.y,
+                alignedPoint.x,
+                alignedPoint.y,
+              ],
+              strokeWidth: toolState.brush.width,
+              color: this.manager.stateApi.getCurrentFill(),
+              clip: this.getClip(selectedEntity.state),
+            });
+          } else {
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getPrefixedId('brush_line'),
+              type: 'brush_line',
+              points: [alignedPoint.x, alignedPoint.y],
+              strokeWidth: toolState.brush.width,
+              color: this.manager.stateApi.getCurrentFill(),
+              clip: this.getClip(selectedEntity.state),
+            });
+          }
+          this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+        }
+
+        if (toolState.selected === 'eraser') {
+          const lastLinePoint = selectedEntity.adapter.getLastPointOfLastLine('eraser_line');
+          const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
+          if (e.evt.shiftKey && lastLinePoint) {
+            // Create a straight line from the last line point
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getPrefixedId('eraser_line'),
+              type: 'eraser_line',
+              points: [
+                // The last point of the last line is already normalized to the entity's coordinates
+                lastLinePoint.x,
+                lastLinePoint.y,
+                alignedPoint.x,
+                alignedPoint.y,
+              ],
+              strokeWidth: toolState.eraser.width,
+              clip: this.getClip(selectedEntity.state),
+            });
+          } else {
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getPrefixedId('eraser_line'),
+              type: 'eraser_line',
+              points: [alignedPoint.x, alignedPoint.y],
+              strokeWidth: toolState.eraser.width,
+              clip: this.getClip(selectedEntity.state),
+            });
+          }
+          this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+        }
+
+        if (toolState.selected === 'rect') {
+          if (selectedEntity.adapter.renderer.bufferState) {
+            selectedEntity.adapter.renderer.commitBuffer();
+          }
+          await selectedEntity.adapter.renderer.setBuffer({
+            id: getPrefixedId('rect'),
+            type: 'rect',
+            rect: { x: Math.round(normalizedPoint.x), y: Math.round(normalizedPoint.y), width: 0, height: 0 },
+            color: this.manager.stateApi.getCurrentFill(),
+          });
+        }
+      }
+    }
+  };
+
+  onStageMouseUp = (_: KonvaEventObject<MouseEvent>) => {
+    this.manager.stateApi.$isMouseDown.set(false);
+    const pos = this.manager.stateApi.$lastCursorPos.get();
+    const selectedEntity = this.manager.stateApi.getSelectedEntity();
+    const isDrawable = selectedEntity?.state.isEnabled;
+
+    if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get()) {
+      const toolState = this.manager.stateApi.getToolState();
+
+      if (toolState.selected === 'brush') {
+        const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
+        if (drawingBuffer?.type === 'brush_line') {
+          selectedEntity.adapter.renderer.commitBuffer();
+        } else {
+          selectedEntity.adapter.renderer.clearBuffer();
+        }
+      }
+
+      if (toolState.selected === 'eraser') {
+        const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
+        if (drawingBuffer?.type === 'eraser_line') {
+          selectedEntity.adapter.renderer.commitBuffer();
+        } else {
+          selectedEntity.adapter.renderer.clearBuffer();
+        }
+      }
+
+      if (toolState.selected === 'rect') {
+        const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
+        if (drawingBuffer?.type === 'rect') {
+          selectedEntity.adapter.renderer.commitBuffer();
+        } else {
+          selectedEntity.adapter.renderer.clearBuffer();
+        }
+      }
+
+      this.manager.stateApi.$lastMouseDownPos.set(null);
+    }
+    this.render();
+  };
+
+  onStageMouseMove = async (e: KonvaEventObject<MouseEvent>) => {
+    const toolState = this.manager.stateApi.getToolState();
+    const pos = this.syncLastCursorPos();
+    const selectedEntity = this.manager.stateApi.getSelectedEntity();
+
+    if (toolState.selected === 'colorPicker') {
+      const color = this.getColorUnderCursor();
+      if (color) {
+        this.manager.stateApi.$colorUnderCursor.set(color);
+      }
+    } else {
+      const isDrawable = selectedEntity?.state.isEnabled;
+      if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get() && getIsPrimaryMouseDown(e)) {
+        if (toolState.selected === 'brush') {
+          const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
+          if (drawingBuffer) {
+            if (drawingBuffer.type === 'brush_line') {
+              const lastPoint = getLastPointOfLine(drawingBuffer.points);
+              const minDistance = toolState.brush.width * BRUSH_SPACING_TARGET_SCALE;
+              if (lastPoint && validateCandidatePoint(pos, lastPoint, minDistance)) {
+                const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
+                const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+                // Do not add duplicate points
+                if (lastPoint.x !== alignedPoint.x || lastPoint.y !== alignedPoint.y) {
+                  drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
+                  await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+                  this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+                }
+              }
+            } else {
+              selectedEntity.adapter.renderer.clearBuffer();
+            }
+          } else {
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
+            const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
+            const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getPrefixedId('brush_line'),
+              type: 'brush_line',
+              points: [alignedPoint.x, alignedPoint.y],
+              strokeWidth: toolState.brush.width,
+              color: this.manager.stateApi.getCurrentFill(),
+              clip: this.getClip(selectedEntity.state),
+            });
+            this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+          }
+        }
+
+        if (toolState.selected === 'eraser') {
+          const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
+          if (drawingBuffer) {
+            if (drawingBuffer.type === 'eraser_line') {
+              const lastPoint = getLastPointOfLine(drawingBuffer.points);
+              const minDistance = toolState.eraser.width * BRUSH_SPACING_TARGET_SCALE;
+              if (lastPoint && validateCandidatePoint(pos, lastPoint, minDistance)) {
+                const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
+                const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
+                // Do not add duplicate points
+                if (lastPoint.x !== alignedPoint.x || lastPoint.y !== alignedPoint.y) {
+                  drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
+                  await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+                  this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+                }
+              }
+            } else {
+              selectedEntity.adapter.renderer.clearBuffer();
+            }
+          } else {
+            if (selectedEntity.adapter.renderer.bufferState) {
+              selectedEntity.adapter.renderer.commitBuffer();
+            }
+            const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
+            const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
+            await selectedEntity.adapter.renderer.setBuffer({
+              id: getPrefixedId('eraser_line'),
+              type: 'eraser_line',
+              points: [alignedPoint.x, alignedPoint.y],
+              strokeWidth: toolState.eraser.width,
+              clip: this.getClip(selectedEntity.state),
+            });
+            this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+          }
+        }
+
+        if (toolState.selected === 'rect') {
+          const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
+          if (drawingBuffer) {
+            if (drawingBuffer.type === 'rect') {
+              const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
+              drawingBuffer.rect.width = Math.round(normalizedPoint.x - drawingBuffer.rect.x);
+              drawingBuffer.rect.height = Math.round(normalizedPoint.y - drawingBuffer.rect.y);
+              await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+            } else {
+              selectedEntity.adapter.renderer.clearBuffer();
+            }
+          }
+        }
+      }
+    }
+
+    this.render();
+  };
+
+  onStageMouseLeave = async (e: KonvaEventObject<MouseEvent>) => {
+    const pos = this.syncLastCursorPos();
+    this.manager.stateApi.$lastCursorPos.set(null);
+    this.manager.stateApi.$lastMouseDownPos.set(null);
+    const selectedEntity = this.manager.stateApi.getSelectedEntity();
+    const toolState = this.manager.stateApi.getToolState();
+    const isDrawable = selectedEntity?.state.isEnabled;
+
+    if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get() && getIsPrimaryMouseDown(e)) {
+      const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
+      const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
+      if (toolState.selected === 'brush' && drawingBuffer?.type === 'brush_line') {
+        const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+        drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
+        await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+        selectedEntity.adapter.renderer.commitBuffer();
+      } else if (toolState.selected === 'eraser' && drawingBuffer?.type === 'eraser_line') {
+        const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
+        drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
+        await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+        selectedEntity.adapter.renderer.commitBuffer();
+      } else if (toolState.selected === 'rect' && drawingBuffer?.type === 'rect') {
+        drawingBuffer.rect.width = Math.round(normalizedPoint.x - drawingBuffer.rect.x);
+        drawingBuffer.rect.height = Math.round(normalizedPoint.y - drawingBuffer.rect.y);
+        await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
+        selectedEntity.adapter.renderer.commitBuffer();
+      }
+    }
+
+    this.render();
+  };
+
+  onStageMouseWheel = (e: KonvaEventObject<WheelEvent>) => {
+    e.evt.preventDefault();
+
+    if (!e.evt.ctrlKey && !e.evt.metaKey) {
+      return;
+    }
+
+    const toolState = this.manager.stateApi.getToolState();
+
+    let delta = e.evt.deltaY;
+
+    if (toolState.invertScroll) {
+      delta = -delta;
+    }
+
+    // Holding ctrl or meta while scrolling changes the brush size
+    if (toolState.selected === 'brush') {
+      this.manager.stateApi.setBrushWidth(calculateNewBrushSizeFromWheelDelta(toolState.brush.width, delta));
+    } else if (toolState.selected === 'eraser') {
+      this.manager.stateApi.setEraserWidth(calculateNewBrushSizeFromWheelDelta(toolState.eraser.width, delta));
+    }
+
+    this.render();
+  };
+
+  onKeyDown = (e: KeyboardEvent) => {
+    if (e.repeat) {
+      return;
+    }
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+    if (e.key === 'Escape') {
+      // Cancel shape drawing on escape
+      const selectedEntity = this.manager.stateApi.getSelectedEntity();
+      if (selectedEntity) {
+        selectedEntity.adapter.renderer.clearBuffer();
+        this.manager.stateApi.$lastMouseDownPos.set(null);
+      }
+    } else if (e.key === ' ') {
+      // Select the view tool on space key down
+      this.manager.stateApi.setToolBuffer(this.manager.stateApi.getToolState().selected);
+      this.manager.stateApi.setTool('view');
+      this.manager.stateApi.$spaceKey.set(true);
+      this.manager.stateApi.$lastCursorPos.set(null);
+      this.manager.stateApi.$lastMouseDownPos.set(null);
+    }
+  };
+
+  onKeyUp = (e: KeyboardEvent) => {
+    if (e.repeat) {
+      return;
+    }
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+    if (e.key === ' ') {
+      // Revert the tool to the previous tool on space key up
+      const toolBuffer = this.manager.stateApi.getToolState().selectedBuffer;
+      this.manager.stateApi.setTool(toolBuffer ?? 'move');
+      this.manager.stateApi.setToolBuffer(null);
+      this.manager.stateApi.$spaceKey.set(false);
+    }
+  };
 
   getLoggingContext = (): SerializableObject => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };

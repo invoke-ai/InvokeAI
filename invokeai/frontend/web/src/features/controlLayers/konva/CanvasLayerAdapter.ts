@@ -3,11 +3,15 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
+import { getLastPointOfLine } from 'features/controlLayers/konva/util';
 import type {
+  CanvasBrushLineState,
   CanvasControlLayerState,
   CanvasEntityIdentifier,
+  CanvasEraserLineState,
   CanvasRasterLayerState,
   CanvasV2State,
+  Coordinate,
   Rect,
 } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
@@ -178,6 +182,19 @@ export class CanvasLayerAdapter {
       extra,
     };
     return stableHash(arg);
+  };
+
+  getLastPointOfLastLine = (type: CanvasBrushLineState['type'] | CanvasEraserLineState['type']): Coordinate | null => {
+    const lastObject = this.state.objects[this.state.objects.length - 1];
+    if (!lastObject) {
+      return null;
+    }
+
+    if (lastObject.type === type) {
+      return getLastPointOfLine(lastObject.points);
+    }
+
+    return null;
   };
 
   logDebugInfo(msg = 'Debug info') {

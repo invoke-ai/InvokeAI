@@ -2,6 +2,7 @@ import type { CanvasEntityIdentifier, Coordinate, Rect } from 'features/controlL
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
+import { clamp } from 'lodash-es';
 import { customAlphabet } from 'nanoid';
 import { assert } from 'tsafe';
 
@@ -128,6 +129,64 @@ export const getIsMouseDown = (e: KonvaEventObject<MouseEvent>): boolean => e.ev
  * @param stage The konva stage
  */
 export const getIsFocused = (stage: Konva.Stage): boolean => stage.container().contains(document.activeElement);
+
+/**
+ * Gets the last point of a line as a coordinate.
+ * @param points An array of numbers representing points as [x1, y1, x2, y2, ...]
+ * @returns The last point of the line as a coordinate, or null if the line has less than 1 point
+ */
+export const getLastPointOfLine = (points: number[]): Coordinate | null => {
+  if (points.length < 2) {
+    return null;
+  }
+  const x = points[points.length - 2];
+  const y = points[points.length - 1];
+  if (x === undefined || y === undefined) {
+    return null;
+  }
+  return { x, y };
+};
+
+export function getIsPrimaryMouseDown(e: KonvaEventObject<MouseEvent>) {
+  return e.evt.buttons === 1;
+}
+
+/**
+ * Calculates the new brush size based on the current brush size and the wheel delta from a mouse wheel event.
+ * @param brushSize The current brush size
+ * @param delta The wheel delta
+ * @returns
+ */
+export const calculateNewBrushSizeFromWheelDelta = (brushSize: number, delta: number) => {
+  // This equation was derived by fitting a curve to the desired brush sizes and deltas
+  // see https://github.com/invoke-ai/InvokeAI/pull/5542#issuecomment-1915847565
+  const targetDelta = Math.sign(delta) * 0.7363 * Math.pow(1.0394, brushSize);
+  // This needs to be clamped to prevent the delta from getting too large
+  const finalDelta = clamp(targetDelta, -20, 20);
+  // The new brush size is also clamped to prevent it from getting too large or small
+  const newBrushSize = clamp(brushSize + finalDelta, 1, 500);
+
+  return newBrushSize;
+};
+
+/**
+ * Validates a candidate point by checking if it is at least `minDistance` away from the last point.
+ * @param candidatePoint The candidate point
+ * @param lastPoint The last point
+ * @param minDistance The minimum distance between points
+ * @returns
+ */
+export const validateCandidatePoint = (
+  candidatePoint: Coordinate,
+  lastPoint: Coordinate | null,
+  minDistance: number
+): boolean => {
+  if (!lastPoint) {
+    return true;
+  }
+
+  return Math.hypot(lastPoint.x - candidatePoint.x, lastPoint.y - candidatePoint.y) >= minDistance;
+};
 
 /**
  * Simple util to map an object to its id property. Serves as a minor optimization to avoid recreating a map callback
