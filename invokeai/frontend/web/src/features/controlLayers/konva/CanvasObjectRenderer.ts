@@ -1,4 +1,3 @@
-import type { SerializableObject } from 'common/types';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
 import { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
@@ -6,6 +5,7 @@ import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
@@ -55,8 +55,8 @@ type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImage
 /**
  * Handles rendering of objects for a canvas entity.
  */
-export class CanvasObjectRenderer {
-  readonly type = 'object_renderer';
+export class CanvasObjectRenderer extends CanvasModuleBase {
+  readonly type = 'entity_object_renderer';
 
   id: string;
   path: string[];
@@ -123,12 +123,13 @@ export class CanvasObjectRenderer {
   $canvasCache = atom<{ canvas: HTMLCanvasElement; rect: Rect } | null>(null);
 
   constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
+    super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.path = this.parent.path.concat(this.id);
     this.manager = parent.manager;
     this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.log.trace('Creating object renderer');
+    this.log.debug('Creating entity object renderer module');
 
     this.konva = {
       objectGroup: new Konva.Group({ name: `${this.type}:object_group`, listening: false }),
@@ -597,11 +598,8 @@ export class CanvasObjectRenderer {
    * Destroys this renderer and all of its object renderers.
    */
   destroy = () => {
-    this.log.trace('Destroying object renderer');
-    for (const cleanup of this.subscriptions) {
-      this.log.trace('Cleaning up listener');
-      cleanup();
-    }
+    this.log.debug('Destroying entity object renderer module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     for (const renderer of this.renderers.values()) {
       renderer.destroy();
     }
@@ -616,13 +614,14 @@ export class CanvasObjectRenderer {
     return {
       id: this.id,
       type: this.type,
+      path: this.path,
       parent: this.parent.id,
       renderers: Array.from(this.renderers.values()).map((renderer) => renderer.repr()),
       buffer: this.bufferRenderer?.repr(),
     };
   };
 
-  getLoggingContext = (): SerializableObject => {
+  getLoggingContext = () => {
     return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

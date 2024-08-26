@@ -1,5 +1,6 @@
 import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import {
   canvasToBlob,
   canvasToImageData,
@@ -14,18 +15,22 @@ import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
-export class CanvasCompositorModule {
+export class CanvasCompositorModule extends CanvasModuleBase {
+  readonly type = 'compositor';
+
   id: string;
   path: string[];
   log: Logger;
   manager: CanvasManager;
+  subscriptions = new Set<() => void>();
 
   constructor(manager: CanvasManager) {
+    super();
     this.id = getPrefixedId('canvas_compositor');
     this.manager = manager;
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.log.debug('Creating canvas compositor');
+    this.log.debug('Creating compositor module');
   }
 
   getCompositeRasterLayerEntityIds = (): string[] => {
@@ -237,7 +242,20 @@ export class CanvasCompositorModule {
     return generationMode;
   }
 
-  getLoggingContext = (): SerializableObject => {
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+    };
+  };
+
+  destroy = () => {
+    this.log.trace('Destroying compositor module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+  };
+
+  getLoggingContext = () => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

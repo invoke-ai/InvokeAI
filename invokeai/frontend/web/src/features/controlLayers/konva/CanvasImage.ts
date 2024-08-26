@@ -1,8 +1,8 @@
 import { Mutex } from 'async-mutex';
-import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import type { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
 import { loadImage } from 'features/controlLayers/konva/util';
@@ -12,7 +12,7 @@ import Konva from 'konva';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
 
-export class CanvasImageRenderer {
+export class CanvasImageRenderer extends CanvasModuleBase {
   readonly type = 'image_renderer';
 
   id: string;
@@ -20,6 +20,7 @@ export class CanvasImageRenderer {
   parent: CanvasObjectRenderer | CanvasStagingAreaModule | CanvasFilterModule;
   manager: CanvasManager;
   log: Logger;
+  subscriptions = new Set<() => void>();
 
   state: CanvasImageState;
   konva: {
@@ -33,6 +34,7 @@ export class CanvasImageRenderer {
   mutex = new Mutex();
 
   constructor(state: CanvasImageState, parent: CanvasObjectRenderer | CanvasStagingAreaModule | CanvasFilterModule) {
+    super();
     const { id, image } = state;
     const { width, height } = image;
     this.id = id;
@@ -41,7 +43,7 @@ export class CanvasImageRenderer {
     this.path = this.parent.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
-    this.log.trace({ state }, 'Creating image');
+    this.log.debug({ state }, 'Creating image renderer module');
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
@@ -166,7 +168,8 @@ export class CanvasImageRenderer {
   };
 
   destroy = () => {
-    this.log.trace('Destroying image');
+    this.log.debug('Destroying image renderer module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
   };
 
@@ -179,6 +182,7 @@ export class CanvasImageRenderer {
     return {
       id: this.id,
       type: this.type,
+      path: this.path,
       parent: this.parent.id,
       isLoading: this.isLoading,
       isError: this.isError,
@@ -186,7 +190,7 @@ export class CanvasImageRenderer {
     };
   };
 
-  getLoggingContext = (): SerializableObject => {
+  getLoggingContext = () => {
     return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }
