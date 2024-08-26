@@ -1,8 +1,10 @@
 import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CANVAS_SCALE_BY } from 'features/controlLayers/konva/constants';
 import { getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
 import type { Coordinate, Dimensions, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
 import type { Logger } from 'roarr';
 
@@ -27,6 +29,18 @@ export class CanvasStageModule {
     this.konva = { stage };
   }
 
+  setEventListeners = () => {
+    this.konva.stage.on('wheel', this.onStageMouseWheel);
+    this.konva.stage.on('dragmove', this.onStageDragMove);
+    this.konva.stage.on('dragend', this.onStageDragEnd);
+
+    return () => {
+      this.konva.stage.off('wheel', this.onStageMouseWheel);
+      this.konva.stage.off('dragmove', this.onStageDragMove);
+      this.konva.stage.off('dragend', this.onStageDragEnd);
+    };
+  };
+
   initialize = () => {
     this.log.debug('Initializing stage');
     this.konva.stage.container(this.container);
@@ -34,11 +48,13 @@ export class CanvasStageModule {
     resizeObserver.observe(this.container);
     this.fitStageToContainer();
     this.fitLayersToStage();
+    const cleanupListeners = this.setEventListeners();
 
     return () => {
       this.log.debug('Destroying stage');
       resizeObserver.disconnect();
       this.konva.stage.destroy();
+      cleanupListeners();
     };
   };
 
@@ -164,6 +180,54 @@ export class CanvasStageModule {
     });
 
     this.manager.stateApi.$stageAttrs.set({
+      x: Math.floor(this.konva.stage.x()),
+      y: Math.floor(this.konva.stage.y()),
+      width: this.konva.stage.width(),
+      height: this.konva.stage.height(),
+      scale: this.konva.stage.scaleX(),
+    });
+  };
+
+  onStageMouseWheel = (e: KonvaEventObject<WheelEvent>) => {
+    e.evt.preventDefault();
+
+    if (e.evt.ctrlKey || e.evt.metaKey) {
+      return;
+    }
+
+    // We need the absolute cursor position - not the scaled position
+    const cursorPos = this.konva.stage.getPointerPosition();
+
+    if (cursorPos) {
+      // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
+      const delta = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
+      const scale = this.manager.stage.getScale() * CANVAS_SCALE_BY ** delta;
+      this.manager.stage.setScale(scale, cursorPos);
+    }
+  };
+
+  onStageDragMove = (e: KonvaEventObject<MouseEvent>) => {
+    if (e.target !== this.konva.stage) {
+      return;
+    }
+
+    this.manager.stateApi.$stageAttrs.set({
+      // Stage position should always be an integer, else we get fractional pixels which are blurry
+      x: Math.floor(this.konva.stage.x()),
+      y: Math.floor(this.konva.stage.y()),
+      width: this.konva.stage.width(),
+      height: this.konva.stage.height(),
+      scale: this.konva.stage.scaleX(),
+    });
+  };
+
+  onStageDragEnd = (e: KonvaEventObject<DragEvent>) => {
+    if (e.target !== this.konva.stage) {
+      return;
+    }
+
+    this.manager.stateApi.$stageAttrs.set({
+      // Stage position should always be an integer, else we get fractional pixels which are blurry
       x: Math.floor(this.konva.stage.x()),
       y: Math.floor(this.konva.stage.y()),
       width: this.konva.stage.width(),
