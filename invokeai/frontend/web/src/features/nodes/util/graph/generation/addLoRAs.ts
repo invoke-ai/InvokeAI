@@ -14,7 +14,7 @@ export const addLoRAs = (
   posCond: Invocation<'compel'>,
   negCond: Invocation<'compel'>
 ): void => {
-  const enabledLoRAs = state.canvasV2.loras.filter(
+  const enabledLoRAs = state.loras.loras.filter(
     (l) => l.isEnabled && (l.model.base === 'sd-1' || l.model.base === 'sd-2')
   );
   const loraCount = enabledLoRAs.length;

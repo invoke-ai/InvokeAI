@@ -1,11 +1,11 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
+import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { LoRACard } from 'features/lora/components/LoRACard';
 import { memo } from 'react';
 
-const selectLoRAsArray = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => canvasV2.loras);
+const selectLoRAsArray = createMemoizedSelector(selectLoRAsSlice, (loras) => loras.loras);
 
 export const LoRAList = memo(() => {
   const lorasArray = useAppSelector(selectLoRAsArray);

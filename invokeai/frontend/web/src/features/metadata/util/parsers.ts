@@ -1,5 +1,5 @@
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { defaultLoRAConfig } from 'features/controlLayers/store/lorasReducers';
+import { defaultLoRAConfig } from 'features/controlLayers/store/lorasSlice';
 import type {
   CanvasControlLayerState,
   CanvasInpaintMaskState,
