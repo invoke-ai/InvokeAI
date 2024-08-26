@@ -5,10 +5,6 @@ export const sessionReducers = {
   sessionStartedStaging: (state) => {
     state.session.isStaging = true;
     state.session.selectedStagedImageIndex = 0;
-    // When we start staging, the user should not be interacting with the stage except to move it around. Set the tool
-    // to view.
-    state.tool.selectedBuffer = state.tool.selected;
-    state.tool.selected = 'view';
   },
   sessionImageStaged: (state, action: PayloadAction<{ stagingAreaImage: StagingAreaImage }>) => {
     const { stagingAreaImage } = action.payload;
@@ -39,11 +35,6 @@ export const sessionReducers = {
     state.session.isStaging = false;
     state.session.stagedImages = [];
     state.session.selectedStagedImageIndex = 0;
-    // When we finish staging, reset the tool back to the previous selection.
-    if (state.tool.selectedBuffer) {
-      state.tool.selected = state.tool.selectedBuffer;
-      state.tool.selectedBuffer = null;
-    }
   },
   sessionModeChanged: (state, action: PayloadAction<{ mode: SessionMode }>) => {
     const { mode } = action.payload;
