@@ -156,11 +156,12 @@ export class CanvasObjectRenderer {
       this.parent.konva.layer.add(this.konva.compositing.group);
     }
 
+    // When switching tool, commit the buffer. This is necessary to prevent the buffer from being lost when the
+    // user switches tool mid-drawing, for example by pressing space to pan the stage. It's easy to press space
+    // to pan _before_ releasing the mouse button, which would cause the buffer to be lost if we didn't commit it.
     this.subscriptions.add(
-      this.manager.stateApi.$toolState.listen((newVal, oldVal) => {
-        if (newVal.selected !== oldVal.selected) {
-          this.commitBuffer();
-        }
+      this.manager.stateApi.$tool.listen(() => {
+        this.commitBuffer();
       })
     );
 

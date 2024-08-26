@@ -145,7 +145,6 @@ export class CanvasRenderingModule {
     if (
       !prevState ||
       state.regions.entities !== prevState.regions.entities ||
-      state.tool.selected !== prevState.tool.selected ||
       state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
     ) {
       // Destroy the konva nodes for nonexistent entities
@@ -184,7 +183,6 @@ export class CanvasRenderingModule {
     if (
       !prevState ||
       state.inpaintMasks.entities !== prevState.inpaintMasks.entities ||
-      state.tool.selected !== prevState.tool.selected ||
       state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
     ) {
       // Destroy the konva nodes for nonexistent entities
@@ -212,7 +210,7 @@ export class CanvasRenderingModule {
   };
 
   renderBbox = (state: CanvasV2State, prevState: CanvasV2State | null) => {
-    if (!prevState || state.bbox !== prevState.bbox || state.tool.selected !== prevState.tool.selected) {
+    if (!prevState || state.bbox !== prevState.bbox) {
       this.manager.preview.bbox.render();
     }
   };
