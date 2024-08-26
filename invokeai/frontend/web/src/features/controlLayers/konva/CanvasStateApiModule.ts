@@ -7,7 +7,6 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   bboxChanged,
-  brushWidthChanged,
   entityBrushLineAdded,
   entityEraserLineAdded,
   entityMoved,
@@ -15,17 +14,20 @@ import {
   entityRectAdded,
   entityReset,
   entitySelected,
-  eraserWidthChanged,
-  fillChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { selectAllRenderableEntities } from 'features/controlLayers/store/selectors';
+import {
+  brushWidthChanged,
+  eraserWidthChanged,
+  fillChanged,
+  type ToolState,
+} from 'features/controlLayers/store/toolSlice';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
-  CanvasV2State,
   Coordinate,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
@@ -97,7 +99,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   }
 
   // Reminder - use arrow functions to avoid binding issues
-  getState = () => {
+  getCanvasState = () => {
     return this.store.getState().canvasV2;
   };
   resetEntity = (arg: EntityIdentifierPayload) => {
@@ -141,36 +143,36 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     );
   };
   getBbox = () => {
-    return this.getState().bbox;
+    return this.getCanvasState().bbox;
   };
 
   getToolState = () => {
-    return this.getState().tool;
+    return this.store.getState().tool;
   };
   getSettings = () => {
-    return this.getState().settings;
+    return this.getCanvasState().settings;
   };
   getRegionsState = () => {
-    return this.getState().regions;
+    return this.getCanvasState().regions;
   };
   getRasterLayersState = () => {
-    return this.getState().rasterLayers;
+    return this.getCanvasState().rasterLayers;
   };
   getControlLayersState = () => {
-    return this.getState().controlLayers;
+    return this.getCanvasState().controlLayers;
   };
   getInpaintMasksState = () => {
-    return this.getState().inpaintMasks;
+    return this.getCanvasState().inpaintMasks;
   };
   getSession = () => {
-    return this.getState().session;
+    return this.getCanvasState().session;
   };
   getIsSelected = (id: string) => {
-    return this.getState().selectedEntityIdentifier?.id === id;
+    return this.getCanvasState().selectedEntityIdentifier?.id === id;
   };
 
   getEntity(identifier: CanvasEntityIdentifier): EntityStateAndAdapter | null {
-    const state = this.getState();
+    const state = this.getCanvasState();
 
     let entityState: EntityStateAndAdapter['state'] | null = null;
     let entityAdapter: EntityStateAndAdapter['adapter'] | null = null;
@@ -202,7 +204,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   }
 
   getRenderedEntityCount = () => {
-    const renderableEntities = selectAllRenderableEntities(this.getState());
+    const renderableEntities = selectAllRenderableEntities(this.getCanvasState());
     let count = 0;
     for (const entity of renderableEntities) {
       if (entity.isEnabled) {
@@ -213,7 +215,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   };
 
   getSelectedEntity = () => {
-    const state = this.getState();
+    const state = this.getCanvasState();
     if (state.selectedEntityIdentifier) {
       return this.getEntity(state.selectedEntityIdentifier);
     }
@@ -221,8 +223,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   };
 
   getCurrentFill = () => {
-    const state = this.getState();
-    let currentFill: RgbaColor = state.tool.fill;
+    let currentFill: RgbaColor = this.getToolState().fill;
     const selectedEntity = this.getSelectedEntity();
     if (selectedEntity) {
       // These two entity types use a compositing rect for opacity. Their fill is always a solid color.
@@ -239,15 +240,14 @@ export class CanvasStateApiModule extends CanvasModuleBase {
       // The brush should use the mask opacity for these enktity types
       return { ...selectedEntity.state.fill.color, a: 1 };
     } else {
-      const state = this.getState();
-      return state.tool.fill;
+      return this.getToolState().fill;
     }
   };
 
   $transformingEntity = atom<CanvasEntityIdentifier | null>(null);
   $isProcessingTransform = atom<boolean>(false);
 
-  $toolState: WritableAtom<CanvasV2State['tool']> = atom();
+  $toolState: WritableAtom<ToolState> = atom();
   $currentFill: WritableAtom<RgbaColor> = atom();
   $selectedEntity: WritableAtom<EntityStateAndAdapter | null> = atom();
   $selectedEntityIdentifier: WritableAtom<CanvasEntityIdentifier | null> = atom();
