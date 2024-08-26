@@ -33,7 +33,7 @@ classifiers = [
 ]
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
-  "accelerate==0.33.0",
+  "accelerate==0.30.1",
   "bitsandbytes==0.43.3; sys_platform!='darwin'",
   "clip_anytorch==2.6.0",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
@@ -60,7 +60,7 @@ dependencies = [
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events==0.11.1",
   "fastapi==0.111.0",
-  "huggingface-hub==0.24.5",
+  "huggingface-hub==0.23.1",
   "pydantic-settings==2.2.1",
   "pydantic==2.7.2",
   "python-socketio==5.11.1",
