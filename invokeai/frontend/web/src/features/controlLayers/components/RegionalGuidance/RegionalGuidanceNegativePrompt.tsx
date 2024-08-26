@@ -1,8 +1,9 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { RegionalGuidanceDeletePromptButton } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceDeletePromptButton';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rgNegativePromptChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { selectRegionalGuidanceEntityOrThrow } from 'features/controlLayers/store/regionsReducers';
+import { selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
@@ -10,24 +11,21 @@ import { usePrompt } from 'features/prompt/usePrompt';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type Props = {
-  id: string;
-};
-
-export const RegionalGuidanceNegativePrompt = memo(({ id }: Props) => {
-  const prompt = useAppSelector((s) => selectRegionalGuidanceEntityOrThrow(s.canvasV2, id).negativePrompt ?? '');
+export const RegionalGuidanceNegativePrompt = memo(() => {
+  const entityIdentifier = useEntityIdentifierContext('regional_guidance');
+  const prompt = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).negativePrompt ?? '');
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const _onChange = useCallback(
     (v: string) => {
-      dispatch(rgNegativePromptChanged({ id, prompt: v }));
+      dispatch(rgNegativePromptChanged({ entityIdentifier, prompt: v }));
     },
-    [dispatch, id]
+    [dispatch, entityIdentifier]
   );
   const onDeletePrompt = useCallback(() => {
-    dispatch(rgNegativePromptChanged({ id, prompt: null }));
-  }, [dispatch, id]);
+    dispatch(rgNegativePromptChanged({ entityIdentifier, prompt: null }));
+  }, [dispatch, entityIdentifier]);
   const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown } = usePrompt({
     prompt,
     textareaRef,

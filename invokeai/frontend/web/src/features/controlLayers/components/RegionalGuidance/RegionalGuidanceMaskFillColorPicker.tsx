@@ -5,27 +5,27 @@ import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { MaskFillStyle } from 'features/controlLayers/components/common/MaskFillStyle';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rgFillColorChanged, rgFillStyleChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { selectRegionalGuidanceEntityOrThrow } from 'features/controlLayers/store/regionsReducers';
+import { selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { FillStyle, RgbColor } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const RegionalGuidanceMaskFillColorPicker = memo(() => {
-  const entityIdentifier = useEntityIdentifierContext();
+  const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const fill = useAppSelector((s) => selectRegionalGuidanceEntityOrThrow(s.canvasV2, entityIdentifier.id).fill);
+  const fill = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).fill);
   const onChangeFillColor = useCallback(
     (color: RgbColor) => {
-      dispatch(rgFillColorChanged({ id: entityIdentifier.id, color }));
+      dispatch(rgFillColorChanged({ entityIdentifier, color }));
     },
-    [dispatch, entityIdentifier.id]
+    [dispatch, entityIdentifier]
   );
   const onChangeFillStyle = useCallback(
     (style: FillStyle) => {
-      dispatch(rgFillStyleChanged({ id: entityIdentifier.id, style }));
+      dispatch(rgFillStyleChanged({ entityIdentifier, style }));
     },
-    [dispatch, entityIdentifier.id]
+    [dispatch, entityIdentifier]
   );
   return (
     <Popover isLazy>
