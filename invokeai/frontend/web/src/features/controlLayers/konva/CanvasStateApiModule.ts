@@ -150,7 +150,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     return this.store.getState().tool;
   };
   getSettings = () => {
-    return this.getCanvasState().settings;
+    return this.store.getState().canvasSettings;
   };
   getRegionsState = () => {
     return this.getCanvasState().regions;

@@ -6,6 +6,7 @@ import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
+import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasV2PersistConfig, canvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
 import { toolPersistConfig, toolSlice } from 'features/controlLayers/store/toolSlice';
@@ -61,6 +62,7 @@ const allReducers = {
   [stylePresetSlice.name]: stylePresetSlice.reducer,
   [paramsSlice.name]: paramsSlice.reducer,
   [toolSlice.name]: toolSlice.reducer,
+  [canvasSettingsSlice.name]: canvasSettingsSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -104,6 +106,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [stylePresetPersistConfig.name]: stylePresetPersistConfig,
   [paramsPersistConfig.name]: paramsPersistConfig,
   [toolPersistConfig.name]: toolPersistConfig,
+  [canvasSettingsPersistConfig.name]: canvasSettingsPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

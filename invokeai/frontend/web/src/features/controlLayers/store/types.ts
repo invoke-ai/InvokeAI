@@ -715,15 +715,6 @@ export type CanvasV2State = {
     entities: CanvasIPAdapterState[];
   };
   loras: LoRA[];
-  settings: {
-    imageSmoothing: boolean;
-    showHUD: boolean;
-    autoSave: boolean;
-    preserveMaskedArea: boolean;
-    cropToBboxOnSave: boolean;
-    clipToBbox: boolean;
-    dynamicGrid: boolean;
-  };
   bbox: {
     rect: {
       x: number;
