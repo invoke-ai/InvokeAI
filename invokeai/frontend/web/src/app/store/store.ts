@@ -8,6 +8,7 @@ import { deepClone } from 'common/util/deepClone';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import { canvasV2PersistConfig, canvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
+import { toolPersistConfig, toolSlice } from 'features/controlLayers/store/toolSlice';
 import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
@@ -59,6 +60,7 @@ const allReducers = {
   [upscaleSlice.name]: upscaleSlice.reducer,
   [stylePresetSlice.name]: stylePresetSlice.reducer,
   [paramsSlice.name]: paramsSlice.reducer,
+  [toolSlice.name]: toolSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -101,6 +103,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [upscalePersistConfig.name]: upscalePersistConfig,
   [stylePresetPersistConfig.name]: stylePresetPersistConfig,
   [paramsPersistConfig.name]: paramsPersistConfig,
+  [toolPersistConfig.name]: toolPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

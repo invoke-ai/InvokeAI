@@ -715,12 +715,6 @@ export type CanvasV2State = {
     entities: CanvasIPAdapterState[];
   };
   loras: LoRA[];
-  tool: {
-    invertScroll: boolean;
-    brush: { width: number };
-    eraser: { width: number };
-    fill: RgbaColor;
-  };
   settings: {
     imageSmoothing: boolean;
     showHUD: boolean;

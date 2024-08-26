@@ -11,7 +11,6 @@ import type {
   CanvasEntityIdentifier,
   CanvasEraserLineState,
   CanvasRasterLayerState,
-  CanvasV2State,
   Coordinate,
   Rect,
 } from 'features/controlLayers/store/types';
@@ -83,11 +82,7 @@ export class CanvasLayerAdapter extends CanvasModuleBase {
     this.konva.layer.destroy();
   };
 
-  update = async (arg?: {
-    state: CanvasLayerAdapter['state'];
-    toolState: CanvasV2State['tool'];
-    isSelected: boolean;
-  }) => {
+  update = async (arg?: { state: CanvasLayerAdapter['state'] }) => {
     const state = get(arg, 'state', this.state);
 
     if (!this.isFirstRender && state === this.state) {
