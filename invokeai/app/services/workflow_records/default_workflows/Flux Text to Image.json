@@ -1,35 +1,77 @@
 {
   "name": "FLUX Text to Image",
   "author": "InvokeAI",
-  "description": "A simple text-to-image workflow using FLUX dev or schnell models. Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. These can be found in the starter models tab within your Model Manager.",
+  "description": "A simple text-to-image workflow using FLUX dev or schnell models. Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager.",
   "version": "1.0.0",
   "contact": "",
   "tags": "text2image, flux",
   "notes": "",
   "exposedFields": [
     {
-      "nodeId": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+      "nodeId": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
       "fieldName": "model"
     },
     {
-      "nodeId": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+      "nodeId": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
       "fieldName": "t5_encoder"
     },
     {
-      "nodeId": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
-      "fieldName": "positive_prompt"
+      "nodeId": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "fieldName": "prompt"
     }
   ],
   "meta": {
     "version": "3.0.0",
     "category": "default"
   },
-"nodes": [
+  "nodes": [
     {
-      "id": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
+      "id": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
       "type": "invocation",
       "data": {
-        "id": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
+        "id": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
+        "type": "flux_model_loader",
+        "version": "1.0.3",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false,
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "",
+            "value": {
+              "key": "f04a7a2f-c74d-4538-8d5e-879a53501662",
+              "hash": "random:4875da7a9508444ffa706f61961c260d0c6729f6181a86b31fad06df1277b850",
+              "name": "FLUX Dev (Quantized)",
+              "base": "flux",
+              "type": "main"
+            }
+          },
+          "t5_encoder": {
+            "name": "t5_encoder",
+            "label": "",
+            "value": {
+              "key": "20dcd9ec-5fbb-4012-8401-049e707da5e5",
+              "hash": "random:f986be43ff3502169e4adbdcee158afb0e0a65a1edc4cab16ae59963630cfd8f",
+              "name": "t5_bnb_int8_quantized_encoder",
+              "base": "any",
+              "type": "t5_encoder"
+            }
+          }
+        }
+      },
+      "position": {
+        "x": 337.09365228062825,
+        "y": 40.63469521079861
+      }
+    },
+    {
+      "id": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "type": "invocation",
+      "data": {
+        "id": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
         "type": "flux_text_encoder",
         "version": "1.0.0",
         "label": "",
@@ -48,61 +90,19 @@
           },
           "t5_max_seq_len": {
             "name": "t5_max_seq_len",
-            "label": "",
+            "label": "T5 Max Seq Len",
             "value": 256
           },
-          "positive_prompt": {
-            "name": "positive_prompt",
+          "prompt": {
+            "name": "prompt",
             "label": "",
-            "value": ""
+            "value": "a cat"
           }
         }
       },
       "position": {
-        "x": 817.9049777916891,
-        "y": 137.19130248771572
-      }
-    },
-    {
-      "id": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
-      "type": "invocation",
-      "data": {
-        "id": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
-        "type": "flux_model_loader",
-        "version": "1.0.3",
-        "label": "",
-        "notes": "",
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true,
-        "inputs": {
-          "model": {
-            "name": "model",
-            "label": "",
-            "value": {
-              "key": "a1deb125-2781-482c-8a71-9a22e76fd956",
-              "hash": "random:40bd0a5b8b2c6edf8f5611e049000329b952efc6a1a24b4f77ca4ae3dbecaf6a",
-              "name": "flux1-schnell-bnb_nf4",
-              "base": "flux",
-              "type": "main"
-            }
-          },
-          "t5_encoder": {
-            "name": "t5_encoder",
-            "label": "T5 Encoder (Model Manager -> Starter Models)",
-            "value": {
-              "key": "798baafd-63bd-4799-8600-5db43662f3aa",
-              "hash": "random:4495f3ac1650e9d5969c365e951a9cffee526573a15f9f4c997e1c63550444fd",
-              "name": "t5_8b_quantized_encoder",
-              "base": "any",
-              "type": "t5_encoder"
-            }
-          }
-        }
-      },
-      "position": {
-        "x": 343.41871407356723,
-        "y": -1.0211223664301414
+        "x": 824.1970602278849,
+        "y": 146.98251001061735
       }
     },
     {
@@ -146,7 +146,7 @@
         "notes": "",
         "isOpen": true,
         "isIntermediate": false,
-        "useCache": false,
+        "useCache": true,
         "inputs": {
           "board": {
             "name": "board",
@@ -203,52 +203,52 @@
   ],
   "edges": [
     {
-      "id": "reactflow__edge-0fa90f47-79cd-4d84-9445-f0b1065e0c3cconditioning-159bdf1b-79e7-4174-b86e-d40e646964c8positive_text_conditioning",
+      "id": "reactflow__edge-4f0207c2-ff40-41fd-b047-ad33fbb1c33amax_seq_len-01f674f8-b3d1-4df1-acac-6cb8e0bfb63ct5_max_seq_len",
       "type": "default",
-      "source": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
-      "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
-      "sourceHandle": "conditioning",
-      "targetHandle": "positive_text_conditioning"
-    },
-    {
-      "id": "reactflow__edge-fd1274a3-c56d-4a96-aa21-83d14c920f08max_seq_len-0fa90f47-79cd-4d84-9445-f0b1065e0c3ct5_max_seq_len",
-      "type": "default",
-      "source": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
-      "target": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
+      "source": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
+      "target": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
       "sourceHandle": "max_seq_len",
       "targetHandle": "t5_max_seq_len"
     },
     {
-      "id": "reactflow__edge-fd1274a3-c56d-4a96-aa21-83d14c920f08t5_encoder-0fa90f47-79cd-4d84-9445-f0b1065e0c3ct5_encoder",
+      "id": "reactflow__edge-4f0207c2-ff40-41fd-b047-ad33fbb1c33avae-159bdf1b-79e7-4174-b86e-d40e646964c8vae",
       "type": "default",
-      "source": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
-      "target": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
-      "sourceHandle": "t5_encoder",
-      "targetHandle": "t5_encoder"
-    },
-    {
-      "id": "reactflow__edge-fd1274a3-c56d-4a96-aa21-83d14c920f08clip-0fa90f47-79cd-4d84-9445-f0b1065e0c3cclip",
-      "type": "default",
-      "source": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
-      "target": "0fa90f47-79cd-4d84-9445-f0b1065e0c3c",
-      "sourceHandle": "clip",
-      "targetHandle": "clip"
-    },
-    {
-      "id": "reactflow__edge-fd1274a3-c56d-4a96-aa21-83d14c920f08vae-159bdf1b-79e7-4174-b86e-d40e646964c8vae",
-      "type": "default",
-      "source": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+      "source": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
       "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
       "sourceHandle": "vae",
       "targetHandle": "vae"
     },
     {
-      "id": "reactflow__edge-fd1274a3-c56d-4a96-aa21-83d14c920f08transformer-159bdf1b-79e7-4174-b86e-d40e646964c8transformer",
+      "id": "reactflow__edge-4f0207c2-ff40-41fd-b047-ad33fbb1c33atransformer-159bdf1b-79e7-4174-b86e-d40e646964c8transformer",
       "type": "default",
-      "source": "fd1274a3-c56d-4a96-aa21-83d14c920f08",
+      "source": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
       "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
       "sourceHandle": "transformer",
       "targetHandle": "transformer"
+    },
+    {
+      "id": "reactflow__edge-4f0207c2-ff40-41fd-b047-ad33fbb1c33at5_encoder-01f674f8-b3d1-4df1-acac-6cb8e0bfb63ct5_encoder",
+      "type": "default",
+      "source": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
+      "target": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "sourceHandle": "t5_encoder",
+      "targetHandle": "t5_encoder"
+    },
+    {
+      "id": "reactflow__edge-4f0207c2-ff40-41fd-b047-ad33fbb1c33aclip-01f674f8-b3d1-4df1-acac-6cb8e0bfb63cclip",
+      "type": "default",
+      "source": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
+      "target": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "sourceHandle": "clip",
+      "targetHandle": "clip"
+    },
+    {
+      "id": "reactflow__edge-01f674f8-b3d1-4df1-acac-6cb8e0bfb63cconditioning-159bdf1b-79e7-4174-b86e-d40e646964c8positive_text_conditioning",
+      "type": "default",
+      "source": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "target": "159bdf1b-79e7-4174-b86e-d40e646964c8",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_text_conditioning"
     },
     {
       "id": "reactflow__edge-4754c534-a5f3-4ad0-9382-7887985e668cvalue-159bdf1b-79e7-4174-b86e-d40e646964c8seed",
