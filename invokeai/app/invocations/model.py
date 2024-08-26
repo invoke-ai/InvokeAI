@@ -1,7 +1,6 @@
 import copy
 from typing import List, Literal, Optional
 
-import yaml
 from pydantic import BaseModel, Field
 
 from invokeai.app.invocations.baseinvocation import (
@@ -11,10 +10,10 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.backend.flux.util import max_seq_lengths
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
+from invokeai.backend.flux.util import max_seq_lengths
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,

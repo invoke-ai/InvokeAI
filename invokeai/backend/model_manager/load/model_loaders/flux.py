@@ -11,8 +11,8 @@ from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CL
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.flux.model import Flux
-from invokeai.backend.flux.util import configs, ae_params
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
+from invokeai.backend.flux.util import ae_params, configs
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
