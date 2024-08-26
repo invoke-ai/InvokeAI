@@ -13,6 +13,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.fields import (
     BoardField,
+    BoundingBoxField,
     ColorField,
     ConditioningField,
     DenoiseMaskField,
@@ -46,6 +47,7 @@ from invokeai.app.invocations.model import (
 from invokeai.app.invocations.primitives import (
     BooleanCollectionOutput,
     BooleanOutput,
+    BoundingBoxOutput,
     ColorCollectionOutput,
     ColorOutput,
     ConditioningCollectionOutput,
@@ -92,6 +94,7 @@ __all__ = [
     "InvocationContext",
     # invokeai.app.invocations.fields
     "BoardField",
+    "BoundingBoxField",
     "ColorField",
     "ConditioningField",
     "DenoiseMaskField",
@@ -128,6 +131,7 @@ __all__ = [
     # invokeai.app.invocations.primitives
     "BooleanCollectionOutput",
     "BooleanOutput",
+    "BoundingBoxOutput",
     "ColorCollectionOutput",
     "ColorOutput",
     "ConditioningCollectionOutput",
