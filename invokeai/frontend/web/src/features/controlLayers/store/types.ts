@@ -2,27 +2,7 @@ import type { SerializableObject } from 'common/types';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/DocumentSize/types';
-import type {
-  ParameterCanvasCoherenceMode,
-  ParameterCFGRescaleMultiplier,
-  ParameterCFGScale,
-  ParameterHeight,
-  ParameterLoRAModel,
-  ParameterMaskBlurMethod,
-  ParameterModel,
-  ParameterNegativePrompt,
-  ParameterNegativeStylePromptSDXL,
-  ParameterPositivePrompt,
-  ParameterPositiveStylePromptSDXL,
-  ParameterPrecision,
-  ParameterScheduler,
-  ParameterSDXLRefinerModel,
-  ParameterSeed,
-  ParameterSteps,
-  ParameterStrength,
-  ParameterVAEModel,
-  ParameterWidth,
-} from 'features/parameters/types/parameterSchemas';
+import type { ParameterHeight, ParameterLoRAModel, ParameterWidth } from 'features/parameters/types/parameterSchemas';
 import { zParameterNegativePrompt, zParameterPositivePrompt } from 'features/parameters/types/parameterSchemas';
 import type { AnyInvocation, BaseModelType, ImageDTO, S } from 'services/api/types';
 import { z } from 'zod';
@@ -763,46 +743,7 @@ export type CanvasV2State = {
       height: ParameterHeight;
     };
     scaleMethod: BoundingBoxScaleMethod;
-  };
-  compositing: {
-    maskBlur: number;
-    maskBlurMethod: ParameterMaskBlurMethod;
-    canvasCoherenceMode: ParameterCanvasCoherenceMode;
-    canvasCoherenceMinDenoise: ParameterStrength;
-    canvasCoherenceEdgeSize: number;
-    infillMethod: string;
-    infillTileSize: number;
-    infillPatchmatchDownscaleSize: number;
-    infillColorValue: RgbaColor;
-  };
-  params: {
-    cfgScale: ParameterCFGScale;
-    cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
-    img2imgStrength: ParameterStrength;
-    iterations: number;
-    scheduler: ParameterScheduler;
-    seed: ParameterSeed;
-    shouldRandomizeSeed: boolean;
-    steps: ParameterSteps;
-    model: ParameterModel | null;
-    vae: ParameterVAEModel | null;
-    vaePrecision: ParameterPrecision;
-    seamlessXAxis: boolean;
-    seamlessYAxis: boolean;
-    clipSkip: number;
-    shouldUseCpuNoise: boolean;
-    positivePrompt: ParameterPositivePrompt;
-    negativePrompt: ParameterNegativePrompt;
-    positivePrompt2: ParameterPositiveStylePromptSDXL;
-    negativePrompt2: ParameterNegativeStylePromptSDXL;
-    shouldConcatPrompts: boolean;
-    refinerModel: ParameterSDXLRefinerModel | null;
-    refinerSteps: number;
-    refinerCFGScale: number;
-    refinerScheduler: ParameterScheduler;
-    refinerPositiveAestheticScore: number;
-    refinerNegativeAestheticScore: number;
-    refinerStart: number;
+    optimalDimension: number;
   };
   session: {
     mode: SessionMode;

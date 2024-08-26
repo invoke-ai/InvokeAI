@@ -2,7 +2,7 @@ import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { vaeSelected } from 'features/controlLayers/store/canvasV2Slice';
+import { vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,8 +12,8 @@ import type { VAEModelConfig } from 'services/api/types';
 const ParamVAEModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const model = useAppSelector((s) => s.canvasV2.params.model);
-  const vae = useAppSelector((s) => s.canvasV2.params.vae);
+  const model = useAppSelector((s) => s.params.model);
+  const vae = useAppSelector((s) => s.params.vae);
   const [modelConfigs, { isLoading }] = useVAEModels();
   const getIsDisabled = useCallback(
     (vae: VAEModelConfig): boolean => {

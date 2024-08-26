@@ -23,7 +23,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       enqueueRequested.match(action) && action.payload.tabName === 'generation',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
-      const model = state.canvasV2.params.model;
+      const model = state.params.model;
       const { prepend } = action.payload;
 
       const manager = $canvasManager.get();

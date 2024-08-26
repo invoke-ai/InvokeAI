@@ -1,7 +1,7 @@
 import { Box, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
-import { setInfillColorValue } from 'features/controlLayers/store/canvasV2Slice';
+import { setInfillColorValue } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import type { RgbaColor } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
@@ -9,8 +9,8 @@ import { useTranslation } from 'react-i18next';
 const ParamInfillColorOptions = () => {
   const dispatch = useAppDispatch();
 
-  const infillColor = useAppSelector((s) => s.canvasV2.compositing.infillColorValue);
-  const infillMethod = useAppSelector((s) => s.canvasV2.compositing.infillMethod);
+  const infillColor = useAppSelector((s) => s.params.infillColorValue);
+  const infillMethod = useAppSelector((s) => s.params.infillMethod);
 
   const { t } = useTranslation();
 

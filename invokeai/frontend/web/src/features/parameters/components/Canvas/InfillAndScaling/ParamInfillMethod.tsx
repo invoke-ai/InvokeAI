@@ -2,7 +2,7 @@ import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setInfillMethod } from 'features/controlLayers/store/canvasV2Slice';
+import { setInfillMethod } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
@@ -10,7 +10,7 @@ import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 const ParamInfillMethod = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const infillMethod = useAppSelector((s) => s.canvasV2.compositing.infillMethod);
+  const infillMethod = useAppSelector((s) => s.params.infillMethod);
   const { data: appConfigData } = useGetAppConfigQuery();
   const options = useMemo<ComboboxOption[]>(
     () =>

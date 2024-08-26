@@ -1,14 +1,13 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
 import {
-  bboxHeightChanged,
-  bboxWidthChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
-} from 'features/controlLayers/store/canvasV2Slice';
+} from 'features/controlLayers/store/paramsSlice';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
   isParameterCFGRescaleMultiplier,
@@ -31,7 +30,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
     effect: async (action, { dispatch, getState }) => {
       const state = getState();
 
-      const currentModel = state.canvasV2.params.model;
+      const currentModel = state.params.model;
 
       if (!currentModel) {
         return;
