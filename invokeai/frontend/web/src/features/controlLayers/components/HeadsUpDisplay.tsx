@@ -1,24 +1,18 @@
 import { Box, Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import {
-  $isDrawing,
-  $isMouseDown,
-  $lastAddedPoint,
-  $lastCursorPos,
-  $lastMouseDownPos,
-  $stageAttrs,
-} from 'features/controlLayers/store/canvasV2Slice';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { round } from 'lodash-es';
 import { memo } from 'react';
 
 export const HeadsUpDisplay = memo(() => {
-  const stageAttrs = useStore($stageAttrs);
-  const cursorPos = useStore($lastCursorPos);
-  const isDrawing = useStore($isDrawing);
-  const isMouseDown = useStore($isMouseDown);
-  const lastMouseDownPos = useStore($lastMouseDownPos);
-  const lastAddedPoint = useStore($lastAddedPoint);
+  const canvasManager = useCanvasManager();
+  const stageAttrs = useStore(canvasManager.stateApi.$stageAttrs);
+  const cursorPos = useStore(canvasManager.stateApi.$lastCursorPos);
+  const isDrawing = useStore(canvasManager.stateApi.$isDrawing);
+  const isMouseDown = useStore(canvasManager.stateApi.$isMouseDown);
+  const lastMouseDownPos = useStore(canvasManager.stateApi.$lastMouseDownPos);
+  const lastAddedPoint = useStore(canvasManager.stateApi.$lastAddedPoint);
   const bbox = useAppSelector((s) => s.canvasV2.bbox);
 
   return (
