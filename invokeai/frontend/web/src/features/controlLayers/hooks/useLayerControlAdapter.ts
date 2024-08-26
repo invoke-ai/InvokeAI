@@ -30,7 +30,7 @@ export const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIden
 export const useDefaultControlAdapter = (): ControlNetConfig | T2IAdapterConfig => {
   const [modelConfigs] = useControlNetAndT2IAdapterModels();
 
-  const baseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
+  const baseModel = useAppSelector((s) => s.params.model?.base);
 
   const defaultControlAdapter = useMemo(() => {
     const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));
@@ -51,7 +51,7 @@ export const useDefaultControlAdapter = (): ControlNetConfig | T2IAdapterConfig 
 export const useDefaultIPAdapter = (): IPAdapterConfig => {
   const [modelConfigs] = useIPAdapterModels();
 
-  const baseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
+  const baseModel = useAppSelector((s) => s.params.model?.base);
 
   const defaultControlAdapter = useMemo(() => {
     const compatibleModels = modelConfigs.filter((m) => (baseModel ? m.base === baseModel : true));

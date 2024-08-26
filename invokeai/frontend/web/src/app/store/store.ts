@@ -7,6 +7,7 @@ import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import { canvasV2PersistConfig, canvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
 import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { dynamicPromptsPersistConfig, dynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { galleryPersistConfig, gallerySlice } from 'features/gallery/store/gallerySlice';
@@ -57,6 +58,7 @@ const allReducers = {
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [upscaleSlice.name]: upscaleSlice.reducer,
   [stylePresetSlice.name]: stylePresetSlice.reducer,
+  [paramsSlice.name]: paramsSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -98,6 +100,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
   [upscalePersistConfig.name]: upscalePersistConfig,
   [stylePresetPersistConfig.name]: stylePresetPersistConfig,
+  [paramsPersistConfig.name]: paramsPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {

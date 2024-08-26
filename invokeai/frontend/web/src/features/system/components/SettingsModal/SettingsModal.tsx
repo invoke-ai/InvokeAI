@@ -19,7 +19,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useClearStorage } from 'common/hooks/useClearStorage';
-import { shouldUseCpuNoiseChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { shouldUseCpuNoiseChanged } from 'features/controlLayers/store/paramsSlice';
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
@@ -89,7 +89,7 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
   const { isOpen: isRefreshModalOpen, onOpen: onRefreshModalOpen, onClose: onRefreshModalClose } = useDisclosure();
 
-  const shouldUseCpuNoise = useAppSelector((s) => s.canvasV2.params.shouldUseCpuNoise);
+  const shouldUseCpuNoise = useAppSelector((s) => s.params.shouldUseCpuNoise);
   const shouldConfirmOnDelete = useAppSelector((s) => s.system.shouldConfirmOnDelete);
   const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
   const shouldAntialiasProgressImage = useAppSelector((s) => s.system.shouldAntialiasProgressImage);

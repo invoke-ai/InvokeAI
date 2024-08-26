@@ -12,7 +12,7 @@ import type { MainModelConfig } from 'services/api/types';
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const selectedModel = useAppSelector((s) => s.canvasV2.params.model);
+  const selectedModel = useAppSelector((s) => s.params.model);
   const [modelConfigs, { isLoading }] = useSDMainModels();
   const tooltipLabel = useMemo(() => {
     if (!modelConfigs.length || !selectedModel) {
