@@ -31,8 +31,8 @@ export const buildSD1Graph = async (
   const generationMode = manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SD1/SD2 graph');
 
-  const { canvasV2, params } = state;
-  const { bbox, session, settings } = canvasV2;
+  const { canvasV2, params, canvasSettings } = state;
+  const { bbox, session } = canvasV2;
 
   const {
     model,
@@ -274,7 +274,7 @@ export const buildSD1Graph = async (
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  const shouldSaveToGallery = session.mode === 'generate' || settings.autoSave;
+  const shouldSaveToGallery = session.mode === 'generate' || canvasSettings.autoSave;
 
   g.updateNode(canvasOutput, {
     id: getPrefixedId('canvas_output'),
