@@ -12,7 +12,7 @@ from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CL
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
-from invokeai.backend.flux.util import ae_params, configs
+from invokeai.backend.flux.util import ae_params, params
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -59,7 +59,7 @@ class FluxVAELoader(ModelLoader):
         model_path = Path(config.path)
 
         with SilenceWarnings():
-            model = AutoEncoder(ae_params)
+            model = AutoEncoder(ae_params[config.config_path])
             sd = load_file(model_path)
             model.load_state_dict(sd, assign=True)
             model.to(dtype=self._torch_dtype)
@@ -188,7 +188,7 @@ class FluxCheckpointModel(ModelLoader):
         model_path = Path(config.path)
 
         with SilenceWarnings():
-            model = Flux(configs[config.config_path].params)
+            model = Flux(params[config.config_path])
             sd = load_file(model_path)
             model.load_state_dict(sd, assign=True)
         return model
@@ -227,7 +227,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
 
         with SilenceWarnings():
             with accelerate.init_empty_weights():
-                model = Flux(configs[config.config_path].params)
+                model = Flux(params[config.config_path])
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=torch.bfloat16)
             sd = load_file(model_path)
             model.load_state_dict(sd, assign=True)
