@@ -1,11 +1,11 @@
 import { CompositeNumberInput } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setIterations } from 'features/controlLayers/store/canvasV2Slice';
+import { setIterations } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 
 export const QueueIterationsNumberInput = memo(() => {
-  const iterations = useAppSelector((s) => s.canvasV2.params.iterations);
+  const iterations = useAppSelector((s) => s.params.iterations);
   const coarseStep = useAppSelector((s) => s.config.sd.iterations.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.iterations.fineStep);
   const dispatch = useAppDispatch();

@@ -1,7 +1,7 @@
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
+import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
@@ -16,14 +16,15 @@ export const addInpaint = async (
   modelLoader: Invocation<'main_model_loader' | 'sdxl_model_loader'>,
   originalSize: Dimensions,
   scaledSize: Dimensions,
-  bbox: CanvasV2State['bbox'],
-  compositing: CanvasV2State['compositing'],
   denoising_start: number,
   fp32: boolean
 ): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
   denoise.denoising_start = denoising_start;
 
-  const mode = state.canvasV2.session.mode;
+  const { params, canvasV2 } = state;
+  const { bbox, session } = canvasV2;
+  const { mode } = session;
+
   const initialImage = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
   const maskImage = await manager.compositor.getCompositeInpaintMaskImageDTO(bbox.rect);
 
@@ -60,15 +61,15 @@ export const addInpaint = async (
     const createGradientMask = g.addNode({
       id: getPrefixedId('create_gradient_mask'),
       type: 'create_gradient_mask',
-      coherence_mode: compositing.canvasCoherenceMode,
-      minimum_denoise: compositing.canvasCoherenceMinDenoise,
-      edge_radius: compositing.canvasCoherenceEdgeSize,
+      coherence_mode: params.canvasCoherenceMode,
+      minimum_denoise: params.canvasCoherenceMinDenoise,
+      edge_radius: params.canvasCoherenceEdgeSize,
       fp32,
     });
     const canvasPasteBack = g.addNode({
       id: getPrefixedId('canvas_v2_mask_and_crop'),
       type: 'canvas_v2_mask_and_crop',
-      mask_blur: compositing.maskBlur,
+      mask_blur: params.maskBlur,
     });
 
     // Resize initial image and mask to scaled size, feed into to gradient mask
@@ -114,16 +115,16 @@ export const addInpaint = async (
     const createGradientMask = g.addNode({
       id: getPrefixedId('create_gradient_mask'),
       type: 'create_gradient_mask',
-      coherence_mode: compositing.canvasCoherenceMode,
-      minimum_denoise: compositing.canvasCoherenceMinDenoise,
-      edge_radius: compositing.canvasCoherenceEdgeSize,
+      coherence_mode: params.canvasCoherenceMode,
+      minimum_denoise: params.canvasCoherenceMinDenoise,
+      edge_radius: params.canvasCoherenceEdgeSize,
       fp32,
       image: { image_name: initialImage.image_name },
     });
     const canvasPasteBack = g.addNode({
       id: getPrefixedId('canvas_v2_mask_and_crop'),
       type: 'canvas_v2_mask_and_crop',
-      mask_blur: compositing.maskBlur,
+      mask_blur: params.maskBlur,
     });
 
     g.addEdge(alphaToMask, 'image', createGradientMask, 'mask');

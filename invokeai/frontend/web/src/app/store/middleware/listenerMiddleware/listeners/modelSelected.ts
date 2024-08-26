@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { loraDeleted, modelChanged, vaeSelected } from 'features/controlLayers/store/canvasV2Slice';
+import { loraDeleted } from 'features/controlLayers/store/canvasV2Slice';
+import { modelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
@@ -23,7 +24,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       const newModel = result.data;
 
       const newBaseModel = newModel.base;
-      const didBaseModelChange = state.canvasV2.params.model?.base !== newBaseModel;
+      const didBaseModelChange = state.params.model?.base !== newBaseModel;
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
@@ -38,7 +39,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         });
 
         // handle incompatible vae
-        const { vae } = state.canvasV2.params;
+        const { vae } = state.params;
         if (vae && vae.base !== newBaseModel) {
           dispatch(vaeSelected(null));
           modelsCleared += 1;
@@ -66,7 +67,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
-      dispatch(modelChanged({ model: newModel, previousModel: state.canvasV2.params.model }));
+      dispatch(modelChanged({ model: newModel, previousModel: state.params.model }));
     },
   });
 };
