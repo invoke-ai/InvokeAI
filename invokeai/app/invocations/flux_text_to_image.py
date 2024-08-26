@@ -116,30 +116,30 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 if context.util.is_canceled():
                     raise CanceledException
 
-                # TODO: Make this look like the image
-                latent_image = unpack(img.float(), self.height, self.width)
-                latent_image = latent_image.squeeze()  # Remove unnecessary dimensions
-                flattened_tensor = latent_image.reshape(-1)  # Flatten to shape [48*128*128]
+                # TODO: Make this look like the image before re-enabling
+                # latent_image = unpack(img.float(), self.height, self.width)
+                # latent_image = latent_image.squeeze()  # Remove unnecessary dimensions
+                # flattened_tensor = latent_image.reshape(-1)  # Flatten to shape [48*128*128]
 
-                # Create a new tensor of the required shape [255, 255, 3]
-                latent_image = flattened_tensor[: 255 * 255 * 3].reshape(255, 255, 3)  # Reshape to RGB format
+                # # Create a new tensor of the required shape [255, 255, 3]
+                # latent_image = flattened_tensor[: 255 * 255 * 3].reshape(255, 255, 3)  # Reshape to RGB format
 
-                # Convert to a NumPy array and then to a PIL Image
-                image = Image.fromarray(latent_image.cpu().numpy().astype(np.uint8))
+                # # Convert to a NumPy array and then to a PIL Image
+                # image = Image.fromarray(latent_image.cpu().numpy().astype(np.uint8))
 
-                (width, height) = image.size
-                width *= 8
-                height *= 8
+                # (width, height) = image.size
+                # width *= 8
+                # height *= 8
 
-                dataURL = image_to_dataURL(image, image_format="JPEG")
+                # dataURL = image_to_dataURL(image, image_format="JPEG")
 
-                # TODO: move this whole function to invocation context to properly reference these variables
-                context._services.events.emit_invocation_denoise_progress(
-                    context._data.queue_item,
-                    context._data.invocation,
-                    state,
-                    ProgressImage(dataURL=dataURL, width=width, height=height),
-                )
+                # # TODO: move this whole function to invocation context to properly reference these variables
+                # context._services.events.emit_invocation_denoise_progress(
+                #     context._data.queue_item,
+                #     context._data.invocation,
+                #     state,
+                #     ProgressImage(dataURL=dataURL, width=width, height=height),
+                # )
 
             x = denoise(
                 model=transformer,
