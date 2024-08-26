@@ -1,6 +1,7 @@
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import { getLastPointOfLine } from 'features/controlLayers/konva/util';
@@ -22,12 +23,13 @@ import type { Logger } from 'roarr';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
-export class CanvasLayerAdapter {
+export class CanvasLayerAdapter extends CanvasModuleBase {
   readonly type = 'layer_adapter';
 
   id: string;
   path: string[];
   manager: CanvasManager;
+  subscriptions = new Set<() => void>();
   log: Logger;
 
   state: CanvasRasterLayerState | CanvasControlLayerState;
@@ -41,11 +43,14 @@ export class CanvasLayerAdapter {
   isFirstRender: boolean = true;
 
   constructor(state: CanvasLayerAdapter['state'], manager: CanvasLayerAdapter['manager']) {
+    super();
     this.id = state.id;
     this.manager = manager;
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.log.debug({ state }, 'Creating layer');
+
+    this.log.debug({ state }, 'Creating layer adapter module');
+
     this.state = state;
 
     this.konva = {
@@ -71,10 +76,10 @@ export class CanvasLayerAdapter {
   };
 
   destroy = (): void => {
-    this.log.debug('Destroying layer');
-    // We need to call the destroy method on all children so they can do their own cleanup.
-    this.transformer.destroy();
+    this.log.debug('Destroying layer adapter module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.renderer.destroy();
+    this.transformer.destroy();
     this.konva.layer.destroy();
   };
 
@@ -144,6 +149,7 @@ export class CanvasLayerAdapter {
     return {
       id: this.id,
       type: this.type,
+      path: this.path,
       state: deepClone(this.state),
       transformer: this.transformer.repr(),
       renderer: this.renderer.repr(),

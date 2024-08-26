@@ -3,6 +3,8 @@ import type { AppStore } from 'app/store/store';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   bboxChanged,
   brushWidthChanged,
@@ -40,6 +42,7 @@ import type {
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
+import type { Logger } from 'roarr';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig } from 'services/api/types';
 import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
@@ -70,13 +73,27 @@ type EntityStateAndAdapter =
       adapter: CanvasMaskAdapter;
     };
 
-export class CanvasStateApiModule {
-  store: AppStore;
+export class CanvasStateApiModule extends CanvasModuleBase {
+  readonly type = 'state_api';
+
+  id: string;
+  path: string[];
   manager: CanvasManager;
+  log: Logger;
+  subscriptions = new Set<() => void>();
+
+  store: AppStore;
 
   constructor(store: AppStore, manager: CanvasManager) {
-    this.store = store;
+    super();
+    this.id = getPrefixedId(this.type);
     this.manager = manager;
+    this.path = this.manager.path.concat(this.id);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
+
+    this.log.debug('Creating state api module');
+
+    this.store = store;
   }
 
   // Reminder - use arrow functions to avoid binding issues
@@ -258,4 +275,21 @@ export class CanvasStateApiModule {
     height: 0,
     scale: 0,
   });
+
+  destroy = () => {
+    this.log.debug('Destroying state api module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+    };
+  };
+
+  getLoggingContext = () => {
+    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
+  };
 }

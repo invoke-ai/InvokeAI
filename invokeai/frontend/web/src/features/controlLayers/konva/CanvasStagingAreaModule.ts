@@ -1,13 +1,14 @@
 import type { SerializableObject } from 'common/types';
 import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasStagingAreaModule {
+export class CanvasStagingAreaModule extends CanvasModuleBase {
   readonly type = 'staging_area';
 
   id: string;
@@ -27,12 +28,14 @@ export class CanvasStagingAreaModule {
   subscriptions: Set<() => void> = new Set();
 
   constructor(parent: CanvasPreviewModule) {
+    super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = this.parent.manager;
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.log.debug('Creating staging area');
+
+    this.log.debug('Creating staging area module');
 
     this.konva = { group: new Konva.Group({ name: `${this.type}:group`, listening: false }) };
     this.image = null;
@@ -85,11 +88,10 @@ export class CanvasStagingAreaModule {
   };
 
   destroy = () => {
+    this.log.debug('Destroying staging area module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     if (this.image) {
       this.image.destroy();
-    }
-    for (const unsubscribe of this.subscriptions) {
-      unsubscribe();
     }
     for (const node of this.getNodes()) {
       node.destroy();
@@ -100,6 +102,7 @@ export class CanvasStagingAreaModule {
     return {
       id: this.id,
       type: this.type,
+      path: this.path,
       selectedImage: this.selectedImage,
     };
   };

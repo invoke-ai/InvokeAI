@@ -1,6 +1,7 @@
 import type { SerializableObject } from 'common/types';
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Rect } from 'features/controlLayers/store/types';
@@ -22,19 +23,16 @@ const ALL_ANCHORS: string[] = [
 const CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 const NO_ANCHORS: string[] = [];
 
-export class CanvasBboxModule {
-  readonly type = 'generation_bbox';
+export class CanvasBboxModule extends CanvasModuleBase {
+  readonly type = 'bbox';
 
   id: string;
   path: string[];
-  parent: CanvasPreviewModule;
   manager: CanvasManager;
   log: Logger;
-
-  /**
-   * A set of subscriptions that should be cleaned up when the transformer is destroyed.
-   */
   subscriptions: Set<() => void> = new Set();
+
+  parent: CanvasPreviewModule;
 
   konva: {
     group: Konva.Group;
@@ -43,13 +41,14 @@ export class CanvasBboxModule {
   };
 
   constructor(parent: CanvasPreviewModule) {
+    super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = this.parent.manager;
-    this.path = this.manager.path.concat(this.id);
+    this.path = this.parent.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
-    this.log.trace('Creating bbox');
+    this.log.debug('Creating bbox module');
 
     // Create a stash to hold onto the last aspect ratio of the bbox - this allows for locking the aspect ratio when
     // transforming the bbox.
@@ -238,7 +237,7 @@ export class CanvasBboxModule {
   }
 
   render = () => {
-    this.log.trace('Rendering generation bbox');
+    this.log.trace('Rendering bbox module');
 
     const bbox = this.manager.stateApi.getBbox();
     const tool = this.manager.stateApi.$tool.get();
@@ -261,15 +260,21 @@ export class CanvasBboxModule {
     });
   };
 
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+    };
+  };
+
   destroy = () => {
-    this.log.trace('Destroying generation bbox');
-    for (const unsubscribe of this.subscriptions) {
-      unsubscribe();
-    }
+    this.log.trace('Destroying bbox module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
   };
 
   getLoggingContext = (): SerializableObject => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
+    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }
