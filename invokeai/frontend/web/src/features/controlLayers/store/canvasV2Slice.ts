@@ -58,8 +58,6 @@ const initialState: CanvasV2State = {
   loras: [],
   ipAdapters: { entities: [] },
   tool: {
-    selected: 'view',
-    selectedBuffer: null,
     invertScroll: false,
     fill: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
     brush: {
@@ -140,17 +138,19 @@ export const canvasV2Slice = createSlice({
   name: 'canvasV2',
   initialState,
   reducers: {
+    // undoable canvas state
     ...rasterLayersReducers,
     ...controlLayersReducers,
     ...ipAdaptersReducers,
     ...regionsReducers,
+    ...inpaintMaskReducers,
+    ...bboxReducers,
+    // move out
     ...lorasReducers,
     ...paramsReducers,
     ...compositingReducers,
     ...settingsReducers,
     ...toolReducers,
-    ...bboxReducers,
-    ...inpaintMaskReducers,
     ...sessionReducers,
     entitySelected: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
@@ -424,8 +424,6 @@ export const {
   eraserWidthChanged,
   fillChanged,
   invertScrollChanged,
-  toolChanged,
-  toolBufferChanged,
   clipToBboxChanged,
   canvasReset,
   settingsDynamicGridToggled,
