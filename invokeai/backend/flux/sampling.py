@@ -8,7 +8,6 @@ from einops import rearrange, repeat
 from torch import Tensor
 from tqdm import tqdm
 
-from invokeai.app.util.step_callback import PipelineIntermediateState
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.conditioner import HFEncoder
 
