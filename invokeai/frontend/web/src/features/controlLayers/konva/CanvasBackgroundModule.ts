@@ -1,29 +1,35 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
+import type { Logger } from 'roarr';
 
-export class CanvasBackgroundModule {
-  readonly type = 'background_grid';
+export class CanvasBackgroundModule extends CanvasModuleBase {
+  readonly type = 'background';
 
   static GRID_LINE_COLOR_COARSE = getArbitraryBaseColor(27);
   static GRID_LINE_COLOR_FINE = getArbitraryBaseColor(18);
 
   id: string;
+  path: string[];
   manager: CanvasManager;
+  subscriptions = new Set<() => void>();
+  log: Logger;
 
   konva: {
     layer: Konva.Layer;
   };
 
-  /**
-   * A set of subscriptions that should be cleaned up when the transformer is destroyed.
-   */
-  subscriptions: Set<() => void> = new Set();
-
   constructor(manager: CanvasManager) {
+    super();
     this.id = getPrefixedId(this.type);
     this.manager = manager;
+    this.path = this.manager.path.concat(this.id);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
+
+    this.log.debug('Creating background module');
+
     this.konva = { layer: new Konva.Layer({ name: `${this.type}:layer`, listening: false }) };
 
     this.subscriptions.add(
@@ -116,9 +122,8 @@ export class CanvasBackgroundModule {
   }
 
   destroy = () => {
-    for (const cleanup of this.subscriptions) {
-      cleanup();
-    }
+    this.log.trace('Destroying background module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.layer.destroy();
   };
 
@@ -144,5 +149,17 @@ export class CanvasBackgroundModule {
       return 128;
     }
     return 256;
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      path: this.path,
+      type: this.type,
+    };
+  };
+
+  getLoggingContext = () => {
+    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

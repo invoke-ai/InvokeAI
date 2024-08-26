@@ -2,24 +2,29 @@ import type { SerializableObject } from 'common/types';
 import { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasV2State } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
 
-export class CanvasRenderingModule {
+export class CanvasRenderingModule extends CanvasModuleBase {
+  readonly type = 'canvas_renderer';
+
   id: string;
   path: string[];
   log: Logger;
   manager: CanvasManager;
+  subscriptions = new Set<() => void>();
 
   state: CanvasV2State | null = null;
 
   constructor(manager: CanvasManager) {
+    super();
     this.id = getPrefixedId('canvas_renderer');
     this.manager = manager;
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.log.debug('Creating canvas renderer');
+    this.log.debug('Creating canvas renderer module');
   }
 
   render = async () => {
@@ -262,5 +267,18 @@ export class CanvasRenderingModule {
 
       this.manager.preview.getLayer().zIndex(++zIndex);
     }
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      path: this.path,
+      type: this.type,
+    };
+  };
+
+  destroy = () => {
+    this.log.debug('Destroying canvas renderer module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
   };
 }

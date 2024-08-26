@@ -1,6 +1,7 @@
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
 import { getLastPointOfLine } from 'features/controlLayers/konva/util';
@@ -21,13 +22,14 @@ import { get, omit } from 'lodash-es';
 import type { Logger } from 'roarr';
 import stableHash from 'stable-hash';
 
-export class CanvasMaskAdapter {
+export class CanvasMaskAdapter extends CanvasModuleBase {
   readonly type = 'mask_adapter';
 
   id: string;
   path: string[];
   manager: CanvasManager;
   log: Logger;
+  subscriptions = new Set<() => void>();
 
   state: CanvasInpaintMaskState | CanvasRegionalGuidanceState;
 
@@ -41,11 +43,14 @@ export class CanvasMaskAdapter {
   };
 
   constructor(state: CanvasMaskAdapter['state'], manager: CanvasMaskAdapter['manager']) {
+    super();
     this.id = state.id;
     this.manager = manager;
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.log.debug({ state }, 'Creating mask');
+
+    this.log.debug({ state }, 'Creating mask adapter module');
+
     this.state = state;
 
     this.konva = {
@@ -71,8 +76,8 @@ export class CanvasMaskAdapter {
   };
 
   destroy = (): void => {
-    this.log.debug('Destroying mask');
-    // We need to call the destroy method on all children so they can do their own cleanup.
+    this.log.debug('Destroying mask adapter module');
+
     this.transformer.destroy();
     this.renderer.destroy();
     this.konva.layer.destroy();
@@ -157,6 +162,7 @@ export class CanvasMaskAdapter {
     return {
       id: this.id,
       type: this.type,
+      path: this.path,
       state: deepClone(this.state),
     };
   };
@@ -182,7 +188,8 @@ export class CanvasMaskAdapter {
     const canvas = this.renderer.getCanvas(rect, attrs);
     return canvas;
   };
-  getLoggingContext = (): SerializableObject => {
+
+  getLoggingContext = () => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

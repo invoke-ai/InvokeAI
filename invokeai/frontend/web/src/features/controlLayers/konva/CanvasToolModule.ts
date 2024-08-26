@@ -1,6 +1,6 @@
-import type { SerializableObject } from 'common/types';
 import { rgbaColorToString, rgbColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import {
   BRUSH_BORDER_INNER_COLOR,
@@ -31,8 +31,8 @@ import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
 
-export class CanvasToolModule {
-  readonly type = 'tool_preview';
+export class CanvasToolModule extends CanvasModuleBase {
+  readonly type = 'tool';
   static readonly COLOR_PICKER_RADIUS = 25;
   static readonly COLOR_PICKER_THICKNESS = 15;
   static readonly COLOR_PICKER_CROSSHAIR_SPACE = 5;
@@ -84,11 +84,15 @@ export class CanvasToolModule {
   subscriptions: Set<() => void> = new Set();
 
   constructor(parent: CanvasPreviewModule) {
+    super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = this.parent.manager;
-    this.path = this.manager.path.concat(this.id);
+    this.path = this.parent.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
+
+    this.log.debug('Creating tool module');
+
     this.konva = {
       stage: this.manager.stage.konva.stage,
       group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
@@ -239,13 +243,6 @@ export class CanvasToolModule {
 
     this.subscriptions.add(cleanupListeners);
   }
-
-  destroy = () => {
-    for (const cleanup of this.subscriptions) {
-      cleanup();
-    }
-    this.konva.group.destroy();
-  };
 
   setToolVisibility = (tool: Tool) => {
     this.konva.brush.group.visible(tool === 'brush');
@@ -882,7 +879,21 @@ export class CanvasToolModule {
     }
   };
 
-  getLoggingContext = (): SerializableObject => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+    };
+  };
+
+  destroy = () => {
+    this.log.debug('Destroying tool module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.konva.group.destroy();
+  };
+
+  getLoggingContext = () => {
+    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

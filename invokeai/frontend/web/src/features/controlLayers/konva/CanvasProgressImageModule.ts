@@ -1,13 +1,13 @@
 import { Mutex } from 'async-mutex';
-import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import { getPrefixedId, loadImage } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 import type { S } from 'services/api/types';
 
-export class CanvasProgressImageModule {
+export class CanvasProgressImageModule extends CanvasModuleBase {
   readonly type = 'progress_image';
 
   id: string;
@@ -35,13 +35,14 @@ export class CanvasProgressImageModule {
   mutex: Mutex = new Mutex();
 
   constructor(parent: CanvasPreviewModule) {
+    super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = parent.manager;
-    this.path = this.manager.path.concat(this.id);
+    this.path = this.parent.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
-    this.log.trace('Creating progress image');
+    this.log.debug('Creating progress image module');
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
@@ -105,15 +106,21 @@ export class CanvasProgressImageModule {
     }
   };
 
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+    };
+  };
+
   destroy = () => {
-    this.log.trace('Destroying progress image');
-    for (const unsubscribe of this.subscriptions) {
-      unsubscribe();
-    }
+    this.log.debug('Destroying progress image module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
   };
 
-  getLoggingContext = (): SerializableObject => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
+  getLoggingContext = () => {
+    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }
