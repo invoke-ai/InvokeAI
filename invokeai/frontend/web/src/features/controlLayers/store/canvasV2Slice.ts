@@ -22,20 +22,17 @@ import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { initialAspectRatioState } from 'features/parameters/components/DocumentSize/constants';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { pick } from 'lodash-es';
-import { atom } from 'nanostores';
 import { assert } from 'tsafe';
 
 import type {
   CanvasEntityIdentifier,
   CanvasV2State,
-  Coordinate,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
   EntityMovedPayload,
   EntityRasterizedPayload,
   EntityRectAddedPayload,
-  StageAttrs,
 } from './types';
 import { getEntityIdentifier, isDrawableEntity } from './types';
 
@@ -563,25 +560,6 @@ export const {
 const migrate = (state: any): any => {
   return state;
 };
-
-// Ephemeral state that does not need to be in redux
-export const $isPreviewVisible = atom(true);
-export const $stageAttrs = atom<StageAttrs>({
-  x: 0,
-  y: 0,
-  width: 0,
-  height: 0,
-  scale: 0,
-});
-export const $shouldShowStagedImage = atom(true);
-export const $isDrawing = atom<boolean>(false);
-export const $isMouseDown = atom<boolean>(false);
-export const $lastAddedPoint = atom<Coordinate | null>(null);
-export const $lastMouseDownPos = atom<Coordinate | null>(null);
-export const $lastCursorPos = atom<Coordinate | null>(null);
-export const $spaceKey = atom<boolean>(false);
-export const $transformingEntity = atom<CanvasEntityIdentifier | null>(null);
-export const $isProcessingTransform = atom<boolean>(false);
 
 export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   name: canvasV2Slice.name,
