@@ -38,8 +38,8 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     }
 
     const manager = new CanvasManager(stage, container, store, socket);
-    const cleanup = manager.initialize();
-    return cleanup;
+    manager.initialize();
+    return manager.destroy;
   }, [asPreview, container, socket, stage, store]);
 
   useLayoutEffect(() => {
