@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
-import { sessionImageStaged } from 'features/controlLayers/store/canvasV2Slice';
+import { sessionImageStaged } from 'features/controlLayers/store/canvasSessionSlice';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
@@ -114,7 +114,7 @@ export const buildOnInvocationComplete = (
   };
 
   const handleOriginCanvas = async (data: S['InvocationCompleteEvent']) => {
-    const session = getState().canvasV2.session;
+    const session = getState().canvasSession;
 
     const imageDTO = await getResultImageDTO(data);
 
