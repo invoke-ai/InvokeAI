@@ -15,8 +15,6 @@ import {
   entitySelected,
   eraserWidthChanged,
   fillChanged,
-  toolBufferChanged,
-  toolChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
 import { selectAllRenderableEntities } from 'features/controlLayers/store/selectors';
 import type {
@@ -114,12 +112,6 @@ export class CanvasStateApiModule {
   };
   setEraserWidth = (width: number) => {
     this.store.dispatch(eraserWidthChanged(width));
-  };
-  setTool = (tool: Tool) => {
-    this.store.dispatch(toolChanged(tool));
-  };
-  setToolBuffer = (toolBuffer: Tool | null) => {
-    this.store.dispatch(toolBufferChanged(toolBuffer));
   };
   setFill = (fill: RgbaColor) => {
     return this.store.dispatch(fillChanged(fill));
@@ -245,6 +237,8 @@ export class CanvasStateApiModule {
   $colorUnderCursor: WritableAtom<RgbColor> = atom(RGBA_BLACK);
 
   // Read-write state, ephemeral interaction state
+  $tool = atom<Tool>('brush');
+  $toolBuffer = atom<Tool | null>(null);
   $isDrawing = atom<boolean>(false);
   $isMouseDown = atom<boolean>(false);
   $lastAddedPoint = atom<Coordinate | null>(null);

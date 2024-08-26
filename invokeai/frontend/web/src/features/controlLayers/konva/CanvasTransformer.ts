@@ -381,20 +381,10 @@ export class CanvasTransformer {
     );
 
     // When the selected tool changes, we need to update the transformer's interaction state.
-    this.subscriptions.add(
-      this.manager.stateApi.$toolState.listen((newVal, oldVal) => {
-        if (newVal.selected !== oldVal.selected) {
-          this.syncInteractionState();
-        }
-      })
-    );
+    this.subscriptions.add(this.manager.stateApi.$tool.listen(this.syncInteractionState));
 
     // When the selected entity changes, we need to update the transformer's interaction state.
-    this.subscriptions.add(
-      this.manager.stateApi.$selectedEntityIdentifier.listen(() => {
-        this.syncInteractionState();
-      })
-    );
+    this.subscriptions.add(this.manager.stateApi.$selectedEntityIdentifier.listen(this.syncInteractionState));
 
     this.parent.konva.layer.add(this.konva.outlineRect);
     this.parent.konva.layer.add(this.konva.proxyRect);
@@ -439,7 +429,7 @@ export class CanvasTransformer {
       return;
     }
 
-    const toolState = this.manager.stateApi.getToolState();
+    const tool = this.manager.stateApi.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
 
     if (!this.parent.renderer.hasObjects()) {
@@ -449,14 +439,14 @@ export class CanvasTransformer {
       return;
     }
 
-    if (isSelected && !this.isTransforming && toolState.selected === 'move') {
+    if (isSelected && !this.isTransforming && tool === 'move') {
       // We are moving this layer, it must be listening
       this.parent.konva.layer.listening(true);
       this.setInteractionMode('drag');
     } else if (isSelected && this.isTransforming) {
       // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer is
       // active, it will interrupt the stage drag events. So we should disable listening when the view tool is selected.
-      if (toolState.selected !== 'view') {
+      if (tool !== 'view') {
         this.parent.konva.layer.listening(true);
         this.setInteractionMode('all');
       } else {
@@ -493,11 +483,12 @@ export class CanvasTransformer {
   startTransform = () => {
     this.log.debug('Starting transform');
     this.isTransforming = true;
-    this.manager.stateApi.setTool('move');
+    this.manager.stateApi.$tool.set('move');
     // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
     // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
     // when the view tool is selected
-    const shouldListen = this.manager.stateApi.getToolState().selected !== 'view';
+    // TODO(psyche): We just set the tool to 'move', why would it be 'view'? Investigate and figure out if this is needed
+    const shouldListen = this.manager.stateApi.$tool.get() !== 'view';
     this.parent.konva.layer.listening(shouldListen);
     this.setInteractionMode('all');
     this.manager.stateApi.$transformingEntity.set(this.parent.getEntityIdentifier());
