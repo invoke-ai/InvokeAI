@@ -28,7 +28,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
   }
 
   render = async () => {
-    const state = this.manager.stateApi.getState();
+    const state = this.manager.stateApi.getCanvasState();
 
     if (!this.state) {
       this.log.trace('First render');
@@ -51,7 +51,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     await this.renderStagingArea(state, prevState);
     this.arrangeEntities(state, prevState);
 
-    this.manager.stateApi.$toolState.set(state.tool);
+    this.manager.stateApi.$toolState.set(this.manager.stateApi.getToolState());
     this.manager.stateApi.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
     this.manager.stateApi.$selectedEntity.set(this.manager.stateApi.getSelectedEntity());
     this.manager.stateApi.$currentFill.set(this.manager.stateApi.getCurrentFill());
@@ -96,11 +96,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
-        await adapter.update({
-          state: entityState,
-          toolState: state.tool,
-          isSelected: state.selectedEntityIdentifier?.id === entityState.id,
-        });
+        await adapter.update({ state: entityState });
       }
     }
   };
@@ -129,11 +125,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
-        await adapter.update({
-          state: entityState,
-          toolState: state.tool,
-          isSelected: state.selectedEntityIdentifier?.id === entityState.id,
-        });
+        await adapter.update({ state: entityState });
       }
     }
   };
@@ -167,11 +159,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
-        await adapter.update({
-          state: entityState,
-          toolState: state.tool,
-          isSelected: state.selectedEntityIdentifier?.id === entityState.id,
-        });
+        await adapter.update({ state: entityState });
       }
     }
   };
@@ -205,11 +193,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
-        await adapter.update({
-          state: entityState,
-          toolState: state.tool,
-          isSelected: state.selectedEntityIdentifier?.id === entityState.id,
-        });
+        await adapter.update({ state: entityState });
       }
     }
   };

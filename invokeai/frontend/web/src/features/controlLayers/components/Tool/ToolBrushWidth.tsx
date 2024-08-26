@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { brushWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { brushWidthChanged } from 'features/controlLayers/store/toolSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -20,7 +20,7 @@ const formatPx = (v: number | string) => `${v} px`;
 export const ToolBrushWidth = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const width = useAppSelector((s) => s.canvasV2.tool.brush.width);
+  const width = useAppSelector((s) => s.tool.brush.width);
   const onChange = useCallback(
     (v: number) => {
       dispatch(brushWidthChanged(Math.round(v)));
