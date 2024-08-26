@@ -112,7 +112,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         with transformer_info as transformer:
             assert isinstance(transformer, Flux)
 
-            def step_callback(img: torch.Tensor, state: PipelineIntermediateState) -> None:
+            def step_callback() -> None:
                 if context.util.is_canceled():
                     raise CanceledException
 
