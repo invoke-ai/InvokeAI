@@ -47,7 +47,7 @@ export class CanvasFilterModule {
       return;
     }
     this.$adapter.set(entity.adapter);
-    this.manager.stateApi.setTool('view');
+    this.manager.stateApi.$tool.set('view');
   };
 
   previewFilter = async () => {

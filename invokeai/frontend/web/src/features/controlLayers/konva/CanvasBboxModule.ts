@@ -31,6 +31,11 @@ export class CanvasBboxModule {
   manager: CanvasManager;
   log: Logger;
 
+  /**
+   * A set of subscriptions that should be cleaned up when the transformer is destroyed.
+   */
+  subscriptions: Set<() => void> = new Set();
+
   konva: {
     group: Konva.Group;
     rect: Konva.Rect;
@@ -228,17 +233,19 @@ export class CanvasBboxModule {
     this.konva.transformer.nodes([this.konva.rect]);
     this.konva.group.add(this.konva.rect);
     this.konva.group.add(this.konva.transformer);
+
+    this.subscriptions.add(this.manager.stateApi.$tool.listen(this.render));
   }
 
-  render() {
+  render = () => {
     this.log.trace('Rendering generation bbox');
 
     const bbox = this.manager.stateApi.getBbox();
-    const toolState = this.manager.stateApi.getToolState();
+    const tool = this.manager.stateApi.$tool.get();
 
     this.konva.group.visible(true);
-    this.parent.getLayer().listening(toolState.selected === 'bbox');
-    this.konva.group.listening(toolState.selected === 'bbox');
+    this.parent.getLayer().listening(tool === 'bbox');
+    this.konva.group.listening(tool === 'bbox');
     this.konva.rect.setAttrs({
       x: bbox.rect.x,
       y: bbox.rect.y,
@@ -246,13 +253,21 @@ export class CanvasBboxModule {
       height: bbox.rect.height,
       scaleX: 1,
       scaleY: 1,
-      listening: toolState.selected === 'bbox',
+      listening: tool === 'bbox',
     });
     this.konva.transformer.setAttrs({
-      listening: toolState.selected === 'bbox',
-      enabledAnchors: toolState.selected === 'bbox' ? ALL_ANCHORS : NO_ANCHORS,
+      listening: tool === 'bbox',
+      enabledAnchors: tool === 'bbox' ? ALL_ANCHORS : NO_ANCHORS,
     });
-  }
+  };
+
+  destroy = () => {
+    this.log.trace('Destroying generation bbox');
+    for (const unsubscribe of this.subscriptions) {
+      unsubscribe();
+    }
+    this.konva.group.destroy();
+  };
 
   getLoggingContext = (): SerializableObject => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
