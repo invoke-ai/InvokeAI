@@ -14,10 +14,9 @@ import {
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva/constants';
 import { snapToNearest } from 'features/controlLayers/konva/util';
-import { $stageAttrs } from 'features/controlLayers/store/canvasV2Slice';
 import { clamp, round } from 'lodash-es';
 import { computed } from 'nanostores';
 import type { KeyboardEvent } from 'react';
@@ -72,12 +71,10 @@ const sliderDefaultValue = mapScaleToSliderValue(100);
 
 const snapCandidates = marks.slice(1, marks.length - 1);
 
-const $scale = computed($stageAttrs, (attrs) => attrs.scale);
-
 export const CanvasScale = memo(() => {
   const { t } = useTranslation();
-  const canvasManager = useStore($canvasManager);
-  const scale = useStore($scale);
+  const canvasManager = useCanvasManager();
+  const scale = useStore(computed(canvasManager.stateApi.$stageAttrs, (attrs) => attrs.scale));
   const [localScale, setLocalScale] = useState(scale * 100);
 
   const onChangeSlider = useCallback(
