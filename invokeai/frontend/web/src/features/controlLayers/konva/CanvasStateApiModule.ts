@@ -4,16 +4,6 @@ import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLaye
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import {
-  $isDrawing,
-  $isMouseDown,
-  $isProcessingTransform,
-  $lastAddedPoint,
-  $lastCursorPos,
-  $lastMouseDownPos,
-  $shouldShowStagedImage,
-  $spaceKey,
-  $stageAttrs,
-  $transformingEntity,
   bboxChanged,
   brushWidthChanged,
   entityBrushLineAdded,
@@ -36,6 +26,7 @@ import type {
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasV2State,
+  Coordinate,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
@@ -45,6 +36,7 @@ import type {
   Rect,
   RgbaColor,
   RgbColor,
+  StageAttrs,
   Tool,
 } from 'features/controlLayers/store/types';
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
@@ -243,8 +235,8 @@ export class CanvasStateApiModule {
     }
   };
 
-  $transformingEntity = $transformingEntity;
-  $isProcessingTransform = $isProcessingTransform;
+  $transformingEntity = atom<CanvasEntityIdentifier | null>(null);
+  $isProcessingTransform = atom<boolean>(false);
 
   $toolState: WritableAtom<CanvasV2State['tool']> = atom();
   $currentFill: WritableAtom<RgbaColor> = atom();
@@ -253,17 +245,23 @@ export class CanvasStateApiModule {
   $colorUnderCursor: WritableAtom<RgbColor> = atom(RGBA_BLACK);
 
   // Read-write state, ephemeral interaction state
-  $isDrawing = $isDrawing;
-  $isMouseDown = $isMouseDown;
-  $lastAddedPoint = $lastAddedPoint;
-  $lastMouseDownPos = $lastMouseDownPos;
-  $lastCursorPos = $lastCursorPos;
+  $isDrawing = atom<boolean>(false);
+  $isMouseDown = atom<boolean>(false);
+  $lastAddedPoint = atom<Coordinate | null>(null);
+  $lastMouseDownPos = atom<Coordinate | null>(null);
+  $lastCursorPos = atom<Coordinate | null>(null);
   $lastCanvasProgressEvent = $lastCanvasProgressEvent;
-  $spaceKey = $spaceKey;
+  $spaceKey = atom<boolean>(false);
   $altKey = $alt;
   $ctrlKey = $ctrl;
   $metaKey = $meta;
   $shiftKey = $shift;
-  $shouldShowStagedImage = $shouldShowStagedImage;
-  $stageAttrs = $stageAttrs;
+  $shouldShowStagedImage = atom(true);
+  $stageAttrs = atom<StageAttrs>({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    scale: 0,
+  });
 }
