@@ -1,10 +1,6 @@
 import { getStore } from 'app/store/nanostores/store';
-import {
-  bboxHeightChanged,
-  bboxWidthChanged,
-  loraAllDeleted,
-  loraRecalled,
-} from 'features/controlLayers/store/canvasV2Slice';
+import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
   negativePrompt2Changed,
   negativePromptChanged,
