@@ -14,7 +14,6 @@ import { rasterLayersReducers } from 'features/controlLayers/store/rasterLayersR
 import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
 import { selectAllEntities, selectAllEntitiesOfType, selectEntity } from 'features/controlLayers/store/selectors';
 import { sessionReducers } from 'features/controlLayers/store/sessionReducers';
-import { settingsReducers } from 'features/controlLayers/store/settingsReducers';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
@@ -66,16 +65,6 @@ const initialState: CanvasV2State = {
       height: 512,
     },
   },
-  settings: {
-    // TODO(psyche): These are copied from old canvas state, need to be implemented
-    autoSave: false,
-    imageSmoothing: true,
-    preserveMaskedArea: false,
-    showHUD: true,
-    clipToBbox: false,
-    cropToBboxOnSave: false,
-    dynamicGrid: false,
-  },
   session: {
     mode: 'generate',
     isStaging: false,
@@ -97,7 +86,6 @@ export const canvasV2Slice = createSlice({
     ...bboxReducers,
     // move out
     ...lorasReducers,
-    ...settingsReducers,
     ...sessionReducers,
     entitySelected: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
@@ -390,10 +378,7 @@ export const canvasV2Slice = createSlice({
 });
 
 export const {
-  clipToBboxChanged,
   canvasReset,
-  settingsDynamicGridToggled,
-  settingsAutoSaveToggled,
   // All entities
   entitySelected,
   entityNameChanged,

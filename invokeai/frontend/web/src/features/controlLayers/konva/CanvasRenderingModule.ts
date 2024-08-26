@@ -4,6 +4,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import type { CanvasSettingsState } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { CanvasV2State } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
 
@@ -17,6 +18,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
   subscriptions = new Set<() => void>();
 
   state: CanvasV2State | null = null;
+  settings: CanvasSettingsState | null = null;
 
   constructor(manager: CanvasManager) {
     super();
@@ -29,20 +31,24 @@ export class CanvasRenderingModule extends CanvasModuleBase {
 
   render = async () => {
     const state = this.manager.stateApi.getCanvasState();
+    const settings = this.manager.stateApi.getSettings();
 
-    if (!this.state) {
+    if (!this.state || !this.settings) {
       this.log.trace('First render');
     }
 
     const prevState = this.state;
     this.state = state;
 
-    if (prevState === state) {
+    const prevSettings = this.settings;
+    this.settings = settings;
+
+    if (prevState === state && prevSettings === settings) {
       // No changes to state - no need to render
       return;
     }
 
-    this.renderBackground(state, prevState);
+    this.renderBackground(settings, prevSettings);
     await this.renderRasterLayers(state, prevState);
     await this.renderControlLayers(prevState, state);
     await this.renderRegionalGuidance(prevState, state);
@@ -57,7 +63,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     this.manager.stateApi.$currentFill.set(this.manager.stateApi.getCurrentFill());
 
     // We have no prev state for the first render
-    if (!prevState) {
+    if (!prevState && !prevSettings) {
       this.manager.setCanvasManager();
     }
   };
@@ -66,8 +72,8 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     return { ...this.manager.getLoggingContext(), path: this.manager.path.join('.') };
   };
 
-  renderBackground = (state: CanvasV2State, prevState: CanvasV2State | null) => {
-    if (!prevState || state.settings.dynamicGrid !== prevState.settings.dynamicGrid) {
+  renderBackground = (settings: CanvasSettingsState, prevSettings: CanvasSettingsState | null) => {
+    if (!prevSettings || settings.dynamicGrid !== prevSettings.dynamicGrid) {
       this.manager.background.render();
     }
   };
