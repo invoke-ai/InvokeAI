@@ -4,6 +4,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import type { CanvasSessionState } from 'features/controlLayers/store/canvasSessionSlice';
 import type { CanvasSettingsState } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { CanvasV2State } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
@@ -19,6 +20,9 @@ export class CanvasRenderingModule extends CanvasModuleBase {
 
   state: CanvasV2State | null = null;
   settings: CanvasSettingsState | null = null;
+  session: CanvasSessionState | null = null;
+
+  isFirstRender = true;
 
   constructor(manager: CanvasManager) {
     super();
@@ -30,42 +34,79 @@ export class CanvasRenderingModule extends CanvasModuleBase {
   }
 
   render = async () => {
-    const state = this.manager.stateApi.getCanvasState();
-    const settings = this.manager.stateApi.getSettings();
-
-    if (!this.state || !this.settings) {
+    if (!this.state || !this.settings || !this.session) {
       this.log.trace('First render');
     }
+
+    await this.renderCanvas();
+    this.renderSettings();
+    await this.renderSession();
+
+    // We have no prev state for the first render
+    if (this.isFirstRender) {
+      this.isFirstRender = false;
+      this.manager.setCanvasManager();
+    }
+  };
+
+  renderCanvas = async () => {
+    const state = this.manager.stateApi.getCanvasState();
 
     const prevState = this.state;
     this.state = state;
 
-    const prevSettings = this.settings;
-    this.settings = settings;
-
-    if (prevState === state && prevSettings === settings) {
+    if (prevState === state) {
       // No changes to state - no need to render
       return;
     }
 
-    this.renderBackground(settings, prevSettings);
     await this.renderRasterLayers(state, prevState);
     await this.renderControlLayers(prevState, state);
     await this.renderRegionalGuidance(prevState, state);
     await this.renderInpaintMasks(state, prevState);
     await this.renderBbox(state, prevState);
-    await this.renderStagingArea(state, prevState);
     this.arrangeEntities(state, prevState);
 
     this.manager.stateApi.$toolState.set(this.manager.stateApi.getToolState());
     this.manager.stateApi.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
     this.manager.stateApi.$selectedEntity.set(this.manager.stateApi.getSelectedEntity());
     this.manager.stateApi.$currentFill.set(this.manager.stateApi.getCurrentFill());
+  };
 
-    // We have no prev state for the first render
-    if (!prevState && !prevSettings) {
-      this.manager.setCanvasManager();
+  renderSettings = () => {
+    const settings = this.manager.stateApi.getSettings();
+
+    if (!this.settings) {
+      this.log.trace('First settings render');
     }
+
+    const prevSettings = this.settings;
+    this.settings = settings;
+
+    if (prevSettings === settings) {
+      // No changes to state - no need to render
+      return;
+    }
+
+    this.renderBackground(settings, prevSettings);
+  };
+
+  renderSession = async () => {
+    const session = this.manager.stateApi.getSession();
+
+    if (!this.session) {
+      this.log.trace('First session render');
+    }
+
+    const prevSession = this.session;
+    this.session = session;
+
+    if (prevSession === session) {
+      // No changes to state - no need to render
+      return;
+    }
+
+    await this.renderStagingArea(session, prevSession);
   };
 
   getLoggingContext = (): SerializableObject => {
@@ -210,8 +251,8 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     }
   };
 
-  renderStagingArea = async (state: CanvasV2State, prevState: CanvasV2State | null) => {
-    if (!prevState || state.session !== prevState.session) {
+  renderStagingArea = async (session: CanvasSessionState, prevSession: CanvasSessionState | null) => {
+    if (!prevSession || session !== prevSession) {
       await this.manager.preview.stagingArea.render();
     }
   };
