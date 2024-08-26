@@ -13,7 +13,7 @@ export const addSDXLLoRAs = (
   posCond: Invocation<'sdxl_compel_prompt'>,
   negCond: Invocation<'sdxl_compel_prompt'>
 ): void => {
-  const enabledLoRAs = state.canvasV2.loras.filter((l) => l.isEnabled && l.model.base === 'sdxl');
+  const enabledLoRAs = state.loras.loras.filter((l) => l.isEnabled && l.model.base === 'sdxl');
   const loraCount = enabledLoRAs.length;
 
   if (loraCount === 0) {

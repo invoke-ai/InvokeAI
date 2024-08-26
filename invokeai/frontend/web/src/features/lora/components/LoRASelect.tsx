@@ -4,14 +4,13 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { loraAdded } from 'features/controlLayers/store/canvasV2Slice';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
+import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';
 import type { LoRAModelConfig } from 'services/api/types';
 
-const selectLoRAs = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => canvasV2.loras);
+const selectLoRAs = createMemoizedSelector(selectLoRAsSlice, (loras) => loras.loras);
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
