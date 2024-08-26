@@ -52,7 +52,7 @@ type Props = {
 };
 
 export const StageComponent = memo(({ asPreview = false }: Props) => {
-  const dynamicGrid = useAppSelector((s) => s.canvasV2.settings.dynamicGrid);
+  const dynamicGrid = useAppSelector((s) => s.canvasSettings.dynamicGrid);
 
   const [stage] = useState(
     () =>
