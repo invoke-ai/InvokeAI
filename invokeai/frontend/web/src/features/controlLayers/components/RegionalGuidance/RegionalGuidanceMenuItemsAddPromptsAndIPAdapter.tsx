@@ -6,36 +6,36 @@ import {
   rgIPAdapterAdded,
   rgNegativePromptChanged,
   rgPositivePromptChanged,
-  selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCanvasV2Slice, selectEntity } from 'features/controlLayers/store/selectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const RegionalGuidanceMenuItemsAddPromptsAndIPAdapter = memo(() => {
-  const { id } = useEntityIdentifierContext();
+  const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
-        const rg = canvasV2.regions.entities.find((rg) => rg.id === id);
+        const entity = selectEntity(canvasV2, entityIdentifier);
         return {
-          canAddPositivePrompt: rg?.positivePrompt === null,
-          canAddNegativePrompt: rg?.negativePrompt === null,
+          canAddPositivePrompt: entity?.positivePrompt === null,
+          canAddNegativePrompt: entity?.negativePrompt === null,
         };
       }),
-    [id]
+    [entityIdentifier]
   );
   const validActions = useAppSelector(selectValidActions);
   const addPositivePrompt = useCallback(() => {
-    dispatch(rgPositivePromptChanged({ id: id, prompt: '' }));
-  }, [dispatch, id]);
+    dispatch(rgPositivePromptChanged({ entityIdentifier, prompt: '' }));
+  }, [dispatch, entityIdentifier]);
   const addNegativePrompt = useCallback(() => {
-    dispatch(rgNegativePromptChanged({ id: id, prompt: '' }));
-  }, [dispatch, id]);
+    dispatch(rgNegativePromptChanged({ entityIdentifier, prompt: '' }));
+  }, [dispatch, entityIdentifier]);
   const addIPAdapter = useCallback(() => {
-    dispatch(rgIPAdapterAdded({ id }));
-  }, [dispatch, id]);
+    dispatch(rgIPAdapterAdded({ entityIdentifier }));
+  }, [dispatch, entityIdentifier]);
 
   return (
     <>

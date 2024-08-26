@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch, RootState } from 'app/store/store';
 import { entityDeleted, ipaImageChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
@@ -51,9 +52,9 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
 // };
 
 const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.canvasV2.ipAdapters.entities.forEach(({ id, ipAdapter }) => {
-    if (ipAdapter.image?.image_name === imageDTO.image_name) {
-      dispatch(ipaImageChanged({ id, imageDTO: null }));
+  state.canvasV2.ipAdapters.entities.forEach((entity) => {
+    if (entity.ipAdapter.image?.image_name === imageDTO.image_name) {
+      dispatch(ipaImageChanged({ entityIdentifier: getEntityIdentifier(entity), imageDTO: null }));
     }
   });
 };

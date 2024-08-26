@@ -1,7 +1,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
 import { ParamNegativePrompt } from 'features/parameters/components/Core/ParamNegativePrompt';
 import { ParamPositivePrompt } from 'features/parameters/components/Core/ParamPositivePrompt';
 import { ParamSDXLNegativeStylePrompt } from 'features/sdxl/components/SDXLPrompts/ParamSDXLNegativeStylePrompt';

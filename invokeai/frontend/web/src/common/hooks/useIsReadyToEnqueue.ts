@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { $isConnected } from 'app/hooks/useSocketIO';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';

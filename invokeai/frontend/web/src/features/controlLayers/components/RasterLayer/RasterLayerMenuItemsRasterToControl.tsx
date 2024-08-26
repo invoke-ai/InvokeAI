@@ -9,11 +9,11 @@ import { PiLightningBold } from 'react-icons/pi';
 export const RasterLayerMenuItemsRasterToControl = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const entityIdentifier = useEntityIdentifierContext();
+  const entityIdentifier = useEntityIdentifierContext('raster_layer');
 
   const convertRasterLayerToControlLayer = useCallback(() => {
-    dispatch(rasterLayerConvertedToControlLayer({ id: entityIdentifier.id }));
-  }, [dispatch, entityIdentifier.id]);
+    dispatch(rasterLayerConvertedToControlLayer({ entityIdentifier }));
+  }, [dispatch, entityIdentifier]);
 
   return (
     <MenuItem onClick={convertRasterLayerToControlLayer} icon={<PiLightningBold />}>

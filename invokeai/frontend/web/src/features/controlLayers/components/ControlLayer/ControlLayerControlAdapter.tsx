@@ -18,35 +18,35 @@ import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/
 
 export const ControlLayerControlAdapter = memo(() => {
   const dispatch = useAppDispatch();
-  const entityIdentifier = useEntityIdentifierContext();
+  const entityIdentifier = useEntityIdentifierContext('control_layer');
   const controlAdapter = useControlLayerControlAdapter(entityIdentifier);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
-      dispatch(controlLayerBeginEndStepPctChanged({ id: entityIdentifier.id, beginEndStepPct }));
+      dispatch(controlLayerBeginEndStepPctChanged({ entityIdentifier, beginEndStepPct }));
     },
-    [dispatch, entityIdentifier.id]
+    [dispatch, entityIdentifier]
   );
 
   const onChangeControlMode = useCallback(
     (controlMode: ControlModeV2) => {
-      dispatch(controlLayerControlModeChanged({ id: entityIdentifier.id, controlMode }));
+      dispatch(controlLayerControlModeChanged({ entityIdentifier, controlMode }));
     },
-    [dispatch, entityIdentifier.id]
+    [dispatch, entityIdentifier]
   );
 
   const onChangeWeight = useCallback(
     (weight: number) => {
-      dispatch(controlLayerWeightChanged({ id: entityIdentifier.id, weight }));
+      dispatch(controlLayerWeightChanged({ entityIdentifier, weight }));
     },
-    [dispatch, entityIdentifier.id]
+    [dispatch, entityIdentifier]
   );
 
   const onChangeModel = useCallback(
     (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig) => {
-      dispatch(controlLayerModelChanged({ id: entityIdentifier.id, modelConfig }));
+      dispatch(controlLayerModelChanged({ entityIdentifier, modelConfig }));
     },
-    [dispatch, entityIdentifier.id]
+    [dispatch, entityIdentifier]
   );
 
   return (
