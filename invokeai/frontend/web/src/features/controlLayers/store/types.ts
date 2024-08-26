@@ -714,7 +714,6 @@ export type CanvasV2State = {
   ipAdapters: {
     entities: CanvasIPAdapterState[];
   };
-  loras: LoRA[];
   bbox: {
     rect: {
       x: number;

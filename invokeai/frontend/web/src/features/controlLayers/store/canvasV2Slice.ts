@@ -8,7 +8,6 @@ import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
 import { controlLayersReducers } from 'features/controlLayers/store/controlLayersReducers';
 import { inpaintMaskReducers } from 'features/controlLayers/store/inpaintMaskReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
-import { lorasReducers } from 'features/controlLayers/store/lorasReducers';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import { rasterLayersReducers } from 'features/controlLayers/store/rasterLayersReducers';
 import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
@@ -52,7 +51,6 @@ const initialState: CanvasV2State = {
     isHidden: false,
     entities: [],
   },
-  loras: [],
   ipAdapters: { entities: [] },
   bbox: {
     rect: { x: 0, y: 0, width: 512, height: 512 },
@@ -77,8 +75,6 @@ export const canvasV2Slice = createSlice({
     ...regionsReducers,
     ...inpaintMaskReducers,
     ...bboxReducers,
-    // move out
-    ...lorasReducers,
     entitySelected: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
       state.selectedEntityIdentifier = entityIdentifier;
@@ -437,13 +433,6 @@ export const {
   rgIPAdapterMethodChanged,
   rgIPAdapterModelChanged,
   rgIPAdapterCLIPVisionModelChanged,
-  // LoRAs
-  loraAdded,
-  loraRecalled,
-  loraDeleted,
-  loraWeightChanged,
-  loraIsEnabledChanged,
-  loraAllDeleted,
   // Inpaint mask
   inpaintMaskAdded,
   // inpaintMaskRecalled,
