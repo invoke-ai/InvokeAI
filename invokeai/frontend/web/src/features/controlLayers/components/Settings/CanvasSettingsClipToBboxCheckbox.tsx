@@ -1,6 +1,6 @@
 import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { clipToBboxChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { clipToBboxChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsClipToBboxCheckbox = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const clipToBbox = useAppSelector((s) => s.canvasV2.settings.clipToBbox);
+  const clipToBbox = useAppSelector((s) => s.canvasSettings.clipToBbox);
   const onChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(clipToBboxChanged(e.target.checked)),
     [dispatch]

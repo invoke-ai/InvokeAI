@@ -1,13 +1,13 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { settingsDynamicGridToggled } from 'features/controlLayers/store/canvasV2Slice';
+import { settingsDynamicGridToggled } from 'features/controlLayers/store/canvasSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const CanvasSettingsDynamicGridSwitch = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const dynamicGrid = useAppSelector((s) => s.canvasV2.settings.dynamicGrid);
+  const dynamicGrid = useAppSelector((s) => s.canvasSettings.dynamicGrid);
   const onChange = useCallback(() => {
     dispatch(settingsDynamicGridToggled());
   }, [dispatch]);
