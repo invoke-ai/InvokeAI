@@ -5,7 +5,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { CanvasEntityListMenuButton } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityListMenuButton';
 import { CanvasPanelContent } from 'features/controlLayers/components/CanvasPanelContent';
-import { $isPreviewVisible } from 'features/controlLayers/store/canvasV2Slice';
 import { selectEntityCount } from 'features/controlLayers/store/selectors';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
@@ -56,7 +55,6 @@ const ParametersPanelTextToImage = () => {
       if (i === 1) {
         dispatch(isImageViewerOpenChanged(false));
       }
-      $isPreviewVisible.set(i === 0);
     },
     [dispatch]
   );

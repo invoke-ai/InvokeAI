@@ -2,8 +2,8 @@ import { Button, ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { INTERACTION_SCOPES, useScopeOnMount } from 'common/hooks/interactionScopes';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import {
-  $shouldShowStagedImage,
   sessionNextStagedImageSelected,
   sessionPrevStagedImageSelected,
   sessionStagedImageDiscarded,
@@ -28,7 +28,8 @@ import { useChangeImageIsIntermediateMutation } from 'services/api/endpoints/ima
 export const StagingAreaToolbar = memo(() => {
   const dispatch = useAppDispatch();
   const session = useAppSelector((s) => s.canvasV2.session);
-  const shouldShowStagedImage = useStore($shouldShowStagedImage);
+  const canvasManager = useCanvasManager();
+  const shouldShowStagedImage = useStore(canvasManager.stateApi.$shouldShowStagedImage);
   const images = useMemo(() => session.stagedImages, [session]);
   const selectedImage = useMemo(() => {
     return images[session.selectedStagedImageIndex] ?? null;
@@ -70,8 +71,8 @@ export const StagingAreaToolbar = memo(() => {
   }, [dispatch]);
 
   const onToggleShouldShowStagedImage = useCallback(() => {
-    $shouldShowStagedImage.set(!shouldShowStagedImage);
-  }, [shouldShowStagedImage]);
+    canvasManager.stateApi.$shouldShowStagedImage.set(!shouldShowStagedImage);
+  }, [canvasManager.stateApi.$shouldShowStagedImage, shouldShowStagedImage]);
 
   const onSaveStagingImage = useCallback(() => {
     if (!selectedImage) {
