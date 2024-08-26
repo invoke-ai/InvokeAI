@@ -1,23 +1,27 @@
 {
   "name": "FLUX Text to Image",
   "author": "InvokeAI",
-  "description": "A simple text-to-image workflow using FLUX dev or schnell models. Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager.",
+  "description": "A simple text-to-image workflow using FLUX dev or schnell models. Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager. We recommend 4 steps for FLUX schnell models and 30 steps for FLUX dev models.",
   "version": "1.0.0",
   "contact": "",
   "tags": "text2image, flux",
-  "notes": "",
+  "notes": "Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager. We recommend 4 steps for FLUX schnell models and 30 steps for FLUX dev models.",
   "exposedFields": [
     {
       "nodeId": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
       "fieldName": "model"
     },
     {
-      "nodeId": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
-      "fieldName": "t5_encoder"
-    },
-    {
       "nodeId": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
       "fieldName": "prompt"
+    },
+    {
+      "nodeId": "159bdf1b-79e7-4174-b86e-d40e646964c8",
+      "fieldName": "num_steps"
+    },
+    {
+      "nodeId": "4f0207c2-ff40-41fd-b047-ad33fbb1c33a",
+      "fieldName": "t5_encoder"
     }
   ],
   "meta": {
@@ -40,7 +44,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "",
+            "label": "Model (Starter Models can be found in Model Manager)",
             "value": {
               "key": "f04a7a2f-c74d-4538-8d5e-879a53501662",
               "hash": "random:4875da7a9508444ffa706f61961c260d0c6729f6181a86b31fad06df1277b850",
@@ -51,7 +55,7 @@
           },
           "t5_encoder": {
             "name": "t5_encoder",
-            "label": "",
+            "label": "T 5 Encoder (Starter Models can be found in Model Manager)",
             "value": {
               "key": "20dcd9ec-5fbb-4012-8401-049e707da5e5",
               "hash": "random:f986be43ff3502169e4adbdcee158afb0e0a65a1edc4cab16ae59963630cfd8f",
@@ -96,7 +100,7 @@
           "prompt": {
             "name": "prompt",
             "label": "",
-            "value": ""
+            "value": "a cat"
           }
         }
       },
@@ -180,8 +184,8 @@
           },
           "num_steps": {
             "name": "num_steps",
-            "label": "",
-            "value": 4
+            "label": "Steps (Recommend 30 for Dev, 4 for Schnell)",
+            "value": 30
           },
           "guidance": {
             "name": "guidance",
