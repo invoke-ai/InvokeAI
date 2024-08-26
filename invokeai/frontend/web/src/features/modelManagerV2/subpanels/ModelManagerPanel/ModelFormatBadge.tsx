@@ -14,7 +14,7 @@ const FORMAT_NAME_MAP: Record<AnyModelConfig['format'], string> = {
   embedding_file: 'embedding',
   embedding_folder: 'embedding',
   t5_encoder: 't5_encoder',
-  t5_encoder_8b: 't5_encoder_8b',
+  bnb_quantized_int8b: 'bnb_quantized_int8b',
   bnb_quantized_nf4b: 'quantized',
 };
 
@@ -26,7 +26,7 @@ const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
   embedding_file: 'base',
   embedding_folder: 'base',
   t5_encoder: 'base',
-  t5_encoder_8b: 'base',
+  bnb_quantized_int8b: 'base',
   bnb_quantized_nf4b: 'base',
 };
 
