@@ -15,7 +15,8 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { snapToNearest } from 'features/controlLayers/konva/util';
-import { entityOpacityChanged, selectEntity } from 'features/controlLayers/store/canvasV2Slice';
+import { entityOpacityChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { selectEntity } from 'features/controlLayers/store/selectors';
 import { isDrawableEntity } from 'features/controlLayers/store/types';
 import { clamp, round } from 'lodash-es';
 import type { KeyboardEvent } from 'react';

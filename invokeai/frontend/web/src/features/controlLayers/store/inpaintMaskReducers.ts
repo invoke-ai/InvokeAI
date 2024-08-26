@@ -1,23 +1,15 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import {
-  type CanvasInpaintMaskState,
-  type CanvasV2State,
-  type EntityIdentifierPayload,
-  type FillStyle,
-  getEntityIdentifier,
-  type RgbColor,
+import { selectEntity } from 'features/controlLayers/store/selectors';
+import type {
+  CanvasInpaintMaskState,
+  CanvasV2State,
+  EntityIdentifierPayload,
+  FillStyle,
+  RgbColor,
 } from 'features/controlLayers/store/types';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { merge } from 'lodash-es';
-import { assert } from 'tsafe';
-
-const selectInpaintMaskEntity = (state: CanvasV2State, id: string) =>
-  state.inpaintMasks.entities.find((layer) => layer.id === id);
-export const selectInpaintMaskEntityOrThrow = (state: CanvasV2State, id: string) => {
-  const entity = selectInpaintMaskEntity(state, id);
-  assert(entity, `Inpaint mask with id ${id} not found`);
-  return entity;
-};
 
 export const inpaintMaskReducers = {
   inpaintMaskAdded: {
@@ -54,17 +46,23 @@ export const inpaintMaskReducers = {
     state.inpaintMasks.entities = [data];
     state.selectedEntityIdentifier = { type: 'inpaint_mask', id: data.id };
   },
-  inpaintMaskFillColorChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ color: RgbColor }>>) => {
+  inpaintMaskFillColorChanged: (
+    state,
+    action: PayloadAction<EntityIdentifierPayload<{ color: RgbColor }, 'inpaint_mask'>>
+  ) => {
     const { color, entityIdentifier } = action.payload;
-    const entity = selectInpaintMaskEntity(state, entityIdentifier.id);
+    const entity = selectEntity(state, entityIdentifier);
     if (!entity) {
       return;
     }
     entity.fill.color = color;
   },
-  inpaintMaskFillStyleChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ style: FillStyle }>>) => {
+  inpaintMaskFillStyleChanged: (
+    state,
+    action: PayloadAction<EntityIdentifierPayload<{ style: FillStyle }, 'inpaint_mask'>>
+  ) => {
     const { style, entityIdentifier } = action.payload;
-    const entity = selectInpaintMaskEntity(state, entityIdentifier.id);
+    const entity = selectEntity(state, entityIdentifier);
     if (!entity) {
       return;
     }

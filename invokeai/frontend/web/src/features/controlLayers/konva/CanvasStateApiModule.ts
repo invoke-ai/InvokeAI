@@ -25,10 +25,10 @@ import {
   entitySelected,
   eraserWidthChanged,
   fillChanged,
-  selectAllRenderableEntities,
   toolBufferChanged,
   toolChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
+import { selectAllRenderableEntities } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
