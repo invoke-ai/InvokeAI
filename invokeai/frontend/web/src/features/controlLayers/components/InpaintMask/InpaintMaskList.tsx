@@ -11,7 +11,9 @@ const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) =
 });
 
 export const InpaintMaskList = memo(() => {
-  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.present.selectedEntityIdentifier?.type === 'inpaint_mask'));
+  const isSelected = useAppSelector((s) =>
+    Boolean(s.canvasV2.present.selectedEntityIdentifier?.type === 'inpaint_mask')
+  );
   const entityIds = useAppSelector(selectEntityIds);
 
   if (entityIds.length === 0) {

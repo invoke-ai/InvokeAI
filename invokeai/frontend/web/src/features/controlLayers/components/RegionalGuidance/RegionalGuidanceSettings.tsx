@@ -18,7 +18,9 @@ export const RegionalGuidanceSettings = memo(() => {
   const hasNegativePrompt = useAppSelector(
     (s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).negativePrompt !== null
   );
-  const hasIPAdapters = useAppSelector((s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).ipAdapters.length > 0);
+  const hasIPAdapters = useAppSelector(
+    (s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).ipAdapters.length > 0
+  );
 
   return (
     <CanvasEntitySettingsWrapper>

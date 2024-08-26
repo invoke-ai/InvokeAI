@@ -245,7 +245,12 @@ export const buildSDXLGraph = async (
     type: 'collect',
     id: getPrefixedId('ip_adapter_collector'),
   });
-  const ipAdapterResult = addIPAdapters(state.canvasV2.present.ipAdapters.entities, g, ipAdapterCollector, modelConfig.base);
+  const ipAdapterResult = addIPAdapters(
+    state.canvasV2.present.ipAdapters.entities,
+    g,
+    ipAdapterCollector,
+    modelConfig.base
+  );
 
   const regionsResult = await addRegions(
     manager,
