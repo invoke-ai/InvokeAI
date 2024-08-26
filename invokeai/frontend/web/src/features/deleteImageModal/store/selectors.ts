@@ -1,5 +1,5 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
 import type { CanvasV2State } from 'features/controlLayers/store/types';
 import { selectDeleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';

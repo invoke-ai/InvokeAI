@@ -1,7 +1,8 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { entityDeleted, selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { entityDeleted } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
 import { useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 

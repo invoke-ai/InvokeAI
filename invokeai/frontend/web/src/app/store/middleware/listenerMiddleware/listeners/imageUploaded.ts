@@ -89,14 +89,16 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
 
       if (postUploadAction?.type === 'SET_IPA_IMAGE') {
         const { id } = postUploadAction;
-        dispatch(ipaImageChanged({ id, imageDTO }));
+        dispatch(ipaImageChanged({ entityIdentifier: { id, type: 'ip_adapter' }, imageDTO }));
         toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
         return;
       }
 
       if (postUploadAction?.type === 'SET_RG_IP_ADAPTER_IMAGE') {
         const { id, ipAdapterId } = postUploadAction;
-        dispatch(rgIPAdapterImageChanged({ id, ipAdapterId, imageDTO }));
+        dispatch(
+          rgIPAdapterImageChanged({ entityIdentifier: { id, type: 'regional_guidance' }, ipAdapterId, imageDTO })
+        );
         toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
         return;
       }

@@ -1,8 +1,7 @@
 import { createMemoizedAppSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
-import { selectControlLayerEntityOrThrow } from 'features/controlLayers/store/controlLayersReducers';
+import { selectCanvasV2Slice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
   ControlNetConfig,
@@ -14,11 +13,11 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useMemo } from 'react';
 import { useControlNetAndT2IAdapterModels, useIPAdapterModels } from 'services/api/hooks/modelsByType';
 
-export const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier) => {
+export const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) => {
   const selectControlAdapter = useMemo(
     () =>
       createMemoizedAppSelector(selectCanvasV2Slice, (canvasV2) => {
-        const layer = selectControlLayerEntityOrThrow(canvasV2, entityIdentifier.id);
+        const layer = selectEntityOrThrow(canvasV2, entityIdentifier);
         return layer.controlAdapter;
       }),
     [entityIdentifier]

@@ -1,3 +1,4 @@
+import type { SerializableObject } from 'common/types';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/DocumentSize/types';
@@ -692,7 +693,9 @@ export type CanvasEntityState =
   | CanvasRegionalGuidanceState
   | CanvasInpaintMaskState
   | CanvasIPAdapterState;
-export type CanvasEntityIdentifier = Pick<CanvasEntityState, 'id' | 'type'>;
+
+export type CanvasEntityType = CanvasEntityState['type'];
+export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
 
 export type LoRA = {
   id: string;
@@ -819,7 +822,17 @@ export type StageAttrs = {
   scale: number;
 };
 
-export type EntityIdentifierPayload<T = object> = { entityIdentifier: CanvasEntityIdentifier } & T;
+export type EntityIdentifierPayload<
+  T extends SerializableObject | void = void,
+  U extends CanvasEntityType = CanvasEntityType,
+> = T extends void
+  ? {
+      entityIdentifier: CanvasEntityIdentifier<U>;
+    }
+  : {
+      entityIdentifier: CanvasEntityIdentifier<U>;
+    } & T;
+
 export type EntityMovedPayload = EntityIdentifierPayload<{ position: Coordinate }>;
 export type EntityBrushLineAddedPayload = EntityIdentifierPayload<{ brushLine: CanvasBrushLineState }>;
 export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{ eraserLine: CanvasEraserLineState }>;
@@ -858,6 +871,8 @@ export function isDrawableEntity(
   return isDrawableEntityType(entity.type);
 }
 
-export const getEntityIdentifier = (entity: CanvasEntityState): CanvasEntityIdentifier => {
+export const getEntityIdentifier = <T extends CanvasEntityType>(
+  entity: Extract<CanvasEntityState, { type: T }>
+): CanvasEntityIdentifier<T> => {
   return { id: entity.id, type: entity.type };
 };
