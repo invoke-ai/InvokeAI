@@ -1,7 +1,7 @@
-import type { SerializableObject } from 'common/types';
 import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -18,7 +18,7 @@ import type { Logger } from 'roarr';
  *
  * It renders an outline when dragging and resizing the entity, with transform anchors for resizing and rotation.
  */
-export class CanvasTransformer {
+export class CanvasTransformer extends CanvasModuleBase {
   readonly type = 'entity_transformer';
 
   static RECT_CALC_DEBOUNCE_MS = 300;
@@ -99,11 +99,13 @@ export class CanvasTransformer {
   };
 
   constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
+    super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = parent.manager;
     this.path = this.parent.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.log.debug('Creating entity transformer module');
 
     this.konva = {
       outlineRect: new Konva.Rect({
@@ -721,6 +723,7 @@ export class CanvasTransformer {
     return {
       id: this.id,
       type: this.type,
+      path: this.path,
       mode: this.interactionMode,
       isTransformEnabled: this.isTransformEnabled,
       isDragEnabled: this.isDragEnabled,
@@ -731,17 +734,14 @@ export class CanvasTransformer {
    * Destroys the transformer, cleaning up any subscriptions.
    */
   destroy = () => {
-    this.log.trace('Destroying transformer');
-    for (const cleanup of this.subscriptions) {
-      this.log.trace('Cleaning up listener');
-      cleanup();
-    }
+    this.log.debug('Destroying entity transformer module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.outlineRect.destroy();
     this.konva.transformer.destroy();
     this.konva.proxyRect.destroy();
   };
 
-  getLoggingContext = (): SerializableObject => {
+  getLoggingContext = () => {
     return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

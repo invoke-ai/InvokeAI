@@ -1,13 +1,13 @@
-import type { SerializableObject } from 'common/types';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
 import type { CanvasBrushLineState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasBrushLineRenderer {
+export class CanvasBrushLineRenderer extends CanvasModuleBase {
   readonly type = 'brush_line_renderer';
 
   id: string;
@@ -15,6 +15,7 @@ export class CanvasBrushLineRenderer {
   parent: CanvasObjectRenderer;
   manager: CanvasManager;
   log: Logger;
+  subscriptions = new Set<() => void>();
 
   state: CanvasBrushLineState;
   konva: {
@@ -23,6 +24,7 @@ export class CanvasBrushLineRenderer {
   };
 
   constructor(state: CanvasBrushLineState, parent: CanvasObjectRenderer) {
+    super();
     const { id, clip } = state;
     this.id = id;
     this.parent = parent;
@@ -30,7 +32,7 @@ export class CanvasBrushLineRenderer {
     this.path = this.parent.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
-    this.log.trace({ state }, 'Creating brush line');
+    this.log.debug({ state }, 'Creating brush line renderer module');
 
     this.konva = {
       group: new Konva.Group({
@@ -69,26 +71,28 @@ export class CanvasBrushLineRenderer {
     return false;
   }
 
-  destroy() {
-    this.log.trace('Destroying brush line');
+  destroy = () => {
+    this.log.debug('Destroying brush line renderer module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
-  }
+  };
 
   setVisibility(isVisible: boolean): void {
     this.log.trace({ isVisible }, 'Setting brush line visibility');
     this.konva.group.visible(isVisible);
   }
 
-  repr() {
+  repr = () => {
     return {
       id: this.id,
       type: this.type,
+      path: this.path,
       parent: this.parent.id,
       state: deepClone(this.state),
     };
-  }
+  };
 
-  getLoggingContext = (): SerializableObject => {
+  getLoggingContext = () => {
     return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }
