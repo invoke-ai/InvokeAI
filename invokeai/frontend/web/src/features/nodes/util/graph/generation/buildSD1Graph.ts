@@ -31,7 +31,8 @@ export const buildSD1Graph = async (
   const generationMode = manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SD1/SD2 graph');
 
-  const { bbox, params, session, settings } = state.canvasV2;
+  const { canvasV2, params } = state;
+  const { bbox, session, settings } = canvasV2;
 
   const {
     model,
@@ -172,7 +173,6 @@ export const buildSD1Graph = async (
       vaePrecision === 'fp32'
     );
   } else if (generationMode === 'inpaint') {
-    const { compositing } = state.canvasV2;
     canvasOutput = await addInpaint(
       state,
       g,
@@ -183,13 +183,10 @@ export const buildSD1Graph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      bbox,
-      compositing,
       1 - params.img2imgStrength,
       vaePrecision === 'fp32'
     );
   } else if (generationMode === 'outpaint') {
-    const { compositing } = state.canvasV2;
     canvasOutput = await addOutpaint(
       state,
       g,
@@ -200,8 +197,6 @@ export const buildSD1Graph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      bbox,
-      compositing,
       1 - params.img2imgStrength,
       fp32
     );

@@ -49,7 +49,7 @@ const ParametersPanelTextToImage = () => {
     }
     return `${t('controlLayers.controlLayers')} (${controlLayersCount})`;
   }, [controlLayersCount, t]);
-  const isSDXL = useAppSelector((s) => s.canvasV2.params.model?.base === 'sdxl');
+  const isSDXL = useAppSelector((s) => s.params.model?.base === 'sdxl');
   const onChangeTabs = useCallback(
     (i: number) => {
       if (i === 1) {

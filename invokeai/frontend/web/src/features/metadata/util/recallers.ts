@@ -4,6 +4,8 @@ import {
   bboxWidthChanged,
   loraAllDeleted,
   loraRecalled,
+} from 'features/controlLayers/store/canvasV2Slice';
+import {
   negativePrompt2Changed,
   negativePromptChanged,
   positivePrompt2Changed,
@@ -22,7 +24,7 @@ import {
   setSeed,
   setSteps,
   vaeSelected,
-} from 'features/controlLayers/store/canvasV2Slice';
+} from 'features/controlLayers/store/paramsSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { MetadataRecallFunc } from 'features/metadata/types';

@@ -8,11 +8,9 @@ import {
   controlLayerModelChanged,
   ipaModelChanged,
   loraDeleted,
-  modelChanged,
-  refinerModelChanged,
   rgIPAdapterModelChanged,
-  vaeSelected,
 } from 'features/controlLayers/store/canvasV2Slice';
+import { modelChanged, refinerModelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
@@ -63,7 +61,7 @@ type ModelHandler = (
 ) => undefined;
 
 const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
-  const currentModel = state.canvasV2.params.model;
+  const currentModel = state.params.model;
   const mainModels = models.filter(isNonRefinerMainModelConfig);
   if (mainModels.length === 0) {
     // No models loaded at all
@@ -110,7 +108,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleRefinerModels: ModelHandler = (models, state, dispatch, _log) => {
-  const currentRefinerModel = state.canvasV2.params.refinerModel;
+  const currentRefinerModel = state.params.refinerModel;
   const refinerModels = models.filter(isRefinerMainModelModelConfig);
   if (models.length === 0) {
     // No models loaded at all
@@ -129,7 +127,7 @@ const handleRefinerModels: ModelHandler = (models, state, dispatch, _log) => {
 };
 
 const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
-  const currentVae = state.canvasV2.params.vae;
+  const currentVae = state.params.vae;
 
   if (currentVae === null) {
     // null is a valid VAE! it means "use the default with the main model"

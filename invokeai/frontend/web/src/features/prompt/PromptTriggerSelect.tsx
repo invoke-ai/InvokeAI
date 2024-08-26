@@ -17,7 +17,7 @@ const noOptionsMessage = () => t('prompt.noMatchingTriggers');
 export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSelectProps) => {
   const { t } = useTranslation();
 
-  const mainModel = useAppSelector((s) => s.canvasV2.params.model);
+  const mainModel = useAppSelector((s) => s.params.model);
   const addedLoRAs = useAppSelector((s) => s.canvasV2.loras);
   const { data: mainModelConfig, isLoading: isLoadingMainModelConfig } = useGetModelConfigQuery(
     mainModel?.key ?? skipToken

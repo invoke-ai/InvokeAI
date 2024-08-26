@@ -1,6 +1,6 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { positivePromptChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
@@ -17,8 +17,8 @@ import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 export const ParamPositivePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.canvasV2.params.positivePrompt);
-  const baseModel = useAppSelector((s) => s.canvasV2.params.model)?.base;
+  const prompt = useAppSelector((s) => s.params.positivePrompt);
+  const baseModel = useAppSelector((s) => s.params.model)?.base;
   const viewMode = useAppSelector((s) => s.stylePreset.viewMode);
   const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
 

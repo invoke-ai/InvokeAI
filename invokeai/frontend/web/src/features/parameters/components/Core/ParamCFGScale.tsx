@@ -1,12 +1,12 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setCfgScale } from 'features/controlLayers/store/canvasV2Slice';
+import { setCfgScale } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamCFGScale = () => {
-  const cfgScale = useAppSelector((s) => s.canvasV2.params.cfgScale);
+  const cfgScale = useAppSelector((s) => s.params.cfgScale);
   const sliderMin = useAppSelector((s) => s.config.sd.guidance.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.guidance.sliderMax);
   const numberInputMin = useAppSelector((s) => s.config.sd.guidance.numberInputMin);

@@ -6,14 +6,12 @@ import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getS
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
 import { ASPECT_RATIO_MAP, initialAspectRatioState } from 'features/parameters/components/DocumentSize/constants';
 import type { AspectRatioID } from 'features/parameters/components/DocumentSize/types';
-import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 
 const syncScaledSize = (state: CanvasV2State) => {
   if (state.bbox.scaleMethod === 'auto') {
-    const optimalDimension = getOptimalDimension(state.params.model);
     const { width, height } = state.bbox.rect;
-    state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, optimalDimension);
+    state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.optimalDimension);
   }
 };
 
@@ -106,15 +104,14 @@ export const bboxReducers = {
     syncScaledSize(state);
   },
   bboxSizeOptimized: (state) => {
-    const optimalDimension = getOptimalDimension(state.params.model);
     if (state.bbox.aspectRatio.isLocked) {
-      const { width, height } = calculateNewSize(state.bbox.aspectRatio.value, optimalDimension ** 2);
+      const { width, height } = calculateNewSize(state.bbox.aspectRatio.value, state.bbox.optimalDimension ** 2);
       state.bbox.rect.width = width;
       state.bbox.rect.height = height;
     } else {
       state.bbox.aspectRatio = deepClone(initialAspectRatioState);
-      state.bbox.rect.width = optimalDimension;
-      state.bbox.rect.height = optimalDimension;
+      state.bbox.rect.width = state.bbox.optimalDimension;
+      state.bbox.rect.height = state.bbox.optimalDimension;
     }
 
     syncScaledSize(state);

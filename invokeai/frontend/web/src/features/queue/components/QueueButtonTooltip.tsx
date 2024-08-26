@@ -2,7 +2,7 @@ import { Divider, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-a
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import type { PropsWithChildren } from 'react';
@@ -11,8 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-const selectPromptsCount = createSelector(selectCanvasV2Slice, selectDynamicPromptsSlice, (canvasV2, dynamicPrompts) =>
-  getShouldProcessPrompt(canvasV2.params.positivePrompt) ? dynamicPrompts.prompts.length : 1
+const selectPromptsCount = createSelector(selectParamsSlice, selectDynamicPromptsSlice, (params, dynamicPrompts) =>
+  getShouldProcessPrompt(params.positivePrompt) ? dynamicPrompts.prompts.length : 1
 );
 
 type Props = {
@@ -32,7 +32,7 @@ const TooltipContent = memo(({ prepend = false }: Props) => {
   const { isReady, reasons } = useIsReadyToEnqueue();
   const isLoadingDynamicPrompts = useAppSelector((s) => s.dynamicPrompts.isLoading);
   const promptsCount = useAppSelector(selectPromptsCount);
-  const iterationsCount = useAppSelector((s) => s.canvasV2.params.iterations);
+  const iterationsCount = useAppSelector((s) => s.params.iterations);
   const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
   const autoAddBoardName = useBoardName(autoAddBoardId);
   const [_, { isLoading }] = useEnqueueBatchMutation({
