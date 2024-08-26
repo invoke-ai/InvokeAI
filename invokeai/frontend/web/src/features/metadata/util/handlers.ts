@@ -1,7 +1,7 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import { objectKeys } from 'common/util/objectKeys';
-import { shouldConcatPromptsChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { shouldConcatPromptsChanged } from 'features/controlLayers/store/paramsSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
 import type {
   BuildMetadataHandlers,

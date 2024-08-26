@@ -1,14 +1,14 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setInfillPatchmatchDownscaleSize } from 'features/controlLayers/store/canvasV2Slice';
+import { setInfillPatchmatchDownscaleSize } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamInfillPatchmatchDownscaleSize = () => {
   const dispatch = useAppDispatch();
-  const infillMethod = useAppSelector((s) => s.canvasV2.compositing.infillMethod);
-  const infillPatchmatchDownscaleSize = useAppSelector((s) => s.canvasV2.compositing.infillPatchmatchDownscaleSize);
+  const infillMethod = useAppSelector((s) => s.params.infillMethod);
+  const infillPatchmatchDownscaleSize = useAppSelector((s) => s.params.infillPatchmatchDownscaleSize);
   const initial = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.sliderMax);

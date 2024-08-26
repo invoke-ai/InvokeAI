@@ -1,6 +1,6 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { negativePrompt2Changed } from 'features/controlLayers/store/canvasV2Slice';
+import { negativePrompt2Changed } from 'features/controlLayers/store/paramsSlice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 export const ParamSDXLNegativeStylePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.canvasV2.params.negativePrompt2);
+  const prompt = useAppSelector((s) => s.params.negativePrompt2);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();
   const handleChange = useCallback(

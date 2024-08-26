@@ -31,7 +31,8 @@ export const buildSDXLGraph = async (
   const generationMode = manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SDXL graph');
 
-  const { bbox, params, session, settings } = state.canvasV2;
+  const { params, canvasV2 } = state;
+  const { bbox, session, settings } = canvasV2;
 
   const {
     model,
@@ -175,7 +176,6 @@ export const buildSDXLGraph = async (
       fp32
     );
   } else if (generationMode === 'inpaint') {
-    const { compositing } = state.canvasV2;
     canvasOutput = await addInpaint(
       state,
       g,
@@ -186,13 +186,10 @@ export const buildSDXLGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      bbox,
-      compositing,
       refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength,
       fp32
     );
   } else if (generationMode === 'outpaint') {
-    const { compositing } = state.canvasV2;
     canvasOutput = await addOutpaint(
       state,
       g,
@@ -203,8 +200,6 @@ export const buildSDXLGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      bbox,
-      compositing,
       refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength,
       fp32
     );

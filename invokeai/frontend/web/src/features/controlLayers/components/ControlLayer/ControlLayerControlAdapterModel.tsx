@@ -18,7 +18,7 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
   const canvasManager = useCanvasManager();
-  const currentBaseModel = useAppSelector((s) => s.canvasV2.params.model?.base);
+  const currentBaseModel = useAppSelector((s) => s.params.model?.base);
   const [modelConfigs, { isLoading }] = useControlNetAndT2IAdapterModels();
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 

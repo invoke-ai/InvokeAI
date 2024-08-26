@@ -6,7 +6,7 @@ import ParamInfillPatchmatchDownscaleSize from './ParamInfillPatchmatchDownscale
 import ParamInfillTilesize from './ParamInfillTilesize';
 
 const ParamInfillOptions = () => {
-  const infillMethod = useAppSelector((s) => s.canvasV2.compositing.infillMethod);
+  const infillMethod = useAppSelector((s) => s.params.infillMethod);
   if (infillMethod === 'tile') {
     return <ParamInfillTilesize />;
   }

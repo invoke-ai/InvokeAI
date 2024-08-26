@@ -1,4 +1,5 @@
 import type { RootState } from 'app/store/store';
+import type { ParamsState } from 'features/controlLayers/store/paramsSlice';
 import type { CanvasV2State } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -25,8 +26,7 @@ export const getBoardField = (state: RootState): BoardField | undefined => {
 export const getPresetModifiedPrompts = (
   state: RootState
 ): { positivePrompt: string; negativePrompt: string; positiveStylePrompt?: string; negativeStylePrompt?: string } => {
-  const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } =
-    state.canvasV2.params;
+  const { positivePrompt, negativePrompt, positivePrompt2, negativePrompt2, shouldConcatPrompts } = state.params;
   const { activeStylePresetId } = state.stylePreset;
 
   if (activeStylePresetId) {
@@ -70,9 +70,9 @@ export const getSizes = (bboxState: CanvasV2State['bbox']) => {
 
 export const getInfill = (
   g: Graph,
-  compositing: CanvasV2State['compositing']
+  params: ParamsState
 ): Invocation<'infill_patchmatch' | 'infill_cv2' | 'infill_lama' | 'infill_rgba' | 'infill_tile'> => {
-  const { infillMethod, infillColorValue, infillPatchmatchDownscaleSize, infillTileSize } = compositing;
+  const { infillMethod, infillColorValue, infillPatchmatchDownscaleSize, infillTileSize } = params;
 
   // Add Infill Nodes
   if (infillMethod === 'patchmatch') {
