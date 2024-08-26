@@ -7,9 +7,9 @@ import {
   bboxWidthChanged,
   controlLayerModelChanged,
   ipaModelChanged,
-  loraDeleted,
   rgIPAdapterModelChanged,
 } from 'features/controlLayers/store/canvasV2Slice';
+import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, refinerModelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
@@ -161,7 +161,7 @@ const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
 
 const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
   const loraModels = models.filter(isLoRAModelConfig);
-  state.canvasV2.loras.forEach((lora) => {
+  state.loras.loras.forEach((lora) => {
     const isLoRAAvailable = loraModels.some((m) => m.key === lora.model.key);
     if (isLoRAAvailable) {
       return;

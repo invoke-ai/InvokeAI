@@ -9,6 +9,7 @@ import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import { canvasSessionPersistConfig, canvasSessionSlice } from 'features/controlLayers/store/canvasSessionSlice';
 import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasV2PersistConfig, canvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
 import { toolPersistConfig, toolSlice } from 'features/controlLayers/store/toolSlice';
 import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
@@ -65,6 +66,7 @@ const allReducers = {
   [toolSlice.name]: toolSlice.reducer,
   [canvasSettingsSlice.name]: canvasSettingsSlice.reducer,
   [canvasSessionSlice.name]: canvasSessionSlice.reducer,
+  [lorasSlice.name]: lorasSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -110,6 +112,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [toolPersistConfig.name]: toolPersistConfig,
   [canvasSettingsPersistConfig.name]: canvasSettingsPersistConfig,
   [canvasSessionPersistConfig.name]: canvasSessionPersistConfig,
+  [lorasPersistConfig.name]: lorasPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
