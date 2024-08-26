@@ -15,7 +15,6 @@ import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
 import { selectAllEntities, selectAllEntitiesOfType, selectEntity } from 'features/controlLayers/store/selectors';
 import { sessionReducers } from 'features/controlLayers/store/sessionReducers';
 import { settingsReducers } from 'features/controlLayers/store/settingsReducers';
-import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
@@ -57,16 +56,6 @@ const initialState: CanvasV2State = {
   },
   loras: [],
   ipAdapters: { entities: [] },
-  tool: {
-    invertScroll: false,
-    fill: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
-    brush: {
-      width: 50,
-    },
-    eraser: {
-      width: 50,
-    },
-  },
   bbox: {
     rect: { x: 0, y: 0, width: 512, height: 512 },
     optimalDimension: 512,
@@ -109,7 +98,6 @@ export const canvasV2Slice = createSlice({
     // move out
     ...lorasReducers,
     ...settingsReducers,
-    ...toolReducers,
     ...sessionReducers,
     entitySelected: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
@@ -364,7 +352,6 @@ export const canvasV2Slice = createSlice({
       const size = pick(state.bbox.rect, 'width', 'height');
       state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, state.bbox.optimalDimension);
       state.session = deepClone(initialState.session);
-      state.tool = deepClone(initialState.tool);
 
       state.ipAdapters = deepClone(initialState.ipAdapters);
       state.rasterLayers = deepClone(initialState.rasterLayers);
@@ -403,10 +390,6 @@ export const canvasV2Slice = createSlice({
 });
 
 export const {
-  brushWidthChanged,
-  eraserWidthChanged,
-  fillChanged,
-  invertScrollChanged,
   clipToBboxChanged,
   canvasReset,
   settingsDynamicGridToggled,

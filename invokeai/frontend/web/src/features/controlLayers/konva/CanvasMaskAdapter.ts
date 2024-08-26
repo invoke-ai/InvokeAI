@@ -11,7 +11,6 @@ import type {
   CanvasEraserLineState,
   CanvasInpaintMaskState,
   CanvasRegionalGuidanceState,
-  CanvasV2State,
   Coordinate,
   Rect,
 } from 'features/controlLayers/store/types';
@@ -83,11 +82,7 @@ export class CanvasMaskAdapter extends CanvasModuleBase {
     this.konva.layer.destroy();
   };
 
-  update = async (arg?: {
-    state: CanvasMaskAdapter['state'];
-    toolState: CanvasV2State['tool'];
-    isSelected: boolean;
-  }) => {
+  update = async (arg?: { state: CanvasMaskAdapter['state'] }) => {
     const state = get(arg, 'state', this.state);
 
     if (!this.isFirstRender && state === this.state && state.fill === this.state.fill) {
