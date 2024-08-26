@@ -39,7 +39,6 @@ dependencies = [
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
   "diffusers[torch]==0.27.2",
-  "flux @ git+https://github.com/black-forest-labs/flux.git@c23ae247225daba30fbd56058d247cc1b1fc20a3",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "mediapipe==0.10.7",          # needed for "mediapipeface" controlnet model
   "numpy==1.26.4",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
