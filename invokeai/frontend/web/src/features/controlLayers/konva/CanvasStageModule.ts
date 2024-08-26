@@ -1,5 +1,5 @@
-import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CANVAS_SCALE_BY } from 'features/controlLayers/konva/constants';
 import { getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
 import type { Coordinate, Dimensions, Rect } from 'features/controlLayers/store/types';
@@ -8,7 +8,9 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
 import type { Logger } from 'roarr';
 
-export class CanvasStageModule {
+export class CanvasStageModule extends CanvasModuleBase {
+  readonly type = 'stage';
+
   static MIN_CANVAS_SCALE = 0.1;
   static MAX_CANVAS_SCALE = 20;
 
@@ -19,12 +21,17 @@ export class CanvasStageModule {
   container: HTMLDivElement;
   log: Logger;
 
+  subscriptions = new Set<() => void>();
+
   constructor(stage: Konva.Stage, container: HTMLDivElement, manager: CanvasManager) {
+    super();
     this.id = getPrefixedId('stage');
     this.manager = manager;
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
+
     this.log.debug('Creating stage module');
+
     this.container = container;
     this.konva = { stage };
   }
@@ -50,12 +57,10 @@ export class CanvasStageModule {
     this.fitLayersToStage();
     const cleanupListeners = this.setEventListeners();
 
-    return () => {
-      this.log.debug('Destroying stage');
+    this.subscriptions.add(cleanupListeners);
+    this.subscriptions.add(() => {
       resizeObserver.disconnect();
-      this.konva.stage.destroy();
-      cleanupListeners();
-    };
+    });
   };
 
   fitStageToContainer = () => {
@@ -276,7 +281,21 @@ export class CanvasStageModule {
     this.konva.stage.add(layer);
   };
 
-  getLoggingContext = (): SerializableObject => {
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+    };
+  };
+
+  destroy = () => {
+    this.log.debug('Destroying stage module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.konva.stage.destroy();
+  };
+
+  getLoggingContext = () => {
     return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }
