@@ -100,7 +100,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
 
   // Reminder - use arrow functions to avoid binding issues
   getCanvasState = () => {
-    return this.store.getState().canvasV2;
+    return this.store.getState().canvasV2.present;
   };
   resetEntity = (arg: EntityIdentifierPayload) => {
     this.store.dispatch(entityReset(arg));

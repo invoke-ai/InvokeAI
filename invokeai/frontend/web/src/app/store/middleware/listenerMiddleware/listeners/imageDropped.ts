@@ -85,7 +85,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payload.imageDTO
       ) {
         const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
-        const { x, y } = getState().canvasV2.bbox.rect;
+        const { x, y } = getState().canvasV2.present.bbox.rect;
         const overrides: Partial<CanvasRasterLayerState> = {
           objects: [imageObject],
           position: { x, y },
@@ -103,7 +103,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payload.imageDTO
       ) {
         const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
-        const { x, y } = getState().canvasV2.bbox.rect;
+        const { x, y } = getState().canvasV2.present.bbox.rect;
         const overrides: Partial<CanvasControlLayerState> = {
           objects: [imageObject],
           position: { x, y },

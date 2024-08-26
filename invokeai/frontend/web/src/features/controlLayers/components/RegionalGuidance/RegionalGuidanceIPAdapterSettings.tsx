@@ -35,7 +35,7 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterN
     dispatch(rgIPAdapterDeleted({ entityIdentifier, ipAdapterId }));
   }, [dispatch, entityIdentifier, ipAdapterId]);
   const ipAdapter = useAppSelector((s) => {
-    const ipa = selectRegionalGuidanceIPAdapter(s.canvasV2, entityIdentifier, ipAdapterId);
+    const ipa = selectRegionalGuidanceIPAdapter(s.canvasV2.present, entityIdentifier, ipAdapterId);
     assert(ipa, `Regional GuidanceIP Adapter with id ${ipAdapterId} not found`);
     return ipa;
   });

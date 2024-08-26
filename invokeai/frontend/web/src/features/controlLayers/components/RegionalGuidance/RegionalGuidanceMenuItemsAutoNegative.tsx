@@ -11,7 +11,7 @@ export const RegionalGuidanceMenuItemsAutoNegative = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const autoNegative = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).autoNegative);
+  const autoNegative = useAppSelector((s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).autoNegative);
   const onClick = useCallback(() => {
     dispatch(rgAutoNegativeToggled({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);

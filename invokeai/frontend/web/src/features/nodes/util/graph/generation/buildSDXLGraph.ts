@@ -32,7 +32,7 @@ export const buildSDXLGraph = async (
   log.debug({ generationMode }, 'Building SDXL graph');
 
   const { params, canvasV2, canvasSettings, canvasSession } = state;
-  const { bbox } = canvasV2;
+  const { bbox } = canvasV2.present;
 
   const {
     model,
@@ -211,9 +211,9 @@ export const buildSDXLGraph = async (
   });
   const controlNetResult = await addControlNets(
     manager,
-    state.canvasV2.controlLayers.entities,
+    state.canvasV2.present.controlLayers.entities,
     g,
-    state.canvasV2.bbox.rect,
+    state.canvasV2.present.bbox.rect,
     controlNetCollector,
     modelConfig.base
   );
@@ -229,9 +229,9 @@ export const buildSDXLGraph = async (
   });
   const t2iAdapterResult = await addT2IAdapters(
     manager,
-    state.canvasV2.controlLayers.entities,
+    state.canvasV2.present.controlLayers.entities,
     g,
-    state.canvasV2.bbox.rect,
+    state.canvasV2.present.bbox.rect,
     t2iAdapterCollector,
     modelConfig.base
   );
@@ -245,13 +245,13 @@ export const buildSDXLGraph = async (
     type: 'collect',
     id: getPrefixedId('ip_adapter_collector'),
   });
-  const ipAdapterResult = addIPAdapters(state.canvasV2.ipAdapters.entities, g, ipAdapterCollector, modelConfig.base);
+  const ipAdapterResult = addIPAdapters(state.canvasV2.present.ipAdapters.entities, g, ipAdapterCollector, modelConfig.base);
 
   const regionsResult = await addRegions(
     manager,
-    state.canvasV2.regions.entities,
+    state.canvasV2.present.regions.entities,
     g,
-    state.canvasV2.bbox.rect,
+    state.canvasV2.present.bbox.rect,
     modelConfig.base,
     denoise,
     posCond,

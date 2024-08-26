@@ -17,10 +17,10 @@ export const ToolEraserButton = memo(() => {
   const selectEraser = useSelectTool('eraser');
   const isSelected = useToolIsSelected('eraser');
   const isDrawingToolAllowed = useAppSelector((s) => {
-    if (!s.canvasV2.selectedEntityIdentifier?.type) {
+    if (!s.canvasV2.present.selectedEntityIdentifier?.type) {
       return false;
     }
-    return isDrawableEntityType(s.canvasV2.selectedEntityIdentifier.type);
+    return isDrawableEntityType(s.canvasV2.present.selectedEntityIdentifier.type);
   });
   const isDisabled = useMemo(() => {
     return isTransforming || isFiltering || isStaging || !isDrawingToolAllowed;

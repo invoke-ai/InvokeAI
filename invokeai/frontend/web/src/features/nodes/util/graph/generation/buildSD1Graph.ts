@@ -32,7 +32,7 @@ export const buildSD1Graph = async (
   log.debug({ generationMode }, 'Building SD1/SD2 graph');
 
   const { canvasV2, params, canvasSettings, canvasSession } = state;
-  const { bbox } = canvasV2;
+  const { bbox } = canvasV2.present;
 
   const {
     model,
@@ -208,9 +208,9 @@ export const buildSD1Graph = async (
   });
   const controlNetResult = await addControlNets(
     manager,
-    state.canvasV2.controlLayers.entities,
+    state.canvasV2.present.controlLayers.entities,
     g,
-    state.canvasV2.bbox.rect,
+    state.canvasV2.present.bbox.rect,
     controlNetCollector,
     modelConfig.base
   );
@@ -226,9 +226,9 @@ export const buildSD1Graph = async (
   });
   const t2iAdapterResult = await addT2IAdapters(
     manager,
-    state.canvasV2.controlLayers.entities,
+    state.canvasV2.present.controlLayers.entities,
     g,
-    state.canvasV2.bbox.rect,
+    state.canvasV2.present.bbox.rect,
     t2iAdapterCollector,
     modelConfig.base
   );
@@ -242,13 +242,13 @@ export const buildSD1Graph = async (
     type: 'collect',
     id: getPrefixedId('ip_adapter_collector'),
   });
-  const ipAdapterResult = addIPAdapters(state.canvasV2.ipAdapters.entities, g, ipAdapterCollector, modelConfig.base);
+  const ipAdapterResult = addIPAdapters(state.canvasV2.present.ipAdapters.entities, g, ipAdapterCollector, modelConfig.base);
 
   const regionsResult = await addRegions(
     manager,
-    state.canvasV2.regions.entities,
+    state.canvasV2.present.regions.entities,
     g,
-    state.canvasV2.bbox.rect,
+    state.canvasV2.present.bbox.rect,
     modelConfig.base,
     denoise,
     posCond,

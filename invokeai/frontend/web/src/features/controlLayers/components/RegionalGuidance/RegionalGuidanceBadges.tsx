@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 export const RegionalGuidanceBadges = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
-  const autoNegative = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).autoNegative);
+  const autoNegative = useAppSelector((s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).autoNegative);
 
   return (
     <>

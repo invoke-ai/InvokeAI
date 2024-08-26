@@ -13,12 +13,12 @@ import { RegionalGuidancePositivePrompt } from './RegionalGuidancePositivePrompt
 export const RegionalGuidanceSettings = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const hasPositivePrompt = useAppSelector(
-    (s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).positivePrompt !== null
+    (s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).positivePrompt !== null
   );
   const hasNegativePrompt = useAppSelector(
-    (s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).negativePrompt !== null
+    (s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).negativePrompt !== null
   );
-  const hasIPAdapters = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).ipAdapters.length > 0);
+  const hasIPAdapters = useAppSelector((s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).ipAdapters.length > 0);
 
   return (
     <CanvasEntitySettingsWrapper>

@@ -11,7 +11,7 @@ const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) =
 });
 
 export const RegionalGuidanceEntityList = memo(() => {
-  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'regional_guidance'));
+  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.present.selectedEntityIdentifier?.type === 'regional_guidance'));
   const rgIds = useAppSelector(selectEntityIds);
 
   if (rgIds.length === 0) {

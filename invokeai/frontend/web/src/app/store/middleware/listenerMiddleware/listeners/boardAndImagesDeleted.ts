@@ -16,7 +16,7 @@ export const addDeleteBoardAndImagesFulfilledListener = (startAppListening: AppS
       const { nodes, canvasV2 } = getState();
 
       deleted_images.forEach((image_name) => {
-        const imageUsage = getImageUsage(nodes.present, canvasV2, image_name);
+        const imageUsage = getImageUsage(nodes.present, canvasV2.present, image_name);
 
         if (imageUsage.isNodesImage && !wasNodeEditorReset) {
           dispatch(nodeEditorReset());

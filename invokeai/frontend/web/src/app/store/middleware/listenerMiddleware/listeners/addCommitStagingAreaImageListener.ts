@@ -58,7 +58,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
       const stagingAreaImage = state.canvasSession.stagedImages[index];
 
       assert(stagingAreaImage, 'No staged image found to accept');
-      const { x, y } = state.canvasV2.bbox.rect;
+      const { x, y } = state.canvasV2.present.bbox.rect;
 
       const { imageDTO, offsetX, offsetY } = stagingAreaImage;
       const imageObject = imageDTOToImageObject(imageDTO);

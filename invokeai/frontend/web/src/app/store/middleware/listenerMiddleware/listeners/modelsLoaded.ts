@@ -83,11 +83,11 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
       dispatch(modelChanged({ model: defaultModelInList, previousModel: currentModel }));
 
       const optimalDimension = getOptimalDimension(defaultModelInList);
-      if (getIsSizeOptimal(state.canvasV2.bbox.rect.width, state.canvasV2.bbox.rect.height, optimalDimension)) {
+      if (getIsSizeOptimal(state.canvasV2.present.bbox.rect.width, state.canvasV2.present.bbox.rect.height, optimalDimension)) {
         return;
       }
       const { width, height } = calculateNewSize(
-        state.canvasV2.bbox.aspectRatio.value,
+        state.canvasV2.present.bbox.aspectRatio.value,
         optimalDimension * optimalDimension
       );
 
@@ -172,7 +172,7 @@ const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
   const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
-  state.canvasV2.controlLayers.entities.forEach((entity) => {
+  state.canvasV2.present.controlLayers.entities.forEach((entity) => {
     const isModelAvailable = caModels.some((m) => m.key === entity.controlAdapter.model?.key);
     if (isModelAvailable) {
       return;
@@ -183,7 +183,7 @@ const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log)
 
 const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
   const ipaModels = models.filter(isIPAdapterModelConfig);
-  state.canvasV2.ipAdapters.entities.forEach((entity) => {
+  state.canvasV2.present.ipAdapters.entities.forEach((entity) => {
     const isModelAvailable = ipaModels.some((m) => m.key === entity.ipAdapter.model?.key);
     if (isModelAvailable) {
       return;
@@ -191,7 +191,7 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
     dispatch(ipaModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
   });
 
-  state.canvasV2.regions.entities.forEach((entity) => {
+  state.canvasV2.present.regions.entities.forEach((entity) => {
     entity.ipAdapters.forEach(({ id: ipAdapterId, model }) => {
       const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
       if (isModelAvailable) {

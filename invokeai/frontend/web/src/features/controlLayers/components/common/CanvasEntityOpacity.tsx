@@ -59,13 +59,13 @@ const snapCandidates = marks.slice(1, marks.length - 1);
 export const CanvasEntityOpacity = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const selectedEntityIdentifier = useAppSelector((s) => s.canvasV2.selectedEntityIdentifier);
+  const selectedEntityIdentifier = useAppSelector((s) => s.canvasV2.present.selectedEntityIdentifier);
   const opacity = useAppSelector((s) => {
-    const selectedEntityIdentifier = s.canvasV2.selectedEntityIdentifier;
+    const selectedEntityIdentifier = s.canvasV2.present.selectedEntityIdentifier;
     if (!selectedEntityIdentifier) {
       return null;
     }
-    const selectedEntity = selectEntity(s.canvasV2, selectedEntityIdentifier);
+    const selectedEntity = selectEntity(s.canvasV2.present, selectedEntityIdentifier);
     if (!selectedEntity) {
       return null;
     }

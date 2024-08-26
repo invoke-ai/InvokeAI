@@ -22,7 +22,7 @@ export const addInpaint = async (
   denoise.denoising_start = denoising_start;
 
   const { params, canvasV2, canvasSession } = state;
-  const { bbox } = canvasV2;
+  const { bbox } = canvasV2.present;
   const { mode } = canvasSession;
 
   const initialImage = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);

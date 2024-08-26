@@ -58,7 +58,7 @@ const allReducers = {
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
-  [canvasV2Slice.name]: canvasV2Slice.reducer,
+  [canvasV2Slice.name]: undoable(canvasV2Slice.reducer),
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [upscaleSlice.name]: upscaleSlice.reducer,
   [stylePresetSlice.name]: stylePresetSlice.reducer,

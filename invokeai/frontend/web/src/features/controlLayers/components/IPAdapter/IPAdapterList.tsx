@@ -12,7 +12,7 @@ const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) =
 });
 
 export const IPAdapterList = memo(() => {
-  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'ip_adapter'));
+  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.present.selectedEntityIdentifier?.type === 'ip_adapter'));
   const ipaIds = useAppSelector(selectEntityIds);
 
   if (ipaIds.length === 0) {

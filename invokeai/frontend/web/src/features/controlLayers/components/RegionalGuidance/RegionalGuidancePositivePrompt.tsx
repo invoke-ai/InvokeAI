@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 export const RegionalGuidancePositivePrompt = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
-  const prompt = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).positivePrompt ?? '');
+  const prompt = useAppSelector((s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).positivePrompt ?? '');
   const dispatch = useAppDispatch();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation();

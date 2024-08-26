@@ -14,7 +14,7 @@ export const InpaintMaskMaskFillColorPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('inpaint_mask');
-  const fill = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).fill);
+  const fill = useAppSelector((s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).fill);
 
   const onChangeFillColor = useCallback(
     (color: RgbColor) => {

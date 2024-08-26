@@ -8,7 +8,7 @@ import { PiLockSimpleFill, PiLockSimpleOpenBold } from 'react-icons/pi';
 export const LockAspectRatioButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isLocked = useAppSelector((s) => s.canvasV2.bbox.aspectRatio.isLocked);
+  const isLocked = useAppSelector((s) => s.canvasV2.present.bbox.aspectRatio.isLocked);
   const onClick = useCallback(() => {
     dispatch(bboxAspectRatioLockToggled());
   }, [dispatch]);

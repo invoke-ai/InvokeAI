@@ -40,7 +40,7 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
 };
 
 // const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-//   state.canvasV2.controlAdapters.entities.forEach(({ id, imageObject, processedImageObject }) => {
+//   state.canvasV2.present.controlAdapters.entities.forEach(({ id, imageObject, processedImageObject }) => {
 //     if (
 //       imageObject?.image.image_name === imageDTO.image_name ||
 //       processedImageObject?.image.image_name === imageDTO.image_name
@@ -52,7 +52,7 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
 // };
 
 const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.canvasV2.ipAdapters.entities.forEach((entity) => {
+  state.canvasV2.present.ipAdapters.entities.forEach((entity) => {
     if (entity.ipAdapter.image?.image_name === imageDTO.image_name) {
       dispatch(ipaImageChanged({ entityIdentifier: getEntityIdentifier(entity), imageDTO: null }));
     }
@@ -60,7 +60,7 @@ const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO
 };
 
 const deleteLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.canvasV2.rasterLayers.entities.forEach(({ id, objects }) => {
+  state.canvasV2.present.rasterLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
       if (obj.type === 'image' && obj.image.image_name === imageDTO.image_name) {

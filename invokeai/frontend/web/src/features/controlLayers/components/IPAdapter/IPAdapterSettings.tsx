@@ -25,7 +25,7 @@ import { IPAdapterModel } from './IPAdapterModel';
 export const IPAdapterSettings = memo(() => {
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('ip_adapter');
-  const ipAdapter = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).ipAdapter);
+  const ipAdapter = useAppSelector((s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).ipAdapter);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {

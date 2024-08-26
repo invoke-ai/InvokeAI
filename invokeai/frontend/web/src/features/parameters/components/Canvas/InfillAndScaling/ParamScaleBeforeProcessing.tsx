@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 const ParamScaleBeforeProcessing = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const scaleMethod = useAppSelector((s) => s.canvasV2.bbox.scaleMethod);
+  const scaleMethod = useAppSelector((s) => s.canvasV2.present.bbox.scaleMethod);
 
   const OPTIONS: ComboboxOption[] = useMemo(
     () => [

@@ -16,7 +16,7 @@ import { assert } from 'tsafe';
 /**
  * Selects the canvasV2 slice from the root state
  */
-export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
+export const selectCanvasV2Slice = (state: RootState) => state.canvasV2.present;
 
 /**
  * Selects the total canvas entity count:

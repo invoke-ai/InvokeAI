@@ -17,10 +17,10 @@ export const ToolRectButton = memo(() => {
   const isTransforming = useIsTransforming();
   const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
   const isDrawingToolAllowed = useAppSelector((s) => {
-    if (!s.canvasV2.selectedEntityIdentifier?.type) {
+    if (!s.canvasV2.present.selectedEntityIdentifier?.type) {
       return false;
     }
-    return isDrawableEntityType(s.canvasV2.selectedEntityIdentifier.type);
+    return isDrawableEntityType(s.canvasV2.present.selectedEntityIdentifier.type);
   });
 
   const isDisabled = useMemo(() => {

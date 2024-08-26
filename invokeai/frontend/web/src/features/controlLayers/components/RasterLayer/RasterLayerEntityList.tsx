@@ -11,7 +11,7 @@ const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) =
 });
 
 export const RasterLayerEntityList = memo(() => {
-  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'raster_layer'));
+  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.present.selectedEntityIdentifier?.type === 'raster_layer'));
   const layerIds = useAppSelector(selectEntityIds);
 
   if (layerIds.length === 0) {

@@ -14,7 +14,7 @@ export const RegionalGuidanceMaskFillColorPicker = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const fill = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).fill);
+  const fill = useAppSelector((s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).fill);
   const onChangeFillColor = useCallback(
     (color: RgbColor) => {
       dispatch(rgFillColorChanged({ entityIdentifier, color }));

@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 export const AspectRatioSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const id = useAppSelector((s) => s.canvasV2.bbox.aspectRatio.id);
+  const id = useAppSelector((s) => s.canvasV2.present.bbox.aspectRatio.id);
 
   const onChange = useCallback(
     (v: SingleValue<ComboboxOption>) => {

@@ -9,7 +9,7 @@ export const ControlLayerBadges = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('control_layer');
   const { t } = useTranslation();
   const withTransparencyEffect = useAppSelector(
-    (s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).withTransparencyEffect
+    (s) => selectEntityOrThrow(s.canvasV2.present, entityIdentifier).withTransparencyEffect
   );
 
   return (

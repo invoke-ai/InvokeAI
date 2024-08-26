@@ -13,7 +13,7 @@ export const HeadsUpDisplay = memo(() => {
   const isMouseDown = useStore(canvasManager.stateApi.$isMouseDown);
   const lastMouseDownPos = useStore(canvasManager.stateApi.$lastMouseDownPos);
   const lastAddedPoint = useStore(canvasManager.stateApi.$lastAddedPoint);
-  const bbox = useAppSelector((s) => s.canvasV2.bbox);
+  const bbox = useAppSelector((s) => s.canvasV2.present.bbox);
 
   return (
     <Flex flexDir="column" bg="blackAlpha.400" borderBottomEndRadius="base" p={2} minW={64} gap={2}>
