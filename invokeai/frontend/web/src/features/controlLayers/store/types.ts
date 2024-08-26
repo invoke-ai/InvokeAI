@@ -736,8 +736,6 @@ export type CanvasV2State = {
   };
   loras: LoRA[];
   tool: {
-    selected: Tool;
-    selectedBuffer: Tool | null;
     invertScroll: boolean;
     brush: { width: number };
     eraser: { width: number };
