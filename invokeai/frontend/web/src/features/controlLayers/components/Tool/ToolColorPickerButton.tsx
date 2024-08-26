@@ -14,7 +14,7 @@ export const ToolColorPickerButton = memo(() => {
   const isTransforming = useIsTransforming();
   const selectColorPicker = useSelectTool('colorPicker');
   const isSelected = useToolIsSelected('colorPicker');
-  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
 
   const isDisabled = useMemo(() => {
     return isTransforming || isFiltering || isStaging;

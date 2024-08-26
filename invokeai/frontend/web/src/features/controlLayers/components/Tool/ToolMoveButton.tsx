@@ -15,7 +15,7 @@ export const ToolMoveButton = memo(() => {
   const isTransforming = useIsTransforming();
   const selectMove = useSelectTool('move');
   const isSelected = useToolIsSelected('move');
-  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
   const isDrawingToolAllowed = useAppSelector((s) => {
     if (!s.canvasV2.selectedEntityIdentifier?.type) {
       return false;

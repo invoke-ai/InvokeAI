@@ -5,7 +5,7 @@ import type { SerializableObject } from 'common/types';
 import type { Result } from 'common/util/result';
 import { isErr, withResult, withResultAsync } from 'common/util/result';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { sessionStagingAreaReset, sessionStartedStaging } from 'features/controlLayers/store/canvasV2Slice';
+import { sessionStagingAreaReset, sessionStartedStaging } from 'features/controlLayers/store/canvasSessionSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
@@ -31,13 +31,13 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       let didStartStaging = false;
 
-      if (!state.canvasV2.session.isStaging && state.canvasV2.session.mode === 'compose') {
+      if (!state.canvasSession.isStaging && state.canvasSession.mode === 'compose') {
         dispatch(sessionStartedStaging());
         didStartStaging = true;
       }
 
       const abortStaging = () => {
-        if (didStartStaging && getState().canvasV2.session.isStaging) {
+        if (didStartStaging && getState().canvasSession.isStaging) {
           dispatch(sessionStagingAreaReset());
         }
       };

@@ -33,9 +33,11 @@ export const CanvasEditor = memo(() => {
       <ControlLayersToolbar />
       <StageComponent />
       <Flex position="absolute" bottom={16} gap={2} align="center" justify="center">
-        <StagingAreaIsStagingGate>
-          <StagingAreaToolbar />
-        </StagingAreaIsStagingGate>
+        <CanvasManagerProviderGate>
+          <StagingAreaIsStagingGate>
+            <StagingAreaToolbar />
+          </StagingAreaIsStagingGate>
+        </CanvasManagerProviderGate>
       </Flex>
       <Flex position="absolute" bottom={16}>
         <CanvasManagerProviderGate>

@@ -14,7 +14,7 @@ export const ToolBboxButton = memo(() => {
   const isSelected = useToolIsSelected('bbox');
   const isFiltering = useIsFiltering();
   const isTransforming = useIsTransforming();
-  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
   const isDisabled = useMemo(() => {
     return isTransforming || isFiltering || isStaging;
   }, [isFiltering, isStaging, isTransforming]);
