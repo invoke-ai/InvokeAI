@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { loraDeleted } from 'features/controlLayers/store/canvasV2Slice';
+import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
@@ -31,7 +31,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         let modelsCleared = 0;
 
         // handle incompatible loras
-        state.canvasV2.loras.forEach((lora) => {
+        state.loras.loras.forEach((lora) => {
           if (lora.model.base !== newBaseModel) {
             dispatch(loraDeleted({ id: lora.id }));
             modelsCleared += 1;
