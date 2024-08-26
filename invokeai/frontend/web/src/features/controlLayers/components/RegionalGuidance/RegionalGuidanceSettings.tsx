@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { RegionalGuidanceAddPromptsIPAdapterButtons } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceAddPromptsIPAdapterButtons';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectRegionalGuidanceEntityOrThrow } from 'features/controlLayers/store/regionsReducers';
+import { selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 
 import { RegionalGuidanceIPAdapters } from './RegionalGuidanceIPAdapters';
@@ -11,35 +11,31 @@ import { RegionalGuidanceNegativePrompt } from './RegionalGuidanceNegativePrompt
 import { RegionalGuidancePositivePrompt } from './RegionalGuidancePositivePrompt';
 
 export const RegionalGuidanceSettings = memo(() => {
-  const { id } = useEntityIdentifierContext();
+  const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const hasPositivePrompt = useAppSelector(
-    (s) => selectRegionalGuidanceEntityOrThrow(s.canvasV2, id).positivePrompt !== null
+    (s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).positivePrompt !== null
   );
   const hasNegativePrompt = useAppSelector(
-    (s) => selectRegionalGuidanceEntityOrThrow(s.canvasV2, id).negativePrompt !== null
+    (s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).negativePrompt !== null
   );
-  const hasIPAdapters = useAppSelector(
-    (s) => selectRegionalGuidanceEntityOrThrow(s.canvasV2, id).ipAdapters.length > 0
-  );
+  const hasIPAdapters = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).ipAdapters.length > 0);
 
   return (
     <CanvasEntitySettingsWrapper>
-      {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && (
-        <RegionalGuidanceAddPromptsIPAdapterButtons id={id} />
-      )}
+      {!hasPositivePrompt && !hasNegativePrompt && !hasIPAdapters && <RegionalGuidanceAddPromptsIPAdapterButtons />}
       {hasPositivePrompt && (
         <>
-          <RegionalGuidancePositivePrompt id={id} />
+          <RegionalGuidancePositivePrompt />
           {(hasNegativePrompt || hasIPAdapters) && <Divider />}
         </>
       )}
       {hasNegativePrompt && (
         <>
-          <RegionalGuidanceNegativePrompt id={id} />
+          <RegionalGuidanceNegativePrompt />
           {hasIPAdapters && <Divider />}
         </>
       )}
-      {hasIPAdapters && <RegionalGuidanceIPAdapters id={id} />}
+      {hasIPAdapters && <RegionalGuidanceIPAdapters />}
     </CanvasEntitySettingsWrapper>
   );
 });

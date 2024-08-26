@@ -1,44 +1,42 @@
 import { Button, Flex } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
   rgIPAdapterAdded,
   rgNegativePromptChanged,
   rgPositivePromptChanged,
-  selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCanvasV2Slice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 
-type AddPromptButtonProps = {
-  id: string;
-};
-
-export const RegionalGuidanceAddPromptsIPAdapterButtons = ({ id }: AddPromptButtonProps) => {
+export const RegionalGuidanceAddPromptsIPAdapterButtons = () => {
+  const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
-        const rg = canvasV2.regions.entities.find((rg) => rg.id === id);
+        const entity = selectEntityOrThrow(canvasV2, entityIdentifier);
         return {
-          canAddPositivePrompt: rg?.positivePrompt === null,
-          canAddNegativePrompt: rg?.negativePrompt === null,
+          canAddPositivePrompt: entity?.positivePrompt === null,
+          canAddNegativePrompt: entity?.negativePrompt === null,
         };
       }),
-    [id]
+    [entityIdentifier]
   );
   const validActions = useAppSelector(selectValidActions);
   const addPositivePrompt = useCallback(() => {
-    dispatch(rgPositivePromptChanged({ id, prompt: '' }));
-  }, [dispatch, id]);
+    dispatch(rgPositivePromptChanged({ entityIdentifier, prompt: '' }));
+  }, [dispatch, entityIdentifier]);
   const addNegativePrompt = useCallback(() => {
-    dispatch(rgNegativePromptChanged({ id, prompt: '' }));
-  }, [dispatch, id]);
+    dispatch(rgNegativePromptChanged({ entityIdentifier, prompt: '' }));
+  }, [dispatch, entityIdentifier]);
   const addIPAdapter = useCallback(() => {
-    dispatch(rgIPAdapterAdded({ id }));
-  }, [dispatch, id]);
+    dispatch(rgIPAdapterAdded({ entityIdentifier }));
+  }, [dispatch, entityIdentifier]);
 
   return (
     <Flex w="full" p={2} justifyContent="space-between">

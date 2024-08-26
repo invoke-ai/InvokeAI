@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
 import { InpaintMask } from 'features/controlLayers/components/InpaintMask/InpaintMask';
 import { mapId } from 'features/controlLayers/konva/util';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 
 const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {

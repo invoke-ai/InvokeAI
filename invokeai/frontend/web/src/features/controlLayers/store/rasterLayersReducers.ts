@@ -1,13 +1,11 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectEntity } from 'features/controlLayers/store/selectors';
 import { merge } from 'lodash-es';
 
-import type { CanvasControlLayerState, CanvasRasterLayerState, CanvasV2State } from './types';
+import type { CanvasControlLayerState, CanvasRasterLayerState, CanvasV2State, EntityIdentifierPayload } from './types';
 import { getEntityIdentifier, initialControlNet } from './types';
-
-const selectRasterLayerEntity = (state: CanvasV2State, id: string) =>
-  state.rasterLayers.entities.find((layer) => layer.id === id);
 
 export const rasterLayersReducers = {
   rasterLayerAdded: {
@@ -38,12 +36,12 @@ export const rasterLayersReducers = {
   rasterLayerRecalled: (state, action: PayloadAction<{ data: CanvasRasterLayerState }>) => {
     const { data } = action.payload;
     state.rasterLayers.entities.push(data);
-    state.selectedEntityIdentifier = { type: 'raster_layer', id: data.id };
+    state.selectedEntityIdentifier = getEntityIdentifier(data);
   },
   rasterLayerConvertedToControlLayer: {
-    reducer: (state, action: PayloadAction<{ id: string; newId: string }>) => {
-      const { id, newId } = action.payload;
-      const layer = selectRasterLayerEntity(state, id);
+    reducer: (state, action: PayloadAction<EntityIdentifierPayload<{ newId: string }, 'raster_layer'>>) => {
+      const { entityIdentifier, newId } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
       if (!layer) {
         return;
       }
@@ -58,14 +56,14 @@ export const rasterLayersReducers = {
       };
 
       // Remove the raster layer
-      state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== id);
+      state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
 
       // Add the converted control layer
       state.controlLayers.entities.push(controlLayerState);
 
       state.selectedEntityIdentifier = { type: controlLayerState.type, id: controlLayerState.id };
     },
-    prepare: (payload: { id: string }) => ({
+    prepare: (payload: EntityIdentifierPayload<void, 'raster_layer'>) => ({
       payload: { ...payload, newId: getPrefixedId('control_layer') },
     }),
   },

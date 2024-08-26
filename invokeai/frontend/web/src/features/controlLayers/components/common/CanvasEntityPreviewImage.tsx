@@ -5,7 +5,7 @@ import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { useEntityAdapter } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
-import { selectCanvasV2Slice, selectEntity } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCanvasV2Slice, selectEntity } from 'features/controlLayers/store/selectors';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
 
