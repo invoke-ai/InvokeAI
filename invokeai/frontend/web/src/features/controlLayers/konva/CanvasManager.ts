@@ -19,7 +19,6 @@ import type { CanvasLayerAdapter } from './CanvasLayerAdapter';
 import type { CanvasMaskAdapter } from './CanvasMaskAdapter';
 import { CanvasPreviewModule } from './CanvasPreviewModule';
 import { CanvasStateApiModule } from './CanvasStateApiModule';
-import { setStageEventHandlers } from './events';
 
 export const $canvasManager = atom<CanvasManager | null>(null);
 const TYPE = 'manager';
@@ -110,7 +109,6 @@ export class CanvasManager {
     this.stateApi.$currentFill.set(this.stateApi.getCurrentFill());
     this.stateApi.$selectedEntity.set(this.stateApi.getSelectedEntity());
 
-    const cleanupEventHandlers = setStageEventHandlers(this);
     const cleanupStage = this.stage.initialize();
     const cleanupStore = this.store.subscribe(this.renderer.render);
 
@@ -122,7 +120,6 @@ export class CanvasManager {
       this.background.destroy();
       this.preview.destroy();
       cleanupStore();
-      cleanupEventHandlers();
       cleanupStage();
     };
   };
