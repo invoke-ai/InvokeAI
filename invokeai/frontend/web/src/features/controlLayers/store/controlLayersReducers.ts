@@ -1,10 +1,10 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectEntity } from 'features/controlLayers/store/selectors';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { merge, omit } from 'lodash-es';
 import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
-import { assert } from 'tsafe';
 
 import type {
   CanvasControlLayerState,
@@ -12,17 +12,10 @@ import type {
   CanvasV2State,
   ControlModeV2,
   ControlNetConfig,
+  EntityIdentifierPayload,
   T2IAdapterConfig,
 } from './types';
 import { getEntityIdentifier, initialControlNet } from './types';
-
-const selectControlLayerEntity = (state: CanvasV2State, id: string) =>
-  state.controlLayers.entities.find((entity) => entity.id === id);
-export const selectControlLayerEntityOrThrow = (state: CanvasV2State, id: string) => {
-  const layer = selectControlLayerEntity(state, id);
-  assert(layer, `Layer with id ${id} not found`);
-  return layer;
-};
 
 export const controlLayersReducers = {
   controlLayerAdded: {
@@ -58,9 +51,9 @@ export const controlLayersReducers = {
     state.selectedEntityIdentifier = { type: 'control_layer', id: data.id };
   },
   controlLayerConvertedToRasterLayer: {
-    reducer: (state, action: PayloadAction<{ id: string; newId: string }>) => {
-      const { id, newId } = action.payload;
-      const layer = selectControlLayerEntity(state, id);
+    reducer: (state, action: PayloadAction<EntityIdentifierPayload<{ newId: string }, 'control_layer'>>) => {
+      const { entityIdentifier, newId } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
       if (!layer) {
         return;
       }
@@ -73,26 +66,30 @@ export const controlLayersReducers = {
       };
 
       // Remove the control layer
-      state.controlLayers.entities = state.controlLayers.entities.filter((layer) => layer.id !== id);
+      state.controlLayers.entities = state.controlLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
 
       // Add the new raster layer
       state.rasterLayers.entities.push(rasterLayerState);
 
       state.selectedEntityIdentifier = { type: rasterLayerState.type, id: rasterLayerState.id };
     },
-    prepare: (payload: { id: string }) => ({
+    prepare: (payload: EntityIdentifierPayload<void, 'control_layer'>) => ({
       payload: { ...payload, newId: getPrefixedId('raster_layer') },
     }),
   },
   controlLayerModelChanged: (
     state,
-    action: PayloadAction<{
-      id: string;
-      modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | null;
-    }>
+    action: PayloadAction<
+      EntityIdentifierPayload<
+        {
+          modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | null;
+        },
+        'control_layer'
+      >
+    >
   ) => {
-    const { id, modelConfig } = action.payload;
-    const layer = selectControlLayerEntity(state, id);
+    const { entityIdentifier, modelConfig } = action.payload;
+    const layer = selectEntity(state, entityIdentifier);
     if (!layer || !layer.controlAdapter) {
       return;
     }
@@ -118,17 +115,23 @@ export const controlLayersReducers = {
       layer.controlAdapter = t2iAdapterConfig;
     }
   },
-  controlLayerControlModeChanged: (state, action: PayloadAction<{ id: string; controlMode: ControlModeV2 }>) => {
-    const { id, controlMode } = action.payload;
-    const layer = selectControlLayerEntity(state, id);
+  controlLayerControlModeChanged: (
+    state,
+    action: PayloadAction<EntityIdentifierPayload<{ controlMode: ControlModeV2 }, 'control_layer'>>
+  ) => {
+    const { entityIdentifier, controlMode } = action.payload;
+    const layer = selectEntity(state, entityIdentifier);
     if (!layer || !layer.controlAdapter || layer.controlAdapter.type !== 'controlnet') {
       return;
     }
     layer.controlAdapter.controlMode = controlMode;
   },
-  controlLayerWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
-    const { id, weight } = action.payload;
-    const layer = selectControlLayerEntity(state, id);
+  controlLayerWeightChanged: (
+    state,
+    action: PayloadAction<EntityIdentifierPayload<{ weight: number }, 'control_layer'>>
+  ) => {
+    const { entityIdentifier, weight } = action.payload;
+    const layer = selectEntity(state, entityIdentifier);
     if (!layer || !layer.controlAdapter) {
       return;
     }
@@ -136,18 +139,21 @@ export const controlLayersReducers = {
   },
   controlLayerBeginEndStepPctChanged: (
     state,
-    action: PayloadAction<{ id: string; beginEndStepPct: [number, number] }>
+    action: PayloadAction<EntityIdentifierPayload<{ beginEndStepPct: [number, number] }, 'control_layer'>>
   ) => {
-    const { id, beginEndStepPct } = action.payload;
-    const layer = selectControlLayerEntity(state, id);
+    const { entityIdentifier, beginEndStepPct } = action.payload;
+    const layer = selectEntity(state, entityIdentifier);
     if (!layer || !layer.controlAdapter) {
       return;
     }
     layer.controlAdapter.beginEndStepPct = beginEndStepPct;
   },
-  controlLayerWithTransparencyEffectToggled: (state, action: PayloadAction<{ id: string }>) => {
-    const { id } = action.payload;
-    const layer = selectControlLayerEntity(state, id);
+  controlLayerWithTransparencyEffectToggled: (
+    state,
+    action: PayloadAction<EntityIdentifierPayload<void, 'control_layer'>>
+  ) => {
+    const { entityIdentifier } = action.payload;
+    const layer = selectEntity(state, entityIdentifier);
     if (!layer) {
       return;
     }

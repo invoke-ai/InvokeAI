@@ -5,7 +5,7 @@ import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { MaskFillStyle } from 'features/controlLayers/components/common/MaskFillStyle';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { inpaintMaskFillColorChanged, inpaintMaskFillStyleChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { selectInpaintMaskEntityOrThrow } from 'features/controlLayers/store/inpaintMaskReducers';
+import { selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { FillStyle, RgbColor } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,8 +13,8 @@ import { useTranslation } from 'react-i18next';
 export const InpaintMaskMaskFillColorPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const entityIdentifier = useEntityIdentifierContext();
-  const fill = useAppSelector((s) => selectInpaintMaskEntityOrThrow(s.canvasV2, entityIdentifier.id).fill);
+  const entityIdentifier = useEntityIdentifierContext('inpaint_mask');
+  const fill = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).fill);
 
   const onChangeFillColor = useCallback(
     (color: RgbColor) => {

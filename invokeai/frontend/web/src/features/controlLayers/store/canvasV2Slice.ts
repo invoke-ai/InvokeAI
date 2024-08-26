@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createAction, createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { PersistConfig } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -13,6 +13,7 @@ import { lorasReducers } from 'features/controlLayers/store/lorasReducers';
 import { paramsReducers } from 'features/controlLayers/store/paramsReducers';
 import { rasterLayersReducers } from 'features/controlLayers/store/rasterLayersReducers';
 import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
+import { selectAllEntities, selectAllEntitiesOfType, selectEntity } from 'features/controlLayers/store/selectors';
 import { sessionReducers } from 'features/controlLayers/store/sessionReducers';
 import { settingsReducers } from 'features/controlLayers/store/settingsReducers';
 import { toolReducers } from 'features/controlLayers/store/toolReducers';
@@ -25,12 +26,7 @@ import { atom } from 'nanostores';
 import { assert } from 'tsafe';
 
 import type {
-  CanvasControlLayerState,
   CanvasEntityIdentifier,
-  CanvasEntityState,
-  CanvasInpaintMaskState,
-  CanvasRasterLayerState,
-  CanvasRegionalGuidanceState,
   CanvasV2State,
   Coordinate,
   EntityBrushLineAddedPayload,
@@ -143,60 +139,6 @@ const initialState: CanvasV2State = {
   },
 };
 
-export function selectEntity(state: CanvasV2State, { id, type }: CanvasEntityIdentifier) {
-  switch (type) {
-    case 'raster_layer':
-      return state.rasterLayers.entities.find((entity) => entity.id === id);
-    case 'control_layer':
-      return state.controlLayers.entities.find((entity) => entity.id === id);
-    case 'inpaint_mask':
-      return state.inpaintMasks.entities.find((entity) => entity.id === id);
-    case 'regional_guidance':
-      return state.regions.entities.find((entity) => entity.id === id);
-    case 'ip_adapter':
-      return state.ipAdapters.entities.find((entity) => entity.id === id);
-    default:
-      return;
-  }
-}
-
-function selectAllEntitiesOfType(state: CanvasV2State, type: CanvasEntityState['type']): CanvasEntityState[] {
-  switch (type) {
-    case 'raster_layer':
-      return state.rasterLayers.entities;
-    case 'control_layer':
-      return state.controlLayers.entities;
-    case 'inpaint_mask':
-      return state.inpaintMasks.entities;
-    case 'regional_guidance':
-      return state.regions.entities;
-    case 'ip_adapter':
-      return state.ipAdapters.entities;
-  }
-}
-
-function selectAllEntities(state: CanvasV2State): CanvasEntityState[] {
-  // These are in the same order as they are displayed in the list!
-  return [
-    ...state.inpaintMasks.entities.toReversed(),
-    ...state.regions.entities.toReversed(),
-    ...state.ipAdapters.entities.toReversed(),
-    ...state.controlLayers.entities.toReversed(),
-    ...state.rasterLayers.entities.toReversed(),
-  ];
-}
-
-export function selectAllRenderableEntities(
-  state: CanvasV2State
-): (CanvasRasterLayerState | CanvasControlLayerState | CanvasInpaintMaskState | CanvasRegionalGuidanceState)[] {
-  return [
-    ...state.rasterLayers.entities,
-    ...state.controlLayers.entities,
-    ...state.inpaintMasks.entities,
-    ...state.regions.entities,
-  ];
-}
-
 export const canvasV2Slice = createSlice({
   name: 'canvasV2',
   initialState,
@@ -217,7 +159,7 @@ export const canvasV2Slice = createSlice({
       const { entityIdentifier } = action.payload;
       state.selectedEntityIdentifier = entityIdentifier;
     },
-    entityNameChanged: (state, action: PayloadAction<EntityIdentifierPayload & { name: string | null }>) => {
+    entityNameChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ name: string | null }>>) => {
       const { entityIdentifier, name } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
@@ -616,8 +558,6 @@ export const {
   sessionPrevStagedImageSelected,
   sessionModeChanged,
 } = canvasV2Slice.actions;
-
-export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {

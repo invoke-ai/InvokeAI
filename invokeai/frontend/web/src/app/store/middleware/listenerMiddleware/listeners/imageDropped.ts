@@ -51,7 +51,9 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payload.imageDTO
       ) {
         const { id } = overData.context;
-        dispatch(ipaImageChanged({ id, imageDTO: activeData.payload.imageDTO }));
+        dispatch(
+          ipaImageChanged({ entityIdentifier: { id, type: 'ip_adapter' }, imageDTO: activeData.payload.imageDTO })
+        );
         return;
       }
 
@@ -64,7 +66,13 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payload.imageDTO
       ) {
         const { id, ipAdapterId } = overData.context;
-        dispatch(rgIPAdapterImageChanged({ id, ipAdapterId, imageDTO: activeData.payload.imageDTO }));
+        dispatch(
+          rgIPAdapterImageChanged({
+            entityIdentifier: { id, type: 'regional_guidance' },
+            ipAdapterId,
+            imageDTO: activeData.payload.imageDTO,
+          })
+        );
         return;
       }
 

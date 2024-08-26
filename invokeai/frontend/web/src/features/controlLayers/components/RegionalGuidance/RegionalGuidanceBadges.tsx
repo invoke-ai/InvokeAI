@@ -1,14 +1,14 @@
 import { Badge } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectRegionalGuidanceEntityOrThrow } from 'features/controlLayers/store/regionsReducers';
+import { selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const RegionalGuidanceBadges = memo(() => {
-  const { id } = useEntityIdentifierContext();
+  const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
-  const autoNegative = useAppSelector((s) => selectRegionalGuidanceEntityOrThrow(s.canvasV2, id).autoNegative);
+  const autoNegative = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).autoNegative);
 
   return (
     <>

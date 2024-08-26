@@ -13,6 +13,7 @@ import {
   rgIPAdapterModelChanged,
   vaeSelected,
 } from 'features/controlLayers/store/canvasV2Slice';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
@@ -178,7 +179,7 @@ const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log)
     if (isModelAvailable) {
       return;
     }
-    dispatch(controlLayerModelChanged({ id: entity.id, modelConfig: null }));
+    dispatch(controlLayerModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
   });
 };
 
@@ -189,16 +190,18 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
     if (isModelAvailable) {
       return;
     }
-    dispatch(ipaModelChanged({ id: entity.id, modelConfig: null }));
+    dispatch(ipaModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
   });
 
-  state.canvasV2.regions.entities.forEach(({ id, ipAdapters }) => {
-    ipAdapters.forEach(({ id: ipAdapterId, model }) => {
+  state.canvasV2.regions.entities.forEach((entity) => {
+    entity.ipAdapters.forEach(({ id: ipAdapterId, model }) => {
       const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
       if (isModelAvailable) {
         return;
       }
-      dispatch(rgIPAdapterModelChanged({ id, ipAdapterId, modelConfig: null }));
+      dispatch(
+        rgIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), ipAdapterId, modelConfig: null })
+      );
     });
   });
 };

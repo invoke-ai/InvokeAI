@@ -7,8 +7,8 @@ import {
   entityArrangedForwardOne,
   entityArrangedToBack,
   entityArrangedToFront,
-  selectCanvasV2Slice,
 } from 'features/controlLayers/store/canvasV2Slice';
+import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, CanvasV2State } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
