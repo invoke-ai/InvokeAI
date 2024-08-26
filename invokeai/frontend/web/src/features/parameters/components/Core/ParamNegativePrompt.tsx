@@ -1,6 +1,6 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { negativePromptChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { negativePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
@@ -13,7 +13,7 @@ import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.canvasV2.params.negativePrompt);
+  const prompt = useAppSelector((s) => s.params.negativePrompt);
   const viewMode = useAppSelector((s) => s.stylePreset.viewMode);
   const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
 

@@ -1,12 +1,12 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setCfgRescaleMultiplier } from 'features/controlLayers/store/canvasV2Slice';
+import { setCfgRescaleMultiplier } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamCFGRescaleMultiplier = () => {
-  const cfgRescaleMultiplier = useAppSelector((s) => s.canvasV2.params.cfgRescaleMultiplier);
+  const cfgRescaleMultiplier = useAppSelector((s) => s.params.cfgRescaleMultiplier);
   const initial = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.sliderMin);
   const sliderMax = useAppSelector((s) => s.config.sd.cfgRescaleMultiplier.sliderMax);

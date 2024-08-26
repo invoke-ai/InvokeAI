@@ -13,7 +13,7 @@ import { getBoardField, getPresetModifiedPrompts } from './graphBuilderUtils';
 export const buildMultidiffusionUpscaleGraph = async (
   state: RootState
 ): Promise<{ g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'compel' | 'sdxl_compel_prompt'> }> => {
-  const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.canvasV2.params;
+  const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.params;
   const { upscaleModel, upscaleInitialImage, structure, creativity, tileControlnetModel, scale } = state.upscale;
 
   assert(model, 'No model found in state');

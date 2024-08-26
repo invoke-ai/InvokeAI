@@ -10,7 +10,7 @@ import { useControlNetModels } from 'services/api/hooks/modelsByType';
 
 export const UpscaleWarning = () => {
   const { t } = useTranslation();
-  const model = useAppSelector((s) => s.canvasV2.params.model);
+  const model = useAppSelector((s) => s.params.model);
   const upscaleModel = useAppSelector((s) => s.upscale.upscaleModel);
   const tileControlnetModel = useAppSelector((s) => s.upscale.tileControlnetModel);
   const upscaleInitialImage = useAppSelector((s) => s.upscale.upscaleInitialImage);

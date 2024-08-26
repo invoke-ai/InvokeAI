@@ -1,5 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
@@ -40,8 +41,8 @@ export const selectEntityCount = createSelector(selectCanvasV2Slice, (canvasV2) 
 /**
  * Selects the optimal dimension for the canvas based on the currently-model
  */
-export const selectOptimalDimension = createSelector(selectCanvasV2Slice, (canvasV2) => {
-  return getOptimalDimension(canvasV2.params.model);
+export const selectOptimalDimension = createSelector(selectParamsSlice, (params) => {
+  return getOptimalDimension(params.model);
 });
 
 /**

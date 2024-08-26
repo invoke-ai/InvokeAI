@@ -2,6 +2,7 @@ import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
 import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
@@ -18,31 +19,34 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selector = createMemoizedSelector([selectHrfSlice, selectCanvasV2Slice], (hrf, canvasV2) => {
-  const { shouldRandomizeSeed, model } = canvasV2.params;
-  const { hrfEnabled } = hrf;
-  const badges: string[] = [];
-  const isSDXL = model?.base === 'sdxl';
+const selector = createMemoizedSelector(
+  [selectHrfSlice, selectCanvasV2Slice, selectParamsSlice],
+  (hrf, canvasV2, params) => {
+    const { shouldRandomizeSeed, model } = params;
+    const { hrfEnabled } = hrf;
+    const badges: string[] = [];
+    const isSDXL = model?.base === 'sdxl';
 
-  const { aspectRatio } = canvasV2.bbox;
-  const { width, height } = canvasV2.bbox.rect;
+    const { aspectRatio } = canvasV2.bbox;
+    const { width, height } = canvasV2.bbox.rect;
 
-  badges.push(`${width}×${height}`);
-  badges.push(aspectRatio.id);
+    badges.push(`${width}×${height}`);
+    badges.push(aspectRatio.id);
 
-  if (aspectRatio.isLocked) {
-    badges.push('locked');
+    if (aspectRatio.isLocked) {
+      badges.push('locked');
+    }
+
+    if (!shouldRandomizeSeed) {
+      badges.push('Manual Seed');
+    }
+
+    if (hrfEnabled && !isSDXL) {
+      badges.push('HiRes Fix');
+    }
+    return { badges, isSDXL };
   }
-
-  if (!shouldRandomizeSeed) {
-    badges.push('Manual Seed');
-  }
-
-  if (hrfEnabled && !isSDXL) {
-    badges.push('HiRes Fix');
-  }
-  return { badges, isSDXL };
-});
+);
 
 const scalingLabelProps: FormLabelProps = {
   minW: '4.5rem',

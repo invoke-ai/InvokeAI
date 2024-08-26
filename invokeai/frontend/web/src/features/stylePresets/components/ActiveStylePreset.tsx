@@ -1,6 +1,6 @@
 import { Badge, Flex, IconButton, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import { activeStylePresetIdChanged, viewModeChanged } from 'features/stylePresets/store/stylePresetSlice';
 import type { MouseEventHandler } from 'react';

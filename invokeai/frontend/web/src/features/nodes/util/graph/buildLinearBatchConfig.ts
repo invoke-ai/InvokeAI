@@ -12,7 +12,7 @@ export const prepareLinearUIBatch = (
   noise: Invocation<'noise'>,
   posCond: Invocation<'compel' | 'sdxl_compel_prompt'>
 ): BatchConfig => {
-  const { iterations, model, shouldRandomizeSeed, seed, shouldConcatPrompts } = state.canvasV2.params;
+  const { iterations, model, shouldRandomizeSeed, seed, shouldConcatPrompts } = state.params;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];

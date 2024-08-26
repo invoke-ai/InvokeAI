@@ -1,19 +1,19 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setClipSkip } from 'features/controlLayers/store/canvasV2Slice';
+import { setClipSkip } from 'features/controlLayers/store/paramsSlice';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamClipSkip = () => {
-  const clipSkip = useAppSelector((s) => s.canvasV2.params.clipSkip);
+  const clipSkip = useAppSelector((s) => s.params.clipSkip);
   const initial = useAppSelector((s) => s.config.sd.clipSkip.initial);
   const sliderMin = useAppSelector((s) => s.config.sd.clipSkip.sliderMin);
   const numberInputMin = useAppSelector((s) => s.config.sd.clipSkip.numberInputMin);
   const coarseStep = useAppSelector((s) => s.config.sd.clipSkip.coarseStep);
   const fineStep = useAppSelector((s) => s.config.sd.clipSkip.fineStep);
-  const model = useAppSelector((s) => s.canvasV2.params.model);
+  const model = useAppSelector((s) => s.params.model);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();

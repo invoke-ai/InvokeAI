@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react';
 import { $isConnected } from 'app/hooks/useSocketIO';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
@@ -34,13 +35,14 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
       selectWorkflowSettingsSlice,
       selectDynamicPromptsSlice,
       selectCanvasV2Slice,
+      selectParamsSlice,
       selectUpscalelice,
       selectConfigSlice,
       selectActiveTab,
     ],
-    (system, nodes, workflowSettings, dynamicPrompts, canvasV2, upscale, config, activeTabName) => {
+    (system, nodes, workflowSettings, dynamicPrompts, canvasV2, params, upscale, config, activeTabName) => {
       const { bbox } = canvasV2;
-      const { model, positivePrompt } = canvasV2.params;
+      const { model, positivePrompt } = params;
 
       const reasons: { prefix?: string; content: string }[] = [];
 

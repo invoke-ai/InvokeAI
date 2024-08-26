@@ -5,12 +5,11 @@ import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/uti
 import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { bboxReducers } from 'features/controlLayers/store/bboxReducers';
-import { compositingReducers } from 'features/controlLayers/store/compositingReducers';
 import { controlLayersReducers } from 'features/controlLayers/store/controlLayersReducers';
 import { inpaintMaskReducers } from 'features/controlLayers/store/inpaintMaskReducers';
 import { ipAdaptersReducers } from 'features/controlLayers/store/ipAdaptersReducers';
 import { lorasReducers } from 'features/controlLayers/store/lorasReducers';
-import { paramsReducers } from 'features/controlLayers/store/paramsReducers';
+import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import { rasterLayersReducers } from 'features/controlLayers/store/rasterLayersReducers';
 import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
 import { selectAllEntities, selectAllEntitiesOfType, selectEntity } from 'features/controlLayers/store/selectors';
@@ -19,8 +18,9 @@ import { settingsReducers } from 'features/controlLayers/store/settingsReducers'
 import { toolReducers } from 'features/controlLayers/store/toolReducers';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
+import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
 import { initialAspectRatioState } from 'features/parameters/components/DocumentSize/constants';
-import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { pick } from 'lodash-es';
 import { assert } from 'tsafe';
 
@@ -69,6 +69,7 @@ const initialState: CanvasV2State = {
   },
   bbox: {
     rect: { x: 0, y: 0, width: 512, height: 512 },
+    optimalDimension: 512,
     aspectRatio: deepClone(initialAspectRatioState),
     scaleMethod: 'auto',
     scaledSize: {
@@ -85,46 +86,6 @@ const initialState: CanvasV2State = {
     clipToBbox: false,
     cropToBboxOnSave: false,
     dynamicGrid: false,
-  },
-  compositing: {
-    maskBlur: 16,
-    maskBlurMethod: 'box',
-    canvasCoherenceMode: 'Gaussian Blur',
-    canvasCoherenceMinDenoise: 0,
-    canvasCoherenceEdgeSize: 16,
-    infillMethod: 'patchmatch',
-    infillTileSize: 32,
-    infillPatchmatchDownscaleSize: 1,
-    infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
-  },
-  params: {
-    cfgScale: 7.5,
-    cfgRescaleMultiplier: 0,
-    img2imgStrength: 0.75,
-    iterations: 1,
-    scheduler: 'euler',
-    seed: 0,
-    shouldRandomizeSeed: true,
-    steps: 50,
-    model: null,
-    vae: null,
-    vaePrecision: 'fp32',
-    seamlessXAxis: false,
-    seamlessYAxis: false,
-    clipSkip: 0,
-    shouldUseCpuNoise: true,
-    positivePrompt: '',
-    negativePrompt: '',
-    positivePrompt2: '',
-    negativePrompt2: '',
-    shouldConcatPrompts: true,
-    refinerModel: null,
-    refinerSteps: 20,
-    refinerCFGScale: 7.5,
-    refinerScheduler: 'euler',
-    refinerPositiveAestheticScore: 6,
-    refinerNegativeAestheticScore: 2.5,
-    refinerStart: 0.8,
   },
   session: {
     mode: 'generate',
@@ -147,8 +108,6 @@ export const canvasV2Slice = createSlice({
     ...bboxReducers,
     // move out
     ...lorasReducers,
-    ...paramsReducers,
-    ...compositingReducers,
     ...settingsReducers,
     ...toolReducers,
     ...sessionReducers,
@@ -400,11 +359,10 @@ export const canvasV2Slice = createSlice({
     },
     canvasReset: (state) => {
       state.bbox = deepClone(initialState.bbox);
-      const optimalDimension = getOptimalDimension(state.params.model);
-      state.bbox.rect.width = optimalDimension;
-      state.bbox.rect.height = optimalDimension;
+      state.bbox.rect.width = state.bbox.optimalDimension;
+      state.bbox.rect.height = state.bbox.optimalDimension;
       const size = pick(state.bbox.rect, 'width', 'height');
-      state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, optimalDimension);
+      state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, state.bbox.optimalDimension);
       state.session = deepClone(initialState.session);
       state.tool = deepClone(initialState.tool);
 
@@ -416,6 +374,31 @@ export const canvasV2Slice = createSlice({
 
       state.selectedEntityIdentifier = deepClone(initialState.selectedEntityIdentifier);
     },
+  },
+  extraReducers(builder) {
+    builder.addCase(modelChanged, (state, action) => {
+      const { model, previousModel } = action.payload;
+
+      // If the model base changes (e.g. SD1.5 -> SDXL), we need to change a few things
+      if (model === null || previousModel?.base === model.base) {
+        return;
+      }
+
+      // Update the bbox size to match the new model's optimal size
+      const optimalDimension = getOptimalDimension(model);
+
+      state.bbox.optimalDimension = optimalDimension;
+
+      if (!getIsSizeOptimal(state.bbox.rect.width, state.bbox.rect.height, optimalDimension)) {
+        const bboxDims = calculateNewSize(state.bbox.aspectRatio.value, optimalDimension * optimalDimension);
+        state.bbox.rect.width = bboxDims.width;
+        state.bbox.rect.height = bboxDims.height;
+
+        if (state.bbox.scaleMethod === 'auto') {
+          state.bbox.scaledSize = getScaledBoundingBoxDimensions(bboxDims, optimalDimension);
+        }
+      }
+    });
   },
 });
 
@@ -495,43 +478,6 @@ export const {
   rgIPAdapterMethodChanged,
   rgIPAdapterModelChanged,
   rgIPAdapterCLIPVisionModelChanged,
-  // Compositing
-  setInfillMethod,
-  setInfillTileSize,
-  setInfillPatchmatchDownscaleSize,
-  setInfillColorValue,
-  setMaskBlur,
-  setCanvasCoherenceMode,
-  setCanvasCoherenceEdgeSize,
-  setCanvasCoherenceMinDenoise,
-  // Parameters
-  setIterations,
-  setSteps,
-  setCfgScale,
-  setCfgRescaleMultiplier,
-  setScheduler,
-  setSeed,
-  setImg2imgStrength,
-  setSeamlessXAxis,
-  setSeamlessYAxis,
-  setShouldRandomizeSeed,
-  vaeSelected,
-  vaePrecisionChanged,
-  setClipSkip,
-  shouldUseCpuNoiseChanged,
-  positivePromptChanged,
-  negativePromptChanged,
-  positivePrompt2Changed,
-  negativePrompt2Changed,
-  shouldConcatPromptsChanged,
-  refinerModelChanged,
-  setRefinerSteps,
-  setRefinerCFGScale,
-  setRefinerScheduler,
-  setRefinerPositiveAestheticScore,
-  setRefinerNegativeAestheticScore,
-  setRefinerStart,
-  modelChanged,
   // LoRAs
   loraAdded,
   loraRecalled,
