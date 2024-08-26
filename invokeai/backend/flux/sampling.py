@@ -109,7 +109,7 @@ def denoise(
     vec: Tensor,
     # sampling parameters
     timesteps: list[float],
-    step_callback: Callable[[Tensor, PipelineIntermediateState], None],
+    step_callback: Callable[[], None],
     guidance: float = 4.0,
 ):
     dtype = model.txt_in.bias.dtype
@@ -123,7 +123,6 @@ def denoise(
 
     # this is ignored for schnell
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
-    step_count = 0
     for t_curr, t_prev in tqdm(list(zip(timesteps[:-1], timesteps[1:], strict=True))):
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
         pred = model(
@@ -137,17 +136,7 @@ def denoise(
         )
 
         img = img + (t_prev - t_curr) * pred
-        step_callback(
-            img,
-            PipelineIntermediateState(
-                step=step_count,
-                order=0,
-                total_steps=len(timesteps),
-                timestep=math.floor(t_curr),
-                latents=img,
-            ),
-        )
-        step_count += 1
+        step_callback()
 
     return img
 
