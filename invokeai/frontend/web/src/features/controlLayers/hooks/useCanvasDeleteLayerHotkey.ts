@@ -15,7 +15,7 @@ export function useCanvasDeleteLayerHotkey() {
   useAssertSingleton(useCanvasDeleteLayerHotkey.name);
   const dispatch = useAppDispatch();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
-  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
 
   const deleteSelectedLayer = useCallback(() => {
     if (selectedEntityIdentifier === null) {

@@ -13,7 +13,7 @@ export const ToolEraserButton = memo(() => {
   const { t } = useTranslation();
   const isFiltering = useIsFiltering();
   const isTransforming = useIsTransforming();
-  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
   const selectEraser = useSelectTool('eraser');
   const isSelected = useToolIsSelected('eraser');
   const isDrawingToolAllowed = useAppSelector((s) => {

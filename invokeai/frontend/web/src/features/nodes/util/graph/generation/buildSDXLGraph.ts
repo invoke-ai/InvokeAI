@@ -31,8 +31,8 @@ export const buildSDXLGraph = async (
   const generationMode = manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SDXL graph');
 
-  const { params, canvasV2, canvasSettings } = state;
-  const { bbox, session } = canvasV2;
+  const { params, canvasV2, canvasSettings, canvasSession } = state;
+  const { bbox } = canvasV2;
 
   const {
     model,
@@ -277,7 +277,7 @@ export const buildSDXLGraph = async (
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  const shouldSaveToGallery = session.mode === 'generate' || canvasSettings.autoSave;
+  const shouldSaveToGallery = canvasSession.mode === 'generate' || canvasSettings.autoSave;
 
   g.updateNode(canvasOutput, {
     id: getPrefixedId('canvas_output'),
