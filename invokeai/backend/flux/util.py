@@ -25,7 +25,7 @@ max_seq_lengths: Dict[str, Literal[256, 512]] = {
 }
 
 
-ae_params=AutoEncoderParams(
+ae_params = AutoEncoderParams(
     resolution=256,
     in_channels=3,
     ch=128,
