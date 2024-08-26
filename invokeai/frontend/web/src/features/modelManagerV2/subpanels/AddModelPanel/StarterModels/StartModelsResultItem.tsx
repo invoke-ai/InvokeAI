@@ -5,11 +5,13 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
 
 type Props = {
   result: GetStarterModelsResponse[number];
+  modelList: AnyModelConfig[];
 };
-export const StarterModelsResultItem = memo(({ result }: Props) => {
+export const StarterModelsResultItem = memo(({ result, modelList }: Props) => {
   const { t } = useTranslation();
   const allSources = useMemo(() => {
     const _allSources = [
@@ -38,9 +40,12 @@ export const StarterModelsResultItem = memo(({ result }: Props) => {
 
   const onClick = useCallback(() => {
     for (const { config, source } of allSources) {
+      if (modelList.some((mc) => config.base === mc.base && config.name === mc.name && config.type === mc.type)) {
+        continue;
+      }
       installModel({ config, source });
     }
-  }, [allSources, installModel]);
+  }, [modelList, allSources, installModel]);
 
   return (
     <Flex alignItems="center" justifyContent="space-between" w="100%" gap={3}>
