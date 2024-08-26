@@ -2,14 +2,14 @@ import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@inv
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
-import { fillChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { fillChanged } from 'features/controlLayers/store/toolSlice';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const ToolFillColorPicker = memo(() => {
   const { t } = useTranslation();
-  const fill = useAppSelector((s) => s.canvasV2.tool.fill);
+  const fill = useAppSelector((s) => s.tool.fill);
   const dispatch = useAppDispatch();
   const onChange = useCallback(
     (color: RgbaColor) => {
