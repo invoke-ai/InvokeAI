@@ -30,6 +30,7 @@ import type { GroupConfig } from 'konva/lib/Group';
 import { debounce } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
+import { serializeError } from 'serialize-error';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -550,17 +551,22 @@ export class CanvasObjectRenderer extends CanvasModuleBase {
     if (this.parent.transformer.pixelRect.width === 0 || this.parent.transformer.pixelRect.height === 0) {
       return;
     }
-    const canvas = this.konva.objectGroup._getCachedSceneCanvas()._canvas as HTMLCanvasElement | undefined | null;
-    if (canvas) {
-      const nodeRect = this.parent.transformer.nodeRect;
-      const pixelRect = this.parent.transformer.pixelRect;
-      const rect = {
-        x: pixelRect.x - nodeRect.x,
-        y: pixelRect.y - nodeRect.y,
-        width: pixelRect.width,
-        height: pixelRect.height,
-      };
-      this.$canvasCache.set({ rect, canvas });
+    try {
+      const canvas = this.konva.objectGroup._getCachedSceneCanvas()._canvas as HTMLCanvasElement | undefined | null;
+      if (canvas) {
+        const nodeRect = this.parent.transformer.nodeRect;
+        const pixelRect = this.parent.transformer.pixelRect;
+        const rect = {
+          x: pixelRect.x - nodeRect.x,
+          y: pixelRect.y - nodeRect.y,
+          width: pixelRect.width,
+          height: pixelRect.height,
+        };
+        this.$canvasCache.set({ rect, canvas });
+      }
+    } catch (error) {
+      // We are using an internal Konva method, so we need to catch any errors that may occur.
+      this.log.warn({ error: serializeError(error) }, 'Failed to update preview canvas');
     }
   }, 300);
 
