@@ -1,6 +1,5 @@
 # Initially pulled from https://github.com/black-forest-labs/flux
 
-import os
 from dataclasses import dataclass
 from typing import Dict, Literal
 
