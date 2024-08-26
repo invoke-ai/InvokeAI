@@ -329,8 +329,16 @@ class ModelProbe(object):
                 checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
                 state_dict = checkpoint.get("state_dict") or checkpoint
                 if "guidance_in.out_layer.weight" in state_dict:
+                    # For flux, this is a key in invokeai.backend.flux.util.params
+                    #   Due to model type and format being the descriminator for model configs this
+                    #   is used rather than attempting to support flux with separate model types and format
+                    #   If changed in the future, please fix me
                     config_file = "flux-dev"
                 else:
+                    # For flux, this is a key in invokeai.backend.flux.util.params
+                    #   Due to model type and format being the descriminator for model configs this
+                    #   is used rather than attempting to support flux with separate model types and format
+                    #   If changed in the future, please fix me
                     config_file = "flux-schnell"
             else:
                 config_file = LEGACY_CONFIGS[base_type][variant_type]
@@ -345,7 +353,11 @@ class ModelProbe(object):
             )
         elif model_type is ModelType.VAE:
             config_file = (
-                "flux/flux1-vae.yaml"
+                # For flux, this is a key in invokeai.backend.flux.util.ae_params
+                #   Due to model type and format being the descriminator for model configs this
+                #   is used rather than attempting to support flux with separate model types and format
+                #   If changed in the future, please fix me
+                "flux"
                 if base_type is BaseModelType.Flux
                 else "stable-diffusion/v1-inference.yaml"
                 if base_type is BaseModelType.StableDiffusion1

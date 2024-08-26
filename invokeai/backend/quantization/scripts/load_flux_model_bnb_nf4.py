@@ -7,7 +7,7 @@ import torch
 from safetensors.torch import load_file, save_file
 
 from invokeai.backend.flux.model import Flux
-from invokeai.backend.flux.util import configs as flux_configs
+from invokeai.backend.flux.util import params
 from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 
 
@@ -35,11 +35,11 @@ def main():
     # inference_dtype = torch.bfloat16
     with log_time("Intialize FLUX transformer on meta device"):
         # TODO(ryand): Determine if this is a schnell model or a dev model and load the appropriate config.
-        params = flux_configs["flux-schnell"].params
+        p = params["flux-schnell"]
 
         # Initialize the model on the "meta" device.
         with accelerate.init_empty_weights():
-            model = Flux(params)
+            model = Flux(p)
 
     # TODO(ryand): We may want to add some modules to not quantize here (e.g. the proj_out layer). See the accelerate
     # `get_keys_to_not_convert(...)` function for a heuristic to determine which modules to not quantize.
