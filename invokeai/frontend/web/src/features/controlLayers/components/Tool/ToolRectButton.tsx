@@ -15,7 +15,7 @@ export const ToolRectButton = memo(() => {
   const isSelected = useToolIsSelected('rect');
   const isFiltering = useIsFiltering();
   const isTransforming = useIsTransforming();
-  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
   const isDrawingToolAllowed = useAppSelector((s) => {
     if (!s.canvasV2.selectedEntityIdentifier?.type) {
       return false;

@@ -730,12 +730,6 @@ export type CanvasV2State = {
     scaleMethod: BoundingBoxScaleMethod;
     optimalDimension: number;
   };
-  session: {
-    mode: SessionMode;
-    isStaging: boolean;
-    stagedImages: StagingAreaImage[];
-    selectedStagedImageIndex: number;
-  };
 };
 
 export type StageAttrs = {

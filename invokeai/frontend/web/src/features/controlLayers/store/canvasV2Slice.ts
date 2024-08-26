@@ -1,5 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createAction, createSlice } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
@@ -13,7 +13,6 @@ import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import { rasterLayersReducers } from 'features/controlLayers/store/rasterLayersReducers';
 import { regionsReducers } from 'features/controlLayers/store/regionsReducers';
 import { selectAllEntities, selectAllEntitiesOfType, selectEntity } from 'features/controlLayers/store/selectors';
-import { sessionReducers } from 'features/controlLayers/store/sessionReducers';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
@@ -65,12 +64,6 @@ const initialState: CanvasV2State = {
       height: 512,
     },
   },
-  session: {
-    mode: 'generate',
-    isStaging: false,
-    stagedImages: [],
-    selectedStagedImageIndex: 0,
-  },
 };
 
 export const canvasV2Slice = createSlice({
@@ -86,7 +79,6 @@ export const canvasV2Slice = createSlice({
     ...bboxReducers,
     // move out
     ...lorasReducers,
-    ...sessionReducers,
     entitySelected: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
       state.selectedEntityIdentifier = entityIdentifier;
@@ -339,7 +331,6 @@ export const canvasV2Slice = createSlice({
       state.bbox.rect.height = state.bbox.optimalDimension;
       const size = pick(state.bbox.rect, 'width', 'height');
       state.bbox.scaledSize = getScaledBoundingBoxDimensions(size, state.bbox.optimalDimension);
-      state.session = deepClone(initialState.session);
 
       state.ipAdapters = deepClone(initialState.ipAdapters);
       state.rasterLayers = deepClone(initialState.rasterLayers);
@@ -458,14 +449,6 @@ export const {
   // inpaintMaskRecalled,
   inpaintMaskFillColorChanged,
   inpaintMaskFillStyleChanged,
-  // Staging
-  sessionStartedStaging,
-  sessionImageStaged,
-  sessionStagedImageDiscarded,
-  sessionStagingAreaReset,
-  sessionNextStagedImageSelected,
-  sessionPrevStagedImageSelected,
-  sessionModeChanged,
 } = canvasV2Slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -479,7 +462,3 @@ export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
   migrate,
   persistDenylist: [],
 };
-
-export const sessionStagingAreaImageAccepted = createAction<{ index: number }>(
-  `${canvasV2Slice.name}/sessionStagingAreaImageAccepted`
-);

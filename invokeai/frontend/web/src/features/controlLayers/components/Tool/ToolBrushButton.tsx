@@ -13,7 +13,7 @@ export const ToolBrushButton = memo(() => {
   const { t } = useTranslation();
   const isFiltering = useIsFiltering();
   const isTransforming = useIsTransforming();
-  const isStaging = useAppSelector((s) => s.canvasV2.session.isStaging);
+  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
   const selectBrush = useSelectTool('brush');
   const isSelected = useToolIsSelected('brush');
   const isDrawingToolAllowed = useAppSelector((s) => {
