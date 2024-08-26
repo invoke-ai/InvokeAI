@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from einops import rearrange
 from PIL import Image
@@ -14,15 +13,13 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import ImageOutput
-from invokeai.app.services.session_processor.session_processor_common import CanceledException, ProgressImage
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.step_callback import PipelineIntermediateState
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.sampling import denoise, get_noise, get_schedule, prepare_latent_img_patches, unpack
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.util import image_to_dataURL
 
 
 @invocation(
