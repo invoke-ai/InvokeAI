@@ -1,15 +1,15 @@
 import type { SerializableObject } from 'common/types';
-import { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
+import { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
+import { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasSessionState } from 'features/controlLayers/store/canvasSessionSlice';
 import type { CanvasSettingsState } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { CanvasState } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
 
-export class CanvasRenderingModule extends CanvasModuleBase {
+export class CanvasRenderingModule extends CanvasModuleABC {
   readonly type = 'canvas_renderer';
 
   id: string;
@@ -139,7 +139,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
       for (const entityState of state.rasterLayers.entities) {
         let adapter = adapterMap.get(entityState.id);
         if (!adapter) {
-          adapter = new CanvasLayerAdapter(entityState, this.manager);
+          adapter = new CanvasEntityLayerAdapter(entityState, this.manager);
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
@@ -168,7 +168,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
       for (const entityState of state.controlLayers.entities) {
         let adapter = adapterMap.get(entityState.id);
         if (!adapter) {
-          adapter = new CanvasLayerAdapter(entityState, this.manager);
+          adapter = new CanvasEntityLayerAdapter(entityState, this.manager);
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
@@ -202,7 +202,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
       for (const entityState of state.regions.entities) {
         let adapter = adapterMap.get(entityState.id);
         if (!adapter) {
-          adapter = new CanvasMaskAdapter(entityState, this.manager);
+          adapter = new CanvasEntityMaskAdapter(entityState, this.manager);
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
@@ -236,7 +236,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
       for (const entityState of state.inpaintMasks.entities) {
         let adapter = adapterMap.get(entityState.id);
         if (!adapter) {
-          adapter = new CanvasMaskAdapter(entityState, this.manager);
+          adapter = new CanvasEntityMaskAdapter(entityState, this.manager);
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }

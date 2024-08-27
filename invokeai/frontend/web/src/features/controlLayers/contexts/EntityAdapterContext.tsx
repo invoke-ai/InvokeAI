@@ -1,18 +1,18 @@
 import type { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
-import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
+import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
+import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useMemo, useSyncExternalStore } from 'react';
 import { assert } from 'tsafe';
 
-const EntityAdapterContext = createContext<CanvasLayerAdapter | CanvasMaskAdapter | null>(null);
+const EntityAdapterContext = createContext<CanvasEntityLayerAdapter | CanvasEntityMaskAdapter | null>(null);
 
 export const EntityLayerAdapterGate = memo(({ children }: PropsWithChildren) => {
   const canvasManager = useCanvasManager();
   const entityIdentifier = useEntityIdentifierContext();
-  const store = useMemo<SyncableMap<string, CanvasLayerAdapter>>(() => {
+  const store = useMemo<SyncableMap<string, CanvasEntityLayerAdapter>>(() => {
     if (entityIdentifier.type === 'raster_layer') {
       return canvasManager.adapters.rasterLayers;
     }
@@ -45,7 +45,7 @@ EntityLayerAdapterGate.displayName = 'EntityLayerAdapterGate';
 export const EntityMaskAdapterGate = memo(({ children }: PropsWithChildren) => {
   const canvasManager = useCanvasManager();
   const entityIdentifier = useEntityIdentifierContext();
-  const store = useMemo<SyncableMap<string, CanvasMaskAdapter>>(() => {
+  const store = useMemo<SyncableMap<string, CanvasEntityMaskAdapter>>(() => {
     if (entityIdentifier.type === 'inpaint_mask') {
       return canvasManager.adapters.inpaintMasks;
     }
@@ -75,7 +75,7 @@ EntityMaskAdapterGate.displayName = 'EntityMaskAdapterGate';
 //   return adapter;
 // };
 
-export const useEntityAdapter = (): CanvasLayerAdapter | CanvasMaskAdapter => {
+export const useEntityAdapter = (): CanvasEntityLayerAdapter | CanvasEntityMaskAdapter => {
   const adapter = useContext(EntityAdapterContext);
   assert(adapter, 'useEntityAdapter must be used within a CanvasRasterLayerAdapterGate');
   return adapter;

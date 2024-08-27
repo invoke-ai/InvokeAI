@@ -1,12 +1,12 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import { CanvasBrushLineRenderer } from 'features/controlLayers/konva/CanvasBrushLine';
-import { CanvasEraserLineRenderer } from 'features/controlLayers/konva/CanvasEraserLine';
-import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
-import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
+import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
+import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { CanvasRectRenderer } from 'features/controlLayers/konva/CanvasRect';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasObjectBrushLineRenderer } from 'features/controlLayers/konva/CanvasObjectBrushLineRenderer';
+import { CanvasObjectEraserLineRenderer } from 'features/controlLayers/konva/CanvasObjectEraserLineRenderer';
+import { CanvasObjectImageRenderer } from 'features/controlLayers/konva/CanvasObjectImageRenderer';
+import { CanvasObjectRectRenderer } from 'features/controlLayers/konva/CanvasObjectRectRenderer';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
@@ -47,7 +47,11 @@ function setFillPatternImage(shape: Konva.Shape, ...args: Parameters<typeof getP
 /**
  * Union of all object renderers.
  */
-type AnyObjectRenderer = CanvasBrushLineRenderer | CanvasEraserLineRenderer | CanvasRectRenderer | CanvasImageRenderer;
+type AnyObjectRenderer =
+  | CanvasObjectBrushLineRenderer
+  | CanvasObjectEraserLineRenderer
+  | CanvasObjectRectRenderer
+  | CanvasObjectImageRenderer;
 /**
  * Union of all object states.
  */
@@ -56,12 +60,12 @@ type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImage
 /**
  * Handles rendering of objects for a canvas entity.
  */
-export class CanvasObjectRenderer extends CanvasModuleBase {
-  readonly type = 'entity_object_renderer';
+export class CanvasEntityRenderer extends CanvasModuleABC {
+  readonly type = 'entity_renderer';
 
   id: string;
   path: string[];
-  parent: CanvasLayerAdapter | CanvasMaskAdapter;
+  parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter;
   manager: CanvasManager;
   log: Logger;
 
@@ -123,7 +127,7 @@ export class CanvasObjectRenderer extends CanvasModuleBase {
 
   $canvasCache = atom<{ canvas: HTMLCanvasElement; rect: Rect } | null>(null);
 
-  constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
+  constructor(parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter) {
     super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
@@ -171,7 +175,7 @@ export class CanvasObjectRenderer extends CanvasModuleBase {
     // need to update the compositing rect to match the stage.
     this.subscriptions.add(
       this.manager.stateApi.$stageAttrs.listen(() => {
-        if (this.konva.compositing && this.parent.type === 'mask_adapter') {
+        if (this.konva.compositing && this.parent.type === 'entity_mask_adapter') {
           this.updateCompositingRectSize();
         }
       })
@@ -282,40 +286,40 @@ export class CanvasObjectRenderer extends CanvasModuleBase {
     const isFirstRender = !renderer;
 
     if (objectState.type === 'brush_line') {
-      assert(renderer instanceof CanvasBrushLineRenderer || !renderer);
+      assert(renderer instanceof CanvasObjectBrushLineRenderer || !renderer);
 
       if (!renderer) {
-        renderer = new CanvasBrushLineRenderer(objectState, this);
+        renderer = new CanvasObjectBrushLineRenderer(objectState, this);
         this.renderers.set(renderer.id, renderer);
         this.konva.objectGroup.add(renderer.konva.group);
       }
 
       didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'eraser_line') {
-      assert(renderer instanceof CanvasEraserLineRenderer || !renderer);
+      assert(renderer instanceof CanvasObjectEraserLineRenderer || !renderer);
 
       if (!renderer) {
-        renderer = new CanvasEraserLineRenderer(objectState, this);
+        renderer = new CanvasObjectEraserLineRenderer(objectState, this);
         this.renderers.set(renderer.id, renderer);
         this.konva.objectGroup.add(renderer.konva.group);
       }
 
       didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'rect') {
-      assert(renderer instanceof CanvasRectRenderer || !renderer);
+      assert(renderer instanceof CanvasObjectRectRenderer || !renderer);
 
       if (!renderer) {
-        renderer = new CanvasRectRenderer(objectState, this);
+        renderer = new CanvasObjectRectRenderer(objectState, this);
         this.renderers.set(renderer.id, renderer);
         this.konva.objectGroup.add(renderer.konva.group);
       }
 
       didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'image') {
-      assert(renderer instanceof CanvasImageRenderer || !renderer);
+      assert(renderer instanceof CanvasObjectImageRenderer || !renderer);
 
       if (!renderer) {
-        renderer = new CanvasImageRenderer(objectState, this);
+        renderer = new CanvasObjectImageRenderer(objectState, this);
         this.renderers.set(renderer.id, renderer);
         this.konva.objectGroup.add(renderer.konva.group);
       }
@@ -342,37 +346,37 @@ export class CanvasObjectRenderer extends CanvasModuleBase {
     }
 
     if (this.bufferState.type === 'brush_line') {
-      assert(this.bufferRenderer instanceof CanvasBrushLineRenderer || !this.bufferRenderer);
+      assert(this.bufferRenderer instanceof CanvasObjectBrushLineRenderer || !this.bufferRenderer);
 
       if (!this.bufferRenderer) {
-        this.bufferRenderer = new CanvasBrushLineRenderer(this.bufferState, this);
+        this.bufferRenderer = new CanvasObjectBrushLineRenderer(this.bufferState, this);
         this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
       }
 
       didRender = this.bufferRenderer.update(this.bufferState, true);
     } else if (this.bufferState.type === 'eraser_line') {
-      assert(this.bufferRenderer instanceof CanvasEraserLineRenderer || !this.bufferRenderer);
+      assert(this.bufferRenderer instanceof CanvasObjectEraserLineRenderer || !this.bufferRenderer);
 
       if (!this.bufferRenderer) {
-        this.bufferRenderer = new CanvasEraserLineRenderer(this.bufferState, this);
+        this.bufferRenderer = new CanvasObjectEraserLineRenderer(this.bufferState, this);
         this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
       }
 
       didRender = this.bufferRenderer.update(this.bufferState, true);
     } else if (this.bufferState.type === 'rect') {
-      assert(this.bufferRenderer instanceof CanvasRectRenderer || !this.bufferRenderer);
+      assert(this.bufferRenderer instanceof CanvasObjectRectRenderer || !this.bufferRenderer);
 
       if (!this.bufferRenderer) {
-        this.bufferRenderer = new CanvasRectRenderer(this.bufferState, this);
+        this.bufferRenderer = new CanvasObjectRectRenderer(this.bufferState, this);
         this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
       }
 
       didRender = this.bufferRenderer.update(this.bufferState, true);
     } else if (this.bufferState.type === 'image') {
-      assert(this.bufferRenderer instanceof CanvasImageRenderer || !this.bufferRenderer);
+      assert(this.bufferRenderer instanceof CanvasObjectImageRenderer || !this.bufferRenderer);
 
       if (!this.bufferRenderer) {
-        this.bufferRenderer = new CanvasImageRenderer(this.bufferState, this);
+        this.bufferRenderer = new CanvasObjectImageRenderer(this.bufferState, this);
         this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
       }
       didRender = await this.bufferRenderer.update(this.bufferState, true);
@@ -478,9 +482,9 @@ export class CanvasObjectRenderer extends CanvasModuleBase {
   needsPixelBbox = (): boolean => {
     let needsPixelBbox = false;
     for (const renderer of this.renderers.values()) {
-      const isEraserLine = renderer instanceof CanvasEraserLineRenderer;
-      const isImage = renderer instanceof CanvasImageRenderer;
-      const hasClip = renderer instanceof CanvasBrushLineRenderer && renderer.state.clip;
+      const isEraserLine = renderer instanceof CanvasObjectEraserLineRenderer;
+      const isImage = renderer instanceof CanvasObjectImageRenderer;
+      const hasClip = renderer instanceof CanvasObjectBrushLineRenderer && renderer.state.clip;
       if (isEraserLine || hasClip || isImage) {
         needsPixelBbox = true;
         break;

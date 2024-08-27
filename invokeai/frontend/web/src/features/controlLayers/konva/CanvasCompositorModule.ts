@@ -1,6 +1,6 @@
 import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import {
   canvasToBlob,
   canvasToImageData,
@@ -15,7 +15,7 @@ import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
-export class CanvasCompositorModule extends CanvasModuleBase {
+export class CanvasCompositorModule extends CanvasModuleABC {
   readonly type = 'compositor';
 
   id: string;
