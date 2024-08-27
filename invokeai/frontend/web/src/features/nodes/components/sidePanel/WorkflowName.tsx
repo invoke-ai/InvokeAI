@@ -1,5 +1,6 @@
 import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectWorkflowIsTouched, selectWorkflowMode, selectWorkflowName } from 'features/nodes/store/workflowSlice';
 import { useTranslation } from 'react-i18next';
 import { PiDotOutlineFill } from 'react-icons/pi';
 
@@ -8,9 +9,9 @@ import { WorkflowWarning } from './viewMode/WorkflowWarning';
 
 export const WorkflowName = () => {
   const { t } = useTranslation();
-  const name = useAppSelector((s) => s.workflow.name);
-  const isTouched = useAppSelector((s) => s.workflow.isTouched);
-  const mode = useAppSelector((s) => s.workflow.mode);
+  const name = useAppSelector(selectWorkflowName);
+  const isTouched = useAppSelector(selectWorkflowIsTouched);
+  const mode = useAppSelector(selectWorkflowMode);
 
   return (
     <Flex gap="1" alignItems="center">

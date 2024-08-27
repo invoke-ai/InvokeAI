@@ -1,7 +1,8 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $edgePendingUpdate, $pendingConnection, $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { $edgePendingUpdate, $pendingConnection, $templates } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { makeConnectionErrorSelector } from 'features/nodes/store/util/makeConnectionErrorSelector';
 import { useMemo } from 'react';
 

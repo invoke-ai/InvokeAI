@@ -18,6 +18,7 @@ import {
   nodesChanged,
   openAddNodePopover,
 } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
@@ -137,7 +138,7 @@ const AddNodePopover = () => {
 
       // Find a cozy spot for the node
       const cursorPos = $cursorPos.get();
-      const { nodes, edges } = store.getState().nodes.present;
+      const { nodes, edges } = selectNodesSlice(store.getState());
       node.position = findUnoccupiedPosition(nodes, cursorPos?.x ?? node.position.x, cursorPos?.y ?? node.position.y);
       node.selected = true;
 
@@ -184,7 +185,7 @@ const AddNodePopover = () => {
         const target = handleType === 'target' ? pendingConnection.nodeId : node.id;
         const targetHandle = handleType === 'target' ? pendingConnection.handleId : null;
 
-        const { nodes, edges } = store.getState().nodes.present;
+        const { nodes, edges } = selectNodesSlice(store.getState());
         const connection = getFirstValidConnection(
           source,
           sourceHandle,

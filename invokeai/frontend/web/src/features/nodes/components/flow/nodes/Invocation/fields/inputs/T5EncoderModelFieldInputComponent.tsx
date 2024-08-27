@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { fieldT5EncoderValueChanged } from 'features/nodes/store/nodesSlice';
 import type { T5EncoderModelFieldInputInstance, T5EncoderModelFieldInputTemplate } from 'features/nodes/types/field';
+import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useT5EncoderModels } from 'services/api/hooks/modelsByType';
@@ -15,7 +16,7 @@ type Props = FieldComponentProps<T5EncoderModelFieldInputInstance, T5EncoderMode
 const T5EncoderModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const { t } = useTranslation();
-  const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
+  const isModelsTabDisabled = useAppSelector(selectIsModelsTabDisabled);
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useT5EncoderModels();
   const _onChange = useCallback(
@@ -42,7 +43,7 @@ const T5EncoderModelFieldInputComponent = (props: Props) => {
 
   return (
     <Flex w="full" alignItems="center" gap={2}>
-      <Tooltip label={!disabledTabs.includes('models') && t('modelManager.starterModelsInModelManager')}>
+      <Tooltip label={!isModelsTabDisabled && t('modelManager.starterModelsInModelManager')}>
         <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value}>
           <Combobox
             value={value}

@@ -1,6 +1,6 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setShouldRandomizeSeed } from 'features/controlLayers/store/paramsSlice';
+import { selectShouldRandomizeSeed, setShouldRandomizeSeed } from 'features/controlLayers/store/paramsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ export const ParamSeedRandomize = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const shouldRandomizeSeed = useAppSelector((s) => s.params.shouldRandomizeSeed);
+  const shouldRandomizeSeed = useAppSelector(selectShouldRandomizeSeed);
 
   const handleChangeShouldRandomizeSeed = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => dispatch(setShouldRandomizeSeed(e.target.checked)),

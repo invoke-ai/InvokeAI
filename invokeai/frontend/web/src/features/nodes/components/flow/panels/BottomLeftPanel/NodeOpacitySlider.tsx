@@ -1,12 +1,12 @@
 import { CompositeSlider, Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { nodeOpacityChanged } from 'features/nodes/store/workflowSettingsSlice';
+import { nodeOpacityChanged, selectNodeOpacity } from 'features/nodes/store/workflowSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const NodeOpacitySlider = () => {
   const dispatch = useAppDispatch();
-  const nodeOpacity = useAppSelector((s) => s.workflowSettings.nodeOpacity);
+  const nodeOpacity = useAppSelector(selectNodeOpacity);
   const { t } = useTranslation();
 
   const handleChange = useCallback(

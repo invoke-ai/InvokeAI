@@ -22,7 +22,6 @@ type Props = {
   setBoardToDelete: (board?: BoardDTO) => void;
 };
 
-
 export const BoardsList = ({ isPrivate, setBoardToDelete }: Props) => {
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector(selectSelectedBoardId);

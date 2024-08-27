@@ -2,7 +2,10 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { handlers, parseAndRecallAllMetadata, parseAndRecallPrompts } from 'features/metadata/util/handlers';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
-import { activeStylePresetIdChanged, selectActivePresetId } from 'features/stylePresets/store/stylePresetSlice';
+import {
+  activeStylePresetIdChanged,
+  selectStylePresetActivePresetId,
+} from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
@@ -13,7 +16,7 @@ import { useDebouncedMetadata } from 'services/api/hooks/useDebouncedMetadata';
 export const useImageActions = (image_name?: string) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const activeStylePresetId = useAppSelector(selectActivePresetId);
+  const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const activeTabName = useAppSelector(selectActiveTab);
   const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(image_name);
   const [hasMetadata, setHasMetadata] = useState(false);

@@ -3,6 +3,8 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { StylePresetExportButton } from 'features/stylePresets/components/StylePresetExportButton';
 import { StylePresetImportButton } from 'features/stylePresets/components/StylePresetImportButton';
+import { selectStylePresetSearchTerm } from 'features/stylePresets/store/stylePresetSlice';
+import { selectAllowPrivateStylePresets } from 'features/system/store/configSlice';
 import { useTranslation } from 'react-i18next';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
@@ -12,8 +14,8 @@ import { StylePresetList } from './StylePresetList';
 import StylePresetSearch from './StylePresetSearch';
 
 export const StylePresetMenu = () => {
-  const searchTerm = useAppSelector((s) => s.stylePreset.searchTerm);
-  const allowPrivateStylePresets = useAppSelector((s) => s.config.allowPrivateStylePresets);
+  const searchTerm = useAppSelector(selectStylePresetSearchTerm);
+  const allowPrivateStylePresets = useAppSelector(selectAllowPrivateStylePresets);
   const { data } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
       const filteredData =

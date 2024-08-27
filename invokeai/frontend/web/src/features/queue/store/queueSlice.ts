@@ -1,5 +1,6 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 
 interface QueueState {
   listCursor: number | undefined;
@@ -33,3 +34,8 @@ export const queueSlice = createSlice({
 });
 
 export const { listCursorChanged, listPriorityChanged, listParamsReset } = queueSlice.actions;
+
+const selectQueueSlice = (state: RootState) => state.queue;
+const createQueueSelector = <T>(selector: Selector<QueueState, T>) => createSelector(selectQueueSlice, selector);
+export const selectQueueListCursor = createQueueSelector((queue) => queue.listCursor);
+export const selectQueueListPriority = createQueueSelector((queue) => queue.listPriority);

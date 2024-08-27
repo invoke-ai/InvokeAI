@@ -18,7 +18,7 @@ import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/Cl
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { configChanged } from 'features/system/store/configSlice';
-import { languageSelector } from 'features/system/store/systemSelectors';
+import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -53,7 +53,7 @@ const App = ({
   selectedStylePresetId,
   destination,
 }: Props) => {
-  const language = useAppSelector(languageSelector);
+  const language = useAppSelector(selectLanguage);
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
   const clearStorage = useClearStorage();

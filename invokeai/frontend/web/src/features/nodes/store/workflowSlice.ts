@@ -1,5 +1,5 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { workflowLoaded } from 'features/nodes/store/actions';
@@ -209,8 +209,6 @@ export const {
   workflowSaved,
 } = workflowSlice.actions;
 
-export const selectWorkflowSlice = (state: RootState) => state.workflow;
-
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateWorkflowState = (state: any): any => {
   if (!('_version' in state)) {
@@ -225,3 +223,12 @@ export const workflowPersistConfig: PersistConfig<WorkflowState> = {
   migrate: migrateWorkflowState,
   persistDenylist: [],
 };
+
+export const selectWorkflowSlice = (state: RootState) => state.workflow;
+const createWorkflowSelector = <T>(selector: Selector<WorkflowState, T>) =>
+  createSelector(selectWorkflowSlice, selector);
+
+export const selectWorkflowName = createWorkflowSelector((workflow) => workflow.name);
+export const selectWorkflowId = createWorkflowSelector((workflow) => workflow.id);
+export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.mode);
+export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);

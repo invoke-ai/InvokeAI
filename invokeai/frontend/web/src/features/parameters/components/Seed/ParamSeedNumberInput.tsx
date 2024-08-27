@@ -2,13 +2,13 @@ import { CompositeNumberInput, FormControl, FormLabel } from '@invoke-ai/ui-libr
 import { NUMPY_RAND_MAX, NUMPY_RAND_MIN } from 'app/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setSeed } from 'features/controlLayers/store/paramsSlice';
+import { selectSeed, selectShouldRandomizeSeed, setSeed } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const ParamSeedNumberInput = memo(() => {
-  const seed = useAppSelector((s) => s.params.seed);
-  const shouldRandomizeSeed = useAppSelector((s) => s.params.shouldRandomizeSeed);
+  const seed = useAppSelector(selectSeed);
+  const shouldRandomizeSeed = useAppSelector(selectShouldRandomizeSeed);
 
   const { t } = useTranslation();
 

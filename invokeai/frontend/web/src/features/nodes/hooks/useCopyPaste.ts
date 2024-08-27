@@ -7,8 +7,8 @@ import {
   $edgesToCopiedNodes,
   edgesChanged,
   nodesChanged,
-  selectNodesSlice,
 } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
 import { isEqual, uniqWith } from 'lodash-es';
 import type { EdgeChange, NodeChange } from 'reactflow';

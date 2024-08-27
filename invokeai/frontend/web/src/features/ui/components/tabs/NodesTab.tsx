@@ -2,12 +2,13 @@ import { Box } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import NodeEditor from 'features/nodes/components/NodeEditor';
+import { selectWorkflowMode } from 'features/nodes/store/workflowSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useRef } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 
 const NodesTab = () => {
-  const mode = useAppSelector((s) => s.workflow.mode);
+  const mode = useAppSelector(selectWorkflowMode);
   const activeTabName = useAppSelector(selectActiveTab);
   const ref = useRef<HTMLDivElement>(null);
   useScopeOnFocus('workflows', ref);

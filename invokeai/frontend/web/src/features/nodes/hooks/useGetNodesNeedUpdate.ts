@@ -1,7 +1,8 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
-import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { $templates } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { getNeedsUpdate } from 'features/nodes/util/node/nodeUpdate';
 import { useMemo } from 'react';

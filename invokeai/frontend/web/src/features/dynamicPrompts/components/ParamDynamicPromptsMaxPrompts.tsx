@@ -1,20 +1,19 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { maxPromptsChanged, selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import { selectConfigSlice } from 'features/system/store/configSlice';
+import {
+  maxPromptsChanged,
+  selectDynamicPromptsCombinatorial,
+  selectDynamicPromptsMaxPrompts,
+} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { selectMaxPromptsConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectMaxPrompts = createSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.maxPrompts);
-const selectMaxPromptsConfig = createSelector(selectConfigSlice, (config) => config.sd.dynamicPrompts.maxPrompts);
-const selectIsDisabled = createSelector(selectDynamicPromptsSlice, (dynamicPrompts) => !dynamicPrompts.combinatorial);
-
 const ParamDynamicPromptsMaxPrompts = () => {
-  const maxPrompts = useAppSelector(selectMaxPrompts);
+  const maxPrompts = useAppSelector(selectDynamicPromptsMaxPrompts);
   const config = useAppSelector(selectMaxPromptsConfig);
-  const isDisabled = useAppSelector(selectIsDisabled);
+  const combinatorial = useAppSelector(selectDynamicPromptsCombinatorial);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -26,7 +25,7 @@ const ParamDynamicPromptsMaxPrompts = () => {
   );
 
   return (
-    <FormControl isDisabled={isDisabled}>
+    <FormControl isDisabled={!combinatorial}>
       <InformationalPopover feature="dynamicPromptsMaxPrompts" inPortal={false}>
         <FormLabel>{t('dynamicPrompts.maxPrompts')}</FormLabel>
       </InformationalPopover>

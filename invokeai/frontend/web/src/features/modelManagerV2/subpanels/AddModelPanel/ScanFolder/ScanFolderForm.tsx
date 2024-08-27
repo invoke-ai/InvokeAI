@@ -1,6 +1,6 @@
 import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setScanPath } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import { createModelManagerSelector, setScanPath } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,8 +8,10 @@ import { useLazyScanFolderQuery } from 'services/api/endpoints/models';
 
 import { ScanModelsResults } from './ScanFolderResults';
 
+const selectScanPath = createModelManagerSelector((mm) => mm.scanPath);
+
 export const ScanModelsForm = memo(() => {
-  const scanPath = useAppSelector((state) => state.modelmanagerV2.scanPath);
+  const scanPath = useAppSelector(selectScanPath);
   const dispatch = useAppDispatch();
   const [errorMessage, setErrorMessage] = useState('');
   const { t } = useTranslation();

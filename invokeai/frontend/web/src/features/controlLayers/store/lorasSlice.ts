@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { LoRA } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -65,8 +65,6 @@ export const lorasSlice = createSlice({
 export const { loraAdded, loraRecalled, loraDeleted, loraWeightChanged, loraIsEnabledChanged, loraAllDeleted } =
   lorasSlice.actions;
 
-export const selectLoRAsSlice = (state: RootState) => state.loras;
-
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
   return state;
@@ -78,3 +76,6 @@ export const lorasPersistConfig: PersistConfig<LoRAsState> = {
   migrate,
   persistDenylist: [],
 };
+
+export const selectLoRAsSlice = (state: RootState) => state.loras;
+export const selectAddedLoRAs = createSelector(selectLoRAsSlice, (loras) => loras.loras);

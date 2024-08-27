@@ -1,3 +1,6 @@
+import type { Selector } from '@reduxjs/toolkit';
+import { createSelector } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type { NodesState } from 'features/nodes/store/types';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { InvocationNode, InvocationNodeData } from 'features/nodes/types/invocation';
@@ -36,3 +39,17 @@ export const selectLastSelectedNode = (nodesSlice: NodesState) => {
   }
   return null;
 };
+
+export const selectNodesSlice = (state: RootState) => state.nodes.present;
+
+const createNodesSelector = <T>(selector: Selector<NodesState, T>) => createSelector(selectNodesSlice, selector);
+export const selectNodes = createNodesSelector((nodes) => nodes.nodes);
+export const selectEdges = createNodesSelector((nodes) => nodes.edges);
+export const selectMayUndo = createSelector(
+  (state: RootState) => state.nodes,
+  (nodes) => nodes.past.length > 0
+);
+export const selectMayRedo = createSelector(
+  (state: RootState) => state.nodes,
+  (nodes) => nodes.future.length > 0
+);

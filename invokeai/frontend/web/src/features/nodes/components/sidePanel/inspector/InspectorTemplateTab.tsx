@@ -3,8 +3,8 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
-import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectLastSelectedNode } from 'features/nodes/store/selectors';
+import { $templates } from 'features/nodes/store/nodesSlice';
+import { selectLastSelectedNode, selectNodesSlice } from 'features/nodes/store/selectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

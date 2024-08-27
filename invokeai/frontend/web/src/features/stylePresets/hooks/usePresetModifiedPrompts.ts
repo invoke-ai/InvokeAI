@@ -1,4 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectNegativePrompt, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import { selectStylePresetActivePresetId } from 'features/stylePresets/store/stylePresetSlice';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 export const PRESET_PLACEHOLDER = '{prompt}';
@@ -10,10 +12,9 @@ export const buildPresetModifiedPrompt = (presetPrompt: string, currentPrompt: s
 };
 
 export const usePresetModifiedPrompts = () => {
-  const positivePrompt = useAppSelector((s) => s.params.positivePrompt);
-  const negativePrompt = useAppSelector((s) => s.params.negativePrompt);
-
-  const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
+  const positivePrompt = useAppSelector(selectPositivePrompt);
+  const negativePrompt = useAppSelector(selectNegativePrompt);
+  const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {

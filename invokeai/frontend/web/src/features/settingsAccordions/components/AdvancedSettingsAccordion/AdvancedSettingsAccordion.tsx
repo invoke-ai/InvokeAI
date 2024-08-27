@@ -3,7 +3,7 @@ import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-libra
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectParamsSlice, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
@@ -28,7 +28,7 @@ const formLabelProps2: FormLabelProps = {
 };
 
 export const AdvancedSettingsAccordion = memo(() => {
-  const vaeKey = useAppSelector((state) => state.params.vae?.key);
+  const vaeKey = useAppSelector(selectVAEKey);
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const activeTabName = useAppSelector(selectActiveTab);
 

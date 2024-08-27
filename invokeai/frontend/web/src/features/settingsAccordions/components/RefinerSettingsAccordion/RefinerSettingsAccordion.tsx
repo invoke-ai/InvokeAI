@@ -2,7 +2,7 @@ import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Flex, FormControlGroup, StandaloneAccordion, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectIsRefinerModelSelected, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import ParamSDXLRefinerCFGScale from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerCFGScale';
 import ParamSDXLRefinerModelSelect from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerModelSelect';
 import ParamSDXLRefinerNegativeAestheticScore from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerNegativeAestheticScore';
@@ -11,7 +11,6 @@ import ParamSDXLRefinerScheduler from 'features/sdxl/components/SDXLRefiner/Para
 import ParamSDXLRefinerStart from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerStart';
 import ParamSDXLRefinerSteps from 'features/sdxl/components/SDXLRefiner/ParamSDXLRefinerSteps';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { isNil } from 'lodash-es';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useIsRefinerAvailable } from 'services/api/hooks/useIsRefinerAvailable';
@@ -60,7 +59,7 @@ const RefinerSettingsAccordionNoRefiner: React.FC = memo(() => {
 RefinerSettingsAccordionNoRefiner.displayName = 'RefinerSettingsAccordionNoRefiner';
 
 const RefinerSettingsAccordionContent: React.FC = memo(() => {
-  const isRefinerModelSelected = useAppSelector((state) => !isNil(state.params.refinerModel));
+  const isRefinerModelSelected = useAppSelector(selectIsRefinerModelSelected);
 
   return (
     <FormControlGroup isDisabled={!isRefinerModelSelected}>
