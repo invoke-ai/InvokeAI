@@ -1676,7 +1676,7 @@
         "resetRegion": "Reset Region",
         "debugLayers": "Debug Layers",
         "rectangle": "Rectangle",
-        "maskPreviewColor": "Mask Preview Color",
+        "maskFill": "Mask Fill",
         "addPositivePrompt": "Add $t(common.positivePrompt)",
         "addNegativePrompt": "Add $t(common.negativePrompt)",
         "addIPAdapter": "Add $t(common.ipAdapter)",

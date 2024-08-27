@@ -193,3 +193,20 @@ export const selectIsSelectedEntityDrawable = createSelector(
 
 export const selectCanvasMayUndo = (state: RootState) => state.canvas.past.length > 0;
 export const selectCanvasMayRedo = (state: RootState) => state.canvas.future.length > 0;
+export const selectSelectedEntityFill = createSelector(
+  selectCanvasSlice,
+  selectSelectedEntityIdentifier,
+  (canvas, selectedEntityIdentifier) => {
+    if (!selectedEntityIdentifier) {
+      return null;
+    }
+    const entity = selectEntity(canvas, selectedEntityIdentifier);
+    if (!entity) {
+      return null;
+    }
+    if (entity.type !== 'inpaint_mask' && entity.type !== 'regional_guidance') {
+      return null;
+    }
+    return entity.fill;
+  }
+);
