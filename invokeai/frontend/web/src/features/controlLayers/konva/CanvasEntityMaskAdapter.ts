@@ -85,28 +85,33 @@ export class CanvasEntityMaskAdapter extends CanvasModuleABC {
   update = async (arg?: { state: CanvasEntityMaskAdapter['state'] }) => {
     const state = get(arg, 'state', this.state);
 
-    if (!this.isFirstRender && state === this.state && state.fill === this.state.fill) {
+    const prevState = this.state;
+    this.state = state;
+
+    if (!this.isFirstRender && prevState === state && prevState.fill === state.fill) {
       this.log.trace('State unchanged, skipping update');
       return;
     }
 
     this.log.debug('Updating');
-    const { position, objects, isEnabled, opacity } = state;
+    const { position, objects, isEnabled, isLocked, opacity } = state;
 
-    if (this.isFirstRender || objects !== this.state.objects) {
+    if (this.isFirstRender || objects !== prevState.objects) {
       await this.updateObjects({ objects });
     }
-    if (this.isFirstRender || position !== this.state.position) {
+    if (this.isFirstRender || position !== prevState.position) {
       this.transformer.updatePosition({ position });
     }
-    if (this.isFirstRender || opacity !== this.state.opacity) {
+    if (this.isFirstRender || opacity !== prevState.opacity) {
       this.renderer.updateOpacity(opacity);
     }
-    if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
+    if (this.isFirstRender || isEnabled !== prevState.isEnabled) {
       this.updateVisibility({ isEnabled });
     }
-
-    if (this.isFirstRender || state.fill !== this.state.fill) {
+    if (this.isFirstRender || isLocked !== prevState.isLocked) {
+      this.transformer.syncInteractionState();
+    }
+    if (this.isFirstRender || state.fill !== prevState.fill) {
       this.renderer.updateCompositingRectFill(state.fill);
     }
 
@@ -118,7 +123,6 @@ export class CanvasEntityMaskAdapter extends CanvasModuleABC {
       this.transformer.updateBbox();
     }
 
-    this.state = state;
     this.isFirstRender = false;
   };
 
