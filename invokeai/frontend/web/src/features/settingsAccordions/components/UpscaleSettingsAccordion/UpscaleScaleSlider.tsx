@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { scaleChanged } from 'features/parameters/store/upscaleSlice';
+import { scaleChanged, selectUpscaleScale } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,7 +12,7 @@ const formatValue = (val: string | number) => `${val}x`;
 export const UpscaleScaleSlider = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const scale = useAppSelector((s) => s.upscale.scale);
+  const scale = useAppSelector(selectUpscaleScale);
 
   const onChange = useCallback(
     (val: number) => {

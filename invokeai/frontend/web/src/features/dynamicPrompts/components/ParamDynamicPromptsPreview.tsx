@@ -1,11 +1,15 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Flex, FormControl, FormLabel, ListItem, OrderedList, Spinner, Text } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import {
+  selectDynamicPromptsIsError,
+  selectDynamicPromptsIsLoading,
+  selectDynamicPromptsParsingError,
+  selectDynamicPromptsPrompts,
+} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiWarningCircleBold } from 'react-icons/pi';
@@ -14,17 +18,12 @@ const listItemStyles: ChakraProps['sx'] = {
   '&::marker': { color: 'base.500' },
 };
 
-const selectPrompts = createSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.prompts);
-const selectParsingError = createSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.parsingError);
-const selectIsError = createSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.isError);
-const selectIsLoading = createSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.isLoading);
-
 const ParamDynamicPromptsPreview = () => {
   const { t } = useTranslation();
-  const parsingError = useAppSelector(selectParsingError);
-  const isError = useAppSelector(selectIsError);
-  const isLoading = useAppSelector(selectIsLoading);
-  const prompts = useAppSelector(selectPrompts);
+  const parsingError = useAppSelector(selectDynamicPromptsParsingError);
+  const isError = useAppSelector(selectDynamicPromptsIsError);
+  const isLoading = useAppSelector(selectDynamicPromptsIsLoading);
+  const prompts = useAppSelector(selectDynamicPromptsPrompts);
 
   const label = useMemo(() => {
     let _label = `${t('dynamicPrompts.promptsPreview')} (${prompts.length})`;

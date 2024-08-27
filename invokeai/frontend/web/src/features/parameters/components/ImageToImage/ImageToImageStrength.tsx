@@ -1,6 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { selectImg2imgStrengthConfig } from 'features/system/store/configSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,13 +13,7 @@ type Props = {
 };
 
 const ImageToImageStrength = ({ value, onChange }: Props) => {
-  const initial = useAppSelector((s) => s.config.sd.img2imgStrength.initial);
-  const sliderMin = useAppSelector((s) => s.config.sd.img2imgStrength.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.img2imgStrength.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.img2imgStrength.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.img2imgStrength.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.img2imgStrength.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.img2imgStrength.fineStep);
+  const config = useAppSelector(selectImg2imgStrengthConfig);
   const { t } = useTranslation();
 
   return (
@@ -27,23 +22,23 @@ const ImageToImageStrength = ({ value, onChange }: Props) => {
         <FormLabel>{`${t('parameters.denoisingStrength')}`}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        step={coarseStep}
-        fineStep={fineStep}
-        min={sliderMin}
-        max={sliderMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
+        min={config.sliderMin}
+        max={config.sliderMax}
+        defaultValue={config.initial}
         onChange={onChange}
         value={value}
-        defaultValue={initial}
         marks={marks}
       />
       <CompositeNumberInput
-        step={coarseStep}
-        fineStep={fineStep}
-        min={numberInputMin}
-        max={numberInputMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
+        min={config.numberInputMin}
+        max={config.numberInputMax}
+        defaultValue={config.initial}
         onChange={onChange}
         value={value}
-        defaultValue={initial}
       />
     </FormControl>
   );

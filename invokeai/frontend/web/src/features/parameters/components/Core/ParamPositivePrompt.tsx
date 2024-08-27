@@ -1,6 +1,6 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
+import { positivePromptChanged, selectBase, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
@@ -9,6 +9,10 @@ import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { SDXLConcatButton } from 'features/sdxl/components/SDXLPrompts/SDXLConcatButton';
+import {
+  selectStylePresetActivePresetId,
+  selectStylePresetViewMode,
+} from 'features/stylePresets/store/stylePresetSlice';
 import { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -17,10 +21,10 @@ import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 export const ParamPositivePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.params.positivePrompt);
-  const baseModel = useAppSelector((s) => s.params.model)?.base;
-  const viewMode = useAppSelector((s) => s.stylePreset.viewMode);
-  const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
+  const prompt = useAppSelector(selectPositivePrompt);
+  const baseModel = useAppSelector(selectBase);
+  const viewMode = useAppSelector(selectStylePresetViewMode);
+  const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {

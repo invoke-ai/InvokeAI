@@ -1,7 +1,11 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import type { FilterableModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import {
+  type FilterableModelType,
+  selectFilteredModelType,
+  selectSearchTerm,
+} from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -23,8 +27,8 @@ import { FetchingModelsLoader } from './FetchingModelsLoader';
 import { ModelListWrapper } from './ModelListWrapper';
 
 const ModelList = () => {
-  const filteredModelType = useAppSelector((s) => s.modelmanagerV2.filteredModelType);
-  const searchTerm = useAppSelector((s) => s.modelmanagerV2.searchTerm);
+  const filteredModelType = useAppSelector(selectFilteredModelType);
+  const searchTerm = useAppSelector(selectSearchTerm);
   const { t } = useTranslation();
 
   const [mainModels, { isLoading: isLoadingMainModels }] = useMainModels();

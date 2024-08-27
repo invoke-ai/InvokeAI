@@ -19,7 +19,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useClearStorage } from 'common/hooks/useClearStorage';
-import { shouldUseCpuNoiseChanged } from 'features/controlLayers/store/paramsSlice';
+import { selectShouldUseCPUNoise, shouldUseCpuNoiseChanged } from 'features/controlLayers/store/paramsSlice';
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
@@ -27,12 +27,18 @@ import { useClearIntermediates } from 'features/system/components/SettingsModal/
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
   logIsEnabledChanged,
+  selectSystemShouldAntialiasProgressImage,
+  selectSystemShouldConfirmOnDelete,
+  selectSystemShouldEnableInformationalPopovers,
+  selectSystemShouldUseNSFWChecker,
+  selectSystemShouldUseWatermarker,
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
   shouldAntialiasProgressImageChanged,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
+import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import { setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
 import type { ChangeEvent, ReactElement } from 'react';
 import { cloneElement, memo, useCallback, useEffect, useState } from 'react';
@@ -89,13 +95,13 @@ const SettingsModal = ({ children, config }: SettingsModalProps) => {
 
   const { isOpen: isRefreshModalOpen, onOpen: onRefreshModalOpen, onClose: onRefreshModalClose } = useDisclosure();
 
-  const shouldUseCpuNoise = useAppSelector((s) => s.params.shouldUseCpuNoise);
-  const shouldConfirmOnDelete = useAppSelector((s) => s.system.shouldConfirmOnDelete);
-  const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
-  const shouldAntialiasProgressImage = useAppSelector((s) => s.system.shouldAntialiasProgressImage);
-  const shouldUseNSFWChecker = useAppSelector((s) => s.system.shouldUseNSFWChecker);
-  const shouldUseWatermarker = useAppSelector((s) => s.system.shouldUseWatermarker);
-  const shouldEnableInformationalPopovers = useAppSelector((s) => s.system.shouldEnableInformationalPopovers);
+  const shouldUseCpuNoise = useAppSelector(selectShouldUseCPUNoise);
+  const shouldConfirmOnDelete = useAppSelector(selectSystemShouldConfirmOnDelete);
+  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+  const shouldAntialiasProgressImage = useAppSelector(selectSystemShouldAntialiasProgressImage);
+  const shouldUseNSFWChecker = useAppSelector(selectSystemShouldUseNSFWChecker);
+  const shouldUseWatermarker = useAppSelector(selectSystemShouldUseWatermarker);
+  const shouldEnableInformationalPopovers = useAppSelector(selectSystemShouldEnableInformationalPopovers);
 
   const clearStorage = useClearStorage();
 

@@ -2,6 +2,7 @@ import { Box, Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-li
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
 import { memo, useCallback, useMemo } from 'react';
@@ -12,7 +13,7 @@ import type { MainModelConfig } from 'services/api/types';
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const selectedModel = useAppSelector((s) => s.params.model);
+  const selectedModel = useAppSelector(selectModel);
   const [modelConfigs, { isLoading }] = useSDMainModels();
   const tooltipLabel = useMemo(() => {
     if (!modelConfigs.length || !selectedModel) {

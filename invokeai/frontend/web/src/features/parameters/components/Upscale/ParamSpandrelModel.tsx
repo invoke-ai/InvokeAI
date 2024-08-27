@@ -2,7 +2,7 @@ import { Box, Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-li
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import { upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
+import { selectUpscaleModel, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSpandrelImageToImageModels } from 'services/api/hooks/modelsByType';
@@ -12,7 +12,7 @@ const ParamSpandrelModel = () => {
   const { t } = useTranslation();
   const [modelConfigs, { isLoading }] = useSpandrelImageToImageModels();
 
-  const model = useAppSelector((s) => s.upscale.upscaleModel);
+  const model = useAppSelector(selectUpscaleModel);
   const dispatch = useAppDispatch();
 
   const tooltipLabel = useMemo(() => {

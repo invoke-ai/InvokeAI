@@ -1,11 +1,12 @@
 import { Box } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 
 export const TabVisibilityGate = memo(({ tab, children }: PropsWithChildren<{ tab: TabName }>) => {
-  const activeTabName = useAppSelector((s) => s.ui.activeTab);
+  const activeTabName = useAppSelector(selectActiveTab);
 
   return (
     <Box

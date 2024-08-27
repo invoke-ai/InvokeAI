@@ -2,7 +2,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState } from 'features/controlLayers/store/types';
 import { selectDeleteImageModalSlice } from 'features/deleteImageModal/store/slice';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
 import { isImageFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';

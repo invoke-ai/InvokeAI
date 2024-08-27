@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { CanvasEntityListMenuButton } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityListMenuButton';
 import { CanvasPanelContent } from 'features/controlLayers/components/CanvasPanelContent';
+import { selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { selectEntityCount } from 'features/controlLayers/store/selectors';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
@@ -49,7 +50,7 @@ const ParametersPanelTextToImage = () => {
     }
     return `${t('controlLayers.controlLayers')} (${controlLayersCount})`;
   }, [controlLayersCount, t]);
-  const isSDXL = useAppSelector((s) => s.params.model?.base === 'sdxl');
+  const isSDXL = useAppSelector(selectIsSDXL);
   const onChangeTabs = useCallback(
     (i: number) => {
       if (i === 1) {
