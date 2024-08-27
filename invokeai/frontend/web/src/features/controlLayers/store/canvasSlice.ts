@@ -475,29 +475,6 @@ export const canvasSlice = createSlice({
       }
       entity.negativePrompt = prompt;
     },
-    rgFillColorChanged: (
-      state,
-      action: PayloadAction<EntityIdentifierPayload<{ color: RgbColor }, 'regional_guidance'>>
-    ) => {
-      const { entityIdentifier, color } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-      entity.fill.color = color;
-    },
-    rgFillStyleChanged: (
-      state,
-      action: PayloadAction<EntityIdentifierPayload<{ style: FillStyle }, 'regional_guidance'>>
-    ) => {
-      const { entityIdentifier, style } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-      entity.fill.style = style;
-    },
-
     rgAutoNegativeToggled: (state, action: PayloadAction<EntityIdentifierPayload<void, 'regional_guidance'>>) => {
       const { entityIdentifier } = action.payload;
       const rg = selectEntity(state, entityIdentifier);
@@ -657,28 +634,6 @@ export const canvasSlice = createSlice({
       const { data } = action.payload;
       state.inpaintMasks.entities = [data];
       state.selectedEntityIdentifier = { type: 'inpaint_mask', id: data.id };
-    },
-    inpaintMaskFillColorChanged: (
-      state,
-      action: PayloadAction<EntityIdentifierPayload<{ color: RgbColor }, 'inpaint_mask'>>
-    ) => {
-      const { color, entityIdentifier } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-      entity.fill.color = color;
-    },
-    inpaintMaskFillStyleChanged: (
-      state,
-      action: PayloadAction<EntityIdentifierPayload<{ style: FillStyle }, 'inpaint_mask'>>
-    ) => {
-      const { style, entityIdentifier } = action.payload;
-      const entity = selectEntity(state, entityIdentifier);
-      if (!entity) {
-        return;
-      }
-      entity.fill.style = style;
     },
     //#region BBox
     bboxScaledSizeChanged: (state, action: PayloadAction<Partial<Dimensions>>) => {
@@ -861,6 +816,28 @@ export const canvasSlice = createSlice({
         return;
       }
       entity.isLocked = !entity.isLocked;
+    },
+    entityFillColorChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ color: RgbColor }, 'inpaint_mask' | 'regional_guidance'>>
+    ) => {
+      const { color, entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      entity.fill.color = color;
+    },
+    entityFillStyleChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ style: FillStyle }, 'inpaint_mask' | 'regional_guidance'>>
+    ) => {
+      const { style, entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      entity.fill.style = style;
     },
     entityMoved: (state, action: PayloadAction<EntityMovedPayload>) => {
       const { entityIdentifier, position } = action.payload;
@@ -1088,6 +1065,8 @@ export const {
   entityReset,
   entityIsEnabledToggled,
   entityIsLockedToggled,
+  entityFillColorChanged,
+  entityFillStyleChanged,
   entityMoved,
   entityDuplicated,
   entityRasterized,
@@ -1139,8 +1118,6 @@ export const {
   // rgRecalled,
   rgPositivePromptChanged,
   rgNegativePromptChanged,
-  rgFillColorChanged,
-  rgFillStyleChanged,
   rgAutoNegativeToggled,
   rgIPAdapterAdded,
   rgIPAdapterDeleted,
@@ -1153,8 +1130,6 @@ export const {
   // Inpaint mask
   inpaintMaskAdded,
   // inpaintMaskRecalled,
-  inpaintMaskFillColorChanged,
-  inpaintMaskFillStyleChanged,
 } = canvasSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

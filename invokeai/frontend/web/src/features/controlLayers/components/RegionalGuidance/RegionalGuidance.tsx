@@ -12,8 +12,6 @@ import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityI
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
-import { RegionalGuidanceMaskFillColorPicker } from './RegionalGuidanceMaskFillColorPicker';
-
 type Props = {
   id: string;
 };
@@ -30,7 +28,6 @@ export const RegionalGuidance = memo(({ id }: Props) => {
             <CanvasEntityEditableTitle />
             <Spacer />
             <RegionalGuidanceBadges />
-            <RegionalGuidanceMaskFillColorPicker />
             <CanvasEntityIsLockedToggle />
             <CanvasEntityEnabledToggle />
           </CanvasEntityHeader>
