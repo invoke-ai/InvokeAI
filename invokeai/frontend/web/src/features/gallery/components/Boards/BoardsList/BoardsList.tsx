@@ -1,7 +1,12 @@
 import { Button, Collapse, Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
+import {
+  selectBoardSearchText,
+  selectListBoardsQueryArgs,
+  selectSelectedBoardId,
+} from 'features/gallery/store/gallerySelectors';
+import { selectAllowPrivateBoards } from 'features/system/store/configSelectors';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
@@ -17,13 +22,14 @@ type Props = {
   setBoardToDelete: (board?: BoardDTO) => void;
 };
 
+
 export const BoardsList = ({ isPrivate, setBoardToDelete }: Props) => {
   const { t } = useTranslation();
-  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
-  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
+  const selectedBoardId = useAppSelector(selectSelectedBoardId);
+  const boardSearchText = useAppSelector(selectBoardSearchText);
   const queryArgs = useAppSelector(selectListBoardsQueryArgs);
   const { data: boards } = useListAllBoardsQuery(queryArgs);
-  const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
+  const allowPrivateBoards = useAppSelector(selectAllowPrivateBoards);
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
 
   const filteredBoards = useMemo(() => {

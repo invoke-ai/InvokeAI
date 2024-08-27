@@ -2,6 +2,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { selectShouldShowImageDetails } from 'features/ui/store/uiSelectors';
 import { setShouldShowImageDetails } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -11,7 +12,7 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 
 export const ToggleMetadataViewerButton = memo(() => {
   const dispatch = useAppDispatch();
-  const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
+  const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const { t } = useTranslation();
 

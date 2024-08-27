@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { PersistConfig } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 
 export type ToolState = {
@@ -52,3 +52,5 @@ export const toolPersistConfig: PersistConfig<ToolState> = {
   migrate,
   persistDenylist: [],
 };
+
+export const selectToolSlice = (state: RootState) => state.tool;

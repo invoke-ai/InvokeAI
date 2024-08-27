@@ -1,3 +1,4 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
@@ -10,8 +11,12 @@ const selectEntityIds = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   return canvas.controlLayers.entities.map(mapId).reverse();
 });
 
+const selectIsSelected = createSelector(selectSelectedEntityIdentifier, (selectedEntityIdentifier) => {
+  return selectedEntityIdentifier?.type === 'control_layer';
+});
+
 export const ControlLayerEntityList = memo(() => {
-  const isSelected = useAppSelector((s) => selectSelectedEntityIdentifier(s)?.type === 'control_layer');
+  const isSelected = useAppSelector(selectIsSelected);
   const layerIds = useAppSelector(selectEntityIds);
 
   if (layerIds.length === 0) {

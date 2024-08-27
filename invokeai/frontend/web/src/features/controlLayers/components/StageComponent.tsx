@@ -1,5 +1,6 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { $socket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/nanostores/store';
@@ -7,6 +8,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
+import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import Konva from 'konva';
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
@@ -51,8 +53,10 @@ type Props = {
   asPreview?: boolean;
 };
 
+const selectDynamicGrid = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.dynamicGrid);
+
 export const StageComponent = memo(({ asPreview = false }: Props) => {
-  const dynamicGrid = useAppSelector((s) => s.canvasSettings.dynamicGrid);
+  const dynamicGrid = useAppSelector(selectDynamicGrid);
 
   const [stage] = useState(
     () =>
