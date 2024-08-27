@@ -53,7 +53,7 @@ async def get_style_preset(
         return StylePresetRecordWithImage(image=image, **style_preset.model_dump())
     except StylePresetNotFoundError:
         raise HTTPException(status_code=404, detail="Style preset not found")
-    
+
 @style_presets_router.post(
     "/i/{style_preset_id}",
     operation_id="set_style_preset",
