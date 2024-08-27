@@ -244,9 +244,9 @@ export class CanvasToolModule extends CanvasModuleABC {
     this.subscriptions.add(cleanupListeners);
   }
 
-  setToolVisibility = (tool: Tool) => {
-    this.konva.brush.group.visible(tool === 'brush');
-    this.konva.eraser.group.visible(tool === 'eraser');
+  setToolVisibility = (tool: Tool, isDrawable: boolean) => {
+    this.konva.brush.group.visible(isDrawable && tool === 'brush');
+    this.konva.eraser.group.visible(isDrawable && tool === 'eraser');
     this.konva.colorPicker.group.visible(tool === 'colorPicker');
   };
 
@@ -259,7 +259,11 @@ export class CanvasToolModule extends CanvasModuleABC {
     const isMouseDown = this.manager.stateApi.$isMouseDown.get();
     const tool = this.manager.stateApi.$tool.get();
 
-    const isDrawable = selectedEntity && selectedEntity.state.isEnabled && isDrawableEntity(selectedEntity.state);
+    const isDrawable =
+      !!selectedEntity &&
+      selectedEntity.state.isEnabled &&
+      !selectedEntity.state.isLocked &&
+      isDrawableEntity(selectedEntity.state);
 
     // Update the stage's pointer style
     if (Boolean(this.manager.stateApi.$transformingEntity.get()) || renderedEntityCount === 0) {
@@ -433,7 +437,7 @@ export class CanvasToolModule extends CanvasModuleABC {
         });
       }
 
-      this.setToolVisibility(tool);
+      this.setToolVisibility(tool, isDrawable);
     }
   };
 
@@ -539,7 +543,7 @@ export class CanvasToolModule extends CanvasModuleABC {
       }
       this.render();
     } else {
-      const isDrawable = selectedEntity?.state.isEnabled;
+      const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
       if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get() && getIsPrimaryMouseDown(e)) {
         this.manager.stateApi.$lastMouseDownPos.set(pos);
         const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
@@ -638,7 +642,7 @@ export class CanvasToolModule extends CanvasModuleABC {
     this.manager.stateApi.$isMouseDown.set(false);
     const pos = this.manager.stateApi.$lastCursorPos.get();
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
-    const isDrawable = selectedEntity?.state.isEnabled;
+    const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
     const tool = this.manager.stateApi.$tool.get();
 
     if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get()) {
@@ -686,7 +690,7 @@ export class CanvasToolModule extends CanvasModuleABC {
         this.manager.stateApi.$colorUnderCursor.set(color);
       }
     } else {
-      const isDrawable = selectedEntity?.state.isEnabled;
+      const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
       if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get() && getIsPrimaryMouseDown(e)) {
         if (tool === 'brush') {
           const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
@@ -786,7 +790,7 @@ export class CanvasToolModule extends CanvasModuleABC {
     this.manager.stateApi.$lastMouseDownPos.set(null);
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
     const toolState = this.manager.stateApi.getToolState();
-    const isDrawable = selectedEntity?.state.isEnabled;
+    const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
     const tool = this.manager.stateApi.$tool.get();
 
     if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get() && getIsPrimaryMouseDown(e)) {
