@@ -4,6 +4,7 @@ import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTyp
 import { useEntityTypeString } from 'features/controlLayers/hooks/useEntityTypeString';
 import { allEntitiesOfTypeIsHiddenToggled } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import type { MouseEventHandler } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold, PiEyeClosedBold } from 'react-icons/pi';
@@ -17,9 +18,13 @@ export const CanvasEntityTypeIsHiddenToggle = memo(({ type }: Props) => {
   const dispatch = useAppDispatch();
   const isHidden = useEntityTypeIsHidden(type);
   const typeString = useEntityTypeString(type);
-  const onClick = useCallback(() => {
-    dispatch(allEntitiesOfTypeIsHiddenToggled({ type }));
-  }, [dispatch, type]);
+  const onClick = useCallback<MouseEventHandler>(
+    (e) => {
+      e.stopPropagation();
+      dispatch(allEntitiesOfTypeIsHiddenToggled({ type }));
+    },
+    [dispatch, type]
+  );
 
   return (
     <IconButton
