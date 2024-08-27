@@ -190,3 +190,6 @@ export const selectIsSelectedEntityDrawable = createSelector(
     return isDrawableEntityType(selectedEntityIdentifier.type);
   }
 );
+
+export const selectCanvasMayUndo = (state: RootState) => state.canvas.past.length > 0;
+export const selectCanvasMayRedo = (state: RootState) => state.canvas.future.length > 0;
