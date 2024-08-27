@@ -25,7 +25,7 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 # Size of a GB in bytes.
-GIG = 2**30
+GB = 2**30
 
 # Size of a MB in bytes.
 MB = 2**20
@@ -196,7 +196,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         # more stats
         if self.stats:
             stats_name = stats_name or key
-            self.stats.cache_size = int(self._max_cache_size * GIG)
+            self.stats.cache_size = int(self._max_cache_size * GB)
             self.stats.high_watermark = max(self.stats.high_watermark, self.cache_size())
             self.stats.in_cache = len(self._cached_models)
             self.stats.loaded_model_sizes[stats_name] = max(
@@ -228,9 +228,9 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
         :param size_required: The amount of space to clear in the execution_device cache, in bytes.
         """
-        reserved = self._max_vram_cache_size * GIG
+        reserved = self._max_vram_cache_size * GB
         vram_in_use = torch.cuda.memory_allocated() + size_required
-        self.logger.debug(f"{(vram_in_use/GIG):.2f}GB VRAM needed for models; max allowed={(reserved/GIG):.2f}GB")
+        self.logger.debug(f"{(vram_in_use/GB):.2f}GB VRAM needed for models; max allowed={(reserved/GB):.2f}GB")
         for _, cache_entry in sorted(self._cached_models.items(), key=lambda x: x[1].size):
             if vram_in_use <= reserved:
                 break
@@ -241,7 +241,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
                 cache_entry.loaded = False
                 vram_in_use = torch.cuda.memory_allocated() + size_required
                 self.logger.debug(
-                    f"Removing {cache_entry.key} from VRAM to free {(cache_entry.size/GIG):.2f}GB; vram free = {(torch.cuda.memory_allocated()/GIG):.2f}GB"
+                    f"Removing {cache_entry.key} from VRAM to free {(cache_entry.size/GB):.2f}GB; vram free = {(torch.cuda.memory_allocated()/GB):.2f}GB"
                 )
 
         TorchDevice.empty_cache()
@@ -299,7 +299,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
         self.logger.debug(
             f"Moved model '{cache_entry.key}' from {source_device} to"
             f" {target_device} in {(end_model_to_time-start_model_to_time):.2f}s."
-            f"Estimated model size: {(cache_entry.size/GIG):.3f} GB."
+            f"Estimated model size: {(cache_entry.size/GB):.3f} GB."
             f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
         )
 
@@ -322,14 +322,14 @@ class ModelCache(ModelCacheBase[AnyModel]):
                     f"Moving model '{cache_entry.key}' from {source_device} to"
                     f" {target_device} caused an unexpected change in VRAM usage. The model's"
                     " estimated size may be incorrect. Estimated model size:"
-                    f" {(cache_entry.size/GIG):.3f} GB.\n"
+                    f" {(cache_entry.size/GB):.3f} GB.\n"
                     f"{get_pretty_snapshot_diff(snapshot_before, snapshot_after)}"
                 )
 
     def print_cuda_stats(self) -> None:
         """Log CUDA diagnostics."""
-        vram = "%4.2fG" % (torch.cuda.memory_allocated() / GIG)
-        ram = "%4.2fG" % (self.cache_size() / GIG)
+        vram = "%4.2fG" % (torch.cuda.memory_allocated() / GB)
+        ram = "%4.2fG" % (self.cache_size() / GB)
 
         in_ram_models = 0
         in_vram_models = 0
@@ -356,13 +356,13 @@ class ModelCache(ModelCacheBase[AnyModel]):
         garbage-collected.
         """
         bytes_needed = size
-        maximum_size = self.max_cache_size * GIG  # stored in GB, convert to bytes
+        maximum_size = self.max_cache_size * GB  # stored in GB, convert to bytes
         current_size = self.cache_size()
 
         if current_size + bytes_needed > maximum_size:
             self.logger.debug(
-                f"Max cache size exceeded: {(current_size/GIG):.2f}/{self.max_cache_size:.2f} GB, need an additional"
-                f" {(bytes_needed/GIG):.2f} GB"
+                f"Max cache size exceeded: {(current_size/GB):.2f}/{self.max_cache_size:.2f} GB, need an additional"
+                f" {(bytes_needed/GB):.2f} GB"
             )
 
         self.logger.debug(f"Before making_room: cached_models={len(self._cached_models)}")
@@ -379,7 +379,7 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
             if not cache_entry.locked:
                 self.logger.debug(
-                    f"Removing {model_key} from RAM cache to free at least {(size/GIG):.2f} GB (-{(cache_entry.size/GIG):.2f} GB)"
+                    f"Removing {model_key} from RAM cache to free at least {(size/GB):.2f} GB (-{(cache_entry.size/GB):.2f} GB)"
                 )
                 current_size -= cache_entry.size
                 models_cleared += 1
