@@ -2,7 +2,7 @@ import { Box, Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import { refinerModelChanged } from 'features/controlLayers/store/paramsSlice';
+import { refinerModelChanged, selectRefinerModel } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ const optionsFilter = (model: MainModelConfig) => model.base === 'sdxl-refiner';
 
 const ParamSDXLRefinerModelSelect = () => {
   const dispatch = useAppDispatch();
-  const model = useAppSelector((s) => s.params.refinerModel);
+  const model = useAppSelector(selectRefinerModel);
   const { t } = useTranslation();
   const [modelConfigs, { isLoading }] = useRefinerModels();
   const _onChange = useCallback(

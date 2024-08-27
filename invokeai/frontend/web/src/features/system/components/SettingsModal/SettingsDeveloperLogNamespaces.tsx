@@ -1,9 +1,8 @@
 import { Flex, FormControl, FormLabel, Tag, TagCloseButton, Text } from '@invoke-ai/ui-library';
 import type { LogNamespace } from 'app/logging/logger';
 import { zLogNamespace } from 'app/logging/logger';
-import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
-import { logNamespaceToggled } from 'features/system/store/systemSlice';
+import { logNamespaceToggled, selectSystemLogNamespaces } from 'features/system/store/systemSlice';
 import { difference } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,13 +10,7 @@ import { useDispatch } from 'react-redux';
 
 export const SettingsDeveloperLogNamespaces = memo(() => {
   const { t } = useTranslation();
-  const enabledLogNamespaces = useAppSelector((s) => {
-    if (s.system.logNamespaces.length === 0) {
-      return EMPTY_ARRAY;
-    } else {
-      return s.system.logNamespaces;
-    }
-  });
+  const enabledLogNamespaces = useAppSelector(selectSystemLogNamespaces);
   const disabledLogNamespaces = useMemo(
     () => difference(zLogNamespace.options, enabledLogNamespaces),
     [enabledLogNamespaces]

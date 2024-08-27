@@ -1,7 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { selectFieldInputInstance } from 'features/nodes/store/selectors';
+import { selectFieldInputInstance, selectNodesSlice } from 'features/nodes/store/selectors';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import { useMemo } from 'react';
 

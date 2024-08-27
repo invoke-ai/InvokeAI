@@ -1,7 +1,8 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { LogNamespace } from 'app/logging/logger';
 import { zLogNamespace } from 'app/logging/logger';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { uniq } from 'lodash-es';
 
@@ -70,8 +71,6 @@ export const {
   setShouldEnableInformationalPopovers,
 } = systemSlice.actions;
 
-export const selectSystemSlice = (state: RootState) => state.system;
-
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateSystemState = (state: any): any => {
   if (!('_version' in state)) {
@@ -86,3 +85,21 @@ export const systemPersistConfig: PersistConfig<SystemState> = {
   migrate: migrateSystemState,
   persistDenylist: [],
 };
+
+export const selectSystemSlice = (state: RootState) => state.system;
+const createSystemSelector = <T>(selector: Selector<SystemState, T>) => createSelector(selectSystemSlice, selector);
+
+export const selectSystemLogLevel = createSystemSelector((system) => system.logLevel);
+export const selectSystemLogNamespaces = createSystemSelector((system) =>
+  system.logNamespaces.length > 0 ? system.logNamespaces : EMPTY_ARRAY
+);
+export const selectSystemLogIsEnabled = createSystemSelector((system) => system.logIsEnabled);
+export const selectSystemShouldConfirmOnDelete = createSystemSelector((system) => system.shouldConfirmOnDelete);
+export const selectSystemShouldUseNSFWChecker = createSystemSelector((system) => system.shouldUseNSFWChecker);
+export const selectSystemShouldUseWatermarker = createSystemSelector((system) => system.shouldUseWatermarker);
+export const selectSystemShouldAntialiasProgressImage = createSystemSelector(
+  (system) => system.shouldAntialiasProgressImage
+);
+export const selectSystemShouldEnableInformationalPopovers = createSystemSelector(
+  (system) => system.shouldEnableInformationalPopovers
+);

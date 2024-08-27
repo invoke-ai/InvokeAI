@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import type { Selector } from 'react-redux';
 import { SelectionMode } from 'reactflow';
 
 type WorkflowSettingsState = {
@@ -69,8 +70,6 @@ export const {
   selectionModeChanged,
 } = workflowSettingsSlice.actions;
 
-export const selectWorkflowSettingsSlice = (state: RootState) => state.workflowSettings;
-
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateWorkflowSettingsState = (state: any): any => {
   if (!('_version' in state)) {
@@ -85,3 +84,15 @@ export const workflowSettingsPersistConfig: PersistConfig<WorkflowSettingsState>
   migrate: migrateWorkflowSettingsState,
   persistDenylist: [],
 };
+
+export const selectWorkflowSettingsSlice = (state: RootState) => state.workflowSettings;
+const createWorkflowSettingsSelector = <T>(selector: Selector<WorkflowSettingsState, T>) =>
+  createSelector(selectWorkflowSettingsSlice, selector);
+export const selectShouldSnapToGrid = createWorkflowSettingsSelector((s) => s.shouldSnapToGrid);
+export const selectSelectionMode = createWorkflowSettingsSelector((s) => s.selectionMode);
+export const selectShouldColorEdges = createWorkflowSettingsSelector((s) => s.shouldColorEdges);
+export const selectShouldAnimateEdges = createWorkflowSettingsSelector((s) => s.shouldAnimateEdges);
+export const selectShouldShowEdgeLabels = createWorkflowSettingsSelector((s) => s.shouldShowEdgeLabels);
+export const selectNodeOpacity = createWorkflowSettingsSelector((s) => s.nodeOpacity);
+export const selectShouldShowMinimapPanel = createWorkflowSettingsSelector((s) => s.shouldShowMinimapPanel);
+export const selectShouldShouldValidateGraph = createWorkflowSettingsSelector((s) => s.shouldValidateGraph);

@@ -1,21 +1,20 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setInfillPatchmatchDownscaleSize } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectInfillMethod,
+  selectInfillPatchmatchDownscaleSize,
+  setInfillPatchmatchDownscaleSize,
+} from 'features/controlLayers/store/paramsSlice';
+import { selectInfillPatchmatchDownscaleSizeConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamInfillPatchmatchDownscaleSize = () => {
   const dispatch = useAppDispatch();
-  const infillMethod = useAppSelector((s) => s.params.infillMethod);
-  const infillPatchmatchDownscaleSize = useAppSelector((s) => s.params.infillPatchmatchDownscaleSize);
-  const initial = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.initial);
-  const sliderMin = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.infillPatchmatchDownscaleSize.fineStep);
+  const infillMethod = useAppSelector(selectInfillMethod);
+  const infillPatchmatchDownscaleSize = useAppSelector(selectInfillPatchmatchDownscaleSize);
+  const config = useAppSelector(selectInfillPatchmatchDownscaleSizeConfig);
 
   const { t } = useTranslation();
 
@@ -32,23 +31,23 @@ const ParamInfillPatchmatchDownscaleSize = () => {
         <FormLabel>{t('parameters.patchmatchDownScaleSize')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        min={sliderMin}
-        max={sliderMax}
-        step={coarseStep}
-        fineStep={fineStep}
         value={infillPatchmatchDownscaleSize}
-        defaultValue={initial}
         onChange={handleChange}
         marks
+        defaultValue={config.initial}
+        min={config.sliderMin}
+        max={config.sliderMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
       />
       <CompositeNumberInput
-        min={numberInputMin}
-        max={numberInputMax}
-        step={coarseStep}
-        fineStep={fineStep}
         value={infillPatchmatchDownscaleSize}
-        defaultValue={initial}
         onChange={handleChange}
+        defaultValue={config.initial}
+        min={config.numberInputMin}
+        max={config.numberInputMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
       />
     </FormControl>
   );

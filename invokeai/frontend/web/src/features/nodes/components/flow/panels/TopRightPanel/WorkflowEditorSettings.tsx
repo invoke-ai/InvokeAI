@@ -16,12 +16,16 @@ import {
   Switch,
   useDisclosure,
 } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopRightPanel/ReloadSchemaButton';
 import {
   selectionModeChanged,
-  selectWorkflowSettingsSlice,
+  selectSelectionMode,
+  selectShouldAnimateEdges,
+  selectShouldColorEdges,
+  selectShouldShouldValidateGraph,
+  selectShouldShowEdgeLabels,
+  selectShouldSnapToGrid,
   shouldAnimateEdgesChanged,
   shouldColorEdgesChanged,
   shouldShowEdgeLabelsChanged,
@@ -35,25 +39,6 @@ import { SelectionMode } from 'reactflow';
 
 const formLabelProps: FormLabelProps = { flexGrow: 1 };
 
-const selector = createMemoizedSelector(selectWorkflowSettingsSlice, (workflowSettings) => {
-  const {
-    shouldAnimateEdges,
-    shouldValidateGraph,
-    shouldSnapToGrid,
-    shouldColorEdges,
-    shouldShowEdgeLabels,
-    selectionMode,
-  } = workflowSettings;
-  return {
-    shouldAnimateEdges,
-    shouldValidateGraph,
-    shouldSnapToGrid,
-    shouldColorEdges,
-    shouldShowEdgeLabels,
-    selectionModeIsChecked: selectionMode === SelectionMode.Full,
-  };
-});
-
 type Props = {
   children: (props: { onOpen: () => void }) => ReactNode;
 };
@@ -61,14 +46,13 @@ type Props = {
 const WorkflowEditorSettings = ({ children }: Props) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
-  const {
-    shouldAnimateEdges,
-    shouldValidateGraph,
-    shouldSnapToGrid,
-    shouldColorEdges,
-    shouldShowEdgeLabels,
-    selectionModeIsChecked,
-  } = useAppSelector(selector);
+
+  const shouldSnapToGrid = useAppSelector(selectShouldSnapToGrid);
+  const selectionMode = useAppSelector(selectSelectionMode);
+  const shouldColorEdges = useAppSelector(selectShouldColorEdges);
+  const shouldAnimateEdges = useAppSelector(selectShouldAnimateEdges);
+  const shouldShowEdgeLabels = useAppSelector(selectShouldShowEdgeLabels);
+  const shouldValidateGraph = useAppSelector(selectShouldShouldValidateGraph);
 
   const handleChangeShouldValidate = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -154,7 +138,7 @@ const WorkflowEditorSettings = ({ children }: Props) => {
                 <FormControl>
                   <Flex w="full">
                     <FormLabel>{t('nodes.fullyContainNodes')}</FormLabel>
-                    <Switch isChecked={selectionModeIsChecked} onChange={handleChangeSelectionMode} />
+                    <Switch isChecked={selectionMode === SelectionMode.Full} onChange={handleChangeSelectionMode} />
                   </Flex>
                   <FormHelperText>{t('nodes.fullyContainNodesHelp')}</FormHelperText>
                 </FormControl>

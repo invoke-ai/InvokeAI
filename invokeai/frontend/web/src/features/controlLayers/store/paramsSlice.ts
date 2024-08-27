@@ -1,4 +1,5 @@
-import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
@@ -270,9 +271,6 @@ export const {
   modelChanged,
 } = paramsSlice.actions;
 
-export const selectParamsSlice = (state: RootState) => state.params;
-export const selectBase = createSelector(selectParamsSlice, (params) => params.model?.base);
-
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
   return state;
@@ -284,3 +282,55 @@ export const paramsPersistConfig: PersistConfig<ParamsState> = {
   migrate,
   persistDenylist: [],
 };
+
+export const selectParamsSlice = (state: RootState) => state.params;
+export const createParamsSelector = <T>(selector: Selector<ParamsState, T>) =>
+  createSelector(selectParamsSlice, selector);
+
+export const selectBase = createParamsSelector((params) => params.model?.base);
+export const selectIsSDXL = createParamsSelector((params) => params.model?.base === 'sdxl');
+export const selectModel = createParamsSelector((params) => params.model);
+export const selectModelKey = createParamsSelector((params) => params.model?.key);
+export const selectVAE = createParamsSelector((params) => params.vae);
+export const selectVAEKey = createParamsSelector((params) => params.vae?.key);
+export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
+export const selectSteps = createParamsSelector((params) => params.steps);
+export const selectCFGRescaleMultiplier = createParamsSelector((params) => params.cfgRescaleMultiplier);
+export const selectCLIPSKip = createParamsSelector((params) => params.clipSkip);
+export const selectCanvasCoherenceEdgeSize = createParamsSelector((params) => params.canvasCoherenceEdgeSize);
+export const selectCanvasCoherenceMinDenoise = createParamsSelector((params) => params.canvasCoherenceMinDenoise);
+export const selectCanvasCoherenceMode = createParamsSelector((params) => params.canvasCoherenceMode);
+export const selectMaskBlur = createParamsSelector((params) => params.maskBlur);
+export const selectInfillMethod = createParamsSelector((params) => params.infillMethod);
+export const selectInfillTileSize = createParamsSelector((params) => params.infillTileSize);
+export const selectInfillPatchmatchDownscaleSize = createParamsSelector(
+  (params) => params.infillPatchmatchDownscaleSize
+);
+export const selectInfillColorValue = createParamsSelector((params) => params.infillColorValue);
+export const selectImg2imgStrength = createParamsSelector((params) => params.img2imgStrength);
+export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
+export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
+export const selectPositivePrompt2 = createParamsSelector((params) => params.positivePrompt2);
+export const selectNegativePrompt2 = createParamsSelector((params) => params.negativePrompt2);
+export const selectShouldConcatPrompts = createParamsSelector((params) => params.shouldConcatPrompts);
+export const selectScheduler = createParamsSelector((params) => params.scheduler);
+export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
+export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);
+export const selectSeed = createParamsSelector((params) => params.seed);
+export const selectShouldRandomizeSeed = createParamsSelector((params) => params.shouldConcatPrompts);
+export const selectVAEPrecision = createParamsSelector((params) => params.vaePrecision);
+export const selectIterations = createParamsSelector((params) => params.iterations);
+export const selectShouldUseCPUNoise = createParamsSelector((params) => params.shouldUseCpuNoise);
+
+export const selectRefinerCFGScale = createParamsSelector((params) => params.refinerCFGScale);
+export const selectRefinerModel = createParamsSelector((params) => params.refinerModel);
+export const selectIsRefinerModelSelected = createParamsSelector((params) => Boolean(params.refinerModel));
+export const selectRefinerPositiveAestheticScore = createParamsSelector(
+  (params) => params.refinerPositiveAestheticScore
+);
+export const selectRefinerNegativeAestheticScore = createParamsSelector(
+  (params) => params.refinerNegativeAestheticScore
+);
+export const selectRefinerScheduler = createParamsSelector((params) => params.refinerScheduler);
+export const selectRefinerStart = createParamsSelector((params) => params.refinerStart);
+export const selectRefinerSteps = createParamsSelector((params) => params.refinerSteps);
