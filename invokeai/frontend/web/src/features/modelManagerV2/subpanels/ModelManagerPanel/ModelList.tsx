@@ -175,12 +175,12 @@ const ModelList = () => {
         {/* T5 Encoders List */}
         {isLoadingT5EncoderModels && <FetchingModelsLoader loadingMessage="Loading T5 Encoder Models..." />}
         {!isLoadingT5EncoderModels && filteredT5EncoderModels.length > 0 && (
-          <ModelListWrapper title="T5 Encoder" modelList={filteredT5EncoderModels} key="t5-encoder" />
+          <ModelListWrapper title={t('modelManager.t5Encoder')} modelList={filteredT5EncoderModels} key="t5-encoder" />
         )}
         {/* Clip Embed List */}
         {isLoadingClipEmbedModels && <FetchingModelsLoader loadingMessage="Loading Clip Embed Models..." />}
         {!isLoadingClipEmbedModels && filteredClipEmbedModels.length > 0 && (
-          <ModelListWrapper title="Clip Embed" modelList={filteredClipEmbedModels} key="clip-embed" />
+          <ModelListWrapper title={t('modelManager.clipEmbed')} modelList={filteredClipEmbedModels} key="clip-embed" />
         )}
         {/* Spandrel Image to Image List */}
         {isLoadingSpandrelImageToImageModels && (
@@ -188,7 +188,7 @@ const ModelList = () => {
         )}
         {!isLoadingSpandrelImageToImageModels && filteredSpandrelImageToImageModels.length > 0 && (
           <ModelListWrapper
-            title="Image-to-Image"
+            title={t('modelManager.spandrelImageToImage')}
             modelList={filteredSpandrelImageToImageModels}
             key="spandrel-image-to-image"
           />
