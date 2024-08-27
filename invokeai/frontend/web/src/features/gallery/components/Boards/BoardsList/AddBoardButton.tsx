@@ -1,6 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { boardIdSelected, boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
+import { selectAllowPrivateBoards } from 'features/system/store/configSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -13,7 +14,7 @@ type Props = {
 const AddBoardButton = ({ isPrivateBoard }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
+  const allowPrivateBoards = useAppSelector(selectAllowPrivateBoards);
   const [createBoard, { isLoading }] = useCreateBoardMutation();
   const label = useMemo(() => {
     if (!allowPrivateBoards) {

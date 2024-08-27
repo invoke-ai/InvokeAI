@@ -1,15 +1,18 @@
 import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
-import { fillChanged } from 'features/controlLayers/store/toolSlice';
+import { fillChanged, selectToolSlice } from 'features/controlLayers/store/toolSlice';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const selectFill = createSelector(selectToolSlice, (tool) => tool.fill);
+
 export const ToolFillColorPicker = memo(() => {
   const { t } = useTranslation();
-  const fill = useAppSelector((s) => s.tool.fill);
+  const fill = useAppSelector(selectFill);
   const dispatch = useAppDispatch();
   const onChange = useCallback(
     (color: RgbaColor) => {

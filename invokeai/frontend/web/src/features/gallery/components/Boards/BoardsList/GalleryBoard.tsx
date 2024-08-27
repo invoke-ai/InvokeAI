@@ -18,6 +18,11 @@ import type { AddToBoardDropData } from 'features/dnd/types';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
+import {
+  selectAutoAddBoardId,
+  selectAutoAssignBoardOnClick,
+  selectSelectedBoardId,
+} from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import type { MouseEvent, MouseEventHandler, MutableRefObject } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -49,9 +54,9 @@ interface GalleryBoardProps {
 const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
-  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
-  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
+  const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
+  const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const editingDisclosure = useDisclosure();
   const [localBoardName, setLocalBoardName] = useState(board.board_name);
   const onStartEditingRef = useRef<MouseEventHandler | undefined>(undefined);

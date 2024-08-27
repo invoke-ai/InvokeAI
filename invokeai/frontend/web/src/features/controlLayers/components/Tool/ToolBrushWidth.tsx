@@ -9,18 +9,20 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { brushWidthChanged } from 'features/controlLayers/store/toolSlice';
+import { brushWidthChanged, selectToolSlice } from 'features/controlLayers/store/toolSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const marks = [0, 100, 200, 300];
 const formatPx = (v: number | string) => `${v} px`;
+const selectBrushWidth = createSelector(selectToolSlice, (tool) => tool.brush.width);
 
 export const ToolBrushWidth = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const width = useAppSelector((s) => s.tool.brush.width);
+  const width = useAppSelector(selectBrushWidth);
   const onChange = useCallback(
     (v: number) => {
       dispatch(brushWidthChanged(Math.round(v)));

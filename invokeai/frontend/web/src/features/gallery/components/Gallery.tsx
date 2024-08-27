@@ -11,9 +11,11 @@ import {
   Text,
   useDisclosure,
 } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
-import { galleryViewChanged } from 'features/gallery/store/gallerySlice';
+import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
+import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { CSSProperties } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,11 +40,14 @@ const SELECTED_STYLES: ChakraProps['sx'] = {
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 
+const selectGalleryView = createSelector(selectGallerySlice, (gallery) => gallery.galleryView);
+const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
+
 export const Gallery = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const galleryView = useAppSelector((s) => s.gallery.galleryView);
-  const initialSearchTerm = useAppSelector((s) => s.gallery.searchTerm);
+  const galleryView = useAppSelector(selectGalleryView);
+  const initialSearchTerm = useAppSelector(selectSearchTerm);
   const searchDisclosure = useDisclosure({ defaultIsOpen: initialSearchTerm.length > 0 });
   const [searchTerm, onChangeSearchTerm, onResetSearchTerm] = useGallerySearchTerm();
 
@@ -59,7 +64,7 @@ export const Gallery = () => {
     onResetSearchTerm();
   }, [onResetSearchTerm, searchDisclosure]);
 
-  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
+  const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const boardName = useBoardName(selectedBoardId);
 
   return (

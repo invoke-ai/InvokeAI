@@ -3,6 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { IMAGE_FILTERS, isFilterType } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +19,7 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
   const canvasManager = useCanvasManager();
-  const currentBaseModel = useAppSelector((s) => s.params.model?.base);
+  const currentBaseModel = useAppSelector(selectBase);
   const [modelConfigs, { isLoading }] = useControlNetAndT2IAdapterModels();
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 

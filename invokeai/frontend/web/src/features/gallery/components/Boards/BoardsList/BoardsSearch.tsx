@@ -1,5 +1,6 @@
 import { IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -8,7 +9,7 @@ import { PiXBold } from 'react-icons/pi';
 
 const BoardsSearch = () => {
   const dispatch = useAppDispatch();
-  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
+  const boardSearchText = useAppSelector(selectBoardSearchText);
   const { t } = useTranslation();
 
   const handleBoardSearch = useCallback(

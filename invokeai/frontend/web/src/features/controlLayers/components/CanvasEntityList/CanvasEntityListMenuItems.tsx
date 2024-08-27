@@ -8,7 +8,7 @@ import {
   rasterLayerAdded,
   rgAdded,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectEntityCount } from 'features/controlLayers/store/selectors';
+import { selectHasEntities } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold, PiTrashSimpleBold } from 'react-icons/pi';
@@ -16,10 +16,7 @@ import { PiPlusBold, PiTrashSimpleBold } from 'react-icons/pi';
 export const CanvasEntityListMenuItems = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const hasEntities = useAppSelector((s) => {
-    const count = selectEntityCount(s);
-    return count > 0;
-  });
+  const hasEntities = useAppSelector(selectHasEntities);
   const addInpaintMask = useCallback(() => {
     dispatch(inpaintMaskAdded({ isSelected: true }));
   }, [dispatch]);

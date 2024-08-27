@@ -1,6 +1,5 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
@@ -8,7 +7,8 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import type { TypesafeDraggableData } from 'features/dnd/types';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
-import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
+import { selectLastSelectedImageName } from 'features/gallery/store/gallerySelectors';
+import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
@@ -19,17 +19,12 @@ import { $hasProgress } from 'services/events/setEventListeners';
 
 import ProgressImage from './ProgressImage';
 
-const selectLastSelectedImageName = createSelector(
-  selectLastSelectedImage,
-  (lastSelectedImage) => lastSelectedImage?.image_name
-);
-
 const CurrentImagePreview = () => {
   const { t } = useTranslation();
-  const shouldShowImageDetails = useAppSelector((s) => s.ui.shouldShowImageDetails);
+  const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
   const hasDenoiseProgress = useStore($hasProgress);
-  const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
+  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
 
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
 

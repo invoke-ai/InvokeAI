@@ -13,8 +13,9 @@ import {
   Spacer,
   Text,
 } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setShouldEnableInformationalPopovers } from 'features/system/store/systemSlice';
+import { selectSystemSlice, setShouldEnableInformationalPopovers } from 'features/system/store/systemSlice';
 import { toast } from 'features/toast/toast';
 import { merge, omit } from 'lodash-es';
 import type { ReactElement } from 'react';
@@ -31,8 +32,10 @@ type Props = {
   children: ReactElement;
 };
 
+const selectShouldEnableInformationalPopovers = createSelector(selectSystemSlice, system => system.shouldEnableInformationalPopovers);
+
 export const InformationalPopover = memo(({ feature, children, inPortal = true, ...rest }: Props) => {
-  const shouldEnableInformationalPopovers = useAppSelector((s) => s.system.shouldEnableInformationalPopovers);
+  const shouldEnableInformationalPopovers = useAppSelector(selectShouldEnableInformationalPopovers);
 
   const data = useMemo(() => POPOVER_DATA[feature], [feature]);
 

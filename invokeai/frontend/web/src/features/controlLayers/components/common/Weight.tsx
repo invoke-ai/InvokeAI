@@ -1,6 +1,8 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,15 +14,11 @@ type Props = {
 const formatValue = (v: number) => v.toFixed(2);
 const marks = [0, 1, 2];
 
+const selectWeightConfig = createSelector(selectConfigSlice, (config) => config.sd.ca.weight);
+
 export const Weight = memo(({ weight, onChange }: Props) => {
   const { t } = useTranslation();
-  const initial = useAppSelector((s) => s.config.sd.ca.weight.initial);
-  const sliderMin = useAppSelector((s) => s.config.sd.ca.weight.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.ca.weight.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.ca.weight.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.ca.weight.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.ca.weight.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.ca.weight.fineStep);
+  const config = useAppSelector(selectWeightConfig);
 
   return (
     <FormControl orientation="horizontal">
@@ -30,23 +28,23 @@ export const Weight = memo(({ weight, onChange }: Props) => {
       <CompositeSlider
         value={weight}
         onChange={onChange}
-        defaultValue={initial}
-        min={sliderMin}
-        max={sliderMax}
-        step={coarseStep}
-        fineStep={fineStep}
+        defaultValue={config.initial}
+        min={config.sliderMin}
+        max={config.sliderMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
         marks={marks}
         formatValue={formatValue}
       />
       <CompositeNumberInput
         value={weight}
         onChange={onChange}
-        min={numberInputMin}
-        max={numberInputMax}
-        step={coarseStep}
-        fineStep={fineStep}
+        min={config.numberInputMin}
+        max={config.numberInputMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
         maxW={20}
-        defaultValue={initial}
+        defaultValue={config.initial}
       />
     </FormControl>
   );

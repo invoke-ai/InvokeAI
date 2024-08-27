@@ -40,6 +40,11 @@ export const selectEntityCount = createSelector(selectCanvasSlice, (canvas) => {
 });
 
 /**
+ * Selects if the canvas has any entities.
+ */
+export const selectHasEntities = createSelector(selectEntityCount, (count) => count > 0);
+
+/**
  * Selects the optimal dimension for the canvas based on the currently-model
  */
 export const selectOptimalDimension = createSelector(selectParamsSlice, (params) => {
@@ -185,4 +190,3 @@ export const selectIsSelectedEntityDrawable = createSelector(
     return isDrawableEntityType(selectedEntityIdentifier.type);
   }
 );
-

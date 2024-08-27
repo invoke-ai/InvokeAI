@@ -1,5 +1,6 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
@@ -18,12 +19,17 @@ const selectImagesToChange = createMemoizedSelector(
   (changeBoardModal) => changeBoardModal.imagesToChange
 );
 
+const selectIsModalOpen = createSelector(
+  selectChangeBoardModalSlice,
+  (changeBoardModal) => changeBoardModal.isModalOpen
+);
+
 const ChangeBoardModal = () => {
   const dispatch = useAppDispatch();
   const [selectedBoard, setSelectedBoard] = useState<string | null>();
   const queryArgs = useAppSelector(selectListBoardsQueryArgs);
   const { data: boards, isFetching } = useListAllBoardsQuery(queryArgs);
-  const isModalOpen = useAppSelector((s) => s.changeBoardModal.isModalOpen);
+  const isModalOpen = useAppSelector(selectIsModalOpen);
   const imagesToChange = useAppSelector(selectImagesToChange);
   const [addImagesToBoard] = useAddImagesToBoardMutation();
   const [removeImagesFromBoard] = useRemoveImagesFromBoardMutation();

@@ -1,5 +1,6 @@
 import { CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectGalleryImageMinimumWidth } from 'features/gallery/store/gallerySelectors';
 import { setGalleryImageMinimumWidth } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 const GallerySettingsPopover = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const galleryImageMinimumWidth = useAppSelector((s) => s.gallery.galleryImageMinimumWidth);
+  const galleryImageMinimumWidth = useAppSelector(selectGalleryImageMinimumWidth);
 
   const onChange = useCallback(
     (v: number) => {
