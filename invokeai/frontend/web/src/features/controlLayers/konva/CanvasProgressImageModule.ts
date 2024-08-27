@@ -1,13 +1,13 @@
 import { Mutex } from 'async-mutex';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import { getPrefixedId, loadImage } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 import type { S } from 'services/api/types';
 
-export class CanvasProgressImageModule extends CanvasModuleBase {
+export class CanvasProgressImageModule extends CanvasModuleABC {
   readonly type = 'progress_image';
 
   id: string;

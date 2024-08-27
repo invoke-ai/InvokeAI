@@ -1,5 +1,5 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { CANVAS_SCALE_BY } from 'features/controlLayers/konva/constants';
 import { getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
 import type { Coordinate, Dimensions, Rect } from 'features/controlLayers/store/types';
@@ -8,7 +8,7 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
 import type { Logger } from 'roarr';
 
-export class CanvasStageModule extends CanvasModuleBase {
+export class CanvasStageModule extends CanvasModuleABC {
   readonly type = 'stage';
 
   static MIN_CANVAS_SCALE = 0.1;

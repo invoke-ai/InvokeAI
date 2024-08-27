@@ -1,18 +1,18 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
+import type { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import type { CanvasRectState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasRectRenderer extends CanvasModuleBase {
-  readonly type = 'rect_renderer';
+export class CanvasObjectRectRenderer extends CanvasModuleABC {
+  readonly type = 'object_rect_renderer';
 
   id: string;
   path: string[];
-  parent: CanvasObjectRenderer;
+  parent: CanvasEntityRenderer;
   manager: CanvasManager;
   log: Logger;
   subscriptions = new Set<() => void>();
@@ -24,7 +24,7 @@ export class CanvasRectRenderer extends CanvasModuleBase {
   };
   isFirstRender: boolean = false;
 
-  constructor(state: CanvasRectState, parent: CanvasObjectRenderer) {
+  constructor(state: CanvasRectState, parent: CanvasEntityRenderer) {
     super();
     const { id } = state;
     this.id = id;

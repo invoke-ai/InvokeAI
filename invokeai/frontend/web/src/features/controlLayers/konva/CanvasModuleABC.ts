@@ -2,7 +2,7 @@ import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { Logger } from 'roarr';
 
-export abstract class CanvasModuleBase {
+export abstract class CanvasModuleABC {
   abstract id: string;
   abstract type: string;
   abstract path: string[];

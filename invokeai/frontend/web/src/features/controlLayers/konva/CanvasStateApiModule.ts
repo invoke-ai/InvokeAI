@@ -1,9 +1,9 @@
 import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
 import type { AppStore } from 'app/store/store';
-import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
+import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
+import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   bboxChanged,
@@ -54,28 +54,28 @@ type EntityStateAndAdapter =
       id: string;
       type: CanvasRasterLayerState['type'];
       state: CanvasRasterLayerState;
-      adapter: CanvasLayerAdapter;
+      adapter: CanvasEntityLayerAdapter;
     }
   | {
       id: string;
       type: CanvasControlLayerState['type'];
       state: CanvasControlLayerState;
-      adapter: CanvasLayerAdapter;
+      adapter: CanvasEntityLayerAdapter;
     }
   | {
       id: string;
       type: CanvasInpaintMaskState['type'];
       state: CanvasInpaintMaskState;
-      adapter: CanvasMaskAdapter;
+      adapter: CanvasEntityMaskAdapter;
     }
   | {
       id: string;
       type: CanvasRegionalGuidanceState['type'];
       state: CanvasRegionalGuidanceState;
-      adapter: CanvasMaskAdapter;
+      adapter: CanvasEntityMaskAdapter;
     };
 
-export class CanvasStateApiModule extends CanvasModuleBase {
+export class CanvasStateApiModule extends CanvasModuleABC {
   readonly type = 'state_api';
 
   id: string;
