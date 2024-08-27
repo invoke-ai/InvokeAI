@@ -569,7 +569,7 @@ class UtilInterface(InvocationContextInterface):
             scale=scale,
         )
 
-    def preview_callback(self, step: int, total_steps: int, order: int, image: Image, scale: int = 1) -> None:
+    def preview_callback(self, step: int, total_steps: int, image: Image, scale: int = 1, order: int = 1) -> None:
         """
         The step preview callback emits a progress event with the current step, the total number of
         steps, a preview image and it's scale.
@@ -577,9 +577,9 @@ class UtilInterface(InvocationContextInterface):
         Args:
             step: Number of current denoise step
             total_steps: Total number of steps in denoise process
-            order: Order of used scheduler
             image: Preview image of denoise step resulted latents
             scale: Scale of preview image
+            order: Order of used scheduler
         """
 
         if self.is_canceled():
