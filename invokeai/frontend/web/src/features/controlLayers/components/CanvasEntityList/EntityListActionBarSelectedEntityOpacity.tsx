@@ -77,7 +77,7 @@ const selectOpacity = createSelector(selectCanvasSlice, (canvas) => {
   return selectedEntity.opacity;
 });
 
-export const CanvasEntityOpacity = memo(() => {
+export const SelectedEntityOpacity = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
@@ -151,6 +151,8 @@ export const CanvasEntityOpacity = memo(() => {
             defaultValue={1}
             onKeyDown={onKeyDown}
             clampValueOnBlur={false}
+            variant="outline"
+            isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'ip_adapter'}
           >
             <NumberInputField paddingInlineEnd={7} />
             <PopoverTrigger>
@@ -186,4 +188,4 @@ export const CanvasEntityOpacity = memo(() => {
   );
 });
 
-CanvasEntityOpacity.displayName = 'CanvasEntityOpacity';
+SelectedEntityOpacity.displayName = 'SelectedEntityOpacity';

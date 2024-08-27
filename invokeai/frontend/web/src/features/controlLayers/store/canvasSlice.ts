@@ -131,6 +131,7 @@ export const canvasSlice = createSlice({
           name: null,
           type: 'raster_layer',
           isEnabled: true,
+          isLocked: false,
           objects: [],
           opacity: 1,
           position: { x: 0, y: 0 },
@@ -191,6 +192,7 @@ export const canvasSlice = createSlice({
           name: null,
           type: 'control_layer',
           isEnabled: true,
+          isLocked: false,
           withTransparencyEffect: true,
           objects: [],
           opacity: 1,
@@ -332,6 +334,7 @@ export const canvasSlice = createSlice({
           id,
           type: 'ip_adapter',
           name: null,
+          isLocked: false,
           isEnabled: true,
           ipAdapter: deepClone(initialIPAdapter),
         };
@@ -420,6 +423,7 @@ export const canvasSlice = createSlice({
         const entity: CanvasRegionalGuidanceState = {
           id,
           name: null,
+          isLocked: false,
           type: 'regional_guidance',
           isEnabled: true,
           objects: [],
@@ -630,6 +634,7 @@ export const canvasSlice = createSlice({
           name: null,
           type: 'inpaint_mask',
           isEnabled: true,
+          isLocked: false,
           objects: [],
           opacity: 1,
           position: { x: 0, y: 0 },
@@ -848,6 +853,14 @@ export const canvasSlice = createSlice({
         return;
       }
       entity.isEnabled = !entity.isEnabled;
+    },
+    entityIsLockedToggled: (state, action: PayloadAction<EntityIdentifierPayload>) => {
+      const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+      entity.isLocked = !entity.isLocked;
     },
     entityMoved: (state, action: PayloadAction<EntityMovedPayload>) => {
       const { entityIdentifier, position } = action.payload;
@@ -1074,6 +1087,7 @@ export const {
   entityNameChanged,
   entityReset,
   entityIsEnabledToggled,
+  entityIsLockedToggled,
   entityMoved,
   entityDuplicated,
   entityRasterized,

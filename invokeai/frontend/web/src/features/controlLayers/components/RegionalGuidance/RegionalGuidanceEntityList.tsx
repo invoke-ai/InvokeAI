@@ -11,7 +11,7 @@ const selectEntityIds = createMemoizedSelector(selectCanvasSlice, (canvas) => {
   return canvas.regions.entities.map(mapId).reverse();
 });
 const selectIsSelected = createSelector(selectSelectedEntityIdentifier, (selectedEntityIdentifier) => {
-  return selectedEntityIdentifier?.type === 'raster_layer';
+  return selectedEntityIdentifier?.type === 'regional_guidance';
 });
 
 export const RegionalGuidanceEntityList = memo(() => {
