@@ -18,15 +18,11 @@ const buildStylePresetsUrl = (path: string = '') => buildV1Url(`style_presets/${
 
 export const stylePresetsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getStylePreset: build.query<
-      paths['/api/v1/style_presets/i/{style_preset_id}']['get']['responses']['200']['content']['application/json'],
-      string
-    >({
-      query: (style_preset_id) => buildStylePresetsUrl(`i/${style_preset_id}`),
-      providesTags: (result, error, style_preset_id) => [
-        { type: 'StylePreset', id: style_preset_id },
-        'FetchOnReconnect',
-      ],
+    selectStylePreset: build.mutation<void, string>({
+      query: (style_preset_id) => ({
+        url: buildStylePresetsUrl(`i/${style_preset_id}`),
+        method: 'POST',
+      }),
     }),
     deleteStylePreset: build.mutation<void, string>({
       query: (style_preset_id) => ({
