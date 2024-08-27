@@ -1,4 +1,4 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
@@ -27,6 +27,7 @@ import type { AspectRatioID } from 'features/parameters/components/DocumentSize/
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import { isEqual, merge, omit } from 'lodash-es';
+import type { UndoableOptions } from 'redux-undo';
 import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -1032,6 +1033,9 @@ export const canvasSlice = createSlice({
       newState.bbox.scaledSize = scaledSize;
       return newState;
     },
+    canvasUndo: () => {},
+    canvasRedo: () => {},
+    canvasClearHistory: () => {},
   },
   extraReducers(builder) {
     builder.addCase(modelChanged, (state, action) => {
@@ -1062,6 +1066,9 @@ export const canvasSlice = createSlice({
 
 export const {
   canvasReset,
+  canvasUndo,
+  canvasRedo,
+  canvasClearHistory,
   // All entities
   entitySelected,
   entityNameChanged,
@@ -1154,3 +1161,47 @@ const syncScaledSize = (state: CanvasState) => {
     state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.optimalDimension);
   }
 };
+
+let filter = true;
+
+export const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
+  limit: 64,
+  undoType: canvasUndo.type,
+  redoType: canvasRedo.type,
+  clearHistoryType: canvasClearHistory.type,
+  filter: (action, _state, _history) => {
+    // Ignore all actions from other slices
+    if (!action.type.startsWith(canvasSlice.name)) {
+      return false;
+    }
+    // Throttle rapid actions of the same type
+    filter = actionsThrottlingFilter(action);
+    return filter;
+  },
+  // This is pretty spammy, leave commented out unless you need it
+  // debug: import.meta.env.MODE === 'development',
+};
+
+// Store rapid actions of the same type at most once every x time.
+// See: https://github.com/omnidan/redux-undo/blob/master/examples/throttled-drag/util/undoFilter.js
+const THROTTLE_MS = 1000;
+let ignoreRapid = false;
+let prevActionType: string | null = null;
+function actionsThrottlingFilter(action: UnknownAction) {
+  // If the actions are of a different type, reset the throttle and allow the action
+  if (action.type !== prevActionType) {
+    ignoreRapid = false;
+    prevActionType = action.type;
+    return true;
+  }
+  // Else, if the actions are of the same type, throttle them. Ignore the action if the flag is set.
+  if (ignoreRapid) {
+    return false;
+  }
+  // We are allowing this action - set the flag and a timeout to clear it.
+  ignoreRapid = true;
+  window.setTimeout(() => {
+    ignoreRapid = false;
+  }, THROTTLE_MS);
+  return true;
+}

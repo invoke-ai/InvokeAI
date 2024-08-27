@@ -1650,6 +1650,7 @@
         "storeNotInitialized": "Store is not initialized"
     },
     "controlLayers": {
+        "clearHistory": "Clear History",
         "generateMode": "Generate",
         "generateModeDesc": "Create individual images. Generated images are added directly to the gallery.",
         "composeMode": "Compose",
