@@ -12,10 +12,13 @@ export const RegionalGuidanceDeletePromptButton = memo(({ onDelete }: Props) => 
   return (
     <Tooltip label={t('controlLayers.deletePrompt')}>
       <IconButton
-        variant="promptOverlay"
+        variant="link"
         aria-label={t('controlLayers.deletePrompt')}
         icon={<PiTrashSimpleBold />}
         onClick={onDelete}
+        flexGrow={0}
+        size="sm"
+        p={0}
       />
     </Tooltip>
   );
