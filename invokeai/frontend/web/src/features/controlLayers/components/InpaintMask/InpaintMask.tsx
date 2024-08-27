@@ -10,8 +10,6 @@ import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityI
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
 
-import { InpaintMaskMaskFillColorPicker } from './InpaintMaskMaskFillColorPicker';
-
 type Props = {
   id: string;
 };
@@ -28,7 +26,6 @@ export const InpaintMask = memo(({ id }: Props) => {
             <CanvasEntityEditableTitle />
             <Spacer />
             <CanvasEntityIsLockedToggle />
-            <InpaintMaskMaskFillColorPicker />
             <CanvasEntityEnabledToggle />
           </CanvasEntityHeader>
         </CanvasEntityContainer>
