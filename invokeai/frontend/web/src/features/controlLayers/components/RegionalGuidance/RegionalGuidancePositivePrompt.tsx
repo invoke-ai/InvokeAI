@@ -1,16 +1,20 @@
-import { Box, Textarea } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { RegionalGuidanceDeletePromptButton } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceDeletePromptButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { rgPositivePromptChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
-import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const _focusVisible: SystemStyleObject = {
+  outline: 'none',
+};
 
 export const RegionalGuidancePositivePrompt = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
@@ -49,14 +53,25 @@ export const RegionalGuidancePositivePrompt = memo(() => {
           placeholder={t('parameters.positivePromptPlaceholder')}
           onChange={onChange}
           onKeyDown={onKeyDown}
-          variant="darkFilled"
-          paddingRight={30}
+          variant="outline"
+          paddingInlineStart={2}
+          paddingInlineEnd={8}
           minH={28}
+          zIndex="0 !important"
+          _focusVisible={_focusVisible}
         />
-        <PromptOverlayButtonWrapper>
+        <Flex
+          flexDir="column"
+          gap={2}
+          position="absolute"
+          insetBlockStart={2}
+          insetInlineEnd={0}
+          alignItems="center"
+          justifyContent="center"
+        >
           <RegionalGuidanceDeletePromptButton onDelete={onDeletePrompt} />
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
-        </PromptOverlayButtonWrapper>
+        </Flex>
       </Box>
     </PromptPopover>
   );
