@@ -6,7 +6,7 @@ import {
   ipaAdded,
   rasterLayerAdded,
   rgAdded,
-} from 'features/controlLayers/store/canvasV2Slice';
+} from 'features/controlLayers/store/canvasSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';

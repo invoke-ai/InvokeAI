@@ -7,41 +7,41 @@ import {
   entityArrangedForwardOne,
   entityArrangedToBack,
   entityArrangedToFront,
-} from 'features/controlLayers/store/canvasV2Slice';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
-import type { CanvasEntityIdentifier, CanvasV2State } from 'features/controlLayers/store/types';
+} from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import type { CanvasEntityIdentifier, CanvasState } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowDownBold, PiArrowLineDownBold, PiArrowLineUpBold, PiArrowUpBold } from 'react-icons/pi';
 
 const getIndexAndCount = (
-  canvasV2: CanvasV2State,
+  canvas: CanvasState,
   { id, type }: CanvasEntityIdentifier
 ): { index: number; count: number } => {
   if (type === 'raster_layer') {
     return {
-      index: canvasV2.rasterLayers.entities.findIndex((entity) => entity.id === id),
-      count: canvasV2.rasterLayers.entities.length,
+      index: canvas.rasterLayers.entities.findIndex((entity) => entity.id === id),
+      count: canvas.rasterLayers.entities.length,
     };
   } else if (type === 'control_layer') {
     return {
-      index: canvasV2.controlLayers.entities.findIndex((entity) => entity.id === id),
-      count: canvasV2.controlLayers.entities.length,
+      index: canvas.controlLayers.entities.findIndex((entity) => entity.id === id),
+      count: canvas.controlLayers.entities.length,
     };
   } else if (type === 'regional_guidance') {
     return {
-      index: canvasV2.regions.entities.findIndex((entity) => entity.id === id),
-      count: canvasV2.regions.entities.length,
+      index: canvas.regions.entities.findIndex((entity) => entity.id === id),
+      count: canvas.regions.entities.length,
     };
   } else if (type === 'inpaint_mask') {
     return {
-      index: canvasV2.inpaintMasks.entities.findIndex((entity) => entity.id === id),
-      count: canvasV2.inpaintMasks.entities.length,
+      index: canvas.inpaintMasks.entities.findIndex((entity) => entity.id === id),
+      count: canvas.inpaintMasks.entities.length,
     };
   } else if (type === 'ip_adapter') {
     return {
-      index: canvasV2.ipAdapters.entities.findIndex((entity) => entity.id === id),
-      count: canvasV2.ipAdapters.entities.length,
+      index: canvas.ipAdapters.entities.findIndex((entity) => entity.id === id),
+      count: canvas.ipAdapters.entities.length,
     };
   } else {
     return {
@@ -57,8 +57,8 @@ export const CanvasEntityMenuItemsArrange = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
-        const { index, count } = getIndexAndCount(canvasV2, entityIdentifier);
+      createMemoizedSelector(selectCanvasSlice, (canvas) => {
+        const { index, count } = getIndexAndCount(canvas, entityIdentifier);
         return {
           canMoveForwardOne: index < count - 1,
           canMoveBackwardOne: index > 0,

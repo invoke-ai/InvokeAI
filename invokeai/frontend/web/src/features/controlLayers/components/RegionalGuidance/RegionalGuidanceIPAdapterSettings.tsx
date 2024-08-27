@@ -1,4 +1,5 @@
 import { Box, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { Weight } from 'features/controlLayers/components/common/Weight';
@@ -14,8 +15,8 @@ import {
   rgIPAdapterMethodChanged,
   rgIPAdapterModelChanged,
   rgIPAdapterWeightChanged,
-} from 'features/controlLayers/store/canvasV2Slice';
-import { selectRegionalGuidanceIPAdapter } from 'features/controlLayers/store/selectors';
+} from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice, selectRegionalGuidanceIPAdapter } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { RGIPAdapterImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -34,11 +35,16 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterN
   const onDeleteIPAdapter = useCallback(() => {
     dispatch(rgIPAdapterDeleted({ entityIdentifier, ipAdapterId }));
   }, [dispatch, entityIdentifier, ipAdapterId]);
-  const ipAdapter = useAppSelector((s) => {
-    const ipa = selectRegionalGuidanceIPAdapter(s.canvasV2, entityIdentifier, ipAdapterId);
-    assert(ipa, `Regional GuidanceIP Adapter with id ${ipAdapterId} not found`);
-    return ipa;
-  });
+  const selectIPAdapter = useMemo(
+    () =>
+      createSelector(selectCanvasSlice, (canvas) => {
+        const ipAdapter = selectRegionalGuidanceIPAdapter(canvas, entityIdentifier, ipAdapterId);
+        assert(ipAdapter, `Regional GuidanceIP Adapter with id ${ipAdapterId} not found`);
+        return ipAdapter;
+      }),
+    [entityIdentifier, ipAdapterId]
+  );
+  const ipAdapter = useAppSelector(selectIPAdapter);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {

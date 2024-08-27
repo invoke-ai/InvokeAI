@@ -1,17 +1,21 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { bboxSizeOptimized } from 'features/controlLayers/store/canvasV2Slice';
-import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { bboxSizeOptimized } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { getIsSizeTooLarge, getIsSizeTooSmall } from 'features/parameters/util/optimalDimension';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RiSparklingFill } from 'react-icons/ri';
 
+const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);
+const selectHeight = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.height);
+
 export const SetOptimalSizeButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const width = useAppSelector((s) => s.canvasV2.bbox.rect.width);
-  const height = useAppSelector((s) => s.canvasV2.bbox.rect.height);
+  const width = useAppSelector(selectWidth);
+  const height = useAppSelector(selectHeight);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const isSizeTooSmall = useMemo(
     () => getIsSizeTooSmall(width, height, optimalDimension),

@@ -1,22 +1,23 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import type {
-  CanvasControlLayerState,
-  CanvasEntityIdentifier,
-  CanvasEntityState,
-  CanvasInpaintMaskState,
-  CanvasRasterLayerState,
-  CanvasRegionalGuidanceState,
-  CanvasV2State,
+import {
+  type CanvasControlLayerState,
+  type CanvasEntityIdentifier,
+  type CanvasEntityState,
+  type CanvasInpaintMaskState,
+  type CanvasRasterLayerState,
+  type CanvasRegionalGuidanceState,
+  type CanvasState,
+  isDrawableEntityType,
 } from 'features/controlLayers/store/types';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { assert } from 'tsafe';
 
 /**
- * Selects the canvasV2 slice from the root state
+ * Selects the canvas slice from the root state
  */
-export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
+export const selectCanvasSlice = (state: RootState) => state.canvas.present;
 
 /**
  * Selects the total canvas entity count:
@@ -28,13 +29,13 @@ export const selectCanvasV2Slice = (state: RootState) => state.canvasV2;
  *
  * It does not check for validity of the entities.
  */
-export const selectEntityCount = createSelector(selectCanvasV2Slice, (canvasV2) => {
+export const selectEntityCount = createSelector(selectCanvasSlice, (canvas) => {
   return (
-    canvasV2.regions.entities.length +
-    canvasV2.ipAdapters.entities.length +
-    canvasV2.rasterLayers.entities.length +
-    canvasV2.controlLayers.entities.length +
-    canvasV2.inpaintMasks.entities.length
+    canvas.regions.entities.length +
+    canvas.ipAdapters.entities.length +
+    canvas.rasterLayers.entities.length +
+    canvas.controlLayers.entities.length +
+    canvas.inpaintMasks.entities.length
   );
 });
 
@@ -46,11 +47,11 @@ export const selectOptimalDimension = createSelector(selectParamsSlice, (params)
 });
 
 /**
- * Selects a single entity from the canvasV2 slice. If the entity identifier is narrowed to a specific type, the
+ * Selects a single entity from the canvas slice. If the entity identifier is narrowed to a specific type, the
  * return type will be narrowed as well.
  */
 export function selectEntity<T extends CanvasEntityIdentifier>(
-  state: CanvasV2State,
+  state: CanvasState,
   entityIdentifier: T
 ): Extract<CanvasEntityState, T> | undefined {
   const { id, type } = entityIdentifier;
@@ -80,11 +81,11 @@ export function selectEntity<T extends CanvasEntityIdentifier>(
 }
 
 /**
- * Selected an entity from the canvasV2 slice. If the entity is not found, an error is thrown.
+ * Selected an entity from the canvas slice. If the entity is not found, an error is thrown.
  * Wrapper around {@link selectEntity}.
  */
 export function selectEntityOrThrow<T extends CanvasEntityIdentifier>(
-  state: CanvasV2State,
+  state: CanvasState,
   entityIdentifier: T
 ): Extract<CanvasEntityState, T> {
   const entity = selectEntity(state, entityIdentifier);
@@ -96,7 +97,7 @@ export function selectEntityOrThrow<T extends CanvasEntityIdentifier>(
  * Selects all entities of the given type.
  */
 export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
-  state: CanvasV2State,
+  state: CanvasState,
   type: T
 ): Extract<CanvasEntityState, { type: T }>[] {
   let entities: CanvasEntityState[] = [];
@@ -126,7 +127,7 @@ export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
 /**
  * Selects all entities, in the order they are displayed in the list.
  */
-export function selectAllEntities(state: CanvasV2State): CanvasEntityState[] {
+export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
   // These are in the same order as they are displayed in the list!
   return [
     ...state.inpaintMasks.entities.toReversed(),
@@ -145,7 +146,7 @@ export function selectAllEntities(state: CanvasV2State): CanvasEntityState[] {
  * - Regional guidance
  */
 export function selectAllRenderableEntities(
-  state: CanvasV2State
+  state: CanvasState
 ): (CanvasRasterLayerState | CanvasControlLayerState | CanvasInpaintMaskState | CanvasRegionalGuidanceState)[] {
   return [
     ...state.rasterLayers.entities,
@@ -159,7 +160,7 @@ export function selectAllRenderableEntities(
  * Selects the IP adapter for the specific Regional Guidance layer.
  */
 export function selectRegionalGuidanceIPAdapter(
-  state: CanvasV2State,
+  state: CanvasState,
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>,
   ipAdapterId: string
 ) {
@@ -169,3 +170,19 @@ export function selectRegionalGuidanceIPAdapter(
   }
   return entity.ipAdapters.find((ipAdapter) => ipAdapter.id === ipAdapterId);
 }
+
+export const selectSelectedEntityIdentifier = createSelector(
+  selectCanvasSlice,
+  (canvas) => canvas.selectedEntityIdentifier
+);
+
+export const selectIsSelectedEntityDrawable = createSelector(
+  selectSelectedEntityIdentifier,
+  (selectedEntityIdentifier) => {
+    if (!selectedEntityIdentifier) {
+      return false;
+    }
+    return isDrawableEntityType(selectedEntityIdentifier.type);
+  }
+);
+

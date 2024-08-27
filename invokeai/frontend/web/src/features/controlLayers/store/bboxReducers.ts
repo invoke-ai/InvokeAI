@@ -1,14 +1,14 @@
 import type { PayloadAction, SliceCaseReducers } from '@reduxjs/toolkit';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
-import type { BoundingBoxScaleMethod, CanvasV2State, Dimensions } from 'features/controlLayers/store/types';
+import type { BoundingBoxScaleMethod, CanvasState, Dimensions } from 'features/controlLayers/store/types';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
 import { ASPECT_RATIO_MAP, initialAspectRatioState } from 'features/parameters/components/DocumentSize/constants';
 import type { AspectRatioID } from 'features/parameters/components/DocumentSize/types';
 import type { IRect } from 'konva/lib/types';
 
-const syncScaledSize = (state: CanvasV2State) => {
+const syncScaledSize = (state: CanvasState) => {
   if (state.bbox.scaleMethod === 'auto') {
     const { width, height } = state.bbox.rect;
     state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.optimalDimension);
@@ -116,4 +116,4 @@ export const bboxReducers = {
 
     syncScaledSize(state);
   },
-} satisfies SliceCaseReducers<CanvasV2State>;
+} satisfies SliceCaseReducers<CanvasState>;

@@ -15,8 +15,12 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { snapToNearest } from 'features/controlLayers/konva/util';
-import { entityOpacityChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { selectEntity } from 'features/controlLayers/store/selectors';
+import { entityOpacityChanged } from 'features/controlLayers/store/canvasSlice';
+import {
+  selectCanvasSlice,
+  selectEntity,
+  selectSelectedEntityIdentifier,
+} from 'features/controlLayers/store/selectors';
 import { isDrawableEntity } from 'features/controlLayers/store/types';
 import { clamp, round } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
@@ -59,13 +63,14 @@ const snapCandidates = marks.slice(1, marks.length - 1);
 export const CanvasEntityOpacity = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const selectedEntityIdentifier = useAppSelector((s) => s.canvasV2.selectedEntityIdentifier);
+  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const opacity = useAppSelector((s) => {
-    const selectedEntityIdentifier = s.canvasV2.selectedEntityIdentifier;
+    const selectedEntityIdentifier = selectSelectedEntityIdentifier(s);
     if (!selectedEntityIdentifier) {
       return null;
     }
-    const selectedEntity = selectEntity(s.canvasV2, selectedEntityIdentifier);
+    const canvas = selectCanvasSlice(s);
+    const selectedEntity = selectEntity(canvas, selectedEntityIdentifier);
     if (!selectedEntity) {
       return null;
     }

@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { PersistConfig } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 
 export type CanvasSettingsState = {
   imageSmoothing: boolean;
@@ -51,3 +51,4 @@ export const canvasSettingsPersistConfig: PersistConfig<CanvasSettingsState> = {
   migrate,
   persistDenylist: [],
 };
+export const selectCanvasSettingsSlice = (s: RootState) => s.canvasSettings;

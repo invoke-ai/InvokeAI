@@ -13,7 +13,7 @@ import {
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
@@ -39,8 +39,8 @@ const DeleteBoardModal = (props: Props) => {
 
   const selectImageUsageSummary = useMemo(
     () =>
-      createMemoizedSelector([selectNodesSlice, selectCanvasV2Slice], (nodes, canvasV2) => {
-        const allImageUsage = (boardImageNames ?? []).map((imageName) => getImageUsage(nodes, canvasV2, imageName));
+      createMemoizedSelector([selectNodesSlice, selectCanvasSlice], (nodes, canvas) => {
+        const allImageUsage = (boardImageNames ?? []).map((imageName) => getImageUsage(nodes, canvas, imageName));
 
         const imageUsageSummary: ImageUsage = {
           isLayerImage: some(allImageUsage, (i) => i.isLayerImage),
