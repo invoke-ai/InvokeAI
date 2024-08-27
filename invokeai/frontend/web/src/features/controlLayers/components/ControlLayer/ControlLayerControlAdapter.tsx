@@ -11,7 +11,7 @@ import {
   controlLayerControlModeChanged,
   controlLayerModelChanged,
   controlLayerWeightChanged,
-} from 'features/controlLayers/store/canvasV2Slice';
+} from 'features/controlLayers/store/canvasSlice';
 import type { ControlModeV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';

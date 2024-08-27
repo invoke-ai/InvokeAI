@@ -3,7 +3,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectEntity } from 'features/controlLayers/store/selectors';
 import type {
   CanvasInpaintMaskState,
-  CanvasV2State,
+  CanvasState,
   EntityIdentifierPayload,
   FillStyle,
   RgbColor,
@@ -68,4 +68,4 @@ export const inpaintMaskReducers = {
     }
     entity.fill.style = style;
   },
-} satisfies SliceCaseReducers<CanvasV2State>;
+} satisfies SliceCaseReducers<CanvasState>;

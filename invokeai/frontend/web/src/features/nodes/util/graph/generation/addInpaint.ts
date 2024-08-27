@@ -1,6 +1,9 @@
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasSessionSlice';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { isEqual } from 'lodash-es';
@@ -21,8 +24,11 @@ export const addInpaint = async (
 ): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
   denoise.denoising_start = denoising_start;
 
-  const { params, canvasV2, canvasSession } = state;
-  const { bbox } = canvasV2;
+  const params = selectParamsSlice(state);
+  const canvasSession = selectCanvasSessionSlice(state);
+  const canvas = selectCanvasSlice(state);
+
+  const { bbox } = canvas;
   const { mode } = canvasSession;
 
   const initialImage = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);

@@ -2,8 +2,8 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { controlLayerWithTransparencyEffectToggled } from 'features/controlLayers/store/canvasV2Slice';
-import { selectCanvasV2Slice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { controlLayerWithTransparencyEffectToggled } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDropHalfBold } from 'react-icons/pi';
@@ -14,8 +14,8 @@ export const ControlLayerMenuItemsTransparencyEffect = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('control_layer');
   const selectWithTransparencyEffect = useMemo(
     () =>
-      createSelector(selectCanvasV2Slice, (canvasV2) => {
-        const entity = selectEntityOrThrow(canvasV2, entityIdentifier);
+      createSelector(selectCanvasSlice, (canvas) => {
+        const entity = selectEntityOrThrow(canvas, entityIdentifier);
         return entity.withTransparencyEffect;
       }),
     [entityIdentifier]

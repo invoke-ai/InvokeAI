@@ -4,7 +4,7 @@ import { useBoolean } from 'common/hooks/useBoolean';
 import { CanvasEntityTitle } from 'features/controlLayers/components/common/CanvasEntityTitle';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityTitle } from 'features/controlLayers/hooks/useEntityTitle';
-import { entityNameChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { entityNameChanged } from 'features/controlLayers/store/canvasSlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 

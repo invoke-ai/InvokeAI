@@ -4,7 +4,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { RegionalGuidanceIPAdapterSettings } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceIPAdapterSettings';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectCanvasV2Slice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { Fragment, memo, useMemo } from 'react';
 
 export const RegionalGuidanceIPAdapters = memo(() => {
@@ -12,8 +12,8 @@ export const RegionalGuidanceIPAdapters = memo(() => {
 
   const selectIPAdapterIds = useMemo(
     () =>
-      createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
-        const ipAdapterIds = selectEntityOrThrow(canvasV2, entityIdentifier).ipAdapters.map(({ id }) => id);
+      createMemoizedSelector(selectCanvasSlice, (canvas) => {
+        const ipAdapterIds = selectEntityOrThrow(canvas, entityIdentifier).ipAdapters.map(({ id }) => id);
         if (ipAdapterIds.length === 0) {
           return EMPTY_ARRAY;
         }

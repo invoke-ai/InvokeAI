@@ -1,17 +1,21 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
 import { RasterLayer } from 'features/controlLayers/components/RasterLayer/RasterLayer';
 import { mapId } from 'features/controlLayers/konva/util';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 
-const selectEntityIds = createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
-  return canvasV2.rasterLayers.entities.map(mapId).reverse();
+const selectEntityIds = createMemoizedSelector(selectCanvasSlice, (canvas) => {
+  return canvas.rasterLayers.entities.map(mapId).reverse();
+});
+const selectIsSelected = createSelector(selectSelectedEntityIdentifier, (selectedEntityIdentifier) => {
+  return selectedEntityIdentifier?.type === 'raster_layer';
 });
 
 export const RasterLayerEntityList = memo(() => {
-  const isSelected = useAppSelector((s) => Boolean(s.canvasV2.selectedEntityIdentifier?.type === 'raster_layer'));
+  const isSelected = useAppSelector(selectIsSelected);
   const layerIds = useAppSelector(selectEntityIds);
 
   if (layerIds.length === 0) {

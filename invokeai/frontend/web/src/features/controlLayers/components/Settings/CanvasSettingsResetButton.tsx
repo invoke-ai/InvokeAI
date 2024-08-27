@@ -1,6 +1,6 @@
 import { Button } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { canvasReset } from 'features/controlLayers/store/canvasV2Slice';
+import { canvasReset } from 'features/controlLayers/store/canvasSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 

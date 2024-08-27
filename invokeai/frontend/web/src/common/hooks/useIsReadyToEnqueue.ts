@@ -3,7 +3,7 @@ import { $isConnected } from 'app/hooks/useSocketIO';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { $templates, selectNodesSlice } from 'features/nodes/store/nodesSlice';
@@ -34,14 +34,14 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
       selectNodesSlice,
       selectWorkflowSettingsSlice,
       selectDynamicPromptsSlice,
-      selectCanvasV2Slice,
+      selectCanvasSlice,
       selectParamsSlice,
       selectUpscalelice,
       selectConfigSlice,
       selectActiveTab,
     ],
-    (system, nodes, workflowSettings, dynamicPrompts, canvasV2, params, upscale, config, activeTabName) => {
-      const { bbox } = canvasV2;
+    (system, nodes, workflowSettings, dynamicPrompts, canvas, params, upscale, config, activeTabName) => {
+      const { bbox } = canvas;
       const { model, positivePrompt } = params;
 
       const reasons: { prefix?: string; content: string }[] = [];
@@ -124,7 +124,7 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
           reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
         }
 
-        canvasV2.controlLayers.entities
+        canvas.controlLayers.entities
           .filter((controlLayer) => controlLayer.isEnabled)
           .forEach((controlLayer, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
@@ -154,7 +154,7 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
             }
           });
 
-        canvasV2.ipAdapters.entities
+        canvas.ipAdapters.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
@@ -182,7 +182,7 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
             }
           });
 
-        canvasV2.regions.entities
+        canvas.regions.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');
@@ -219,7 +219,7 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
             }
           });
 
-        canvasV2.rasterLayers.entities
+        canvas.rasterLayers.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layers_one');

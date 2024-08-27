@@ -1,22 +1,26 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { bboxScaledSizeChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { bboxScaledSizeChanged } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice, selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const selectIsManual = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaleMethod === 'manual');
+const selectScaledHeight = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaledSize.height);
+const selectScaledBoundingBoxHeightConfig = createSelector(
+  selectConfigSlice,
+  (config) => config.sd.scaledBoundingBoxHeight
+);
 
 const ParamScaledHeight = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const isManual = useAppSelector((s) => s.canvasV2.bbox.scaleMethod === 'manual');
-  const height = useAppSelector((s) => s.canvasV2.bbox.scaledSize.height);
-  const sliderMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.scaledBoundingBoxHeight.fineStep);
+  const isManual = useAppSelector(selectIsManual);
+  const scaledHeight = useAppSelector(selectScaledHeight);
+  const config = useAppSelector(selectScaledBoundingBoxHeightConfig);
 
   const onChange = useCallback(
     (height: number) => {
@@ -29,21 +33,21 @@ const ParamScaledHeight = () => {
     <FormControl isDisabled={!isManual}>
       <FormLabel>{t('parameters.scaledHeight')}</FormLabel>
       <CompositeSlider
-        min={sliderMin}
-        max={sliderMax}
-        step={coarseStep}
-        fineStep={fineStep}
-        value={height}
+        min={config.sliderMin}
+        max={config.sliderMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
+        value={scaledHeight}
         onChange={onChange}
         marks
         defaultValue={optimalDimension}
       />
       <CompositeNumberInput
-        min={numberInputMin}
-        max={numberInputMax}
-        step={coarseStep}
-        fineStep={fineStep}
-        value={height}
+        min={config.numberInputMin}
+        max={config.numberInputMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
+        value={scaledHeight}
         onChange={onChange}
         defaultValue={optimalDimension}
       />

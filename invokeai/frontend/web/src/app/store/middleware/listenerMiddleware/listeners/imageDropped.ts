@@ -6,7 +6,8 @@ import {
   ipaImageChanged,
   rasterLayerAdded,
   rgIPAdapterImageChanged,
-} from 'features/controlLayers/store/canvasV2Slice';
+} from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasControlLayerState, CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
@@ -85,7 +86,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payload.imageDTO
       ) {
         const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
-        const { x, y } = getState().canvasV2.bbox.rect;
+        const { x, y } = selectCanvasSlice(getState()).bbox.rect;
         const overrides: Partial<CanvasRasterLayerState> = {
           objects: [imageObject],
           position: { x, y },
@@ -103,7 +104,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payload.imageDTO
       ) {
         const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
-        const { x, y } = getState().canvasV2.bbox.rect;
+        const { x, y } = selectCanvasSlice(getState()).bbox.rect;
         const overrides: Partial<CanvasControlLayerState> = {
           objects: [imageObject],
           position: { x, y },

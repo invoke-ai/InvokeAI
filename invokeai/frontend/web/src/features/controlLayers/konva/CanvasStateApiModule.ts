@@ -14,8 +14,8 @@ import {
   entityRectAdded,
   entityReset,
   entitySelected,
-} from 'features/controlLayers/store/canvasV2Slice';
-import { selectAllRenderableEntities } from 'features/controlLayers/store/selectors';
+} from 'features/controlLayers/store/canvasSlice';
+import { selectAllRenderableEntities, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import {
   brushWidthChanged,
   eraserWidthChanged,
@@ -100,7 +100,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
 
   // Reminder - use arrow functions to avoid binding issues
   getCanvasState = () => {
-    return this.store.getState().canvasV2;
+    return selectCanvasSlice(this.store.getState());
   };
   resetEntity = (arg: EntityIdentifierPayload) => {
     this.store.dispatch(entityReset(arg));

@@ -3,7 +3,7 @@ import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectEntity, selectRegionalGuidanceIPAdapter } from 'features/controlLayers/store/selectors';
 import type {
-  CanvasV2State,
+  CanvasState,
   CLIPVisionModelV2,
   EntityIdentifierPayload,
   FillStyle,
@@ -29,7 +29,7 @@ const DEFAULT_MASK_COLORS: RgbColor[] = [
   { r: 161, g: 120, b: 214 }, // rgb(161, 120, 214)
 ];
 
-const getRGMaskFill = (state: CanvasV2State): RgbColor => {
+const getRGMaskFill = (state: CanvasState): RgbColor => {
   const lastFill = state.regions.entities.slice(-1)[0]?.fill.color;
   let i = DEFAULT_MASK_COLORS.findIndex((c) => isEqual(c, lastFill));
   if (i === -1) {
@@ -249,4 +249,4 @@ export const regionsReducers = {
     }
     ipAdapter.clipVisionModel = clipVisionModel;
   },
-} satisfies SliceCaseReducers<CanvasV2State>;
+} satisfies SliceCaseReducers<CanvasState>;

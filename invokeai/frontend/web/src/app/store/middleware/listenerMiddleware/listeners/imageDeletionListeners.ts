@@ -1,7 +1,8 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch, RootState } from 'app/store/store';
-import { entityDeleted, ipaImageChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { entityDeleted, ipaImageChanged } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { isModalOpenChanged } from 'features/deleteImageModal/store/slice';
@@ -40,7 +41,7 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
 };
 
 // const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-//   state.canvasV2.controlAdapters.entities.forEach(({ id, imageObject, processedImageObject }) => {
+//   state.canvas.present.controlAdapters.entities.forEach(({ id, imageObject, processedImageObject }) => {
 //     if (
 //       imageObject?.image.image_name === imageDTO.image_name ||
 //       processedImageObject?.image.image_name === imageDTO.image_name
@@ -52,7 +53,7 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
 // };
 
 const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.canvasV2.ipAdapters.entities.forEach((entity) => {
+  selectCanvasSlice(state).ipAdapters.entities.forEach((entity) => {
     if (entity.ipAdapter.image?.image_name === imageDTO.image_name) {
       dispatch(ipaImageChanged({ entityIdentifier: getEntityIdentifier(entity), imageDTO: null }));
     }
@@ -60,7 +61,7 @@ const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO
 };
 
 const deleteLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-  state.canvasV2.rasterLayers.entities.forEach(({ id, objects }) => {
+  selectCanvasSlice(state).rasterLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
       if (obj.type === 'image' && obj.image.image_name === imageDTO.image_name) {

@@ -3,7 +3,8 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { useIsFiltering } from 'features/controlLayers/hooks/useIsFiltering';
 import { useIsTransforming } from 'features/controlLayers/hooks/useIsTransforming';
-import { isDrawableEntityType } from 'features/controlLayers/store/types';
+import { selectIsStaging } from 'features/controlLayers/store/canvasSessionSlice';
+import { selectIsSelectedEntityDrawable } from 'features/controlLayers/store/selectors';
 import { memo, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -15,13 +16,8 @@ export const ToolMoveButton = memo(() => {
   const isTransforming = useIsTransforming();
   const selectMove = useSelectTool('move');
   const isSelected = useToolIsSelected('move');
-  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
-  const isDrawingToolAllowed = useAppSelector((s) => {
-    if (!s.canvasV2.selectedEntityIdentifier?.type) {
-      return false;
-    }
-    return isDrawableEntityType(s.canvasV2.selectedEntityIdentifier.type);
-  });
+  const isStaging = useAppSelector(selectIsStaging);
+  const isDrawingToolAllowed = useAppSelector(selectIsSelectedEntityDrawable);
   const isDisabled = useMemo(() => {
     return isTransforming || isFiltering || isStaging || !isDrawingToolAllowed;
   }, [isDrawingToolAllowed, isFiltering, isStaging, isTransforming]);

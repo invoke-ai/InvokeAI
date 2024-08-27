@@ -1,14 +1,14 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { entityDeleted } from 'features/controlLayers/store/canvasV2Slice';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
+import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 const selectSelectedEntityIdentifier = createMemoizedSelector(
-  selectCanvasV2Slice,
-  (canvasV2State) => canvasV2State.selectedEntityIdentifier
+  selectCanvasSlice,
+  (canvasState) => canvasState.selectedEntityIdentifier
 );
 
 export function useCanvasDeleteLayerHotkey() {

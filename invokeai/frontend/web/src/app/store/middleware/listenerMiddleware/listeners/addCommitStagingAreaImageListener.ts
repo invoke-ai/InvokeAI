@@ -4,7 +4,8 @@ import {
   sessionStagingAreaImageAccepted,
   sessionStagingAreaReset,
 } from 'features/controlLayers/store/canvasSessionSlice';
-import { rasterLayerAdded } from 'features/controlLayers/store/canvasV2Slice';
+import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
@@ -58,7 +59,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
       const stagingAreaImage = state.canvasSession.stagedImages[index];
 
       assert(stagingAreaImage, 'No staged image found to accept');
-      const { x, y } = state.canvasV2.bbox.rect;
+      const { x, y } = selectCanvasSlice(state).bbox.rect;
 
       const { imageDTO, offsetX, offsetY } = stagingAreaImage;
       const imageObject = imageDTOToImageObject(imageDTO);

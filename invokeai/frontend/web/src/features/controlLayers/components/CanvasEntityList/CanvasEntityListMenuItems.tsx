@@ -7,7 +7,7 @@ import {
   ipaAdded,
   rasterLayerAdded,
   rgAdded,
-} from 'features/controlLayers/store/canvasV2Slice';
+} from 'features/controlLayers/store/canvasSlice';
 import { selectEntityCount } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

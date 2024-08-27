@@ -8,7 +8,7 @@ import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 
 import type {
   CanvasIPAdapterState,
-  CanvasV2State,
+  CanvasState,
   CLIPVisionModelV2,
   EntityIdentifierPayload,
   IPMethodV2,
@@ -104,4 +104,4 @@ export const ipAdaptersReducers = {
     }
     entity.ipAdapter.beginEndStepPct = beginEndStepPct;
   },
-} satisfies SliceCaseReducers<CanvasV2State>;
+} satisfies SliceCaseReducers<CanvasState>;
