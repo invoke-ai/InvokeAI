@@ -2,6 +2,7 @@ import { Spacer } from '@invoke-ai/ui-library';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
+import { CanvasEntityIsLockedToggle } from 'features/controlLayers/components/common/CanvasEntityIsLockedToggle';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
@@ -28,6 +29,7 @@ export const ControlLayer = memo(({ id }: Props) => {
             <CanvasEntityEditableTitle />
             <Spacer />
             <ControlLayerBadges />
+            <CanvasEntityIsLockedToggle />
             <CanvasEntityEnabledToggle />
           </CanvasEntityHeader>
           <CanvasEntitySettingsWrapper>

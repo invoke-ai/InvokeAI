@@ -1658,7 +1658,6 @@
         "autoSave": "Auto-save to Gallery",
         "resetCanvas": "Reset Canvas",
         "resetAll": "Reset All",
-        "deleteAll": "Delete All",
         "clearCaches": "Clear Caches",
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
@@ -1735,6 +1734,10 @@
         "showingType": "Showing {{type}}",
         "dynamicGrid": "Dynamic Grid",
         "logDebugInfo": "Log Debug Info",
+        "locked": "Locked",
+        "unlocked": "Unlocked",
+        "deleteSelected": "Delete Selected",
+        "deleteAll": "Delete All",
         "fill": {
             "fillStyle": "Fill Style",
             "solid": "Solid",

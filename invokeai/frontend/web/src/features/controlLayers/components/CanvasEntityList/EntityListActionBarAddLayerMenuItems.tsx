@@ -1,22 +1,19 @@
-import { MenuDivider, MenuItem } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { MenuItem } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
 import {
-  allEntitiesDeleted,
   controlLayerAdded,
   inpaintMaskAdded,
   ipaAdded,
   rasterLayerAdded,
   rgAdded,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectHasEntities } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold, PiTrashSimpleBold } from 'react-icons/pi';
+import { PiPlusBold } from 'react-icons/pi';
 
 export const CanvasEntityListMenuItems = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const hasEntities = useAppSelector(selectHasEntities);
   const addInpaintMask = useCallback(() => {
     dispatch(inpaintMaskAdded({ isSelected: true }));
   }, [dispatch]);
@@ -31,9 +28,6 @@ export const CanvasEntityListMenuItems = memo(() => {
   }, [dispatch]);
   const addIPAdapter = useCallback(() => {
     dispatch(ipaAdded({ isSelected: true }));
-  }, [dispatch]);
-  const deleteAll = useCallback(() => {
-    dispatch(allEntitiesDeleted());
   }, [dispatch]);
 
   return (
@@ -52,10 +46,6 @@ export const CanvasEntityListMenuItems = memo(() => {
       </MenuItem>
       <MenuItem icon={<PiPlusBold />} onClick={addIPAdapter}>
         {t('controlLayers.ipAdapter', { count: 1 })}
-      </MenuItem>
-      <MenuDivider />
-      <MenuItem onClick={deleteAll} icon={<PiTrashSimpleBold />} color="error.300" isDisabled={!hasEntities}>
-        {t('controlLayers.deleteAll', { count: 1 })}
       </MenuItem>
     </>
   );
