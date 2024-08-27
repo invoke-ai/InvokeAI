@@ -2,20 +2,20 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
-import { entityIsEnabledToggled } from 'features/controlLayers/store/canvasSlice';
+import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
+import { entityIsLockedToggled } from 'features/controlLayers/store/canvasSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCheckBold } from 'react-icons/pi';
+import { PiLockSimpleFill } from 'react-icons/pi';
 
-export const CanvasEntityEnabledToggle = memo(() => {
+export const CanvasEntityIsLockedToggle = memo(() => {
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
   const ref = useRef<HTMLButtonElement>(null);
-  const isEnabled = useEntityIsEnabled(entityIdentifier);
+  const isLocked = useEntityIsLocked(entityIdentifier);
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
-    dispatch(entityIsEnabledToggled({ entityIdentifier }));
+    dispatch(entityIsLockedToggled({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
   const isHovered = useBoolean(false);
 
@@ -25,13 +25,13 @@ export const CanvasEntityEnabledToggle = memo(() => {
       size="sm"
       onMouseOver={isHovered.setTrue}
       onMouseOut={isHovered.setFalse}
-      aria-label={t(isEnabled ? 'common.enabled' : 'common.disabled')}
-      tooltip={t(isEnabled ? 'common.enabled' : 'common.disabled')}
+      aria-label={t(isLocked ? 'controlLayers.locked' : 'controlLayers.unlocked')}
+      tooltip={t(isLocked ? 'controlLayers.locked' : 'controlLayers.unlocked')}
       variant="ghost"
-      icon={isEnabled || isHovered.isTrue ? <PiCheckBold /> : undefined}
+      icon={isLocked || isHovered.isTrue ? <PiLockSimpleFill /> : undefined}
       onClick={onClick}
     />
   );
 });
 
-CanvasEntityEnabledToggle.displayName = 'CanvasEntityEnabledToggle';
+CanvasEntityIsLockedToggle.displayName = 'CanvasEntityIsLockedToggle';

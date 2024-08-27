@@ -38,13 +38,13 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
             boxSize={4}
             as={PiCaretDownBold}
             transform={collapse.isTrue ? undefined : 'rotate(-90deg)'}
-            fill={isSelected ? 'invokeBlue.300' : 'base.300'}
+            fill={isSelected ? 'base.200' : 'base.500'}
             transitionProperty="common"
             transitionDuration="fast"
           />
           <Text
             fontWeight="semibold"
-            color={isSelected ? 'invokeBlue.300' : 'base.300'}
+            color={isSelected ? 'base.200' : 'base.500'}
             userSelect="none"
             transitionProperty="common"
             transitionDuration="fast"
