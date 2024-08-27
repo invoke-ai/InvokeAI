@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional, Union
 
+from deprecated import deprecated
 from PIL.Image import Image
 from pydantic.networks import AnyHttpUrl
 from torch import Tensor
@@ -25,12 +26,14 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
+from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.util.util import image_to_dataURL
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation
     from invokeai.app.invocations.model import ModelIdentifierField
     from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+    from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 """
 The InvocationContext provides access to various services and data about the current invocation.
@@ -537,7 +540,48 @@ class UtilInterface(InvocationContextInterface):
         """
         return self._is_canceled()
 
-    def preview_callback(self, step: int, total_steps: int, order: int, image: Image, scale: int = 1):
+    @deprecated("sd_step_callback is deprecated and will be removed in future versions, use preview_callback instead")
+    def sd_step_callback(self, intermediate_state: "PipelineIntermediateState", base_model: BaseModelType) -> None:
+        """
+        The step callback emits a progress event with the current step, the total number of
+        steps, a preview image, and some other internal metadata.
+        This should be called after each denoising step.
+        Args:
+            intermediate_state: The intermediate state of the diffusion pipeline.
+            base_model: The base model for the current denoising step.
+        """
+        if self.is_canceled():
+            raise CanceledException
+
+        sample = intermediate_state.latents
+        if intermediate_state.predicted_original is not None:
+            sample = intermediate_state.predicted_original
+
+        image, scale = PreviewExt.gen_latents_preview(
+            sample=sample,
+            base_model=base_model,
+        )
+        self.preview_callback(
+            step=intermediate_state.step,
+            total_steps=intermediate_state.total_steps,
+            order=intermediate_state.order,
+            image=image,
+            scale=scale,
+        )
+
+    def preview_callback(self, step: int, total_steps: int, order: int, image: Image, scale: int = 1) -> None:
+        """
+        The step preview callback emits a progress event with the current step, the total number of
+        steps, a preview image and it's scale.
+        This should be called after each denoising step.
+        Args:
+            step: Number of current denoise step
+            total_steps: Total number of steps in denoise process
+            order: Order of used scheduler
+            image: Preview image of denoise step resulted latents
+            scale: Scale of preview image
+        """
+
         if self.is_canceled():
             raise CanceledException
 

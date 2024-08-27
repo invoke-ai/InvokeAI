@@ -10,6 +10,7 @@ import PIL.Image
 import psutil
 import torch
 import torchvision.transforms as T
+from deprecated import deprecated
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
@@ -26,6 +27,17 @@ from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import U
 from invokeai.backend.util.attention import auto_detect_slice_size
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
+
+
+@dataclass
+@deprecated("PipelineIntermediateState is deprecated and will be removed in future versions")
+class PipelineIntermediateState:
+    step: int
+    order: int
+    total_steps: int
+    timestep: int
+    latents: torch.Tensor
+    predicted_original: Optional[torch.Tensor] = None
 
 
 @dataclass
