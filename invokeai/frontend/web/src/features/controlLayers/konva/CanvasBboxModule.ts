@@ -1,7 +1,7 @@
 import type { SerializableObject } from 'common/types';
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Rect } from 'features/controlLayers/store/types';
@@ -23,7 +23,7 @@ const ALL_ANCHORS: string[] = [
 const CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 const NO_ANCHORS: string[] = [];
 
-export class CanvasBboxModule extends CanvasModuleBase {
+export class CanvasBboxModule extends CanvasModuleABC {
   readonly type = 'bbox';
 
   id: string;

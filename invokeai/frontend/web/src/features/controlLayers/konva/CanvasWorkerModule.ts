@@ -1,10 +1,10 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import type { Logger } from 'roarr';
 
-export class CanvasWorkerModule extends CanvasModuleBase {
+export class CanvasWorkerModule extends CanvasModuleABC {
   readonly type = 'worker';
 
   id: string;

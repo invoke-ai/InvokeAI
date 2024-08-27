@@ -1,14 +1,14 @@
 import type { SerializableObject } from 'common/types';
-import { CanvasImageRenderer } from 'features/controlLayers/konva/CanvasImage';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasObjectImageRenderer } from 'features/controlLayers/konva/CanvasObjectImageRenderer';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasStagingAreaModule extends CanvasModuleBase {
+export class CanvasStagingAreaModule extends CanvasModuleABC {
   readonly type = 'staging_area';
 
   id: string;
@@ -19,7 +19,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
   konva: { group: Konva.Group };
 
-  image: CanvasImageRenderer | null;
+  image: CanvasObjectImageRenderer | null;
   selectedImage: StagingAreaImage | null;
 
   /**
@@ -58,7 +58,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
       if (!this.image) {
         const { image_name } = imageDTO;
-        this.image = new CanvasImageRenderer(
+        this.image = new CanvasObjectImageRenderer(
           {
             id: 'staging-area-image',
             type: 'image',

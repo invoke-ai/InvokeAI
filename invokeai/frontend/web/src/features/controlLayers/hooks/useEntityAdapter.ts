@@ -1,11 +1,13 @@
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
-import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
+import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
+import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
 
-export const useEntityAdapter = (entityIdentifier: CanvasEntityIdentifier): CanvasLayerAdapter | CanvasMaskAdapter => {
+export const useEntityAdapter = (
+  entityIdentifier: CanvasEntityIdentifier
+): CanvasEntityLayerAdapter | CanvasEntityMaskAdapter => {
   const canvasManager = useCanvasManager();
 
   const adapter = useMemo(() => {
