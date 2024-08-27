@@ -64,17 +64,17 @@ const snapCandidates = marks.slice(1, marks.length - 1);
 const selectOpacity = createSelector(selectCanvasSlice, (canvas) => {
   const selectedEntityIdentifier = canvas.selectedEntityIdentifier;
   if (!selectedEntityIdentifier) {
-    return 100; // fallback to 100% opacity
+    return 1; // fallback to 100% opacity
   }
   const selectedEntity = selectEntity(canvas, selectedEntityIdentifier);
   if (!selectedEntity) {
-    return 100; // fallback to 100% opacity
+    return 1; // fallback to 100% opacity
   }
   if (!isDrawableEntity(selectedEntity)) {
-    return 100; // fallback to 100% opacity
+    return 1; // fallback to 100% opacity
   }
   // Opacity is a float from 0-1, but we want to display it as a percentage
-  return selectedEntity.opacity * 100;
+  return selectedEntity.opacity;
 });
 
 export const CanvasEntityOpacity = memo(() => {
@@ -83,7 +83,7 @@ export const CanvasEntityOpacity = memo(() => {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const opacity = useAppSelector(selectOpacity);
 
-  const [localOpacity, setLocalOpacity] = useState(opacity);
+  const [localOpacity, setLocalOpacity] = useState(opacity * 100);
 
   const onChangeSlider = useCallback(
     (opacity: number) => {
