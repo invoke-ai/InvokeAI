@@ -85,24 +85,30 @@ export class CanvasEntityLayerAdapter extends CanvasModuleABC {
   update = async (arg?: { state: CanvasEntityLayerAdapter['state'] }) => {
     const state = get(arg, 'state', this.state);
 
-    if (!this.isFirstRender && state === this.state) {
+    const prevState = this.state;
+    this.state = state;
+
+    if (!this.isFirstRender && prevState === state) {
       this.log.trace('State unchanged, skipping update');
       return;
     }
 
     this.log.debug('Updating');
-    const { position, objects, opacity, isEnabled } = state;
+    const { position, objects, opacity, isEnabled, isLocked } = state;
 
-    if (this.isFirstRender || isEnabled !== this.state.isEnabled) {
+    if (this.isFirstRender || isEnabled !== prevState.isEnabled) {
       this.updateVisibility({ isEnabled });
     }
-    if (this.isFirstRender || objects !== this.state.objects) {
+    if (this.isFirstRender || isLocked !== prevState.isLocked) {
+      this.transformer.syncInteractionState();
+    }
+    if (this.isFirstRender || objects !== prevState.objects) {
       await this.updateObjects({ objects });
     }
-    if (this.isFirstRender || position !== this.state.position) {
+    if (this.isFirstRender || position !== prevState.position) {
       this.transformer.updatePosition({ position });
     }
-    if (this.isFirstRender || opacity !== this.state.opacity) {
+    if (this.isFirstRender || opacity !== prevState.opacity) {
       this.renderer.updateOpacity(opacity);
     }
 
@@ -117,7 +123,6 @@ export class CanvasEntityLayerAdapter extends CanvasModuleABC {
       this.transformer.updateBbox();
     }
 
-    this.state = state;
     this.isFirstRender = false;
   };
 
