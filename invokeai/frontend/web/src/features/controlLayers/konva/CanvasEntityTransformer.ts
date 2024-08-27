@@ -436,7 +436,7 @@ export class CanvasEntityTransformer extends CanvasModuleABC {
     const tool = this.manager.stateApi.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
 
-    if (!this.parent.renderer.hasObjects()) {
+    if (!this.parent.renderer.hasObjects() || this.parent.state.isLocked || !this.parent.state.isEnabled) {
       // The layer is totally empty, we can just disable the layer
       this.parent.konva.layer.listening(false);
       this.setInteractionMode('off');
