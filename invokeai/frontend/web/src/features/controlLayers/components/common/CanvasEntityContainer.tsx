@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsSelected } from 'features/controlLayers/hooks/useEntityIsSelected';
 import { useEntitySelectionColor } from 'features/controlLayers/hooks/useEntitySelectionColor';
-import { entitySelected } from 'features/controlLayers/store/canvasV2Slice';
+import { entitySelected } from 'features/controlLayers/store/canvasSlice';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback } from 'react';
 

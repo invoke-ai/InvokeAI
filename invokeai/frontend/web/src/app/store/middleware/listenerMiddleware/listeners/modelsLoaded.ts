@@ -8,9 +8,10 @@ import {
   controlLayerModelChanged,
   ipaModelChanged,
   rgIPAdapterModelChanged,
-} from 'features/controlLayers/store/canvasV2Slice';
+} from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, refinerModelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
@@ -81,15 +82,12 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     const result = zParameterModel.safeParse(defaultModelInList);
     if (result.success) {
       dispatch(modelChanged({ model: defaultModelInList, previousModel: currentModel }));
-
+      const { bbox } = selectCanvasSlice(state);
       const optimalDimension = getOptimalDimension(defaultModelInList);
-      if (getIsSizeOptimal(state.canvasV2.bbox.rect.width, state.canvasV2.bbox.rect.height, optimalDimension)) {
+      if (getIsSizeOptimal(bbox.rect.width, bbox.rect.height, optimalDimension)) {
         return;
       }
-      const { width, height } = calculateNewSize(
-        state.canvasV2.bbox.aspectRatio.value,
-        optimalDimension * optimalDimension
-      );
+      const { width, height } = calculateNewSize(bbox.aspectRatio.value, optimalDimension * optimalDimension);
 
       dispatch(bboxWidthChanged({ width }));
       dispatch(bboxHeightChanged({ height }));
@@ -172,7 +170,7 @@ const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
   const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
-  state.canvasV2.controlLayers.entities.forEach((entity) => {
+  selectCanvasSlice(state).controlLayers.entities.forEach((entity) => {
     const isModelAvailable = caModels.some((m) => m.key === entity.controlAdapter.model?.key);
     if (isModelAvailable) {
       return;
@@ -183,7 +181,7 @@ const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log)
 
 const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
   const ipaModels = models.filter(isIPAdapterModelConfig);
-  state.canvasV2.ipAdapters.entities.forEach((entity) => {
+  selectCanvasSlice(state).ipAdapters.entities.forEach((entity) => {
     const isModelAvailable = ipaModels.some((m) => m.key === entity.ipAdapter.model?.key);
     if (isModelAvailable) {
       return;
@@ -191,7 +189,7 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
     dispatch(ipaModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
   });
 
-  state.canvasV2.regions.entities.forEach((entity) => {
+  selectCanvasSlice(state).regions.entities.forEach((entity) => {
     entity.ipAdapters.forEach(({ id: ipAdapterId, model }) => {
       const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
       if (isModelAvailable) {

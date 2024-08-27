@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { ipaImageChanged, rgIPAdapterImageChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { ipaImageChanged, rgIPAdapterImageChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';

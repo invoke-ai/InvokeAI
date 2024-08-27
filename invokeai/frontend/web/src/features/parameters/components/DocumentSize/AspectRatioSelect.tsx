@@ -1,18 +1,22 @@
 import type { ComboboxOption, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { SingleValue } from 'chakra-react-select';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { ASPECT_RATIO_OPTIONS } from 'features/parameters/components/DocumentSize/constants';
 import { isAspectRatioID } from 'features/parameters/components/DocumentSize/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const selectAspectRatioID = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.id);
+
 export const AspectRatioSelect = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const id = useAppSelector((s) => s.canvasV2.bbox.aspectRatio.id);
+  const id = useAppSelector(selectAspectRatioID);
 
   const onChange = useCallback(
     (v: SingleValue<ComboboxOption>) => {

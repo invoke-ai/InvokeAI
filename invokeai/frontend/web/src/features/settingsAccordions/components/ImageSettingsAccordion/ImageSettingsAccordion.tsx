@@ -3,7 +3,7 @@ import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-a
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
 import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
 import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
@@ -20,15 +20,15 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selector = createMemoizedSelector(
-  [selectHrfSlice, selectCanvasV2Slice, selectParamsSlice],
-  (hrf, canvasV2, params) => {
+  [selectHrfSlice, selectCanvasSlice, selectParamsSlice],
+  (hrf, canvas, params) => {
     const { shouldRandomizeSeed, model } = params;
     const { hrfEnabled } = hrf;
     const badges: string[] = [];
     const isSDXL = model?.base === 'sdxl';
 
-    const { aspectRatio } = canvasV2.bbox;
-    const { width, height } = canvasV2.bbox.rect;
+    const { aspectRatio } = canvas.bbox;
+    const { width, height } = canvas.bbox.rect;
 
     badges.push(`${width}×${height}`);
     badges.push(aspectRatio.id);

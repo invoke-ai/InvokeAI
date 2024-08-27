@@ -1,9 +1,13 @@
 import { Box, Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { round } from 'lodash-es';
 import { memo } from 'react';
+
+const selectBbox = createSelector(selectCanvasSlice, (canvas) => canvas.bbox);
 
 export const HeadsUpDisplay = memo(() => {
   const canvasManager = useCanvasManager();
@@ -13,7 +17,7 @@ export const HeadsUpDisplay = memo(() => {
   const isMouseDown = useStore(canvasManager.stateApi.$isMouseDown);
   const lastMouseDownPos = useStore(canvasManager.stateApi.$lastMouseDownPos);
   const lastAddedPoint = useStore(canvasManager.stateApi.$lastAddedPoint);
-  const bbox = useAppSelector((s) => s.canvasV2.bbox);
+  const bbox = useAppSelector(selectBbox);
 
   return (
     <Flex flexDir="column" bg="blackAlpha.400" borderBottomEndRadius="base" p={2} minW={64} gap={2}>

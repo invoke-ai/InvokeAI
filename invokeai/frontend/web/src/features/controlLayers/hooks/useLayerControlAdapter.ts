@@ -1,7 +1,7 @@
 import { createMemoizedAppSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
-import { selectCanvasV2Slice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
   ControlNetConfig,
@@ -16,8 +16,8 @@ import { useControlNetAndT2IAdapterModels, useIPAdapterModels } from 'services/a
 export const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) => {
   const selectControlAdapter = useMemo(
     () =>
-      createMemoizedAppSelector(selectCanvasV2Slice, (canvasV2) => {
-        const layer = selectEntityOrThrow(canvasV2, entityIdentifier);
+      createMemoizedAppSelector(selectCanvasSlice, (canvas) => {
+        const layer = selectEntityOrThrow(canvas, entityIdentifier);
         return layer.controlAdapter;
       }),
     [entityIdentifier]
