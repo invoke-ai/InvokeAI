@@ -9,18 +9,20 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { eraserWidthChanged } from 'features/controlLayers/store/toolSlice';
+import { eraserWidthChanged, selectToolSlice } from 'features/controlLayers/store/toolSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const marks = [0, 100, 200, 300];
 const formatPx = (v: number | string) => `${v} px`;
+const selectEraserWidth = createSelector(selectToolSlice, (tool) => tool.eraser.width);
 
 export const ToolEraserWidth = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const width = useAppSelector((s) => s.tool.eraser.width);
+  const width = useAppSelector(selectEraserWidth);
   const onChange = useCallback(
     (v: number) => {
       dispatch(eraserWidthChanged(Math.round(v)));

@@ -1,5 +1,6 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { selectSearchTerm } from 'features/gallery/store/gallerySelectors';
 import { searchTermChanged } from 'features/gallery/store/gallerySlice';
 import { debounce } from 'lodash-es';
 import { useCallback, useMemo, useState } from 'react';
@@ -9,7 +10,7 @@ export const useGallerySearchTerm = () => {
   useAssertSingleton('gallery-search-state');
 
   const dispatch = useAppDispatch();
-  const searchTerm = useAppSelector((s) => s.gallery.searchTerm);
+  const searchTerm = useAppSelector(selectSearchTerm);
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
 

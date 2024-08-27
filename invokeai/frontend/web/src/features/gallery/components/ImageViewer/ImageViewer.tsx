@@ -6,11 +6,12 @@ import CurrentImagePreview from 'features/gallery/components/ImageViewer/Current
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
 import { ImageComparisonDroppable } from 'features/gallery/components/ImageViewer/ImageComparisonDroppable';
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
+import { selectHasImageToCompare } from 'features/gallery/store/gallerySelectors';
 import { memo, useRef } from 'react';
 import { useMeasure } from 'react-use';
 
 export const ImageViewer = memo(() => {
-  const isComparing = useAppSelector((s) => s.gallery.imageToCompare !== null);
+  const hasImageToCompare = useAppSelector(selectHasImageToCompare);
   const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
   const ref = useRef<HTMLDivElement>(null);
   useScopeOnFocus('imageViewer', ref);
@@ -33,11 +34,11 @@ export const ImageViewer = memo(() => {
       alignItems="center"
       justifyContent="center"
     >
-      {isComparing && <CompareToolbar />}
-      {!isComparing && <ViewerToolbar />}
+      {hasImageToCompare && <CompareToolbar />}
+      {!hasImageToCompare && <ViewerToolbar />}
       <Box ref={containerRef} w="full" h="full">
-        {!isComparing && <CurrentImagePreview />}
-        {isComparing && <ImageComparison containerDims={containerDims} />}
+        {!hasImageToCompare && <CurrentImagePreview />}
+        {hasImageToCompare && <ImageComparison containerDims={containerDims} />}
       </Box>
       <ImageComparisonDroppable />
     </Flex>

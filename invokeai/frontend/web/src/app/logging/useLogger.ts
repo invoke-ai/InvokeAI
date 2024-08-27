@@ -1,15 +1,21 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { createLogWriter } from '@roarr/browser-log-writer';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { useEffect, useMemo } from 'react';
 import { ROARR, Roarr } from 'roarr';
 
 import type { LogNamespace } from './logger';
 import { $logger, BASE_CONTEXT, LOG_LEVEL_MAP, logger } from './logger';
 
+const selectLogLevel = createSelector(selectSystemSlice, (system) => system.logLevel);
+const selectLogNamespaces = createSelector(selectSystemSlice, (system) => system.logNamespaces);
+const selectLogIsEnabled = createSelector(selectSystemSlice, (system) => system.logIsEnabled);
+
 export const useLogger = (namespace: LogNamespace) => {
-  const logLevel = useAppSelector((s) => s.system.logLevel);
-  const logNamespaces = useAppSelector((s) => s.system.logNamespaces);
-  const logIsEnabled = useAppSelector((s) => s.system.logIsEnabled);
+  const logLevel = useAppSelector(selectLogLevel);
+  const logNamespaces = useAppSelector(selectLogNamespaces);
+  const logIsEnabled = useAppSelector(selectLogIsEnabled);
 
   // The provided Roarr browser log writer uses localStorage to config logging to console
   useEffect(() => {

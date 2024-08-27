@@ -1,9 +1,11 @@
 import { Button, ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { INTERACTION_SCOPES, useScopeOnMount } from 'common/hooks/interactionScopes';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import {
+  selectCanvasSessionSlice,
   sessionNextStagedImageSelected,
   sessionPrevStagedImageSelected,
   sessionStagedImageDiscarded,
@@ -25,15 +27,25 @@ import {
 } from 'react-icons/pi';
 import { useChangeImageIsIntermediateMutation } from 'services/api/endpoints/images';
 
+const selectStagedImageIndex = createSelector(
+  selectCanvasSessionSlice,
+  (canvasSession) => canvasSession.selectedStagedImageIndex
+);
+
+const selectSelectedImage = createSelector(
+  [selectCanvasSessionSlice, selectStagedImageIndex],
+  (canvasSession, index) => canvasSession.stagedImages[index] ?? null
+);
+
+const selectImageCount = createSelector(selectCanvasSessionSlice, (canvasSession) => canvasSession.stagedImages.length);
+
 export const StagingAreaToolbar = memo(() => {
   const dispatch = useAppDispatch();
-  const session = useAppSelector((s) => s.canvasSession);
   const canvasManager = useCanvasManager();
+  const index = useAppSelector(selectStagedImageIndex);
+  const selectedImage = useAppSelector(selectSelectedImage);
+  const imageCount = useAppSelector(selectImageCount);
   const shouldShowStagedImage = useStore(canvasManager.stateApi.$shouldShowStagedImage);
-  const images = useMemo(() => session.stagedImages, [session]);
-  const selectedImage = useMemo(() => {
-    return images[session.selectedStagedImageIndex] ?? null;
-  }, [images, session.selectedStagedImageIndex]);
   const isCanvasActive = useStore(INTERACTION_SCOPES.canvas.$isActive);
   const [changeIsImageIntermediate] = useChangeImageIsIntermediateMutation();
   useScopeOnMount('stagingArea');
@@ -52,19 +64,19 @@ export const StagingAreaToolbar = memo(() => {
     if (!selectedImage) {
       return;
     }
-    dispatch(sessionStagingAreaImageAccepted({ index: session.selectedStagedImageIndex }));
-  }, [dispatch, selectedImage, session.selectedStagedImageIndex]);
+    dispatch(sessionStagingAreaImageAccepted({ index }));
+  }, [dispatch, index, selectedImage]);
 
   const onDiscardOne = useCallback(() => {
     if (!selectedImage) {
       return;
     }
-    if (images.length === 1) {
+    if (imageCount === 1) {
       dispatch(sessionStagingAreaReset());
     } else {
-      dispatch(sessionStagedImageDiscarded({ index: session.selectedStagedImageIndex }));
+      dispatch(sessionStagedImageDiscarded({ index }));
     }
-  }, [selectedImage, images.length, dispatch, session.selectedStagedImageIndex]);
+  }, [selectedImage, imageCount, dispatch, index]);
 
   const onDiscardAll = useCallback(() => {
     dispatch(sessionStagingAreaReset());
@@ -112,12 +124,12 @@ export const StagingAreaToolbar = memo(() => {
   );
 
   const counterText = useMemo(() => {
-    if (images.length > 0) {
-      return `${(session.selectedStagedImageIndex ?? 0) + 1} of ${images.length}`;
+    if (imageCount > 0) {
+      return `${(index ?? 0) + 1} of ${imageCount}`;
     } else {
       return `0 of 0`;
     }
-  }, [images.length, session.selectedStagedImageIndex]);
+  }, [imageCount, index]);
 
   return (
     <>
@@ -128,7 +140,7 @@ export const StagingAreaToolbar = memo(() => {
           icon={<PiArrowLeftBold />}
           onClick={onPrev}
           colorScheme="invokeBlue"
-          isDisabled={images.length <= 1 || !shouldShowStagedImage}
+          isDisabled={imageCount <= 1 || !shouldShowStagedImage}
         />
         <Button colorScheme="base" pointerEvents="none" minW={28}>
           {counterText}
@@ -139,7 +151,7 @@ export const StagingAreaToolbar = memo(() => {
           icon={<PiArrowRightBold />}
           onClick={onNext}
           colorScheme="invokeBlue"
-          isDisabled={images.length <= 1 || !shouldShowStagedImage}
+          isDisabled={imageCount <= 1 || !shouldShowStagedImage}
         />
       </ButtonGroup>
       <ButtonGroup borderRadius="base" shadow="dark-lg">

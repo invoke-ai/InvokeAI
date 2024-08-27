@@ -1,6 +1,7 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { offsetChanged } from 'features/gallery/store/gallerySlice';
+import { offsetChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { throttle } from 'lodash-es';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
@@ -56,9 +57,13 @@ const getRange = (currentPage: number, totalPages: number, siblingCount: number)
   return fullRange as (number | 'ellipsis')[];
 };
 
+const selectOffset = createSelector(selectGallerySlice, (gallery) => gallery.offset);
+const selectLimit = createSelector(selectGallerySlice, (gallery) => gallery.limit);
+
 export const useGalleryPagination = () => {
   const dispatch = useAppDispatch();
-  const { offset, limit } = useAppSelector((s) => s.gallery);
+  const offset = useAppSelector(selectOffset);
+  const limit = useAppSelector(selectLimit);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
 
   const { count, total } = useListImagesQuery(queryArgs, {

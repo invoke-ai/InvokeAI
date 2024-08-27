@@ -13,6 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { snapToNearest } from 'features/controlLayers/konva/util';
 import { entityOpacityChanged } from 'features/controlLayers/store/canvasSlice';
@@ -60,27 +61,29 @@ const sliderDefaultValue = mapOpacityToSliderValue(100);
 
 const snapCandidates = marks.slice(1, marks.length - 1);
 
+const selectOpacity = createSelector(selectCanvasSlice, (canvas) => {
+  const selectedEntityIdentifier = canvas.selectedEntityIdentifier;
+  if (!selectedEntityIdentifier) {
+    return 100; // fallback to 100% opacity
+  }
+  const selectedEntity = selectEntity(canvas, selectedEntityIdentifier);
+  if (!selectedEntity) {
+    return 100; // fallback to 100% opacity
+  }
+  if (!isDrawableEntity(selectedEntity)) {
+    return 100; // fallback to 100% opacity
+  }
+  // Opacity is a float from 0-1, but we want to display it as a percentage
+  return selectedEntity.opacity * 100;
+});
+
 export const CanvasEntityOpacity = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
-  const opacity = useAppSelector((s) => {
-    const selectedEntityIdentifier = selectSelectedEntityIdentifier(s);
-    if (!selectedEntityIdentifier) {
-      return null;
-    }
-    const canvas = selectCanvasSlice(s);
-    const selectedEntity = selectEntity(canvas, selectedEntityIdentifier);
-    if (!selectedEntity) {
-      return null;
-    }
-    if (!isDrawableEntity(selectedEntity)) {
-      return null;
-    }
-    return selectedEntity.opacity;
-  });
+  const opacity = useAppSelector(selectOpacity);
 
-  const [localOpacity, setLocalOpacity] = useState((opacity ?? 1) * 100);
+  const [localOpacity, setLocalOpacity] = useState(opacity);
 
   const onChangeSlider = useCallback(
     (opacity: number) => {

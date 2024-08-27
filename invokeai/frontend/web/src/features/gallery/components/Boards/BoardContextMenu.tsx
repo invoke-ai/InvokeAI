@@ -2,7 +2,8 @@ import type { ContextMenuProps } from '@invoke-ai/ui-library';
 import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { autoAddBoardIdChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { selectAutoAddBoardId, selectAutoAssignBoardOnClick } from 'features/gallery/store/gallerySelectors';
+import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
@@ -24,9 +25,9 @@ type Props = {
 const BoardContextMenu = ({ board, setBoardToDelete, children }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
+  const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectIsSelectedForAutoAdd = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => board.board_id === gallery.autoAddBoardId),
+    () => createSelector(selectAutoAddBoardId, (autoAddBoardId) => board.board_id === autoAddBoardId),
     [board.board_id]
   );
 

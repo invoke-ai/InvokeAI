@@ -6,6 +6,11 @@ import type { RemoveFromBoardDropData } from 'features/dnd/types';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
 import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
+import {
+  selectAutoAddBoardId,
+  selectAutoAssignBoardOnClick,
+  selectBoardSearchText,
+} from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,9 +32,9 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
       return { imagesTotal: data?.total ?? 0 };
     },
   });
-  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
-  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
-  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
+  const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
+  const boardSearchText = useAppSelector(selectBoardSearchText);
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
     dispatch(boardIdSelected({ boardId: 'none' }));

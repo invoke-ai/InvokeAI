@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
@@ -271,6 +271,7 @@ export const {
 } = paramsSlice.actions;
 
 export const selectParamsSlice = (state: RootState) => state.params;
+export const selectBase = createSelector(selectParamsSlice, (params) => params.model?.base);
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {

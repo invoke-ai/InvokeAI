@@ -1,5 +1,6 @@
 import { Flex, MenuDivider, MenuItem, Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
@@ -8,14 +9,14 @@ import { imagesToChangeSelected, isModalOpenChanged } from 'features/changeBoard
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { sentImageToCanvas, sentImageToImg2Img } from 'features/gallery/store/actions';
-import { imageToCompareChanged } from 'features/gallery/store/gallerySlice';
+import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { size } from 'lodash-es';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowsCounterClockwiseBold,
@@ -42,7 +43,11 @@ type SingleSelectionMenuItemsProps = {
 
 const SingleSelectionMenuItems = (props: SingleSelectionMenuItemsProps) => {
   const { imageDTO } = props;
-  const maySelectForCompare = useAppSelector((s) => s.gallery.imageToCompare?.image_name !== imageDTO.image_name);
+  const selectMaySelectForCompare = useMemo(
+    () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name !== imageDTO.image_name),
+    [imageDTO.image_name]
+  );
+  const maySelectForCompare = useAppSelector(selectMaySelectForCompare);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const customStarUi = useStore($customStarUI);

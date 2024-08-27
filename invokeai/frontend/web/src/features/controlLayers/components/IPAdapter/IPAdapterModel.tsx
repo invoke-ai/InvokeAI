@@ -2,6 +2,7 @@ import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import type { CLIPVisionModelV2 } from 'features/controlLayers/store/types';
 import { isCLIPVisionModelV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -24,7 +25,7 @@ type Props = {
 
 export const IPAdapterModel = memo(({ modelKey, onChangeModel, clipVisionModel, onChangeCLIPVisionModel }: Props) => {
   const { t } = useTranslation();
-  const currentBaseModel = useAppSelector((s) => s.params.model?.base);
+  const currentBaseModel = useAppSelector(selectBase);
   const [modelConfigs, { isLoading }] = useIPAdapterModels();
   const selectedModel = useMemo(() => modelConfigs.find((m) => m.key === modelKey), [modelConfigs, modelKey]);
 

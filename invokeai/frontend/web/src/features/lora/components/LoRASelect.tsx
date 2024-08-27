@@ -1,23 +1,24 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
+import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLoRAModels } from 'services/api/hooks/modelsByType';
 import type { LoRAModelConfig } from 'services/api/types';
 
-const selectLoRAs = createMemoizedSelector(selectLoRAsSlice, (loras) => loras.loras);
+const selectLoRAs = createSelector(selectLoRAsSlice, (loras) => loras.loras);
 
 const LoRASelect = () => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useLoRAModels();
   const { t } = useTranslation();
   const addedLoRAs = useAppSelector(selectLoRAs);
-  const currentBaseModel = useAppSelector((s) => s.params.model?.base);
+  const currentBaseModel = useAppSelector(selectBase);
 
   const getIsDisabled = (model: LoRAModelConfig): boolean => {
     const isCompatible = currentBaseModel === model.base;

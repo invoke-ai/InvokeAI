@@ -1,5 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
@@ -26,7 +27,7 @@ const selectPostUploadAction = createMemoizedSelector(selectActiveTab, (activeTa
 
 export const useFullscreenDropzone = () => {
   const { t } = useTranslation();
-  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
   const postUploadAction = useAppSelector(selectPostUploadAction);
   const [uploadImage] = useUploadImageMutation();

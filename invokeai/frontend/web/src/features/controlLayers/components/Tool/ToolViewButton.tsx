@@ -3,6 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { useIsFiltering } from 'features/controlLayers/hooks/useIsFiltering';
 import { useIsTransforming } from 'features/controlLayers/hooks/useIsTransforming';
+import { selectIsStaging } from 'features/controlLayers/store/canvasSessionSlice';
 import { memo, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -12,7 +13,7 @@ export const ToolViewButton = memo(() => {
   const { t } = useTranslation();
   const isTransforming = useIsTransforming();
   const isFiltering = useIsFiltering();
-  const isStaging = useAppSelector((s) => s.canvasSession.isStaging);
+  const isStaging = useAppSelector(selectIsStaging);
   const selectView = useSelectTool('view');
   const isSelected = useToolIsSelected('view');
   const isDisabled = useMemo(() => {

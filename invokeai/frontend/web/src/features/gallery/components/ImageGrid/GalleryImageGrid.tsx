@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { GallerySelectionCountTag } from 'features/gallery/components/ImageGrid/GallerySelectionCountTag';
 import { useGalleryHotkeys } from 'features/gallery/hooks/useGalleryHotkeys';
-import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectGalleryImageMinimumWidth, selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { limitChanged } from 'features/gallery/store/gallerySlice';
 import { debounce } from 'lodash-es';
 import { memo, useEffect, useMemo, useState } from 'react';
@@ -59,7 +59,7 @@ export default memo(GalleryImageGrid);
 
 const Content = () => {
   const dispatch = useAppDispatch();
-  const galleryImageMinimumWidth = useAppSelector((s) => s.gallery.galleryImageMinimumWidth);
+  const galleryImageMinimumWidth = useAppSelector(selectGalleryImageMinimumWidth);
 
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const { imageDTOs } = useListImagesQuery(queryArgs, {

@@ -1,35 +1,47 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { imageToCompareChanged, isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
+import { selectHasImageToCompare, selectIsImageViewerOpen } from 'features/gallery/store/gallerySelectors';
+import {
+  imageToCompareChanged,
+  isImageViewerOpenChanged,
+  selectGallerySlice,
+} from 'features/gallery/store/gallerySlice';
+import { selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
+import { selectUiSlice } from 'features/ui/store/uiSlice';
 import { useCallback } from 'react';
 
+const selectIsOpen = createSelector(selectUiSlice, selectWorkflowSlice, selectGallerySlice, (ui, workflow, gallery) => {
+  const tab = ui.activeTab;
+  const workflowsMode = workflow.mode;
+  if (tab === 'models' || tab === 'queue') {
+    return false;
+  }
+  if (tab === 'workflows' && workflowsMode === 'edit') {
+    return false;
+  }
+  if (tab === 'workflows' && workflowsMode === 'view') {
+    return true;
+  }
+  if (tab === 'upscaling') {
+    return true;
+  }
+  return gallery.isImageViewerOpen;
+});
+
 export const useIsImageViewerOpen = () => {
-  const isOpen = useAppSelector((s) => {
-    const tab = s.ui.activeTab;
-    const workflowsMode = s.workflow.mode;
-    if (tab === 'models' || tab === 'queue') {
-      return false;
-    }
-    if (tab === 'workflows' && workflowsMode === 'edit') {
-      return false;
-    }
-    if (tab === 'workflows' && workflowsMode === 'view') {
-      return true;
-    }
-    if (tab === 'upscaling') {
-      return true;
-    }
-    return s.gallery.isImageViewerOpen;
-  });
+  const isOpen = useAppSelector(selectIsOpen);
   return isOpen;
 };
 
+const selectIsForcedOpen = createSelector(selectUiSlice, selectWorkflowSlice, (ui, workflow) => {
+  return ui.activeTab === 'upscaling' || (ui.activeTab === 'workflows' && workflow.mode === 'view');
+});
+
 export const useImageViewer = () => {
   const dispatch = useAppDispatch();
-  const isComparing = useAppSelector((s) => s.gallery.imageToCompare !== null);
-  const isNaturallyOpen = useAppSelector((s) => s.gallery.isImageViewerOpen);
-  const isForcedOpen = useAppSelector(
-    (s) => s.ui.activeTab === 'upscaling' || (s.ui.activeTab === 'workflows' && s.workflow.mode === 'view')
-  );
+  const isComparing = useAppSelector(selectHasImageToCompare);
+  const isNaturallyOpen = useAppSelector(selectIsImageViewerOpen);
+  const isForcedOpen = useAppSelector(selectIsForcedOpen);
 
   const onClose = useCallback(() => {
     if (isForcedOpen) {

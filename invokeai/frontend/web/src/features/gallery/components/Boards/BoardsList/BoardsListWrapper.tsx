@@ -2,6 +2,7 @@ import { Box } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
+import { selectAllowPrivateBoards } from 'features/system/store/configSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo, useState } from 'react';
@@ -15,7 +16,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 };
 
 const BoardsListWrapper = () => {
-  const allowPrivateBoards = useAppSelector((s) => s.config.allowPrivateBoards);
+  const allowPrivateBoards = useAppSelector(selectAllowPrivateBoards);
   const [boardToDelete, setBoardToDelete] = useState<BoardDTO>();
 
   return (

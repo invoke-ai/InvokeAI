@@ -5,6 +5,7 @@ import { selectComparisonImages } from 'features/gallery/components/ImageViewer/
 import { ImageComparisonHover } from 'features/gallery/components/ImageViewer/ImageComparisonHover';
 import { ImageComparisonSideBySide } from 'features/gallery/components/ImageViewer/ImageComparisonSideBySide';
 import { ImageComparisonSlider } from 'features/gallery/components/ImageViewer/ImageComparisonSlider';
+import { selectComparisonMode } from 'features/gallery/store/gallerySelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImagesBold } from 'react-icons/pi';
@@ -15,7 +16,7 @@ type Props = {
 
 export const ImageComparison = memo(({ containerDims }: Props) => {
   const { t } = useTranslation();
-  const comparisonMode = useAppSelector((s) => s.gallery.comparisonMode);
+  const comparisonMode = useAppSelector(selectComparisonMode);
   const { firstImage, secondImage } = useAppSelector(selectComparisonImages);
 
   if (!firstImage || !secondImage) {

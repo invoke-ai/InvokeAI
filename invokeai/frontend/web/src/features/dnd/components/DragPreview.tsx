@@ -2,6 +2,7 @@ import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Box, Flex, Heading, Image, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { TypesafeDraggableData } from 'features/dnd/types';
+import { selectSelectionCount } from 'features/gallery/store/gallerySelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -34,7 +35,7 @@ const multiImageStyles: ChakraProps['sx'] = {
 
 const DragPreview = (props: OverlayDragImageProps) => {
   const { t } = useTranslation();
-  const selectionCount = useAppSelector((s) => s.gallery.selection.length);
+  const selectionCount = useAppSelector(selectSelectionCount);
   if (!props.dragData) {
     return null;
   }

@@ -1,10 +1,12 @@
 import { useAltModifier } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { GALLERY_GRID_CLASS_NAME } from 'features/gallery/components/ImageGrid/constants';
 import { GALLERY_IMAGE_CLASS_NAME } from 'features/gallery/components/ImageGrid/GalleryImage';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
+import { selectImageToCompare, selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { imageSelected, imageToCompareChanged } from 'features/gallery/store/gallerySlice';
 import { getIsVisible } from 'features/gallery/util/getIsVisible';
 import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAlign';
@@ -127,14 +129,18 @@ type UseGalleryNavigationReturn = {
 export const useGalleryNavigation = (): UseGalleryNavigationReturn => {
   const dispatch = useAppDispatch();
   const alt = useAltModifier();
-  const lastSelectedImage = useAppSelector((s) => {
-    const lastSelected = s.gallery.selection.slice(-1)[0] ?? null;
-    if (alt) {
-      return s.gallery.imageToCompare ?? lastSelected;
-    } else {
-      return lastSelected;
-    }
-  });
+  const selectImage = useMemo(
+    () =>
+      createSelector(selectLastSelectedImage, selectImageToCompare, (lastSelectedImage, imageToCompare) => {
+        if (alt) {
+          return imageToCompare ?? lastSelectedImage;
+        } else {
+          return lastSelectedImage;
+        }
+      }),
+    [alt]
+  );
+  const lastSelectedImage = useAppSelector(selectImage);
   const { imageDTOs } = useGalleryImages();
   const loadedImagesCount = useMemo(() => imageDTOs.length, [imageDTOs.length]);
 
