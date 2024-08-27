@@ -1,4 +1,5 @@
 import { Flex } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { CanvasEditor } from 'features/controlLayers/components/ControlLayersEditor';
@@ -18,7 +19,7 @@ import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
-import { $isGalleryPanelOpen, $isParametersPanelOpen } from 'features/ui/store/uiSlice';
+import { $isGalleryPanelOpen, $isParametersPanelOpen, selectUiSlice } from 'features/ui/store/uiSlice';
 import type { TabName } from 'features/ui/store/uiTypes';
 import type { CSSProperties } from 'react';
 import { memo, useMemo, useRef } from 'react';
@@ -41,11 +42,18 @@ const OPTIONS_PANEL_MIN_SIZE_PCT = 20;
 const onGalleryPanelCollapse = (isCollapsed: boolean) => $isGalleryPanelOpen.set(!isCollapsed);
 const onParametersPanelCollapse = (isCollapsed: boolean) => $isParametersPanelOpen.set(!isCollapsed);
 
+const selectShouldShowGalleryPanel = createSelector(selectUiSlice, (ui) =>
+  TABS_WITH_GALLERY_PANEL.includes(ui.activeTab)
+);
+const selectShouldShowOptionsPanel = createSelector(selectUiSlice, (ui) =>
+  TABS_WITH_OPTIONS_PANEL.includes(ui.activeTab)
+);
+
 export const AppContent = memo(() => {
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const isImageViewerOpen = useIsImageViewerOpen();
-  const shouldShowGalleryPanel = useAppSelector((s) => TABS_WITH_GALLERY_PANEL.includes(s.ui.activeTab));
-  const shouldShowOptionsPanel = useAppSelector((s) => TABS_WITH_OPTIONS_PANEL.includes(s.ui.activeTab));
+  const shouldShowGalleryPanel = useAppSelector(selectShouldShowGalleryPanel);
+  const shouldShowOptionsPanel = useAppSelector(selectShouldShowOptionsPanel);
   const ref = useRef<HTMLDivElement>(null);
   useScopeOnFocus('gallery', ref);
 

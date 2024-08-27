@@ -1,20 +1,17 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import type { FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS, isFilterType } from 'features/controlLayers/store/types';
-import { configSelector } from 'features/system/store/configSelectors';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { includes, map } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
-const selectDisabledProcessors = createMemoizedSelector(
-  configSelector,
-  (config) => config.sd.disabledControlNetProcessors
-);
+const selectDisabledProcessors = createSelector(selectConfigSlice, (config) => config.sd.disabledControlNetProcessors);
 
 type Props = {
   filterType: FilterConfig['type'];

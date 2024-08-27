@@ -2,6 +2,7 @@ import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from 
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
+import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanel, type UsePanelOptions } from 'features/ui/hooks/usePanel';
@@ -21,7 +22,7 @@ const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 
 const GalleryPanelContent = () => {
   const { t } = useTranslation();
-  const boardSearchText = useAppSelector((s) => s.gallery.boardSearchText);
+  const boardSearchText = useAppSelector(selectBoardSearchText);
   const dispatch = useAppDispatch();
   const boardSearchDisclosure = useDisclosure({ defaultIsOpen: !!boardSearchText.length });
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
