@@ -11,7 +11,10 @@ import { useSelector } from 'react-redux';
 
 const ChakraCanvas = chakra.canvas;
 
-const PADDING = 4;
+const PADDING = 2;
+
+const CONTAINER_WIDTH = 36; // this is size 12 in our theme - need it in px for the canvas
+const CONTAINER_WIDTH_PX = `${CONTAINER_WIDTH}px`;
 
 export const CanvasEntityPreviewImage = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
@@ -31,11 +34,10 @@ export const CanvasEntityPreviewImage = memo(() => {
     [entityIdentifier]
   );
   const maskColor = useSelector(selectMaskColor);
-  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cache = useStore(adapter.renderer.$canvasCache);
   useEffect(() => {
-    if (!cache || !canvasRef.current || !containerRef.current) {
+    if (!cache || !canvasRef.current) {
       return;
     }
     const ctx = canvasRef.current.getContext('2d');
@@ -49,7 +51,7 @@ export const CanvasEntityPreviewImage = memo(() => {
     canvasRef.current.width = rect.width;
     canvasRef.current.height = rect.height;
 
-    const scale = containerRef.current.offsetWidth / rect.width;
+    const scale = CONTAINER_WIDTH / rect.width;
 
     const sx = rect.x;
     const sy = rect.y;
@@ -72,11 +74,10 @@ export const CanvasEntityPreviewImage = memo(() => {
   return (
     <Flex
       position="relative"
-      ref={containerRef}
       alignItems="center"
       justifyContent="center"
-      w={12}
-      h={12}
+      w={CONTAINER_WIDTH_PX}
+      h={CONTAINER_WIDTH_PX}
       borderRadius="sm"
       borderWidth={1}
       bg="base.900"
