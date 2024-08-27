@@ -54,7 +54,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
         max_vram_cache_size: float,
         execution_device: torch.device = torch.device("cuda"),
         storage_device: torch.device = torch.device("cpu"),
-        precision: torch.dtype = torch.float16,
         lazy_offloading: bool = True,
         log_memory_usage: bool = False,
         logger: Optional[Logger] = None,
@@ -65,7 +64,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
         :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
         :param execution_device: Torch device to load active model into [torch.device('cuda')]
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
-        :param precision: Precision for loaded models [torch.float16]
         :param lazy_offloading: Keep model in VRAM until another model needs to be loaded
         :param log_memory_usage: If True, a memory snapshot will be captured before and after every model cache
             operation, and the result will be logged (at debug level). There is a time cost to capturing the memory
@@ -74,7 +72,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
         """
         # allow lazy offloading only when vram cache enabled
         self._lazy_offloading = lazy_offloading and max_vram_cache_size > 0
-        self._precision: torch.dtype = precision
         self._max_cache_size: float = max_cache_size
         self._max_vram_cache_size: float = max_vram_cache_size
         self._execution_device: torch.device = execution_device
@@ -342,8 +339,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
     def make_room(self, size: int) -> None:
         """Make enough room in the cache to accommodate a new model of indicated size."""
-        # calculate how much memory this model will require
-        # multiplier = 2 if self.precision==torch.float32 else 1
         bytes_needed = size
         maximum_size = self.max_cache_size * GIG  # stored in GB, convert to bytes
         current_size = self.cache_size()
