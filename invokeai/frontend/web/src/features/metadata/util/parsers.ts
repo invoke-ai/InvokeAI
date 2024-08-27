@@ -504,6 +504,7 @@ const parseControlNetToControlAdapterLayer: MetadataParseFunc<CanvasControlLayer
     id: getPrefixedId('control_layer'),
     type: 'control_layer',
     isEnabled: true,
+    isLocked: false,
     opacity: 1,
     name: null,
     objects: [],
@@ -548,6 +549,7 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<CanvasControlLayer
     id: getPrefixedId('control_layer'),
     type: 'control_layer',
     isEnabled: true,
+    isLocked: false,
     opacity: 1,
     position: { x: 0, y: 0 },
     controlAdapter: {
@@ -600,6 +602,7 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasIPAdapterState> = 
     id: getPrefixedId('ip_adapter'),
     type: 'ip_adapter',
     isEnabled: true,
+    isLocked: false,
     name: null,
     ipAdapter: {
       model: zModelIdentifierField.parse(ipAdapterModel),
