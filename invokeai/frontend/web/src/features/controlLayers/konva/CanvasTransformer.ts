@@ -601,10 +601,12 @@ export class CanvasTransformer extends CanvasModuleBase {
     // If the bbox has no width or height, that means the layer is fully transparent. This can happen if it is only
     // eraser lines, fully clipped brush lines or if it has been fully erased.
     if (this.pixelRect.width === 0 || this.pixelRect.height === 0) {
-      // We shouldn't reset on the first render - the bbox will be calculated on the next render
-      // The layer is fully transparent but has objects - reset it
-      this.manager.stateApi.resetEntity({ entityIdentifier: this.parent.getEntityIdentifier() });
-      this.syncInteractionState();
+      // If the layer already has no objects, we don't need to reset the entity state. This would cause a push to the
+      // undo stack and clear the redo stack.
+      if (this.parent.renderer.hasObjects()) {
+        this.manager.stateApi.resetEntity({ entityIdentifier: this.parent.getEntityIdentifier() });
+        this.syncInteractionState();
+      }
     } else {
       this.syncInteractionState();
       this.update(this.parent.state.position, this.pixelRect);
