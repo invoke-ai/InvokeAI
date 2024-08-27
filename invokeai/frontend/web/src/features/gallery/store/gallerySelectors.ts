@@ -45,7 +45,7 @@ export const selectAutoAssignBoardOnClick = createSelector(
 export const selectBoardSearchText = createSelector(selectGallerySlice, (gallery) => gallery.boardSearchText);
 export const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
 export const selectSelectionCount = createSelector(selectGallerySlice, (gallery) => gallery.selection.length);
-export const selectHasSelection = createSelector(selectSelectionCount, (count) => count > 0);
+export const selectHasMultipleImagesSelected = createSelector(selectSelectionCount, (count) => count > 1);
 export const selectGalleryImageMinimumWidth = createSelector(
   selectGallerySlice,
   (gallery) => gallery.galleryImageMinimumWidth
