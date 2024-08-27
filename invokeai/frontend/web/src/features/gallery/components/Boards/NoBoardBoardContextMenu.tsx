@@ -1,6 +1,8 @@
 import type { ContextMenuProps } from '@invoke-ai/ui-library';
 import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectAutoAddBoardId, selectAutoAssignBoardOnClick } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback } from 'react';
@@ -12,11 +14,13 @@ type Props = {
   children: ContextMenuProps<HTMLDivElement>['children'];
 };
 
+const selectIsSelectedForAutoAdd = createSelector(selectAutoAddBoardId, (autoAddBoardId) => autoAddBoardId === 'none');
+
 const NoBoardBoardContextMenu = ({ children }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
-  const isSelectedForAutoAdd = useAppSelector((s) => s.gallery.autoAddBoardId === 'none');
+  const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
+  const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
   const isBulkDownloadEnabled = useFeatureStatus('bulkDownload');
 
   const [bulkDownload] = useBulkDownloadImagesMutation();

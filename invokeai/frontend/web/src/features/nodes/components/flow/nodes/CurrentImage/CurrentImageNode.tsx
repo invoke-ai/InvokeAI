@@ -4,6 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
+import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import type { AnimationProps } from 'framer-motion';
@@ -15,7 +16,7 @@ import type { NodeProps } from 'reactflow';
 import { $lastProgressEvent } from 'services/events/setEventListeners';
 
 const CurrentImageNode = (props: NodeProps) => {
-  const imageDTO = useAppSelector((s) => s.gallery.selection[s.gallery.selection.length - 1]);
+  const imageDTO = useAppSelector(selectLastSelectedImage);
   const lastProgressEvent = useStore($lastProgressEvent);
 
   if (lastProgressEvent?.progress_image) {

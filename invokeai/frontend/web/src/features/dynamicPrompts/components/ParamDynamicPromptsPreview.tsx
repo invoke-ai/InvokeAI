@@ -1,6 +1,6 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
 import { Flex, FormControl, FormLabel, ListItem, OrderedList, Spinner, Text } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
@@ -10,17 +10,20 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiWarningCircleBold } from 'react-icons/pi';
 
-const selectPrompts = createMemoizedSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.prompts);
-
 const listItemStyles: ChakraProps['sx'] = {
   '&::marker': { color: 'base.500' },
 };
 
+const selectPrompts = createSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.prompts);
+const selectParsingError = createSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.parsingError);
+const selectIsError = createSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.isError);
+const selectIsLoading = createSelector(selectDynamicPromptsSlice, (dynamicPrompts) => dynamicPrompts.isLoading);
+
 const ParamDynamicPromptsPreview = () => {
   const { t } = useTranslation();
-  const parsingError = useAppSelector((s) => s.dynamicPrompts.parsingError);
-  const isError = useAppSelector((s) => s.dynamicPrompts.isError);
-  const isLoading = useAppSelector((s) => s.dynamicPrompts.isLoading);
+  const parsingError = useAppSelector(selectParsingError);
+  const isError = useAppSelector(selectIsError);
+  const isLoading = useAppSelector(selectIsLoading);
   const prompts = useAppSelector(selectPrompts);
 
   const label = useMemo(() => {

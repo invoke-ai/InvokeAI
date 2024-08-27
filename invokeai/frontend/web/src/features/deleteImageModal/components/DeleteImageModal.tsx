@@ -1,4 +1,5 @@
 import { ConfirmationAlertDialog, Divider, Flex, FormControl, FormLabel, Switch, Text } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
@@ -11,7 +12,7 @@ import {
 } from 'features/deleteImageModal/store/slice';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
+import { selectSystemSlice, setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 import { some } from 'lodash-es';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -41,11 +42,17 @@ const selectImageUsages = createMemoizedSelector(
   }
 );
 
+const selectShouldConfirmOnDelete = createSelector(selectSystemSlice, (system) => system.shouldConfirmOnDelete);
+const selectIsModalOpen = createSelector(
+  selectDeleteImageModalSlice,
+  (deleteImageModal) => deleteImageModal.isModalOpen
+);
+
 const DeleteImageModal = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const shouldConfirmOnDelete = useAppSelector((s) => s.system.shouldConfirmOnDelete);
-  const isModalOpen = useAppSelector((s) => s.deleteImageModal.isModalOpen);
+  const shouldConfirmOnDelete = useAppSelector(selectShouldConfirmOnDelete);
+  const isModalOpen = useAppSelector(selectIsModalOpen);
   const { imagesToDelete, imagesUsage, imageUsageSummary } = useAppSelector(selectImageUsages);
 
   const handleChangeShouldConfirmOnDelete = useCallback(

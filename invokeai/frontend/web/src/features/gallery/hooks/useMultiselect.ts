@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectHasSelection } from 'features/gallery/store/gallerySelectors';
 import { selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { MouseEvent } from 'react';
@@ -9,7 +10,7 @@ import type { ImageDTO } from 'services/api/types';
 
 export const useMultiselect = (imageDTO?: ImageDTO) => {
   const dispatch = useAppDispatch();
-  const areMultiplesSelected = useAppSelector((s) => s.gallery.selection.length > 1);
+  const areMultiplesSelected = useAppSelector(selectHasSelection);
   const selectIsSelected = useMemo(
     () =>
       createSelector(selectGallerySlice, (gallery) =>

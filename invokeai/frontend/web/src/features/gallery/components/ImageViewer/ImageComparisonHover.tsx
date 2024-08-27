@@ -5,13 +5,14 @@ import { preventDefault } from 'common/util/stopPropagation';
 import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
+import { selectComparisonFit } from 'features/gallery/store/gallerySelectors';
 import { memo, useMemo, useRef } from 'react';
 
 import type { ComparisonProps } from './common';
 import { fitDimsToContainer, getSecondImageDims } from './common';
 
 export const ImageComparisonHover = memo(({ firstImage, secondImage, containerDims }: ComparisonProps) => {
-  const comparisonFit = useAppSelector((s) => s.gallery.comparisonFit);
+  const comparisonFit = useAppSelector(selectComparisonFit);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const mouseOver = useBoolean(false);
   const fittedDims = useMemo<Dimensions>(

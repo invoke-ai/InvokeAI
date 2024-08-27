@@ -1,13 +1,20 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo, useMemo } from 'react';
 import { $progressImage } from 'services/events/setEventListeners';
 
+const selectShouldAntialiasProgressImage = createSelector(
+  selectSystemSlice,
+  (system) => system.shouldAntialiasProgressImage
+);
+
 const CurrentImagePreview = () => {
   const progressImage = useStore($progressImage);
-  const shouldAntialiasProgressImage = useAppSelector((s) => s.system.shouldAntialiasProgressImage);
+  const shouldAntialiasProgressImage = useAppSelector(selectShouldAntialiasProgressImage);
 
   const sx = useMemo<SystemStyleObject>(
     () => ({

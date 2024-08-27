@@ -10,6 +10,7 @@ import {
   UnorderedList,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectComparisonFit, selectComparisonMode } from 'features/gallery/store/gallerySelectors';
 import {
   comparedImagesSwapped,
   comparisonFitChanged,
@@ -25,8 +26,8 @@ import { PiArrowsOutBold, PiQuestion, PiSwapBold, PiXBold } from 'react-icons/pi
 export const CompareToolbar = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const comparisonMode = useAppSelector((s) => s.gallery.comparisonMode);
-  const comparisonFit = useAppSelector((s) => s.gallery.comparisonFit);
+  const comparisonMode = useAppSelector(selectComparisonMode);
+  const comparisonFit = useAppSelector(selectComparisonFit);
   const setComparisonModeSlider = useCallback(() => {
     dispatch(comparisonModeChanged('slider'));
   }, [dispatch]);
