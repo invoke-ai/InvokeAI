@@ -1,29 +1,28 @@
-import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
+import type { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import type { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
-import type { CanvasBrushLineState } from 'features/controlLayers/store/types';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import type { CanvasEraserLineState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasBrushLineRenderer extends CanvasModuleBase {
-  readonly type = 'brush_line_renderer';
+export class CanvasObjectEraserLineRenderer extends CanvasModuleABC {
+  readonly type = 'object_eraser_line_renderer';
 
   id: string;
   path: string[];
-  parent: CanvasObjectRenderer;
+  parent: CanvasEntityRenderer;
   manager: CanvasManager;
   log: Logger;
   subscriptions = new Set<() => void>();
 
-  state: CanvasBrushLineState;
+  state: CanvasEraserLineState;
   konva: {
     group: Konva.Group;
     line: Konva.Line;
   };
 
-  constructor(state: CanvasBrushLineState, parent: CanvasObjectRenderer) {
+  constructor(state: CanvasEraserLineState, parent: CanvasEntityRenderer) {
     super();
     const { id, clip } = state;
     this.id = id;
@@ -32,7 +31,7 @@ export class CanvasBrushLineRenderer extends CanvasModuleBase {
     this.path = this.parent.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
 
-    this.log.debug({ state }, 'Creating brush line renderer module');
+    this.log.debug({ state }, 'Creating eraser line renderer module');
 
     this.konva = {
       group: new Konva.Group({
@@ -44,24 +43,24 @@ export class CanvasBrushLineRenderer extends CanvasModuleBase {
         name: `${this.type}:line`,
         listening: false,
         shadowForStrokeEnabled: false,
+        stroke: 'red', // Eraser lines use compositing, does not matter what color they have
         tension: 0.3,
         lineCap: 'round',
         lineJoin: 'round',
-        globalCompositeOperation: 'source-over',
+        globalCompositeOperation: 'destination-out',
       }),
     };
     this.konva.group.add(this.konva.line);
     this.state = state;
   }
 
-  update(state: CanvasBrushLineState, force = false): boolean {
+  update(state: CanvasEraserLineState, force = false): boolean {
     if (force || this.state !== state) {
-      this.log.trace({ state }, 'Updating brush line');
-      const { points, color, strokeWidth } = state;
+      this.log.trace({ state }, 'Updating eraser line');
+      const { points, strokeWidth } = state;
       this.konva.line.setAttrs({
         // A line with only one point will not be rendered, so we duplicate the points to make it visible
         points: points.length === 2 ? [...points, ...points] : points,
-        stroke: rgbaColorToString(color),
         strokeWidth,
       });
       this.state = state;
@@ -72,7 +71,7 @@ export class CanvasBrushLineRenderer extends CanvasModuleBase {
   }
 
   destroy = () => {
-    this.log.debug('Destroying brush line renderer module');
+    this.log.debug('Destroying eraser line renderer module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
   };

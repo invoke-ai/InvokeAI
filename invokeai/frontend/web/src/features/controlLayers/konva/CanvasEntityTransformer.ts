@@ -1,7 +1,7 @@
-import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
+import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
+import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { CanvasMaskAdapter } from 'features/controlLayers/konva/CanvasMaskAdapter';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -18,14 +18,14 @@ import type { Logger } from 'roarr';
  *
  * It renders an outline when dragging and resizing the entity, with transform anchors for resizing and rotation.
  */
-export class CanvasTransformer extends CanvasModuleBase {
+export class CanvasEntityTransformer extends CanvasModuleABC {
   readonly type = 'entity_transformer';
 
   static RECT_CALC_DEBOUNCE_MS = 300;
   static OUTLINE_PADDING = 0;
   static OUTLINE_COLOR = 'hsl(200 76% 50% / 1)'; // invokeBlue.500
 
-  static ANCHOR_FILL_COLOR = CanvasTransformer.OUTLINE_COLOR;
+  static ANCHOR_FILL_COLOR = CanvasEntityTransformer.OUTLINE_COLOR;
   static ANCHOR_STROKE_COLOR = 'hsl(200 76% 77% / 1)'; // invokeBlue.200
   static ANCHOR_CORNER_RADIUS_RATIO = 0.5;
   static ANCHOR_STROKE_WIDTH = 2;
@@ -39,7 +39,7 @@ export class CanvasTransformer extends CanvasModuleBase {
 
   id: string;
   path: string[];
-  parent: CanvasLayerAdapter | CanvasMaskAdapter;
+  parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter;
   manager: CanvasManager;
   log: Logger;
 
@@ -98,7 +98,7 @@ export class CanvasTransformer extends CanvasModuleBase {
     outlineRect: Konva.Rect;
   };
 
-  constructor(parent: CanvasLayerAdapter | CanvasMaskAdapter) {
+  constructor(parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter) {
     super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
@@ -112,7 +112,7 @@ export class CanvasTransformer extends CanvasModuleBase {
         listening: false,
         draggable: false,
         name: `${this.type}:outline_rect`,
-        stroke: CanvasTransformer.OUTLINE_COLOR,
+        stroke: CanvasEntityTransformer.OUTLINE_COLOR,
         perfectDrawEnabled: false,
         strokeHitEnabled: false,
       }),
@@ -128,36 +128,38 @@ export class CanvasTransformer extends CanvasModuleBase {
         // Transforming will retain aspect ratio only when shift is held
         keepRatio: false,
         // The padding is the distance between the transformer bbox and the nodes
-        padding: CanvasTransformer.OUTLINE_PADDING,
+        padding: CanvasEntityTransformer.OUTLINE_PADDING,
         // This is `invokeBlue.400`
-        stroke: CanvasTransformer.OUTLINE_COLOR,
-        anchorFill: CanvasTransformer.ANCHOR_FILL_COLOR,
-        anchorStroke: CanvasTransformer.ANCHOR_STROKE_COLOR,
-        anchorStrokeWidth: CanvasTransformer.ANCHOR_STROKE_WIDTH,
-        anchorSize: CanvasTransformer.RESIZE_ANCHOR_SIZE,
-        anchorCornerRadius: CanvasTransformer.RESIZE_ANCHOR_SIZE * CanvasTransformer.ANCHOR_CORNER_RADIUS_RATIO,
+        stroke: CanvasEntityTransformer.OUTLINE_COLOR,
+        anchorFill: CanvasEntityTransformer.ANCHOR_FILL_COLOR,
+        anchorStroke: CanvasEntityTransformer.ANCHOR_STROKE_COLOR,
+        anchorStrokeWidth: CanvasEntityTransformer.ANCHOR_STROKE_WIDTH,
+        anchorSize: CanvasEntityTransformer.RESIZE_ANCHOR_SIZE,
+        anchorCornerRadius:
+          CanvasEntityTransformer.RESIZE_ANCHOR_SIZE * CanvasEntityTransformer.ANCHOR_CORNER_RADIUS_RATIO,
         // This function is called for each anchor to style it (and do anything else you might want to do).
         anchorStyleFunc: (anchor) => {
           // Give the rotater special styling
           if (anchor.hasName('rotater')) {
             anchor.setAttrs({
-              height: CanvasTransformer.ROTATE_ANCHOR_SIZE,
-              width: CanvasTransformer.ROTATE_ANCHOR_SIZE,
-              cornerRadius: CanvasTransformer.ROTATE_ANCHOR_SIZE * CanvasTransformer.ANCHOR_CORNER_RADIUS_RATIO,
-              fill: CanvasTransformer.ROTATE_ANCHOR_FILL_COLOR,
-              stroke: CanvasTransformer.ANCHOR_FILL_COLOR,
-              offsetX: CanvasTransformer.ROTATE_ANCHOR_SIZE / 2,
-              offsetY: CanvasTransformer.ROTATE_ANCHOR_SIZE / 2,
+              height: CanvasEntityTransformer.ROTATE_ANCHOR_SIZE,
+              width: CanvasEntityTransformer.ROTATE_ANCHOR_SIZE,
+              cornerRadius:
+                CanvasEntityTransformer.ROTATE_ANCHOR_SIZE * CanvasEntityTransformer.ANCHOR_CORNER_RADIUS_RATIO,
+              fill: CanvasEntityTransformer.ROTATE_ANCHOR_FILL_COLOR,
+              stroke: CanvasEntityTransformer.ANCHOR_FILL_COLOR,
+              offsetX: CanvasEntityTransformer.ROTATE_ANCHOR_SIZE / 2,
+              offsetY: CanvasEntityTransformer.ROTATE_ANCHOR_SIZE / 2,
             });
           }
           // Add some padding to the hit area of the anchors
           anchor.hitFunc((context) => {
             context.beginPath();
             context.rect(
-              -CanvasTransformer.ANCHOR_HIT_PADDING,
-              -CanvasTransformer.ANCHOR_HIT_PADDING,
-              anchor.width() + CanvasTransformer.ANCHOR_HIT_PADDING * 2,
-              anchor.height() + CanvasTransformer.ANCHOR_HIT_PADDING * 2
+              -CanvasEntityTransformer.ANCHOR_HIT_PADDING,
+              -CanvasEntityTransformer.ANCHOR_HIT_PADDING,
+              anchor.width() + CanvasEntityTransformer.ANCHOR_HIT_PADDING * 2,
+              anchor.height() + CanvasEntityTransformer.ANCHOR_HIT_PADDING * 2
             );
             context.closePath();
             context.fillStrokeShape(anchor);
@@ -337,8 +339,8 @@ export class CanvasTransformer extends CanvasModuleBase {
       // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
       // and border
       this.konva.outlineRect.setAttrs({
-        x: this.konva.proxyRect.x() - this.manager.stage.getScaledPixels(CanvasTransformer.OUTLINE_PADDING),
-        y: this.konva.proxyRect.y() - this.manager.stage.getScaledPixels(CanvasTransformer.OUTLINE_PADDING),
+        x: this.konva.proxyRect.x() - this.manager.stage.getScaledPixels(CanvasEntityTransformer.OUTLINE_PADDING),
+        y: this.konva.proxyRect.y() - this.manager.stage.getScaledPixels(CanvasEntityTransformer.OUTLINE_PADDING),
       });
 
       // The object group is translated by the difference between the interaction rect's new and old positions (which is
@@ -400,7 +402,7 @@ export class CanvasTransformer extends CanvasModuleBase {
    */
   update = (position: Coordinate, bbox: Rect) => {
     const onePixel = this.manager.stage.getScaledPixels(1);
-    const bboxPadding = this.manager.stage.getScaledPixels(CanvasTransformer.OUTLINE_PADDING);
+    const bboxPadding = this.manager.stage.getScaledPixels(CanvasEntityTransformer.OUTLINE_PADDING);
 
     this.konva.outlineRect.setAttrs({
       x: position.x + bbox.x - bboxPadding,
@@ -467,7 +469,7 @@ export class CanvasTransformer extends CanvasModuleBase {
    */
   syncScale = () => {
     const onePixel = this.manager.stage.getScaledPixels(1);
-    const bboxPadding = this.manager.stage.getScaledPixels(CanvasTransformer.OUTLINE_PADDING);
+    const bboxPadding = this.manager.stage.getScaledPixels(CanvasEntityTransformer.OUTLINE_PADDING);
 
     this.konva.outlineRect.setAttrs({
       x: this.konva.proxyRect.x() - bboxPadding,
@@ -672,7 +674,7 @@ export class CanvasTransformer extends CanvasModuleBase {
         this.updateBbox();
       }
     );
-  }, CanvasTransformer.RECT_CALC_DEBOUNCE_MS);
+  }, CanvasEntityTransformer.RECT_CALC_DEBOUNCE_MS);
 
   requestRectCalculation = () => {
     this.isPendingRectCalculation = true;

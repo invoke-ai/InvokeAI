@@ -1,11 +1,11 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { GenerationMode } from 'features/controlLayers/store/types';
 import { LRUCache } from 'lru-cache';
 import type { Logger } from 'roarr';
 
-export class CanvasCacheModule extends CanvasModuleBase {
+export class CanvasCacheModule extends CanvasModuleABC {
   readonly type = 'cache';
 
   id: string;

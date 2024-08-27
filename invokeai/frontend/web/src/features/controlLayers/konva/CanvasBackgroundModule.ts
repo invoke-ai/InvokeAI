@@ -1,11 +1,11 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasBackgroundModule extends CanvasModuleBase {
+export class CanvasBackgroundModule extends CanvasModuleABC {
   readonly type = 'background';
 
   static GRID_LINE_COLOR_COARSE = getArbitraryBaseColor(27);
