@@ -1738,6 +1738,8 @@
         "unlocked": "Unlocked",
         "deleteSelected": "Delete Selected",
         "deleteAll": "Delete All",
+        "flipHorizontal": "Flip Horizontal",
+        "flipVertical": "Flip Vertical",
         "fill": {
             "fillStyle": "Fill Style",
             "solid": "Solid",

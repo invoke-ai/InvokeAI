@@ -259,13 +259,7 @@ export class CanvasEntityTransformer extends CanvasModuleABC {
       // This is called when a transform anchor is dragged. By this time, the transform constraints in the above
       // callbacks have been enforced, and the transformer has updated its nodes' attributes. We need to pass the
       // updated attributes to the object group, propagating the transformation on down.
-      this.parent.renderer.konva.objectGroup.setAttrs({
-        x: this.konva.proxyRect.x(),
-        y: this.konva.proxyRect.y(),
-        scaleX: this.konva.proxyRect.scaleX(),
-        scaleY: this.konva.proxyRect.scaleY(),
-        rotation: this.konva.proxyRect.rotation(),
-      });
+      this.syncObjectGroupWithProxyRect();
     });
 
     this.konva.transformer.on('transformend', () => {
@@ -395,6 +389,53 @@ export class CanvasEntityTransformer extends CanvasModuleABC {
     this.parent.konva.layer.add(this.konva.transformer);
   }
 
+  flipHorizontal = () => {
+    if (!this.isTransforming || this.$isProcessing.get()) {
+      return;
+    }
+
+    // Flipping horizontally = flipping across the vertical axis:
+    // - Flip by negating the x scale
+    // - Restore position by translating the rect rightwards by the width of the rect
+    const x = this.konva.proxyRect.x();
+    const width = this.konva.proxyRect.width();
+    const scaleX = this.konva.proxyRect.scaleX();
+    this.konva.proxyRect.setAttrs({
+      scaleX: -scaleX,
+      x: x + width * scaleX,
+    });
+
+    this.syncObjectGroupWithProxyRect();
+  };
+
+  flipVertical = () => {
+    if (!this.isTransforming || this.$isProcessing.get()) {
+      return;
+    }
+
+    // Flipping vertically = flipping across the horizontal axis:
+    // - Flip by negating the y scale
+    // - Restore position by translating the rect downwards by the height of the rect
+    const y = this.konva.proxyRect.y();
+    const height = this.konva.proxyRect.height();
+    const scaleY = this.konva.proxyRect.scaleY();
+    this.konva.proxyRect.setAttrs({
+      scaleY: -scaleY,
+      y: y + height * scaleY,
+    });
+    this.syncObjectGroupWithProxyRect();
+  };
+
+  syncObjectGroupWithProxyRect = () => {
+    this.parent.renderer.konva.objectGroup.setAttrs({
+      x: this.konva.proxyRect.x(),
+      y: this.konva.proxyRect.y(),
+      scaleX: this.konva.proxyRect.scaleX(),
+      scaleY: this.konva.proxyRect.scaleY(),
+      rotation: this.konva.proxyRect.rotation(),
+    });
+  };
+
   /**
    * Updates the transformer's visual components to match the parent entity's position and bounding box.
    * @param position The position of the parent entity
@@ -510,6 +551,12 @@ export class CanvasEntityTransformer extends CanvasModuleABC {
     this.stopTransform();
   };
 
+  resetTransform = () => {
+    this.resetScale();
+    this.updatePosition();
+    this.updateBbox();
+  };
+
   /**
    * Stops the transformation of the entity. If the transformation is in progress, the entity will be reset to its
    * original state.
@@ -520,12 +567,9 @@ export class CanvasEntityTransformer extends CanvasModuleABC {
     this.isTransforming = false;
     this.setInteractionMode('off');
 
-    // Reset the scale of the the entity. We've either replaced the transformed objects with a rasterized image, or
+    // Reset the transform of the the entity. We've either replaced the transformed objects with a rasterized image, or
     // canceled a transformation. In either case, the scale should be reset.
-    this.resetScale();
-
-    this.updatePosition();
-    this.updateBbox();
+    this.resetTransform();
     this.syncInteractionState();
     this.manager.stateApi.$transformingEntity.set(null);
     this.$isProcessing.set(false);
