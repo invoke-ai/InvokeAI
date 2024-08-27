@@ -130,15 +130,6 @@ class ModelCache(ModelCacheBase[AnyModel]):
             total += cache_record.size
         return total
 
-    def exists(
-        self,
-        key: str,
-        submodel_type: Optional[SubModelType] = None,
-    ) -> bool:
-        """Return true if the model identified by key and submodel_type is in the cache."""
-        key = self._make_cache_key(key, submodel_type)
-        return key in self._cached_models
-
     def put(
         self,
         key: str,
