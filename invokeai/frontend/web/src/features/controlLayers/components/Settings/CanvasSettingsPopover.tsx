@@ -11,6 +11,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { CanvasSettingsAutoSaveCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsAutoSaveCheckbox';
 import { CanvasSettingsClearCachesButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearCachesButton';
+import { CanvasSettingsClearHistoryButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearHistoryButton';
 import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsClipToBboxCheckbox';
 import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsDynamicGridSwitch';
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
@@ -60,6 +61,7 @@ const DebugSettings = () => {
       <CanvasSettingsClearCachesButton />
       <CanvasSettingsRecalculateRectsButton />
       <CanvasSettingsLogDebugInfoButton />
+      <CanvasSettingsClearHistoryButton />
     </>
   );
 };
