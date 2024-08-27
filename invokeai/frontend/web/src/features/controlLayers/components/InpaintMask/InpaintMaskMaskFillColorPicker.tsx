@@ -1,20 +1,25 @@
 import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbColorPicker from 'common/components/RgbColorPicker';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { MaskFillStyle } from 'features/controlLayers/components/common/MaskFillStyle';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { inpaintMaskFillColorChanged, inpaintMaskFillStyleChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { inpaintMaskFillColorChanged, inpaintMaskFillStyleChanged } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { FillStyle, RgbColor } from 'features/controlLayers/store/types';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const InpaintMaskMaskFillColorPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('inpaint_mask');
-  const fill = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).fill);
+  const selectFill = useMemo(
+    () => createSelector(selectCanvasSlice, (canvas) => selectEntityOrThrow(canvas, entityIdentifier).fill),
+    [entityIdentifier]
+  );
+  const fill = useAppSelector(selectFill);
 
   const onChangeFillColor = useCallback(
     (color: RgbColor) => {

@@ -1,22 +1,22 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { bboxWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice, selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);
+const selectWidthConfig = createSelector(selectConfigSlice, (config) => config.sd.width);
 
 export const ParamWidth = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const width = useAppSelector((s) => s.canvasV2.bbox.rect.width);
+  const width = useAppSelector(selectWidth);
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const sliderMin = useAppSelector((s) => s.config.sd.width.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.width.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.width.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.width.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.width.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.width.fineStep);
+  const config = useAppSelector(selectWidthConfig);
 
   const onChange = useCallback(
     (v: number) => {
@@ -25,7 +25,10 @@ export const ParamWidth = memo(() => {
     [dispatch]
   );
 
-  const marks = useMemo(() => [sliderMin, optimalDimension, sliderMax], [sliderMin, optimalDimension, sliderMax]);
+  const marks = useMemo(
+    () => [config.sliderMin, optimalDimension, config.sliderMax],
+    [config.sliderMax, config.sliderMin, optimalDimension]
+  );
 
   return (
     <FormControl>
@@ -36,20 +39,20 @@ export const ParamWidth = memo(() => {
         value={width}
         onChange={onChange}
         defaultValue={optimalDimension}
-        min={sliderMin}
-        max={sliderMax}
-        step={coarseStep}
-        fineStep={fineStep}
+        min={config.sliderMin}
+        max={config.sliderMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
         marks={marks}
       />
       <CompositeNumberInput
         value={width}
         onChange={onChange}
         defaultValue={optimalDimension}
-        min={numberInputMin}
-        max={numberInputMax}
-        step={coarseStep}
-        fineStep={fineStep}
+        min={config.numberInputMin}
+        max={config.numberInputMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
       />
     </FormControl>
   );

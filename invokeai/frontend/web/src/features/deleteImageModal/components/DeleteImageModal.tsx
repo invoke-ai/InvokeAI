@@ -1,7 +1,7 @@
 import { ConfirmationAlertDialog, Divider, Flex, FormControl, FormLabel, Switch, Text } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasV2Slice } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { getImageUsage, selectImageUsage } from 'features/deleteImageModal/store/selectors';
 import {
@@ -20,11 +20,11 @@ import { useTranslation } from 'react-i18next';
 import ImageUsageMessage from './ImageUsageMessage';
 
 const selectImageUsages = createMemoizedSelector(
-  [selectDeleteImageModalSlice, selectNodesSlice, selectCanvasV2Slice, selectImageUsage],
-  (deleteImageModal, nodes, canvasV2, imagesUsage) => {
+  [selectDeleteImageModalSlice, selectNodesSlice, selectCanvasSlice, selectImageUsage],
+  (deleteImageModal, nodes, canvas, imagesUsage) => {
     const { imagesToDelete } = deleteImageModal;
 
-    const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) => getImageUsage(nodes, canvasV2, image_name));
+    const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) => getImageUsage(nodes, canvas, image_name));
 
     const imageUsageSummary: ImageUsage = {
       isLayerImage: some(allImageUsage, (i) => i.isLayerImage),

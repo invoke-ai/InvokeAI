@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { stopPropagation } from 'common/util/stopPropagation';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
-import { entityIsEnabledToggled } from 'features/controlLayers/store/canvasV2Slice';
+import { entityIsEnabledToggled } from 'features/controlLayers/store/canvasSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';

@@ -8,7 +8,7 @@ import { deepClone } from 'common/util/deepClone';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import { canvasSessionPersistConfig, canvasSessionSlice } from 'features/controlLayers/store/canvasSessionSlice';
 import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
-import { canvasV2PersistConfig, canvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { canvasPersistConfig, canvasSlice } from 'features/controlLayers/store/canvasSlice';
 import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
 import { toolPersistConfig, toolSlice } from 'features/controlLayers/store/toolSlice';
@@ -58,7 +58,7 @@ const allReducers = {
   [queueSlice.name]: queueSlice.reducer,
   [workflowSlice.name]: workflowSlice.reducer,
   [hrfSlice.name]: hrfSlice.reducer,
-  [canvasV2Slice.name]: canvasV2Slice.reducer,
+  [canvasSlice.name]: undoable(canvasSlice.reducer),
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [upscaleSlice.name]: upscaleSlice.reducer,
   [stylePresetSlice.name]: stylePresetSlice.reducer,
@@ -104,7 +104,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [dynamicPromptsPersistConfig.name]: dynamicPromptsPersistConfig,
   [modelManagerV2PersistConfig.name]: modelManagerV2PersistConfig,
   [hrfPersistConfig.name]: hrfPersistConfig,
-  [canvasV2PersistConfig.name]: canvasV2PersistConfig,
+  [canvasPersistConfig.name]: canvasPersistConfig,
   [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
   [upscalePersistConfig.name]: upscalePersistConfig,
   [stylePresetPersistConfig.name]: stylePresetPersistConfig,

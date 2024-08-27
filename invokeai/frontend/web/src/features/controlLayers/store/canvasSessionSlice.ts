@@ -1,6 +1,6 @@
-import { createAction, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { PersistConfig } from 'app/store/store';
-import { canvasV2Slice } from 'features/controlLayers/store/canvasV2Slice';
+import { createAction, createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { PersistConfig, RootState } from 'app/store/store';
+import { canvasSlice } from 'features/controlLayers/store/canvasSlice';
 import type { SessionMode, StagingAreaImage } from 'features/controlLayers/store/types';
 
 export type CanvasSessionState = {
@@ -79,5 +79,9 @@ export const canvasSessionPersistConfig: PersistConfig<CanvasSessionState> = {
   persistDenylist: [],
 };
 export const sessionStagingAreaImageAccepted = createAction<{ index: number }>(
-  `${canvasV2Slice.name}/sessionStagingAreaImageAccepted`
+  `${canvasSlice.name}/sessionStagingAreaImageAccepted`
 );
+
+export const selectCanvasSessionSlice = (s: RootState) => s.canvasSession;
+
+export const selectIsStaging = createSelector(selectCanvasSessionSlice, (canvasSession) => canvasSession.isStaging);

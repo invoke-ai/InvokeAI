@@ -1,6 +1,6 @@
 import type { RootState } from 'app/store/store';
 import type { ParamsState } from 'features/controlLayers/store/paramsSlice';
-import type { CanvasV2State } from 'features/controlLayers/store/types';
+import type { CanvasState } from 'features/controlLayers/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { buildPresetModifiedPrompt } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
@@ -62,7 +62,7 @@ export const getPresetModifiedPrompts = (
   };
 };
 
-export const getSizes = (bboxState: CanvasV2State['bbox']) => {
+export const getSizes = (bboxState: CanvasState['bbox']) => {
   const originalSize = pick(bboxState.rect, 'width', 'height');
   const scaledSize = ['auto', 'manual'].includes(bboxState.scaleMethod) ? bboxState.scaledSize : originalSize;
   return { originalSize, scaledSize };

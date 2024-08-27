@@ -1,4 +1,5 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
@@ -12,8 +13,8 @@ import {
   ipaMethodChanged,
   ipaModelChanged,
   ipaWeightChanged,
-} from 'features/controlLayers/store/canvasV2Slice';
-import { selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+} from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { IPAImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -25,7 +26,11 @@ import { IPAdapterModel } from './IPAdapterModel';
 export const IPAdapterSettings = memo(() => {
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('ip_adapter');
-  const ipAdapter = useAppSelector((s) => selectEntityOrThrow(s.canvasV2, entityIdentifier).ipAdapter);
+  const selectIPAdapter = useMemo(
+    () => createSelector(selectCanvasSlice, (s) => selectEntityOrThrow(s, entityIdentifier).ipAdapter),
+    [entityIdentifier]
+  );
+  const ipAdapter = useAppSelector(selectIPAdapter);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {

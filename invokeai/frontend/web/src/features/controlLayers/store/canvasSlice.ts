@@ -22,7 +22,7 @@ import { assert } from 'tsafe';
 
 import type {
   CanvasEntityIdentifier,
-  CanvasV2State,
+  CanvasState,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
@@ -32,7 +32,7 @@ import type {
 } from './types';
 import { getEntityIdentifier, isDrawableEntity } from './types';
 
-const initialState: CanvasV2State = {
+const initialState: CanvasState = {
   _version: 3,
   selectedEntityIdentifier: null,
   rasterLayers: {
@@ -64,8 +64,8 @@ const initialState: CanvasV2State = {
   },
 };
 
-export const canvasV2Slice = createSlice({
-  name: 'canvasV2',
+export const canvasSlice = createSlice({
+  name: 'canvas',
   initialState,
   reducers: {
     // undoable canvas state
@@ -217,7 +217,7 @@ export const canvasV2Slice = createSlice({
     entityDeleted: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
 
-      let selectedEntityIdentifier: CanvasV2State['selectedEntityIdentifier'] = null;
+      let selectedEntityIdentifier: CanvasState['selectedEntityIdentifier'] = null;
       const allEntities = selectAllEntities(state);
       const index = allEntities.findIndex((entity) => entity.id === entityIdentifier.id);
       const nextIndex = allEntities.length > 1 ? (index + 1) % allEntities.length : -1;
@@ -438,15 +438,15 @@ export const {
   // inpaintMaskRecalled,
   inpaintMaskFillColorChanged,
   inpaintMaskFillStyleChanged,
-} = canvasV2Slice.actions;
+} = canvasSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
   return state;
 };
 
-export const canvasV2PersistConfig: PersistConfig<CanvasV2State> = {
-  name: canvasV2Slice.name,
+export const canvasPersistConfig: PersistConfig<CanvasState> = {
+  name: canvasSlice.name,
   initialState,
   migrate,
   persistDenylist: [],

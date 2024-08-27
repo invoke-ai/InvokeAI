@@ -1,22 +1,26 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { bboxScaledSizeChanged } from 'features/controlLayers/store/canvasV2Slice';
-import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { bboxScaledSizeChanged } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice, selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const selectIsManual = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaleMethod === 'manual');
+const selectScaledWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaledSize.width);
+const selectScaledBoundingBoxWidthConfig = createSelector(
+  selectConfigSlice,
+  (config) => config.sd.scaledBoundingBoxWidth
+);
 
 const ParamScaledWidth = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
-  const isManual = useAppSelector((s) => s.canvasV2.bbox.scaleMethod === 'manual');
-  const width = useAppSelector((s) => s.canvasV2.bbox.scaledSize.width);
-  const sliderMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.scaledBoundingBoxWidth.fineStep);
+  const isManual = useAppSelector(selectIsManual);
+  const scaledWidth = useAppSelector(selectScaledWidth);
+  const config = useAppSelector(selectScaledBoundingBoxWidthConfig);
   const onChange = useCallback(
     (width: number) => {
       dispatch(bboxScaledSizeChanged({ width }));
@@ -28,21 +32,21 @@ const ParamScaledWidth = () => {
     <FormControl isDisabled={!isManual}>
       <FormLabel>{t('parameters.scaledWidth')}</FormLabel>
       <CompositeSlider
-        min={sliderMin}
-        max={sliderMax}
-        step={coarseStep}
-        fineStep={fineStep}
-        value={width}
+        min={config.sliderMin}
+        max={config.sliderMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
+        value={scaledWidth}
         onChange={onChange}
         defaultValue={optimalDimension}
         marks
       />
       <CompositeNumberInput
-        min={numberInputMin}
-        max={numberInputMax}
-        step={coarseStep}
-        fineStep={fineStep}
-        value={width}
+        min={config.numberInputMin}
+        max={config.numberInputMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
+        value={scaledWidth}
         onChange={onChange}
         defaultValue={optimalDimension}
       />

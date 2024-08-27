@@ -9,7 +9,7 @@ import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/
 import type {
   CanvasControlLayerState,
   CanvasRasterLayerState,
-  CanvasV2State,
+  CanvasState,
   ControlModeV2,
   ControlNetConfig,
   EntityIdentifierPayload,
@@ -159,4 +159,4 @@ export const controlLayersReducers = {
     }
     layer.withTransparencyEffect = !layer.withTransparencyEffect;
   },
-} satisfies SliceCaseReducers<CanvasV2State>;
+} satisfies SliceCaseReducers<CanvasState>;

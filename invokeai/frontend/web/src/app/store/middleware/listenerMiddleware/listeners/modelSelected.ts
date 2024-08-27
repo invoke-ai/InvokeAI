@@ -46,7 +46,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
 
         // handle incompatible controlnets
-        // state.canvasV2.controlAdapters.entities.forEach((ca) => {
+        // state.canvas.present.controlAdapters.entities.forEach((ca) => {
         //   if (ca.model?.base !== newBaseModel) {
         //     modelsCleared += 1;
         //     if (ca.isEnabled) {

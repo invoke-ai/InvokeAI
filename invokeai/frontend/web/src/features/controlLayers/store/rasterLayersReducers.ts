@@ -4,7 +4,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectEntity } from 'features/controlLayers/store/selectors';
 import { merge } from 'lodash-es';
 
-import type { CanvasControlLayerState, CanvasRasterLayerState, CanvasV2State, EntityIdentifierPayload } from './types';
+import type { CanvasControlLayerState, CanvasRasterLayerState, CanvasState, EntityIdentifierPayload } from './types';
 import { getEntityIdentifier, initialControlNet } from './types';
 
 export const rasterLayersReducers = {
@@ -67,4 +67,4 @@ export const rasterLayersReducers = {
       payload: { ...payload, newId: getPrefixedId('control_layer') },
     }),
   },
-} satisfies SliceCaseReducers<CanvasV2State>;
+} satisfies SliceCaseReducers<CanvasState>;
