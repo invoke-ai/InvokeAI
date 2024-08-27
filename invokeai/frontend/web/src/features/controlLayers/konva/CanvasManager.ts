@@ -6,7 +6,7 @@ import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import { CanvasCompositorModule } from 'features/controlLayers/konva/CanvasCompositorModule';
 import { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { CanvasRenderingModule } from 'features/controlLayers/konva/CanvasRenderingModule';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
@@ -16,14 +16,14 @@ import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 
 import { CanvasBackgroundModule } from './CanvasBackgroundModule';
-import type { CanvasLayerAdapter } from './CanvasLayerAdapter';
-import type { CanvasMaskAdapter } from './CanvasMaskAdapter';
+import type { CanvasEntityLayerAdapter } from './CanvasEntityLayerAdapter';
+import type { CanvasEntityMaskAdapter } from './CanvasEntityMaskAdapter';
 import { CanvasPreviewModule } from './CanvasPreviewModule';
 import { CanvasStateApiModule } from './CanvasStateApiModule';
 
 export const $canvasManager = atom<CanvasManager | null>(null);
 
-export class CanvasManager extends CanvasModuleBase {
+export class CanvasManager extends CanvasModuleABC {
   readonly type = 'manager';
 
   id: string;
@@ -37,11 +37,11 @@ export class CanvasManager extends CanvasModuleBase {
   subscriptions = new Set<() => void>();
 
   adapters = {
-    rasterLayers: new SyncableMap<string, CanvasLayerAdapter>(),
-    controlLayers: new SyncableMap<string, CanvasLayerAdapter>(),
-    regionMasks: new SyncableMap<string, CanvasMaskAdapter>(),
-    inpaintMasks: new SyncableMap<string, CanvasMaskAdapter>(),
-    getAll: (): (CanvasLayerAdapter | CanvasMaskAdapter)[] => {
+    rasterLayers: new SyncableMap<string, CanvasEntityLayerAdapter>(),
+    controlLayers: new SyncableMap<string, CanvasEntityLayerAdapter>(),
+    regionMasks: new SyncableMap<string, CanvasEntityMaskAdapter>(),
+    inpaintMasks: new SyncableMap<string, CanvasEntityMaskAdapter>(),
+    getAll: (): (CanvasEntityLayerAdapter | CanvasEntityMaskAdapter)[] => {
       return [
         ...this.adapters.rasterLayers.values(),
         ...this.adapters.controlLayers.values(),

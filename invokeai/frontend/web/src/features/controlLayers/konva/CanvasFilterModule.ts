@@ -1,7 +1,7 @@
 import type { SerializableObject } from 'common/types';
-import type { CanvasLayerAdapter } from 'features/controlLayers/konva/CanvasLayerAdapter';
+import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, CanvasImageState, FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -11,7 +11,7 @@ import { getImageDTO } from 'services/api/endpoints/images';
 import type { BatchConfig, ImageDTO, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
-export class CanvasFilterModule extends CanvasModuleBase {
+export class CanvasFilterModule extends CanvasModuleABC {
   readonly type = 'canvas_filter';
 
   id: string;
@@ -22,7 +22,7 @@ export class CanvasFilterModule extends CanvasModuleBase {
 
   imageState: CanvasImageState | null = null;
 
-  $adapter = atom<CanvasLayerAdapter | null>(null);
+  $adapter = atom<CanvasEntityLayerAdapter | null>(null);
   $isFiltering = computed(this.$adapter, (adapter) => Boolean(adapter));
   $isProcessing = atom<boolean>(false);
   $config = atom<FilterConfig>(IMAGE_FILTERS.canny_image_processor.buildDefaults());

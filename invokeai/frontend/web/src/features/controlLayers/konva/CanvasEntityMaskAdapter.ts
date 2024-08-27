@@ -1,9 +1,9 @@
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
+import { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
+import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
-import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { getLastPointOfLine } from 'features/controlLayers/konva/util';
 import type {
   CanvasBrushLineState,
@@ -21,8 +21,8 @@ import { get, omit } from 'lodash-es';
 import type { Logger } from 'roarr';
 import stableHash from 'stable-hash';
 
-export class CanvasMaskAdapter extends CanvasModuleBase {
-  readonly type = 'mask_adapter';
+export class CanvasEntityMaskAdapter extends CanvasModuleABC {
+  readonly type = 'entity_mask_adapter';
 
   id: string;
   path: string[];
@@ -32,8 +32,8 @@ export class CanvasMaskAdapter extends CanvasModuleBase {
 
   state: CanvasInpaintMaskState | CanvasRegionalGuidanceState;
 
-  transformer: CanvasTransformer;
-  renderer: CanvasObjectRenderer;
+  transformer: CanvasEntityTransformer;
+  renderer: CanvasEntityRenderer;
 
   isFirstRender: boolean = true;
 
@@ -41,7 +41,7 @@ export class CanvasMaskAdapter extends CanvasModuleBase {
     layer: Konva.Layer;
   };
 
-  constructor(state: CanvasMaskAdapter['state'], manager: CanvasMaskAdapter['manager']) {
+  constructor(state: CanvasEntityMaskAdapter['state'], manager: CanvasEntityMaskAdapter['manager']) {
     super();
     this.id = state.id;
     this.manager = manager;
@@ -63,8 +63,8 @@ export class CanvasMaskAdapter extends CanvasModuleBase {
       }),
     };
 
-    this.renderer = new CanvasObjectRenderer(this);
-    this.transformer = new CanvasTransformer(this);
+    this.renderer = new CanvasEntityRenderer(this);
+    this.transformer = new CanvasEntityTransformer(this);
   }
 
   /**
@@ -82,7 +82,7 @@ export class CanvasMaskAdapter extends CanvasModuleBase {
     this.konva.layer.destroy();
   };
 
-  update = async (arg?: { state: CanvasMaskAdapter['state'] }) => {
+  update = async (arg?: { state: CanvasEntityMaskAdapter['state'] }) => {
     const state = get(arg, 'state', this.state);
 
     if (!this.isFirstRender && state === this.state && state.fill === this.state.fill) {
@@ -163,7 +163,7 @@ export class CanvasMaskAdapter extends CanvasModuleBase {
   };
 
   getHashableState = (): SerializableObject => {
-    const keysToOmit: (keyof CanvasMaskAdapter['state'])[] = ['fill', 'name', 'opacity'];
+    const keysToOmit: (keyof CanvasEntityMaskAdapter['state'])[] = ['fill', 'name', 'opacity'];
     return omit(this.state, keysToOmit);
   };
 

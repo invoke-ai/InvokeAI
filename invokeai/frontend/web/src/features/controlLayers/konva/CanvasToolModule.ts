@@ -1,6 +1,6 @@
 import { rgbaColorToString, rgbColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import {
   BRUSH_BORDER_INNER_COLOR,
@@ -31,7 +31,7 @@ import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
 
-export class CanvasToolModule extends CanvasModuleBase {
+export class CanvasToolModule extends CanvasModuleABC {
   readonly type = 'tool';
   static readonly COLOR_PICKER_RADIUS = 25;
   static readonly COLOR_PICKER_THICKNESS = 15;

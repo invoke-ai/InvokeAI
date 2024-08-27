@@ -1,5 +1,5 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { CanvasProgressImageModule } from 'features/controlLayers/konva/CanvasProgressImageModule';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
@@ -9,7 +9,7 @@ import { CanvasBboxModule } from './CanvasBboxModule';
 import { CanvasStagingAreaModule } from './CanvasStagingAreaModule';
 import { CanvasToolModule } from './CanvasToolModule';
 
-export class CanvasPreviewModule extends CanvasModuleBase {
+export class CanvasPreviewModule extends CanvasModuleABC {
   readonly type = 'preview';
 
   id: string;

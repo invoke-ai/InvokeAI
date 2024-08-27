@@ -1,9 +1,9 @@
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
+import { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
+import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { CanvasObjectRenderer } from 'features/controlLayers/konva/CanvasObjectRenderer';
-import { CanvasTransformer } from 'features/controlLayers/konva/CanvasTransformer';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { getLastPointOfLine } from 'features/controlLayers/konva/util';
 import type {
   CanvasBrushLineState,
@@ -22,8 +22,8 @@ import type { Logger } from 'roarr';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
-export class CanvasLayerAdapter extends CanvasModuleBase {
-  readonly type = 'layer_adapter';
+export class CanvasEntityLayerAdapter extends CanvasModuleABC {
+  readonly type = 'entity_layer_adapter';
 
   id: string;
   path: string[];
@@ -36,12 +36,12 @@ export class CanvasLayerAdapter extends CanvasModuleBase {
   konva: {
     layer: Konva.Layer;
   };
-  transformer: CanvasTransformer;
-  renderer: CanvasObjectRenderer;
+  transformer: CanvasEntityTransformer;
+  renderer: CanvasEntityRenderer;
 
   isFirstRender: boolean = true;
 
-  constructor(state: CanvasLayerAdapter['state'], manager: CanvasLayerAdapter['manager']) {
+  constructor(state: CanvasEntityLayerAdapter['state'], manager: CanvasEntityLayerAdapter['manager']) {
     super();
     this.id = state.id;
     this.manager = manager;
@@ -63,8 +63,8 @@ export class CanvasLayerAdapter extends CanvasModuleBase {
       }),
     };
 
-    this.renderer = new CanvasObjectRenderer(this);
-    this.transformer = new CanvasTransformer(this);
+    this.renderer = new CanvasEntityRenderer(this);
+    this.transformer = new CanvasEntityTransformer(this);
   }
 
   /**
@@ -82,7 +82,7 @@ export class CanvasLayerAdapter extends CanvasModuleBase {
     this.konva.layer.destroy();
   };
 
-  update = async (arg?: { state: CanvasLayerAdapter['state'] }) => {
+  update = async (arg?: { state: CanvasEntityLayerAdapter['state'] }) => {
     const state = get(arg, 'state', this.state);
 
     if (!this.isFirstRender && state === this.state) {
