@@ -54,6 +54,7 @@ async def get_style_preset(
     except StylePresetNotFoundError:
         raise HTTPException(status_code=404, detail="Style preset not found")
 
+
 @style_presets_router.post(
     "/i/{style_preset_id}",
     operation_id="set_style_preset",
