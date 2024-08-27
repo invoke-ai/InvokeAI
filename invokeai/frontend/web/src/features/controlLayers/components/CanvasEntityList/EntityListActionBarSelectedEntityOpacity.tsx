@@ -134,7 +134,11 @@ export const SelectedEntityOpacity = memo(() => {
 
   return (
     <Popover>
-      <FormControl w="min-content" gap={2}>
+      <FormControl
+        w="min-content"
+        gap={2}
+        isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'ip_adapter'}
+      >
         <FormLabel m={0}>{t('controlLayers.opacity')}</FormLabel>
         <PopoverAnchor>
           <NumberInput
@@ -152,7 +156,6 @@ export const SelectedEntityOpacity = memo(() => {
             onKeyDown={onKeyDown}
             clampValueOnBlur={false}
             variant="outline"
-            isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'ip_adapter'}
           >
             <NumberInputField paddingInlineEnd={7} />
             <PopoverTrigger>
@@ -164,6 +167,7 @@ export const SelectedEntityOpacity = memo(() => {
                 position="absolute"
                 insetInlineEnd={0}
                 h="full"
+                isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'ip_adapter'}
               />
             </PopoverTrigger>
           </NumberInput>
@@ -181,6 +185,7 @@ export const SelectedEntityOpacity = memo(() => {
             marks={marks}
             formatValue={formatSliderValue}
             alwaysShowMarks
+            isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'ip_adapter'}
           />
         </PopoverBody>
       </PopoverContent>
