@@ -57,10 +57,7 @@ async def get_style_preset(
 
 @style_presets_router.post(
     "/i/{style_preset_id}",
-    operation_id="set_style_preset",
-    responses={
-        200: {"model": StylePresetRecordWithImage},
-    },
+    operation_id="select_style_preset",
 )
 async def select_style_preset(
     style_preset_id: str = Path(description="The style preset to select"),
