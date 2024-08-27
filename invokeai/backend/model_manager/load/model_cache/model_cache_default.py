@@ -1,22 +1,6 @@
 # Copyright (c) 2024 Lincoln D. Stein and the InvokeAI Development team
 # TODO: Add Stalker's proper name to copyright
-"""
-Manage a RAM cache of diffusion/transformer models for fast switching.
-They are moved between GPU VRAM and CPU RAM as necessary. If the cache
-grows larger than a preset maximum, then the least recently used
-model will be cleared and (re)loaded from disk when next needed.
-
-The cache returns context manager generators designed to load the
-model into the GPU within the context, and unload outside the
-context. Use like this:
-
-   cache = ModelCache(max_cache_size=7.5)
-   with cache.get_model('runwayml/stable-diffusion-1-5') as SD1,
-          cache.get_model('stabilityai/stable-diffusion-2') as SD2:
-       do_something_in_GPU(SD1,SD2)
-
-
-"""
+""" """
 
 import gc
 import math
@@ -48,6 +32,38 @@ MB = 2**20
 
 
 class ModelCache(ModelCacheBase[AnyModel]):
+    """A cache for managing models in memory.
+
+    The cache is based on two levels of model storage:
+    - execution_device: The device where most models are executed (typically "cuda", "mps", or "cpu").
+    - storage_device: The device where models are offloaded when not in active use (typically "cpu").
+
+    The model cache is based on the following assumptions:
+    - storage_device_mem_size > execution_device_mem_size
+    - disk_to_storage_device_transfer_time >> storage_device_to_execution_device_transfer_time
+
+    A copy of all models in the cache is always kept on the storage_device. A subset of the models also have a copy on
+    the execution_device.
+
+    Models are moved between the storage_device and the execution_device as necessary. Cache size limits are enforced
+    on both the storage_device and the execution_device. The execution_device cache uses a smallest-first offload
+    policy. The storage_device cache uses a least-recently-used (LRU) offload policy.
+
+    Note: Neither of these offload policies has really been compared against alternatives. It's likely that different
+    policies would be better, although the optimal policies are likely heavily dependent on usage patterns and HW
+    configuration.
+
+    The cache returns context manager generators designed to load the model into the execution device (often GPU) within
+    the context, and unload outside the context.
+
+    Example usage:
+    ```
+    cache = ModelCache(max_cache_size=7.5, max_vram_cache_size=6.0)
+    with cache.get_model('runwayml/stable-diffusion-1-5') as SD1:
+        do_something_on_gpu(SD1)
+    ```
+    """
+
     def __init__(
         self,
         max_cache_size: float,
@@ -61,10 +77,11 @@ class ModelCache(ModelCacheBase[AnyModel]):
         """
         Initialize the model RAM cache.
 
-        :param max_cache_size: Maximum size of the RAM cache [6.0 GB]
+        :param max_cache_size: Maximum size of the storage_device cache in GBs.
+        :param max_vram_cache_size: Maximum size of the execution_device cache in GBs.
         :param execution_device: Torch device to load active model into [torch.device('cuda')]
         :param storage_device: Torch device to save inactive model in [torch.device('cpu')]
-        :param lazy_offloading: Keep model in VRAM until another model needs to be loaded
+        :param lazy_offloading: Keep model in VRAM until another model needs to be loaded.
         :param log_memory_usage: If True, a memory snapshot will be captured before and after every model cache
             operation, and the result will be logged (at debug level). There is a time cost to capturing the memory
             snapshots, so it is recommended to disable this feature unless you are actively inspecting the model cache's
@@ -207,7 +224,10 @@ class ModelCache(ModelCacheBase[AnyModel]):
             return model_key
 
     def offload_unlocked_models(self, size_required: int) -> None:
-        """Move any unused models from VRAM."""
+        """Offload models from the execution_device to make room for size_required.
+
+        :param size_required: The amount of space to clear in the execution_device cache, in bytes.
+        """
         reserved = self._max_vram_cache_size * GIG
         vram_in_use = torch.cuda.memory_allocated() + size_required
         self.logger.debug(f"{(vram_in_use/GIG):.2f}GB VRAM needed for models; max allowed={(reserved/GIG):.2f}GB")
@@ -329,7 +349,12 @@ class ModelCache(ModelCacheBase[AnyModel]):
                 )
 
     def make_room(self, size: int) -> None:
-        """Make enough room in the cache to accommodate a new model of indicated size."""
+        """Make enough room in the cache to accommodate a new model of indicated size.
+
+        Note: This function deletes all of the cache's internal references to a model in order to free it. If there are
+        external references to the model, there's nothing that the cache can do about it, and those models will not be
+        garbage-collected.
+        """
         bytes_needed = size
         maximum_size = self.max_cache_size * GIG  # stored in GB, convert to bytes
         current_size = self.cache_size()
