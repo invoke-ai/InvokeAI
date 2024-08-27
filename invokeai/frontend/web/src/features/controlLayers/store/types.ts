@@ -529,11 +529,15 @@ const zIPAdapterConfig = z.object({
 });
 export type IPAdapterConfig = z.infer<typeof zIPAdapterConfig>;
 
-const zCanvasIPAdapterState = z.object({
+const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
-  type: z.literal('ip_adapter'),
   isEnabled: z.boolean(),
+  isLocked: z.boolean(),
+});
+
+const zCanvasIPAdapterState = zCanvasEntityBase.extend({
+  type: z.literal('ip_adapter'),
   ipAdapter: zIPAdapterConfig,
 });
 export type CanvasIPAdapterState = z.infer<typeof zCanvasIPAdapterState>;
@@ -555,11 +559,8 @@ const zRegionalGuidanceIPAdapterConfig = z.object({
 });
 export type RegionalGuidanceIPAdapterConfig = z.infer<typeof zRegionalGuidanceIPAdapterConfig>;
 
-const zCanvasRegionalGuidanceState = z.object({
-  id: zId,
-  name: zName,
+const zCanvasRegionalGuidanceState = zCanvasEntityBase.extend({
   type: z.literal('regional_guidance'),
-  isEnabled: z.boolean(),
   position: zCoordinate,
   opacity: zOpacity,
   objects: z.array(zCanvasObjectState),
@@ -571,11 +572,8 @@ const zCanvasRegionalGuidanceState = z.object({
 });
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
 
-const zCanvasInpaintMaskState = z.object({
-  id: zId,
-  name: zName,
+const zCanvasInpaintMaskState = zCanvasEntityBase.extend({
   type: z.literal('inpaint_mask'),
-  isEnabled: z.boolean(),
   position: zCoordinate,
   fill: zFill,
   opacity: zOpacity,
@@ -600,11 +598,8 @@ const zT2IAdapterConfig = z.object({
 });
 export type T2IAdapterConfig = z.infer<typeof zT2IAdapterConfig>;
 
-export const zCanvasRasterLayerState = z.object({
-  id: zId,
-  name: zName,
+export const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   type: z.literal('raster_layer'),
-  isEnabled: z.boolean(),
   position: zCoordinate,
   opacity: zOpacity,
   objects: z.array(zCanvasObjectState),

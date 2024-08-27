@@ -1,9 +1,8 @@
 import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Box, Flex, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { CanvasEntityListMenuButton } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityListMenuButton';
 import { CanvasPanelContent } from 'features/controlLayers/components/CanvasPanelContent';
 import { selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { selectEntityCount } from 'features/controlLayers/store/selectors';
@@ -100,8 +99,6 @@ const ParametersPanelTextToImage = () => {
                   >
                     {controlLayersTitle}
                   </Tab>
-                  <Spacer />
-                  <CanvasEntityListMenuButton />
                 </TabList>
                 <TabPanels w="full" h="full">
                   <TabPanel p={0} w="full" h="full">
