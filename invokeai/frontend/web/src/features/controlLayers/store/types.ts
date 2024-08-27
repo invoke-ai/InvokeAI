@@ -692,7 +692,7 @@ export type StagingAreaImage = {
 
 export type SessionMode = 'generate' | 'compose';
 
-export type CanvasV2State = {
+export type CanvasState = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
   inpaintMasks: {

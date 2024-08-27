@@ -6,7 +6,7 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasSessionState } from 'features/controlLayers/store/canvasSessionSlice';
 import type { CanvasSettingsState } from 'features/controlLayers/store/canvasSettingsSlice';
-import type { CanvasV2State } from 'features/controlLayers/store/types';
+import type { CanvasState } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
 
 export class CanvasRenderingModule extends CanvasModuleBase {
@@ -18,7 +18,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
   manager: CanvasManager;
   subscriptions = new Set<() => void>();
 
-  state: CanvasV2State | null = null;
+  state: CanvasState | null = null;
   settings: CanvasSettingsState | null = null;
   session: CanvasSessionState | null = null;
 
@@ -119,7 +119,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     }
   };
 
-  renderRasterLayers = async (state: CanvasV2State, prevState: CanvasV2State | null) => {
+  renderRasterLayers = async (state: CanvasState, prevState: CanvasState | null) => {
     const adapterMap = this.manager.adapters.rasterLayers;
 
     if (!prevState || state.rasterLayers.isHidden !== prevState.rasterLayers.isHidden) {
@@ -148,7 +148,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     }
   };
 
-  renderControlLayers = async (prevState: CanvasV2State | null, state: CanvasV2State) => {
+  renderControlLayers = async (prevState: CanvasState | null, state: CanvasState) => {
     const adapterMap = this.manager.adapters.controlLayers;
 
     if (!prevState || state.controlLayers.isHidden !== prevState.controlLayers.isHidden) {
@@ -177,7 +177,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     }
   };
 
-  renderRegionalGuidance = async (prevState: CanvasV2State | null, state: CanvasV2State) => {
+  renderRegionalGuidance = async (prevState: CanvasState | null, state: CanvasState) => {
     const adapterMap = this.manager.adapters.regionMasks;
 
     if (!prevState || state.regions.isHidden !== prevState.regions.isHidden) {
@@ -211,7 +211,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     }
   };
 
-  renderInpaintMasks = async (state: CanvasV2State, prevState: CanvasV2State | null) => {
+  renderInpaintMasks = async (state: CanvasState, prevState: CanvasState | null) => {
     const adapterMap = this.manager.adapters.inpaintMasks;
 
     if (!prevState || state.inpaintMasks.isHidden !== prevState.inpaintMasks.isHidden) {
@@ -245,7 +245,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     }
   };
 
-  renderBbox = (state: CanvasV2State, prevState: CanvasV2State | null) => {
+  renderBbox = (state: CanvasState, prevState: CanvasState | null) => {
     if (!prevState || state.bbox !== prevState.bbox) {
       this.manager.preview.bbox.render();
     }
@@ -257,7 +257,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     }
   };
 
-  arrangeEntities = (state: CanvasV2State, prevState: CanvasV2State | null) => {
+  arrangeEntities = (state: CanvasState, prevState: CanvasState | null) => {
     if (
       !prevState ||
       state.rasterLayers.entities !== prevState.rasterLayers.entities ||

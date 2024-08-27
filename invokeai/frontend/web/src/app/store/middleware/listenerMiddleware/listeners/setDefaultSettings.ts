@@ -1,5 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasV2Slice';
+import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
 import {
   setCfgRescaleMultiplier,
   setCfgScale,

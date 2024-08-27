@@ -6,8 +6,8 @@ import {
   rgIPAdapterAdded,
   rgNegativePromptChanged,
   rgPositivePromptChanged,
-} from 'features/controlLayers/store/canvasV2Slice';
-import { selectCanvasV2Slice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+} from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -18,8 +18,8 @@ export const RegionalGuidanceAddPromptsIPAdapterButtons = () => {
   const dispatch = useAppDispatch();
   const selectValidActions = useMemo(
     () =>
-      createMemoizedSelector(selectCanvasV2Slice, (canvasV2) => {
-        const entity = selectEntityOrThrow(canvasV2, entityIdentifier);
+      createMemoizedSelector(selectCanvasSlice, (canvas) => {
+        const entity = selectEntityOrThrow(canvas, entityIdentifier);
         return {
           canAddPositivePrompt: entity?.positivePrompt === null,
           canAddNegativePrompt: entity?.negativePrompt === null,
