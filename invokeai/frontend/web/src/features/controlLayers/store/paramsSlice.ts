@@ -317,7 +317,7 @@ export const selectScheduler = createParamsSelector((params) => params.scheduler
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
 export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);
 export const selectSeed = createParamsSelector((params) => params.seed);
-export const selectShouldRandomizeSeed = createParamsSelector((params) => params.shouldConcatPrompts);
+export const selectShouldRandomizeSeed = createParamsSelector((params) => params.shouldRandomizeSeed);
 export const selectVAEPrecision = createParamsSelector((params) => params.vaePrecision);
 export const selectIterations = createParamsSelector((params) => params.iterations);
 export const selectShouldUseCPUNoise = createParamsSelector((params) => params.shouldUseCpuNoise);
