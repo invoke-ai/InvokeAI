@@ -1045,10 +1045,7 @@ export const canvasSlice = createSlice({
         const bboxDims = calculateNewSize(state.bbox.aspectRatio.value, optimalDimension * optimalDimension);
         state.bbox.rect.width = bboxDims.width;
         state.bbox.rect.height = bboxDims.height;
-
-        if (state.bbox.scaleMethod === 'auto') {
-          state.bbox.scaledSize = getScaledBoundingBoxDimensions(bboxDims, optimalDimension);
-        }
+        syncScaledSize(state);
       }
     });
   },
