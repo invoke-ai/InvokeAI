@@ -15,18 +15,6 @@ export const Filter = memo(() => {
   const isFiltering = useStore(canvasManager.filter.$isFiltering);
   const isProcessing = useStore(canvasManager.filter.$isProcessing);
 
-  const previewFilter = useCallback(() => {
-    canvasManager.filter.previewFilter();
-  }, [canvasManager.filter]);
-
-  const applyFilter = useCallback(() => {
-    canvasManager.filter.applyFilter();
-  }, [canvasManager.filter]);
-
-  const cancelFilter = useCallback(() => {
-    canvasManager.filter.cancelFilter();
-  }, [canvasManager.filter]);
-
   const onChangeFilterConfig = useCallback(
     (filterConfig: FilterConfig) => {
       canvasManager.filter.$config.set(filterConfig);
@@ -65,24 +53,27 @@ export const Filter = memo(() => {
       <FilterSettings filterConfig={config} onChange={onChangeFilterConfig} />
       <ButtonGroup isAttached={false} size="sm" alignSelf="self-end">
         <Button
+          variant="ghost"
           leftIcon={<PiShootingStarBold />}
-          onClick={previewFilter}
+          onClick={canvasManager.filter.previewFilter}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.preview')}
         >
           {t('controlLayers.filter.preview')}
         </Button>
         <Button
+          variant="ghost"
           leftIcon={<PiCheckBold />}
-          onClick={applyFilter}
+          onClick={canvasManager.filter.applyFilter}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.apply')}
         >
           {t('controlLayers.filter.apply')}
         </Button>
         <Button
+          variant="ghost"
           leftIcon={<PiXBold />}
-          onClick={cancelFilter}
+          onClick={canvasManager.filter.cancelFilter}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.cancel')}
         >
