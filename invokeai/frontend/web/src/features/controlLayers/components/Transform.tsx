@@ -6,23 +6,21 @@ import {
   useEntityIdentifierContext,
 } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityAdapter } from 'features/controlLayers/hooks/useEntityAdapter';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCheckBold, PiXBold } from 'react-icons/pi';
+import {
+  PiArrowsCounterClockwiseBold,
+  PiCheckBold,
+  PiFlipHorizontalFill,
+  PiFlipVerticalFill,
+  PiXBold,
+} from 'react-icons/pi';
 
 const TransformBox = memo(() => {
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
   const adapter = useEntityAdapter(entityIdentifier);
   const isProcessing = useStore(adapter.transformer.$isProcessing);
-
-  const applyTransform = useCallback(() => {
-    adapter.transformer.applyTransform();
-  }, [adapter.transformer]);
-
-  const cancelFilter = useCallback(() => {
-    adapter.transformer.stopTransform();
-  }, [adapter.transformer]);
 
   return (
     <Flex
@@ -40,16 +38,49 @@ const TransformBox = memo(() => {
       <Heading size="md" color="base.300" userSelect="none">
         {t('controlLayers.tool.transform')}
       </Heading>
+      <ButtonGroup isAttached={false} size="sm" justifyContent="center">
+        <Button
+          leftIcon={<PiFlipHorizontalFill />}
+          onClick={adapter.transformer.flipHorizontal}
+          isLoading={isProcessing}
+          loadingText={t('controlLayers.flipHorizontal')}
+        >
+          {t('controlLayers.flipHorizontal')}
+        </Button>
+        <Button
+          leftIcon={<PiFlipVerticalFill />}
+          onClick={adapter.transformer.flipVertical}
+          isLoading={isProcessing}
+          loadingText={t('controlLayers.flipVertical')}
+        >
+          {t('controlLayers.flipVertical')}
+        </Button>
+        <Button
+          leftIcon={<PiArrowsCounterClockwiseBold />}
+          onClick={adapter.transformer.resetTransform}
+          isLoading={isProcessing}
+          loadingText={t('controlLayers.reset')}
+        >
+          {t('accessibility.reset')}
+        </Button>
+      </ButtonGroup>
       <ButtonGroup isAttached={false} size="sm" alignSelf="self-end">
         <Button
           leftIcon={<PiCheckBold />}
-          onClick={applyTransform}
+          onClick={adapter.transformer.applyTransform}
           isLoading={isProcessing}
           loadingText={t('common.apply')}
+          variant="ghost"
         >
           {t('common.apply')}
         </Button>
-        <Button leftIcon={<PiXBold />} onClick={cancelFilter} isLoading={isProcessing} loadingText={t('common.cancel')}>
+        <Button
+          leftIcon={<PiXBold />}
+          onClick={adapter.transformer.stopTransform}
+          isLoading={isProcessing}
+          loadingText={t('common.cancel')}
+          variant="ghost"
+        >
           {t('common.cancel')}
         </Button>
       </ButtonGroup>
