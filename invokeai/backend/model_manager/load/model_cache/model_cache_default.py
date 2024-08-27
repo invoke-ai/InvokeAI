@@ -40,15 +40,8 @@ from invokeai.backend.model_manager.load.model_util import calc_model_size_by_da
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
-# Maximum size of the cache, in gigs
-# Default is roughly enough to hold three fp16 diffusers models in RAM simultaneously
-DEFAULT_MAX_CACHE_SIZE = 6.0
-
-# amount of GPU memory to hold in reserve for use by generations (GB)
-DEFAULT_MAX_VRAM_CACHE_SIZE = 2.75
-
-# actual size of a gig
-GIG = 1073741824
+# Size of a GB in bytes.
+GIG = 2**30
 
 # Size of a MB in bytes.
 MB = 2**20
@@ -59,8 +52,8 @@ class ModelCache(ModelCacheBase[AnyModel]):
 
     def __init__(
         self,
-        max_cache_size: float = DEFAULT_MAX_CACHE_SIZE,
-        max_vram_cache_size: float = DEFAULT_MAX_VRAM_CACHE_SIZE,
+        max_cache_size: float,
+        max_vram_cache_size: float,
         execution_device: torch.device = torch.device("cuda"),
         storage_device: torch.device = torch.device("cpu"),
         precision: torch.dtype = torch.float16,
