@@ -2,7 +2,7 @@ import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import { selectBase, selectVAE, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,16 +12,16 @@ import type { VAEModelConfig } from 'services/api/types';
 const ParamVAEModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const model = useAppSelector((s) => s.params.model);
-  const vae = useAppSelector((s) => s.params.vae);
+  const base = useAppSelector(selectBase);
+  const vae = useAppSelector(selectVAE);
   const [modelConfigs, { isLoading }] = useVAEModels();
   const getIsDisabled = useCallback(
     (vae: VAEModelConfig): boolean => {
-      const isCompatible = model?.base === vae.base;
-      const hasMainModel = Boolean(model?.base);
+      const isCompatible = base === vae.base;
+      const hasMainModel = Boolean(base);
       return !hasMainModel || !isCompatible;
     },
-    [model?.base]
+    [base]
   );
   const _onChange = useCallback(
     (vae: VAEModelConfig | null) => {

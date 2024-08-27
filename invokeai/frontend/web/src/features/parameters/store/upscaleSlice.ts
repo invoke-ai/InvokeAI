@@ -1,5 +1,5 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { ParameterSpandrelImageToImageModel } from 'features/parameters/types/parameterSchemas';
 import type { ControlNetModelConfig, ImageDTO } from 'services/api/types';
@@ -64,8 +64,6 @@ export const {
   postProcessingModelChanged,
 } = upscaleSlice.actions;
 
-export const selectUpscalelice = (state: RootState) => state.upscale;
-
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateUpscaleState = (state: any): any => {
   if (!('_version' in state)) {
@@ -80,3 +78,13 @@ export const upscalePersistConfig: PersistConfig<UpscaleState> = {
   migrate: migrateUpscaleState,
   persistDenylist: [],
 };
+
+export const selectUpscalelice = (state: RootState) => state.upscale;
+const createUpscaleSelector = <T>(selector: Selector<UpscaleState, T>) => createSelector(selectUpscalelice, selector);
+export const selectPostProcessingModel = createUpscaleSelector((upscale) => upscale.postProcessingModel);
+export const selectCreativity = createUpscaleSelector((upscale) => upscale.creativity);
+export const selectUpscaleModel = createUpscaleSelector((upscale) => upscale.upscaleModel);
+export const selectTileControlNetModel = createUpscaleSelector((upscale) => upscale.tileControlnetModel);
+export const selectStructure = createUpscaleSelector((upscale) => upscale.structure);
+export const selectUpscaleInitialImage = createUpscaleSelector((upscale) => upscale.upscaleInitialImage);
+export const selectUpscaleScale = createUpscaleSelector((upscale) => upscale.scale);

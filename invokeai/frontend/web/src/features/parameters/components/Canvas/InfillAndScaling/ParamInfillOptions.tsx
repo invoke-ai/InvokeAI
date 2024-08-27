@@ -1,4 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectInfillMethod } from 'features/controlLayers/store/paramsSlice';
 import { memo } from 'react';
 
 import ParamInfillColorOptions from './ParamInfillColorOptions';
@@ -6,7 +7,7 @@ import ParamInfillPatchmatchDownscaleSize from './ParamInfillPatchmatchDownscale
 import ParamInfillTilesize from './ParamInfillTilesize';
 
 const ParamInfillOptions = () => {
-  const infillMethod = useAppSelector((s) => s.params.infillMethod);
+  const infillMethod = useAppSelector(selectInfillMethod);
   if (infillMethod === 'tile') {
     return <ParamInfillTilesize />;
   }

@@ -9,6 +9,7 @@ import {
   $templates,
   edgesChanged,
 } from 'features/nodes/store/nodesSlice';
+import { selectNodes, selectNodesSlice } from 'features/nodes/store/selectors';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { useCallback, useMemo } from 'react';
@@ -24,7 +25,7 @@ export const useConnection = () => {
   const onConnectStart = useCallback<OnConnectStart>(
     (event, { nodeId, handleId, handleType }) => {
       assert(nodeId && handleId && handleType, 'Invalid connection start event');
-      const nodes = store.getState().nodes.present.nodes;
+      const nodes = selectNodes(store.getState());
 
       const node = nodes.find((n) => n.id === nodeId);
       if (!node) {
@@ -72,7 +73,7 @@ export const useConnection = () => {
     if (!pendingConnection) {
       return;
     }
-    const { nodes, edges } = store.getState().nodes.present;
+    const { nodes, edges } = selectNodesSlice(store.getState());
     if (mouseOverNodeId) {
       const { handleType } = pendingConnection;
       const source = handleType === 'source' ? pendingConnection.nodeId : mouseOverNodeId;

@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { updateAllNodesRequested } from 'features/nodes/store/actions';
 import { $templates, nodesChanged } from 'features/nodes/store/nodesSlice';
+import { selectNodes } from 'features/nodes/store/selectors';
 import { NodeUpdateError } from 'features/nodes/types/error';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { getNeedsUpdate, updateNode } from 'features/nodes/util/node/nodeUpdate';
@@ -14,7 +15,7 @@ export const addUpdateAllNodesRequestedListener = (startAppListening: AppStartLi
   startAppListening({
     actionCreator: updateAllNodesRequested,
     effect: (action, { dispatch, getState }) => {
-      const { nodes } = getState().nodes.present;
+      const nodes = selectNodes(getState());
       const templates = $templates.get();
 
       let unableToUpdateCount = 0;

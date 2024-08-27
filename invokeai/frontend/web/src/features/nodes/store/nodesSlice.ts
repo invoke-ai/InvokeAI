@@ -1,6 +1,6 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
-import type { PersistConfig, RootState } from 'app/store/store';
+import type { PersistConfig } from 'app/store/store';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
@@ -439,8 +439,6 @@ export const closeAddNodePopover = () => {
 export const openAddNodePopover = () => {
   $isAddNodePopoverOpen.set(true);
 };
-
-export const selectNodesSlice = (state: RootState) => state.nodes.present;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateNodesState = (state: any): any => {

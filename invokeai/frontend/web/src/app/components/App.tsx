@@ -17,7 +17,7 @@ import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterM
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import { configChanged } from 'features/system/store/configSlice';
-import { languageSelector } from 'features/system/store/systemSelectors';
+import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -45,7 +45,7 @@ interface Props {
 }
 
 const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflowId, destination }: Props) => {
-  const language = useAppSelector(languageSelector);
+  const language = useAppSelector(selectLanguage);
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
   const clearStorage = useClearStorage();

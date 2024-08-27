@@ -1,12 +1,13 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { setDefaultSettings } from 'features/parameters/store/actions';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RiSparklingFill } from 'react-icons/ri';
 
 export const UseDefaultSettingsButton = () => {
-  const model = useAppSelector((s) => s.params.model);
+  const model = useAppSelector(selectModel);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 

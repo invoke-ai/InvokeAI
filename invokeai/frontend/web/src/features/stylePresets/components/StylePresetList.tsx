@@ -1,6 +1,7 @@
 import { Button, Collapse, Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { selectStylePresetSearchTerm } from 'features/stylePresets/store/stylePresetSlice';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 import type { StylePresetRecordWithImage } from 'services/api/endpoints/stylePresets';
@@ -10,7 +11,7 @@ import { StylePresetListItem } from './StylePresetListItem';
 export const StylePresetList = ({ title, data }: { title: string; data: StylePresetRecordWithImage[] }) => {
   const { t } = useTranslation();
   const { onToggle, isOpen } = useDisclosure({ defaultIsOpen: true });
-  const searchTerm = useAppSelector((s) => s.stylePreset.searchTerm);
+  const searchTerm = useAppSelector(selectStylePresetSearchTerm);
 
   return (
     <Flex flexDir="column">

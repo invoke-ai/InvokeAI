@@ -2,6 +2,7 @@ import { CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } f
 import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
+import { selectStepsConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
@@ -14,14 +15,12 @@ type DefaultSteps = MainModelDefaultSettingsFormData['steps'];
 export const DefaultSteps = memo((props: UseControllerProps<MainModelDefaultSettingsFormData>) => {
   const { field } = useController(props);
 
-  const sliderMin = useAppSelector((s) => s.config.sd.steps.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.steps.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.steps.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.steps.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.steps.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.steps.fineStep);
+  const config = useAppSelector(selectStepsConfig);
   const { t } = useTranslation();
-  const marks = useMemo(() => [sliderMin, Math.floor(sliderMax / 2), sliderMax], [sliderMax, sliderMin]);
+  const marks = useMemo(
+    () => [config.sliderMin, Math.floor(config.sliderMax / 2), config.sliderMax],
+    [config.sliderMax, config.sliderMin]
+  );
 
   const onChange = useCallback(
     (v: number) => {
@@ -54,20 +53,20 @@ export const DefaultSteps = memo((props: UseControllerProps<MainModelDefaultSett
       <Flex w="full" gap={4}>
         <CompositeSlider
           value={value}
-          min={sliderMin}
-          max={sliderMax}
-          step={coarseStep}
-          fineStep={fineStep}
+          min={config.sliderMin}
+          max={config.sliderMax}
+          step={config.coarseStep}
+          fineStep={config.fineStep}
           onChange={onChange}
           marks={marks}
           isDisabled={isDisabled}
         />
         <CompositeNumberInput
           value={value}
-          min={numberInputMin}
-          max={numberInputMax}
-          step={coarseStep}
-          fineStep={fineStep}
+          min={config.numberInputMin}
+          max={config.numberInputMax}
+          step={config.coarseStep}
+          fineStep={config.fineStep}
           onChange={onChange}
           isDisabled={isDisabled}
         />

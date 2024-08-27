@@ -1,6 +1,7 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useMainModelDefaultSettings } from 'features/modelManagerV2/hooks/useMainModelDefaultSettings';
+import { selectSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { DefaultHeight } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultHeight';
 import { DefaultWidth } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultWidth';
 import type { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
@@ -42,7 +43,7 @@ type Props = {
 };
 
 export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
-  const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
+  const selectedModelKey = useAppSelector(selectSelectedModelKey);
   const { t } = useTranslation();
 
   const defaultSettingsDefaults = useMainModelDefaultSettings(modelConfig);

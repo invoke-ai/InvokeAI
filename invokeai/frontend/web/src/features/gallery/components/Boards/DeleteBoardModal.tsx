@@ -17,7 +17,7 @@ import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { some } from 'lodash-es';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';

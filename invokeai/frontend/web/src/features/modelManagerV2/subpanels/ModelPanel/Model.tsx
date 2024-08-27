@@ -1,5 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
+import { selectSelectedModelKey, selectSelectedModelMode } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiExclamationMarkBold } from 'react-icons/pi';
@@ -10,8 +11,8 @@ import { ModelView } from './ModelView';
 
 export const Model = memo(() => {
   const { t } = useTranslation();
-  const selectedModelMode = useAppSelector((s) => s.modelmanagerV2.selectedModelMode);
-  const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
+  const selectedModelMode = useAppSelector(selectSelectedModelMode);
+  const selectedModelKey = useAppSelector(selectSelectedModelKey);
   const { data: modelConfigs, isLoading } = useGetModelConfigsQuery();
   const modelConfig = useMemo(() => {
     if (!modelConfigs) {

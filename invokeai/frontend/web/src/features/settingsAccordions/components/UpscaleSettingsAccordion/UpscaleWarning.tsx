@@ -1,8 +1,15 @@
 import { Button, Flex, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
 import { useIsTooLargeToUpscale } from 'features/parameters/hooks/useIsTooLargeToUpscale';
-import { tileControlnetModelChanged } from 'features/parameters/store/upscaleSlice';
+import {
+  selectTileControlNetModel,
+  selectUpscaleInitialImage,
+  selectUpscaleModel,
+  tileControlnetModelChanged,
+} from 'features/parameters/store/upscaleSlice';
+import { selectIsModelsTabDisabled, selectMaxUpscaleDimension } from 'features/system/store/configSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useCallback, useEffect, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -10,16 +17,15 @@ import { useControlNetModels } from 'services/api/hooks/modelsByType';
 
 export const UpscaleWarning = () => {
   const { t } = useTranslation();
-  const model = useAppSelector((s) => s.params.model);
-  const upscaleModel = useAppSelector((s) => s.upscale.upscaleModel);
-  const tileControlnetModel = useAppSelector((s) => s.upscale.tileControlnetModel);
-  const upscaleInitialImage = useAppSelector((s) => s.upscale.upscaleInitialImage);
+  const model = useAppSelector(selectModel);
+  const upscaleModel = useAppSelector(selectUpscaleModel);
+  const tileControlnetModel = useAppSelector(selectTileControlNetModel);
+  const upscaleInitialImage = useAppSelector(selectUpscaleInitialImage);
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useControlNetModels();
-  const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
-  const shouldShowButton = useMemo(() => !disabledTabs.includes('models'), [disabledTabs]);
-  const maxUpscaleDimension = useAppSelector((s) => s.config.maxUpscaleDimension);
-  const isTooLargeToUpscale = useIsTooLargeToUpscale(upscaleInitialImage || undefined);
+  const isModelsTabDisabled = useAppSelector(selectIsModelsTabDisabled);
+  const maxUpscaleDimension = useAppSelector(selectMaxUpscaleDimension);
+  const isTooLargeToUpscale = useIsTooLargeToUpscale(upscaleInitialImage);
 
   useEffect(() => {
     const validModel = modelConfigs.find((cnetModel) => {
@@ -57,7 +63,7 @@ export const UpscaleWarning = () => {
     $installModelsTab.set(3);
   }, [dispatch]);
 
-  if (modelWarnings.length && !shouldShowButton) {
+  if (modelWarnings.length && isModelsTabDisabled) {
     return null;
   }
 

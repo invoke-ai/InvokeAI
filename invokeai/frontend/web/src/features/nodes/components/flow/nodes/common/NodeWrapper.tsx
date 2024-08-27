@@ -5,6 +5,8 @@ import NodeSelectionOverlay from 'common/components/NodeSelectionOverlay';
 import { useExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { nodesChanged } from 'features/nodes/store/nodesSlice';
+import { selectNodes } from 'features/nodes/store/selectors';
+import { selectNodeOpacity } from 'features/nodes/store/workflowSettingsSlice';
 import { DRAG_HANDLE_CLASSNAME, NODE_WIDTH } from 'features/nodes/types/constants';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import type { MouseEvent, PropsWithChildren } from 'react';
@@ -33,13 +35,13 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   const dispatch = useAppDispatch();
 
-  const opacity = useAppSelector((s) => s.workflowSettings.nodeOpacity);
+  const opacity = useAppSelector(selectNodeOpacity);
   const { onCloseGlobal } = useGlobalMenuClose();
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       if (!e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
-        const { nodes } = store.getState().nodes.present;
+        const nodes = selectNodes(store.getState());
         const nodeChanges: NodeChange[] = [];
         nodes.forEach(({ id, selected }) => {
           if (selected !== (id === nodeId)) {

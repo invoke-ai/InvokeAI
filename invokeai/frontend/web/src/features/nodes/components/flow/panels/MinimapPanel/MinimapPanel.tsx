@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { chakra, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectShouldShowMinimapPanel } from 'features/nodes/store/workflowSettingsSlice';
 import { memo } from 'react';
 import { MiniMap } from 'reactflow';
 
@@ -16,7 +17,7 @@ const minimapStyles: SystemStyleObject = {
 };
 
 const MinimapPanel = () => {
-  const shouldShowMinimapPanel = useAppSelector((s) => s.workflowSettings.shouldShowMinimapPanel);
+  const shouldShowMinimapPanel = useAppSelector(selectShouldShowMinimapPanel);
 
   return (
     <Flex gap={2} position="absolute" bottom={0} insetInlineEnd={0}>

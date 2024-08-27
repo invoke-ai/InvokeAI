@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import type { TypesafeDroppableData } from 'features/dnd/types';
-import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
+import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
@@ -11,7 +11,7 @@ import type { PostUploadAction } from 'services/api/types';
 
 export const UpscaleInitialImage = () => {
   const dispatch = useAppDispatch();
-  const imageDTO = useAppSelector((s) => s.upscale.upscaleInitialImage);
+  const imageDTO = useAppSelector(selectUpscaleInitialImage);
 
   const droppableData = useMemo<TypesafeDroppableData | undefined>(
     () => ({

@@ -2,7 +2,10 @@ import { Badge, ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure }
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
-import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
+import {
+  activeStylePresetIdChanged,
+  selectStylePresetActivePresetId,
+} from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
@@ -16,7 +19,7 @@ import StylePresetImage from './StylePresetImage';
 export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithImage }) => {
   const dispatch = useAppDispatch();
   const [deleteStylePreset] = useDeleteStylePresetMutation();
-  const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
+  const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
 

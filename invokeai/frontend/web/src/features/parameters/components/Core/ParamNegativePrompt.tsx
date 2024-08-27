@@ -1,21 +1,25 @@
 import { Box, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { negativePromptChanged } from 'features/controlLayers/store/paramsSlice';
+import { negativePromptChanged, selectNegativePrompt } from 'features/controlLayers/store/paramsSlice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
+import {
+  selectStylePresetActivePresetId,
+  selectStylePresetViewMode,
+} from 'features/stylePresets/store/stylePresetSlice';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
 export const ParamNegativePrompt = memo(() => {
   const dispatch = useAppDispatch();
-  const prompt = useAppSelector((s) => s.params.negativePrompt);
-  const viewMode = useAppSelector((s) => s.stylePreset.viewMode);
-  const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
+  const prompt = useAppSelector(selectNegativePrompt);
+  const viewMode = useAppSelector(selectStylePresetViewMode);
+  const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
