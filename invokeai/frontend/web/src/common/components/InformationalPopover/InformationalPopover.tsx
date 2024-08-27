@@ -32,7 +32,10 @@ type Props = {
   children: ReactElement;
 };
 
-const selectShouldEnableInformationalPopovers = createSelector(selectSystemSlice, system => system.shouldEnableInformationalPopovers);
+const selectShouldEnableInformationalPopovers = createSelector(
+  selectSystemSlice,
+  (system) => system.shouldEnableInformationalPopovers
+);
 
 export const InformationalPopover = memo(({ feature, children, inPortal = true, ...rest }: Props) => {
   const shouldEnableInformationalPopovers = useAppSelector(selectShouldEnableInformationalPopovers);

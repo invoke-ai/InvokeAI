@@ -3,6 +3,8 @@ import { Combobox, FormControl } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
+import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
+import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import type { PromptTriggerSelectProps } from 'features/prompt/types';
 import { t } from 'i18next';
 import { flatten, map } from 'lodash-es';
@@ -17,8 +19,8 @@ const noOptionsMessage = () => t('prompt.noMatchingTriggers');
 export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSelectProps) => {
   const { t } = useTranslation();
 
-  const mainModel = useAppSelector((s) => s.params.model);
-  const addedLoRAs = useAppSelector((s) => s.loras.loras);
+  const mainModel = useAppSelector(selectModel);
+  const addedLoRAs = useAppSelector(selectAddedLoRAs);
   const { data: mainModelConfig, isLoading: isLoadingMainModelConfig } = useGetModelConfigQuery(
     mainModel?.key ?? skipToken
   );

@@ -1,6 +1,8 @@
 import { Button, Flex, Heading, Spacer, Text } from '@invoke-ai/ui-library';
+import { EMPTY_OBJECT } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import dateFormat, { masks } from 'dateformat';
+import { selectWorkflowId } from 'features/nodes/store/workflowSlice';
 import { useWorkflowLibraryModalContext } from 'features/workflowLibrary/context/useWorkflowLibraryModalContext';
 import { useDeleteLibraryWorkflow } from 'features/workflowLibrary/hooks/useDeleteLibraryWorkflow';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
@@ -14,9 +16,9 @@ type Props = {
 
 const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
   const { t } = useTranslation();
-  const workflowId = useAppSelector((s) => s.workflow.id);
+  const workflowId = useAppSelector(selectWorkflowId);
   const { onClose } = useWorkflowLibraryModalContext();
-  const { deleteWorkflow, deleteWorkflowResult } = useDeleteLibraryWorkflow({});
+  const { deleteWorkflow, deleteWorkflowResult } = useDeleteLibraryWorkflow(EMPTY_OBJECT);
   const { getAndLoadWorkflow, getAndLoadWorkflowResult } = useGetAndLoadLibraryWorkflow({ onSuccess: onClose });
 
   const handleDeleteWorkflow = useCallback(() => {

@@ -2,7 +2,12 @@ import { Badge, Flex, IconButton, Spacer, Text, Tooltip } from '@invoke-ai/ui-li
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
-import { activeStylePresetIdChanged, viewModeChanged } from 'features/stylePresets/store/stylePresetSlice';
+import {
+  activeStylePresetIdChanged,
+  selectStylePresetActivePresetId,
+  selectStylePresetViewMode,
+  viewModeChanged,
+} from 'features/stylePresets/store/stylePresetSlice';
 import type { MouseEventHandler } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,9 +17,8 @@ import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 import StylePresetImage from './StylePresetImage';
 
 export const ActiveStylePreset = () => {
-  const viewMode = useAppSelector((s) => s.stylePreset.viewMode);
-
-  const activeStylePresetId = useAppSelector((s) => s.stylePreset.activeStylePresetId);
+  const viewMode = useAppSelector(selectStylePresetViewMode);
+  const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
 
   const { activeStylePreset } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
