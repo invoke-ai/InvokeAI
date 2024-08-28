@@ -25,15 +25,13 @@ const FloatingSidePanelButtons = (props: Props) => {
   const { queueBack, isLoading, isDisabled } = useQueueBack();
   const { data: queueStatus } = useGetQueueStatusQuery();
 
-  const queueButtonIcon = useMemo(
-    () =>
-      !isDisabled && queueStatus?.processor.is_processing ? (
-        <Icon boxSize={6} as={PiCircleNotchBold} animation={spinAnimation} />
-      ) : (
-        <RiSparklingFill size="16px" />
-      ),
-    [isDisabled, queueStatus?.processor.is_processing]
-  );
+  const queueButtonIcon = useMemo(() => {
+    const isProcessing = (queueStatus?.queue.in_progress ?? 0) > 0;
+    if (!isDisabled && isProcessing) {
+      return <Icon boxSize={6} as={PiCircleNotchBold} animation={spinAnimation} />;
+    }
+    return <RiSparklingFill size="16px" />;
+  }, [isDisabled, queueStatus]);
 
   if (!props.panelApi.isCollapsed) {
     return null;
