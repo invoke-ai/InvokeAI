@@ -7,13 +7,15 @@ import { CanvasSettingsPopover } from 'features/controlLayers/components/Setting
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolSettings } from 'features/controlLayers/components/Tool/ToolSettings';
-import { UndoRedoButtonGroup } from 'features/controlLayers/components/UndoRedoButtonGroup';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasUndoRedo } from 'features/controlLayers/hooks/useCanvasUndoRedo';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
 import { ViewerToggleMenu } from 'features/gallery/components/ImageViewer/ViewerToggleMenu';
 import { memo } from 'react';
 
 export const ControlLayersToolbar = memo(() => {
+  useCanvasUndoRedo();
+
   return (
     <CanvasManagerProviderGate>
       <Flex w="full" gap={2} alignItems="center">
@@ -27,7 +29,6 @@ export const ControlLayersToolbar = memo(() => {
         <Spacer />
         <ToolFillColorPicker />
         <CanvasModeSwitcher />
-        <UndoRedoButtonGroup />
         <CanvasSettingsPopover />
         <ViewerToggleMenu />
       </Flex>
