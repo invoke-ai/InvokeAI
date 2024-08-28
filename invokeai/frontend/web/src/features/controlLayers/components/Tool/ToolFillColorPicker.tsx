@@ -1,4 +1,4 @@
-import { Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai/ui-library';
+import { Box, Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger, Tooltip } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
@@ -23,17 +23,13 @@ export const ToolFillColorPicker = memo(() => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <Flex
-          as="button"
-          aria-label={t('controlLayers.brushColor')}
-          borderRadius="full"
-          borderWidth={1}
-          bg={rgbaColorToString(fill)}
-          w={8}
-          h={8}
-          cursor="pointer"
-          tabIndex={-1}
-        />
+        <Flex role="button" aria-label={t('controlLayers.fill.fillColor')} tabIndex={-1} w={8} h={8}>
+          <Tooltip label={t('controlLayers.fill.fillColor')}>
+            <Flex w="full" h="full" alignItems="center" justifyContent="center">
+              <Box borderRadius="full" w={6} h={6} borderWidth={1} bg={rgbaColorToString(fill)} />
+            </Flex>
+          </Tooltip>
+        </Flex>
       </PopoverTrigger>
       <PopoverContent>
         <PopoverBody minH={64}>
