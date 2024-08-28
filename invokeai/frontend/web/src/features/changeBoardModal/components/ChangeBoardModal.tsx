@@ -83,6 +83,7 @@ const ChangeBoardModal = () => {
       acceptCallback={handleChangeBoard}
       acceptButtonText={t('boards.move')}
       cancelButtonText={t('boards.cancel')}
+      useInert={false}
     >
       <Flex flexDir="column" gap={4}>
         <Text>
