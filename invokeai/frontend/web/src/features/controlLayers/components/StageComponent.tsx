@@ -82,10 +82,11 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
   );
 
   return (
-    <Flex position="relative" w="full" h="full" bg={dynamicGrid ? 'base.850' : 'base.900'}>
+    <Flex position="relative" w="full" h="full" bg={dynamicGrid ? 'base.850' : 'base.900'} borderRadius="base">
       {!dynamicGrid && (
         <Flex
           position="absolute"
+          borderRadius="base"
           bgImage={TRANSPARENCY_CHECKER_PATTERN}
           top={0}
           right={0}
@@ -102,9 +103,6 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
         left={0}
         ref={containerRef}
         borderRadius="base"
-        border={1}
-        borderStyle="solid"
-        borderColor="base.700"
         overflow="hidden"
         data-testid="control-layers-canvas"
       />

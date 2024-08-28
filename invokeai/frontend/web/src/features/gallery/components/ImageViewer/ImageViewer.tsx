@@ -21,7 +21,7 @@ export const ImageViewer = memo(() => {
     <Flex
       ref={ref}
       tabIndex={-1}
-      layerStyle="first"
+      layerStyle="body"
       borderRadius="base"
       position="absolute"
       flexDirection="column"
@@ -29,7 +29,6 @@ export const ImageViewer = memo(() => {
       right={0}
       bottom={0}
       left={0}
-      p={2}
       rowGap={4}
       alignItems="center"
       justifyContent="center"
