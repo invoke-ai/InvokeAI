@@ -15241,10 +15241,9 @@ export type components = {
             version: string;
             /**
              * Node Pack
-             * @description Whether or not this is a custom node
-             * @default null
+             * @description The node pack that this node belongs to, will be 'invokeai' for built-in nodes
              */
-            node_pack: string | null;
+            node_pack: string;
             /**
              * @description The node's classification
              * @default stable
