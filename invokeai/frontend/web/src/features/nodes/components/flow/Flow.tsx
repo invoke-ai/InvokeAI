@@ -8,10 +8,10 @@ import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
+  $addNodeCmdk,
   $cursorPos,
   $didUpdateEdge,
   $edgePendingUpdate,
-  $isAddNodePopoverOpen,
   $lastEdgeUpdateMouseEvent,
   $pendingConnection,
   $viewport,
@@ -281,7 +281,7 @@ export const Flow = memo(() => {
   const onEscapeHotkey = useCallback(() => {
     if (!$edgePendingUpdate.get()) {
       $pendingConnection.set(null);
-      $isAddNodePopoverOpen.set(false);
+      $addNodeCmdk.set(false);
       cancelConnection();
     }
   }, [cancelConnection]);
