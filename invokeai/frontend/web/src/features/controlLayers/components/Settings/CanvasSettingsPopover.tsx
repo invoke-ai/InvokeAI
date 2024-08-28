@@ -27,7 +27,7 @@ export const CanvasSettingsPopover = memo(() => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <IconButton aria-label={t('common.settingsLabel')} icon={<RiSettings4Fill />} />
+        <IconButton aria-label={t('common.settingsLabel')} icon={<RiSettings4Fill />} variant="ghost" />
       </PopoverTrigger>
       <PopoverContent>
         <PopoverArrow />
