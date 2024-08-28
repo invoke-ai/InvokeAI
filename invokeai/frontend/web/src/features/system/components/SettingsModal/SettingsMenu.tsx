@@ -25,12 +25,13 @@ import {
 } from 'react-icons/pi';
 import { RiDiscordFill, RiGithubFill, RiSettings4Line } from 'react-icons/ri';
 
-import SettingsModal from './SettingsModal';
+import { useSettingsModal } from './SettingsModal';
 import { SettingsUpsellMenuItem } from './SettingsUpsellMenuItem';
 const SettingsMenu = () => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
   useGlobalMenuClose(onClose);
+  const settingsModal = useSettingsModal();
 
   const isBugLinkEnabled = useFeatureStatus('bugLink');
   const isDiscordLinkEnabled = useFeatureStatus('discordLink');
@@ -75,11 +76,9 @@ const SettingsMenu = () => {
                 {t('common.hotkeysLabel')}
               </MenuItem>
             </HotkeysModal>
-            <SettingsModal>
-              <MenuItem as="button" icon={<PiToggleRightFill />}>
-                {t('common.settingsLabel')}
-              </MenuItem>
-            </SettingsModal>
+            <MenuItem onClick={settingsModal.setTrue} as="button" icon={<PiToggleRightFill />}>
+              {t('common.settingsLabel')}
+            </MenuItem>
           </MenuGroup>
           <MenuGroup title={t('accessibility.about')}>
             <AboutModal>
