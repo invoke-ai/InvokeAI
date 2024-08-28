@@ -51,7 +51,7 @@ export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
 export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
 export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
-type ClipEmbedModelConfig = S['CLIPEmbedDiffusersConfig'];
+export type ClipEmbedModelConfig = S['CLIPEmbedDiffusersConfig'];
 export type T5EncoderModelConfig = S['T5EncoderConfig'];
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = S['T5EncoderBnbQuantizedLlmInt8bConfig'];
 export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
@@ -80,6 +80,10 @@ export const isLoRAModelConfig = (config: AnyModelConfig): config is LoRAModelCo
 
 export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
   return config.type === 'vae';
+};
+
+export const isFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return config.type === 'vae' && config.base === 'flux';
 };
 
 export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {

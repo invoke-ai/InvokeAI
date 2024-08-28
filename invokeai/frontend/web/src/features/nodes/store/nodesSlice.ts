@@ -6,11 +6,13 @@ import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
   BooleanFieldValue,
+  CLIPEmbedModelFieldValue,
   ColorFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
   FieldValue,
   FloatFieldValue,
+  FluxVAEModelFieldValue,
   ImageFieldValue,
   IntegerFieldValue,
   IPAdapterModelFieldValue,
@@ -29,10 +31,12 @@ import type {
 import {
   zBoardFieldValue,
   zBooleanFieldValue,
+  zCLIPEmbedModelFieldValue,
   zColorFieldValue,
   zControlNetModelFieldValue,
   zEnumFieldValue,
   zFloatFieldValue,
+  zFluxVAEModelFieldValue,
   zImageFieldValue,
   zIntegerFieldValue,
   zIPAdapterModelFieldValue,
@@ -346,6 +350,12 @@ export const nodesSlice = createSlice({
     fieldT5EncoderValueChanged: (state, action: FieldValueAction<T5EncoderModelFieldValue>) => {
       fieldValueReducer(state, action, zT5EncoderModelFieldValue);
     },
+    fieldCLIPEmbedValueChanged: (state, action: FieldValueAction<CLIPEmbedModelFieldValue>) => {
+      fieldValueReducer(state, action, zCLIPEmbedModelFieldValue);
+    },
+    fieldFluxVAEModelValueChanged: (state, action: FieldValueAction<FluxVAEModelFieldValue>) => {
+      fieldValueReducer(state, action, zFluxVAEModelFieldValue);
+    },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
       fieldValueReducer(state, action, zEnumFieldValue);
     },
@@ -408,6 +418,8 @@ export const {
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
   fieldT5EncoderValueChanged,
+  fieldCLIPEmbedValueChanged,
+  fieldFluxVAEModelValueChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
@@ -521,6 +533,8 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
   fieldT5EncoderValueChanged,
+  fieldCLIPEmbedValueChanged,
+  fieldFluxVAEModelValueChanged,
   nodesChanged,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
