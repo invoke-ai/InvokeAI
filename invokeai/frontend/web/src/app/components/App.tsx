@@ -17,6 +17,8 @@ import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterM
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
+import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
+import SettingsModal from 'features/system/components/SettingsModal/SettingsModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
@@ -135,6 +137,8 @@ const App = ({
       <StylePresetModal />
       <ClearQueueConfirmationsAlertDialog />
       <PreselectedImage selectedImage={selectedImage} />
+      <SettingsModal />
+      <RefreshAfterResetModal />
     </ErrorBoundary>
   );
 };
