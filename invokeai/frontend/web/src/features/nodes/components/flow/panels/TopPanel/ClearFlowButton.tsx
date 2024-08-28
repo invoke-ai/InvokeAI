@@ -47,6 +47,7 @@ const ClearFlowButton = () => {
         onClose={onClose}
         title={t('nodes.clearWorkflow')}
         acceptCallback={handleNewWorkflow}
+        useInert={false}
       >
         <Flex flexDir="column" gap={2}>
           <Text>{t('nodes.clearWorkflowDesc')}</Text>
