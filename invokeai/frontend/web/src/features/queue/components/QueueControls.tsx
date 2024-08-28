@@ -3,20 +3,21 @@ import { ClearQueueIconButton } from 'features/queue/components/ClearQueueIconBu
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 
 import { InvokeQueueBackButton } from './InvokeQueueBackButton';
 import { QueueActionsMenuButton } from './QueueActionsMenuButton';
 
 const QueueControls = () => {
   const isPrependEnabled = useFeatureStatus('prependQueue');
+  const containerRef = useRef<HTMLDivElement>(null);
   return (
-    <Flex w="full" position="relative" borderRadius="base" gap={2} flexDir="column">
+    <Flex ref={containerRef} w="full" position="relative" borderRadius="base" gap={2} flexDir="column">
       <ButtonGroup size="lg" isAttached={false}>
         {isPrependEnabled && <QueueFrontButton />}
         <InvokeQueueBackButton />
         <Spacer />
-        <QueueActionsMenuButton />
+        <QueueActionsMenuButton containerRef={containerRef} />
         <ClearQueueIconButton />
       </ButtonGroup>
       <ProgressBar />
