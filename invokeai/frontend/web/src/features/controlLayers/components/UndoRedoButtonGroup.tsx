@@ -29,13 +29,14 @@ export const UndoRedoButtonGroup = memo(() => {
   ]);
 
   return (
-    <ButtonGroup>
+    <ButtonGroup isAttached={false}>
       <IconButton
         aria-label={t('unifiedCanvas.undo')}
         tooltip={t('unifiedCanvas.undo')}
         onClick={handleUndo}
         icon={<PiArrowCounterClockwiseBold />}
         isDisabled={!mayUndo}
+        variant="ghost"
       />
       <IconButton
         aria-label={t('unifiedCanvas.redo')}
@@ -43,6 +44,7 @@ export const UndoRedoButtonGroup = memo(() => {
         onClick={handleRedo}
         icon={<PiArrowClockwiseBold />}
         isDisabled={!mayRedo}
+        variant="ghost"
       />
     </ButtonGroup>
   );
