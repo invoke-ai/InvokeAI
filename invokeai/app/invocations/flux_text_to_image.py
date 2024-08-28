@@ -101,11 +101,6 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         bs, t5_seq_len, _ = t5_embeddings.shape
         txt_ids = torch.zeros(bs, t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device())
 
-        # HACK(ryand): Manually empty the cache. Currently we don't check the size of the model before loading it from
-        # disk. Since the transformer model is large (24GB), there's a good chance that it will OOM on 32GB RAM systems
-        # if the cache is not empty.
-        context.models._services.model_manager.load.ram_cache.make_room(24 * 2**30)
-
         with transformer_info as transformer:
             assert isinstance(transformer, Flux)
 
