@@ -28,6 +28,7 @@ describe('validateWorkflow', () => {
           isOpen: true,
           isIntermediate: true,
           useCache: true,
+          nodePack: 'invokeai',
           inputs: {
             model: {
               name: 'model',
@@ -56,6 +57,7 @@ describe('validateWorkflow', () => {
           isOpen: true,
           isIntermediate: true,
           useCache: true,
+          nodePack: 'invokeai',
           inputs: {
             board: {
               name: 'board',
