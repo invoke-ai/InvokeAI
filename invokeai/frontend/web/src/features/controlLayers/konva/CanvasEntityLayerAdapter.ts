@@ -112,12 +112,11 @@ export class CanvasEntityLayerAdapter extends CanvasModuleABC {
       this.renderer.updateOpacity(opacity);
     }
 
-    if (state.type === 'control_layer' && this.state.type === 'control_layer') {
-      if (this.isFirstRender || state.withTransparencyEffect !== this.state.withTransparencyEffect) {
+    if (state.type === 'control_layer' && prevState.type === 'control_layer') {
+      if (this.isFirstRender || state.withTransparencyEffect !== prevState.withTransparencyEffect) {
         this.renderer.updateTransparencyEffect(state.withTransparencyEffect);
       }
     }
-    // this.transformer.syncInteractionState();
 
     if (this.isFirstRender) {
       this.transformer.updateBbox();
