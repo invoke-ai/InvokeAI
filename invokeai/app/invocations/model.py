@@ -157,7 +157,7 @@ class FluxModelLoaderOutput(BaseInvocationOutput):
     title="Flux Main Model",
     tags=["model", "flux"],
     category="model",
-    version="1.0.3",
+    version="1.0.4",
     classification=Classification.Prototype,
 )
 class FluxModelLoaderInvocation(BaseInvocation):
