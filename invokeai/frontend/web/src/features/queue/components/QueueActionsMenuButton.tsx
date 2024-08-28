@@ -1,6 +1,5 @@
 import {
   Badge,
-  Box,
   IconButton,
   Menu,
   MenuButton,
@@ -18,13 +17,18 @@ import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
+import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPauseFill, PiPlayFill, PiTrashSimpleBold } from 'react-icons/pi';
 import { RiListCheck, RiPlayList2Fill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
-export const QueueActionsMenuButton = memo(() => {
+type Props = {
+  containerRef: RefObject<HTMLDivElement>;
+};
+
+export const QueueActionsMenuButton = memo(({ containerRef }: Props) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -54,14 +58,30 @@ export const QueueActionsMenuButton = memo(() => {
   }, [dispatch]);
 
   useEffect(() => {
-    if (menuButtonRef.current) {
-      const { x, y } = menuButtonRef.current.getBoundingClientRect();
-      setBadgePos({ x: x - 10, y: y - 10 });
+    if (!containerRef.current || !menuButtonRef.current) {
+      return;
     }
-  }, []);
+
+    const container = containerRef.current;
+    const menuButton = menuButtonRef.current;
+
+    const cb = () => {
+      const { x, y } = menuButton.getBoundingClientRect();
+      setBadgePos({ x: x - 10, y: y - 10 });
+    };
+
+    // // update badge position on resize
+    const resizeObserver = new ResizeObserver(cb);
+    resizeObserver.observe(container);
+    cb();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [containerRef]);
 
   return (
-    <Box pos="relative">
+    <>
       <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose} placement="bottom-end">
         <MenuButton ref={menuButtonRef} as={IconButton} aria-label="Queue Actions Menu" icon={<RiListCheck />} />
         <MenuList>
@@ -113,7 +133,7 @@ export const QueueActionsMenuButton = memo(() => {
           </Badge>
         </Portal>
       )}
-    </Box>
+    </>
   );
 });
 
