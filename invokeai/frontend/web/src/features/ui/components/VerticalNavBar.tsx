@@ -18,7 +18,7 @@ export const VerticalNavBar = memo(() => {
   const customNavComponent = useStore($customNavComponent);
 
   return (
-    <Flex flexDir="column" alignItems="center" pt={4} pb={2} gap={4}>
+    <Flex flexDir="column" alignItems="center" py={2} gap={4}>
       <InvokeAILogoComponent />
       <Flex gap={4} pt={6} h="full" flexDir="column">
         <TabMountGate tab="generation">
