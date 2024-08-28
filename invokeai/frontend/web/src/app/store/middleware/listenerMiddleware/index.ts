@@ -53,7 +53,6 @@ import type { AppDispatch, RootState } from 'app/store/store';
 
 import { addArchivedOrDeletedBoardListener } from './listeners/addArchivedOrDeletedBoardListener';
 import { addEnqueueRequestedUpscale } from './listeners/enqueueRequestedUpscale';
-import { addStylePresetSelectedListener } from './listeners/stylePresetSelected';
 
 export const listenerMiddleware = createListenerMiddleware();
 
@@ -123,9 +122,6 @@ addImageAddedToBoardFulfilledListener(startAppListening);
 addImageRemovedFromBoardFulfilledListener(startAppListening);
 addBoardIdSelectedListener(startAppListening);
 addArchivedOrDeletedBoardListener(startAppListening);
-
-// Style Presets
-addStylePresetSelectedListener(startAppListening);
 
 // Node schemas
 addGetOpenAPISchemaListener(startAppListening);

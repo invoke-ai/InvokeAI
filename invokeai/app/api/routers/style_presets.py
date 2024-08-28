@@ -55,18 +55,6 @@ async def get_style_preset(
         raise HTTPException(status_code=404, detail="Style preset not found")
 
 
-@style_presets_router.post(
-    "/i/{style_preset_id}",
-    operation_id="select_style_preset",
-)
-async def select_style_preset(
-    style_preset_id: str = Path(description="The style preset to select"),
-) -> None:
-    """Selects a style preset, this will be used for saving recently used style presets"""
-
-    return
-
-
 @style_presets_router.patch(
     "/i/{style_preset_id}",
     operation_id="update_style_preset",
