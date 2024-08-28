@@ -123,6 +123,7 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
         title={t('modelManager.deleteModel')}
         acceptCallback={handleModelDelete}
         acceptButtonText={t('modelManager.delete')}
+        useInert={false}
       >
         <Flex rowGap={4} flexDirection="column">
           <Text fontWeight="bold">{t('modelManager.deleteMsg1')}</Text>

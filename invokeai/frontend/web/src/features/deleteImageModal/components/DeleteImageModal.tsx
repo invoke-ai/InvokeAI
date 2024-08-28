@@ -81,6 +81,7 @@ const DeleteImageModal = () => {
       cancelButtonText={t('boards.cancel')}
       acceptButtonText={t('controlnet.delete')}
       acceptCallback={handleDelete}
+      useInert={false}
     >
       <Flex direction="column" gap={3}>
         <ImageUsageMessage imageUsage={imageUsageSummary} />

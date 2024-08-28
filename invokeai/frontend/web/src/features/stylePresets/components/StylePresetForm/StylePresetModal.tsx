@@ -67,7 +67,7 @@ export const StylePresetModal = () => {
   }, [stylePresetModalState.prefilledFormData]);
 
   return (
-    <Modal isOpen={stylePresetModalState.isModalOpen} onClose={handleCloseModal} isCentered size="2xl">
+    <Modal isOpen={stylePresetModalState.isModalOpen} onClose={handleCloseModal} isCentered size="2xl" useInert={false}>
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>{modalTitle}</ModalHeader>

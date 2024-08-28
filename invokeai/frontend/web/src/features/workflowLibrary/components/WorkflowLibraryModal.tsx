@@ -16,7 +16,7 @@ const WorkflowLibraryModal = () => {
   const { t } = useTranslation();
   const { isOpen, onClose } = useWorkflowLibraryModalContext();
   return (
-    <Modal isOpen={isOpen} onClose={onClose} isCentered>
+    <Modal isOpen={isOpen} onClose={onClose} isCentered useInert={false}>
       <ModalOverlay />
       <ModalContent w="80%" h="80%" minW="unset" minH="unset" maxW="1200px" maxH="664px">
         <ModalHeader>{t('workflows.workflowLibrary')}</ModalHeader>

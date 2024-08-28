@@ -70,7 +70,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
       {cloneElement(children, {
         onClick: onOpen,
       })}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false}>
         <ModalOverlay />
         <ModalContent maxH="80vh" h="80vh">
           <ModalHeader>{t('hotkeys.keyboardShortcuts')}</ModalHeader>

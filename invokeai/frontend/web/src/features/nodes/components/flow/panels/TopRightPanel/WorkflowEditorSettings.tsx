@@ -102,7 +102,7 @@ const WorkflowEditorSettings = ({ children }: Props) => {
     <>
       {children({ onOpen })}
 
-      <Modal isOpen={isOpen} onClose={onClose} size="2xl" isCentered>
+      <Modal isOpen={isOpen} onClose={onClose} size="2xl" isCentered useInert={false}>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>{t('nodes.workflowSettings')}</ModalHeader>

@@ -46,6 +46,7 @@ export const NewWorkflowConfirmationAlertDialog = memo((props: Props) => {
         onClose={onClose}
         title={t('nodes.newWorkflow')}
         acceptCallback={handleNewWorkflow}
+        useInert={false}
       >
         <Flex flexDir="column" gap={2}>
           <Text>{t('nodes.newWorkflowDesc')}</Text>
