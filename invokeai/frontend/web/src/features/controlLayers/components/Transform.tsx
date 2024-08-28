@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Flex, Heading } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import {
@@ -8,13 +8,7 @@ import {
 import { useEntityAdapter } from 'features/controlLayers/hooks/useEntityAdapter';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiArrowsCounterClockwiseBold,
-  PiCheckBold,
-  PiFlipHorizontalFill,
-  PiFlipVerticalFill,
-  PiXBold,
-} from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiCheckBold, PiXBold } from 'react-icons/pi';
 
 const TransformBox = memo(() => {
   const { t } = useTranslation();
@@ -38,33 +32,17 @@ const TransformBox = memo(() => {
       <Heading size="md" color="base.300" userSelect="none">
         {t('controlLayers.tool.transform')}
       </Heading>
-      <ButtonGroup isAttached={false} size="sm" justifyContent="center">
-        <Button
-          leftIcon={<PiFlipHorizontalFill />}
-          onClick={adapter.transformer.flipHorizontal}
-          isLoading={isProcessing}
-          loadingText={t('controlLayers.flipHorizontal')}
-        >
-          {t('controlLayers.flipHorizontal')}
-        </Button>
-        <Button
-          leftIcon={<PiFlipVerticalFill />}
-          onClick={adapter.transformer.flipVertical}
-          isLoading={isProcessing}
-          loadingText={t('controlLayers.flipVertical')}
-        >
-          {t('controlLayers.flipVertical')}
-        </Button>
+      <ButtonGroup isAttached={false} size="sm" w="full">
         <Button
           leftIcon={<PiArrowsCounterClockwiseBold />}
           onClick={adapter.transformer.resetTransform}
           isLoading={isProcessing}
           loadingText={t('controlLayers.reset')}
+          variant="ghost"
         >
           {t('accessibility.reset')}
         </Button>
-      </ButtonGroup>
-      <ButtonGroup isAttached={false} size="sm" alignSelf="self-end">
+        <Spacer />
         <Button
           leftIcon={<PiCheckBold />}
           onClick={adapter.transformer.applyTransform}

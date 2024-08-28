@@ -389,42 +389,43 @@ export class CanvasEntityTransformer extends CanvasModuleABC {
     this.parent.konva.layer.add(this.konva.transformer);
   }
 
-  flipHorizontal = () => {
-    if (!this.isTransforming || this.$isProcessing.get()) {
-      return;
-    }
+  // TODO(psyche): These don't work when the entity is rotated, need to do some math to offset the flip after rotation
+  // flipHorizontal = () => {
+  //   if (!this.isTransforming || this.$isProcessing.get()) {
+  //     return;
+  //   }
 
-    // Flipping horizontally = flipping across the vertical axis:
-    // - Flip by negating the x scale
-    // - Restore position by translating the rect rightwards by the width of the rect
-    const x = this.konva.proxyRect.x();
-    const width = this.konva.proxyRect.width();
-    const scaleX = this.konva.proxyRect.scaleX();
-    this.konva.proxyRect.setAttrs({
-      scaleX: -scaleX,
-      x: x + width * scaleX,
-    });
+  //   // Flipping horizontally = flipping across the vertical axis:
+  //   // - Flip by negating the x scale
+  //   // - Restore position by translating the rect rightwards by the width of the rect
+  //   const x = this.konva.proxyRect.x();
+  //   const width = this.konva.proxyRect.width();
+  //   const scaleX = this.konva.proxyRect.scaleX();
+  //   this.konva.proxyRect.setAttrs({
+  //     scaleX: -scaleX,
+  //     x: x + width * scaleX,
+  //   });
 
-    this.syncObjectGroupWithProxyRect();
-  };
+  //   this.syncObjectGroupWithProxyRect();
+  // };
 
-  flipVertical = () => {
-    if (!this.isTransforming || this.$isProcessing.get()) {
-      return;
-    }
+  // flipVertical = () => {
+  //   if (!this.isTransforming || this.$isProcessing.get()) {
+  //     return;
+  //   }
 
-    // Flipping vertically = flipping across the horizontal axis:
-    // - Flip by negating the y scale
-    // - Restore position by translating the rect downwards by the height of the rect
-    const y = this.konva.proxyRect.y();
-    const height = this.konva.proxyRect.height();
-    const scaleY = this.konva.proxyRect.scaleY();
-    this.konva.proxyRect.setAttrs({
-      scaleY: -scaleY,
-      y: y + height * scaleY,
-    });
-    this.syncObjectGroupWithProxyRect();
-  };
+  //   // Flipping vertically = flipping across the horizontal axis:
+  //   // - Flip by negating the y scale
+  //   // - Restore position by translating the rect downwards by the height of the rect
+  //   const y = this.konva.proxyRect.y();
+  //   const height = this.konva.proxyRect.height();
+  //   const scaleY = this.konva.proxyRect.scaleY();
+  //   this.konva.proxyRect.setAttrs({
+  //     scaleY: -scaleY,
+  //     y: y + height * scaleY,
+  //   });
+  //   this.syncObjectGroupWithProxyRect();
+  // };
 
   syncObjectGroupWithProxyRect = () => {
     this.parent.renderer.konva.objectGroup.setAttrs({
