@@ -35,7 +35,7 @@ export const RegionalGuidanceSettings = memo(() => {
       {flags.hasPositivePrompt && (
         <>
           <RegionalGuidancePositivePrompt />
-          {(!flags.hasNegativePrompt && flags.hasIPAdapters) && <Divider />}
+          {!flags.hasNegativePrompt && flags.hasIPAdapters && <Divider />}
         </>
       )}
       {flags.hasNegativePrompt && (
