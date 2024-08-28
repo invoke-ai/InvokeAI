@@ -18,7 +18,6 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
-  $addNodeCmdk,
   $cursorPos,
   $edgePendingUpdate,
   $pendingConnection,
@@ -175,20 +174,19 @@ export const AddNodeCmdk = memo(() => {
     setSearchTerm(e.target.value);
   }, []);
 
-  const onSelect = useCallback(
-    (value: string) => {
-      addNode(value);
-      $addNodeCmdk.set(false);
-      setSearchTerm('');
-    },
-    [addNode]
-  );
-
   const onClose = useCallback(() => {
     addNodeCmdk.setFalse();
     setSearchTerm('');
     $pendingConnection.set(null);
   }, [addNodeCmdk]);
+
+  const onSelect = useCallback(
+    (value: string) => {
+      addNode(value);
+      onClose();
+    },
+    [addNode, onClose]
+  );
 
   return (
     <Modal
