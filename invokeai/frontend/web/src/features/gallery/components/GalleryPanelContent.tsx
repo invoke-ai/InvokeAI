@@ -59,7 +59,7 @@ const GalleryPanelContent = () => {
   }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
   return (
-    <Flex ref={ref} position="relative" flexDirection="column" h="full" w="full" pt={2} tabIndex={-1}>
+    <Flex ref={ref} position="relative" flexDirection="column" h="full" w="full" tabIndex={-1}>
       <Flex alignItems="center" gap={0}>
         <GalleryHeader />
         <Flex alignItems="center" justifyContent="space-between" w="full">
