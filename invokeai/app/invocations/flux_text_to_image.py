@@ -58,13 +58,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        # Load the conditioning data.
-        cond_data = context.conditioning.load(self.positive_text_conditioning.conditioning_name)
-        assert len(cond_data.conditionings) == 1
-        flux_conditioning = cond_data.conditionings[0]
-        assert isinstance(flux_conditioning, FLUXConditioningInfo)
-
-        latents = self._run_diffusion(context, flux_conditioning.clip_embeds, flux_conditioning.t5_embeds)
+        latents = self._run_diffusion(context)
         image = self._run_vae_decoding(context, latents)
         image_dto = context.images.save(image=image)
         return ImageOutput.build(image_dto)
@@ -72,11 +66,19 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _run_diffusion(
         self,
         context: InvocationContext,
-        clip_embeddings: torch.Tensor,
-        t5_embeddings: torch.Tensor,
     ):
-        transformer_info = context.models.load(self.transformer.transformer)
         inference_dtype = torch.bfloat16
+
+        # Load the conditioning data.
+        cond_data = context.conditioning.load(self.positive_text_conditioning.conditioning_name)
+        assert len(cond_data.conditionings) == 1
+        flux_conditioning = cond_data.conditionings[0]
+        assert isinstance(flux_conditioning, FLUXConditioningInfo)
+        flux_conditioning = flux_conditioning.to(dtype=inference_dtype)
+        t5_embeddings = flux_conditioning.t5_embeds
+        clip_embeddings = flux_conditioning.clip_embeds
+
+        transformer_info = context.models.load(self.transformer.transformer)
 
         # Prepare input noise.
         x = get_noise(
@@ -88,13 +90,13 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             seed=self.seed,
         )
 
-        img, img_ids = prepare_latent_img_patches(x)
+        x, img_ids = prepare_latent_img_patches(x)
 
         is_schnell = "schnell" in transformer_info.config.config_path
 
         timesteps = get_schedule(
             num_steps=self.num_steps,
-            image_seq_len=img.shape[1],
+            image_seq_len=x.shape[1],
             shift=not is_schnell,
         )
 
@@ -135,7 +137,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
             x = denoise(
                 model=transformer,
-                img=img,
+                img=x,
                 img_ids=img_ids,
                 txt=t5_embeddings,
                 txt_ids=txt_ids,
