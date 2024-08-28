@@ -19,8 +19,6 @@ export const CanvasEditor = memo(() => {
     <Flex
       tabIndex={-1}
       ref={ref}
-      layerStyle="first"
-      p={2}
       borderRadius="base"
       position="relative"
       flexDirection="column"
