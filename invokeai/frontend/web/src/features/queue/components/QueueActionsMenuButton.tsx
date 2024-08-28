@@ -9,6 +9,7 @@ import {
   Portal,
   useDisclosure,
 } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppDispatch } from 'app/store/storeHooks';
 import type { Coordinate } from 'features/controlLayers/store/types';
 import { useClearQueueConfirmationAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
@@ -16,7 +17,7 @@ import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
 import { useResumeProcessor } from 'features/queue/hooks/useResumeProcessor';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { $isParametersPanelOpen, setActiveTab } from 'features/ui/store/uiSlice';
 import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +35,7 @@ export const QueueActionsMenuButton = memo(({ containerRef }: Props) => {
   const { t } = useTranslation();
   const [badgePos, setBadgePos] = useState<Coordinate | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const isParametersPanelOpen = useStore($isParametersPanelOpen);
   const dialogState = useClearQueueConfirmationAlertDialog();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
@@ -66,6 +68,9 @@ export const QueueActionsMenuButton = memo(({ containerRef }: Props) => {
     const menuButton = menuButtonRef.current;
 
     const cb = () => {
+      if (!$isParametersPanelOpen.get()) {
+        return;
+      }
       const { x, y } = menuButton.getBoundingClientRect();
       setBadgePos({ x: x - 10, y: y - 10 });
     };
@@ -120,7 +125,7 @@ export const QueueActionsMenuButton = memo(({ containerRef }: Props) => {
           </MenuItem>
         </MenuList>
       </Menu>
-      {queueSize > 0 && badgePos !== null && (
+      {queueSize > 0 && badgePos !== null && isParametersPanelOpen && (
         <Portal>
           <Badge
             pos="absolute"
