@@ -1737,6 +1737,7 @@
         "flipHorizontal": "Flip Horizontal",
         "flipVertical": "Flip Vertical",
         "fill": {
+            "fillColor": "Fill Color",
             "fillStyle": "Fill Style",
             "solid": "Solid",
             "grid": "Grid",
