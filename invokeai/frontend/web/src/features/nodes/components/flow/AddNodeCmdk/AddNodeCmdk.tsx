@@ -12,7 +12,7 @@ import {
   Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppStore } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { CommandEmpty, CommandItem, CommandList, CommandRoot } from 'cmdk';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
@@ -33,6 +33,7 @@ import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memoize } from 'lodash-es';
 import { computed } from 'nanostores';
 import type { ChangeEvent } from 'react';
@@ -166,9 +167,10 @@ export const AddNodeCmdk = memo(() => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const addNode = useAddNode();
+  const tab = useAppSelector(selectActiveTab);
   const throttledSearchTerm = useThrottle(searchTerm, 100);
 
-  useHotkeys(['shift+a', 'space'], addNodeCmdk.setTrue, { preventDefault: true });
+  useHotkeys(['shift+a', 'space'], addNodeCmdk.setTrue, { enabled: tab === 'workflows', preventDefault: true }, [tab]);
 
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
