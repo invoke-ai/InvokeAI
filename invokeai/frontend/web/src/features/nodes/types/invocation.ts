@@ -16,7 +16,7 @@ const zInvocationTemplate = z.object({
   outputType: z.string().min(1),
   version: zSemVer,
   useCache: z.boolean(),
-  nodePack: z.string().min(1).nullish(),
+  nodePack: z.string().min(1).default('invokeai'),
   classification: zClassification,
 });
 export type InvocationTemplate = z.infer<typeof zInvocationTemplate>;
@@ -26,7 +26,7 @@ export type InvocationTemplate = z.infer<typeof zInvocationTemplate>;
 export const zInvocationNodeData = z.object({
   id: z.string().trim().min(1),
   version: zSemVer,
-  nodePack: z.string().min(1).nullish(),
+  nodePack: z.string().min(1).default('invokeai'),
   label: z.string(),
   notes: z.string(),
   type: z.string().trim().min(1),

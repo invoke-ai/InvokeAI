@@ -85,6 +85,7 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
         isOpen: true,
         isIntermediate: node.is_intermediate ?? false,
         useCache: node.use_cache ?? true,
+        nodePack: template.nodePack,
         inputs,
       },
     });
