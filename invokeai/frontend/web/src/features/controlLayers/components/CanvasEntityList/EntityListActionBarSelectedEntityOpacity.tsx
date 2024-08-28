@@ -57,7 +57,7 @@ const marks = [
   mapOpacityToSliderValue(1),
 ];
 
-const sliderDefaultValue = mapOpacityToSliderValue(100);
+const sliderDefaultValue = mapOpacityToSliderValue(1);
 
 const snapCandidates = marks.slice(1, marks.length - 1);
 
