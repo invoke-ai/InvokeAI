@@ -23,7 +23,9 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.model_manager import LoadedModel
+from invokeai.backend.model_manager.config import BaseModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
 
@@ -52,7 +54,19 @@ class ImageToLatentsInvocation(BaseInvocation):
     fp32: bool = InputField(default=DEFAULT_PRECISION == torch.float32, description=FieldDescriptions.fp32)
 
     @staticmethod
-    def vae_encode(
+    def vae_encode_flux(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
+        # TODO(ryand): Expose seed parameter at the invocation level.
+        # TODO(ryand): Write a util function for generating random tensors that is consistent across devices / dtypes.
+        # There's a starting point in get_noise(...), but it needs to be extracted and generalized. This function
+        # should be used for VAE encode sampling.
+        generator = torch.Generator().manual_seed(0)
+        with vae_info as vae:
+            assert isinstance(vae, AutoEncoder)
+            latents = vae.encode(image_tensor, sample=True, generator=generator)
+            return latents
+
+    @staticmethod
+    def vae_encode_stable_diffusion(
         vae_info: LoadedModel, upcast: bool, tiled: bool, image_tensor: torch.Tensor, tile_size: int = 0
     ) -> torch.Tensor:
         with vae_info as vae:
@@ -106,6 +120,27 @@ class ImageToLatentsInvocation(BaseInvocation):
             latents = latents.to(dtype=orig_dtype)
 
         return latents
+
+    @staticmethod
+    def vae_encode(
+        vae_info: LoadedModel, upcast: bool, tiled: bool, image_tensor: torch.Tensor, tile_size: int = 0
+    ) -> torch.Tensor:
+        if vae_info.config.base == BaseModelType.Flux:
+            if upcast:
+                raise NotImplementedError("FLUX VAE encode does not currently support upcast=True.")
+            if tiled:
+                raise NotImplementedError("FLUX VAE encode does not currently support tiled=True.")
+            return ImageToLatentsInvocation.vae_encode_flux(vae_info=vae_info, image_tensor=image_tensor)
+        elif vae_info.config.base in [
+            BaseModelType.StableDiffusion1,
+            BaseModelType.StableDiffusion2,
+            BaseModelType.StableDiffusionXL,
+        ]:
+            return ImageToLatentsInvocation.vae_encode_stable_diffusion(
+                vae_info=vae_info, upcast=upcast, tiled=tiled, image_tensor=image_tensor, tile_size=tile_size
+            )
+        else:
+            raise ValueError(f"Unsupported VAE base type: '{vae_info.config.base}'")
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:

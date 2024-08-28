@@ -258,16 +258,17 @@ class Decoder(nn.Module):
 
 
 class DiagonalGaussian(nn.Module):
-    def __init__(self, sample: bool = True, chunk_dim: int = 1):
+    def __init__(self, chunk_dim: int = 1):
         super().__init__()
-        self.sample = sample
         self.chunk_dim = chunk_dim
 
-    def forward(self, z: Tensor) -> Tensor:
+    def forward(self, z: Tensor, sample: bool = True, generator: torch.Generator | None = None) -> Tensor:
         mean, logvar = torch.chunk(z, 2, dim=self.chunk_dim)
-        if self.sample:
+        if sample:
             std = torch.exp(0.5 * logvar)
-            return mean + std * torch.randn_like(mean)
+            # Unfortunately, torch.randn_like(...) does not accept a generator argument at the time of writing, so we
+            # have to use torch.randn(...) instead.
+            return mean + std * torch.randn(size=mean.size(), generator=generator, dtype=mean.dtype, device=mean.device)
         else:
             return mean
 
@@ -297,8 +298,21 @@ class AutoEncoder(nn.Module):
         self.scale_factor = params.scale_factor
         self.shift_factor = params.shift_factor
 
-    def encode(self, x: Tensor) -> Tensor:
-        z = self.reg(self.encoder(x))
+    def encode(self, x: Tensor, sample: bool = True, generator: torch.Generator | None = None) -> Tensor:
+        """Run VAE encoding on input tensor x.
+
+        Args:
+            x (Tensor): Input image tensor. Shape: (batch_size, in_channels, height, width).
+            sample (bool, optional): If True, sample from the encoded distribution, else, return the distribution mean.
+                Defaults to True.
+            generator (torch.Generator | None, optional): Optional random number generator for reproducibility.
+                Defaults to None.
+
+        Returns:
+            Tensor: Encoded latent tensor. Shape: (batch_size, z_channels, latent_height, latent_width).
+        """
+
+        z = self.reg(self.encoder(x), sample=sample, generator=generator)
         z = self.scale_factor * (z - self.shift_factor)
         return z
 
