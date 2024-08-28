@@ -1,6 +1,7 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
 import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig } from 'app/store/store';
+import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { workflowLoaded } from 'features/nodes/store/actions';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
@@ -443,14 +444,8 @@ export const $didUpdateEdge = atom(false);
 export const $lastEdgeUpdateMouseEvent = atom<MouseEvent | null>(null);
 
 export const $viewport = atom<Viewport>({ x: 0, y: 0, zoom: 1 });
-export const $isAddNodePopoverOpen = atom(false);
-export const closeAddNodePopover = () => {
-  $isAddNodePopoverOpen.set(false);
-  $pendingConnection.set(null);
-};
-export const openAddNodePopover = () => {
-  $isAddNodePopoverOpen.set(true);
-};
+export const $addNodeCmdk = atom(false);
+export const useAddNodeCmdk = buildUseBoolean($addNodeCmdk);
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateNodesState = (state: any): any => {
