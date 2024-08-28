@@ -68,7 +68,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
         objects: [imageObject],
       };
 
-      api.dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+      api.dispatch(rasterLayerAdded({ overrides, isSelected: false }));
       api.dispatch(sessionStagingAreaReset());
     },
   });
