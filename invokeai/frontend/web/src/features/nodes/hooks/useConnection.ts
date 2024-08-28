@@ -2,9 +2,9 @@ import { useStore } from '@nanostores/react';
 import { useAppStore } from 'app/store/storeHooks';
 import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import {
+  $addNodeCmdk,
   $didUpdateEdge,
   $edgePendingUpdate,
-  $isAddNodePopoverOpen,
   $pendingConnection,
   $templates,
   edgesChanged,
@@ -107,7 +107,7 @@ export const useConnection = () => {
       $pendingConnection.set(null);
     } else {
       // The mouse is not over a node - we should open the add node popover
-      $isAddNodePopoverOpen.set(true);
+      $addNodeCmdk.set(true);
     }
   }, [store, templates, updateNodeInternals]);
 
