@@ -22,6 +22,7 @@ export const ClearQueueConfirmationsAlertDialog = memo(() => {
       title={t('queue.clearTooltip')}
       acceptCallback={clearQueue}
       acceptButtonText={t('queue.clear')}
+      useInert={false}
     >
       <Text>{t('queue.clearQueueAlertDialog')}</Text>
       <br />

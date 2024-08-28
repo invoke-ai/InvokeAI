@@ -20,7 +20,7 @@ export const DynamicPromptsModal = memo(() => {
   const { isOpen, onClose } = useDynamicPromptsModal();
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} isCentered>
+    <Modal isOpen={isOpen} onClose={onClose} isCentered useInert={false}>
       <ModalOverlay />
       <ModalContent w="80vw" h="80vh" maxW="unset" maxH="unset">
         <ModalHeader>{t('dynamicPrompts.dynamicPrompts')}</ModalHeader>
