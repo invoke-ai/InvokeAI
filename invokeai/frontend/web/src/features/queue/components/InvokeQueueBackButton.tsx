@@ -25,7 +25,6 @@ export const InvokeQueueBackButton = memo(() => {
           isDisabled={isDisabled}
           rightIcon={<RiSparkling2Fill />}
           variant="solid"
-          zIndex={1}
           colorScheme="invokeYellow"
           size="lg"
           w="calc(100% - 60px)"
