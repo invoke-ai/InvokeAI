@@ -304,6 +304,11 @@ class ModelProbe(object):
         else:
             error_hint = f"class {class_name} is not one of the supported classes [{', '.join(cls.CLASS2TYPE.keys())}]"
 
+        if (folder_path / "tokenizer").exists() and (folder_path / "text_encoder").exists():
+            return ModelType.CLIPEmbed
+        if (folder_path / "tokenizer_2").exists() and (folder_path / "text_encoder_2").exists():
+            return ModelType.T5Encoder
+
         # give up
         raise InvalidModelConfigException(
             f"Unable to determine model type for {folder_path}" + (f"; {error_hint}" if error_hint else "")
@@ -747,6 +752,10 @@ class TextualInversionFolderProbe(FolderProbeBase):
 
 
 class T5EncoderFolderProbe(FolderProbeBase):
+
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Any
+
     def get_format(self) -> ModelFormat:
         return ModelFormat.T5Encoder
 
