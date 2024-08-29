@@ -39,7 +39,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Latents to Image",
     tags=["latents", "image", "vae", "l2i"],
     category="latents",
-    version="1.3.0",
+    version="1.4.0",
 )
 class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an image from latents."""

@@ -36,7 +36,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Image to Latents",
     tags=["latents", "image", "vae", "i2l"],
     category="latents",
-    version="1.1.0",
+    version="1.2.0",
 )
 class ImageToLatentsInvocation(BaseInvocation):
     """Encodes an image into latents."""

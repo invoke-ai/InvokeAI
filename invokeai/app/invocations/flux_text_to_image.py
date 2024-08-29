@@ -29,7 +29,7 @@ EPS = 1e-6
     title="FLUX Text to Image",
     tags=["image", "flux"],
     category="image",
-    version="1.0.0",
+    version="2.0.0",
     classification=Classification.Prototype,
 )
 class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
