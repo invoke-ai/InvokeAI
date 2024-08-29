@@ -23,7 +23,7 @@ export const CanvasEntityDeleteButton = memo(() => {
       alignSelf="stretch"
       icon={<PiTrashSimpleFill />}
       onClick={onClick}
-      colorScheme='error'
+      colorScheme="error"
     />
   );
 });

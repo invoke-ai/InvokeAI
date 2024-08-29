@@ -1,10 +1,11 @@
 import { IconButton, useShiftModifier } from '@invoke-ai/ui-library';
 import { QueueCountBadge } from 'features/queue/components/QueueCountBadge';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
-import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
+
+import { useClearQueue } from './ClearQueueConfirmationAlertDialog';
 
 export const ClearQueueIconButton = memo((_) => {
   const ref = useRef<HTMLDivElement>(null);
