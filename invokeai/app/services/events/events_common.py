@@ -88,7 +88,8 @@ class QueueItemEventBase(QueueEventBase):
 
     item_id: int = Field(description="The ID of the queue item")
     batch_id: str = Field(description="The ID of the queue batch")
-    origin: str | None = Field(default=None, description="The origin of the batch")
+    origin: str | None = Field(default=None, description="The origin of the queue item")
+    destination: str | None = Field(default=None, description="The destination of the queue item")
 
 
 class InvocationEventBase(QueueItemEventBase):
@@ -114,6 +115,7 @@ class InvocationStartedEvent(InvocationEventBase):
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
+            destination=queue_item.destination,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -148,6 +150,7 @@ class InvocationDenoiseProgressEvent(InvocationEventBase):
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
+            destination=queue_item.destination,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -186,6 +189,7 @@ class InvocationCompleteEvent(InvocationEventBase):
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
+            destination=queue_item.destination,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -219,6 +223,7 @@ class InvocationErrorEvent(InvocationEventBase):
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
+            destination=queue_item.destination,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -257,6 +262,7 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
+            destination=queue_item.destination,
             session_id=queue_item.session_id,
             status=queue_item.status,
             error_type=queue_item.error_type,
