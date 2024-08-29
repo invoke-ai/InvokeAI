@@ -98,9 +98,9 @@ export const StagingAreaToolbar = memo(() => {
     onPrev,
     {
       preventDefault: true,
-      enabled: isCanvasActive,
+      enabled: isCanvasActive && shouldShowStagedImage && imageCount > 1,
     },
-    [isCanvasActive]
+    [isCanvasActive, shouldShowStagedImage, imageCount]
   );
 
   useHotkeys(
@@ -108,9 +108,9 @@ export const StagingAreaToolbar = memo(() => {
     onNext,
     {
       preventDefault: true,
-      enabled: isCanvasActive,
+      enabled: isCanvasActive && shouldShowStagedImage && imageCount > 1,
     },
-    [isCanvasActive]
+    [isCanvasActive, shouldShowStagedImage, imageCount]
   );
 
   useHotkeys(
@@ -118,9 +118,9 @@ export const StagingAreaToolbar = memo(() => {
     onAccept,
     {
       preventDefault: true,
-      enabled: isCanvasActive,
+      enabled: isCanvasActive && shouldShowStagedImage && imageCount > 1,
     },
-    [isCanvasActive]
+    [isCanvasActive, shouldShowStagedImage, imageCount]
   );
 
   const counterText = useMemo(() => {
