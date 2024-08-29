@@ -119,7 +119,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     def _vae_decode_flux(self, vae_info: LoadedModel, latents: torch.Tensor) -> Image.Image:
         with vae_info as vae:
             assert isinstance(vae, AutoEncoder)
-            latents = latents.to(dtype=TorchDevice.choose_torch_dtype())
+            latents = latents.to(device=TorchDevice.choose_torch_device(), dtype=TorchDevice.choose_torch_dtype())
             img = vae.decode(latents)
 
         img = img.clamp(-1, 1)
