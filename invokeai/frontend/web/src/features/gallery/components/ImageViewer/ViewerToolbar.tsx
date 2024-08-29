@@ -7,7 +7,7 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 import CurrentImageButtons from './CurrentImageButtons';
-import { ViewerToggleMenu } from './ViewerToggleMenu';
+import { ViewerToggle } from './ViewerToggleMenu';
 
 const selectShowToggle = createSelector(selectActiveTab, (tab) => {
   if (tab === 'upscaling' || tab === 'workflows') {
@@ -31,7 +31,7 @@ export const ViewerToolbar = memo(() => {
       </Flex>
       <Flex flex={1} justifyContent="center">
         <Flex gap={2} marginInlineStart="auto">
-          {showToggle && <ViewerToggleMenu />}
+          {showToggle && <ViewerToggle />}
         </Flex>
       </Flex>
     </Flex>
