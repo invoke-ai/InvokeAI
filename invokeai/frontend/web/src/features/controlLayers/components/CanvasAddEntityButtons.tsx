@@ -34,19 +34,19 @@ export const CanvasAddEntityButtons = memo(() => {
     <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center">
       <ButtonGroup orientation="vertical" isAttached={false}>
         <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addInpaintMask}>
-          {t('controlLayers.inpaintMask', { count: 1 })}
+          {t('controlLayers.inpaintMask')}
         </Button>
         <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addRegionalGuidance}>
-          {t('controlLayers.regionalGuidance', { count: 1 })}
+          {t('controlLayers.regionalGuidance')}
         </Button>
         <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addRasterLayer}>
-          {t('controlLayers.rasterLayer', { count: 1 })}
+          {t('controlLayers.rasterLayer')}
         </Button>
         <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addControlLayer}>
-          {t('controlLayers.controlLayer', { count: 1 })}
+          {t('controlLayers.controlLayer')}
         </Button>
         <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addIPAdapter}>
-          {t('controlLayers.ipAdapter', { count: 1 })}
+          {t('controlLayers.ipAdapter')}
         </Button>
       </ButtonGroup>
     </Flex>

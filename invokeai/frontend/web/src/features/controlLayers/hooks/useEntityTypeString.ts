@@ -8,15 +8,15 @@ export const useEntityTypeString = (type: CanvasEntityIdentifier['type']): strin
   const typeString = useMemo(() => {
     switch (type) {
       case 'control_layer':
-        return t('controlLayers.controlLayer', { count: 0 });
+        return t('controlLayers.controlLayer');
       case 'raster_layer':
-        return t('controlLayers.rasterLayer', { count: 0 });
+        return t('controlLayers.rasterLayer');
       case 'inpaint_mask':
-        return t('controlLayers.inpaintMask', { count: 0 });
+        return t('controlLayers.inpaintMask');
       case 'regional_guidance':
-        return t('controlLayers.regionalGuidance', { count: 0 });
+        return t('controlLayers.regionalGuidance');
       case 'ip_adapter':
-        return t('controlLayers.ipAdapter', { count: 0 });
+        return t('controlLayers.ipAdapter');
       default:
         return '';
     }
