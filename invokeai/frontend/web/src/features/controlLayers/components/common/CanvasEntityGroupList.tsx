@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Collapse, Flex, Icon, Spacer, Text } from '@invoke-ai/ui-library';
 import { useBoolean } from 'common/hooks/useBoolean';
+import { CanvasEntityAddOfTypeButton } from 'features/controlLayers/components/common/CanvasEntityAddOfTypeButton';
 import { CanvasEntityTypeIsHiddenToggle } from 'features/controlLayers/components/common/CanvasEntityTypeIsHiddenToggle';
 import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTitle';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
@@ -53,6 +54,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
           </Text>
           <Spacer />
         </Flex>
+        <CanvasEntityAddOfTypeButton type={type} />
         {type !== 'ip_adapter' && <CanvasEntityTypeIsHiddenToggle type={type} />}
       </Flex>
       <Collapse in={collapse.isTrue}>
