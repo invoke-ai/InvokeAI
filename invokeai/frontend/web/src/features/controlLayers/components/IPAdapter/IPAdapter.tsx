@@ -1,7 +1,7 @@
 import { Spacer } from '@invoke-ai/ui-library';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
-import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
+import { CanvasEntityHeaderCommonActions } from 'features/controlLayers/components/common/CanvasEntityHeaderCommonActions';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { IPAdapterSettings } from 'features/controlLayers/components/IPAdapter/IPAdapterSettings';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
@@ -18,10 +18,10 @@ export const IPAdapter = memo(({ id }: Props) => {
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <CanvasEntityContainer>
-        <CanvasEntityHeader ps={4}>
+        <CanvasEntityHeader ps={4} py={5}>
           <CanvasEntityEditableTitle />
           <Spacer />
-          <CanvasEntityEnabledToggle />
+          <CanvasEntityHeaderCommonActions />
         </CanvasEntityHeader>
         <IPAdapterSettings />
       </CanvasEntityContainer>
