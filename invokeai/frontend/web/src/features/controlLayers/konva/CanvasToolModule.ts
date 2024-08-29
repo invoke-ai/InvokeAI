@@ -864,6 +864,10 @@ export class CanvasToolModule extends CanvasModuleABC {
       this.manager.stateApi.$spaceKey.set(true);
       this.manager.stateApi.$lastCursorPos.set(null);
       this.manager.stateApi.$lastMouseDownPos.set(null);
+    } else if (e.key === 'Alt') {
+      // Select the color picker on alt key down
+      this.manager.stateApi.$toolBuffer.set(this.manager.stateApi.$tool.get());
+      this.manager.stateApi.$tool.set('colorPicker');
     }
   };
 
@@ -880,6 +884,11 @@ export class CanvasToolModule extends CanvasModuleABC {
       this.manager.stateApi.$tool.set(toolBuffer ?? 'move');
       this.manager.stateApi.$toolBuffer.set(null);
       this.manager.stateApi.$spaceKey.set(false);
+    } else if (e.key === 'Alt') {
+      // Revert the tool to the previous tool on alt key up
+      const toolBuffer = this.manager.stateApi.$toolBuffer.get();
+      this.manager.stateApi.$tool.set(toolBuffer ?? 'move');
+      this.manager.stateApi.$toolBuffer.set(null);
     }
   };
 
