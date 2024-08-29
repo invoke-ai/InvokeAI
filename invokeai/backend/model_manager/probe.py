@@ -752,7 +752,6 @@ class TextualInversionFolderProbe(FolderProbeBase):
 
 
 class T5EncoderFolderProbe(FolderProbeBase):
-
     def get_base_type(self) -> BaseModelType:
         return BaseModelType.Any
 
