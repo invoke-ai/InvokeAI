@@ -1,10 +1,11 @@
 import { ButtonGroup, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { memo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold, PiPencilBold } from 'react-icons/pi';
 
-export const ViewerToggleMenu = () => {
+export const ViewerToggle = memo(() => {
   const { t } = useTranslation();
   const imageViewer = useImageViewer();
   useHotkeys('z', imageViewer.onToggle, [imageViewer]);
@@ -52,4 +53,6 @@ export const ViewerToggleMenu = () => {
       </ButtonGroup>
     </Flex>
   );
-};
+});
+
+ViewerToggle.displayName = 'ViewerToggle';
