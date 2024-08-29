@@ -12,7 +12,7 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
-from invokeai.app.invocations.model import TransformerField, VAEField
+from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -51,10 +51,6 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.flux_model,
         input=Input.Connection,
         title="Transformer",
-    )
-    vae: VAEField = InputField(
-        description=FieldDescriptions.vae,
-        input=Input.Connection,
     )
     positive_text_conditioning: FluxConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
