@@ -10,7 +10,7 @@ import { ToolSettings } from 'features/controlLayers/components/Tool/ToolSetting
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasUndoRedo } from 'features/controlLayers/hooks/useCanvasUndoRedo';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
-import { ViewerToggleMenu } from 'features/gallery/components/ImageViewer/ViewerToggleMenu';
+import { ViewerToggle } from 'features/gallery/components/ImageViewer/ViewerToggleMenu';
 import { memo } from 'react';
 
 export const ControlLayersToolbar = memo(() => {
@@ -30,7 +30,7 @@ export const ControlLayersToolbar = memo(() => {
         <ToolFillColorPicker />
         <CanvasModeSwitcher />
         <CanvasSettingsPopover />
-        <ViewerToggleMenu />
+        <ViewerToggle />
       </Flex>
     </CanvasManagerProviderGate>
   );
