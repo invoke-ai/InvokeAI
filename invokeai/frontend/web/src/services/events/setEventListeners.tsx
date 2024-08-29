@@ -131,7 +131,7 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
       }
     }
 
-    if (origin === 'canvas' && destination === 'canvas') {
+    if (origin === 'generation' && destination === 'canvas') {
       $lastCanvasProgressEvent.set(data);
     }
   });
