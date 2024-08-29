@@ -1681,9 +1681,14 @@ export type components = {
             batch_id?: string;
             /**
              * Origin
-             * @description The origin of this batch.
+             * @description The origin of this queue item. This data is used by the frontend to determine how to handle results.
              */
             origin?: string | null;
+            /**
+             * Destination
+             * @description The origin of this queue item. This data is used by the frontend to determine how to handle results
+             */
+            destination?: string | null;
             /**
              * Data
              * @description The batch data collection.
@@ -1777,6 +1782,11 @@ export type components = {
              * @description The origin of the batch
              */
             origin: string | null;
+            /**
+             * Destination
+             * @description The destination of the batch
+             */
+            destination: string | null;
             /**
              * Pending
              * @description Number of queue items with status 'pending'
@@ -8857,10 +8867,16 @@ export type components = {
             batch_id: string;
             /**
              * Origin
-             * @description The origin of the batch
+             * @description The origin of the queue item
              * @default null
              */
             origin: string | null;
+            /**
+             * Destination
+             * @description The destination of the queue item
+             * @default null
+             */
+            destination: string | null;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -8909,10 +8925,16 @@ export type components = {
             batch_id: string;
             /**
              * Origin
-             * @description The origin of the batch
+             * @description The origin of the queue item
              * @default null
              */
             origin: string | null;
+            /**
+             * Destination
+             * @description The destination of the queue item
+             * @default null
+             */
+            destination: string | null;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -8978,10 +9000,16 @@ export type components = {
             batch_id: string;
             /**
              * Origin
-             * @description The origin of the batch
+             * @description The origin of the queue item
              * @default null
              */
             origin: string | null;
+            /**
+             * Destination
+             * @description The destination of the queue item
+             * @default null
+             */
+            destination: string | null;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -9205,10 +9233,16 @@ export type components = {
             batch_id: string;
             /**
              * Origin
-             * @description The origin of the batch
+             * @description The origin of the queue item
              * @default null
              */
             origin: string | null;
+            /**
+             * Destination
+             * @description The destination of the queue item
+             * @default null
+             */
+            destination: string | null;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -12279,10 +12313,16 @@ export type components = {
             batch_id: string;
             /**
              * Origin
-             * @description The origin of the batch
+             * @description The origin of the queue item
              * @default null
              */
             origin: string | null;
+            /**
+             * Destination
+             * @description The destination of the queue item
+             * @default null
+             */
+            destination: string | null;
             /**
              * Status
              * @description The new status of the queue item
@@ -13641,9 +13681,14 @@ export type components = {
             batch_id: string;
             /**
              * Origin
-             * @description The origin of this queue item.
+             * @description The origin of this queue item. This data is used by the frontend to determine how to handle results.
              */
             origin?: string | null;
+            /**
+             * Destination
+             * @description The origin of this queue item. This data is used by the frontend to determine how to handle results
+             */
+            destination?: string | null;
             /**
              * Session Id
              * @description The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed.
@@ -13726,9 +13771,14 @@ export type components = {
             batch_id: string;
             /**
              * Origin
-             * @description The origin of this queue item.
+             * @description The origin of this queue item. This data is used by the frontend to determine how to handle results.
              */
             origin?: string | null;
+            /**
+             * Destination
+             * @description The origin of this queue item. This data is used by the frontend to determine how to handle results
+             */
+            destination?: string | null;
             /**
              * Session Id
              * @description The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed.
