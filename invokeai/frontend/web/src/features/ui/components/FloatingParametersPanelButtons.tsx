@@ -1,8 +1,8 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { ButtonGroup, Flex, Icon, IconButton, Portal, spinAnimation } from '@invoke-ai/ui-library';
 import CancelCurrentQueueItemIconButton from 'features/queue/components/CancelCurrentQueueItemIconButton';
+import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { QueueButtonTooltip } from 'features/queue/components/QueueButtonTooltip';
-import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo, useMemo } from 'react';
