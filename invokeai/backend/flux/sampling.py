@@ -91,7 +91,7 @@ def get_schedule(
 
     # shifting the schedule to favor high timesteps for higher signal images
     if shift:
-        # eastimate mu based on linear estimation between two points
+        # estimate mu based on linear estimation between two points
         mu = get_lin_function(y1=base_shift, y2=max_shift)(image_seq_len)
         timesteps = time_shift(mu, 1.0, timesteps)
 

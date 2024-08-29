@@ -28,6 +28,7 @@ from invokeai.backend.model_manager import LoadedModel
 from invokeai.backend.model_manager.config import BaseModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -59,9 +60,12 @@ class ImageToLatentsInvocation(BaseInvocation):
         # TODO(ryand): Write a util function for generating random tensors that is consistent across devices / dtypes.
         # There's a starting point in get_noise(...), but it needs to be extracted and generalized. This function
         # should be used for VAE encode sampling.
-        generator = torch.Generator().manual_seed(0)
+        generator = torch.Generator(device=TorchDevice.choose_torch_device()).manual_seed(0)
         with vae_info as vae:
             assert isinstance(vae, AutoEncoder)
+            image_tensor = image_tensor.to(
+                device=TorchDevice.choose_torch_device(), dtype=TorchDevice.choose_torch_dtype()
+            )
             latents = vae.encode(image_tensor, sample=True, generator=generator)
             return latents
 
