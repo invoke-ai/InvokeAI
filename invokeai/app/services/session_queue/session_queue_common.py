@@ -77,7 +77,14 @@ BatchDataCollection: TypeAlias = list[list[BatchDatum]]
 
 class Batch(BaseModel):
     batch_id: str = Field(default_factory=uuid_string, description="The ID of the batch")
-    origin: str | None = Field(default=None, description="The origin of this batch.")
+    origin: str | None = Field(
+        default=None,
+        description="The origin of this queue item. This data is used by the frontend to determine how to handle results.",
+    )
+    destination: str | None = Field(
+        default=None,
+        description="The origin of this queue item. This data is used by the frontend to determine how to handle results",
+    )
     data: Optional[BatchDataCollection] = Field(default=None, description="The batch data collection.")
     graph: Graph = Field(description="The graph to initialize the session with")
     workflow: Optional[WorkflowWithoutID] = Field(
@@ -196,7 +203,14 @@ class SessionQueueItemWithoutGraph(BaseModel):
     status: QUEUE_ITEM_STATUS = Field(default="pending", description="The status of this queue item")
     priority: int = Field(default=0, description="The priority of this queue item")
     batch_id: str = Field(description="The ID of the batch associated with this queue item")
-    origin: str | None = Field(default=None, description="The origin of this queue item. ")
+    origin: str | None = Field(
+        default=None,
+        description="The origin of this queue item. This data is used by the frontend to determine how to handle results.",
+    )
+    destination: str | None = Field(
+        default=None,
+        description="The origin of this queue item. This data is used by the frontend to determine how to handle results",
+    )
     session_id: str = Field(
         description="The ID of the session associated with this queue item. The session doesn't exist in graph_executions until the queue item is executed."
     )
@@ -297,6 +311,7 @@ class BatchStatus(BaseModel):
     queue_id: str = Field(..., description="The ID of the queue")
     batch_id: str = Field(..., description="The ID of the batch")
     origin: str | None = Field(..., description="The origin of the batch")
+    destination: str | None = Field(..., description="The destination of the batch")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
     completed: int = Field(..., description="Number of queue items with status 'complete'")
@@ -443,6 +458,7 @@ class SessionQueueValueToInsert(NamedTuple):
     priority: int  # priority
     workflow: Optional[str]  # workflow json
     origin: str | None
+    destination: str | None
 
 
 ValuesToInsert: TypeAlias = list[SessionQueueValueToInsert]
@@ -464,6 +480,7 @@ def prepare_values_to_insert(queue_id: str, batch: Batch, priority: int, max_new
                 priority,  # priority
                 json.dumps(workflow, default=to_jsonable_python) if workflow else None,  # workflow (json)
                 batch.origin,  # origin
+                batch.destination,  # destination
             )
         )
     return values_to_insert

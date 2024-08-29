@@ -10,9 +10,11 @@ class Migration15Callback:
     def _add_origin_col(self, cursor: sqlite3.Cursor) -> None:
         """
         - Adds `origin` column to the session queue table.
+        - Adds `destination` column to the session queue table.
         """
 
         cursor.execute("ALTER TABLE session_queue ADD COLUMN origin TEXT;")
+        cursor.execute("ALTER TABLE session_queue ADD COLUMN destination TEXT;")
 
 
 def build_migration_15() -> Migration:
@@ -21,6 +23,7 @@ def build_migration_15() -> Migration:
 
     This migration does the following:
         - Adds `origin` column to the session queue table.
+        - Adds `destination` column to the session queue table.
     """
     migration_15 = Migration(
         from_version=14,
