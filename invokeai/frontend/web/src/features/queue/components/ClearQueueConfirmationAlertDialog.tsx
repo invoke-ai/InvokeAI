@@ -1,26 +1,75 @@
 import { ConfirmationAlertDialog, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { $isConnected } from 'app/hooks/useSocketIO';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
-import { useClearQueue } from 'features/queue/hooks/useClearQueue';
+import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
+import { toast } from 'features/toast/toast';
 import { atom } from 'nanostores';
-import { memo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useClearQueueMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 const $boolean = atom(false);
-export const useClearQueueConfirmationAlertDialog = buildUseBoolean($boolean);
+const useClearQueueConfirmationAlertDialog = buildUseBoolean($boolean);
+
+export const useClearQueue = () => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const dialog = useClearQueueConfirmationAlertDialog();
+  const isOpen = useStore(dialog.$boolean);
+  const { data: queueStatus } = useGetQueueStatusQuery();
+  const isConnected = useStore($isConnected);
+  const [trigger, { isLoading }] = useClearQueueMutation({
+    fixedCacheKey: 'clearQueue',
+  });
+
+  const clearQueue = useCallback(async () => {
+    if (!queueStatus?.queue.total) {
+      return;
+    }
+
+    try {
+      await trigger().unwrap();
+      toast({
+        id: 'QUEUE_CLEAR_SUCCEEDED',
+        title: t('queue.clearSucceeded'),
+        status: 'success',
+      });
+      dispatch(listCursorChanged(undefined));
+      dispatch(listPriorityChanged(undefined));
+    } catch {
+      toast({
+        id: 'QUEUE_CLEAR_FAILED',
+        title: t('queue.clearFailed'),
+        status: 'error',
+      });
+    }
+  }, [queueStatus?.queue.total, trigger, dispatch, t]);
+
+  const isDisabled = useMemo(() => !isConnected || !queueStatus?.queue.total, [isConnected, queueStatus?.queue.total]);
+
+  return {
+    clearQueue,
+    isOpen,
+    openDialog: dialog.setTrue,
+    closeDialog: dialog.setFalse,
+    isLoading,
+    queueStatus,
+    isDisabled,
+  };
+};
 
 export const ClearQueueConfirmationsAlertDialog = memo(() => {
   const { t } = useTranslation();
-  const dialogState = useClearQueueConfirmationAlertDialog();
-  const isOpen = useStore(dialogState.$boolean);
-  const { clearQueue } = useClearQueue();
+  const clearQueue = useClearQueue();
 
   return (
     <ConfirmationAlertDialog
-      isOpen={isOpen}
-      onClose={dialogState.setFalse}
+      isOpen={clearQueue.isOpen}
+      onClose={clearQueue.closeDialog}
       title={t('queue.clearTooltip')}
-      acceptCallback={clearQueue}
+      acceptCallback={clearQueue.clearQueue}
       acceptButtonText={t('queue.clear')}
       useInert={false}
     >
