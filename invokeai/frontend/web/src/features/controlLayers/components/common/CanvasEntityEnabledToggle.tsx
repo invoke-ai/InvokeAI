@@ -21,7 +21,8 @@ export const CanvasEntityEnabledToggle = memo(() => {
       size="sm"
       aria-label={t(isEnabled ? 'common.enabled' : 'common.disabled')}
       tooltip={t(isEnabled ? 'common.enabled' : 'common.disabled')}
-      variant="ghost"
+      variant="link"
+      alignSelf="stretch"
       icon={isEnabled ? <PiCircleFill /> : <PiCircleBold />}
       onClick={onClick}
     />
