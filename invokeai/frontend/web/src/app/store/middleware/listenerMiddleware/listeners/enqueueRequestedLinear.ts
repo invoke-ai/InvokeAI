@@ -31,7 +31,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       let didStartStaging = false;
 
-      if (!state.canvasSession.isStaging && state.canvasSession.mode === 'compose') {
+      if (!state.canvasSession.isStaging && state.canvasSession.sendToCanvas) {
         dispatch(sessionStartedStaging());
         didStartStaging = true;
       }
@@ -70,7 +70,11 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       const { g, noise, posCond } = buildGraphResult.value;
 
-      const prepareBatchResult = withResult(() => prepareLinearUIBatch(state, g, prepend, noise, posCond));
+      const destination = state.canvasSession.sendToCanvas ? 'canvas' : 'gallery';
+
+      const prepareBatchResult = withResult(() =>
+        prepareLinearUIBatch(state, g, prepend, noise, posCond, 'generation', destination)
+      );
 
       if (isErr(prepareBatchResult)) {
         log.error({ error: serializeError(prepareBatchResult.error) }, 'Failed to prepare batch');

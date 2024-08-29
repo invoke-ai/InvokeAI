@@ -15,7 +15,7 @@ export const InvokeQueueBackButton = memo(() => {
   const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
 
   return (
-    <Flex pos="relative" flexGrow={1} minW="240px">
+    <Flex pos="relative" w="192px">
       <QueueIterationsNumberInput />
       <QueueButtonTooltip>
         <Button

@@ -1,17 +1,17 @@
 import { createAction, createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { canvasSlice } from 'features/controlLayers/store/canvasSlice';
-import type { SessionMode, StagingAreaImage } from 'features/controlLayers/store/types';
+import type { StagingAreaImage } from 'features/controlLayers/store/types';
 
 export type CanvasSessionState = {
-  mode: SessionMode;
+  sendToCanvas: boolean;
   isStaging: boolean;
   stagedImages: StagingAreaImage[];
   selectedStagedImageIndex: number;
 };
 
 const initialState: CanvasSessionState = {
-  mode: 'generate',
+  sendToCanvas: false,
   isStaging: false,
   stagedImages: [],
   selectedStagedImageIndex: 0,
@@ -27,6 +27,7 @@ export const canvasSessionSlice = createSlice({
     },
     sessionImageStaged: (state, action: PayloadAction<{ stagingAreaImage: StagingAreaImage }>) => {
       const { stagingAreaImage } = action.payload;
+      state.isStaging = true;
       state.stagedImages.push(stagingAreaImage);
       state.selectedStagedImageIndex = state.stagedImages.length - 1;
     },
@@ -50,9 +51,8 @@ export const canvasSessionSlice = createSlice({
       state.stagedImages = [];
       state.selectedStagedImageIndex = 0;
     },
-    sessionModeChanged: (state, action: PayloadAction<{ mode: SessionMode }>) => {
-      const { mode } = action.payload;
-      state.mode = mode;
+    sessionSendToCanvasChanged: (state, action: PayloadAction<boolean>) => {
+      state.sendToCanvas = action.payload;
     },
   },
 });
@@ -64,7 +64,7 @@ export const {
   sessionStagingAreaReset,
   sessionNextStagedImageSelected,
   sessionPrevStagedImageSelected,
-  sessionModeChanged,
+  sessionSendToCanvasChanged,
 } = canvasSessionSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -85,3 +85,7 @@ export const sessionStagingAreaImageAccepted = createAction<{ index: number }>(
 export const selectCanvasSessionSlice = (s: RootState) => s.canvasSession;
 
 export const selectIsStaging = createSelector(selectCanvasSessionSlice, (canvasSession) => canvasSession.isStaging);
+export const selectIsComposing = createSelector(
+  selectCanvasSessionSlice,
+  (canvasSession) => canvasSession.sendToCanvas
+);

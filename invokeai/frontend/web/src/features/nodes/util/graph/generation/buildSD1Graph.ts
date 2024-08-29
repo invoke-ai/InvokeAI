@@ -282,7 +282,7 @@ export const buildSD1Graph = async (
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  const shouldSaveToGallery = canvasSession.mode === 'generate' || canvasSettings.autoSave;
+  const shouldSaveToGallery = !canvasSession.sendToCanvas || canvasSettings.autoSave;
 
   g.updateNode(canvasOutput, {
     id: getPrefixedId('canvas_output'),

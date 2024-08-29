@@ -4,7 +4,8 @@ export const COLUMN_WIDTHS = {
   statusDot: 2,
   time: '4rem',
   origin: '5rem',
+  destination: '6rem',
   batchId: '5rem',
   fieldValues: 'auto',
   actions: 'auto',
-};
+} as const;
