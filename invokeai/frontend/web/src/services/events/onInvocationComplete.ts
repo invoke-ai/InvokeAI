@@ -154,7 +154,7 @@ export const buildOnInvocationComplete = (
     // Update the node execution states - the image output is handled below
     if (data.origin === 'workflows') {
       await handleOriginWorkflows(data);
-    } else if (data.origin === 'canvas') {
+    } else if (data.origin === 'generation') {
       await handleOriginCanvas(data);
     } else {
       await handleOriginOther(data);
