@@ -685,8 +685,6 @@ export type StagingAreaImage = {
   offsetY: number;
 };
 
-export type SessionMode = 'generate' | 'compose';
-
 export type CanvasState = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
