@@ -1,13 +1,13 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { ButtonGroup, Flex, Icon, IconButton, Portal, spinAnimation } from '@invoke-ai/ui-library';
 import CancelCurrentQueueItemIconButton from 'features/queue/components/CancelCurrentQueueItemIconButton';
-import { ClearAllQueueIconButton } from 'features/queue/components/ClearQueueIconButton';
 import { QueueButtonTooltip } from 'features/queue/components/QueueButtonTooltip';
+import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCircleNotchBold, PiSlidersHorizontalBold } from 'react-icons/pi';
+import { PiCircleNotchBold, PiSlidersHorizontalBold, PiTrashSimpleBold } from 'react-icons/pi';
 import { RiSparklingFill } from 'react-icons/ri';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
@@ -23,6 +23,7 @@ type Props = {
 const FloatingSidePanelButtons = (props: Props) => {
   const { t } = useTranslation();
   const { queueBack, isLoading, isDisabled } = useQueueBack();
+  const clearQueue = useClearQueue();
   const { data: queueStatus } = useGetQueueStatusQuery();
 
   const queueButtonIcon = useMemo(() => {
@@ -71,7 +72,17 @@ const FloatingSidePanelButtons = (props: Props) => {
           </QueueButtonTooltip>
           <CancelCurrentQueueItemIconButton sx={floatingButtonStyles} />
         </ButtonGroup>
-        <ClearAllQueueIconButton sx={floatingButtonStyles} />
+        <IconButton
+          isDisabled={clearQueue.isDisabled}
+          isLoading={clearQueue.isLoading}
+          aria-label={t('queue.clear')}
+          tooltip={t('queue.clearTooltip')}
+          icon={<PiTrashSimpleBold />}
+          colorScheme="error"
+          onClick={clearQueue.openDialog}
+          data-testid={t('queue.clear')}
+          sx={floatingButtonStyles}
+        />
       </Flex>
     </Portal>
   );
