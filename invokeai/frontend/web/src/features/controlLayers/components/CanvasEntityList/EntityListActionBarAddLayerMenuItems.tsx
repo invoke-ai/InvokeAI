@@ -33,19 +33,19 @@ export const CanvasEntityListMenuItems = memo(() => {
   return (
     <>
       <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask}>
-        {t('controlLayers.inpaintMask', { count: 1 })}
+        {t('controlLayers.inpaintMask')}
       </MenuItem>
       <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance}>
-        {t('controlLayers.regionalGuidance', { count: 1 })}
+        {t('controlLayers.regionalGuidance')}
       </MenuItem>
       <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>
-        {t('controlLayers.rasterLayer', { count: 1 })}
+        {t('controlLayers.rasterLayer')}
       </MenuItem>
       <MenuItem icon={<PiPlusBold />} onClick={addControlLayer}>
-        {t('controlLayers.controlLayer', { count: 1 })}
+        {t('controlLayers.controlLayer')}
       </MenuItem>
       <MenuItem icon={<PiPlusBold />} onClick={addIPAdapter}>
-        {t('controlLayers.ipAdapter', { count: 1 })}
+        {t('controlLayers.ipAdapter')}
       </MenuItem>
     </>
   );
