@@ -96,8 +96,17 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
   });
 
   socket.on('invocation_denoise_progress', (data) => {
-    const { invocation_source_id, invocation, step, total_steps, progress_image, origin, destination, percentage, session_id } =
-      data;
+    const {
+      invocation_source_id,
+      invocation,
+      step,
+      total_steps,
+      progress_image,
+      origin,
+      destination,
+      percentage,
+      session_id,
+    } = data;
 
     if (cancellations.has(session_id)) {
       // Do not update the progress if this session has been cancelled. This prevents a race condition where we get a

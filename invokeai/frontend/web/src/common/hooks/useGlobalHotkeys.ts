@@ -1,7 +1,7 @@
 import { useAppDispatch } from 'app/store/storeHooks';
 import { addScope, removeScope, setScopes } from 'common/hooks/interactionScopes';
+import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
-import { useClearQueue } from 'features/queue/hooks/useClearQueue';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import { useQueueFront } from 'features/queue/hooks/useQueueFront';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
