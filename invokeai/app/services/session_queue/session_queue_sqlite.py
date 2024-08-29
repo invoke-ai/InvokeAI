@@ -128,8 +128,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
             self.__cursor.executemany(
                 """--sql
-                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values_to_insert,
             )
@@ -579,7 +579,8 @@ class SqliteSessionQueue(SessionQueueBase):
                     session_id,
                     batch_id,
                     queue_id,
-                    origin
+                    origin,
+                    destination
                 FROM session_queue
                 WHERE queue_id = ?
             """
@@ -659,7 +660,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.acquire()
             self.__cursor.execute(
                 """--sql
-                SELECT status, count(*), origin
+                SELECT status, count(*), origin, destination
                 FROM session_queue
                 WHERE
                   queue_id = ?
@@ -672,6 +673,7 @@ class SqliteSessionQueue(SessionQueueBase):
             total = sum(row[1] for row in result)
             counts: dict[str, int] = {row[0]: row[1] for row in result}
             origin = result[0]["origin"] if result else None
+            destination = result[0]["destination"] if result else None
         except Exception:
             self.__conn.rollback()
             raise
@@ -681,6 +683,7 @@ class SqliteSessionQueue(SessionQueueBase):
         return BatchStatus(
             batch_id=batch_id,
             origin=origin,
+            destination=destination,
             queue_id=queue_id,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
