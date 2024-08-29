@@ -1679,6 +1679,7 @@
         "deletePrompt": "Delete Prompt",
         "resetRegion": "Reset Region",
         "debugLayers": "Debug Layers",
+        "showHUD": "Show HUD",
         "rectangle": "Rectangle",
         "maskFill": "Mask Fill",
         "addPositivePrompt": "Add $t(common.positivePrompt)",

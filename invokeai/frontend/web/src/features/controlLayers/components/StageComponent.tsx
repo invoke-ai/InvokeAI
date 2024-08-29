@@ -48,9 +48,11 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null) 
 };
 
 const selectDynamicGrid = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.dynamicGrid);
+const selectShowHUD = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.showHUD);
 
 export const StageComponent = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
+  const showHUD = useAppSelector(selectShowHUD);
 
   const [stage] = useState(
     () =>
@@ -99,9 +101,11 @@ export const StageComponent = memo(() => {
         overflow="hidden"
         data-testid="control-layers-canvas"
       />
-      <Flex position="absolute" top={1} insetInlineStart={1} pointerEvents="none">
-        <HeadsUpDisplay />
-      </Flex>
+      {showHUD && (
+        <Flex position="absolute" top={1} insetInlineStart={1} pointerEvents="none">
+          <HeadsUpDisplay />
+        </Flex>
+      )}
     </Flex>
   );
 });
