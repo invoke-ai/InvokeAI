@@ -8,20 +8,18 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import Konva from 'konva';
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
-import { v4 as uuidv4 } from 'uuid';
 
 const log = logger('canvas');
-
-const showHud = false;
 
 // This will log warnings when layers > 5 - maybe use `import.meta.env.MODE === 'development'` instead?
 Konva.showWarnings = false;
 
-const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, asPreview: boolean) => {
+const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null) => {
   const store = useAppStore();
   const socket = useStore($socket);
   const dpr = useDevicePixelRatio({ round: false });
@@ -42,28 +40,23 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null, 
     const manager = new CanvasManager(stage, container, store, socket);
     manager.initialize();
     return manager.destroy;
-  }, [asPreview, container, socket, stage, store]);
+  }, [container, socket, stage, store]);
 
   useLayoutEffect(() => {
     Konva.pixelRatio = dpr;
   }, [dpr]);
 };
 
-type Props = {
-  asPreview?: boolean;
-};
-
 const selectDynamicGrid = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.dynamicGrid);
 
-export const StageComponent = memo(({ asPreview = false }: Props) => {
+export const StageComponent = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
 
   const [stage] = useState(
     () =>
       new Konva.Stage({
-        id: uuidv4(),
+        id: getPrefixedId('konva_stage'),
         container: document.createElement('div'),
-        listening: !asPreview,
       })
   );
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
@@ -72,7 +65,7 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
     setContainer(el);
   }, []);
 
-  useStageRenderer(stage, container, asPreview);
+  useStageRenderer(stage, container);
 
   useEffect(
     () => () => {
@@ -106,11 +99,9 @@ export const StageComponent = memo(({ asPreview = false }: Props) => {
         overflow="hidden"
         data-testid="control-layers-canvas"
       />
-      {!asPreview && (
-        <Flex position="absolute" top={0} insetInlineStart={0} pointerEvents="none">
-          {showHud && <HeadsUpDisplay />}
-        </Flex>
-      )}
+      <Flex position="absolute" top={1} insetInlineStart={1} pointerEvents="none">
+        <HeadsUpDisplay />
+      </Flex>
     </Flex>
   );
 });
