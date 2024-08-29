@@ -1,6 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
 import { Flex, Spacer } from '@invoke-ai/ui-library';
-import { CanvasModeSwitcher } from 'features/controlLayers/components/CanvasModeSwitcher';
 import { CanvasResetViewButton } from 'features/controlLayers/components/CanvasResetViewButton';
 import { CanvasScale } from 'features/controlLayers/components/CanvasScale';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
@@ -28,7 +27,6 @@ export const ControlLayersToolbar = memo(() => {
         <CanvasResetViewButton />
         <Spacer />
         <ToolFillColorPicker />
-        <CanvasModeSwitcher />
         <CanvasSettingsPopover />
         <ViewerToggle />
       </Flex>

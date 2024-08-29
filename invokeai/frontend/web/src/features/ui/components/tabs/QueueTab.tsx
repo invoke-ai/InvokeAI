@@ -4,7 +4,7 @@ import { memo } from 'react';
 
 const QueueTab = () => {
   return (
-    <Flex w="full" h="full">
+    <Flex layerStyle="body" w="full" h="full">
       <QueueTabContent />
     </Flex>
   );

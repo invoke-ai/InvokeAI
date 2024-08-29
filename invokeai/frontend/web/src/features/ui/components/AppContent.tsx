@@ -1,4 +1,4 @@
-import { Flex } from '@invoke-ai/ui-library';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
@@ -7,6 +7,7 @@ import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import { useIsImageViewerOpen } from 'features/gallery/components/ImageViewer/useImageViewer';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
+import QueueControls from 'features/queue/components/QueueControls';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
@@ -89,8 +90,14 @@ export const AppContent = memo(() => {
 
   const galleryPanel = usePanel(galleryPanelUsePanelOptions);
 
-  useHotkeys('g', galleryPanel.toggle, [galleryPanel.toggle]);
-  useHotkeys(['t', 'o'], optionsPanel.toggle, [optionsPanel.toggle]);
+  useHotkeys('g', galleryPanel.toggle, { enabled: shouldShowGalleryPanel }, [
+    galleryPanel.toggle,
+    shouldShowGalleryPanel,
+  ]);
+  useHotkeys(['t', 'o'], optionsPanel.toggle, { enabled: shouldShowOptionsPanel }, [
+    optionsPanel.toggle,
+    shouldShowOptionsPanel,
+  ]);
   useHotkeys(
     'shift+r',
     () => {
@@ -133,21 +140,26 @@ export const AppContent = memo(() => {
           storage={panelStorage}
         >
           <Panel order={0} collapsible style={panelStyles} {...optionsPanel.panelProps}>
-            <TabMountGate tab="generation">
-              <TabVisibilityGate tab="generation">
-                <ParametersPanelTextToImage />
-              </TabVisibilityGate>
-            </TabMountGate>
-            <TabMountGate tab="upscaling">
-              <TabVisibilityGate tab="upscaling">
-                <ParametersPanelUpscale />
-              </TabVisibilityGate>
-            </TabMountGate>
-            <TabMountGate tab="workflows">
-              <TabVisibilityGate tab="workflows">
-                <NodeEditorPanelGroup />
-              </TabVisibilityGate>
-            </TabMountGate>
+            <Flex flexDir="column" w="full" h="full" gap={2}>
+              <QueueControls />
+              <Box position="relative" w="full" h="full">
+                <TabMountGate tab="generation">
+                  <TabVisibilityGate tab="generation">
+                    <ParametersPanelTextToImage />
+                  </TabVisibilityGate>
+                </TabMountGate>
+                <TabMountGate tab="upscaling">
+                  <TabVisibilityGate tab="upscaling">
+                    <ParametersPanelUpscale />
+                  </TabVisibilityGate>
+                </TabMountGate>
+                <TabMountGate tab="workflows">
+                  <TabVisibilityGate tab="workflows">
+                    <NodeEditorPanelGroup />
+                  </TabVisibilityGate>
+                </TabMountGate>
+              </Box>
+            </Flex>
           </Panel>
           <ResizeHandle id="options-main-handle" orientation="vertical" {...optionsPanel.resizeHandleProps} />
           <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>

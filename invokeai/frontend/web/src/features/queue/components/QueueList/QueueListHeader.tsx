@@ -25,6 +25,9 @@ const QueueListHeader = () => {
       <Flex ps={0.5} w={COLUMN_WIDTHS.origin} alignItems="center">
         <Text variant="subtext">{t('queue.origin')}</Text>
       </Flex>
+      <Flex ps={0.5} w={COLUMN_WIDTHS.destination} alignItems="center">
+        <Text variant="subtext">{t('queue.destination')}</Text>
+      </Flex>
       <Flex ps={0.5} w={COLUMN_WIDTHS.time} alignItems="center">
         <Text variant="subtext">{t('queue.time')}</Text>
       </Flex>
