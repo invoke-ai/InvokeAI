@@ -31,8 +31,8 @@ export const CanvasAddEntityButtons = memo(() => {
   }, [dispatch]);
 
   return (
-    <Flex flexDir="column" w="full" h="full" alignItems="center" justifyContent="center">
-      <ButtonGroup orientation="vertical" isAttached={false}>
+    <Flex flexDir="column" w="full" h="full" alignItems="center">
+      <ButtonGroup position="relative" orientation="vertical" isAttached={false} top="20%">
         <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addInpaintMask}>
           {t('controlLayers.inpaintMask')}
         </Button>
