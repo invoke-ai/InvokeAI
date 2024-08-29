@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { $isConnected } from 'app/hooks/useSocketIO';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useClearQueueConfirmationAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
@@ -10,6 +11,7 @@ import { useClearQueueMutation, useGetQueueStatusQuery } from 'services/api/endp
 export const useClearQueue = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const dialog = useClearQueueConfirmationAlertDialog();
   const { data: queueStatus } = useGetQueueStatusQuery();
   const isConnected = useStore($isConnected);
   const [trigger, { isLoading }] = useClearQueueMutation({
@@ -41,5 +43,5 @@ export const useClearQueue = () => {
 
   const isDisabled = useMemo(() => !isConnected || !queueStatus?.queue.total, [isConnected, queueStatus?.queue.total]);
 
-  return { clearQueue, isLoading, queueStatus, isDisabled };
+  return { clearQueue, openDialog: dialog.setTrue, isLoading, queueStatus, isDisabled };
 };

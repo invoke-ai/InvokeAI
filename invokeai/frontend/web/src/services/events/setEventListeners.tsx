@@ -96,7 +96,7 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
   });
 
   socket.on('invocation_denoise_progress', (data) => {
-    const { invocation_source_id, invocation, step, total_steps, progress_image, origin, percentage, session_id } =
+    const { invocation_source_id, invocation, step, total_steps, progress_image, origin, destination, percentage, session_id } =
       data;
 
     if (cancellations.has(session_id)) {
@@ -122,7 +122,7 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
       }
     }
 
-    if (origin === 'canvas') {
+    if (origin === 'canvas' && destination === 'canvas') {
       $lastCanvasProgressEvent.set(data);
     }
   });

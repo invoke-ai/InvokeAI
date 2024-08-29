@@ -32,6 +32,7 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
           workflow: builtWorkflow,
           runs: state.params.iterations,
           origin: 'workflows',
+          destination: 'gallery',
         },
         prepend: action.payload.prepend,
       };

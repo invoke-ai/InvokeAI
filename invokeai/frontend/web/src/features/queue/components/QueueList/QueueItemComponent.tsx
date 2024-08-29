@@ -1,6 +1,7 @@
 import type { ChakraProps, CollapseProps } from '@invoke-ai/ui-library';
 import { ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
+import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
@@ -52,6 +53,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
 
   const isCanceled = useMemo(() => ['canceled', 'completed', 'failed'].includes(item.status), [item.status]);
   const originText = useOriginText(item.origin);
+  const destinationText = useDestinationText(item.destination);
 
   const icon = useMemo(() => <PiXBold />, []);
   return (
@@ -74,6 +76,11 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
         <Flex w={COLUMN_WIDTHS.origin} flexShrink={0}>
           <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
             {originText}
+          </Text>
+        </Flex>
+        <Flex w={COLUMN_WIDTHS.destination} flexShrink={0}>
+          <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
+            {destinationText}
           </Text>
         </Flex>
         <Flex w={COLUMN_WIDTHS.time} alignItems="center" flexShrink={0}>
