@@ -3,7 +3,6 @@ import 'reactflow/dist/style.css';
 import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowMode } from 'features/nodes/store/workflowSlice';
-import QueueControls from 'features/queue/components/QueueControls';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
@@ -34,7 +33,6 @@ const NodeEditorPanelGroup = () => {
 
   return (
     <Flex w="full" h="full" gap={2} flexDir="column">
-      <QueueControls />
       <Flex w="full" justifyContent="space-between" alignItems="center" gap="4" padding={1}>
         <Flex justifyContent="space-between" alignItems="center" gap="4">
           <WorkflowLibraryButton />

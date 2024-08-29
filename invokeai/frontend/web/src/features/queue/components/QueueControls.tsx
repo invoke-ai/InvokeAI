@@ -1,25 +1,27 @@
-import { ButtonGroup, Flex, Spacer } from '@invoke-ai/ui-library';
+import { Flex, Spacer } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasSendToToggle } from 'features/controlLayers/components/CanvasSendToToggle';
 import { ClearQueueIconButton } from 'features/queue/components/ClearQueueIconButton';
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { memo, useRef } from 'react';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { memo } from 'react';
 
 import { InvokeQueueBackButton } from './InvokeQueueBackButton';
-import { QueueActionsMenuButton } from './QueueActionsMenuButton';
 
 const QueueControls = () => {
   const isPrependEnabled = useFeatureStatus('prependQueue');
-  const containerRef = useRef<HTMLDivElement>(null);
+  const tab = useAppSelector(selectActiveTab);
   return (
-    <Flex ref={containerRef} w="full" position="relative" borderRadius="base" gap={2} flexDir="column">
-      <ButtonGroup size="lg" isAttached={false}>
+    <Flex w="full" position="relative" borderRadius="base" gap={2} flexDir="column">
+      <Flex gap={2}>
         {isPrependEnabled && <QueueFrontButton />}
         <InvokeQueueBackButton />
         <Spacer />
-        <QueueActionsMenuButton containerRef={containerRef} />
+        {tab === 'generation' && <CanvasSendToToggle />}
         <ClearQueueIconButton />
-      </ButtonGroup>
+      </Flex>
       <ProgressBar />
     </Flex>
   );

@@ -13,7 +13,7 @@ import { getCategories, getListImagesUrl } from 'services/api/util';
 
 const log = logger('events');
 
-const isCanvasOutput = (data: S['InvocationCompleteEvent']) => {
+const isCanvasOutputNode = (data: S['InvocationCompleteEvent']) => {
   return data.invocation_source_id.split(':')[0] === 'canvas_output';
 };
 
@@ -114,25 +114,19 @@ export const buildOnInvocationComplete = (
   };
 
   const handleOriginCanvas = async (data: S['InvocationCompleteEvent']) => {
-    const session = getState().canvasSession;
-
     const imageDTO = await getResultImageDTO(data);
 
     if (!imageDTO) {
       return;
     }
 
-    if (session.mode === 'compose') {
-      if (session.isStaging && isCanvasOutput(data)) {
+    if (data.destination === 'canvas') {
+      if (isCanvasOutputNode(data)) {
         if (data.result.type === 'canvas_v2_mask_and_crop_output') {
           const { offset_x, offset_y } = data.result;
-          if (session.isStaging) {
-            dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
-          }
+          dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
         } else if (data.result.type === 'image_output') {
-          if (session.isStaging) {
-            dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
-          }
+          dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
         }
       }
     } else {

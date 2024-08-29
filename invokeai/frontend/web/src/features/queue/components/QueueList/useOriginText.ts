@@ -4,13 +4,13 @@ import type { SessionQueueItemDTO } from 'services/api/types';
 export const useOriginText = (origin: SessionQueueItemDTO['origin']) => {
   const { t } = useTranslation();
 
-  if (origin === 'canvas') {
-    return t('queue.originCanvas');
+  if (origin === 'generation') {
+    return t('queue.generation');
   }
 
   if (origin === 'workflows') {
-    return t('queue.originWorkflows');
+    return t('queue.workflows');
   }
 
-  return t('queue.originOther');
+  return t('queue.other');
 };

@@ -10,7 +10,9 @@ export const prepareLinearUIBatch = (
   g: Graph,
   prepend: boolean,
   noise: Invocation<'noise'>,
-  posCond: Invocation<'compel' | 'sdxl_compel_prompt'>
+  posCond: Invocation<'compel' | 'sdxl_compel_prompt'>,
+  origin: 'generation' | 'workflows' | 'upscaling',
+  destination: 'canvas' | 'gallery'
 ): BatchConfig => {
   const { iterations, model, shouldRandomizeSeed, seed, shouldConcatPrompts } = state.params;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
@@ -103,7 +105,8 @@ export const prepareLinearUIBatch = (
       graph: g.getGraph(),
       runs: 1,
       data,
-      origin: 'canvas',
+      origin,
+      destination,
     },
   };
 

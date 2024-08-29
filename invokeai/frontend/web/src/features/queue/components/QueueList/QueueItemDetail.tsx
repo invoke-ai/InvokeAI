@@ -1,5 +1,6 @@
 import { Button, ButtonGroup, Flex, Heading, Spinner, Text } from '@invoke-ai/ui-library';
 import DataViewer from 'features/gallery/components/ImageMetadataViewer/DataViewer';
+import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
 import { useCancelBatch } from 'features/queue/hooks/useCancelBatch';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
@@ -17,7 +18,7 @@ type Props = {
 };
 
 const QueueItemComponent = ({ queueItemDTO }: Props) => {
-  const { session_id, batch_id, item_id, origin } = queueItemDTO;
+  const { session_id, batch_id, item_id, origin, destination } = queueItemDTO;
   const { t } = useTranslation();
   const { cancelBatch, isLoading: isLoadingCancelBatch, isCanceled } = useCancelBatch(batch_id);
 
@@ -26,6 +27,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
   const { data: queueItem } = useGetQueueItemQuery(item_id);
 
   const originText = useOriginText(origin);
+  const destinationText = useDestinationText(destination);
 
   const statusAndTiming = useMemo(() => {
     if (!queueItem) {
@@ -54,6 +56,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
       >
         <QueueItemData label={t('queue.status')} data={statusAndTiming} />
         <QueueItemData label={t('queue.origin')} data={originText} />
+        <QueueItemData label={t('queue.destination')} data={destinationText} />
         <QueueItemData label={t('queue.item')} data={item_id} />
         <QueueItemData label={t('queue.batch')} data={batch_id} />
         <QueueItemData label={t('queue.session')} data={session_id} />

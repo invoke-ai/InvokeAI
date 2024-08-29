@@ -8,7 +8,6 @@ import { selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { selectEntityCount } from 'features/controlLayers/store/selectors';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
-import QueueControls from 'features/queue/components/QueueControls';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
@@ -64,7 +63,6 @@ const ParametersPanelTextToImage = () => {
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
-      <QueueControls />
       <StylePresetMenuTrigger />
       <Flex w="full" h="full" position="relative">
         <Box position="absolute" top={0} left={0} right={0} bottom={0} ref={ref}>
