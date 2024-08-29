@@ -18,6 +18,7 @@ import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/compo
 import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsResetButton } from 'features/controlLayers/components/Settings/CanvasSettingsResetButton';
+import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RiSettings4Fill } from 'react-icons/ri';
@@ -37,6 +38,7 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsInvertScrollCheckbox />
             <CanvasSettingsClipToBboxCheckbox />
             <CanvasSettingsDynamicGridSwitch />
+            <CanvasSettingsShowHUDSwitch />
             <CanvasSettingsResetButton />
             <DebugSettings />
           </Flex>
