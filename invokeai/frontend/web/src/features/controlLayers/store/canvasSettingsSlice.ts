@@ -35,10 +35,14 @@ export const canvasSettingsSlice = createSlice({
     settingsAutoSaveToggled: (state) => {
       state.autoSave = !state.autoSave;
     },
+    settingsShowHUDToggled: (state) => {
+      state.showHUD = !state.showHUD;
+    },
   },
 });
 
-export const { clipToBboxChanged, settingsAutoSaveToggled, settingsDynamicGridToggled } = canvasSettingsSlice.actions;
+export const { clipToBboxChanged, settingsAutoSaveToggled, settingsDynamicGridToggled, settingsShowHUDToggled } =
+  canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {
