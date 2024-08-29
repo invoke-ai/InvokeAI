@@ -1,9 +1,12 @@
 from typing import Optional
 
 import torch
+import torchvision.transforms as tv_transforms
+from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
+    DenoiseMaskField,
     FieldDescriptions,
     FluxConditioningField,
     Input,
@@ -16,8 +19,15 @@ from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux.denoise import denoise
 from invokeai.backend.flux.model import Flux
-from invokeai.backend.flux.sampling import denoise, get_noise, get_schedule, prepare_latent_img_patches, unpack
+from invokeai.backend.flux.sampling_utils import (
+    generate_img_ids,
+    get_noise,
+    get_schedule,
+    pack,
+    unpack,
+)
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 
@@ -39,6 +49,11 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     latents: Optional[LatentsField] = InputField(
         default=None,
         description=FieldDescriptions.latents,
+        input=Input.Connection,
+    )
+    denoise_mask: Optional[DenoiseMaskField] = InputField(
+        default=None,
+        description=FieldDescriptions.denoise_mask,
         input=Input.Connection,
     )
     denoising_start: float = InputField(
@@ -95,7 +110,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             init_latents = init_latents.to(device=TorchDevice.choose_torch_device(), dtype=inference_dtype)
 
         # Prepare input noise.
-        x = get_noise(
+        noise = get_noise(
             num_samples=1,
             height=self.height,
             width=self.width,
@@ -107,14 +122,16 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         transformer_info = context.models.load(self.transformer.transformer)
         is_schnell = "schnell" in transformer_info.config.config_path
 
+        image_seq_len = noise.shape[-1] * noise.shape[-2] // 4
         timesteps = get_schedule(
             num_steps=self.num_steps,
-            image_seq_len=x.shape[1],
+            image_seq_len=image_seq_len,
             shift=not is_schnell,
         )
 
-        # Prepare inputs for image-to-image case.
+        # Prepare input latent image.
         if self.denoising_start > EPS:
+            # If denoising_start > 0, we are doing image-to-image.
             if init_latents is None:
                 raise ValueError("latents must be provided if denoising_start > 0.")
 
@@ -125,12 +142,33 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
             # Noise the orig_latents by the appropriate amount for the first timestep.
             t_0 = timesteps[0]
-            x = t_0 * x + (1.0 - t_0) * init_latents
+            x = t_0 * noise + (1.0 - t_0) * init_latents
+        else:
+            # We are not doing image-to-image, so we are starting from noise.
+            x = noise
 
-        x, img_ids = prepare_latent_img_patches(x)
+        # Prepare inpaint mask.
+        inpaint_mask = self._prep_inpaint_mask(context, x)
+        if inpaint_mask is not None:
+            assert init_latents is not None
+            # Expand the inpaint mask to the same shape as the init_latents so that when we pack inpaint_mask it lines
+            # up with the init_latents.
+            inpaint_mask = inpaint_mask.expand_as(init_latents)
+
+        b, _c, h, w = x.shape
+        img_ids = generate_img_ids(h=h, w=w, batch_size=b, device=x.device, dtype=x.dtype)
 
         bs, t5_seq_len, _ = t5_embeddings.shape
         txt_ids = torch.zeros(bs, t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device())
+
+        # Pack all latent tensors.
+        init_latents = pack(init_latents) if init_latents is not None else None
+        inpaint_mask = pack(inpaint_mask) if inpaint_mask is not None else None
+        noise = pack(noise)
+        x = pack(x)
+
+        # Verify that we calculated the image_seq_len correctly.
+        assert image_seq_len == x.shape[1]
 
         with transformer_info as transformer:
             assert isinstance(transformer, Flux)
@@ -174,8 +212,33 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 timesteps=timesteps,
                 step_callback=step_callback,
                 guidance=self.guidance,
+                init_latents=init_latents,
+                noise=noise,
+                inpaint_mask=inpaint_mask,
             )
 
         x = unpack(x.float(), self.height, self.width)
 
         return x
+
+    def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
+        """Prepare the inpaint mask.
+
+        Loads the mask, resizes if necessary, casts to same device/dtype as latents.
+
+        Returns:
+            tuple[torch.Tensor | None, bool]: (mask, is_gradient_mask)
+        """
+        if self.denoise_mask is None:
+            return None
+
+        mask = context.tensors.load(self.denoise_mask.mask_name)
+        _, _, latent_height, latent_width = latents.shape
+        mask = tv_resize(
+            img=mask,
+            size=[latent_height, latent_width],
+            interpolation=tv_transforms.InterpolationMode.BILINEAR,
+            antialias=False,
+        )
+        mask = mask.to(device=latents.device, dtype=latents.dtype)
+        return mask
