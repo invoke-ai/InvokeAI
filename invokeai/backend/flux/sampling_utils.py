@@ -5,7 +5,6 @@ from typing import Callable
 
 import torch
 from einops import rearrange, repeat
-from torch import Tensor
 
 
 def get_noise(
@@ -31,7 +30,7 @@ def get_noise(
     ).to(device=device, dtype=dtype)
 
 
-def time_shift(mu: float, sigma: float, t: Tensor):
+def time_shift(mu: float, sigma: float, t: torch.Tensor) -> torch.Tensor:
     return math.exp(mu) / (math.exp(mu) + (1 / t - 1) ** sigma)
 
 
@@ -60,7 +59,8 @@ def get_schedule(
     return timesteps.tolist()
 
 
-def unpack(x: Tensor, height: int, width: int) -> Tensor:
+def unpack(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
+    """Unpack flat array of patch embeddings to latent image."""
     return rearrange(
         x,
         "b (h w) (c ph pw) -> b c (h ph) (w pw)",
@@ -71,39 +71,27 @@ def unpack(x: Tensor, height: int, width: int) -> Tensor:
     )
 
 
-def pack(x: Tensor) -> Tensor:
+def pack(x: torch.Tensor) -> torch.Tensor:
+    """Pack latent image to flattented array of patch embeddings."""
     # Pixel unshuffle with a scale of 2, and flatten the height/width dimensions to get an array of patches.
     return rearrange(x, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
 
 
-def generate_img_ids(h: int, w: int, batch_size: int, device: torch.device, dtype: torch.dtype) -> Tensor:
+def generate_img_ids(h: int, w: int, batch_size: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+    """Generate tensor of image position ids.
+
+    Args:
+        h (int): Height of image in latent space.
+        w (int): Width of image in latent space.
+        batch_size (int): Batch size.
+        device (torch.device): Device.
+        dtype (torch.dtype): dtype.
+
+    Returns:
+        torch.Tensor: Image position ids.
+    """
     img_ids = torch.zeros(h // 2, w // 2, 3, device=device, dtype=dtype)
     img_ids[..., 1] = img_ids[..., 1] + torch.arange(h // 2, device=device, dtype=dtype)[:, None]
     img_ids[..., 2] = img_ids[..., 2] + torch.arange(w // 2, device=device, dtype=dtype)[None, :]
     img_ids = repeat(img_ids, "h w c -> b (h w) c", b=batch_size)
     return img_ids
-
-
-def prepare_latent_img_patches(img: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    """Convert an input image in latent space to patches for diffusion.
-
-    This implementation was extracted from:
-    https://github.com/black-forest-labs/flux/blob/c00d7c60b085fce8058b9df845e036090873f2ce/src/flux/sampling.py#L32
-
-    Args:
-        img (torch.Tensor): Input image in latent space.
-
-    Returns:
-        tuple[Tensor, Tensor]: (img, img_ids), as defined in the original flux repo.
-    """
-    bs, c, h, w = img.shape
-
-    img = pack(img)
-
-    # Generate patch position ids.
-    img_ids = torch.zeros(h // 2, w // 2, 3, device=img.device, dtype=img.dtype)
-    img_ids[..., 1] = img_ids[..., 1] + torch.arange(h // 2, device=img.device, dtype=img.dtype)[:, None]
-    img_ids[..., 2] = img_ids[..., 2] + torch.arange(w // 2, device=img.device, dtype=img.dtype)[None, :]
-    img_ids = repeat(img_ids, "h w c -> b (h w) c", b=bs)
-
-    return img, img_ids

@@ -3,7 +3,7 @@ from typing import Callable
 import torch
 from tqdm import tqdm
 
-from invokeai.backend.flux.inpaint import merge_intermediate_latents_with_init_latents
+from invokeai.backend.flux.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
 
 
@@ -19,10 +19,7 @@ def denoise(
     timesteps: list[float],
     step_callback: Callable[[], None],
     guidance: float,
-    # For inpainting:
-    init_latents: torch.Tensor | None,
-    noise: torch.Tensor,
-    inpaint_mask: torch.Tensor | None,
+    inpaint_extension: InpaintExtension | None,
 ):
     # guidance_vec is ignored for schnell.
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
@@ -40,15 +37,8 @@ def denoise(
 
         img = img + (t_prev - t_curr) * pred
 
-        if inpaint_mask is not None:
-            assert init_latents is not None
-            img = merge_intermediate_latents_with_init_latents(
-                init_latents=init_latents,
-                intermediate_latents=img,
-                timestep=t_prev,
-                noise=noise,
-                inpaint_mask=inpaint_mask,
-            )
+        if inpaint_extension is not None:
+            img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
 
         step_callback()
 

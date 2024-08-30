@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Callable, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -20,6 +20,7 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.denoise import denoise
+from invokeai.backend.flux.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
     generate_img_ids,
@@ -30,8 +31,6 @@ from invokeai.backend.flux.sampling_utils import (
 )
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
-
-EPS = 1e-6
 
 
 @invocation(
@@ -51,6 +50,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.latents,
         input=Input.Connection,
     )
+    # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
     denoise_mask: Optional[DenoiseMaskField] = InputField(
         default=None,
         description=FieldDescriptions.denoise_mask,
@@ -122,6 +122,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         transformer_info = context.models.load(self.transformer.transformer)
         is_schnell = "schnell" in transformer_info.config.config_path
 
+        # Calculate the timestep schedule.
         image_seq_len = noise.shape[-1] * noise.shape[-2] // 4
         timesteps = get_schedule(
             num_steps=self.num_steps,
@@ -130,7 +131,7 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         # Prepare input latent image.
-        if self.denoising_start > EPS:
+        if self.denoising_start > 1e-5:
             # If denoising_start > 0, we are doing image-to-image.
             if init_latents is None:
                 raise ValueError("latents must be provided if denoising_start > 0.")
@@ -144,16 +145,10 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             t_0 = timesteps[0]
             x = t_0 * noise + (1.0 - t_0) * init_latents
         else:
-            # We are not doing image-to-image, so we are starting from noise.
+            # We are not doing image-to-image, so start from noise.
             x = noise
 
-        # Prepare inpaint mask.
         inpaint_mask = self._prep_inpaint_mask(context, x)
-        if inpaint_mask is not None:
-            assert init_latents is not None
-            # Expand the inpaint mask to the same shape as the init_latents so that when we pack inpaint_mask it lines
-            # up with the init_latents.
-            inpaint_mask = inpaint_mask.expand_as(init_latents)
 
         b, _c, h, w = x.shape
         img_ids = generate_img_ids(h=h, w=w, batch_size=b, device=x.device, dtype=x.dtype)
@@ -167,40 +162,21 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         noise = pack(noise)
         x = pack(x)
 
-        # Verify that we calculated the image_seq_len correctly.
+        # Now that we have 'packed' the latent tensors, verify that we calculated the image_seq_len correctly.
         assert image_seq_len == x.shape[1]
+
+        # Prepare inpaint extension.
+        inpaint_extension: InpaintExtension | None = None
+        if inpaint_mask is not None:
+            assert init_latents is not None
+            inpaint_extension = InpaintExtension(
+                init_latents=init_latents,
+                inpaint_mask=inpaint_mask,
+                noise=noise,
+            )
 
         with transformer_info as transformer:
             assert isinstance(transformer, Flux)
-
-            def step_callback() -> None:
-                if context.util.is_canceled():
-                    raise CanceledException
-
-                # TODO: Make this look like the image before re-enabling
-                # latent_image = unpack(img.float(), self.height, self.width)
-                # latent_image = latent_image.squeeze()  # Remove unnecessary dimensions
-                # flattened_tensor = latent_image.reshape(-1)  # Flatten to shape [48*128*128]
-
-                # # Create a new tensor of the required shape [255, 255, 3]
-                # latent_image = flattened_tensor[: 255 * 255 * 3].reshape(255, 255, 3)  # Reshape to RGB format
-
-                # # Convert to a NumPy array and then to a PIL Image
-                # image = Image.fromarray(latent_image.cpu().numpy().astype(np.uint8))
-
-                # (width, height) = image.size
-                # width *= 8
-                # height *= 8
-
-                # dataURL = image_to_dataURL(image, image_format="JPEG")
-
-                # # TODO: move this whole function to invocation context to properly reference these variables
-                # context._services.events.emit_invocation_denoise_progress(
-                #     context._data.queue_item,
-                #     context._data.invocation,
-                #     state,
-                #     ProgressImage(dataURL=dataURL, width=width, height=height),
-                # )
 
             x = denoise(
                 model=transformer,
@@ -210,29 +186,35 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 txt_ids=txt_ids,
                 vec=clip_embeddings,
                 timesteps=timesteps,
-                step_callback=step_callback,
+                step_callback=self._build_step_callback(context),
                 guidance=self.guidance,
-                init_latents=init_latents,
-                noise=noise,
-                inpaint_mask=inpaint_mask,
+                inpaint_extension=inpaint_extension,
             )
 
         x = unpack(x.float(), self.height, self.width)
-
         return x
 
     def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
         """Prepare the inpaint mask.
 
-        Loads the mask, resizes if necessary, casts to same device/dtype as latents.
+        - Loads the mask
+        - Resizes if necessary
+        - Casts to same device/dtype as latents
+        - Expands mask to the same shape as latents so that they line up after 'packing'
+
+        Args:
+            context (InvocationContext): The invocation context, for loading the inpaint mask.
+            latents (torch.Tensor): A latent image tensor. In 'unpacked' format. Used to determine the target shape,
+                device, and dtype for the inpaint mask.
 
         Returns:
-            tuple[torch.Tensor | None, bool]: (mask, is_gradient_mask)
+            torch.Tensor | None: Inpaint mask.
         """
         if self.denoise_mask is None:
             return None
 
         mask = context.tensors.load(self.denoise_mask.mask_name)
+
         _, _, latent_height, latent_width = latents.shape
         mask = tv_resize(
             img=mask,
@@ -240,5 +222,41 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             interpolation=tv_transforms.InterpolationMode.BILINEAR,
             antialias=False,
         )
+
         mask = mask.to(device=latents.device, dtype=latents.dtype)
-        return mask
+
+        # Expand the inpaint mask to the same shape as `latents` so that when we 'pack' `mask` it lines up with
+        # `latents`.
+        return mask.expand_as(latents)
+
+    def _build_step_callback(self, context: InvocationContext) -> Callable[[], None]:
+        def step_callback() -> None:
+            if context.util.is_canceled():
+                raise CanceledException
+
+            # TODO: Make this look like the image before re-enabling
+            # latent_image = unpack(img.float(), self.height, self.width)
+            # latent_image = latent_image.squeeze()  # Remove unnecessary dimensions
+            # flattened_tensor = latent_image.reshape(-1)  # Flatten to shape [48*128*128]
+
+            # # Create a new tensor of the required shape [255, 255, 3]
+            # latent_image = flattened_tensor[: 255 * 255 * 3].reshape(255, 255, 3)  # Reshape to RGB format
+
+            # # Convert to a NumPy array and then to a PIL Image
+            # image = Image.fromarray(latent_image.cpu().numpy().astype(np.uint8))
+
+            # (width, height) = image.size
+            # width *= 8
+            # height *= 8
+
+            # dataURL = image_to_dataURL(image, image_format="JPEG")
+
+            # # TODO: move this whole function to invocation context to properly reference these variables
+            # context._services.events.emit_invocation_denoise_progress(
+            #     context._data.queue_item,
+            #     context._data.invocation,
+            #     state,
+            #     ProgressImage(dataURL=dataURL, width=width, height=height),
+            # )
+
+        return step_callback
