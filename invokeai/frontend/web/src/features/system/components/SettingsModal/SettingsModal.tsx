@@ -14,7 +14,6 @@ import {
   Switch,
   Text,
 } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
@@ -42,7 +41,6 @@ import {
 } from 'features/system/store/systemSlice';
 import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import { setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
-import { atom } from 'nanostores';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -68,8 +66,7 @@ type SettingsModalProps = {
   config?: ConfigOptions;
 };
 
-const $settingsModal = atom(false);
-export const useSettingsModal = buildUseBoolean($settingsModal);
+export const [useSettingsModal] = buildUseBoolean(false);
 
 const SettingsModal = ({ config = defaultConfig }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
@@ -96,7 +93,6 @@ const SettingsModal = ({ config = defaultConfig }: SettingsModalProps) => {
     refetchIntermediatesCount,
   } = useClearIntermediates(Boolean(config?.shouldShowClearIntermediates));
   const settingsModal = useSettingsModal();
-  const settingsModalIsOpen = useStore(settingsModal.$boolean);
   const refreshModal = useRefreshAfterResetModal();
 
   const shouldUseCpuNoise = useAppSelector(selectShouldUseCPUNoise);
@@ -110,10 +106,10 @@ const SettingsModal = ({ config = defaultConfig }: SettingsModalProps) => {
   const clearStorage = useClearStorage();
 
   useEffect(() => {
-    if (settingsModalIsOpen && Boolean(config?.shouldShowClearIntermediates)) {
+    if (settingsModal.isTrue && Boolean(config?.shouldShowClearIntermediates)) {
       refetchIntermediatesCount();
     }
-  }, [config?.shouldShowClearIntermediates, refetchIntermediatesCount, settingsModalIsOpen]);
+  }, [config?.shouldShowClearIntermediates, refetchIntermediatesCount, settingsModal.isTrue]);
 
   const handleClickResetWebUI = useCallback(() => {
     clearStorage();
@@ -165,7 +161,7 @@ const SettingsModal = ({ config = defaultConfig }: SettingsModalProps) => {
   );
 
   return (
-    <Modal isOpen={settingsModalIsOpen} onClose={settingsModal.setFalse} size="2xl" isCentered useInert={false}>
+    <Modal isOpen={settingsModal.isTrue} onClose={settingsModal.setFalse} size="2xl" isCentered useInert={false}>
       <ModalOverlay />
       <ModalContent maxH="80vh" h="68rem">
         <ModalHeader bg="none">{t('common.settingsLabel')}</ModalHeader>
