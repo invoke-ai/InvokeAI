@@ -1654,6 +1654,10 @@
         "storeNotInitialized": "Store is not initialized"
     },
     "controlLayers": {
+        "saveCanvasToGallery": "Save Canvas To Gallery",
+        "saveBboxToGallery": "Save Bbox To Gallery",
+        "savedToGalleryOk": "Saved to Gallery",
+        "savedToGalleryError": "Error saving to gallery",
         "clearHistory": "Clear History",
         "generateMode": "Generate",
         "generateModeDesc": "Create individual images. Generated images are added directly to the gallery.",
