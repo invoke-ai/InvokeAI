@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 from invokeai.backend.flux.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
+from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 
 def denoise(
@@ -17,10 +18,11 @@ def denoise(
     vec: torch.Tensor,
     # sampling parameters
     timesteps: list[float],
-    step_callback: Callable[[], None],
+    step_callback: Callable[[torch.Tensor, PipelineIntermediateState], None],
     guidance: float,
     inpaint_extension: InpaintExtension | None,
 ):
+    step = 0
     # guidance_vec is ignored for schnell.
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
     for t_curr, t_prev in tqdm(list(zip(timesteps[:-1], timesteps[1:], strict=True))):
@@ -40,6 +42,16 @@ def denoise(
         if inpaint_extension is not None:
             img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
 
-        step_callback()
+        step_callback(
+            img,
+            PipelineIntermediateState(
+                step=step,
+                order=1,
+                total_steps=len(timesteps),
+                timestep=int(t_curr),
+                latents=img,
+            ),
+        )
+        step += 1
 
     return img
