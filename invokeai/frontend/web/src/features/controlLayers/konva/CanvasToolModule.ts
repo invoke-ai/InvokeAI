@@ -468,9 +468,6 @@ export class CanvasToolModule extends CanvasModuleABC {
 
   syncLastCursorPos = (): Coordinate | null => {
     const pos = getScaledCursorPosition(this.konva.stage);
-    if (!pos) {
-      return null;
-    }
     this.manager.stateApi.$lastCursorPos.set(pos);
     return pos;
   };
