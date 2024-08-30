@@ -444,8 +444,7 @@ export const $didUpdateEdge = atom(false);
 export const $lastEdgeUpdateMouseEvent = atom<MouseEvent | null>(null);
 
 export const $viewport = atom<Viewport>({ x: 0, y: 0, zoom: 1 });
-export const $addNodeCmdk = atom(false);
-export const useAddNodeCmdk = buildUseBoolean($addNodeCmdk);
+export const [useAddNodeCmdk, $addNodeCmdk] = buildUseBoolean(false);
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateNodesState = (state: any): any => {

@@ -8,31 +8,27 @@ import {
   ModalOverlay,
   Text,
 } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
-import { atom } from 'nanostores';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const $refreshAfterResetModalState = atom(false);
-export const useRefreshAfterResetModal = buildUseBoolean($refreshAfterResetModalState);
+export const [useRefreshAfterResetModal] = buildUseBoolean(false);
 
 const RefreshAfterResetModal = () => {
   const { t } = useTranslation();
   const [countdown, setCountdown] = useState(3);
 
   const refreshModal = useRefreshAfterResetModal();
-  const isOpen = useStore(refreshModal.$boolean);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!refreshModal.isTrue) {
       return;
     }
     const i = window.setInterval(() => setCountdown((prev) => prev - 1), 1000);
     return () => {
       window.clearInterval(i);
     };
-  }, [isOpen]);
+  }, [refreshModal.isTrue]);
 
   useEffect(() => {
     if (countdown <= 0) {
@@ -44,7 +40,7 @@ const RefreshAfterResetModal = () => {
     <>
       <Modal
         closeOnOverlayClick={false}
-        isOpen={isOpen}
+        isOpen={refreshModal.isTrue}
         onClose={refreshModal.setFalse}
         isCentered
         closeOnEsc={false}

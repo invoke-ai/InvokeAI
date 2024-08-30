@@ -163,7 +163,6 @@ const cmdkRootSx: SystemStyleObject = {
 export const AddNodeCmdk = memo(() => {
   const { t } = useTranslation();
   const addNodeCmdk = useAddNodeCmdk();
-  const addNodeCmdkIsOpen = useStore(addNodeCmdk.$boolean);
   const inputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const addNode = useAddNode();
@@ -192,7 +191,7 @@ export const AddNodeCmdk = memo(() => {
 
   return (
     <Modal
-      isOpen={addNodeCmdkIsOpen}
+      isOpen={addNodeCmdk.isTrue}
       onClose={onClose}
       useInert={false}
       initialFocusRef={inputRef}

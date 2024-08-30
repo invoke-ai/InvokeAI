@@ -4,6 +4,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { AddNodeCmdk } from 'features/nodes/components/flow/AddNodeCmdk/AddNodeCmdk';
 import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
+import WorkflowEditorSettings from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
 import { LoadWorkflowFromGraphModal } from 'features/workflowLibrary/components/LoadWorkflowFromGraphModal/LoadWorkflowFromGraphModal';
 import { SaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/SaveWorkflowAsDialog';
 import { memo } from 'react';
@@ -39,6 +40,7 @@ const NodeEditor = () => {
           <LoadWorkflowFromGraphModal />
         </>
       )}
+      <WorkflowEditorSettings />
       {isLoading && <IAINoContentFallback label={t('nodes.loadingNodes')} icon={MdDeviceHub} />}
     </Flex>
   );

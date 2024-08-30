@@ -5,19 +5,16 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
 import { toast } from 'features/toast/toast';
-import { atom } from 'nanostores';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useClearQueueMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
-const $boolean = atom(false);
-const useClearQueueConfirmationAlertDialog = buildUseBoolean($boolean);
+const [useClearQueueConfirmationAlertDialog] = buildUseBoolean(false);
 
 export const useClearQueue = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const dialog = useClearQueueConfirmationAlertDialog();
-  const isOpen = useStore(dialog.$boolean);
   const { data: queueStatus } = useGetQueueStatusQuery();
   const isConnected = useStore($isConnected);
   const [trigger, { isLoading }] = useClearQueueMutation({
@@ -51,7 +48,7 @@ export const useClearQueue = () => {
 
   return {
     clearQueue,
-    isOpen,
+    isOpen: dialog.isTrue,
     openDialog: dialog.setTrue,
     closeDialog: dialog.setFalse,
     isLoading,
