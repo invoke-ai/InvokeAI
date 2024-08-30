@@ -123,9 +123,14 @@ export const canvasSlice = createSlice({
     rasterLayerAdded: {
       reducer: (
         state,
-        action: PayloadAction<{ id: string; overrides?: Partial<CanvasRasterLayerState>; isSelected?: boolean }>
+        action: PayloadAction<{
+          id: string;
+          overrides?: Partial<CanvasRasterLayerState>;
+          isSelected?: boolean;
+          deleteOthers?: boolean;
+        }>
       ) => {
-        const { id, overrides, isSelected } = action.payload;
+        const { id, overrides, isSelected, deleteOthers } = action.payload;
         const entity: CanvasRasterLayerState = {
           id,
           name: null,
@@ -137,12 +142,25 @@ export const canvasSlice = createSlice({
           position: { x: 0, y: 0 },
         };
         merge(entity, overrides);
-        state.rasterLayers.entities.push(entity);
+
+        if (deleteOthers) {
+          state.rasterLayers.entities = [entity];
+        } else {
+          state.rasterLayers.entities.push(entity);
+        }
+
         if (isSelected) {
           state.selectedEntityIdentifier = getEntityIdentifier(entity);
         }
       },
-      prepare: (payload: { overrides?: Partial<CanvasRasterLayerState>; isSelected?: boolean }) => ({
+      prepare: (payload: {
+        overrides?: Partial<CanvasRasterLayerState>;
+        isSelected?: boolean;
+        /**
+         * asdf
+         */
+        deleteOthers?: boolean;
+      }) => ({
         payload: { ...payload, id: getPrefixedId('raster_layer') },
       }),
     },
@@ -603,9 +621,14 @@ export const canvasSlice = createSlice({
     inpaintMaskAdded: {
       reducer: (
         state,
-        action: PayloadAction<{ id: string; overrides?: Partial<CanvasInpaintMaskState>; isSelected?: boolean }>
+        action: PayloadAction<{
+          id: string;
+          overrides?: Partial<CanvasInpaintMaskState>;
+          isSelected?: boolean;
+          deleteOthers?: boolean;
+        }>
       ) => {
-        const { id, overrides, isSelected } = action.payload;
+        const { id, overrides, isSelected, deleteOthers } = action.payload;
         const entity: CanvasInpaintMaskState = {
           id,
           name: null,
@@ -621,12 +644,22 @@ export const canvasSlice = createSlice({
           },
         };
         merge(entity, overrides);
-        state.inpaintMasks.entities.push(entity);
+
+        if (deleteOthers) {
+          state.inpaintMasks.entities = [entity];
+        } else {
+          state.inpaintMasks.entities.push(entity);
+        }
+
         if (isSelected) {
           state.selectedEntityIdentifier = getEntityIdentifier(entity);
         }
       },
-      prepare: (payload?: { overrides?: Partial<CanvasInpaintMaskState>; isSelected?: boolean }) => ({
+      prepare: (payload?: {
+        overrides?: Partial<CanvasInpaintMaskState>;
+        isSelected?: boolean;
+        deleteOthers?: boolean;
+      }) => ({
         payload: { ...payload, id: getPrefixedId('inpaint_mask') },
       }),
     },
