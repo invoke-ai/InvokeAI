@@ -418,19 +418,25 @@ export function snapToNearest(value: number, candidateValues: number[], threshol
 }
 
 /**
- * Gets the union of two rects
- * @param rect1 The first rect
- * @param rect2 The second rect
+ * Gets the union of any number of rects.
+ * @params rects The rects to union
  * @returns The union of the two rects
  */
 export const getRectUnion = (...rects: Rect[]): Rect => {
+  const firstRect = rects.shift();
+
+  if (!firstRect) {
+    return getEmptyRect();
+  }
+
   const rect = rects.reduce<Rect>((acc, r) => {
     const x = Math.min(acc.x, r.x);
     const y = Math.min(acc.y, r.y);
     const width = Math.max(acc.x + acc.width, r.x + r.width) - x;
     const height = Math.max(acc.y + acc.height, r.y + r.height) - y;
     return { x, y, width, height };
-  }, getEmptyRect());
+  }, firstRect);
+
   return rect;
 };
 
