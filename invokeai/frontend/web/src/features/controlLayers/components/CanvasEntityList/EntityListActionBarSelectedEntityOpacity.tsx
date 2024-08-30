@@ -157,7 +157,7 @@ export const SelectedEntityOpacity = memo(() => {
             clampValueOnBlur={false}
             variant="outline"
           >
-            <NumberInputField paddingInlineEnd={7} />
+            <NumberInputField paddingInlineEnd={7} _focusVisible={{ zIndex: 0 }} />
             <PopoverTrigger>
               <IconButton
                 aria-label="open-slider"
