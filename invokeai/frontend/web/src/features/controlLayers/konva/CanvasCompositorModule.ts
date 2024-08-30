@@ -147,6 +147,19 @@ export class CanvasCompositorModule extends CanvasModuleABC {
     return stableHash(data);
   };
 
+  rasterizeAndUploadCompositeRasterLayer = async (rect: Rect, saveToGallery: boolean) => {
+    this.log.trace({ rect }, 'Rasterizing composite raster layer');
+
+    const canvas = this.getCompositeRasterLayerCanvas(rect);
+    const blob = await canvasToBlob(canvas);
+
+    if (this.manager._isDebugging) {
+      previewBlob(blob, 'Composite raster layer canvas');
+    }
+
+    return uploadImage(blob, 'composite-raster-layer.png', 'general', !saveToGallery);
+  };
+
   getCompositeRasterLayerImageDTO = async (rect: Rect): Promise<ImageDTO> => {
     let imageDTO: ImageDTO | null = null;
 
@@ -161,15 +174,7 @@ export class CanvasCompositorModule extends CanvasModuleABC {
       }
     }
 
-    this.log.trace({ rect }, 'Rasterizing composite raster layer');
-
-    const canvas = this.getCompositeRasterLayerCanvas(rect);
-    const blob = await canvasToBlob(canvas);
-    if (this.manager._isDebugging) {
-      previewBlob(blob, 'Composite raster layer canvas');
-    }
-
-    imageDTO = await uploadImage(blob, 'composite-raster-layer.png', 'general', true);
+    imageDTO = await this.rasterizeAndUploadCompositeRasterLayer(rect, false);
     this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
     return imageDTO;
   };
