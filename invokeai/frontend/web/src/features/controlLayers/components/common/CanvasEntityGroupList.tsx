@@ -2,11 +2,12 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Collapse, Flex, Icon, Spacer, Text } from '@invoke-ai/ui-library';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { CanvasEntityAddOfTypeButton } from 'features/controlLayers/components/common/CanvasEntityAddOfTypeButton';
+import { CanvasEntityMergeVisibleButton } from 'features/controlLayers/components/common/CanvasEntityMergeVisibleButton';
 import { CanvasEntityTypeIsHiddenToggle } from 'features/controlLayers/components/common/CanvasEntityTypeIsHiddenToggle';
 import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTitle';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { PropsWithChildren } from 'react';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { PiCaretDownBold } from 'react-icons/pi';
 
 type Props = PropsWithChildren<{
@@ -21,6 +22,9 @@ const _hover: SystemStyleObject = {
 export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props) => {
   const title = useEntityTypeTitle(type);
   const collapse = useBoolean(true);
+  const canMergeVisible = useMemo(() => type === 'raster_layer' || type === 'inpaint_mask', [type]);
+  const canHideAll = useMemo(() => type !== 'ip_adapter', [type]);
+
   return (
     <Flex flexDir="column" w="full">
       <Flex w="full">
@@ -54,8 +58,9 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
           </Text>
           <Spacer />
         </Flex>
+        {canMergeVisible && <CanvasEntityMergeVisibleButton type={type} />}
         <CanvasEntityAddOfTypeButton type={type} />
-        {type !== 'ip_adapter' && <CanvasEntityTypeIsHiddenToggle type={type} />}
+        {canHideAll && <CanvasEntityTypeIsHiddenToggle type={type} />}
       </Flex>
       <Collapse in={collapse.isTrue}>
         <Flex flexDir="column" gap={2} pt={2}>
