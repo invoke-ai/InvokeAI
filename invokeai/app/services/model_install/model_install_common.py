@@ -103,7 +103,7 @@ class HFModelSource(StringLikeSource):
         if self.variant:
             base += f":{self.variant or ''}"
         if self.subfolder:
-            base += f"::{self.subfolder}"
+            base += f"::{self.subfolder.as_posix()}"
         return base
 
 
