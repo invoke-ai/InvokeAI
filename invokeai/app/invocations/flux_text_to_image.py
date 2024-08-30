@@ -23,6 +23,7 @@ from invokeai.backend.flux.denoise import denoise
 from invokeai.backend.flux.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
+    clip_timestep_schedule,
     generate_img_ids,
     get_noise,
     get_schedule,
@@ -62,6 +63,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         le=1,
         description=FieldDescriptions.denoising_start,
     )
+    denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
     transformer: TransformerField = InputField(
         description=FieldDescriptions.flux_model,
         input=Input.Connection,
@@ -130,6 +132,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             shift=not is_schnell,
         )
 
+        # Clip the timesteps schedule based on denoising_start and denoising_end.
+        timesteps = clip_timestep_schedule(timesteps, self.denoising_start, self.denoising_end)
+
         # Prepare input latent image.
         if init_latents is not None:
             # If init_latents is provided, we are doing image-to-image.
@@ -140,11 +145,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     "to be poor. Consider using a FLUX dev model instead."
                 )
 
-            # Clip the timesteps schedule based on denoising_start.
-            # TODO(ryand): Should we apply denoising_start in timestep-space rather than timestep-index-space?
-            start_idx = int(self.denoising_start * len(timesteps))
-            timesteps = timesteps[start_idx:]
-
             # Noise the orig_latents by the appropriate amount for the first timestep.
             t_0 = timesteps[0]
             x = t_0 * noise + (1.0 - t_0) * init_latents
@@ -154,6 +154,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
 
             x = noise
+
+        # If len(timesteps) == 1, then short-circuit. We are just noising the input latents, but not taking any
+        # denoising steps.
+        if len(timesteps) <= 1:
+            return x
 
         inpaint_mask = self._prep_inpaint_mask(context, x)
 

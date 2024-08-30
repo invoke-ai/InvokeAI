@@ -59,6 +59,44 @@ def get_schedule(
     return timesteps.tolist()
 
 
+def _find_last_index_ge_val(timesteps: list[float], val: float, eps: float = 1e-6) -> int:
+    """Find the last index in timesteps that is >= val.
+
+    We use epsilon-close equality to avoid potential floating point errors.
+    """
+    idx = len(list(filter(lambda t: t >= (val - eps), timesteps))) - 1
+    assert idx >= 0
+    return idx
+
+
+def clip_timestep_schedule(timesteps: list[float], denoising_start: float, denoising_end: float) -> list[float]:
+    """Clip the timestep schedule to the denoising range.
+
+    Args:
+        timesteps (list[float]): The original timestep schedule: [1.0, ..., 0.0].
+        denoising_start (float): A value in [0, 1] specifying the start of the denoising process. E.g. a value of 0.2
+            would mean that the denoising process start at the last timestep in the schedule >= 0.8.
+        denoising_end (float): A value in [0, 1] specifying the end of the denoising process. E.g. a value of 0.8 would
+            mean that the denoising process end at the last timestep in the schedule >= 0.2.
+
+    Returns:
+        list[float]: The clipped timestep schedule.
+    """
+    assert 0.0 <= denoising_start <= 1.0
+    assert 0.0 <= denoising_end <= 1.0
+    assert denoising_start <= denoising_end
+
+    t_start_val = 1.0 - denoising_start
+    t_end_val = 1.0 - denoising_end
+
+    t_start_idx = _find_last_index_ge_val(timesteps, t_start_val)
+    t_end_idx = _find_last_index_ge_val(timesteps, t_end_val)
+
+    clipped_timesteps = timesteps[t_start_idx : t_end_idx + 1]
+
+    return clipped_timesteps
+
+
 def unpack(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
     """Unpack flat array of patch embeddings to latent image."""
     return rearrange(
