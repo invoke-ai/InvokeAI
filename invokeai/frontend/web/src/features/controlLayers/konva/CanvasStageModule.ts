@@ -85,26 +85,23 @@ export class CanvasStageModule extends CanvasModuleABC {
       }
     }
 
-    const rectUnion = getRectUnion(...rects);
-
-    if (rectUnion.width === 0 || rectUnion.height === 0) {
-      // fall back to the bbox if there is no content
-      return this.manager.stateApi.getBbox().rect;
-    } else {
-      return rectUnion;
-    }
+    return getRectUnion(...rects);
   };
 
   fitBboxToStage = () => {
-    this.log.trace('Fitting bbox to stage');
-    const bbox = this.manager.stateApi.getBbox();
-    this.fitRect(bbox.rect);
+    const { rect } = this.manager.stateApi.getBbox();
+    this.log.trace({ rect }, 'Fitting bbox to stage');
+    this.fitRect(rect);
   };
 
   fitLayersToStage() {
-    this.log.trace('Fitting layers to stage');
     const rect = this.getVisibleRect();
-    this.fitRect(rect);
+    if (rect.width === 0 || rect.height === 0) {
+      this.fitBboxToStage();
+    } else {
+      this.log.trace({ rect }, 'Fitting layers to stage');
+      this.fitRect(rect);
+    }
   }
 
   fitRect = (rect: Rect) => {

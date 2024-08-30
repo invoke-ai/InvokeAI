@@ -2,6 +2,7 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { CanvasResetViewButton } from 'features/controlLayers/components/CanvasResetViewButton';
 import { CanvasScale } from 'features/controlLayers/components/CanvasScale';
+import { SaveToGalleryButton } from 'features/controlLayers/components/SaveToGalleryButton';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
@@ -27,6 +28,7 @@ export const ControlLayersToolbar = memo(() => {
         <CanvasResetViewButton />
         <Spacer />
         <ToolFillColorPicker />
+        <SaveToGalleryButton />
         <CanvasSettingsPopover />
         <ViewerToggle />
       </Flex>
