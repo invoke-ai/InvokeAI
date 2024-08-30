@@ -131,10 +131,14 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         # Prepare input latent image.
-        if self.denoising_start > 1e-5:
-            # If denoising_start > 0, we are doing image-to-image.
-            if init_latents is None:
-                raise ValueError("latents must be provided if denoising_start > 0.")
+        if init_latents is not None:
+            # If init_latents is provided, we are doing image-to-image.
+
+            if is_schnell:
+                context.logger.warning(
+                    "Running image-to-image with a FLUX schnell model. This is not recommended. The results are likely "
+                    "to be poor. Consider using a FLUX dev model instead."
+                )
 
             # Clip the timesteps schedule based on denoising_start.
             # TODO(ryand): Should we apply denoising_start in timestep-space rather than timestep-index-space?
@@ -145,7 +149,10 @@ class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             t_0 = timesteps[0]
             x = t_0 * noise + (1.0 - t_0) * init_latents
         else:
-            # We are not doing image-to-image, so start from noise.
+            # init_latents are not provided, so we are not doing image-to-image (i.e. we are starting from pure noise).
+            if self.denoising_start > 1e-5:
+                raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+
             x = noise
 
         inpaint_mask = self._prep_inpaint_mask(context, x)
