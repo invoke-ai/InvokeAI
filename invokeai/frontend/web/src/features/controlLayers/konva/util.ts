@@ -302,10 +302,13 @@ export const konvaNodeToCanvas = (node: Konva.Node, bbox?: Rect): HTMLCanvasElem
  * @returns A Promise that resolves with Blob of the node cropped to the bounding box
  */
 export const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob> => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
-      assert(blob, 'blob is null');
-      resolve(blob);
+      if (!blob) {
+        reject('Failed to convert canvas to blob');
+      } else {
+        resolve(blob);
+      }
     });
   });
 };
