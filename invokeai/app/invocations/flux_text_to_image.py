@@ -34,15 +34,15 @@ from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
-    "flux_text_to_image",
-    title="FLUX Text to Image",
+    "flux_denoise",
+    title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="2.0.0",
+    version="1.0.0",
     classification=Classification.Prototype,
 )
-class FluxTextToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
-    """Text-to-image generation using a FLUX model."""
+class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Run denoising process with a FLUX transformer model."""
 
     # If latents is provided, this means we are doing image-to-image.
     latents: Optional[LatentsField] = InputField(
