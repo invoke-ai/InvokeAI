@@ -2,7 +2,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
 import { CANVAS_SCALE_BY } from 'features/controlLayers/konva/constants';
 import { getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
-import type { Coordinate, Dimensions, Rect } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, Coordinate, Dimensions, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
@@ -76,13 +76,17 @@ export class CanvasStageModule extends CanvasModuleABC {
     });
   };
 
-  getVisibleRect = (): Rect => {
+  getVisibleRect = (type?: Exclude<CanvasEntityIdentifier['type'], 'ip_adapter'>): Rect => {
     const rects = [];
 
     for (const adapter of this.manager.adapters.getAll()) {
-      if (adapter.state.isEnabled) {
-        rects.push(adapter.transformer.getRelativeRect());
+      if (!adapter.state.isEnabled) {
+        continue;
       }
+      if (type && adapter.state.type !== type) {
+        continue;
+      }
+      rects.push(adapter.transformer.getRelativeRect());
     }
 
     return getRectUnion(...rects);
