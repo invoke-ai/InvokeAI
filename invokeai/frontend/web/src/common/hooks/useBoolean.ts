@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react';
 import type { WritableAtom } from 'nanostores';
 import { atom } from 'nanostores';
+import { useCallback, useState } from 'react';
 
 type UseBoolean = {
   isTrue: boolean;
@@ -50,4 +51,24 @@ export const buildUseBoolean = (initialValue: boolean): [() => UseBoolean, Writa
  * Hook to manage a boolean state. Use this for a local boolean state.
  * @param initialValue Initial value of the boolean
  */
-export const useBoolean = (initialValue: boolean) => buildUseBoolean(initialValue)[0]();
+export const useBoolean = (initialValue: boolean) => {
+  const [isTrue, set] = useState(initialValue);
+
+  const setTrue = useCallback(() => {
+    set(true);
+  }, [set]);
+  const setFalse = useCallback(() => {
+    set(false);
+  }, [set]);
+  const toggle = useCallback(() => {
+    set((val) => !val);
+  }, [set]);
+
+  return {
+    isTrue,
+    setTrue,
+    setFalse,
+    set,
+    toggle,
+  };
+};
