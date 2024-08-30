@@ -53,6 +53,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
     fp32: bool = InputField(default=DEFAULT_PRECISION == torch.float32, description=FieldDescriptions.fp32)
 
+    @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
