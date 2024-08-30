@@ -12,5 +12,9 @@ export const useOriginText = (origin: SessionQueueItemDTO['origin']) => {
     return t('queue.workflows');
   }
 
+  if (origin === 'upscaling') {
+    return t('queue.upscaling');
+  }
+
   return t('queue.other');
 };
