@@ -179,6 +179,18 @@ export class CanvasCompositorModule extends CanvasModuleABC {
     return imageDTO;
   };
 
+  rasterizeAndUploadCompositeInpaintMask = async (rect: Rect, saveToGallery: boolean) => {
+    this.log.trace({ rect }, 'Rasterizing composite inpaint mask');
+
+    const canvas = this.getCompositeInpaintMaskCanvas(rect);
+    const blob = await canvasToBlob(canvas);
+    if (this.manager._isDebugging) {
+      previewBlob(blob, 'Composite inpaint mask canvas');
+    }
+
+    return uploadImage(blob, 'composite-inpaint-mask.png', 'general', !saveToGallery);
+  };
+
   getCompositeInpaintMaskImageDTO = async (rect: Rect): Promise<ImageDTO> => {
     let imageDTO: ImageDTO | null = null;
 
@@ -193,15 +205,7 @@ export class CanvasCompositorModule extends CanvasModuleABC {
       }
     }
 
-    this.log.trace({ rect }, 'Rasterizing composite inpaint mask');
-
-    const canvas = this.getCompositeInpaintMaskCanvas(rect);
-    const blob = await canvasToBlob(canvas);
-    if (this.manager._isDebugging) {
-      previewBlob(blob, 'Composite inpaint mask canvas');
-    }
-
-    imageDTO = await uploadImage(blob, 'composite-inpaint-mask.png', 'general', true);
+    imageDTO = await this.rasterizeAndUploadCompositeInpaintMask(rect, false);
     this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
     return imageDTO;
   };
