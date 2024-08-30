@@ -287,6 +287,11 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
       resolve(ctx.getImageData(0, 0, width, height));
     };
 
+    image.onerror = function (e) {
+      canvas.remove();
+      reject(e);
+    };
+
     image.src = dataURL;
   });
 };
