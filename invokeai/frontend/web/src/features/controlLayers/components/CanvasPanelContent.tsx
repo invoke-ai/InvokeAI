@@ -24,7 +24,7 @@ export const CanvasPanelContent = memo(() => {
       <Flex flexDir="column" gap={2} w="full" h="full">
         <EntityListActionBar />
         <Divider py={0} />
-        <ContextMenu<HTMLDivElement> renderMenu={renderMenu} stopImmediatePropagation stopPropagation>
+        <ContextMenu<HTMLDivElement> renderMenu={renderMenu}>
           {(ref) => (
             <Box ref={ref} w="full" h="full">
               {!hasEntities && <CanvasAddEntityButtons />}
