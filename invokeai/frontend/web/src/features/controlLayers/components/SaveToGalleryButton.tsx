@@ -22,7 +22,7 @@ export const SaveToGalleryButton = memo(() => {
   const onClick = useCallback(async () => {
     isSaving.setTrue();
 
-    const rect = shift ? canvasManager.stateApi.getBbox().rect : canvasManager.stage.getVisibleRect();
+    const rect = shift ? canvasManager.stateApi.getBbox().rect : canvasManager.stage.getVisibleRect('raster_layer');
 
     const result = await withResultAsync(() =>
       canvasManager.compositor.rasterizeAndUploadCompositeRasterLayer(rect, true)
