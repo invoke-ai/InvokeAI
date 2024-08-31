@@ -66,7 +66,7 @@ export const Gallery = () => {
     <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" pt={1}>
       <Tabs index={galleryView === 'images' ? 0 : 1} variant="enclosed" display="flex" flexDir="column" w="full">
         <TabList gap={2} fontSize="sm" borderColor="base.800" alignItems="center" w="full">
-          <Text fontSize="sm" fontWeight="semibold" noOfLines={1} px="2">
+          <Text fontSize="sm" fontWeight="semibold" noOfLines={1} px="2" wordBreak="break-all">
             {boardName}
           </Text>
           <Spacer />

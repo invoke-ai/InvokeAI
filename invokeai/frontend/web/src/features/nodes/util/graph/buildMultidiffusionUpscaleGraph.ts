@@ -22,11 +22,10 @@ import {
 } from './constants';
 import { addLoRAs } from './generation/addLoRAs';
 import { addSDXLLoRas } from './generation/addSDXLLoRAs';
-import { getBoardField, getSDXLStylePrompts } from './graphBuilderUtils';
+import { getBoardField, getPresetModifiedPrompts } from './graphBuilderUtils';
 
 export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise<GraphType> => {
   const { model, cfgScale: cfg_scale, scheduler, steps, vaePrecision, seed, vae } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
   const { upscaleModel, upscaleInitialImage, structure, creativity, tileControlnetModel, scale } = state.upscale;
 
   assert(model, 'No model found in state');
@@ -99,7 +98,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
   let modelNode;
 
   if (model.base === 'sdxl') {
-    const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
+    const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } =
+      getPresetModifiedPrompts(state);
 
     posCondNode = g.addNode({
       type: 'sdxl_compel_prompt',
@@ -132,6 +132,8 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
       negative_style_prompt: negativeStylePrompt,
     });
   } else {
+    const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
+
     posCondNode = g.addNode({
       type: 'compel',
       id: POSITIVE_CONDITIONING,

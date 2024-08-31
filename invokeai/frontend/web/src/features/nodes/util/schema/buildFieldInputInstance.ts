@@ -15,12 +15,16 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   MainModelField: undefined,
   SchedulerField: 'euler',
   SDXLMainModelField: undefined,
+  FluxMainModelField: undefined,
   SDXLRefinerModelField: undefined,
   StringField: '',
   T2IAdapterModelField: undefined,
   SpandrelImageToImageModelField: undefined,
   VAEModelField: undefined,
   ControlNetModelField: undefined,
+  T5EncoderModelField: undefined,
+  FluxVAEModelField: undefined,
+  CLIPEmbedModelField: undefined,
 };
 
 export const buildFieldInputInstance = (id: string, template: FieldInputTemplate): FieldInputInstance => {

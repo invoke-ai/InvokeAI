@@ -52,6 +52,7 @@ class BaseModelType(str, Enum):
     StableDiffusion2 = "sd-2"
     StableDiffusionXL = "sdxl"
     StableDiffusionXLRefiner = "sdxl-refiner"
+    Flux = "flux"
     # Kandinsky2_1 = "kandinsky-2.1"
 
 
@@ -66,7 +67,9 @@ class ModelType(str, Enum):
     TextualInversion = "embedding"
     IPAdapter = "ip_adapter"
     CLIPVision = "clip_vision"
+    CLIPEmbed = "clip_embed"
     T2IAdapter = "t2i_adapter"
+    T5Encoder = "t5_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
 
 
@@ -74,6 +77,7 @@ class SubModelType(str, Enum):
     """Submodel type."""
 
     UNet = "unet"
+    Transformer = "transformer"
     TextEncoder = "text_encoder"
     TextEncoder2 = "text_encoder_2"
     Tokenizer = "tokenizer"
@@ -104,6 +108,9 @@ class ModelFormat(str, Enum):
     EmbeddingFile = "embedding_file"
     EmbeddingFolder = "embedding_folder"
     InvokeAI = "invokeai"
+    T5Encoder = "t5_encoder"
+    BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
+    BnbQuantizednf4b = "bnb_quantized_nf4b"
 
 
 class SchedulerPredictionType(str, Enum):
@@ -186,7 +193,9 @@ class ModelConfigBase(BaseModel):
 class CheckpointConfigBase(ModelConfigBase):
     """Model config for checkpoint-style models."""
 
-    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
+    format: Literal[ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b] = Field(
+        description="Format of the provided checkpoint model", default=ModelFormat.Checkpoint
+    )
     config_path: str = Field(description="path to the checkpoint model config file")
     converted_at: Optional[float] = Field(
         description="When this model was last converted to diffusers", default_factory=time.time
@@ -203,6 +212,26 @@ class DiffusersConfigBase(ModelConfigBase):
 class LoRAConfigBase(ModelConfigBase):
     type: Literal[ModelType.LoRA] = ModelType.LoRA
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
+
+
+class T5EncoderConfigBase(ModelConfigBase):
+    type: Literal[ModelType.T5Encoder] = ModelType.T5Encoder
+
+
+class T5EncoderConfig(T5EncoderConfigBase):
+    format: Literal[ModelFormat.T5Encoder] = ModelFormat.T5Encoder
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.T5Encoder.value}.{ModelFormat.T5Encoder.value}")
+
+
+class T5EncoderBnbQuantizedLlmInt8bConfig(T5EncoderConfigBase):
+    format: Literal[ModelFormat.BnbQuantizedLlmInt8b] = ModelFormat.BnbQuantizedLlmInt8b
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.T5Encoder.value}.{ModelFormat.BnbQuantizedLlmInt8b.value}")
 
 
 class LoRALyCORISConfig(LoRAConfigBase):
@@ -229,7 +258,6 @@ class VAECheckpointConfig(CheckpointConfigBase):
     """Model config for standalone VAE models."""
 
     type: Literal[ModelType.VAE] = ModelType.VAE
-    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
     @staticmethod
     def get_tag() -> Tag:
@@ -268,7 +296,6 @@ class ControlNetCheckpointConfig(CheckpointConfigBase, ControlAdapterConfigBase)
     """Model config for ControlNet models (diffusers version)."""
 
     type: Literal[ModelType.ControlNet] = ModelType.ControlNet
-    format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
 
     @staticmethod
     def get_tag() -> Tag:
@@ -317,6 +344,21 @@ class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):
         return Tag(f"{ModelType.Main.value}.{ModelFormat.Checkpoint.value}")
 
 
+class MainBnbQuantized4bCheckpointConfig(CheckpointConfigBase, MainConfigBase):
+    """Model config for main checkpoint models."""
+
+    prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
+    upcast_attention: bool = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.format = ModelFormat.BnbQuantizednf4b
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.Main.value}.{ModelFormat.BnbQuantizednf4b.value}")
+
+
 class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase):
     """Model config for main diffusers models."""
 
@@ -348,6 +390,17 @@ class IPAdapterCheckpointConfig(IPAdapterBaseConfig):
     @staticmethod
     def get_tag() -> Tag:
         return Tag(f"{ModelType.IPAdapter.value}.{ModelFormat.Checkpoint.value}")
+
+
+class CLIPEmbedDiffusersConfig(DiffusersConfigBase):
+    """Model config for Clip Embeddings."""
+
+    type: Literal[ModelType.CLIPEmbed] = ModelType.CLIPEmbed
+    format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}")
 
 
 class CLIPVisionDiffusersConfig(DiffusersConfigBase):
@@ -408,12 +461,15 @@ AnyModelConfig = Annotated[
     Union[
         Annotated[MainDiffusersConfig, MainDiffusersConfig.get_tag()],
         Annotated[MainCheckpointConfig, MainCheckpointConfig.get_tag()],
+        Annotated[MainBnbQuantized4bCheckpointConfig, MainBnbQuantized4bCheckpointConfig.get_tag()],
         Annotated[VAEDiffusersConfig, VAEDiffusersConfig.get_tag()],
         Annotated[VAECheckpointConfig, VAECheckpointConfig.get_tag()],
         Annotated[ControlNetDiffusersConfig, ControlNetDiffusersConfig.get_tag()],
         Annotated[ControlNetCheckpointConfig, ControlNetCheckpointConfig.get_tag()],
         Annotated[LoRALyCORISConfig, LoRALyCORISConfig.get_tag()],
         Annotated[LoRADiffusersConfig, LoRADiffusersConfig.get_tag()],
+        Annotated[T5EncoderConfig, T5EncoderConfig.get_tag()],
+        Annotated[T5EncoderBnbQuantizedLlmInt8bConfig, T5EncoderBnbQuantizedLlmInt8bConfig.get_tag()],
         Annotated[TextualInversionFileConfig, TextualInversionFileConfig.get_tag()],
         Annotated[TextualInversionFolderConfig, TextualInversionFolderConfig.get_tag()],
         Annotated[IPAdapterInvokeAIConfig, IPAdapterInvokeAIConfig.get_tag()],
@@ -421,6 +477,7 @@ AnyModelConfig = Annotated[
         Annotated[T2IAdapterConfig, T2IAdapterConfig.get_tag()],
         Annotated[SpandrelImageToImageConfig, SpandrelImageToImageConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
+        Annotated[CLIPEmbedDiffusersConfig, CLIPEmbedDiffusersConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),
 ]

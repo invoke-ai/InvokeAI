@@ -13,6 +13,7 @@ const BASE_COLOR_MAP: Record<BaseModelType, string> = {
   'sd-2': 'teal',
   sdxl: 'invokeBlue',
   'sdxl-refiner': 'invokeBlue',
+  flux: 'gold',
 };
 
 const ModelBaseBadge = ({ base }: Props) => {

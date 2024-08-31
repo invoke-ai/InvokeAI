@@ -91,7 +91,8 @@
         "enabled": "Включено",
         "disabled": "Отключено",
         "comparingDesc": "Сравнение двух изображений",
-        "comparing": "Сравнение"
+        "comparing": "Сравнение",
+        "dontShowMeThese": "Не показывай мне это"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
@@ -153,7 +154,11 @@
         "showArchivedBoards": "Показать архивированные доски",
         "searchImages": "Поиск по метаданным",
         "displayBoardSearch": "Отобразить поиск досок",
-        "displaySearch": "Отобразить поиск"
+        "displaySearch": "Отобразить поиск",
+        "exitBoardSearch": "Выйти из поиска досок",
+        "go": "Перейти",
+        "exitSearch": "Выйти из поиска",
+        "jump": "Пыгнуть"
     },
     "hotkeys": {
         "keyboardShortcuts": "Горячие клавиши",
@@ -376,6 +381,10 @@
         "toggleViewer": {
             "title": "Переключить просмотр изображений",
             "desc": "Переключение между средством просмотра изображений и рабочей областью для текущей вкладки."
+        },
+        "postProcess": {
+            "desc": "Обработайте текущее изображение с помощью выбранной модели постобработки",
+            "title": "Обработать изображение"
         }
     },
     "modelManager": {
@@ -589,7 +598,10 @@
         "infillColorValue": "Цвет заливки",
         "globalSettings": "Глобальные настройки",
         "globalNegativePromptPlaceholder": "Глобальный негативный запрос",
-        "globalPositivePromptPlaceholder": "Глобальный запрос"
+        "globalPositivePromptPlaceholder": "Глобальный запрос",
+        "postProcessing": "Постобработка (Shift + U)",
+        "processImage": "Обработка изображения",
+        "sendToUpscale": "Отправить на увеличение"
     },
     "settings": {
         "models": "Модели",
@@ -623,7 +635,9 @@
         "intermediatesCleared_many": "Очищено {{count}} промежуточных",
         "clearIntermediatesDesc1": "Очистка промежуточных элементов приведет к сбросу состояния Canvas и ControlNet.",
         "intermediatesClearedFailed": "Проблема очистки промежуточных",
-        "reloadingIn": "Перезагрузка через"
+        "reloadingIn": "Перезагрузка через",
+        "informationalPopoversDisabled": "Информационные всплывающие окна отключены",
+        "informationalPopoversDisabledDesc": "Информационные всплывающие окна были отключены. Включите их в Настройках."
     },
     "toast": {
         "uploadFailed": "Загрузка не удалась",
@@ -694,7 +708,9 @@
         "sessionRef": "Сессия: {{sessionId}}",
         "outOfMemoryError": "Ошибка нехватки памяти",
         "outOfMemoryErrorDesc": "Ваши текущие настройки генерации превышают возможности системы. Пожалуйста, измените настройки и повторите попытку.",
-        "somethingWentWrong": "Что-то пошло не так"
+        "somethingWentWrong": "Что-то пошло не так",
+        "importFailed": "Импорт неудачен",
+        "importSuccessful": "Импорт успешен"
     },
     "tooltip": {
         "feature": {
@@ -1017,7 +1033,8 @@
         "composition": "Только композиция",
         "hed": "HED",
         "beginEndStepPercentShort": "Начало/конец %",
-        "setControlImageDimensionsForce": "Скопируйте размер в Ш/В (игнорируйте модель)"
+        "setControlImageDimensionsForce": "Скопируйте размер в Ш/В (игнорируйте модель)",
+        "depthAnythingSmallV2": "Small V2"
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
@@ -1042,7 +1059,7 @@
         "downloadBoard": "Скачать доску",
         "deleteBoard": "Удалить доску",
         "deleteBoardAndImages": "Удалить доску и изображения",
-        "deletedBoardsCannotbeRestored": "Удаленные доски не подлежат восстановлению",
+        "deletedBoardsCannotbeRestored": "Удаленные доски не могут быть восстановлены. Выбор «Удалить только доску» переведет изображения в состояние без категории.",
         "assetsWithCount_one": "{{count}} ассет",
         "assetsWithCount_few": "{{count}} ассета",
         "assetsWithCount_many": "{{count}} ассетов",
@@ -1057,7 +1074,11 @@
         "boards": "Доски",
         "addPrivateBoard": "Добавить личную доску",
         "private": "Личные доски",
-        "shared": "Общие доски"
+        "shared": "Общие доски",
+        "hideBoards": "Скрыть доски",
+        "viewBoards": "Просмотреть доски",
+        "noBoards": "Нет досок {{boardType}}",
+        "deletedPrivateBoardsCannotbeRestored": "Удаленные доски не могут быть восстановлены. Выбор «Удалить только доску» переведет изображения в приватное состояние без категории для создателя изображения."
     },
     "dynamicPrompts": {
         "seedBehaviour": {
@@ -1417,6 +1438,30 @@
             "paragraphs": [
                 "Метод, с помощью которого применяется текущий IP-адаптер."
             ]
+        },
+        "structure": {
+            "paragraphs": [
+                "Структура контролирует, насколько точно выходное изображение будет соответствовать макету оригинала. Низкая структура допускает значительные изменения, в то время как высокая структура строго сохраняет исходную композицию и макет."
+            ],
+            "heading": "Структура"
+        },
+        "scale": {
+            "paragraphs": [
+                "Масштаб управляет размером выходного изображения и основывается на кратном разрешении входного изображения. Например, при увеличении в 2 раза изображения 1024x1024 на выходе получится 2048 x 2048."
+            ],
+            "heading": "Масштаб"
+        },
+        "creativity": {
+            "paragraphs": [
+                "Креативность контролирует степень свободы, предоставляемой модели при добавлении деталей. При низкой креативности модель остается близкой к оригинальному изображению, в то время как высокая креативность позволяет вносить больше изменений. При использовании подсказки высокая креативность увеличивает влияние подсказки."
+            ],
+            "heading": "Креативность"
+        },
+        "upscaleModel": {
+            "heading": "Модель увеличения",
+            "paragraphs": [
+                "Модель увеличения масштаба масштабирует изображение до выходного размера перед добавлением деталей. Можно использовать любую поддерживаемую модель масштабирования, но некоторые из них специализированы для различных видов изображений, например фотографий или линейных рисунков."
+            ]
         }
     },
     "metadata": {
@@ -1693,7 +1738,78 @@
             "canvasTab": "$t(ui.tabs.canvas) $t(common.tab)",
             "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
-            "queue": "Очередь"
+            "queue": "Очередь",
+            "upscaling": "Увеличение",
+            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
         }
+    },
+    "upscaling": {
+        "exceedsMaxSize": "Параметры масштабирования превышают максимальный размер",
+        "exceedsMaxSizeDetails": "Максимальный предел масштабирования составляет {{maxUpscaleDimension}}x{{maxUpscaleDimension}} пикселей. Пожалуйста, попробуйте использовать меньшее изображение или уменьшите масштаб.",
+        "structure": "Структура",
+        "missingTileControlNetModel": "Не установлены подходящие модели ControlNet",
+        "missingUpscaleInitialImage": "Отсутствует увеличиваемое изображение",
+        "missingUpscaleModel": "Отсутствует увеличивающая модель",
+        "creativity": "Креативность",
+        "upscaleModel": "Модель увеличения",
+        "scale": "Масштаб",
+        "mainModelDesc": "Основная модель (архитектура SD1.5 или SDXL)",
+        "upscaleModelDesc": "Модель увеличения (img2img)",
+        "postProcessingModel": "Модель постобработки",
+        "tileControlNetModelDesc": "Модель ControlNet для выбранной архитектуры основной модели",
+        "missingModelsWarning": "Зайдите в <LinkComponent>Менеджер моделей</LinkComponent> чтоб установить необходимые модели:",
+        "postProcessingMissingModelWarning": "Посетите <LinkComponent>Менеджер моделей</LinkComponent>, чтобы установить модель постобработки (img2img)."
+    },
+    "stylePresets": {
+        "noMatchingTemplates": "Нет подходящих шаблонов",
+        "promptTemplatesDesc1": "Шаблоны подсказок добавляют текст к подсказкам, которые вы пишете в окне подсказок.",
+        "sharedTemplates": "Общие шаблоны",
+        "templateDeleted": "Шаблон запроса удален",
+        "toggleViewMode": "Переключить режим просмотра",
+        "type": "Тип",
+        "unableToDeleteTemplate": "Не получилось удалить шаблон запроса",
+        "viewModeTooltip": "Вот как будет выглядеть ваш запрос с выбранным шаблоном. Чтобы его отредактировать, щелкните в любом месте текстового поля.",
+        "viewList": "Просмотреть список шаблонов",
+        "active": "Активно",
+        "choosePromptTemplate": "Выберите шаблон запроса",
+        "defaultTemplates": "Стандартные шаблоны",
+        "deleteImage": "Удалить изображение",
+        "deleteTemplate": "Удалить шаблон",
+        "deleteTemplate2": "Вы уверены, что хотите удалить этот шаблон? Это нельзя отменить.",
+        "editTemplate": "Редактировать шаблон",
+        "exportPromptTemplates": "Экспорт моих шаблонов запроса (CSV)",
+        "exportDownloaded": "Экспорт скачан",
+        "exportFailed": "Невозможно сгенерировать и загрузить CSV",
+        "flatten": "Объединить выбранный шаблон с текущим запросом",
+        "acceptedColumnsKeys": "Принимаемые столбцы/ключи:",
+        "positivePromptColumn": "'prompt' или 'positive_prompt'",
+        "insertPlaceholder": "Вставить заполнитель",
+        "name": "Имя",
+        "negativePrompt": "Негативный запрос",
+        "promptTemplatesDesc3": "Если вы не используете заполнитель, шаблон будет добавлен в конец запроса.",
+        "positivePrompt": "Позитивный запрос",
+        "preview": "Предпросмотр",
+        "private": "Приватный",
+        "templateActions": "Действия с шаблоном",
+        "updatePromptTemplate": "Обновить шаблон запроса",
+        "uploadImage": "Загрузить изображение",
+        "useForTemplate": "Использовать для шаблона запроса",
+        "clearTemplateSelection": "Очистить выбор шаблона",
+        "copyTemplate": "Копировать шаблон",
+        "createPromptTemplate": "Создать шаблон запроса",
+        "importTemplates": "Импортировать шаблоны запроса (CSV/JSON)",
+        "nameColumn": "'name'",
+        "negativePromptColumn": "'negative_prompt'",
+        "myTemplates": "Мои шаблоны",
+        "noTemplates": "Нет шаблонов",
+        "promptTemplatesDesc2": "Используйте строку-заполнитель <Pre>{{placeholder}}</Pre>, чтобы указать место, куда должен быть включен ваш запрос в шаблоне.",
+        "searchByName": "Поиск по имени",
+        "shared": "Общий"
+    },
+    "upsell": {
+        "inviteTeammates": "Пригласите членов команды",
+        "professional": "Профессионал",
+        "professionalUpsell": "Доступно в профессиональной версии Invoke. Нажмите здесь или посетите invoke.com/pricing для получения более подробной информации.",
+        "shareAccess": "Поделиться доступом"
     }
 }

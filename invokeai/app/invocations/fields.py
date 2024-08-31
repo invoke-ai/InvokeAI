@@ -40,14 +40,18 @@ class UIType(str, Enum, metaclass=MetaEnum):
 
     # region Model Field Types
     MainModel = "MainModelField"
+    FluxMainModel = "FluxMainModelField"
     SDXLMainModel = "SDXLMainModelField"
     SDXLRefinerModel = "SDXLRefinerModelField"
     ONNXModel = "ONNXModelField"
     VAEModel = "VAEModelField"
+    FluxVAEModel = "FluxVAEModelField"
     LoRAModel = "LoRAModelField"
     ControlNetModel = "ControlNetModelField"
     IPAdapterModel = "IPAdapterModelField"
     T2IAdapterModel = "T2IAdapterModelField"
+    T5EncoderModel = "T5EncoderModelField"
+    CLIPEmbedModel = "CLIPEmbedModelField"
     SpandrelImageToImageModel = "SpandrelImageToImageModelField"
     # endregion
 
@@ -125,13 +129,17 @@ class FieldDescriptions:
     negative_cond = "Negative conditioning tensor"
     noise = "Noise tensor"
     clip = "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count"
+    t5_encoder = "T5 tokenizer and text encoder"
+    clip_embed_model = "CLIP Embed loader"
     unet = "UNet (scheduler, LoRAs)"
+    transformer = "Transformer"
     vae = "VAE"
     cond = "Conditioning tensor"
     controlnet_model = "ControlNet model to load"
     vae_model = "VAE model to load"
     lora_model = "LoRA model to load"
     main_model = "Main model (UNet, VAE, CLIP) to load"
+    flux_model = "Flux model (Transformer) to load"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -229,6 +237,12 @@ class ColorField(BaseModel):
 
     def tuple(self) -> Tuple[int, int, int, int]:
         return (self.r, self.g, self.b, self.a)
+
+
+class FluxConditioningField(BaseModel):
+    """A conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
 
 
 class ConditioningField(BaseModel):

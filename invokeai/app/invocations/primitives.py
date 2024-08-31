@@ -12,6 +12,7 @@ from invokeai.app.invocations.fields import (
     ConditioningField,
     DenoiseMaskField,
     FieldDescriptions,
+    FluxConditioningField,
     ImageField,
     Input,
     InputField,
@@ -412,6 +413,17 @@ class MaskOutput(BaseInvocationOutput):
     mask: TensorField = OutputField(description="The mask.")
     width: int = OutputField(description="The width of the mask in pixels.")
     height: int = OutputField(description="The height of the mask in pixels.")
+
+
+@invocation_output("flux_conditioning_output")
+class FluxConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a single conditioning tensor"""
+
+    conditioning: FluxConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "FluxConditioningOutput":
+        return cls(conditioning=FluxConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("conditioning_output")

@@ -2,12 +2,15 @@ import { FieldParseError } from 'features/nodes/types/error';
 import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
+  CLIPEmbedModelFieldInputTemplate,
   ColorFieldInputTemplate,
   ControlNetModelFieldInputTemplate,
   EnumFieldInputTemplate,
   FieldInputTemplate,
   FieldType,
   FloatFieldInputTemplate,
+  FluxMainModelFieldInputTemplate,
+  FluxVAEModelFieldInputTemplate,
   ImageFieldInputTemplate,
   IntegerFieldInputTemplate,
   IPAdapterModelFieldInputTemplate,
@@ -22,6 +25,7 @@ import type {
   StatelessFieldInputTemplate,
   StringFieldInputTemplate,
   T2IAdapterModelFieldInputTemplate,
+  T5EncoderModelFieldInputTemplate,
   VAEModelFieldInputTemplate,
 } from 'features/nodes/types/field';
 import { isStatefulFieldType } from 'features/nodes/types/field';
@@ -180,6 +184,20 @@ const buildSDXLMainModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLMainMo
   return template;
 };
 
+const buildFluxMainModelFieldInputTemplate: FieldInputTemplateBuilder<FluxMainModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FluxMainModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildRefinerModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLRefinerModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -200,6 +218,48 @@ const buildVAEModelFieldInputTemplate: FieldInputTemplateBuilder<VAEModelFieldIn
   fieldType,
 }) => {
   const template: VAEModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildT5EncoderModelFieldInputTemplate: FieldInputTemplateBuilder<T5EncoderModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: T5EncoderModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildCLIPEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPEmbedModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: CLIPEmbedModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildFluxVAEModelFieldInputTemplate: FieldInputTemplateBuilder<FluxVAEModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FluxVAEModelFieldInputTemplate = {
     ...baseField,
     type: fieldType,
     default: schemaObject.default ?? undefined,
@@ -386,11 +446,15 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   MainModelField: buildMainModelFieldInputTemplate,
   SchedulerField: buildSchedulerFieldInputTemplate,
   SDXLMainModelField: buildSDXLMainModelFieldInputTemplate,
+  FluxMainModelField: buildFluxMainModelFieldInputTemplate,
   SDXLRefinerModelField: buildRefinerModelFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
   T2IAdapterModelField: buildT2IAdapterModelFieldInputTemplate,
   SpandrelImageToImageModelField: buildSpandrelImageToImageModelFieldInputTemplate,
   VAEModelField: buildVAEModelFieldInputTemplate,
+  T5EncoderModelField: buildT5EncoderModelFieldInputTemplate,
+  CLIPEmbedModelField: buildCLIPEmbedModelFieldInputTemplate,
+  FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
 } as const;
 
 export const buildFieldInputTemplate = (

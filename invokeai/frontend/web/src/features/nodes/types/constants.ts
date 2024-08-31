@@ -31,6 +31,7 @@ export const MODEL_TYPES = [
   'ControlNetModelField',
   'LoRAModelField',
   'MainModelField',
+  'FluxMainModelField',
   'SDXLMainModelField',
   'SDXLRefinerModelField',
   'VaeModelField',
@@ -38,6 +39,7 @@ export const MODEL_TYPES = [
   'VAEField',
   'CLIPField',
   'T2IAdapterModelField',
+  'T5EncoderField',
   'SpandrelImageToImageModelField',
 ];
 
@@ -50,6 +52,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   CLIPField: 'green.500',
   ColorField: 'pink.300',
   ConditioningField: 'cyan.500',
+  FluxConditioningField: 'cyan.500',
   ControlField: 'teal.500',
   ControlNetModelField: 'teal.500',
   EnumField: 'blue.500',
@@ -61,6 +64,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   LatentsField: 'pink.500',
   LoRAModelField: 'teal.500',
   MainModelField: 'teal.500',
+  FluxMainModelField: 'teal.500',
   SDXLMainModelField: 'teal.500',
   SDXLRefinerModelField: 'teal.500',
   SpandrelImageToImageModelField: 'teal.500',
@@ -68,6 +72,8 @@ export const FIELD_COLORS: { [key: string]: string } = {
   T2IAdapterField: 'teal.500',
   T2IAdapterModelField: 'teal.500',
   UNetField: 'red.500',
+  T5EncoderField: 'green.500',
+  TransformerField: 'red.500',
   VAEField: 'blue.500',
   VAEModelField: 'teal.500',
 };

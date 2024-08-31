@@ -30,6 +30,7 @@ from invokeai.app.api.routers import (
     images,
     model_manager,
     session_queue,
+    style_presets,
     utilities,
     workflows,
 )
@@ -55,11 +56,13 @@ mimetypes.add_type("text/css", ".css")
 torch_device_name = TorchDevice.get_torch_device_name()
 logger.info(f"Using torch device: {torch_device_name}")
 
+loop = asyncio.new_event_loop()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Add startup event to load dependencies
-    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
+    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, loop=loop, logger=logger)
     yield
     # Shut down threads
     ApiDependencies.shutdown()
@@ -106,6 +109,7 @@ app.include_router(board_images.board_images_router, prefix="/api")
 app.include_router(app_info.app_router, prefix="/api")
 app.include_router(session_queue.session_queue_router, prefix="/api")
 app.include_router(workflows.workflows_router, prefix="/api")
+app.include_router(style_presets.style_presets_router, prefix="/api")
 
 app.openapi = get_openapi_func(app)
 
@@ -184,8 +188,6 @@ def invoke_api() -> None:
 
     check_cudnn(logger)
 
-    # Start our own event loop for eventing usage
-    loop = asyncio.new_event_loop()
     config = uvicorn.Config(
         app=app,
         host=app_config.host,
