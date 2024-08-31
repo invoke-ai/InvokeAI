@@ -1,6 +1,7 @@
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
-import { CANVAS_GRID_SIZE_FINE } from 'features/controlLayers/konva/constants';
 import type { Dimensions } from 'features/controlLayers/store/types';
+
+const CANVAS_GRID_SIZE_FINE = 8;
 
 /**
  * Scales the bounding box dimensions to the optimal dimension. The optimal dimensions should be the trained dimension

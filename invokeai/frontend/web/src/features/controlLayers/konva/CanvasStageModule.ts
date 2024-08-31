@@ -1,6 +1,5 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
-import { CANVAS_SCALE_BY } from 'features/controlLayers/konva/constants';
 import { getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, Coordinate, Dimensions, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
@@ -8,11 +7,29 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
 import type { Logger } from 'roarr';
 
+type CanvasStageModuleConfig = {
+  /**
+   * The minimum (furthest-zoomed-in) scale of the canvas
+   */
+  MIN_SCALE: number;
+  /**
+   * The maximum (furthest-zoomed-out) scale of the canvas
+   */
+  MAX_SCALE: number;
+  /**
+   * The factor by which the canvas should be scaled when zooming in/out
+   */
+  SCALE_FACTOR: number;
+};
+
+const DEFAULT_CONFIG: CanvasStageModuleConfig = {
+  MIN_SCALE: 0.1,
+  MAX_SCALE: 20,
+  SCALE_FACTOR: 0.999,
+};
+
 export class CanvasStageModule extends CanvasModuleABC {
   readonly type = 'stage';
-
-  static MIN_CANVAS_SCALE = 0.1;
-  static MAX_CANVAS_SCALE = 20;
 
   id: string;
   path: string[];
@@ -20,15 +37,22 @@ export class CanvasStageModule extends CanvasModuleABC {
   manager: CanvasManager;
   container: HTMLDivElement;
   log: Logger;
+  config: CanvasStageModuleConfig;
 
   subscriptions = new Set<() => void>();
 
-  constructor(stage: Konva.Stage, container: HTMLDivElement, manager: CanvasManager) {
+  constructor(
+    stage: Konva.Stage,
+    container: HTMLDivElement,
+    manager: CanvasManager,
+    config?: Partial<CanvasStageModuleConfig>
+  ) {
     super();
     this.id = getPrefixedId('stage');
     this.manager = manager;
     this.path = this.manager.path.concat(this.id);
     this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.config = { ...DEFAULT_CONFIG, ...config };
 
     this.log.debug('Creating stage module');
 
@@ -163,11 +187,7 @@ export class CanvasStageModule extends CanvasModuleABC {
    */
   setScale = (scale: number, center: Coordinate = this.getCenter(true)) => {
     this.log.trace('Setting scale');
-    const newScale = clamp(
-      Math.round(scale * 100) / 100,
-      CanvasStageModule.MIN_CANVAS_SCALE,
-      CanvasStageModule.MAX_CANVAS_SCALE
-    );
+    const newScale = clamp(Math.round(scale * 100) / 100, this.config.MIN_SCALE, this.config.MAX_SCALE);
 
     const { x, y } = this.getPosition();
     const oldScale = this.getScale();
@@ -207,7 +227,7 @@ export class CanvasStageModule extends CanvasModuleABC {
     if (cursorPos) {
       // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
       const delta = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
-      const scale = this.manager.stage.getScale() * CANVAS_SCALE_BY ** delta;
+      const scale = this.manager.stage.getScale() * this.config.SCALE_FACTOR ** delta;
       this.manager.stage.setScale(scale, cursorPos);
     }
   };

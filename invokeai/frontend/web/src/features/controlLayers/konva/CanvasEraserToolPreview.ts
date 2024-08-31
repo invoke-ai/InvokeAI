@@ -1,0 +1,141 @@
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
+import { alignCoordForTool, getPrefixedId } from 'features/controlLayers/konva/util';
+import Konva from 'konva';
+import type { Logger } from 'roarr';
+
+type EraserToolPreviewConfig = {
+  /**
+   * The inner border color for the eraser tool preview.
+   */
+  BORDER_INNER_COLOR: string;
+  /**
+   * The outer border color for the eraser tool preview.
+   */
+  BORDER_OUTER_COLOR: string;
+};
+
+const DEFAULT_CONFIG: EraserToolPreviewConfig = {
+  BORDER_INNER_COLOR: 'rgba(0,0,0,1)',
+  BORDER_OUTER_COLOR: 'rgba(255,255,255,0.8)',
+};
+
+export class CanvasEraserToolPreview extends CanvasModuleABC {
+  readonly type = 'eraser_tool_preview';
+
+  id: string;
+  path: string[];
+  parent: CanvasToolModule;
+  manager: CanvasManager;
+  log: Logger;
+  subscriptions: Set<() => void> = new Set();
+
+  config: EraserToolPreviewConfig;
+
+  konva: {
+    group: Konva.Group;
+    cutoutCircle: Konva.Circle;
+    innerBorder: Konva.Ring;
+    outerBorder: Konva.Ring;
+  };
+
+  constructor(parent: CanvasToolModule, config?: Partial<EraserToolPreviewConfig>) {
+    super();
+    this.id = getPrefixedId(this.type);
+    this.parent = parent;
+    this.manager = this.parent.manager;
+    this.path = this.parent.path.concat(this.id);
+    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.config = { ...DEFAULT_CONFIG, ...config };
+
+    this.log.debug('Creating eraser tool preview module');
+
+    this.konva = {
+      group: new Konva.Group({ name: `${this.type}:eraser_group`, listening: false }),
+      cutoutCircle: new Konva.Circle({
+        name: `${this.type}:eraser_cutout_circle`,
+        listening: false,
+        strokeEnabled: false,
+        // The fill is used only to erase what is underneath it, so its color doesn't matter - just needs to be opaque
+        fill: 'white',
+        globalCompositeOperation: 'destination-out',
+      }),
+      innerBorder: new Konva.Ring({
+        name: `${this.type}:eraser_inner_border_ring`,
+        listening: false,
+        innerRadius: 0,
+        outerRadius: 0,
+        fill: this.config.BORDER_INNER_COLOR,
+        strokeEnabled: false,
+      }),
+      outerBorder: new Konva.Ring({
+        name: `${this.type}:eraser_outer_border_ring`,
+        innerRadius: 0,
+        outerRadius: 0,
+        fill: this.config.BORDER_OUTER_COLOR,
+        strokeEnabled: false,
+      }),
+    };
+    this.konva.group.add(this.konva.cutoutCircle, this.konva.innerBorder, this.konva.outerBorder);
+  }
+
+  render = () => {
+    const cursorPos = this.manager.stateApi.$lastCursorPos.get();
+
+    if (!cursorPos) {
+      return;
+    }
+
+    const toolState = this.manager.stateApi.getToolState();
+    const alignedCursorPos = alignCoordForTool(cursorPos, toolState.eraser.width);
+    const radius = toolState.eraser.width / 2;
+
+    // The circle is scaled
+    this.konva.cutoutCircle.setAttrs({
+      x: alignedCursorPos.x,
+      y: alignedCursorPos.y,
+      radius,
+    });
+
+    // But the borders are in screen-pixels
+    const onePixel = this.manager.stage.getScaledPixels(1);
+    const twoPixels = this.manager.stage.getScaledPixels(2);
+
+    this.konva.innerBorder.setAttrs({
+      x: cursorPos.x,
+      y: cursorPos.y,
+      innerRadius: radius,
+      outerRadius: radius + onePixel,
+    });
+    this.konva.outerBorder.setAttrs({
+      x: cursorPos.x,
+      y: cursorPos.y,
+      innerRadius: radius + onePixel,
+      outerRadius: radius + twoPixels,
+    });
+  };
+
+  setVisibility = (visible: boolean) => {
+    this.konva.group.visible(visible);
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      config: this.config,
+    };
+  };
+
+  destroy = () => {
+    this.log.debug('Destroying eraser tool preview module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.konva.group.destroy();
+  };
+
+  getLoggingContext = () => {
+    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
+  };
+}

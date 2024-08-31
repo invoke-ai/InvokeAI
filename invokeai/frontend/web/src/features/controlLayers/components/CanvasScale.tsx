@@ -15,9 +15,8 @@ import {
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { MAX_CANVAS_SCALE, MIN_CANVAS_SCALE } from 'features/controlLayers/konva/constants';
 import { snapToNearest } from 'features/controlLayers/konva/util';
-import { clamp, round } from 'lodash-es';
+import { round } from 'lodash-es';
 import { computed } from 'nanostores';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
@@ -102,7 +101,7 @@ export const CanvasScale = memo(() => {
       setLocalScale(100);
       return;
     }
-    canvasManager.stage.setScale(clamp(localScale / 100, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE));
+    canvasManager.stage.setScale(localScale / 100);
   }, [canvasManager, localScale]);
 
   const onChangeNumberInput = useCallback((valueAsString: string, valueAsNumber: number) => {
@@ -130,8 +129,8 @@ export const CanvasScale = memo(() => {
           <NumberInput
             display="flex"
             alignItems="center"
-            min={MIN_CANVAS_SCALE * 100}
-            max={MAX_CANVAS_SCALE * 100}
+            min={canvasManager.stage.config.MIN_SCALE * 100}
+            max={canvasManager.stage.config.MAX_SCALE * 100}
             value={localScale}
             onChange={onChangeNumberInput}
             onBlur={onBlur}
