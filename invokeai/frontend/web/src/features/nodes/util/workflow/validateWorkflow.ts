@@ -29,6 +29,7 @@ const MODEL_FIELD_TYPES = [
   'ModelIdentifier',
   'MainModelField',
   'SDXLMainModelField',
+  'FluxMainModelField',
   'SDXLRefinerModelField',
   'VAEModelField',
   'LoRAModelField',

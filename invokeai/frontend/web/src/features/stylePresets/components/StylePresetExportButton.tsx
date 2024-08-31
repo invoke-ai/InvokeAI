@@ -16,9 +16,9 @@ export const StylePresetExportButton = () => {
   const { t } = useTranslation();
   const { presetCount } = useListStylePresetsQuery(undefined, {
     selectFromResult: ({ data }) => {
-      const userPresets = data?.filter((preset) => preset.type === 'user') ?? EMPTY_ARRAY;
+      const presetsToExport = data?.filter((preset) => preset.type !== 'default') ?? EMPTY_ARRAY;
       return {
-        presetCount: userPresets.length,
+        presetCount: presetsToExport.length,
       };
     },
   });

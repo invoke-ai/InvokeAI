@@ -34,6 +34,7 @@ classifiers = [
 dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate==0.31.0",
+  "bitsandbytes==0.43.3; sys_platform!='darwin'",
   "clip_anytorch==2.6.0",       # replacing "clip @ https://github.com/openai/CLIP/archive/eaa22acb90a5876642d0507623e859909230a52d.zip",
   "compel==2.0.2",
   "controlnet-aux==0.0.7",
@@ -46,6 +47,8 @@ dependencies = [
   "opencv-python==4.9.0.80",
   "pytorch-lightning==2.1.3",
   "safetensors==0.4.3",
+  # sentencepiece is required to load T5TokenizerFast (used by FLUX).
+  "sentencepiece==0.2.0",
   "spandrel==0.3.4",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
   "torch==2.2.2",
@@ -127,8 +130,6 @@ dependencies = [
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"
-"invokeai-import-images" = "invokeai.frontend.install.import_images:main"
-"invokeai-db-maintenance" = "invokeai.backend.util.db_maintenance:main"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"

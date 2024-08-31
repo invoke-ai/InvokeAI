@@ -5,14 +5,16 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
 
 import { StarterModelsResultItem } from './StartModelsResultItem';
 
 type StarterModelsResultsProps = {
   results: NonNullable<GetStarterModelsResponse>;
+  modelList: AnyModelConfig[];
 };
 
-export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps) => {
+export const StarterModelsResults = memo(({ results, modelList }: StarterModelsResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -72,7 +74,7 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
         <ScrollableContent>
           <Flex flexDir="column" gap={3}>
             {filteredResults.map((result) => (
-              <StarterModelsResultItem key={result.source} result={result} />
+              <StarterModelsResultItem key={result.source} result={result} modelList={modelList} />
             ))}
           </Flex>
         </ScrollableContent>

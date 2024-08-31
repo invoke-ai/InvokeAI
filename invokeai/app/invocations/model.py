@@ -1,5 +1,5 @@
 import copy
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -13,7 +13,14 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
-from invokeai.backend.model_manager.config import AnyModelConfig, BaseModelType, ModelType, SubModelType
+from invokeai.backend.flux.util import max_seq_lengths
+from invokeai.backend.model_manager.config import (
+    AnyModelConfig,
+    BaseModelType,
+    CheckpointConfigBase,
+    ModelType,
+    SubModelType,
+)
 
 
 class ModelIdentifierField(BaseModel):
@@ -58,6 +65,15 @@ class CLIPField(BaseModel):
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
     skipped_layers: int = Field(description="Number of skipped layers in text_encoder")
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
+
+
+class TransformerField(BaseModel):
+    transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
+
+
+class T5EncoderField(BaseModel):
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
 
 
 class VAEField(BaseModel):
@@ -120,6 +136,112 @@ class ModelIdentifierInvocation(BaseInvocation):
             raise Exception(f"Unknown model {self.model.key}")
 
         return ModelIdentifierOutput(model=self.model)
+
+
+@invocation_output("flux_model_loader_output")
+class FluxModelLoaderOutput(BaseInvocationOutput):
+    """Flux base model loader output"""
+
+    transformer: TransformerField = OutputField(description=FieldDescriptions.transformer, title="Transformer")
+    clip: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP")
+    t5_encoder: T5EncoderField = OutputField(description=FieldDescriptions.t5_encoder, title="T5 Encoder")
+    vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
+    max_seq_len: Literal[256, 512] = OutputField(
+        description="The max sequence length to used for the T5 encoder. (256 for schnell transformer, 512 for dev transformer)",
+        title="Max Seq Length",
+    )
+
+
+@invocation(
+    "flux_model_loader",
+    title="Flux Main Model",
+    tags=["model", "flux"],
+    category="model",
+    version="1.0.3",
+    classification=Classification.Prototype,
+)
+class FluxModelLoaderInvocation(BaseInvocation):
+    """Loads a flux base model, outputting its submodels."""
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.flux_model,
+        ui_type=UIType.FluxMainModel,
+        input=Input.Direct,
+    )
+
+    t5_encoder: ModelIdentifierField = InputField(
+        description=FieldDescriptions.t5_encoder,
+        ui_type=UIType.T5EncoderModel,
+        input=Input.Direct,
+    )
+
+    def invoke(self, context: InvocationContext) -> FluxModelLoaderOutput:
+        model_key = self.model.key
+
+        if not context.models.exists(model_key):
+            raise ValueError(f"Unknown model: {model_key}")
+        transformer = self._get_model(context, SubModelType.Transformer)
+        tokenizer = self._get_model(context, SubModelType.Tokenizer)
+        tokenizer2 = self._get_model(context, SubModelType.Tokenizer2)
+        clip_encoder = self._get_model(context, SubModelType.TextEncoder)
+        t5_encoder = self._get_model(context, SubModelType.TextEncoder2)
+        vae = self._get_model(context, SubModelType.VAE)
+        transformer_config = context.models.get_config(transformer)
+        assert isinstance(transformer_config, CheckpointConfigBase)
+
+        return FluxModelLoaderOutput(
+            transformer=TransformerField(transformer=transformer),
+            clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], skipped_layers=0),
+            t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder),
+            vae=VAEField(vae=vae),
+            max_seq_len=max_seq_lengths[transformer_config.config_path],
+        )
+
+    def _get_model(self, context: InvocationContext, submodel: SubModelType) -> ModelIdentifierField:
+        match submodel:
+            case SubModelType.Transformer:
+                return self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+            case SubModelType.VAE:
+                return self._pull_model_from_mm(
+                    context,
+                    SubModelType.VAE,
+                    "FLUX.1-schnell_ae",
+                    ModelType.VAE,
+                    BaseModelType.Flux,
+                )
+            case submodel if submodel in [SubModelType.Tokenizer, SubModelType.TextEncoder]:
+                return self._pull_model_from_mm(
+                    context,
+                    submodel,
+                    "clip-vit-large-patch14",
+                    ModelType.CLIPEmbed,
+                    BaseModelType.Any,
+                )
+            case submodel if submodel in [SubModelType.Tokenizer2, SubModelType.TextEncoder2]:
+                return self._pull_model_from_mm(
+                    context,
+                    submodel,
+                    self.t5_encoder.name,
+                    ModelType.T5Encoder,
+                    BaseModelType.Any,
+                )
+            case _:
+                raise Exception(f"{submodel.value} is not a supported submodule for a flux model")
+
+    def _pull_model_from_mm(
+        self,
+        context: InvocationContext,
+        submodel: SubModelType,
+        name: str,
+        type: ModelType,
+        base: BaseModelType,
+    ):
+        if models := context.models.search_by_attrs(name=name, base=base, type=type):
+            if len(models) != 1:
+                raise Exception(f"Multiple models detected for selected model with name {name}")
+            return ModelIdentifierField.from_config(models[0]).model_copy(update={"submodel_type": submodel})
+        else:
+            raise ValueError(f"Please install the {base}:{type} model named {name} via starter models")
 
 
 @invocation(

@@ -29,14 +29,14 @@ export const StylePresetMenuTrigger = () => {
       py={2}
       px={3}
       borderRadius="base"
-      gap={1}
+      gap={2}
       role="button"
       _hover={_hover}
       transitionProperty="background-color"
       transitionDuration="normal"
+      w="full"
     >
       <ActiveStylePreset />
-
       <IconButton aria-label={t('stylePresets.viewList')} variant="ghost" icon={<PiCaretDownBold />} size="sm" />
     </Flex>
   );

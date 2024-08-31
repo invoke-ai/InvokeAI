@@ -95,6 +95,7 @@ class ModelProbe(object):
     }
 
     CLASS2TYPE = {
+        "FluxPipeline": ModelType.Main,
         "StableDiffusionPipeline": ModelType.Main,
         "StableDiffusionInpaintPipeline": ModelType.Main,
         "StableDiffusionXLPipeline": ModelType.Main,
@@ -106,6 +107,7 @@ class ModelProbe(object):
         "ControlNetModel": ModelType.ControlNet,
         "CLIPVisionModelWithProjection": ModelType.CLIPVision,
         "T2IAdapter": ModelType.T2IAdapter,
+        "CLIPModel": ModelType.CLIPEmbed,
     }
 
     @classmethod
@@ -161,7 +163,7 @@ class ModelProbe(object):
         fields["description"] = (
             fields.get("description") or f"{fields['base'].value} {model_type.value} model {fields['name']}"
         )
-        fields["format"] = fields.get("format") or probe.get_format()
+        fields["format"] = ModelFormat(fields.get("format")) if "format" in fields else probe.get_format()
         fields["hash"] = fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)
 
         fields["default_settings"] = fields.get("default_settings")
@@ -176,10 +178,10 @@ class ModelProbe(object):
             fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()
 
         # additional fields needed for main and controlnet models
-        if (
-            fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE]
-            and fields["format"] is ModelFormat.Checkpoint
-        ):
+        if fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE] and fields["format"] in [
+            ModelFormat.Checkpoint,
+            ModelFormat.BnbQuantizednf4b,
+        ]:
             ckpt_config_path = cls._get_checkpoint_config_path(
                 model_path,
                 model_type=fields["type"],
@@ -222,7 +224,8 @@ class ModelProbe(object):
         ckpt = ckpt.get("state_dict", ckpt)
 
         for key in [str(k) for k in ckpt.keys()]:
-            if key.startswith(("cond_stage_model.", "first_stage_model.", "model.diffusion_model.")):
+            if key.startswith(("cond_stage_model.", "first_stage_model.", "model.diffusion_model.", "double_blocks.")):
+                # Keys starting with double_blocks are associated with Flux models
                 return ModelType.Main
             elif key.startswith(("encoder.conv_in", "decoder.conv_in")):
                 return ModelType.VAE
@@ -321,10 +324,27 @@ class ModelProbe(object):
             return possible_conf.absolute()
 
         if model_type is ModelType.Main:
-            config_file = LEGACY_CONFIGS[base_type][variant_type]
-            if isinstance(config_file, dict):  # need another tier for sd-2.x models
-                config_file = config_file[prediction_type]
-            config_file = f"stable-diffusion/{config_file}"
+            if base_type == BaseModelType.Flux:
+                # TODO: Decide between dev/schnell
+                checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
+                state_dict = checkpoint.get("state_dict") or checkpoint
+                if "guidance_in.out_layer.weight" in state_dict:
+                    # For flux, this is a key in invokeai.backend.flux.util.params
+                    #   Due to model type and format being the descriminator for model configs this
+                    #   is used rather than attempting to support flux with separate model types and format
+                    #   If changed in the future, please fix me
+                    config_file = "flux-dev"
+                else:
+                    # For flux, this is a key in invokeai.backend.flux.util.params
+                    #   Due to model type and format being the descriminator for model configs this
+                    #   is used rather than attempting to support flux with separate model types and format
+                    #   If changed in the future, please fix me
+                    config_file = "flux-schnell"
+            else:
+                config_file = LEGACY_CONFIGS[base_type][variant_type]
+                if isinstance(config_file, dict):  # need another tier for sd-2.x models
+                    config_file = config_file[prediction_type]
+                config_file = f"stable-diffusion/{config_file}"
         elif model_type is ModelType.ControlNet:
             config_file = (
                 "controlnet/cldm_v15.yaml"
@@ -333,7 +353,13 @@ class ModelProbe(object):
             )
         elif model_type is ModelType.VAE:
             config_file = (
-                "stable-diffusion/v1-inference.yaml"
+                # For flux, this is a key in invokeai.backend.flux.util.ae_params
+                #   Due to model type and format being the descriminator for model configs this
+                #   is used rather than attempting to support flux with separate model types and format
+                #   If changed in the future, please fix me
+                "flux"
+                if base_type is BaseModelType.Flux
+                else "stable-diffusion/v1-inference.yaml"
                 if base_type is BaseModelType.StableDiffusion1
                 else "stable-diffusion/sd_xl_base.yaml"
                 if base_type is BaseModelType.StableDiffusionXL
@@ -416,11 +442,15 @@ class CheckpointProbeBase(ProbeBase):
         self.checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
 
     def get_format(self) -> ModelFormat:
+        state_dict = self.checkpoint.get("state_dict") or self.checkpoint
+        if "double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict:
+            return ModelFormat.BnbQuantizednf4b
         return ModelFormat("checkpoint")
 
     def get_variant_type(self) -> ModelVariantType:
         model_type = ModelProbe.get_model_type_from_checkpoint(self.model_path, self.checkpoint)
-        if model_type != ModelType.Main:
+        base_type = self.get_base_type()
+        if model_type != ModelType.Main or base_type == BaseModelType.Flux:
             return ModelVariantType.Normal
         state_dict = self.checkpoint.get("state_dict") or self.checkpoint
         in_channels = state_dict["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
@@ -440,6 +470,8 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
     def get_base_type(self) -> BaseModelType:
         checkpoint = self.checkpoint
         state_dict = self.checkpoint.get("state_dict") or checkpoint
+        if "double_blocks.0.img_attn.norm.key_norm.scale" in state_dict:
+            return BaseModelType.Flux
         key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
         if key_name in state_dict and state_dict[key_name].shape[-1] == 768:
             return BaseModelType.StableDiffusion1
@@ -482,6 +514,7 @@ class VaeCheckpointProbe(CheckpointProbeBase):
             (r"xl", BaseModelType.StableDiffusionXL),
             (r"sd2", BaseModelType.StableDiffusion2),
             (r"vae", BaseModelType.StableDiffusion1),
+            (r"FLUX.1-schnell_ae", BaseModelType.Flux),
         ]:
             if re.search(regexp, self.model_path.name, re.IGNORECASE):
                 return basetype
@@ -541,11 +574,13 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
 
     def get_base_type(self) -> BaseModelType:
         checkpoint = self.checkpoint
+
         for key_name in (
-            "control_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
-            "controlnet_mid_block.bias",
-            "input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
-            "down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight",
+                "control_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+                "controlnet_mid_block.bias",
+                "input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+                "down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight",
+                "input_blocks.7.0.emb_layers.1.down",
         ):
             if key_name not in checkpoint:
                 continue
@@ -713,6 +748,11 @@ class TextualInversionFolderProbe(FolderProbeBase):
         return TextualInversionCheckpointProbe(path).get_base_type()
 
 
+class T5EncoderFolderProbe(FolderProbeBase):
+    def get_format(self) -> ModelFormat:
+        return ModelFormat.T5Encoder
+
+
 class ONNXFolderProbe(PipelineFolderProbe):
     def get_base_type(self) -> BaseModelType:
         # Due to the way the installer is set up, the configuration file for safetensors
@@ -805,6 +845,11 @@ class CLIPVisionFolderProbe(FolderProbeBase):
         return BaseModelType.Any
 
 
+class CLIPEmbedFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Any
+
+
 class SpandrelImageToImageFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
         raise NotImplementedError()
@@ -835,8 +880,10 @@ ModelProbe.register_probe("diffusers", ModelType.Main, PipelineFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.VAE, VaeFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.LoRA, LoRAFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.TextualInversion, TextualInversionFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.T5Encoder, T5EncoderFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.ControlNet, ControlNetFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.IPAdapter, IPAdapterFolderProbe)
+ModelProbe.register_probe("diffusers", ModelType.CLIPEmbed, CLIPEmbedFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.CLIPVision, CLIPVisionFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.T2IAdapter, T2IAdapterFolderProbe)
 ModelProbe.register_probe("diffusers", ModelType.SpandrelImageToImage, SpandrelImageToImageFolderProbe)
