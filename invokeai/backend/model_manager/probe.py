@@ -108,6 +108,8 @@ class ModelProbe(object):
         "CLIPVisionModelWithProjection": ModelType.CLIPVision,
         "T2IAdapter": ModelType.T2IAdapter,
         "CLIPModel": ModelType.CLIPEmbed,
+        "CLIPTextModel": ModelType.CLIPEmbed,
+        "T5EncoderModel": ModelType.T5Encoder,
     }
 
     @classmethod
@@ -283,9 +285,16 @@ class ModelProbe(object):
         if (folder_path / "image_encoder.txt").exists():
             return ModelType.IPAdapter
 
-        i = folder_path / "model_index.json"
-        c = folder_path / "config.json"
-        config_path = i if i.exists() else c if c.exists() else None
+        config_path = None
+        for p in [
+            folder_path / "model_index.json",  # pipeline
+            folder_path / "config.json",  # most diffusers
+            folder_path / "text_encoder_2" / "config.json",  # T5 text encoder
+            folder_path / "text_encoder" / "config.json",  # T5 CLIP
+        ]:
+            if p.exists():
+                config_path = p
+                break
 
         if config_path:
             with open(config_path, "r") as file:
@@ -336,7 +345,7 @@ class ModelProbe(object):
                     config_file = "flux-dev"
                 else:
                     # For flux, this is a key in invokeai.backend.flux.util.params
-                    #   Due to model type and format being the descriminator for model configs this
+                    #   Due to model type and format being the discriminator for model configs this
                     #   is used rather than attempting to support flux with separate model types and format
                     #   If changed in the future, please fix me
                     config_file = "flux-schnell"
@@ -749,6 +758,9 @@ class TextualInversionFolderProbe(FolderProbeBase):
 class T5EncoderFolderProbe(FolderProbeBase):
     def get_format(self) -> ModelFormat:
         return ModelFormat.T5Encoder
+
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Flux
 
 
 class ONNXFolderProbe(PipelineFolderProbe):
