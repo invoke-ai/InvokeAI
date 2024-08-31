@@ -54,8 +54,10 @@ class InvokeLinear8bitLt(bnb.nn.Linear8bitLt):
 
         # See `bnb.nn.Linear8bitLt._save_to_state_dict()` for the serialization logic of SCB and weight_format.
         scb = state_dict.pop(prefix + "SCB", None)
-        # weight_format is unused, but we pop it so we can validate that there are no unexpected keys.
-        _weight_format = state_dict.pop(prefix + "weight_format", None)
+
+        # Currently, we only support weight_format=0.
+        weight_format = state_dict.pop(prefix + "weight_format", None)
+        assert weight_format == 0
 
         # TODO(ryand): Technically, we should be using `strict`, `missing_keys`, `unexpected_keys`, and `error_msgs`
         # rather than raising an exception to correctly implement this API.
@@ -88,6 +90,14 @@ class InvokeLinear8bitLt(bnb.nn.Linear8bitLt):
                 SCB=None,
             )
             self.bias = bias if bias is None else torch.nn.Parameter(bias)
+
+        # Reset the state. The persisted fields are based on the initialization behaviour in
+        # `bnb.nn.Linear8bitLt.__init__()`.
+        new_state = bnb.MatmulLtState()
+        new_state.threshold = self.state.threshold
+        new_state.has_fp16_weights = False
+        new_state.use_pool = self.state.use_pool
+        self.state = new_state
 
 
 def _convert_linear_layers_to_llm_8bit(

@@ -7,6 +7,7 @@ import {
   isControlNetModelConfig,
   isControlNetOrT2IAdapterModelConfig,
   isFluxMainModelModelConfig,
+  isFluxVAEModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
@@ -52,3 +53,4 @@ export const useSpandrelImageToImageModels = buildModelsHook(isSpandrelImageToIm
 export const useIPAdapterModels = buildModelsHook(isIPAdapterModelConfig);
 export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
 export const useVAEModels = buildModelsHook(isVAEModelConfig);
+export const useFluxVAEModels = buildModelsHook(isFluxVAEModelConfig);

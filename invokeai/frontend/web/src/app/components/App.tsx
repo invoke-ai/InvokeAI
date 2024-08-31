@@ -14,6 +14,7 @@ import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageMo
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
+import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { configChanged } from 'features/system/store/configSlice';
 import { languageSelector } from 'features/system/store/systemSelectors';
 import InvokeTabs from 'features/ui/components/InvokeTabs';
@@ -39,10 +40,17 @@ interface Props {
     action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
   };
   selectedWorkflowId?: string;
+  selectedStylePresetId?: string;
   destination?: InvokeTabName | undefined;
 }
 
-const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflowId, destination }: Props) => {
+const App = ({
+  config = DEFAULT_CONFIG,
+  selectedImage,
+  selectedWorkflowId,
+  selectedStylePresetId,
+  destination,
+}: Props) => {
   const language = useAppSelector(languageSelector);
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
@@ -80,6 +88,12 @@ const App = ({ config = DEFAULT_CONFIG, selectedImage, selectedWorkflowId, desti
       getAndLoadWorkflow(selectedWorkflowId);
     }
   }, [selectedWorkflowId, getAndLoadWorkflow]);
+
+  useEffect(() => {
+    if (selectedStylePresetId) {
+      dispatch(activeStylePresetIdChanged(selectedStylePresetId));
+    }
+  }, [dispatch, selectedStylePresetId]);
 
   useEffect(() => {
     if (destination) {

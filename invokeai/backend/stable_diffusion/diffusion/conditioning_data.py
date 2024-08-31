@@ -43,6 +43,11 @@ class FLUXConditioningInfo:
     clip_embeds: torch.Tensor
     t5_embeds: torch.Tensor
 
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.clip_embeds = self.clip_embeds.to(device=device, dtype=dtype)
+        self.t5_embeds = self.t5_embeds.to(device=device, dtype=dtype)
+        return self
+
 
 @dataclass
 class ConditioningFieldData:

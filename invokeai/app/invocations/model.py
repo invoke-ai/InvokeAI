@@ -157,7 +157,7 @@ class FluxModelLoaderOutput(BaseInvocationOutput):
     title="Flux Main Model",
     tags=["model", "flux"],
     category="model",
-    version="1.0.3",
+    version="1.0.4",
     classification=Classification.Prototype,
 )
 class FluxModelLoaderInvocation(BaseInvocation):
@@ -169,23 +169,35 @@ class FluxModelLoaderInvocation(BaseInvocation):
         input=Input.Direct,
     )
 
-    t5_encoder: ModelIdentifierField = InputField(
-        description=FieldDescriptions.t5_encoder,
-        ui_type=UIType.T5EncoderModel,
+    t5_encoder_model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.t5_encoder, ui_type=UIType.T5EncoderModel, input=Input.Direct, title="T5 Encoder"
+    )
+
+    clip_embed_model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.clip_embed_model,
+        ui_type=UIType.CLIPEmbedModel,
         input=Input.Direct,
+        title="CLIP Embed",
+    )
+
+    vae_model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.vae_model, ui_type=UIType.FluxVAEModel, title="VAE"
     )
 
     def invoke(self, context: InvocationContext) -> FluxModelLoaderOutput:
-        model_key = self.model.key
+        for key in [self.model.key, self.t5_encoder_model.key, self.clip_embed_model.key, self.vae_model.key]:
+            if not context.models.exists(key):
+                raise ValueError(f"Unknown model: {key}")
 
-        if not context.models.exists(model_key):
-            raise ValueError(f"Unknown model: {model_key}")
-        transformer = self._get_model(context, SubModelType.Transformer)
-        tokenizer = self._get_model(context, SubModelType.Tokenizer)
-        tokenizer2 = self._get_model(context, SubModelType.Tokenizer2)
-        clip_encoder = self._get_model(context, SubModelType.TextEncoder)
-        t5_encoder = self._get_model(context, SubModelType.TextEncoder2)
-        vae = self._get_model(context, SubModelType.VAE)
+        transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+        vae = self.vae_model.model_copy(update={"submodel_type": SubModelType.VAE})
+
+        tokenizer = self.clip_embed_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+        clip_encoder = self.clip_embed_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+
+        tokenizer2 = self.t5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
+        t5_encoder = self.t5_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
+
         transformer_config = context.models.get_config(transformer)
         assert isinstance(transformer_config, CheckpointConfigBase)
 
@@ -196,52 +208,6 @@ class FluxModelLoaderInvocation(BaseInvocation):
             vae=VAEField(vae=vae),
             max_seq_len=max_seq_lengths[transformer_config.config_path],
         )
-
-    def _get_model(self, context: InvocationContext, submodel: SubModelType) -> ModelIdentifierField:
-        match submodel:
-            case SubModelType.Transformer:
-                return self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
-            case SubModelType.VAE:
-                return self._pull_model_from_mm(
-                    context,
-                    SubModelType.VAE,
-                    "FLUX.1-schnell_ae",
-                    ModelType.VAE,
-                    BaseModelType.Flux,
-                )
-            case submodel if submodel in [SubModelType.Tokenizer, SubModelType.TextEncoder]:
-                return self._pull_model_from_mm(
-                    context,
-                    submodel,
-                    "clip-vit-large-patch14",
-                    ModelType.CLIPEmbed,
-                    BaseModelType.Any,
-                )
-            case submodel if submodel in [SubModelType.Tokenizer2, SubModelType.TextEncoder2]:
-                return self._pull_model_from_mm(
-                    context,
-                    submodel,
-                    self.t5_encoder.name,
-                    ModelType.T5Encoder,
-                    BaseModelType.Any,
-                )
-            case _:
-                raise Exception(f"{submodel.value} is not a supported submodule for a flux model")
-
-    def _pull_model_from_mm(
-        self,
-        context: InvocationContext,
-        submodel: SubModelType,
-        name: str,
-        type: ModelType,
-        base: BaseModelType,
-    ):
-        if models := context.models.search_by_attrs(name=name, base=base, type=type):
-            if len(models) != 1:
-                raise Exception(f"Multiple models detected for selected model with name {name}")
-            return ModelIdentifierField.from_config(models[0]).model_copy(update={"submodel_type": submodel})
-        else:
-            raise ValueError(f"Please install the {base}:{type} model named {name} via starter models")
 
 
 @invocation(
