@@ -576,11 +576,11 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
         checkpoint = self.checkpoint
 
         for key_name in (
-                "control_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
-                "controlnet_mid_block.bias",
-                "input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
-                "down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight",
-                "input_blocks.7.0.emb_layers.1.down",
+            "control_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+            "controlnet_mid_block.bias",
+            "input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+            "down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight",
+            "input_blocks.7.0.emb_layers.1.down",
         ):
             if key_name not in checkpoint:
                 continue
