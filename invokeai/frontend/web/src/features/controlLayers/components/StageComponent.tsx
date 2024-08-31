@@ -7,7 +7,7 @@ import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
+import { TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import Konva from 'konva';
@@ -82,7 +82,7 @@ export const StageComponent = memo(() => {
         <Flex
           position="absolute"
           borderRadius="base"
-          bgImage={TRANSPARENCY_CHECKER_PATTERN}
+          bgImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL}
           top={0}
           right={0}
           bottom={0}
