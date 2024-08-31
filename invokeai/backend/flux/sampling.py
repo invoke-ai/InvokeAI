@@ -111,16 +111,7 @@ def denoise(
     step_callback: Callable[[], None],
     guidance: float = 4.0,
 ):
-    dtype = model.txt_in.bias.dtype
-
-    # TODO(ryand): This shouldn't be necessary if we manage the dtypes properly in the caller.
-    img = img.to(dtype=dtype)
-    img_ids = img_ids.to(dtype=dtype)
-    txt = txt.to(dtype=dtype)
-    txt_ids = txt_ids.to(dtype=dtype)
-    vec = vec.to(dtype=dtype)
-
-    # this is ignored for schnell
+    # guidance_vec is ignored for schnell.
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
     for t_curr, t_prev in tqdm(list(zip(timesteps[:-1], timesteps[1:], strict=True))):
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
@@ -168,9 +159,9 @@ def prepare_latent_img_patches(latent_img: torch.Tensor) -> tuple[torch.Tensor, 
         img = repeat(img, "1 ... -> bs ...", bs=bs)
 
     # Generate patch position ids.
-    img_ids = torch.zeros(h // 2, w // 2, 3, device=img.device)
-    img_ids[..., 1] = img_ids[..., 1] + torch.arange(h // 2, device=img.device)[:, None]
-    img_ids[..., 2] = img_ids[..., 2] + torch.arange(w // 2, device=img.device)[None, :]
+    img_ids = torch.zeros(h // 2, w // 2, 3, device=img.device, dtype=img.dtype)
+    img_ids[..., 1] = img_ids[..., 1] + torch.arange(h // 2, device=img.device, dtype=img.dtype)[:, None]
+    img_ids[..., 2] = img_ids[..., 2] + torch.arange(w // 2, device=img.device, dtype=img.dtype)[None, :]
     img_ids = repeat(img_ids, "h w c -> b (h w) c", b=bs)
 
     return img, img_ids

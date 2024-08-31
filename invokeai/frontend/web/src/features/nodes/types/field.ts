@@ -151,6 +151,14 @@ const zT5EncoderModelFieldType = zFieldTypeBase.extend({
   name: z.literal('T5EncoderModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zCLIPEmbedModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('CLIPEmbedModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zFluxVAEModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('FluxVAEModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zSchedulerFieldType = zFieldTypeBase.extend({
   name: z.literal('SchedulerField'),
   originalType: zStatelessFieldType.optional(),
@@ -175,6 +183,8 @@ const zStatefulFieldType = z.union([
   zT2IAdapterModelFieldType,
   zSpandrelImageToImageModelFieldType,
   zT5EncoderModelFieldType,
+  zCLIPEmbedModelFieldType,
+  zFluxVAEModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
 ]);
@@ -667,7 +677,53 @@ export const isT5EncoderModelFieldInputInstance = (val: unknown): val is T5Encod
 export const isT5EncoderModelFieldInputTemplate = (val: unknown): val is T5EncoderModelFieldInputTemplate =>
   zT5EncoderModelFieldInputTemplate.safeParse(val).success;
 
-// #endregio
+// #endregion
+
+// #region FluxVAEModelField
+
+export const zFluxVAEModelFieldValue = zModelIdentifierField.optional();
+const zFluxVAEModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zFluxVAEModelFieldValue,
+});
+const zFluxVAEModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zFluxVAEModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zFluxVAEModelFieldValue,
+});
+
+export type FluxVAEModelFieldValue = z.infer<typeof zFluxVAEModelFieldValue>;
+
+export type FluxVAEModelFieldInputInstance = z.infer<typeof zFluxVAEModelFieldInputInstance>;
+export type FluxVAEModelFieldInputTemplate = z.infer<typeof zFluxVAEModelFieldInputTemplate>;
+export const isFluxVAEModelFieldInputInstance = (val: unknown): val is FluxVAEModelFieldInputInstance =>
+  zFluxVAEModelFieldInputInstance.safeParse(val).success;
+export const isFluxVAEModelFieldInputTemplate = (val: unknown): val is FluxVAEModelFieldInputTemplate =>
+  zFluxVAEModelFieldInputTemplate.safeParse(val).success;
+
+// #endregion
+
+// #region CLIPEmbedModelField
+
+export const zCLIPEmbedModelFieldValue = zModelIdentifierField.optional();
+const zCLIPEmbedModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zCLIPEmbedModelFieldValue,
+});
+const zCLIPEmbedModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zCLIPEmbedModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zCLIPEmbedModelFieldValue,
+});
+
+export type CLIPEmbedModelFieldValue = z.infer<typeof zCLIPEmbedModelFieldValue>;
+
+export type CLIPEmbedModelFieldInputInstance = z.infer<typeof zCLIPEmbedModelFieldInputInstance>;
+export type CLIPEmbedModelFieldInputTemplate = z.infer<typeof zCLIPEmbedModelFieldInputTemplate>;
+export const isCLIPEmbedModelFieldInputInstance = (val: unknown): val is CLIPEmbedModelFieldInputInstance =>
+  zCLIPEmbedModelFieldInputInstance.safeParse(val).success;
+export const isCLIPEmbedModelFieldInputTemplate = (val: unknown): val is CLIPEmbedModelFieldInputTemplate =>
+  zCLIPEmbedModelFieldInputTemplate.safeParse(val).success;
+
+// #endregion
 
 // #region SchedulerField
 
@@ -758,6 +814,8 @@ export const zStatefulFieldValue = z.union([
   zT2IAdapterModelFieldValue,
   zSpandrelImageToImageModelFieldValue,
   zT5EncoderModelFieldValue,
+  zFluxVAEModelFieldValue,
+  zCLIPEmbedModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
 ]);
@@ -788,6 +846,8 @@ const zStatefulFieldInputInstance = z.union([
   zT2IAdapterModelFieldInputInstance,
   zSpandrelImageToImageModelFieldInputInstance,
   zT5EncoderModelFieldInputInstance,
+  zFluxVAEModelFieldInputInstance,
+  zCLIPEmbedModelFieldInputInstance,
   zColorFieldInputInstance,
   zSchedulerFieldInputInstance,
 ]);
@@ -819,6 +879,8 @@ const zStatefulFieldInputTemplate = z.union([
   zT2IAdapterModelFieldInputTemplate,
   zSpandrelImageToImageModelFieldInputTemplate,
   zT5EncoderModelFieldInputTemplate,
+  zFluxVAEModelFieldInputTemplate,
+  zCLIPEmbedModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,

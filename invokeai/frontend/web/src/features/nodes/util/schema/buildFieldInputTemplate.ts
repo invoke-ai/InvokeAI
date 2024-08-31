@@ -2,6 +2,7 @@ import { FieldParseError } from 'features/nodes/types/error';
 import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
+  CLIPEmbedModelFieldInputTemplate,
   ColorFieldInputTemplate,
   ControlNetModelFieldInputTemplate,
   EnumFieldInputTemplate,
@@ -9,6 +10,7 @@ import type {
   FieldType,
   FloatFieldInputTemplate,
   FluxMainModelFieldInputTemplate,
+  FluxVAEModelFieldInputTemplate,
   ImageFieldInputTemplate,
   IntegerFieldInputTemplate,
   IPAdapterModelFieldInputTemplate,
@@ -238,6 +240,34 @@ const buildT5EncoderModelFieldInputTemplate: FieldInputTemplateBuilder<T5Encoder
   return template;
 };
 
+const buildCLIPEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPEmbedModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: CLIPEmbedModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildFluxVAEModelFieldInputTemplate: FieldInputTemplateBuilder<FluxVAEModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: FluxVAEModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildLoRAModelFieldInputTemplate: FieldInputTemplateBuilder<LoRAModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -423,6 +453,8 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   SpandrelImageToImageModelField: buildSpandrelImageToImageModelFieldInputTemplate,
   VAEModelField: buildVAEModelFieldInputTemplate,
   T5EncoderModelField: buildT5EncoderModelFieldInputTemplate,
+  CLIPEmbedModelField: buildCLIPEmbedModelFieldInputTemplate,
+  FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
 } as const;
 
 export const buildFieldInputTemplate = (

@@ -194,15 +194,6 @@ class ModelCacheBase(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def exists(
-        self,
-        key: str,
-        submodel_type: Optional[SubModelType] = None,
-    ) -> bool:
-        """Return true if the model identified by key and submodel_type is in the cache."""
-        pass
-
-    @abstractmethod
     def cache_size(self) -> int:
         """Get the total size of the models currently cached."""
         pass

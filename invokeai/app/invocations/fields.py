@@ -45,11 +45,13 @@ class UIType(str, Enum, metaclass=MetaEnum):
     SDXLRefinerModel = "SDXLRefinerModelField"
     ONNXModel = "ONNXModelField"
     VAEModel = "VAEModelField"
+    FluxVAEModel = "FluxVAEModelField"
     LoRAModel = "LoRAModelField"
     ControlNetModel = "ControlNetModelField"
     IPAdapterModel = "IPAdapterModelField"
     T2IAdapterModel = "T2IAdapterModelField"
     T5EncoderModel = "T5EncoderModelField"
+    CLIPEmbedModel = "CLIPEmbedModelField"
     SpandrelImageToImageModel = "SpandrelImageToImageModelField"
     # endregion
 
@@ -128,6 +130,7 @@ class FieldDescriptions:
     noise = "Noise tensor"
     clip = "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count"
     t5_encoder = "T5 tokenizer and text encoder"
+    clip_embed_model = "CLIP Embed loader"
     unet = "UNet (scheduler, LoRAs)"
     transformer = "Transformer"
     vae = "VAE"
