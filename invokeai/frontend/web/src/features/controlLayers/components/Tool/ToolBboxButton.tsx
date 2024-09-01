@@ -20,12 +20,12 @@ export const ToolBboxButton = memo(() => {
     return isTransforming || isFiltering || isStaging;
   }, [isFiltering, isStaging, isTransforming]);
 
-  useHotkeys('q', selectBbox, { enabled: !isDisabled || isSelected }, [selectBbox, isSelected, isDisabled]);
+  useHotkeys('c', selectBbox, { enabled: !isDisabled || isSelected }, [selectBbox, isSelected, isDisabled]);
 
   return (
     <IconButton
-      aria-label={`${t('controlLayers.tool.bbox')} (Q)`}
-      tooltip={`${t('controlLayers.tool.bbox')} (Q)`}
+      aria-label={`${t('controlLayers.tool.bbox')} (C)`}
+      tooltip={`${t('controlLayers.tool.bbox')} (C)`}
       icon={<PiBoundingBoxBold />}
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="outline"
