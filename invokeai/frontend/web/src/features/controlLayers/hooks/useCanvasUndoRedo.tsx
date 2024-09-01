@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { canvasRedo, canvasUndo } from 'features/controlLayers/store/canvasSlice';
