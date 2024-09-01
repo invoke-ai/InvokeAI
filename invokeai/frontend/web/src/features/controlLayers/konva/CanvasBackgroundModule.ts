@@ -1,21 +1,31 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasBackgroundModule extends CanvasModuleABC {
-  readonly type = 'background';
+type CanvasBackgroundModuleConfig = {
+  GRID_LINE_COLOR_COARSE: string;
+  GRID_LINE_COLOR_FINE: string;
+};
 
-  static GRID_LINE_COLOR_COARSE = getArbitraryBaseColor(27);
-  static GRID_LINE_COLOR_FINE = getArbitraryBaseColor(18);
+const DEFAULT_CONFIG: CanvasBackgroundModuleConfig = {
+  GRID_LINE_COLOR_COARSE: getArbitraryBaseColor(27),
+  GRID_LINE_COLOR_FINE: getArbitraryBaseColor(18),
+};
+
+export class CanvasBackgroundModule extends CanvasModuleBase {
+  readonly type = 'background';
 
   id: string;
   path: string[];
+  parent: CanvasManager;
   manager: CanvasManager;
   subscriptions = new Set<() => void>();
   log: Logger;
+
+  config: CanvasBackgroundModuleConfig = DEFAULT_CONFIG;
 
   konva: {
     layer: Konva.Layer;
@@ -25,21 +35,18 @@ export class CanvasBackgroundModule extends CanvasModuleABC {
     super();
     this.id = getPrefixedId(this.type);
     this.manager = manager;
-    this.path = this.manager.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.parent = manager;
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
-    this.log.debug('Creating background module');
+    this.log.debug('Creating module');
 
     this.konva = { layer: new Konva.Layer({ name: `${this.type}:layer`, listening: false }) };
 
-    this.subscriptions.add(
-      this.manager.stateApi.$stageAttrs.listen(() => {
-        this.render();
-      })
-    );
+    this.subscriptions.add(this.manager.stateApi.$stageAttrs.listen(this.render));
   }
 
-  render() {
+  render = () => {
     const settings = this.manager.stateApi.getSettings();
 
     if (!settings.dynamicGrid) {
@@ -100,7 +107,7 @@ export class CanvasBackgroundModule extends CanvasModuleABC {
           x: _x,
           y: gridFullRect.y1,
           points: [0, 0, 0, ySize],
-          stroke: _x % 64 ? CanvasBackgroundModule.GRID_LINE_COLOR_FINE : CanvasBackgroundModule.GRID_LINE_COLOR_COARSE,
+          stroke: _x % 64 ? this.config.GRID_LINE_COLOR_FINE : this.config.GRID_LINE_COLOR_COARSE,
           strokeWidth,
           listening: false,
         })
@@ -113,18 +120,12 @@ export class CanvasBackgroundModule extends CanvasModuleABC {
           x: gridFullRect.x1,
           y: _y,
           points: [0, 0, xSize, 0],
-          stroke: _y % 64 ? CanvasBackgroundModule.GRID_LINE_COLOR_FINE : CanvasBackgroundModule.GRID_LINE_COLOR_COARSE,
+          stroke: _y % 64 ? this.config.GRID_LINE_COLOR_FINE : this.config.GRID_LINE_COLOR_COARSE,
           strokeWidth,
           listening: false,
         })
       );
     }
-  }
-
-  destroy = () => {
-    this.log.trace('Destroying background module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-    this.konva.layer.destroy();
   };
 
   /**
@@ -151,15 +152,9 @@ export class CanvasBackgroundModule extends CanvasModuleABC {
     return 256;
   };
 
-  repr = () => {
-    return {
-      id: this.id,
-      path: this.path,
-      type: this.type,
-    };
-  };
-
-  getLoggingContext = () => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
+  destroy = () => {
+    this.log.trace('Destroying module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.konva.layer.destroy();
   };
 }

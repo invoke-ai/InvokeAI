@@ -2,7 +2,7 @@ import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
 import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectBrushLineRenderer } from 'features/controlLayers/konva/CanvasObjectBrushLineRenderer';
 import { CanvasObjectEraserLineRenderer } from 'features/controlLayers/konva/CanvasObjectEraserLineRenderer';
 import { CanvasObjectImageRenderer } from 'features/controlLayers/konva/CanvasObjectImageRenderer';
@@ -60,7 +60,7 @@ type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImage
 /**
  * Handles rendering of objects for a canvas entity.
  */
-export class CanvasEntityRenderer extends CanvasModuleABC {
+export class CanvasEntityRenderer extends CanvasModuleBase {
   readonly type = 'entity_renderer';
 
   id: string;
@@ -131,10 +131,10 @@ export class CanvasEntityRenderer extends CanvasModuleABC {
     super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
-    this.path = this.parent.path.concat(this.id);
     this.manager = parent.manager;
-    this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.log.debug('Creating entity object renderer module');
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
+    this.log.debug('Creating module');
 
     this.konva = {
       objectGroup: new Konva.Group({ name: `${this.type}:object_group`, listening: false }),
@@ -604,11 +604,8 @@ export class CanvasEntityRenderer extends CanvasModuleABC {
     return imageData;
   };
 
-  /**
-   * Destroys this renderer and all of its object renderers.
-   */
   destroy = () => {
-    this.log.debug('Destroying entity object renderer module');
+    this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     for (const renderer of this.renderers.values()) {
       renderer.destroy();
@@ -616,10 +613,6 @@ export class CanvasEntityRenderer extends CanvasModuleABC {
     this.renderers.clear();
   };
 
-  /**
-   * Gets a serializable representation of the renderer.
-   * @returns A serializable representation of the renderer.
-   */
   repr = () => {
     return {
       id: this.id,
@@ -629,9 +622,5 @@ export class CanvasEntityRenderer extends CanvasModuleABC {
       renderers: Array.from(this.renderers.values()).map((renderer) => renderer.repr()),
       buffer: this.bufferRenderer?.repr(),
     };
-  };
-
-  getLoggingContext = () => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

@@ -3,7 +3,7 @@ import { deepClone } from 'common/util/deepClone';
 import { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getLastPointOfLine } from 'features/controlLayers/konva/util';
 import type {
   CanvasBrushLineState,
@@ -22,13 +22,13 @@ import type { Logger } from 'roarr';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
-export class CanvasEntityLayerAdapter extends CanvasModuleABC {
+export class CanvasEntityLayerAdapter extends CanvasModuleBase {
   readonly type = 'entity_layer_adapter';
 
   id: string;
   path: string[];
   manager: CanvasManager;
-  subscriptions = new Set<() => void>();
+  parent: CanvasManager;
   log: Logger;
 
   state: CanvasRasterLayerState | CanvasControlLayerState;
@@ -45,10 +45,11 @@ export class CanvasEntityLayerAdapter extends CanvasModuleABC {
     super();
     this.id = state.id;
     this.manager = manager;
-    this.path = this.manager.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.parent = manager;
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
-    this.log.debug({ state }, 'Creating layer adapter module');
+    this.log.debug('Creating module');
 
     this.state = state;
 
@@ -72,14 +73,6 @@ export class CanvasEntityLayerAdapter extends CanvasModuleABC {
    */
   getEntityIdentifier = (): CanvasEntityIdentifier => {
     return getEntityIdentifier(this.state);
-  };
-
-  destroy = (): void => {
-    this.log.debug('Destroying layer adapter module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-    this.renderer.destroy();
-    this.transformer.destroy();
-    this.konva.layer.destroy();
   };
 
   update = async (arg?: { state: CanvasEntityLayerAdapter['state'] }) => {
@@ -144,21 +137,6 @@ export class CanvasEntityLayerAdapter extends CanvasModuleABC {
     }
   };
 
-  repr = () => {
-    return {
-      id: this.id,
-      type: this.type,
-      path: this.path,
-      state: deepClone(this.state),
-      transformer: this.transformer.repr(),
-      renderer: this.renderer.repr(),
-    };
-  };
-
-  getLoggingContext = (): SerializableObject => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
-  };
-
   getCanvas = (rect?: Rect): HTMLCanvasElement => {
     // TODO(psyche) - cache this - maybe with package `memoizee`? Would require careful review of cache invalidation
     this.log.trace({ rect }, 'Getting canvas');
@@ -202,30 +180,21 @@ export class CanvasEntityLayerAdapter extends CanvasModuleABC {
     return null;
   };
 
-  logDebugInfo(msg = 'Debug info') {
-    const info = {
-      repr: this.repr(),
-      interactionRectAttrs: {
-        x: this.transformer.konva.proxyRect.x(),
-        y: this.transformer.konva.proxyRect.y(),
-        scaleX: this.transformer.konva.proxyRect.scaleX(),
-        scaleY: this.transformer.konva.proxyRect.scaleY(),
-        width: this.transformer.konva.proxyRect.width(),
-        height: this.transformer.konva.proxyRect.height(),
-        rotation: this.transformer.konva.proxyRect.rotation(),
-      },
-      objectGroupAttrs: {
-        x: this.renderer.konva.objectGroup.x(),
-        y: this.renderer.konva.objectGroup.y(),
-        scaleX: this.renderer.konva.objectGroup.scaleX(),
-        scaleY: this.renderer.konva.objectGroup.scaleY(),
-        width: this.renderer.konva.objectGroup.width(),
-        height: this.renderer.konva.objectGroup.height(),
-        rotation: this.renderer.konva.objectGroup.rotation(),
-        offsetX: this.renderer.konva.objectGroup.offsetX(),
-        offsetY: this.renderer.konva.objectGroup.offsetY(),
-      },
+  destroy = (): void => {
+    this.log.debug('Destroying module');
+    this.renderer.destroy();
+    this.transformer.destroy();
+    this.konva.layer.destroy();
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      state: deepClone(this.state),
+      transformer: this.transformer.repr(),
+      renderer: this.renderer.repr(),
     };
-    this.log.trace(info, msg);
-  }
+  };
 }

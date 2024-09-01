@@ -1,12 +1,12 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasEraserLineState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasObjectEraserLineRenderer extends CanvasModuleABC {
+export class CanvasObjectEraserLineRenderer extends CanvasModuleBase {
   readonly type = 'object_eraser_line_renderer';
 
   id: string;
@@ -14,7 +14,6 @@ export class CanvasObjectEraserLineRenderer extends CanvasModuleABC {
   parent: CanvasEntityRenderer;
   manager: CanvasManager;
   log: Logger;
-  subscriptions = new Set<() => void>();
 
   state: CanvasEraserLineState;
   konva: {
@@ -24,19 +23,18 @@ export class CanvasObjectEraserLineRenderer extends CanvasModuleABC {
 
   constructor(state: CanvasEraserLineState, parent: CanvasEntityRenderer) {
     super();
-    const { id, clip } = state;
-    this.id = id;
+    this.id = state.id;
     this.parent = parent;
     this.manager = parent.manager;
-    this.path = this.parent.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
     this.log.debug({ state }, 'Creating eraser line renderer module');
 
     this.konva = {
       group: new Konva.Group({
         name: `${this.type}:group`,
-        clip,
+        clip: state.clip,
         listening: false,
       }),
       line: new Konva.Line({
@@ -70,16 +68,15 @@ export class CanvasObjectEraserLineRenderer extends CanvasModuleABC {
     return false;
   }
 
-  destroy = () => {
-    this.log.debug('Destroying eraser line renderer module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-    this.konva.group.destroy();
-  };
-
   setVisibility(isVisible: boolean): void {
     this.log.trace({ isVisible }, 'Setting brush line visibility');
     this.konva.group.visible(isVisible);
   }
+
+  destroy = () => {
+    this.log.debug('Destroying module');
+    this.konva.group.destroy();
+  };
 
   repr = () => {
     return {
@@ -89,9 +86,5 @@ export class CanvasObjectEraserLineRenderer extends CanvasModuleABC {
       parent: this.parent.id,
       state: deepClone(this.state),
     };
-  };
-
-  getLoggingContext = () => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }
