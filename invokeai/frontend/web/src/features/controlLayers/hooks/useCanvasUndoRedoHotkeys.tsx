@@ -6,7 +6,7 @@ import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useDispatch } from 'react-redux';
 
-export const useCanvasUndoRedo = () => {
+export const useCanvasUndoRedoHotkeys = () => {
   useAssertSingleton('useCanvasUndoRedo');
   const dispatch = useDispatch();
 
