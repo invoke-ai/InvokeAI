@@ -48,7 +48,7 @@ export const CanvasEntityListMenuItems = memo(() => {
         {t('controlLayers.controlLayer')}
       </MenuItem>
       <MenuItem icon={<PiPlusBold />} onClick={addIPAdapter}>
-        {t('controlLayers.ipAdapter')}
+        {t('controlLayers.globalIPAdapter')}
       </MenuItem>
     </>
   );

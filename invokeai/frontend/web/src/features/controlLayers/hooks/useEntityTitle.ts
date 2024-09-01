@@ -33,7 +33,7 @@ export const useEntityTitle = (entityIdentifier: CanvasEntityIdentifier) => {
       case 'raster_layer':
         return t('controlLayers.rasterLayer');
       case 'ip_adapter':
-        return t('common.ipAdapter');
+        return t('controlLayers.globalIPAdapter');
       case 'regional_guidance':
         return t('controlLayers.regionalGuidance');
       default:
