@@ -15,7 +15,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 
 const $selectedEntityBuffer = atom<CanvasEntityIdentifier | null>(null);
 
-export const useCanvasEntityQuickSwitch = () => {
+export const useCanvasEntityQuickSwitchHotkey = () => {
   useAssertSingleton('useCanvasEntityQuickSwitch');
 
   const dispatch = useAppDispatch();
