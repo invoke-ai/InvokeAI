@@ -84,6 +84,7 @@ const getRGMaskFill = (state: CanvasState): RgbColor => {
 const initialState: CanvasState = {
   _version: 3,
   selectedEntityIdentifier: null,
+  quickSwitchEntityIdentifier: null,
   rasterLayers: {
     isHidden: false,
     entities: [],
@@ -791,6 +792,22 @@ export const canvasSlice = createSlice({
       }
       state.selectedEntityIdentifier = entityIdentifier;
     },
+    entityIsBookmarkedForQuickSwitchChanged: (
+      state,
+      action: PayloadAction<{ entityIdentifier: CanvasEntityIdentifier | null }>
+    ) => {
+      const { entityIdentifier } = action.payload;
+      if (!entityIdentifier) {
+        state.quickSwitchEntityIdentifier = null;
+        return;
+      }
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        // Cannot select a non-existent entity
+        return;
+      }
+      state.quickSwitchEntityIdentifier = entityIdentifier;
+    },
     entityNameChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ name: string | null }>>) => {
       const { entityIdentifier, name } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -1105,6 +1122,7 @@ export const {
   canvasClearHistory,
   // All entities
   entitySelected,
+  entityIsBookmarkedForQuickSwitchChanged,
   entityNameChanged,
   entityReset,
   entityIsEnabledToggled,
