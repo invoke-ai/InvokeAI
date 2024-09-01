@@ -15,6 +15,11 @@ const DEFAULT_CONFIG: CanvasBackgroundModuleConfig = {
   GRID_LINE_COLOR_FINE: getArbitraryBaseColor(18),
 };
 
+/**
+ * Renders a background grid on the canvas, where the grid spacing changes based on the stage scale.
+ *
+ * The grid is only visible when the dynamic grid setting is enabled.
+ */
 export class CanvasBackgroundModule extends CanvasModuleBase {
   readonly type = 'background';
 
@@ -22,13 +27,19 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
   path: string[];
   parent: CanvasManager;
   manager: CanvasManager;
-  subscriptions = new Set<() => void>();
   log: Logger;
 
+  subscriptions = new Set<() => void>();
   config: CanvasBackgroundModuleConfig = DEFAULT_CONFIG;
 
+  /**
+   * The Konva objects that make up the background grid:
+   * - A layer to hold the grid lines
+   * - An array of grid lines
+   */
   konva: {
     layer: Konva.Layer;
+    lines: Konva.Line[];
   };
 
   constructor(manager: CanvasManager) {
@@ -41,11 +52,20 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
 
     this.log.debug('Creating module');
 
-    this.konva = { layer: new Konva.Layer({ name: `${this.type}:layer`, listening: false }) };
+    this.konva = { layer: new Konva.Layer({ name: `${this.type}:layer`, listening: false }), lines: [] };
 
+    /**
+     * The background grid should be rendered when the stage attributes change:
+     * - scale
+     * - position
+     * - size
+     */
     this.subscriptions.add(this.manager.stateApi.$stageAttrs.listen(this.render));
   }
 
+  /**
+   * Renders the background grid.
+   */
   render = () => {
     const settings = this.manager.stateApi.getSettings();
 
@@ -56,11 +76,10 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
 
     this.konva.layer.visible(true);
 
-    this.konva.layer.zIndex(0);
     const scale = this.manager.stage.getScale();
     const { x, y } = this.manager.stage.getPosition();
     const { width, height } = this.manager.stage.getSize();
-    const gridSpacing = this.getGridSpacing(scale);
+    const gridSpacing = CanvasBackgroundModule.getGridSpacing(scale);
     const stageRect = {
       x1: 0,
       y1: 0,
@@ -99,41 +118,44 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
     let _y = 0;
 
     this.konva.layer.destroyChildren();
+    this.konva.lines = [];
 
     for (let i = 0; i < xSteps; i++) {
       _x = gridFullRect.x1 + i * gridSpacing;
-      this.konva.layer.add(
-        new Konva.Line({
-          x: _x,
-          y: gridFullRect.y1,
-          points: [0, 0, 0, ySize],
-          stroke: _x % 64 ? this.config.GRID_LINE_COLOR_FINE : this.config.GRID_LINE_COLOR_COARSE,
-          strokeWidth,
-          listening: false,
-        })
-      );
+      const line = new Konva.Line({
+        x: _x,
+        y: gridFullRect.y1,
+        points: [0, 0, 0, ySize],
+        stroke: _x % 64 ? this.config.GRID_LINE_COLOR_FINE : this.config.GRID_LINE_COLOR_COARSE,
+        strokeWidth,
+        listening: false,
+      });
+      this.konva.lines.push(line);
+      this.konva.layer.add(line);
     }
     for (let i = 0; i < ySteps; i++) {
       _y = gridFullRect.y1 + i * gridSpacing;
-      this.konva.layer.add(
-        new Konva.Line({
-          x: gridFullRect.x1,
-          y: _y,
-          points: [0, 0, xSize, 0],
-          stroke: _y % 64 ? this.config.GRID_LINE_COLOR_FINE : this.config.GRID_LINE_COLOR_COARSE,
-          strokeWidth,
-          listening: false,
-        })
-      );
+      const line = new Konva.Line({
+        x: gridFullRect.x1,
+        y: _y,
+        points: [0, 0, xSize, 0],
+        stroke: _y % 64 ? this.config.GRID_LINE_COLOR_FINE : this.config.GRID_LINE_COLOR_COARSE,
+        strokeWidth,
+        listening: false,
+      });
+      this.konva.lines.push(line);
+      this.konva.layer.add(line);
     }
   };
 
   /**
-   * Gets the grid spacing. The value depends on the stage scale - at higher scales, the grid spacing is smaller.
+   * Gets the grid line spacing for the dynamic grid.
+   *
+   * The value depends on the stage scale - at higher scales, the grid spacing is smaller.
+   *
    * @param scale The stage scale
-   * @returns The grid spacing based on the stage scale
    */
-  getGridSpacing = (scale: number): number => {
+  static getGridSpacing = (scale: number): number => {
     if (scale >= 2) {
       return 8;
     }

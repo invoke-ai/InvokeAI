@@ -63,6 +63,9 @@ const DEFAULT_CONFIG: ColorPickerToolConfig = {
   CROSSHAIR_BORDER_COLOR: 'rgba(255,255,255,0.8)',
 };
 
+/**
+ * Renders a preview of the color picker tool on the canvas.
+ */
 export class CanvasColorPickerToolPreview extends CanvasModuleBase {
   readonly type = 'color_picker_tool_preview';
 
@@ -74,10 +77,16 @@ export class CanvasColorPickerToolPreview extends CanvasModuleBase {
 
   config: ColorPickerToolConfig = DEFAULT_CONFIG;
 
+  /**
+   * The Konva objects that make up the color picker tool preview:
+   * - A group to hold all the objects
+   * - A ring that shows the candidate and current color
+   * - A crosshair to help with color selection
+   */
   konva: {
     group: Konva.Group;
-    ringNewColor: Konva.Ring;
-    ringOldColor: Konva.Arc;
+    ringCandidateColor: Konva.Ring;
+    ringCurrentColor: Konva.Arc;
     ringInnerBorder: Konva.Ring;
     ringOuterBorder: Konva.Ring;
     crosshairNorthInner: Konva.Line;
@@ -98,18 +107,18 @@ export class CanvasColorPickerToolPreview extends CanvasModuleBase {
     this.path = this.manager.buildPath(this);
     this.log = this.manager.buildLogger(this);
 
-    this.log.debug('Creating color picker tool preview module');
+    this.log.debug('Creating module');
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:color_picker_group`, listening: false }),
-      ringNewColor: new Konva.Ring({
-        name: `${this.type}:color_picker_new_color_ring`,
+      ringCandidateColor: new Konva.Ring({
+        name: `${this.type}:color_picker_candidate_color_ring`,
         innerRadius: 0,
         outerRadius: 0,
         strokeEnabled: false,
       }),
-      ringOldColor: new Konva.Arc({
-        name: `${this.type}:color_picker_old_color_arc`,
+      ringCurrentColor: new Konva.Arc({
+        name: `${this.type}:color_picker_current_color_arc`,
         innerRadius: 0,
         outerRadius: 0,
         angle: 180,
@@ -164,8 +173,8 @@ export class CanvasColorPickerToolPreview extends CanvasModuleBase {
     };
 
     this.konva.group.add(
-      this.konva.ringNewColor,
-      this.konva.ringOldColor,
+      this.konva.ringCandidateColor,
+      this.konva.ringCurrentColor,
       this.konva.ringInnerBorder,
       this.konva.ringOuterBorder,
       this.konva.crosshairNorthOuter,
@@ -179,9 +188,13 @@ export class CanvasColorPickerToolPreview extends CanvasModuleBase {
     );
   }
 
+  /**
+   * Renders the color picker tool preview on the canvas.
+   */
   render = () => {
     const cursorPos = this.manager.stateApi.$lastCursorPos.get();
 
+    // If the cursor position is not available, do not render the preview. The tool module will handle visibility.
     if (!cursorPos) {
       return;
     }
@@ -193,14 +206,14 @@ export class CanvasColorPickerToolPreview extends CanvasModuleBase {
     const onePixel = this.manager.stage.getScaledPixels(1);
     const twoPixels = this.manager.stage.getScaledPixels(2);
 
-    this.konva.ringNewColor.setAttrs({
+    this.konva.ringCandidateColor.setAttrs({
       x: cursorPos.x,
       y: cursorPos.y,
       fill: rgbColorToString(colorUnderCursor),
       innerRadius: colorPickerInnerRadius,
       outerRadius: colorPickerOuterRadius,
     });
-    this.konva.ringOldColor.setAttrs({
+    this.konva.ringCurrentColor.setAttrs({
       x: cursorPos.x,
       y: cursorPos.y,
       fill: rgbColorToString(toolState.fill),

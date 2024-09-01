@@ -22,6 +22,15 @@ import type { Logger } from 'roarr';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
+/**
+ * Handles the rendering for a single raster or control layer entity.
+ *
+ * This module has two main components:
+ * - A transformer, which handles the positioning and interaction state of the layer
+ * - A renderer, which handles the rendering of the layer's objects
+ *
+ * The canvas rendering module interacts with this module to coordinate the rendering of all raster and control layers.
+ */
 export class CanvasEntityLayerAdapter extends CanvasModuleBase {
   readonly type = 'entity_layer_adapter';
 
@@ -31,12 +40,29 @@ export class CanvasEntityLayerAdapter extends CanvasModuleBase {
   parent: CanvasManager;
   log: Logger;
 
+  /**
+   * The last known state of the entity.
+   */
   state: CanvasRasterLayerState | CanvasControlLayerState;
 
+  /**
+   * The Konva nodes that make up the entity layer:
+   * - A layer to hold the everything
+   *
+   * Note that the transformer and object renderer have their own Konva nodes, but they are not stored here.
+   */
   konva: {
     layer: Konva.Layer;
   };
+
+  /**
+   * The transformer for this entity layer.
+   */
   transformer: CanvasEntityTransformer;
+
+  /**
+   * The renderer for this entity layer.
+   */
   renderer: CanvasEntityRenderer;
 
   isFirstRender: boolean = true;
