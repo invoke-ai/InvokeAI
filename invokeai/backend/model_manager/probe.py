@@ -756,11 +756,17 @@ class TextualInversionFolderProbe(FolderProbeBase):
 
 
 class T5EncoderFolderProbe(FolderProbeBase):
-    def get_format(self) -> ModelFormat:
-        return ModelFormat.T5Encoder
-
     def get_base_type(self) -> BaseModelType:
         return BaseModelType.Flux
+
+    def get_format(self) -> ModelFormat:
+        path = self.model_path / "text_encoder_2"
+        if (path / "model.safetensors.index.json").exists():
+            return ModelFormat.T5Encoder
+        files = path.glob("*.safetensors")
+        if any(x for x in files if "llm_int8" in x.as_posix()):
+            return ModelFormat.BnbQuantizedLlmInt8b
+        raise f"{self.model_path.as_posix()}: unknown model format"
 
 
 class ONNXFolderProbe(PipelineFolderProbe):
