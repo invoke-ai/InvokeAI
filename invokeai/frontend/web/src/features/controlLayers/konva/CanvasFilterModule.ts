@@ -1,7 +1,7 @@
 import type { SerializableObject } from 'common/types';
 import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, CanvasImageState, FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -11,14 +11,14 @@ import { getImageDTO } from 'services/api/endpoints/images';
 import type { BatchConfig, ImageDTO, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
-export class CanvasFilterModule extends CanvasModuleABC {
+export class CanvasFilterModule extends CanvasModuleBase {
   readonly type = 'canvas_filter';
 
   id: string;
   path: string[];
+  parent: CanvasManager;
   manager: CanvasManager;
   log: Logger;
-  subscriptions = new Set<() => void>();
 
   imageState: CanvasImageState | null = null;
 
@@ -30,9 +30,10 @@ export class CanvasFilterModule extends CanvasModuleABC {
   constructor(manager: CanvasManager) {
     super();
     this.id = getPrefixedId(this.type);
+    this.parent = manager;
     this.manager = manager;
-    this.path = this.manager.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating filter module');
   }
@@ -166,22 +167,5 @@ export class CanvasFilterModule extends CanvasModuleABC {
     };
 
     return batch;
-  };
-
-  destroy = () => {
-    this.log.trace('Destroying filter module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-  };
-
-  repr = () => {
-    return {
-      id: this.id,
-      type: this.type,
-      path: this.path,
-    };
-  };
-
-  getLoggingContext = () => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

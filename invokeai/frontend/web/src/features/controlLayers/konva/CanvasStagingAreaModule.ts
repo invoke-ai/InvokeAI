@@ -1,41 +1,34 @@
-import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImageRenderer } from 'features/controlLayers/konva/CanvasObjectImageRenderer';
-import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasStagingAreaModule extends CanvasModuleABC {
+export class CanvasStagingAreaModule extends CanvasModuleBase {
   readonly type = 'staging_area';
 
   id: string;
   path: string[];
-  parent: CanvasPreviewModule;
+  parent: CanvasManager;
   manager: CanvasManager;
   log: Logger;
 
+  subscriptions: Set<() => void> = new Set();
   konva: { group: Konva.Group };
-
   image: CanvasObjectImageRenderer | null;
   selectedImage: StagingAreaImage | null;
 
-  /**
-   * A set of subscriptions that should be cleaned up when the transformer is destroyed.
-   */
-  subscriptions: Set<() => void> = new Set();
-
-  constructor(parent: CanvasPreviewModule) {
+  constructor(manager: CanvasManager) {
     super();
     this.id = getPrefixedId(this.type);
-    this.parent = parent;
-    this.manager = this.parent.manager;
-    this.path = this.manager.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.parent = manager;
+    this.manager = manager;
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
-    this.log.debug('Creating staging area module');
+    this.log.debug('Creating module');
 
     this.konva = { group: new Konva.Group({ name: `${this.type}:group`, listening: false }) };
     this.image = null;
@@ -88,7 +81,7 @@ export class CanvasStagingAreaModule extends CanvasModuleABC {
   };
 
   destroy = () => {
-    this.log.debug('Destroying staging area module');
+    this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     if (this.image) {
       this.image.destroy();
@@ -105,9 +98,5 @@ export class CanvasStagingAreaModule extends CanvasModuleABC {
       path: this.path,
       selectedImage: this.selectedImage,
     };
-  };
-
-  getLoggingContext = (): SerializableObject => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

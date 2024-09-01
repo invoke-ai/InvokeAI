@@ -1,8 +1,6 @@
-import type { SerializableObject } from 'common/types';
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
-import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -23,16 +21,16 @@ const ALL_ANCHORS: string[] = [
 const CORNER_ANCHORS: string[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
 const NO_ANCHORS: string[] = [];
 
-export class CanvasBboxModule extends CanvasModuleABC {
+export class CanvasBboxModule extends CanvasModuleBase {
   readonly type = 'bbox';
 
   id: string;
   path: string[];
+  parent: CanvasManager;
   manager: CanvasManager;
   log: Logger;
-  subscriptions: Set<() => void> = new Set();
 
-  parent: CanvasPreviewModule;
+  subscriptions: Set<() => void> = new Set();
 
   konva: {
     group: Konva.Group;
@@ -40,13 +38,13 @@ export class CanvasBboxModule extends CanvasModuleABC {
     transformer: Konva.Transformer;
   };
 
-  constructor(parent: CanvasPreviewModule) {
+  constructor(manager: CanvasManager) {
     super();
     this.id = getPrefixedId(this.type);
-    this.parent = parent;
-    this.manager = this.parent.manager;
-    this.path = this.parent.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.parent = manager;
+    this.manager = manager;
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating bbox module');
 
@@ -243,7 +241,9 @@ export class CanvasBboxModule extends CanvasModuleABC {
     const tool = this.manager.stateApi.$tool.get();
 
     this.konva.group.visible(true);
-    this.parent.getLayer().listening(tool === 'bbox');
+
+    this.manager.konva.previewLayer.listening(tool === 'bbox');
+
     this.konva.group.listening(tool === 'bbox');
     this.konva.rect.setAttrs({
       x: bbox.rect.x,
@@ -260,21 +260,9 @@ export class CanvasBboxModule extends CanvasModuleABC {
     });
   };
 
-  repr = () => {
-    return {
-      id: this.id,
-      type: this.type,
-      path: this.path,
-    };
-  };
-
   destroy = () => {
     this.log.trace('Destroying bbox module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
-  };
-
-  getLoggingContext = (): SerializableObject => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

@@ -1,5 +1,5 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
 import { alignCoordForTool, getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
@@ -21,7 +21,7 @@ const DEFAULT_CONFIG: EraserToolPreviewConfig = {
   BORDER_OUTER_COLOR: 'rgba(255,255,255,0.8)',
 };
 
-export class CanvasEraserToolPreview extends CanvasModuleABC {
+export class CanvasEraserToolPreview extends CanvasModuleBase {
   readonly type = 'eraser_tool_preview';
 
   id: string;
@@ -29,7 +29,6 @@ export class CanvasEraserToolPreview extends CanvasModuleABC {
   parent: CanvasToolModule;
   manager: CanvasManager;
   log: Logger;
-  subscriptions: Set<() => void> = new Set();
 
   config: EraserToolPreviewConfig;
 
@@ -45,11 +44,11 @@ export class CanvasEraserToolPreview extends CanvasModuleABC {
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = this.parent.manager;
-    this.path = this.parent.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
     this.config = { ...DEFAULT_CONFIG, ...config };
 
-    this.log.debug('Creating eraser tool preview module');
+    this.log.debug('Creating module');
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:eraser_group`, listening: false }),
@@ -131,11 +130,6 @@ export class CanvasEraserToolPreview extends CanvasModuleABC {
 
   destroy = () => {
     this.log.debug('Destroying eraser tool preview module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
-  };
-
-  getLoggingContext = () => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }
