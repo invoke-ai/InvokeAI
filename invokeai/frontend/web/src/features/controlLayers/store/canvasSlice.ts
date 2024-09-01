@@ -775,6 +775,11 @@ export const canvasSlice = createSlice({
     //#region Shared entity
     entitySelected: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        // Cannot select a non-existent entity
+        return;
+      }
       state.selectedEntityIdentifier = entityIdentifier;
     },
     entityNameChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ name: string | null }>>) => {
