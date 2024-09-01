@@ -1654,7 +1654,8 @@
         "storeNotInitialized": "Store is not initialized"
     },
     "controlLayers": {
-        "saveCanvasToGallery": "Save Canvas To Gallery",
+        "bookmarkedForQuickSwitch": "Bookmarked for Quick Switch",
+        "notBookmarkedForQuickSwitch": "Not Bookmarked for Quick Switch",
         "saveBboxToGallery": "Save Bbox To Gallery",
         "savedToGalleryOk": "Saved to Gallery",
         "savedToGalleryError": "Error saving to gallery",
