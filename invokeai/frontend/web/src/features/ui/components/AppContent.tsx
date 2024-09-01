@@ -2,7 +2,7 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
-import { CanvasEditor } from 'features/controlLayers/components/ControlLayersEditor';
+import { CanvasEditor } from 'features/controlLayers/components/CanvasEditor';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import { useIsImageViewerOpen } from 'features/gallery/components/ImageViewer/useImageViewer';
