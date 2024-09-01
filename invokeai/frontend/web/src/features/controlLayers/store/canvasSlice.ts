@@ -42,7 +42,6 @@ import type {
   CLIPVisionModelV2,
   ControlModeV2,
   ControlNetConfig,
-  Dimensions,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
@@ -669,8 +668,17 @@ export const canvasSlice = createSlice({
       state.selectedEntityIdentifier = { type: 'inpaint_mask', id: data.id };
     },
     //#region BBox
-    bboxScaledSizeChanged: (state, action: PayloadAction<Partial<Dimensions>>) => {
-      state.bbox.scaledSize = { ...state.bbox.scaledSize, ...action.payload };
+    bboxScaledWidthChanged: (state, action: PayloadAction<number>) => {
+      state.bbox.scaledSize.width = action.payload;
+      if (state.bbox.aspectRatio.isLocked) {
+        state.bbox.scaledSize.height = roundToMultiple(state.bbox.scaledSize.width / state.bbox.aspectRatio.value, 8);
+      }
+    },
+    bboxScaledHeightChanged: (state, action: PayloadAction<number>) => {
+      state.bbox.scaledSize.height = action.payload;
+      if (state.bbox.aspectRatio.isLocked) {
+        state.bbox.scaledSize.width = roundToMultiple(state.bbox.scaledSize.height * state.bbox.aspectRatio.value, 8);
+      }
     },
     bboxScaleMethodChanged: (state, action: PayloadAction<BoundingBoxScaleMethod>) => {
       state.bbox.scaleMethod = action.payload;
@@ -721,6 +729,7 @@ export const canvasSlice = createSlice({
     },
     bboxAspectRatioLockToggled: (state) => {
       state.bbox.aspectRatio.isLocked = !state.bbox.aspectRatio.isLocked;
+      syncScaledSize(state);
     },
     bboxAspectRatioIdChanged: (state, action: PayloadAction<{ id: AspectRatioID }>) => {
       const { id } = action.payload;
@@ -1118,7 +1127,8 @@ export const {
   allEntitiesOfTypeIsHiddenToggled,
   // bbox
   bboxChanged,
-  bboxScaledSizeChanged,
+  bboxScaledWidthChanged,
+  bboxScaledHeightChanged,
   bboxScaleMethodChanged,
   bboxWidthChanged,
   bboxHeightChanged,
@@ -1180,7 +1190,7 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
 };
 
 const syncScaledSize = (state: CanvasState) => {
-  if (state.bbox.scaleMethod === 'auto') {
+  if (state.bbox.scaleMethod === 'auto' || (state.bbox.scaleMethod === 'manual' && state.bbox.aspectRatio.isLocked)) {
     const { width, height } = state.bbox.rect;
     state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.optimalDimension);
   }
