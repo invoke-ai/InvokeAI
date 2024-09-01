@@ -1,16 +1,16 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import {
-  type CanvasControlLayerState,
-  type CanvasEntityIdentifier,
-  type CanvasEntityState,
-  type CanvasInpaintMaskState,
-  type CanvasRasterLayerState,
-  type CanvasRegionalGuidanceState,
-  type CanvasState,
-  isDrawableEntityType,
+import type {
+  CanvasControlLayerState,
+  CanvasEntityIdentifier,
+  CanvasEntityState,
+  CanvasInpaintMaskState,
+  CanvasRasterLayerState,
+  CanvasRegionalGuidanceState,
+  CanvasState,
 } from 'features/controlLayers/store/types';
+import { isDrawableEntityType } from 'features/controlLayers/store/types';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { assert } from 'tsafe';
 
