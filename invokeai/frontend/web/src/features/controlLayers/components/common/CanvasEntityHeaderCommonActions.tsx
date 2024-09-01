@@ -1,6 +1,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { CanvasEntityDeleteButton } from 'features/controlLayers/components/common/CanvasEntityDeleteButton';
 import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
+import { CanvasEntityIsBookmarkedForQuickSwitchToggle } from 'features/controlLayers/components/common/CanvasEntityIsBookmarkedForQuickSwitchToggle';
 import { CanvasEntityIsLockedToggle } from 'features/controlLayers/components/common/CanvasEntityIsLockedToggle';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { memo } from 'react';
@@ -10,6 +11,7 @@ export const CanvasEntityHeaderCommonActions = memo(() => {
 
   return (
     <Flex alignSelf="stretch">
+      <CanvasEntityIsBookmarkedForQuickSwitchToggle />
       {entityIdentifier.type !== 'ip_adapter' && <CanvasEntityIsLockedToggle />}
       <CanvasEntityEnabledToggle />
       <CanvasEntityDeleteButton />
