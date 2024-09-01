@@ -1,4 +1,4 @@
-import { $shift, IconButton } from '@invoke-ai/ui-library';
+import { $alt, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
 import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -7,7 +7,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 
-export const CanvasResetViewButton = memo(() => {
+export const CanvasToolbarResetViewButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useStore($canvasManager);
   const isCanvasActive = useStore(INTERACTION_SCOPES.canvas.$isActive);
@@ -27,7 +27,7 @@ export const CanvasResetViewButton = memo(() => {
   }, [canvasManager]);
 
   const onReset = useCallback(() => {
-    if ($shift.get()) {
+    if ($alt.get()) {
       resetView();
     } else {
       resetZoom();
@@ -35,7 +35,7 @@ export const CanvasResetViewButton = memo(() => {
   }, [resetView, resetZoom]);
 
   useHotkeys('r', resetView, { enabled: isCanvasActive }, [isCanvasActive]);
-  useHotkeys('shift+r', resetZoom, { enabled: isCanvasActive }, [isCanvasActive]);
+  useHotkeys('alt+r', resetZoom, { enabled: isCanvasActive }, [isCanvasActive]);
 
   return (
     <IconButton
@@ -48,4 +48,4 @@ export const CanvasResetViewButton = memo(() => {
   );
 });
 
-CanvasResetViewButton.displayName = 'CanvasResetViewButton';
+CanvasToolbarResetViewButton.displayName = 'CanvasToolbarResetViewButton';

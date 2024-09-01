@@ -70,7 +70,7 @@ const sliderDefaultValue = mapScaleToSliderValue(100);
 
 const snapCandidates = marks.slice(1, marks.length - 1);
 
-export const CanvasScale = memo(() => {
+export const CanvasToolbarScale = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const scale = useStore(computed(canvasManager.stateApi.$stageAttrs, (attrs) => attrs.scale));
@@ -174,4 +174,4 @@ export const CanvasScale = memo(() => {
   );
 });
 
-CanvasScale.displayName = 'CanvasScale';
+CanvasToolbarScale.displayName = 'CanvasToolbarScale';

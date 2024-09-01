@@ -13,7 +13,7 @@ const log = logger('canvas');
 
 const [useIsSaving] = buildUseBoolean(false);
 
-export const SaveToGalleryButton = memo(() => {
+export const CanvasToolbarSaveToGalleryButton = memo(() => {
   const { t } = useTranslation();
   const shift = useShiftModifier();
   const canvasManager = useCanvasManager();
@@ -50,4 +50,4 @@ export const SaveToGalleryButton = memo(() => {
   );
 });
 
-SaveToGalleryButton.displayName = 'SaveToGalleryButton';
+CanvasToolbarSaveToGalleryButton.displayName = 'CanvasToolbarSaveToGalleryButton';
