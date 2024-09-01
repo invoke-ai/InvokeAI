@@ -164,7 +164,6 @@ export class CanvasEntityMaskAdapter extends CanvasModuleBase {
   };
 
   getCanvas = (rect?: Rect): HTMLCanvasElement => {
-    // TODO(psyche): Cache this?
     // The opacity may have been changed in response to user selecting a different entity category, and the mask regions
     // should be fully opaque - set opacity to 1 before rendering the canvas
     const attrs: GroupConfig = { opacity: 1 };
