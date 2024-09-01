@@ -11,24 +11,47 @@ import {
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { eraserWidthChanged, selectToolSlice } from 'features/controlLayers/store/toolSlice';
+import { clamp } from 'lodash-es';
 import { memo, useCallback } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
-const marks = [0, 100, 200, 300];
+const marks = [1, 100, 200, 300];
 const formatPx = (v: number | string) => `${v} px`;
 const selectEraserWidth = createSelector(selectToolSlice, (tool) => tool.eraser.width);
 
 export const ToolEraserWidth = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const isSelected = useToolIsSelected('eraser');
   const width = useAppSelector(selectEraserWidth);
   const onChange = useCallback(
     (v: number) => {
-      dispatch(eraserWidthChanged(Math.round(v)));
+      dispatch(eraserWidthChanged(clamp(Math.round(v), 1, 600)));
     },
     [dispatch]
   );
+  const increment = useCallback(() => {
+    let newWidth = Math.round(width * 1.15);
+    if (newWidth === width) {
+      newWidth += 1;
+    }
+    onChange(newWidth);
+  }, [onChange, width]);
+
+  const decrement = useCallback(() => {
+    let newWidth = Math.round(width * 0.85);
+    if (newWidth === width) {
+      newWidth -= 1;
+    }
+    onChange(newWidth);
+  }, [onChange, width]);
+
+  useHotkeys('[', decrement, { enabled: isSelected }, [decrement, isSelected]);
+  useHotkeys(']', increment, { enabled: isSelected }, [increment, isSelected]);
+
   return (
     <FormControl w="min-content" gap={2}>
       <FormLabel m={0}>{t('controlLayers.width')}</FormLabel>
