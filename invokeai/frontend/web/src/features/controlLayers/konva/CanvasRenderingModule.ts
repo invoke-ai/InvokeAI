@@ -1,22 +1,21 @@
-import type { SerializableObject } from 'common/types';
 import { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
 import { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasSessionState } from 'features/controlLayers/store/canvasSessionSlice';
 import type { CanvasSettingsState } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { CanvasState } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
 
-export class CanvasRenderingModule extends CanvasModuleABC {
+export class CanvasRenderingModule extends CanvasModuleBase {
   readonly type = 'canvas_renderer';
 
   id: string;
   path: string[];
   log: Logger;
+  parent: CanvasManager;
   manager: CanvasManager;
-  subscriptions = new Set<() => void>();
 
   state: CanvasState | null = null;
   settings: CanvasSettingsState | null = null;
@@ -27,10 +26,12 @@ export class CanvasRenderingModule extends CanvasModuleABC {
   constructor(manager: CanvasManager) {
     super();
     this.id = getPrefixedId('canvas_renderer');
+    this.parent = manager;
     this.manager = manager;
-    this.path = this.manager.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.log.debug('Creating canvas renderer module');
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
+
+    this.log.debug('Creating module');
   }
 
   render = async () => {
@@ -107,10 +108,6 @@ export class CanvasRenderingModule extends CanvasModuleABC {
     }
 
     await this.renderStagingArea(session, prevSession);
-  };
-
-  getLoggingContext = (): SerializableObject => {
-    return { ...this.manager.getLoggingContext(), path: this.manager.path.join('.') };
   };
 
   renderBackground = (settings: CanvasSettingsState, prevSettings: CanvasSettingsState | null) => {
@@ -247,13 +244,13 @@ export class CanvasRenderingModule extends CanvasModuleABC {
 
   renderBbox = (state: CanvasState, prevState: CanvasState | null) => {
     if (!prevState || state.bbox !== prevState.bbox) {
-      this.manager.preview.bbox.render();
+      this.manager.bbox.render();
     }
   };
 
   renderStagingArea = async (session: CanvasSessionState, prevSession: CanvasSessionState | null) => {
     if (!prevSession || session !== prevSession) {
-      await this.manager.preview.stagingArea.render();
+      await this.manager.stagingArea.render();
     }
   };
 
@@ -276,7 +273,7 @@ export class CanvasRenderingModule extends CanvasModuleABC {
       // 3. Control layers
       // 4. Regions
       // 5. Inpaint masks
-      // 6. Preview (bbox, staging area, progress image, tool)
+      // 6. Preview layer (bbox, staging area, progress image, tool)
 
       this.manager.background.konva.layer.zIndex(++zIndex);
 
@@ -296,20 +293,7 @@ export class CanvasRenderingModule extends CanvasModuleABC {
         this.manager.adapters.inpaintMasks.get(id)?.konva.layer.zIndex(++zIndex);
       }
 
-      this.manager.preview.getLayer().zIndex(++zIndex);
+      this.manager.konva.previewLayer.zIndex(++zIndex);
     }
-  };
-
-  repr = () => {
-    return {
-      id: this.id,
-      path: this.path,
-      type: this.type,
-    };
-  };
-
-  destroy = () => {
-    this.log.debug('Destroying canvas renderer module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
   };
 }

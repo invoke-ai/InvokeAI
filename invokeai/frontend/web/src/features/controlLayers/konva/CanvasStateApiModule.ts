@@ -3,7 +3,7 @@ import type { AppStore } from 'app/store/store';
 import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
 import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   bboxChanged,
@@ -75,23 +75,24 @@ type EntityStateAndAdapter =
       adapter: CanvasEntityMaskAdapter;
     };
 
-export class CanvasStateApiModule extends CanvasModuleABC {
+export class CanvasStateApiModule extends CanvasModuleBase {
   readonly type = 'state_api';
 
   id: string;
   path: string[];
+  parent: CanvasManager;
   manager: CanvasManager;
   log: Logger;
-  subscriptions = new Set<() => void>();
 
   store: AppStore;
 
   constructor(store: AppStore, manager: CanvasManager) {
     super();
     this.id = getPrefixedId(this.type);
+    this.parent = manager;
     this.manager = manager;
-    this.path = this.manager.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating state api module');
 
@@ -275,21 +276,4 @@ export class CanvasStateApiModule extends CanvasModuleABC {
     height: 0,
     scale: 0,
   });
-
-  destroy = () => {
-    this.log.debug('Destroying state api module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-  };
-
-  repr = () => {
-    return {
-      id: this.id,
-      type: this.type,
-      path: this.path,
-    };
-  };
-
-  getLoggingContext = () => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
-  };
 }

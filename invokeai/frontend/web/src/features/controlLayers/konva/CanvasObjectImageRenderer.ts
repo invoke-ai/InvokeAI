@@ -3,7 +3,7 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
 import type { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
 import { loadImage } from 'features/controlLayers/konva/util';
 import type { CanvasImageState } from 'features/controlLayers/store/types';
@@ -12,7 +12,7 @@ import Konva from 'konva';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
 
-export class CanvasObjectImageRenderer extends CanvasModuleABC {
+export class CanvasObjectImageRenderer extends CanvasModuleBase {
   readonly type = 'object_image_renderer';
 
   id: string;
@@ -20,7 +20,6 @@ export class CanvasObjectImageRenderer extends CanvasModuleABC {
   parent: CanvasEntityRenderer | CanvasStagingAreaModule | CanvasFilterModule;
   manager: CanvasManager;
   log: Logger;
-  subscriptions = new Set<() => void>();
 
   state: CanvasImageState;
   konva: {
@@ -35,15 +34,15 @@ export class CanvasObjectImageRenderer extends CanvasModuleABC {
 
   constructor(state: CanvasImageState, parent: CanvasEntityRenderer | CanvasStagingAreaModule | CanvasFilterModule) {
     super();
-    const { id, image } = state;
-    const { width, height } = image;
-    this.id = id;
+    this.id = state.id;
     this.parent = parent;
     this.manager = parent.manager;
-    this.path = this.parent.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
-    this.log.debug({ state }, 'Creating image renderer module');
+    this.log.debug({ state }, 'Creating module');
+
+    const { width, height } = state.image;
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
@@ -169,7 +168,6 @@ export class CanvasObjectImageRenderer extends CanvasModuleABC {
 
   destroy = () => {
     this.log.debug('Destroying image renderer module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
   };
 
@@ -188,9 +186,5 @@ export class CanvasObjectImageRenderer extends CanvasModuleABC {
       isError: this.isError,
       state: deepClone(this.state),
     };
-  };
-
-  getLoggingContext = () => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

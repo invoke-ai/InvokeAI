@@ -3,32 +3,36 @@ import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
+import { CanvasBboxModule } from 'features/controlLayers/konva/CanvasBboxModule';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import { CanvasCompositorModule } from 'features/controlLayers/konva/CanvasCompositorModule';
 import { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasProgressImageModule } from 'features/controlLayers/konva/CanvasProgressImageModule';
 import { CanvasRenderingModule } from 'features/controlLayers/konva/CanvasRenderingModule';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
+import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
+import { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type Konva from 'konva';
+import Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 
 import { CanvasBackgroundModule } from './CanvasBackgroundModule';
 import type { CanvasEntityLayerAdapter } from './CanvasEntityLayerAdapter';
 import type { CanvasEntityMaskAdapter } from './CanvasEntityMaskAdapter';
-import { CanvasPreviewModule } from './CanvasPreviewModule';
 import { CanvasStateApiModule } from './CanvasStateApiModule';
 
 export const $canvasManager = atom<CanvasManager | null>(null);
 
-export class CanvasManager extends CanvasModuleABC {
+export class CanvasManager extends CanvasModuleBase {
   readonly type = 'manager';
 
   id: string;
   path: string[];
   manager: CanvasManager;
+  parent: CanvasManager;
   log: Logger;
 
   store: AppStore;
@@ -52,7 +56,6 @@ export class CanvasManager extends CanvasModuleABC {
   };
 
   stateApi: CanvasStateApiModule;
-  preview: CanvasPreviewModule;
   background: CanvasBackgroundModule;
   filter: CanvasFilterModule;
   stage: CanvasStageModule;
@@ -60,6 +63,14 @@ export class CanvasManager extends CanvasModuleABC {
   cache: CanvasCacheModule;
   renderer: CanvasRenderingModule;
   compositor: CanvasCompositorModule;
+  tool: CanvasToolModule;
+  bbox: CanvasBboxModule;
+  stagingArea: CanvasStagingAreaModule;
+  progressImage: CanvasProgressImageModule;
+
+  konva: {
+    previewLayer: Konva.Layer;
+  };
 
   _isDebugging: boolean = false;
 
@@ -68,6 +79,7 @@ export class CanvasManager extends CanvasModuleABC {
     this.id = getPrefixedId(this.type);
     this.path = [this.id];
     this.manager = this;
+    this.parent = this;
     this.log = logger('canvas').child((message) => {
       return {
         ...message,
@@ -87,14 +99,29 @@ export class CanvasManager extends CanvasModuleABC {
     this.worker = new CanvasWorkerModule(this);
     this.cache = new CanvasCacheModule(this);
     this.renderer = new CanvasRenderingModule(this);
-    this.preview = new CanvasPreviewModule(this);
     this.filter = new CanvasFilterModule(this);
 
     this.compositor = new CanvasCompositorModule(this);
-    this.stage.addLayer(this.preview.getLayer());
 
     this.background = new CanvasBackgroundModule(this);
     this.stage.addLayer(this.background.konva.layer);
+
+    this.konva = {
+      previewLayer: new Konva.Layer({ listening: false, imageSmoothingEnabled: false }),
+    };
+    this.stage.addLayer(this.konva.previewLayer);
+
+    this.stagingArea = new CanvasStagingAreaModule(this);
+    this.konva.previewLayer.add(this.stagingArea.konva.group);
+
+    this.progressImage = new CanvasProgressImageModule(this);
+    this.konva.previewLayer.add(this.progressImage.konva.group);
+
+    this.bbox = new CanvasBboxModule(this);
+    this.konva.previewLayer.add(this.bbox.konva.group);
+
+    this.tool = new CanvasToolModule(this);
+    this.konva.previewLayer.add(this.tool.konva.group);
   }
 
   enableDebugging() {
@@ -121,19 +148,28 @@ export class CanvasManager extends CanvasModuleABC {
   };
 
   destroy = () => {
-    this.log.debug('Destroying canvas manager module');
+    this.log.debug('Destroying module');
+
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
+
     for (const adapter of this.adapters.getAll()) {
       adapter.destroy();
     }
+
+    this.bbox.destroy();
+    this.stagingArea.destroy();
+    this.tool.destroy();
+    this.progressImage.destroy();
+    this.konva.previewLayer.destroy();
+
     this.stateApi.destroy();
-    this.preview.destroy();
     this.background.destroy();
     this.filter.destroy();
     this.worker.destroy();
     this.renderer.destroy();
     this.compositor.destroy();
     this.stage.destroy();
+
     $canvasManager.set(null);
   };
 
@@ -152,7 +188,10 @@ export class CanvasManager extends CanvasModuleABC {
       inpaintMasks: Array.from(this.adapters.inpaintMasks.values()).map((adapter) => adapter.repr()),
       regionMasks: Array.from(this.adapters.regionMasks.values()).map((adapter) => adapter.repr()),
       stateApi: this.stateApi.repr(),
-      preview: this.preview.repr(),
+      bbox: this.bbox.repr(),
+      stagingArea: this.stagingArea.repr(),
+      tool: this.tool.repr(),
+      progressImage: this.progressImage.repr(),
       background: this.background.repr(),
       filter: this.filter.repr(),
       worker: this.worker.repr(),
@@ -162,19 +201,19 @@ export class CanvasManager extends CanvasModuleABC {
     };
   };
 
-  getLoggingContext = (): SerializableObject => {
-    return {
-      path: this.path.join('.'),
-    };
+  getLoggingContext = (): SerializableObject => ({ path: this.path });
+
+  buildPath = (canvasModule: CanvasModuleBase): string[] => {
+    return canvasModule.parent.path.concat(canvasModule.id);
   };
 
-  buildLogger = (getContext: () => SerializableObject): Logger => {
+  buildLogger = (canvasModule: CanvasModuleBase): Logger => {
     return this.log.child((message) => {
       return {
         ...message,
         context: {
           ...message.context,
-          ...getContext(),
+          ...canvasModule.getLoggingContext(),
         },
       };
     });

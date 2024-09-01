@@ -2,8 +2,7 @@ import { CanvasBrushToolPreview } from 'features/controlLayers/konva/CanvasBrush
 import { CanvasColorPickerToolPreview } from 'features/controlLayers/konva/CanvasColorPickerToolPreview';
 import { CanvasEraserToolPreview } from 'features/controlLayers/konva/CanvasEraserToolPreview';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
-import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import {
   alignCoordForTool,
   calculateNewBrushSizeFromWheelDelta,
@@ -36,17 +35,17 @@ const DEFAULT_CONFIG: CanvasToolModuleConfig = {
   BRUSH_SPACING_TARGET_SCALE: 0.1,
 };
 
-export class CanvasToolModule extends CanvasModuleABC {
+export class CanvasToolModule extends CanvasModuleBase {
   readonly type = 'tool';
 
   id: string;
   path: string[];
-  parent: CanvasPreviewModule;
+  parent: CanvasManager;
   manager: CanvasManager;
   log: Logger;
   subscriptions: Set<() => void> = new Set();
 
-  config: CanvasToolModuleConfig;
+  config: CanvasToolModuleConfig = DEFAULT_CONFIG;
 
   brushToolPreview: CanvasBrushToolPreview;
   eraserToolPreview: CanvasEraserToolPreview;
@@ -57,14 +56,13 @@ export class CanvasToolModule extends CanvasModuleABC {
     group: Konva.Group;
   };
 
-  constructor(parent: CanvasPreviewModule, config?: Partial<CanvasToolModuleConfig>) {
+  constructor(manager: CanvasManager) {
     super();
     this.id = getPrefixedId(this.type);
-    this.parent = parent;
-    this.manager = this.parent.manager;
-    this.path = this.parent.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.parent = manager;
+    this.manager = manager;
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating tool module');
 
@@ -624,21 +622,9 @@ export class CanvasToolModule extends CanvasModuleABC {
     }
   };
 
-  repr = () => {
-    return {
-      id: this.id,
-      type: this.type,
-      path: this.path,
-    };
-  };
-
   destroy = () => {
-    this.log.debug('Destroying tool module');
+    this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
-  };
-
-  getLoggingContext = () => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

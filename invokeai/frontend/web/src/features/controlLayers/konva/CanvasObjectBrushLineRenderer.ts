@@ -2,12 +2,12 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasBrushLineState } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-export class CanvasObjectBrushLineRenderer extends CanvasModuleABC {
+export class CanvasObjectBrushLineRenderer extends CanvasModuleBase {
   readonly type = 'object_brush_line_renderer';
 
   id: string;
@@ -15,7 +15,6 @@ export class CanvasObjectBrushLineRenderer extends CanvasModuleABC {
   parent: CanvasEntityRenderer;
   manager: CanvasManager;
   log: Logger;
-  subscriptions = new Set<() => void>();
 
   state: CanvasBrushLineState;
   konva: {
@@ -29,10 +28,10 @@ export class CanvasObjectBrushLineRenderer extends CanvasModuleABC {
     this.id = id;
     this.parent = parent;
     this.manager = parent.manager;
-    this.path = this.parent.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
-    this.log.debug({ state }, 'Creating brush line renderer module');
+    this.log.debug({ state }, 'Creating module');
 
     this.konva = {
       group: new Konva.Group({
@@ -71,16 +70,15 @@ export class CanvasObjectBrushLineRenderer extends CanvasModuleABC {
     return false;
   }
 
-  destroy = () => {
-    this.log.debug('Destroying brush line renderer module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-    this.konva.group.destroy();
-  };
-
   setVisibility(isVisible: boolean): void {
     this.log.trace({ isVisible }, 'Setting brush line visibility');
     this.konva.group.visible(isVisible);
   }
+
+  destroy = () => {
+    this.log.debug('Destroying module');
+    this.konva.group.destroy();
+  };
 
   repr = () => {
     return {
@@ -90,9 +88,5 @@ export class CanvasObjectBrushLineRenderer extends CanvasModuleABC {
       parent: this.parent.id,
       state: deepClone(this.state),
     };
-  };
-
-  getLoggingContext = () => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

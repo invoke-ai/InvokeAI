@@ -1,29 +1,30 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Extents, ExtentsResult, GetBboxTask, WorkerLogMessage } from 'features/controlLayers/konva/worker';
 import type { Logger } from 'roarr';
 
-export class CanvasWorkerModule extends CanvasModuleABC {
+export class CanvasWorkerModule extends CanvasModuleBase {
   readonly type = 'worker';
 
   id: string;
   path: string[];
   log: Logger;
+  parent: CanvasManager;
   manager: CanvasManager;
-  subscriptions = new Set<() => void>();
 
   worker: Worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
   tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }> = new Map();
 
   constructor(manager: CanvasManager) {
     super();
-    this.id = getPrefixedId('worker');
+    this.id = getPrefixedId(this.type);
+    this.parent = manager;
     this.manager = manager;
-    this.path = this.manager.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
-    this.log.debug('Creating worker module');
+    this.log.debug('Creating module');
 
     this.worker.onmessage = (event: MessageEvent<ExtentsResult | WorkerLogMessage>) => {
       const { type, data } = event.data;
@@ -71,12 +72,7 @@ export class CanvasWorkerModule extends CanvasModuleABC {
 
   destroy = () => {
     this.log.trace('Destroying worker module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.worker.terminate();
     this.tasks.clear();
-  };
-
-  getLoggingContext = () => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }

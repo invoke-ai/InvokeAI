@@ -1,6 +1,6 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
@@ -63,7 +63,7 @@ const DEFAULT_CONFIG: ColorPickerToolConfig = {
   CROSSHAIR_BORDER_COLOR: 'rgba(255,255,255,0.8)',
 };
 
-export class CanvasColorPickerToolPreview extends CanvasModuleABC {
+export class CanvasColorPickerToolPreview extends CanvasModuleBase {
   readonly type = 'color_picker_tool_preview';
 
   id: string;
@@ -71,9 +71,8 @@ export class CanvasColorPickerToolPreview extends CanvasModuleABC {
   parent: CanvasToolModule;
   manager: CanvasManager;
   log: Logger;
-  subscriptions: Set<() => void> = new Set();
 
-  config: ColorPickerToolConfig;
+  config: ColorPickerToolConfig = DEFAULT_CONFIG;
 
   konva: {
     group: Konva.Group;
@@ -91,14 +90,13 @@ export class CanvasColorPickerToolPreview extends CanvasModuleABC {
     crosshairWestOuter: Konva.Line;
   };
 
-  constructor(parent: CanvasToolModule, config?: Partial<ColorPickerToolConfig>) {
+  constructor(parent: CanvasToolModule) {
     super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = this.parent.manager;
-    this.path = this.parent.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating color picker tool preview module');
 
@@ -277,11 +275,6 @@ export class CanvasColorPickerToolPreview extends CanvasModuleABC {
 
   destroy = () => {
     this.log.debug('Destroying color picker tool preview module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
-  };
-
-  getLoggingContext = () => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

@@ -1,29 +1,53 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { GenerationMode } from 'features/controlLayers/store/types';
 import { LRUCache } from 'lru-cache';
 import type { Logger } from 'roarr';
 
-export class CanvasCacheModule extends CanvasModuleABC {
+type CanvasCacheModuleConfig = {
+  /**
+   * The maximum size of the image name cache.
+   */
+  imageNameCacheSize: number;
+  /**
+   * The maximum size of the canvas element cache.
+   */
+  canvasElementCacheSize: number;
+  /**
+   * The maximum size of the generation mode cache.
+   */
+  generationModeCacheSize: number;
+};
+
+const DEFAULT_CONFIG: CanvasCacheModuleConfig = {
+  imageNameCacheSize: 100,
+  canvasElementCacheSize: 32,
+  generationModeCacheSize: 100,
+};
+
+export class CanvasCacheModule extends CanvasModuleBase {
   readonly type = 'cache';
 
   id: string;
   path: string[];
   log: Logger;
+  parent: CanvasManager;
   manager: CanvasManager;
-  subscriptions = new Set<() => void>();
 
-  imageNameCache = new LRUCache<string, string>({ max: 100 });
-  canvasElementCache = new LRUCache<string, HTMLCanvasElement>({ max: 32 });
-  generationModeCache = new LRUCache<string, GenerationMode>({ max: 100 });
+  config: CanvasCacheModuleConfig = DEFAULT_CONFIG;
+
+  imageNameCache = new LRUCache<string, string>({ max: this.config.imageNameCacheSize });
+  canvasElementCache = new LRUCache<string, HTMLCanvasElement>({ max: this.config.canvasElementCacheSize });
+  generationModeCache = new LRUCache<string, GenerationMode>({ max: this.config.generationModeCacheSize });
 
   constructor(manager: CanvasManager) {
     super();
     this.id = getPrefixedId('cache');
     this.manager = manager;
-    this.path = this.manager.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.parent = manager;
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating cache module');
   }
@@ -34,21 +58,8 @@ export class CanvasCacheModule extends CanvasModuleABC {
     this.generationModeCache.clear();
   };
 
-  repr = () => {
-    return {
-      id: this.id,
-      path: this.path,
-      type: this.type,
-    };
-  };
-
   destroy = () => {
     this.log.debug('Destroying cache module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.clearAll();
-  };
-
-  getLoggingContext = () => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
   };
 }
