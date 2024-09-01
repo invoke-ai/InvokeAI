@@ -1,5 +1,6 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useDefaultIPAdapter } from 'features/controlLayers/hooks/useLayerControlAdapter';
 import {
   controlLayerAdded,
   inpaintMaskAdded,
@@ -14,6 +15,7 @@ import { PiPlusBold } from 'react-icons/pi';
 export const CanvasEntityListMenuItems = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const defaultIPAdapter = useDefaultIPAdapter();
   const addInpaintMask = useCallback(() => {
     dispatch(inpaintMaskAdded({ isSelected: true }));
   }, [dispatch]);
@@ -27,8 +29,9 @@ export const CanvasEntityListMenuItems = memo(() => {
     dispatch(controlLayerAdded({ isSelected: true }));
   }, [dispatch]);
   const addIPAdapter = useCallback(() => {
-    dispatch(ipaAdded({ isSelected: true }));
-  }, [dispatch]);
+    const overrides = { ipAdapter: defaultIPAdapter };
+    dispatch(ipaAdded({ isSelected: true, overrides }));
+  }, [defaultIPAdapter, dispatch]);
 
   return (
     <>
