@@ -31,7 +31,7 @@ function formatPct(v: number | string) {
   return `${round(Number(v), 2).toLocaleString()}%`;
 }
 
-function mapSliderValueToScale(value: number) {
+function mapSliderValueToRawValue(value: number) {
   if (value <= 40) {
     // 0 to 40 -> 10% to 100%
     return 10 + (90 * value) / 40;
@@ -44,29 +44,29 @@ function mapSliderValueToScale(value: number) {
   }
 }
 
-function mapScaleToSliderValue(scale: number) {
-  if (scale <= 100) {
-    return ((scale - 10) * 40) / 90;
-  } else if (scale <= 500) {
-    return 40 + ((scale - 100) * 30) / 400;
+function mapRawValueToSliderValue(value: number) {
+  if (value <= 100) {
+    return ((value - 10) * 40) / 90;
+  } else if (value <= 500) {
+    return 40 + ((value - 100) * 30) / 400;
   } else {
-    return 70 + ((scale - 500) * 30) / 1500;
+    return 70 + ((value - 500) * 30) / 1500;
   }
 }
 
 function formatSliderValue(value: number) {
-  return String(mapSliderValueToScale(value));
+  return String(mapSliderValueToRawValue(value));
 }
 
 const marks = [
-  mapScaleToSliderValue(10),
-  mapScaleToSliderValue(50),
-  mapScaleToSliderValue(100),
-  mapScaleToSliderValue(500),
-  mapScaleToSliderValue(2000),
+  mapRawValueToSliderValue(10),
+  mapRawValueToSliderValue(50),
+  mapRawValueToSliderValue(100),
+  mapRawValueToSliderValue(500),
+  mapRawValueToSliderValue(2000),
 ];
 
-const sliderDefaultValue = mapScaleToSliderValue(100);
+const sliderDefaultValue = mapRawValueToSliderValue(100);
 
 const snapCandidates = marks.slice(1, marks.length - 1);
 
@@ -78,24 +78,18 @@ export const CanvasToolbarScale = memo(() => {
 
   const onChangeSlider = useCallback(
     (scale: number) => {
-      if (!canvasManager) {
-        return;
-      }
       let snappedScale = scale;
       // Do not snap if shift key is held
       if (!$shift.get()) {
         snappedScale = snapToNearest(scale, snapCandidates, 2);
       }
-      const mappedScale = mapSliderValueToScale(snappedScale);
+      const mappedScale = mapSliderValueToRawValue(snappedScale);
       canvasManager.stage.setScale(mappedScale / 100);
     },
     [canvasManager]
   );
 
   const onBlur = useCallback(() => {
-    if (!canvasManager) {
-      return;
-    }
     if (isNaN(Number(localScale))) {
       canvasManager.stage.setScale(1);
       setLocalScale(100);
@@ -161,7 +155,7 @@ export const CanvasToolbarScale = memo(() => {
           <CompositeSlider
             min={0}
             max={100}
-            value={mapScaleToSliderValue(localScale)}
+            value={mapRawValueToSliderValue(localScale)}
             onChange={onChangeSlider}
             defaultValue={sliderDefaultValue}
             marks={marks}

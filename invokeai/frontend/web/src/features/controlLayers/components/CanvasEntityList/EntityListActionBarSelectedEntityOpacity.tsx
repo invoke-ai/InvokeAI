@@ -37,11 +37,11 @@ function formatPct(v: number | string) {
   return `${round(Number(v), 2).toLocaleString()}%`;
 }
 
-function mapSliderValueToOpacity(value: number) {
+function mapSliderValueToRawValue(value: number) {
   return value / 100;
 }
 
-function mapOpacityToSliderValue(opacity: number) {
+function mapRawValueToSliderValue(opacity: number) {
   return opacity * 100;
 }
 
@@ -50,14 +50,14 @@ function formatSliderValue(value: number) {
 }
 
 const marks = [
-  mapOpacityToSliderValue(0),
-  mapOpacityToSliderValue(0.25),
-  mapOpacityToSliderValue(0.5),
-  mapOpacityToSliderValue(0.75),
-  mapOpacityToSliderValue(1),
+  mapRawValueToSliderValue(0),
+  mapRawValueToSliderValue(0.25),
+  mapRawValueToSliderValue(0.5),
+  mapRawValueToSliderValue(0.75),
+  mapRawValueToSliderValue(1),
 ];
 
-const sliderDefaultValue = mapOpacityToSliderValue(1);
+const sliderDefaultValue = mapRawValueToSliderValue(1);
 
 const snapCandidates = marks.slice(1, marks.length - 1);
 
@@ -95,7 +95,7 @@ export const SelectedEntityOpacity = memo(() => {
       if (!$shift.get()) {
         snappedOpacity = snapToNearest(opacity, snapCandidates, 2);
       }
-      const mappedOpacity = mapSliderValueToOpacity(snappedOpacity);
+      const mappedOpacity = mapSliderValueToRawValue(snappedOpacity);
 
       dispatch(entityOpacityChanged({ entityIdentifier: selectedEntityIdentifier, opacity: mappedOpacity }));
     },
