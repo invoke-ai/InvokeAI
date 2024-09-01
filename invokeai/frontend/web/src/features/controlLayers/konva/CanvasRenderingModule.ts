@@ -56,6 +56,11 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     const prevState = this.state;
     this.state = state;
 
+    this.manager.stateApi.$toolState.set(this.manager.stateApi.getToolState());
+    this.manager.stateApi.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
+    this.manager.stateApi.$selectedEntity.set(this.manager.stateApi.getSelectedEntity());
+    this.manager.stateApi.$currentFill.set(this.manager.stateApi.getCurrentFill());
+
     if (prevState === state) {
       // No changes to state - no need to render
       return;
@@ -67,11 +72,6 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     await this.renderInpaintMasks(state, prevState);
     await this.renderBbox(state, prevState);
     this.arrangeEntities(state, prevState);
-
-    this.manager.stateApi.$toolState.set(this.manager.stateApi.getToolState());
-    this.manager.stateApi.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
-    this.manager.stateApi.$selectedEntity.set(this.manager.stateApi.getSelectedEntity());
-    this.manager.stateApi.$currentFill.set(this.manager.stateApi.getCurrentFill());
   };
 
   renderSettings = () => {

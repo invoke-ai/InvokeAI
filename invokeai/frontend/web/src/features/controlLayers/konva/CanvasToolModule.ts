@@ -80,7 +80,18 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.group.add(this.colorPickerToolPreview.konva.group);
 
     this.subscriptions.add(this.manager.stateApi.$stageAttrs.listen(this.render));
-    this.subscriptions.add(this.manager.stateApi.$toolState.listen(this.render));
+    this.subscriptions.add(
+      this.manager.stateApi.$toolState.listen((value, oldValue) => {
+        if (
+          value !== oldValue ||
+          value.brush.width !== oldValue.brush.width ||
+          value.eraser.width !== oldValue.eraser.width ||
+          value.fill !== oldValue.fill
+        ) {
+          this.render();
+        }
+      })
+    );
     this.subscriptions.add(this.manager.stateApi.$tool.listen(this.render));
 
     const cleanupListeners = this.setEventListeners();
