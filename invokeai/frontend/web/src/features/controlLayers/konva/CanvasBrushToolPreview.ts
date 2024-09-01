@@ -22,6 +22,9 @@ const DEFAULT_CONFIG: BrushToolPreviewConfig = {
   BORDER_OUTER_COLOR: 'rgba(255,255,255,0.8)',
 };
 
+/**
+ * Renders a preview of the brush tool on the canvas.
+ */
 export class CanvasBrushToolPreview extends CanvasModuleBase {
   readonly type = 'brush_tool_preview';
 
@@ -33,6 +36,13 @@ export class CanvasBrushToolPreview extends CanvasModuleBase {
 
   config: BrushToolPreviewConfig = DEFAULT_CONFIG;
 
+  /**
+   * The Konva objects that make up the brush tool preview:
+   * - A group to hold the fill circle and borders
+   * - A circle to fill the brush area
+   * - An inner border ring
+   * - An outer border ring
+   */
   konva: {
     group: Konva.Group;
     fillCircle: Konva.Circle;
@@ -80,6 +90,7 @@ export class CanvasBrushToolPreview extends CanvasModuleBase {
   render = () => {
     const cursorPos = this.manager.stateApi.$lastCursorPos.get();
 
+    // If the cursor position is not available, do not update the brush preview. The tool module will handle visiblity.
     if (!cursorPos) {
       return;
     }
@@ -129,7 +140,7 @@ export class CanvasBrushToolPreview extends CanvasModuleBase {
   };
 
   destroy = () => {
-    this.log.debug('Destroying brush tool preview module');
+    this.log.debug('Destroying module');
     this.konva.group.destroy();
   };
 }
