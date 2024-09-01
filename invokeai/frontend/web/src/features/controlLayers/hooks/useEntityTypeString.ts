@@ -16,7 +16,7 @@ export const useEntityTypeString = (type: CanvasEntityIdentifier['type']): strin
       case 'regional_guidance':
         return t('controlLayers.regionalGuidance');
       case 'ip_adapter':
-        return t('controlLayers.ipAdapter');
+        return t('controlLayers.globalIPAdapter');
       default:
         return '';
     }

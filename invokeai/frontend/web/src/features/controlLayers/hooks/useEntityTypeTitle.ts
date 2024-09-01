@@ -22,7 +22,7 @@ export const useEntityTypeTitle = (type: CanvasEntityIdentifier['type']): string
       case 'regional_guidance':
         return t('controlLayers.regionalGuidance_withCount', { count, context });
       case 'ip_adapter':
-        return t('controlLayers.ipAdapters_withCount', { count, context });
+        return t('controlLayers.globalIPAdapters_withCount', { count, context });
       default:
         return '';
     }
