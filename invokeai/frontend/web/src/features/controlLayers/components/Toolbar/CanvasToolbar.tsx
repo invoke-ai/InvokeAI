@@ -10,6 +10,7 @@ import { CanvasToolbarScale } from 'features/controlLayers/components/Toolbar/Ca
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasEntityQuickSwitch } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitch';
 import { useCanvasUndoRedo } from 'features/controlLayers/hooks/useCanvasUndoRedo';
+import { useNextPrevEntityHotkeys } from 'features/controlLayers/hooks/useNextPrevEntity';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
 import { ViewerToggle } from 'features/gallery/components/ImageViewer/ViewerToggleMenu';
 import { memo } from 'react';
@@ -17,6 +18,7 @@ import { memo } from 'react';
 export const CanvasToolbar = memo(() => {
   useCanvasUndoRedo();
   useCanvasEntityQuickSwitch();
+  useNextPrevEntityHotkeys();
 
   return (
     <CanvasManagerProviderGate>
