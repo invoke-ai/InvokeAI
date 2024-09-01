@@ -1,6 +1,6 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
 import { alignCoordForTool, getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
@@ -22,16 +22,16 @@ const DEFAULT_CONFIG: BrushToolPreviewConfig = {
   BORDER_OUTER_COLOR: 'rgba(255,255,255,0.8)',
 };
 
-export class CanvasBrushToolPreview extends CanvasModuleABC {
+export class CanvasBrushToolPreview extends CanvasModuleBase {
   readonly type = 'brush_tool_preview';
+
   id: string;
   path: string[];
   parent: CanvasToolModule;
   manager: CanvasManager;
   log: Logger;
-  subscriptions: Set<() => void> = new Set();
 
-  config: BrushToolPreviewConfig;
+  config: BrushToolPreviewConfig = DEFAULT_CONFIG;
 
   konva: {
     group: Konva.Group;
@@ -40,16 +40,15 @@ export class CanvasBrushToolPreview extends CanvasModuleABC {
     outerBorder: Konva.Ring;
   };
 
-  constructor(parent: CanvasToolModule, config?: Partial<BrushToolPreviewConfig>) {
+  constructor(parent: CanvasToolModule) {
     super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = this.parent.manager;
-    this.path = this.parent.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
-    this.log.debug('Creating brush tool preview module');
+    this.log.debug('Creating module');
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:brush_group`, listening: false }),
@@ -131,11 +130,6 @@ export class CanvasBrushToolPreview extends CanvasModuleABC {
 
   destroy = () => {
     this.log.debug('Destroying brush tool preview module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.konva.group.destroy();
-  };
-
-  getLoggingContext = () => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

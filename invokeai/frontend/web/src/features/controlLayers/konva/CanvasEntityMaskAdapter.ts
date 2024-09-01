@@ -3,7 +3,7 @@ import { deepClone } from 'common/util/deepClone';
 import { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getLastPointOfLine } from 'features/controlLayers/konva/util';
 import type {
   CanvasBrushLineState,
@@ -21,14 +21,14 @@ import { get, omit } from 'lodash-es';
 import type { Logger } from 'roarr';
 import stableHash from 'stable-hash';
 
-export class CanvasEntityMaskAdapter extends CanvasModuleABC {
+export class CanvasEntityMaskAdapter extends CanvasModuleBase {
   readonly type = 'entity_mask_adapter';
 
   id: string;
   path: string[];
+  parent: CanvasManager;
   manager: CanvasManager;
   log: Logger;
-  subscriptions = new Set<() => void>();
 
   state: CanvasInpaintMaskState | CanvasRegionalGuidanceState;
 
@@ -44,11 +44,12 @@ export class CanvasEntityMaskAdapter extends CanvasModuleABC {
   constructor(state: CanvasEntityMaskAdapter['state'], manager: CanvasEntityMaskAdapter['manager']) {
     super();
     this.id = state.id;
+    this.parent = manager;
     this.manager = manager;
-    this.path = this.manager.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
-    this.log.debug({ state }, 'Creating mask adapter module');
+    this.log.debug('Creating module');
 
     this.state = state;
 
@@ -72,14 +73,6 @@ export class CanvasEntityMaskAdapter extends CanvasModuleABC {
    */
   getEntityIdentifier = (): CanvasEntityIdentifier => {
     return getEntityIdentifier(this.state);
-  };
-
-  destroy = (): void => {
-    this.log.debug('Destroying mask adapter module');
-
-    this.transformer.destroy();
-    this.renderer.destroy();
-    this.konva.layer.destroy();
   };
 
   update = async (arg?: { state: CanvasEntityMaskAdapter['state'] }) => {
@@ -157,15 +150,6 @@ export class CanvasEntityMaskAdapter extends CanvasModuleABC {
     return null;
   };
 
-  repr = () => {
-    return {
-      id: this.id,
-      type: this.type,
-      path: this.path,
-      state: deepClone(this.state),
-    };
-  };
-
   getHashableState = (): SerializableObject => {
     const keysToOmit: (keyof CanvasEntityMaskAdapter['state'])[] = ['fill', 'name', 'opacity'];
     return omit(this.state, keysToOmit);
@@ -188,7 +172,19 @@ export class CanvasEntityMaskAdapter extends CanvasModuleABC {
     return canvas;
   };
 
-  getLoggingContext = () => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
+  destroy = () => {
+    this.log.debug('Destroying module');
+    this.transformer.destroy();
+    this.renderer.destroy();
+    this.konva.layer.destroy();
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      state: deepClone(this.state),
+    };
   };
 }

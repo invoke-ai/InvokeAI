@@ -1,25 +1,19 @@
 import { Mutex } from 'async-mutex';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
-import type { CanvasPreviewModule } from 'features/controlLayers/konva/CanvasPreviewModule';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId, loadImage } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 import type { S } from 'services/api/types';
 
-export class CanvasProgressImageModule extends CanvasModuleABC {
+export class CanvasProgressImageModule extends CanvasModuleBase {
   readonly type = 'progress_image';
 
   id: string;
   path: string[];
-  parent: CanvasPreviewModule;
+  parent: CanvasManager;
   manager: CanvasManager;
   log: Logger;
-
-  /**
-   * A set of subscriptions that should be cleaned up when the transformer is destroyed.
-   */
-  subscriptions: Set<() => void> = new Set();
 
   progressImageId: string | null = null;
   konva: {
@@ -34,13 +28,13 @@ export class CanvasProgressImageModule extends CanvasModuleABC {
 
   mutex: Mutex = new Mutex();
 
-  constructor(parent: CanvasPreviewModule) {
+  constructor(manager: CanvasManager) {
     super();
     this.id = getPrefixedId(this.type);
-    this.parent = parent;
-    this.manager = parent.manager;
-    this.path = this.parent.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.parent = manager;
+    this.manager = manager;
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating progress image module');
 
@@ -106,21 +100,8 @@ export class CanvasProgressImageModule extends CanvasModuleABC {
     }
   };
 
-  repr = () => {
-    return {
-      id: this.id,
-      type: this.type,
-      path: this.path,
-    };
-  };
-
   destroy = () => {
-    this.log.debug('Destroying progress image module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.log.debug('Destroying module');
     this.konva.group.destroy();
-  };
-
-  getLoggingContext = () => {
-    return { ...this.parent.getLoggingContext(), path: this.path.join('.') };
   };
 }

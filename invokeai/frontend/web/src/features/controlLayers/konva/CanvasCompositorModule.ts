@@ -1,6 +1,6 @@
 import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleABC } from 'features/controlLayers/konva/CanvasModuleABC';
+import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import {
   canvasToBlob,
   canvasToImageData,
@@ -15,21 +15,22 @@ import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
-export class CanvasCompositorModule extends CanvasModuleABC {
+export class CanvasCompositorModule extends CanvasModuleBase {
   readonly type = 'compositor';
 
   id: string;
   path: string[];
   log: Logger;
+  parent: CanvasManager;
   manager: CanvasManager;
-  subscriptions = new Set<() => void>();
 
   constructor(manager: CanvasManager) {
     super();
     this.id = getPrefixedId('canvas_compositor');
+    this.parent = manager;
     this.manager = manager;
-    this.path = this.manager.path.concat(this.id);
-    this.log = this.manager.buildLogger(this.getLoggingContext);
+    this.path = this.manager.buildPath(this);
+    this.log = this.manager.buildLogger(this);
     this.log.debug('Creating compositor module');
   }
 
@@ -250,21 +251,4 @@ export class CanvasCompositorModule extends CanvasModuleABC {
     this.manager.cache.generationModeCache.set(hash, generationMode);
     return generationMode;
   }
-
-  repr = () => {
-    return {
-      id: this.id,
-      type: this.type,
-      path: this.path,
-    };
-  };
-
-  destroy = () => {
-    this.log.trace('Destroying compositor module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-  };
-
-  getLoggingContext = () => {
-    return { ...this.manager.getLoggingContext(), path: this.path.join('.') };
-  };
 }
