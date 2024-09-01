@@ -65,6 +65,9 @@ export class CanvasEntityLayerAdapter extends CanvasModuleBase {
    */
   renderer: CanvasEntityRenderer;
 
+  /**
+   * Whether this is the first render of the entity layer.
+   */
   isFirstRender: boolean = true;
 
   constructor(state: CanvasEntityLayerAdapter['state'], manager: CanvasEntityLayerAdapter['manager']) {
@@ -101,7 +104,7 @@ export class CanvasEntityLayerAdapter extends CanvasModuleBase {
     return getEntityIdentifier(this.state);
   };
 
-  update = async (arg?: { state: CanvasEntityLayerAdapter['state'] }) => {
+  update = async (arg?: { state: CanvasEntityLayerAdapter['state'] }): Promise<void> => {
     const state = get(arg, 'state', this.state);
 
     const prevState = this.state;
@@ -164,7 +167,6 @@ export class CanvasEntityLayerAdapter extends CanvasModuleBase {
   };
 
   getCanvas = (rect?: Rect): HTMLCanvasElement => {
-    // TODO(psyche) - cache this - maybe with package `memoizee`? Would require careful review of cache invalidation
     this.log.trace({ rect }, 'Getting canvas');
     // The opacity may have been changed in response to user selecting a different entity category, so we must restore
     // the original opacity before rendering the canvas

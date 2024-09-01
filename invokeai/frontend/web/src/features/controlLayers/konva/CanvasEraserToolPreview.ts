@@ -30,7 +30,7 @@ export class CanvasEraserToolPreview extends CanvasModuleBase {
   manager: CanvasManager;
   log: Logger;
 
-  config: EraserToolPreviewConfig;
+  config: EraserToolPreviewConfig = DEFAULT_CONFIG;
 
   konva: {
     group: Konva.Group;
@@ -39,14 +39,13 @@ export class CanvasEraserToolPreview extends CanvasModuleBase {
     outerBorder: Konva.Ring;
   };
 
-  constructor(parent: CanvasToolModule, config?: Partial<EraserToolPreviewConfig>) {
+  constructor(parent: CanvasToolModule) {
     super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
     this.manager = this.parent.manager;
     this.path = this.manager.buildPath(this);
     this.log = this.manager.buildLogger(this);
-    this.config = { ...DEFAULT_CONFIG, ...config };
 
     this.log.debug('Creating module');
 
