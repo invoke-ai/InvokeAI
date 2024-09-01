@@ -5,7 +5,6 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { CanvasPanelContent } from 'features/controlLayers/components/CanvasPanelContent';
 import { selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
-import { selectEntityCount } from 'features/controlLayers/store/selectors';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
@@ -18,7 +17,7 @@ import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePr
 import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const overlayScrollbarsStyles: CSSProperties = {
@@ -41,13 +40,6 @@ const selectedStyles: ChakraProps['sx'] = {
 const ParametersPanelTextToImage = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const controlLayersCount = useAppSelector(selectEntityCount);
-  const controlLayersTitle = useMemo(() => {
-    if (controlLayersCount === 0) {
-      return t('controlLayers.controlLayers');
-    }
-    return `${t('controlLayers.controlLayers')} (${controlLayersCount})`;
-  }, [controlLayersCount, t]);
   const isSDXL = useAppSelector(selectIsSDXL);
   const onChangeTabs = useCallback(
     (i: number) => {
@@ -95,7 +87,7 @@ const ParametersPanelTextToImage = () => {
                     _selected={selectedStyles}
                     data-testid="generation-tab-control-layers-tab-button"
                   >
-                    {controlLayersTitle}
+                    {t('controlLayers.layer_other')}
                   </Tab>
                 </TabList>
                 <TabPanels w="full" h="full">
