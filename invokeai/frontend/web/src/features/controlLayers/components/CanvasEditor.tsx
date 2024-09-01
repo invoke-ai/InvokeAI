@@ -2,12 +2,12 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea';
-import { ControlLayersToolbar } from 'features/controlLayers/components/ControlLayersToolbar';
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { StageComponent } from 'features/controlLayers/components/StageComponent';
 import { StagingAreaIsStagingGate } from 'features/controlLayers/components/StagingArea/StagingAreaIsStagingGate';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
-import { Transform } from 'features/controlLayers/components/Transform';
+import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
+import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { memo, useRef } from 'react';
 
@@ -28,7 +28,7 @@ export const CanvasEditor = memo(() => {
       alignItems="center"
       justifyContent="center"
     >
-      <ControlLayersToolbar />
+      <CanvasToolbar />
       <StageComponent />
       <Flex position="absolute" bottom={8} gap={2} align="center" justify="center">
         <CanvasManagerProviderGate>

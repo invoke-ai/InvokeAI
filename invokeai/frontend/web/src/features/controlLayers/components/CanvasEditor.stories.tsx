@@ -1,6 +1,6 @@
 import { Flex } from '@invoke-ai/ui-library';
 import type { Meta, StoryObj } from '@storybook/react';
-import { CanvasEditor } from 'features/controlLayers/components/ControlLayersEditor';
+import { CanvasEditor } from 'features/controlLayers/components/CanvasEditor';
 
 const meta: Meta<typeof CanvasEditor> = {
   title: 'Feature/ControlLayers',
