@@ -763,10 +763,20 @@ class T5EncoderFolderProbe(FolderProbeBase):
         path = self.model_path / "text_encoder_2"
         if (path / "model.safetensors.index.json").exists():
             return ModelFormat.T5Encoder
-        files = path.glob("*.safetensors")
+        files = list(path.glob("*.safetensors"))
+        if len(files) == 0:
+            raise InvalidModelConfigException(f"{self.model_path.as_posix()}: no .safetensors files found")
+
+        # shortcut: look for the quantization in the name
         if any(x for x in files if "llm_int8" in x.as_posix()):
             return ModelFormat.BnbQuantizedLlmInt8b
-        raise f"{self.model_path.as_posix()}: unknown model format"
+
+        # more reliable path: probe contents for a 'SCB' key
+        ckpt = read_checkpoint_meta(files[0], scan=True)
+        if any("SCB" in x for x in ckpt.keys()):
+            return ModelFormat.BnbQuantizedLlmInt8b
+
+        raise InvalidModelConfigException(f"{self.model_path.as_posix()}: unknown model format")
 
 
 class ONNXFolderProbe(PipelineFolderProbe):
