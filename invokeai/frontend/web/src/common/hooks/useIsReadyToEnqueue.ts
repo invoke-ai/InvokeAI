@@ -128,7 +128,7 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
         canvas.controlLayers.entities
           .filter((controlLayer) => controlLayer.isEnabled)
           .forEach((controlLayer, i) => {
-            const layerLiteral = i18n.t('controlLayers.layers_one');
+            const layerLiteral = i18n.t('controlLayers.layer_one');
             const layerNumber = i + 1;
             const layerType = i18n.t(LAYER_TYPE_TO_TKEY['control_layer']);
             const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
@@ -158,7 +158,7 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
         canvas.ipAdapters.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
-            const layerLiteral = i18n.t('controlLayers.layers_one');
+            const layerLiteral = i18n.t('controlLayers.layer_one');
             const layerNumber = i + 1;
             const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
             const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
@@ -186,7 +186,7 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
         canvas.regions.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
-            const layerLiteral = i18n.t('controlLayers.layers_one');
+            const layerLiteral = i18n.t('controlLayers.layer_one');
             const layerNumber = i + 1;
             const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
             const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
@@ -223,7 +223,7 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
         canvas.rasterLayers.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
-            const layerLiteral = i18n.t('controlLayers.layers_one');
+            const layerLiteral = i18n.t('controlLayers.layer_one');
             const layerNumber = i + 1;
             const layerType = i18n.t(LAYER_TYPE_TO_TKEY[entity.type]);
             const prefix = `${layerLiteral} #${layerNumber} (${layerType})`;
