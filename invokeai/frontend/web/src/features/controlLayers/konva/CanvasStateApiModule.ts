@@ -239,7 +239,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     const selectedEntity = this.getSelectedEntity();
     if (selectedEntity?.state.type === 'regional_guidance' || selectedEntity?.state.type === 'inpaint_mask') {
       // The brush should use the mask opacity for these enktity types
-      return { ...selectedEntity.state.fill.color, a: 1 };
+      return { ...selectedEntity.state.fill.color, a: 0.5 };
     } else {
       return this.getToolState().fill;
     }
