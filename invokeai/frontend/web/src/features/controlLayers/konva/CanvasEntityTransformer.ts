@@ -220,7 +220,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     // When the stage scale changes, we may need to re-scale some of the transformer's components. For example,
     // the bbox outline should always be 1 screen pixel wide, so we need to update its stroke width.
     this.subscriptions.add(
-      this.manager.stateApi.$stageAttrs.listen((newVal, oldVal) => {
+      this.manager.stage.$stageAttrs.listen((newVal, oldVal) => {
         if (newVal.scale !== oldVal.scale) {
           this.syncScale();
         }
@@ -236,7 +236,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     );
 
     // When the selected tool changes, we need to update the transformer's interaction state.
-    this.subscriptions.add(this.manager.stateApi.$tool.listen(this.syncInteractionState));
+    this.subscriptions.add(this.manager.tool.$tool.listen(this.syncInteractionState));
 
     // When the selected entity changes, we need to update the transformer's interaction state.
     this.subscriptions.add(this.manager.stateApi.$selectedEntityIdentifier.listen(this.syncInteractionState));
@@ -511,7 +511,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
 
-    const tool = this.manager.stateApi.$tool.get();
+    const tool = this.manager.tool.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
 
     if (!this.parent.renderer.hasObjects() || this.parent.state.isLocked || !this.parent.state.isEnabled) {
@@ -565,12 +565,12 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   startTransform = () => {
     this.log.debug('Starting transform');
     this.$isTransforming.set(true);
-    this.manager.stateApi.$tool.set('move');
+    this.manager.tool.$tool.set('move');
     // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
     // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
     // when the view tool is selected
     // TODO(psyche): We just set the tool to 'move', why would it be 'view'? Investigate and figure out if this is needed
-    const shouldListen = this.manager.stateApi.$tool.get() !== 'view';
+    const shouldListen = this.manager.tool.$tool.get() !== 'view';
     this.parent.konva.layer.listening(shouldListen);
     this.setInteractionMode('all');
     this.manager.stateApi.$transformingAdapter.set(this.parent);

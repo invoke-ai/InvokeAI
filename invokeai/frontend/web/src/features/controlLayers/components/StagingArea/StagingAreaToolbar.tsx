@@ -45,7 +45,7 @@ export const StagingAreaToolbar = memo(() => {
   const index = useAppSelector(selectStagedImageIndex);
   const selectedImage = useAppSelector(selectSelectedImage);
   const imageCount = useAppSelector(selectImageCount);
-  const shouldShowStagedImage = useStore(canvasManager.stateApi.$shouldShowStagedImage);
+  const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
   const isCanvasActive = useStore(INTERACTION_SCOPES.canvas.$isActive);
   const [changeIsImageIntermediate] = useChangeImageIsIntermediateMutation();
   useScopeOnMount('stagingArea');
@@ -83,8 +83,8 @@ export const StagingAreaToolbar = memo(() => {
   }, [dispatch]);
 
   const onToggleShouldShowStagedImage = useCallback(() => {
-    canvasManager.stateApi.$shouldShowStagedImage.set(!shouldShowStagedImage);
-  }, [canvasManager.stateApi.$shouldShowStagedImage, shouldShowStagedImage]);
+    canvasManager.stagingArea.$shouldShowStagedImage.set(!shouldShowStagedImage);
+  }, [canvasManager.stagingArea.$shouldShowStagedImage, shouldShowStagedImage]);
 
   const onSaveStagingImage = useCallback(() => {
     if (!selectedImage) {

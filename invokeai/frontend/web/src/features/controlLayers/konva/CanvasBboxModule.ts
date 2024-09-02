@@ -112,7 +112,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
     this.konva.group.add(this.konva.transformer);
 
     // We will listen to the tool state to determine if the bbox should be visible or not.
-    this.subscriptions.add(this.manager.stateApi.$tool.listen(this.render));
+    this.subscriptions.add(this.manager.tool.$tool.listen(this.render));
   }
 
   /**
@@ -122,7 +122,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
     this.log.trace('Rendering');
 
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
-    const tool = this.manager.stateApi.$tool.get();
+    const tool = this.manager.tool.$tool.get();
 
     this.konva.group.visible(true);
 
