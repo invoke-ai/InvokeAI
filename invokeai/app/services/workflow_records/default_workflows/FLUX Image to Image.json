@@ -1,11 +1,11 @@
 {
-  "name": "FLUX Text to Image",
+  "name": "FLUX Image to Image",
   "author": "InvokeAI",
-  "description": "A simple text-to-image workflow using FLUX dev or schnell models.",
+  "description": "A simple image-to-image workflow using a FLUX dev model. ",
   "version": "1.0.4",
   "contact": "",
-  "tags": "text2image, flux",
-  "notes": "Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager. We recommend 4 steps for FLUX schnell models and 30 steps for FLUX dev models.",
+  "tags": "image2image, flux, image-to-image",
+  "notes": "Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager. We recommend using FLUX dev models for image-to-image workflows. The image-to-image performance with FLUX schnell models is poor.",
   "exposedFields": [
     {
       "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
@@ -24,11 +24,15 @@
       "fieldName": "vae_model"
     },
     {
+      "nodeId": "ace0258f-67d7-4eee-a218-6fff27065214",
+      "fieldName": "denoising_start"
+    },
+    {
       "nodeId": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
       "fieldName": "prompt"
     },
     {
-      "nodeId": "4fe24f07-f906-4f55-ab2c-9beee56ef5bd",
+      "nodeId": "ace0258f-67d7-4eee-a218-6fff27065214",
       "fieldName": "num_steps"
     }
   ],
@@ -38,10 +42,41 @@
   },
   "nodes": [
     {
-      "id": "4fe24f07-f906-4f55-ab2c-9beee56ef5bd",
+      "id": "2981a67c-480f-4237-9384-26b68dbf912b",
       "type": "invocation",
       "data": {
-        "id": "4fe24f07-f906-4f55-ab2c-9beee56ef5bd",
+        "id": "2981a67c-480f-4237-9384-26b68dbf912b",
+        "type": "flux_vae_encode",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": "",
+            "value": {
+              "image_name": "8a5c62aa-9335-45d2-9c71-89af9fc1f8d4.png"
+            }
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          }
+        }
+      },
+      "position": {
+        "x": 732.7680166609682,
+        "y": -24.37398171806909
+      }
+    },
+    {
+      "id": "ace0258f-67d7-4eee-a218-6fff27065214",
+      "type": "invocation",
+      "data": {
+        "id": "ace0258f-67d7-4eee-a218-6fff27065214",
         "type": "flux_denoise",
         "version": "1.0.0",
         "label": "",
@@ -69,7 +104,7 @@
           "denoising_start": {
             "name": "denoising_start",
             "label": "",
-            "value": 0
+            "value": 0.04
           },
           "denoising_end": {
             "name": "denoising_end",
@@ -112,8 +147,8 @@
         }
       },
       "position": {
-        "x": 1186.1868226120378,
-        "y": -214.9459927686657
+        "x": 1182.8836633018684,
+        "y": -251.38882958913183
       }
     },
     {
@@ -167,7 +202,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": ""
+            "label": "Model (dev variant recommended for Image-to-Image)"
           },
           "t5_encoder_model": {
             "name": "t5_encoder_model",
@@ -175,17 +210,31 @@
           },
           "clip_embed_model": {
             "name": "clip_embed_model",
-            "label": ""
+            "label": "",
+            "value": {
+              "key": "fa23a584-b623-415d-832a-21b5098ff1a1",
+              "hash": "blake3:17c19f0ef941c3b7609a9c94a659ca5364de0be364a91d4179f0e39ba17c3b70",
+              "name": "clip-vit-large-patch14",
+              "base": "any",
+              "type": "clip_embed"
+            }
           },
           "vae_model": {
             "name": "vae_model",
-            "label": ""
+            "label": "",
+            "value": {
+              "key": "74fc82ba-c0a8-479d-a890-2126f82da758",
+              "hash": "blake3:ce21cb76364aa6e2421311cf4a4b5eb052a76c4f1cd207b50703d8978198a068",
+              "name": "FLUX.1-schnell_ae",
+              "base": "flux",
+              "type": "vae"
+            }
           }
         }
       },
       "position": {
-        "x": 381.1882713063478,
-        "y": -95.89663532854017
+        "x": 328.1809894659957,
+        "y": -90.2241133566946
       }
     },
     {
@@ -217,13 +266,13 @@
           "prompt": {
             "name": "prompt",
             "label": "",
-            "value": "a cat"
+            "value": "a cat wearing a birthday hat"
           }
         }
       },
       "position": {
-        "x": 778.4899149328337,
-        "y": -100.36469216659502
+        "x": 745.8823365057267,
+        "y": -299.60249175851914
       }
     },
     {
@@ -252,43 +301,75 @@
         }
       },
       "position": {
-        "x": 800.9667463219505,
-        "y": 285.8297267547506
+        "x": 725.834098928012,
+        "y": 496.2710031089931
       }
     }
   ],
   "edges": [
     {
-      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90transformer-4fe24f07-f906-4f55-ab2c-9beee56ef5bdtransformer",
+      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912bheight-ace0258f-67d7-4eee-a218-6fff27065214height",
+      "type": "default",
+      "source": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
+      "sourceHandle": "height",
+      "targetHandle": "height"
+    },
+    {
+      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912bwidth-ace0258f-67d7-4eee-a218-6fff27065214width",
+      "type": "default",
+      "source": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
+      "sourceHandle": "width",
+      "targetHandle": "width"
+    },
+    {
+      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912blatents-ace0258f-67d7-4eee-a218-6fff27065214latents",
+      "type": "default",
+      "source": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    },
+    {
+      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90vae-2981a67c-480f-4237-9384-26b68dbf912bvae",
       "type": "default",
       "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
-      "target": "4fe24f07-f906-4f55-ab2c-9beee56ef5bd",
-      "sourceHandle": "transformer",
-      "targetHandle": "transformer"
+      "target": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
     },
     {
-      "id": "reactflow__edge-01f674f8-b3d1-4df1-acac-6cb8e0bfb63cconditioning-4fe24f07-f906-4f55-ab2c-9beee56ef5bdpositive_text_conditioning",
+      "id": "reactflow__edge-ace0258f-67d7-4eee-a218-6fff27065214latents-7e5172eb-48c1-44db-a770-8fd83e1435d1latents",
       "type": "default",
-      "source": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
-      "target": "4fe24f07-f906-4f55-ab2c-9beee56ef5bd",
-      "sourceHandle": "conditioning",
-      "targetHandle": "positive_text_conditioning"
+      "source": "ace0258f-67d7-4eee-a218-6fff27065214",
+      "target": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
     },
     {
-      "id": "reactflow__edge-4754c534-a5f3-4ad0-9382-7887985e668cvalue-4fe24f07-f906-4f55-ab2c-9beee56ef5bdseed",
+      "id": "reactflow__edge-4754c534-a5f3-4ad0-9382-7887985e668cvalue-ace0258f-67d7-4eee-a218-6fff27065214seed",
       "type": "default",
       "source": "4754c534-a5f3-4ad0-9382-7887985e668c",
-      "target": "4fe24f07-f906-4f55-ab2c-9beee56ef5bd",
+      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
       "sourceHandle": "value",
       "targetHandle": "seed"
     },
     {
-      "id": "reactflow__edge-4fe24f07-f906-4f55-ab2c-9beee56ef5bdlatents-7e5172eb-48c1-44db-a770-8fd83e1435d1latents",
+      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90transformer-ace0258f-67d7-4eee-a218-6fff27065214transformer",
       "type": "default",
-      "source": "4fe24f07-f906-4f55-ab2c-9beee56ef5bd",
-      "target": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
-      "sourceHandle": "latents",
-      "targetHandle": "latents"
+      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "reactflow__edge-01f674f8-b3d1-4df1-acac-6cb8e0bfb63cconditioning-ace0258f-67d7-4eee-a218-6fff27065214positive_text_conditioning",
+      "type": "default",
+      "source": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_text_conditioning"
     },
     {
       "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90vae-7e5172eb-48c1-44db-a770-8fd83e1435d1vae",

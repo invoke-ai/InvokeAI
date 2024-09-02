@@ -185,7 +185,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     )
     denoise_mask: Optional[DenoiseMaskField] = InputField(
         default=None,
-        description=FieldDescriptions.mask,
+        description=FieldDescriptions.denoise_mask,
         input=Input.Connection,
         ui_order=8,
     )
