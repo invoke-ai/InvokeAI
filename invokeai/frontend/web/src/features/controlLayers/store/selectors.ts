@@ -181,9 +181,9 @@ export const selectSelectedEntityIdentifier = createSelector(
   (canvas) => canvas.selectedEntityIdentifier
 );
 
-export const selectQuickSwitchEntityIdentifier = createSelector(
+export const selectBookmarkedEntityIdentifier = createSelector(
   selectCanvasSlice,
-  (canvas) => canvas.quickSwitchEntityIdentifier
+  (canvas) => canvas.bookmarkedEntityIdentifier
 );
 
 export const selectIsSelectedEntityDrawable = createSelector(
