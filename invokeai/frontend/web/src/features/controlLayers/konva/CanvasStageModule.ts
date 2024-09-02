@@ -1,10 +1,17 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
-import type { CanvasEntityIdentifier, Coordinate, Dimensions, Rect } from 'features/controlLayers/store/types';
+import type {
+  CanvasEntityIdentifier,
+  Coordinate,
+  Dimensions,
+  Rect,
+  StageAttrs,
+} from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
+import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 
 type CanvasStageModuleConfig = {
@@ -41,6 +48,14 @@ export class CanvasStageModule extends CanvasModuleBase {
   konva: { stage: Konva.Stage };
 
   config: CanvasStageModuleConfig = DEFAULT_CONFIG;
+
+  $stageAttrs = atom<StageAttrs>({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    scale: 0,
+  });
 
   subscriptions = new Set<() => void>();
 
@@ -89,7 +104,7 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.log.trace('Fitting stage to container');
     this.konva.stage.width(this.konva.stage.container().offsetWidth);
     this.konva.stage.height(this.konva.stage.container().offsetHeight);
-    this.manager.stateApi.$stageAttrs.set({
+    this.$stageAttrs.set({
       x: this.konva.stage.x(),
       y: this.konva.stage.y(),
       width: this.konva.stage.width(),
@@ -149,8 +164,8 @@ export class CanvasStageModule extends CanvasModuleBase {
       scaleY: scale,
     });
 
-    this.manager.stateApi.$stageAttrs.set({
-      ...this.manager.stateApi.$stageAttrs.get(),
+    this.$stageAttrs.set({
+      ...this.$stageAttrs.get(),
       x,
       y,
       scale,
@@ -203,7 +218,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       scaleY: newScale,
     });
 
-    this.manager.stateApi.$stageAttrs.set({
+    this.$stageAttrs.set({
       x: Math.floor(this.konva.stage.x()),
       y: Math.floor(this.konva.stage.y()),
       width: this.konva.stage.width(),
@@ -235,7 +250,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       return;
     }
 
-    this.manager.stateApi.$stageAttrs.set({
+    this.$stageAttrs.set({
       // Stage position should always be an integer, else we get fractional pixels which are blurry
       x: Math.floor(this.konva.stage.x()),
       y: Math.floor(this.konva.stage.y()),
@@ -250,7 +265,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       return;
     }
 
-    this.manager.stateApi.$stageAttrs.set({
+    this.$stageAttrs.set({
       // Stage position should always be an integer, else we get fractional pixels which are blurry
       x: Math.floor(this.konva.stage.x()),
       y: Math.floor(this.konva.stage.y()),

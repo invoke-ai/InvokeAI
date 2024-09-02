@@ -88,7 +88,7 @@ export class CanvasBrushToolPreview extends CanvasModuleBase {
   }
 
   render = () => {
-    const cursorPos = this.manager.stateApi.$lastCursorPos.get();
+    const cursorPos = this.manager.tool.$lastCursorPos.get();
 
     // If the cursor position is not available, do not update the brush preview. The tool module will handle visiblity.
     if (!cursorPos) {

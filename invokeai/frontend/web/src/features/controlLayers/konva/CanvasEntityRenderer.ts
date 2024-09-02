@@ -175,7 +175,7 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
     // user switches tool mid-drawing, for example by pressing space to pan the stage. It's easy to press space
     // to pan _before_ releasing the mouse button, which would cause the buffer to be lost if we didn't commit it.
     this.subscriptions.add(
-      this.manager.stateApi.$tool.listen(() => {
+      this.manager.tool.$tool.listen(() => {
         this.commitBuffer();
       })
     );
@@ -183,7 +183,7 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
     // The compositing rect must cover the whole stage at all times. When the stage is scaled, moved or resized, we
     // need to update the compositing rect to match the stage.
     this.subscriptions.add(
-      this.manager.stateApi.$stageAttrs.listen(() => {
+      this.manager.stage.$stageAttrs.listen(() => {
         if (this.konva.compositing && this.parent.type === 'entity_mask_adapter') {
           this.updateCompositingRectSize();
         }
@@ -256,7 +256,7 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
     this.log.trace('Updating compositing rect size');
     assert(this.konva.compositing, 'Missing compositing rect');
 
-    const { x, y, width, height, scale } = this.manager.stateApi.$stageAttrs.get();
+    const { x, y, width, height, scale } = this.manager.stage.$stageAttrs.get();
 
     this.konva.compositing.rect.setAttrs({
       x: -x / scale,

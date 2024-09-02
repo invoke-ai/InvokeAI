@@ -4,6 +4,7 @@ import { CanvasObjectImageRenderer } from 'features/controlLayers/konva/CanvasOb
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 
 export class CanvasStagingAreaModule extends CanvasModuleBase {
@@ -20,6 +21,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   image: CanvasObjectImageRenderer | null;
   selectedImage: StagingAreaImage | null;
 
+  $shouldShowStagedImage = atom<boolean>(true);
+
   constructor(manager: CanvasManager) {
     super();
     this.id = getPrefixedId(this.type);
@@ -34,14 +37,14 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.image = null;
     this.selectedImage = null;
 
-    this.subscriptions.add(this.manager.stateApi.$shouldShowStagedImage.listen(this.render));
+    this.subscriptions.add(this.$shouldShowStagedImage.listen(this.render));
   }
 
   render = async () => {
     this.log.trace('Rendering staging area');
     const session = this.manager.stateApi.getSession();
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
-    const shouldShowStagedImage = this.manager.stateApi.$shouldShowStagedImage.get();
+    const shouldShowStagedImage = this.$shouldShowStagedImage.get();
 
     this.selectedImage = session.stagedImages[session.selectedStagedImageIndex] ?? null;
     this.konva.group.position({ x, y });

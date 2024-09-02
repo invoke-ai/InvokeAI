@@ -60,7 +60,7 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
      * - position
      * - size
      */
-    this.subscriptions.add(this.manager.stateApi.$stageAttrs.listen(this.render));
+    this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
   }
 
   /**

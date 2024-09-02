@@ -6,7 +6,7 @@ import { memo } from 'react';
 
 export const ToolSettings = memo(() => {
   const canvasManager = useCanvasManager();
-  const tool = useStore(canvasManager.stateApi.$tool);
+  const tool = useStore(canvasManager.tool.$tool);
   if (tool === 'brush') {
     return <ToolBrushWidth />;
   }
