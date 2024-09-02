@@ -192,7 +192,7 @@ export class CanvasColorPickerToolPreview extends CanvasModuleBase {
    * Renders the color picker tool preview on the canvas.
    */
   render = () => {
-    const cursorPos = this.manager.stateApi.$lastCursorPos.get();
+    const cursorPos = this.manager.tool.$lastCursorPos.get();
 
     // If the cursor position is not available, do not render the preview. The tool module will handle visibility.
     if (!cursorPos) {
@@ -200,7 +200,7 @@ export class CanvasColorPickerToolPreview extends CanvasModuleBase {
     }
 
     const toolState = this.manager.stateApi.getToolState();
-    const colorUnderCursor = this.manager.stateApi.$colorUnderCursor.get();
+    const colorUnderCursor = this.parent.$colorUnderCursor.get();
     const colorPickerInnerRadius = this.manager.stage.getScaledPixels(this.config.RING_INNER_RADIUS);
     const colorPickerOuterRadius = this.manager.stage.getScaledPixels(this.config.RING_OUTER_RADIUS);
     const onePixel = this.manager.stage.getScaledPixels(1);

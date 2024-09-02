@@ -6,14 +6,14 @@ import { useCallback } from 'react';
 
 export const useToolIsSelected = (tool: Tool) => {
   const canvasManager = useCanvasManager();
-  const isSelected = useStore(computed(canvasManager.stateApi.$tool, (t) => t === tool));
+  const isSelected = useStore(computed(canvasManager.tool.$tool, (t) => t === tool));
   return isSelected;
 };
 
 export const useSelectTool = (tool: Tool) => {
   const canvasManager = useCanvasManager();
   const setTool = useCallback(() => {
-    canvasManager.stateApi.$tool.set(tool);
-  }, [canvasManager.stateApi.$tool, tool]);
+    canvasManager.tool.$tool.set(tool);
+  }, [canvasManager.tool.$tool, tool]);
   return setTool;
 };

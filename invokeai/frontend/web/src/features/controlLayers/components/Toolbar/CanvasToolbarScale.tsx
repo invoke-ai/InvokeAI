@@ -73,7 +73,7 @@ const snapCandidates = marks.slice(1, marks.length - 1);
 export const CanvasToolbarScale = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
-  const scale = useStore(computed(canvasManager.stateApi.$stageAttrs, (attrs) => attrs.scale));
+  const scale = useStore(computed(canvasManager.stage.$stageAttrs, (attrs) => attrs.scale));
   const [localScale, setLocalScale] = useState(scale * 100);
 
   const onChangeSlider = useCallback(

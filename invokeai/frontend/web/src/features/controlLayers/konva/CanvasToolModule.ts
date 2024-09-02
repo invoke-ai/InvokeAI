@@ -22,9 +22,10 @@ import type {
   RgbColor,
   Tool,
 } from 'features/controlLayers/store/types';
-import { isDrawableEntity } from 'features/controlLayers/store/types';
+import { isDrawableEntity, RGBA_BLACK } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 
 type CanvasToolModuleConfig = {
@@ -50,6 +51,36 @@ export class CanvasToolModule extends CanvasModuleBase {
   brushToolPreview: CanvasBrushToolPreview;
   eraserToolPreview: CanvasEraserToolPreview;
   colorPickerToolPreview: CanvasColorPickerToolPreview;
+
+  /**
+   * The currently selected tool.
+   */
+  $tool = atom<Tool>('brush');
+  /**
+   * A buffer for the currently selected tool. This is used to temporarily store the tool while the user is using any
+   * hold-to-activate tools, like the view or color picker tools.
+   */
+  $toolBuffer = atom<Tool | null>(null);
+  /**
+   * The last point added to the current entity.
+   */
+  $lastAddedPoint = atom<Coordinate | null>(null);
+  /**
+   * Whether the mouse is currently down.
+   */
+  $isMouseDown = atom<boolean>(false);
+  /**
+   * The last position where the mouse was down.
+   */
+  $lastMouseDownPos = atom<Coordinate | null>(null);
+  /**
+   * The last cursor position.
+   */
+  $lastCursorPos = atom<Coordinate | null>(null);
+  /**
+   * The color currently under the cursor. Only has a value when the color picker tool is active.
+   */
+  $colorUnderCursor = atom<RgbColor>(RGBA_BLACK);
 
   konva: {
     stage: Konva.Stage;
@@ -79,7 +110,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.group.add(this.eraserToolPreview.konva.group);
     this.konva.group.add(this.colorPickerToolPreview.konva.group);
 
-    this.subscriptions.add(this.manager.stateApi.$stageAttrs.listen(this.render));
+    this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
     this.subscriptions.add(
       this.manager.stateApi.$toolState.listen((value, oldValue) => {
         if (
@@ -92,7 +123,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
       })
     );
-    this.subscriptions.add(this.manager.stateApi.$tool.listen(this.render));
+    this.subscriptions.add(this.$tool.listen(this.render));
 
     const cleanupListeners = this.setEventListeners();
 
@@ -109,8 +140,8 @@ export class CanvasToolModule extends CanvasModuleBase {
     const stage = this.manager.stage;
     const renderedEntityCount = this.manager.stateApi.getRenderedEntityCount();
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
-    const isMouseDown = this.manager.stateApi.$isMouseDown.get();
-    const tool = this.manager.stateApi.$tool.get();
+    const isMouseDown = this.$isMouseDown.get();
+    const tool = this.$tool.get();
 
     const isDrawable =
       !!selectedEntity &&
@@ -153,8 +184,8 @@ export class CanvasToolModule extends CanvasModuleBase {
     const stage = this.manager.stage;
     const renderedEntityCount = this.manager.stateApi.getRenderedEntityCount();
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
-    const cursorPos = this.manager.stateApi.$lastCursorPos.get();
-    const tool = this.manager.stateApi.$tool.get();
+    const cursorPos = this.$lastCursorPos.get();
+    const tool = this.$tool.get();
 
     const isDrawable =
       !!selectedEntity &&
@@ -187,7 +218,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   syncLastCursorPos = (): Coordinate | null => {
     const pos = getScaledCursorPosition(this.konva.stage);
-    this.manager.stateApi.$lastCursorPos.set(pos);
+    this.$lastCursorPos.set(pos);
     return pos;
   };
 
@@ -268,16 +299,16 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStageMouseDown = async (e: KonvaEventObject<MouseEvent>) => {
-    this.manager.stateApi.$isMouseDown.set(true);
+    this.$isMouseDown.set(true);
     const toolState = this.manager.stateApi.getToolState();
-    const tool = this.manager.stateApi.$tool.get();
+    const tool = this.$tool.get();
     const pos = this.syncLastCursorPos();
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
 
     if (tool === 'colorPicker') {
       const color = this.getColorUnderCursor();
       if (color) {
-        this.manager.stateApi.$colorUnderCursor.set(color);
+        this.$colorUnderCursor.set(color);
       }
       if (color) {
         this.manager.stateApi.setFill({ ...toolState.fill, ...color });
@@ -286,7 +317,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     } else {
       const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
       if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get() && getIsPrimaryMouseDown(e)) {
-        this.manager.stateApi.$lastMouseDownPos.set(pos);
+        this.$lastMouseDownPos.set(pos);
         const normalizedPoint = offsetCoord(pos, selectedEntity.state.position);
 
         if (tool === 'brush') {
@@ -325,7 +356,7 @@ export class CanvasToolModule extends CanvasModuleBase {
               clip: this.getClip(selectedEntity.state),
             });
           }
-          this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+          this.$lastAddedPoint.set(alignedPoint);
         }
 
         if (tool === 'eraser') {
@@ -361,7 +392,7 @@ export class CanvasToolModule extends CanvasModuleBase {
               clip: this.getClip(selectedEntity.state),
             });
           }
-          this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+          this.$lastAddedPoint.set(alignedPoint);
         }
 
         if (tool === 'rect') {
@@ -380,11 +411,11 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStageMouseUp = (_: KonvaEventObject<MouseEvent>) => {
-    this.manager.stateApi.$isMouseDown.set(false);
-    const pos = this.manager.stateApi.$lastCursorPos.get();
+    this.$isMouseDown.set(false);
+    const pos = this.$lastCursorPos.get();
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
     const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
-    const tool = this.manager.stateApi.$tool.get();
+    const tool = this.$tool.get();
 
     if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get()) {
       if (tool === 'brush') {
@@ -414,7 +445,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
       }
 
-      this.manager.stateApi.$lastMouseDownPos.set(null);
+      this.$lastMouseDownPos.set(null);
     }
     this.render();
   };
@@ -423,12 +454,12 @@ export class CanvasToolModule extends CanvasModuleBase {
     const toolState = this.manager.stateApi.getToolState();
     const pos = this.syncLastCursorPos();
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
-    const tool = this.manager.stateApi.$tool.get();
+    const tool = this.$tool.get();
 
     if (tool === 'colorPicker') {
       const color = this.getColorUnderCursor();
       if (color) {
-        this.manager.stateApi.$colorUnderCursor.set(color);
+        this.$colorUnderCursor.set(color);
       }
     } else {
       const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
@@ -446,7 +477,7 @@ export class CanvasToolModule extends CanvasModuleBase {
                 if (lastPoint.x !== alignedPoint.x || lastPoint.y !== alignedPoint.y) {
                   drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
                   await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
-                  this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+                  this.$lastAddedPoint.set(alignedPoint);
                 }
               }
             } else {
@@ -466,7 +497,7 @@ export class CanvasToolModule extends CanvasModuleBase {
               color: this.manager.stateApi.getCurrentFill(),
               clip: this.getClip(selectedEntity.state),
             });
-            this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+            this.$lastAddedPoint.set(alignedPoint);
           }
         }
 
@@ -483,7 +514,7 @@ export class CanvasToolModule extends CanvasModuleBase {
                 if (lastPoint.x !== alignedPoint.x || lastPoint.y !== alignedPoint.y) {
                   drawingBuffer.points.push(alignedPoint.x, alignedPoint.y);
                   await selectedEntity.adapter.renderer.setBuffer(drawingBuffer);
-                  this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+                  this.$lastAddedPoint.set(alignedPoint);
                 }
               }
             } else {
@@ -502,7 +533,7 @@ export class CanvasToolModule extends CanvasModuleBase {
               strokeWidth: toolState.eraser.width,
               clip: this.getClip(selectedEntity.state),
             });
-            this.manager.stateApi.$lastAddedPoint.set(alignedPoint);
+            this.$lastAddedPoint.set(alignedPoint);
           }
         }
 
@@ -527,12 +558,12 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   onStageMouseLeave = async (e: KonvaEventObject<MouseEvent>) => {
     const pos = this.syncLastCursorPos();
-    this.manager.stateApi.$lastCursorPos.set(null);
-    this.manager.stateApi.$lastMouseDownPos.set(null);
+    this.$lastCursorPos.set(null);
+    this.$lastMouseDownPos.set(null);
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
     const toolState = this.manager.stateApi.getToolState();
     const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
-    const tool = this.manager.stateApi.$tool.get();
+    const tool = this.$tool.get();
 
     if (pos && isDrawable && !this.manager.stateApi.$spaceKey.get() && getIsPrimaryMouseDown(e)) {
       const drawingBuffer = selectedEntity.adapter.renderer.bufferState;
@@ -566,7 +597,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     const toolState = this.manager.stateApi.getToolState();
-    const tool = this.manager.stateApi.$tool.get();
+    const tool = this.$tool.get();
 
     let delta = e.evt.deltaY;
 
@@ -596,19 +627,19 @@ export class CanvasToolModule extends CanvasModuleBase {
       const selectedEntity = this.manager.stateApi.getSelectedEntity();
       if (selectedEntity) {
         selectedEntity.adapter.renderer.clearBuffer();
-        this.manager.stateApi.$lastMouseDownPos.set(null);
+        this.$lastMouseDownPos.set(null);
       }
     } else if (e.key === ' ') {
       // Select the view tool on space key down
-      this.manager.stateApi.$toolBuffer.set(this.manager.stateApi.$tool.get());
-      this.manager.stateApi.$tool.set('view');
+      this.$toolBuffer.set(this.$tool.get());
+      this.$tool.set('view');
       this.manager.stateApi.$spaceKey.set(true);
-      this.manager.stateApi.$lastCursorPos.set(null);
-      this.manager.stateApi.$lastMouseDownPos.set(null);
+      this.$lastCursorPos.set(null);
+      this.$lastMouseDownPos.set(null);
     } else if (e.key === 'Alt') {
       // Select the color picker on alt key down
-      this.manager.stateApi.$toolBuffer.set(this.manager.stateApi.$tool.get());
-      this.manager.stateApi.$tool.set('colorPicker');
+      this.$toolBuffer.set(this.$tool.get());
+      this.$tool.set('colorPicker');
     }
   };
 
@@ -621,15 +652,15 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
     if (e.key === ' ') {
       // Revert the tool to the previous tool on space key up
-      const toolBuffer = this.manager.stateApi.$toolBuffer.get();
-      this.manager.stateApi.$tool.set(toolBuffer ?? 'move');
-      this.manager.stateApi.$toolBuffer.set(null);
+      const toolBuffer = this.$toolBuffer.get();
+      this.$tool.set(toolBuffer ?? 'move');
+      this.$toolBuffer.set(null);
       this.manager.stateApi.$spaceKey.set(false);
     } else if (e.key === 'Alt') {
       // Revert the tool to the previous tool on alt key up
-      const toolBuffer = this.manager.stateApi.$toolBuffer.get();
-      this.manager.stateApi.$tool.set(toolBuffer ?? 'move');
-      this.manager.stateApi.$toolBuffer.set(null);
+      const toolBuffer = this.$toolBuffer.get();
+      this.$tool.set(toolBuffer ?? 'move');
+      this.$toolBuffer.set(null);
     }
   };
 
