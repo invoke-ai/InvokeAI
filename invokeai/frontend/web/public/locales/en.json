@@ -1654,8 +1654,8 @@
         "storeNotInitialized": "Store is not initialized"
     },
     "controlLayers": {
-        "bookmarkedForQuickSwitch": "Bookmarked for Quick Switch",
-        "notBookmarkedForQuickSwitch": "Not Bookmarked for Quick Switch",
+        "bookmark": "Bookmark for Quick Switch",
+        "removeBookmark": "Remove Bookmark",
         "saveBboxToGallery": "Save Bbox To Gallery",
         "savedToGalleryOk": "Saved to Gallery",
         "savedToGalleryError": "Error saving to gallery",
