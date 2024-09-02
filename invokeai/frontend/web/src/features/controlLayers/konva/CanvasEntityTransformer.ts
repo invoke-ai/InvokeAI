@@ -90,21 +90,27 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   /**
    * The rect of the parent, _including_ transparent regions.
    * It is calculated via Konva's getClientRect method, which is fast but includes transparent regions.
+   *
+   * Stored as a nanostores atom for easy reactivity.
    */
-  nodeRect = getEmptyRect();
+  $nodeRect = atom<Rect>(getEmptyRect());
 
   /**
    * The rect of the parent, _excluding_ transparent regions.
    * If the parent's nodes have no possibility of transparent regions, this will be calculated the same way as nodeRect.
    * If the parent's nodes may have transparent regions, this will be calculated manually by rasterizing the parent and
    * checking the pixel data.
+   *
+   * Stored as a nanostores atom for easy reactivity.
    */
-  pixelRect = getEmptyRect();
+  $pixelRect = atom<Rect>(getEmptyRect());
 
   /**
    * Whether the transformer is currently calculating the rect of the parent.
+   *
+   * Stored as a nanostores atom for easy reactivity.
    */
-  isPendingRectCalculation: boolean = true;
+  $isPendingRectCalculation = atom<boolean>(true);
 
   /**
    * A set of subscriptions that should be cleaned up when the transformer is destroyed.
@@ -113,27 +119,40 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   /**
    * Whether the transformer is currently transforming the entity.
+   *
+   * Stored as a nanostores atom for easy reactivity.
    */
-  isTransforming: boolean = false;
+  $isTransforming = atom<boolean>(false);
 
   /**
    * The current interaction mode of the transformer:
    * - 'all': The entity can be moved, resized, and rotated.
    * - 'drag': The entity can be moved.
    * - 'off': The transformer is not interactable.
+   *
+   * Stored as a nanostores atom for easy reactivity.
    */
-  interactionMode: 'all' | 'drag' | 'off' = 'off';
+  $interactionMode = atom<'all' | 'drag' | 'off'>('off');
 
   /**
    * Whether dragging is enabled. Dragging is enabled in both 'all' and 'drag' interaction modes.
+   *
+   * Stored as a nanostores atom for easy reactivity.
    */
-  isDragEnabled: boolean = false;
+  $isDragEnabled = atom<boolean>(false);
 
   /**
    * Whether transforming is enabled. Transforming is enabled only in 'all' interaction mode.
+   *
+   * Stored as a nanostores atom for easy reactivity.
    */
-  isTransformEnabled: boolean = false;
+  $isTransformEnabled = atom<boolean>(false);
 
+  /**
+   * Whether the transformer is currently processing (rasterizing and uploading) the transformed entity.
+   *
+   * Stored as a nanostores atom for easy reactivity.
+   */
   $isProcessing = atom(false);
 
   konva: {
@@ -386,15 +405,17 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   };
 
   onDragEnd = () => {
-    if (this.isTransforming) {
+    if (this.$isTransforming.get()) {
       // If we are transforming the entity, we should not push the new position to the state. This will trigger a
       // re-render of the entity and bork the transformation.
       return;
     }
 
+    const pixelRect = this.$pixelRect.get();
+
     const position = {
-      x: this.konva.proxyRect.x() - this.pixelRect.x,
-      y: this.konva.proxyRect.y() - this.pixelRect.y,
+      x: this.konva.proxyRect.x() - pixelRect.x,
+      y: this.konva.proxyRect.y() - pixelRect.y,
     };
 
     this.log.trace({ position }, 'Position changed');
@@ -480,7 +501,10 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
 
-    if (this.isPendingRectCalculation || this.pixelRect.width === 0 || this.pixelRect.height === 0) {
+    const pixelRect = this.$pixelRect.get();
+    const isPendingRectCalculation = this.$isPendingRectCalculation.get();
+
+    if (isPendingRectCalculation || pixelRect.width === 0 || pixelRect.height === 0) {
       // If the rect is being calculated, or if the rect has no width or height, we can't interact with the transformer
       this.parent.konva.layer.listening(false);
       this.setInteractionMode('off');
@@ -497,11 +521,11 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
 
-    if (isSelected && !this.isTransforming && tool === 'move') {
+    if (isSelected && !this.$isTransforming.get() && tool === 'move') {
       // We are moving this layer, it must be listening
       this.parent.konva.layer.listening(true);
       this.setInteractionMode('drag');
-    } else if (isSelected && this.isTransforming) {
+    } else if (isSelected && this.$isTransforming.get()) {
       // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer is
       // active, it will interrupt the stage drag events. So we should disable listening when the view tool is selected.
       if (tool !== 'view') {
@@ -540,7 +564,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   startTransform = () => {
     this.log.debug('Starting transform');
-    this.isTransforming = true;
+    this.$isTransforming.set(true);
     this.manager.stateApi.$tool.set('move');
     // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
     // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
@@ -577,7 +601,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   stopTransform = () => {
     this.log.debug('Stopping transform');
 
-    this.isTransforming = false;
+    this.$isTransforming.set(false);
     this.setInteractionMode('off');
 
     // Reset the transform of the the entity. We've either replaced the transformed objects with a rasterized image, or
@@ -613,16 +637,17 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.log.trace('Updating position');
     const position = get(arg, 'position', this.parent.state.position);
 
+    const pixelRect = this.$pixelRect.get();
     const groupAttrs: Partial<GroupConfig> = {
-      x: position.x + this.pixelRect.x,
-      y: position.y + this.pixelRect.y,
-      offsetX: this.pixelRect.x,
-      offsetY: this.pixelRect.y,
+      x: position.x + pixelRect.x,
+      y: position.y + pixelRect.y,
+      offsetX: pixelRect.x,
+      offsetY: pixelRect.y,
     };
     this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
     this.parent.renderer.konva.bufferGroup.setAttrs(groupAttrs);
 
-    this.update(position, this.pixelRect);
+    this.update(position, pixelRect);
   };
 
   /**
@@ -633,7 +658,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * - 'off': The transformer is not interactable.
    */
   setInteractionMode = (interactionMode: 'all' | 'drag' | 'off') => {
-    this.interactionMode = interactionMode;
+    this.$interactionMode.set(interactionMode);
     if (interactionMode === 'drag') {
       this._enableDrag();
       this._disableTransform();
@@ -650,16 +675,19 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   };
 
   updateBbox = () => {
-    this.log.trace({ nodeRect: this.nodeRect, pixelRect: this.pixelRect }, 'Updating bbox');
+    const nodeRect = this.$nodeRect.get();
+    const pixelRect = this.$pixelRect.get();
 
-    if (this.isPendingRectCalculation) {
+    this.log.trace({ nodeRect, pixelRect }, 'Updating bbox');
+
+    if (this.$isPendingRectCalculation.get()) {
       this.syncInteractionState();
       return;
     }
 
     // If the bbox has no width or height, that means the layer is fully transparent. This can happen if it is only
     // eraser lines, fully clipped brush lines or if it has been fully erased.
-    if (this.pixelRect.width === 0 || this.pixelRect.height === 0) {
+    if (pixelRect.width === 0 || pixelRect.height === 0) {
       // If the layer already has no objects, we don't need to reset the entity state. This would cause a push to the
       // undo stack and clear the redo stack.
       if (this.parent.renderer.hasObjects()) {
@@ -668,12 +696,12 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       }
     } else {
       this.syncInteractionState();
-      this.update(this.parent.state.position, this.pixelRect);
+      this.update(this.parent.state.position, pixelRect);
       const groupAttrs: Partial<GroupConfig> = {
-        x: this.parent.state.position.x + this.pixelRect.x,
-        y: this.parent.state.position.y + this.pixelRect.y,
-        offsetX: this.pixelRect.x,
-        offsetY: this.pixelRect.y,
+        x: this.parent.state.position.x + pixelRect.x,
+        y: this.parent.state.position.y + pixelRect.y,
+        offsetX: pixelRect.x,
+        offsetY: pixelRect.y,
       };
       this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
       this.parent.renderer.konva.bufferGroup.setAttrs(groupAttrs);
@@ -685,13 +713,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   calculateRect = debounce(() => {
     this.log.debug('Calculating bbox');
 
-    this.isPendingRectCalculation = true;
+    this.$isPendingRectCalculation.set(true);
 
     if (!this.parent.renderer.hasObjects()) {
       this.log.trace('No objects, resetting bbox');
-      this.nodeRect = getEmptyRect();
-      this.pixelRect = getEmptyRect();
-      this.isPendingRectCalculation = false;
+      this.$nodeRect.set(getEmptyRect());
+      this.$pixelRect.set(getEmptyRect());
+      this.$isPendingRectCalculation.set(false);
       this.updateBbox();
       return;
     }
@@ -699,10 +727,10 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const rect = this.parent.renderer.konva.objectGroup.getClientRect({ skipTransform: true });
 
     if (!this.parent.renderer.needsPixelBbox()) {
-      this.nodeRect = { ...rect };
-      this.pixelRect = { ...rect };
-      this.log.trace({ nodeRect: this.nodeRect, pixelRect: this.pixelRect }, 'Got bbox from client rect');
-      this.isPendingRectCalculation = false;
+      this.$nodeRect.set({ ...rect });
+      this.$pixelRect.set({ ...rect });
+      this.log.trace({ nodeRect: this.$nodeRect.get(), pixelRect: this.$pixelRect.get() }, 'Got bbox from client rect');
+      this.$isPendingRectCalculation.set(false);
       this.updateBbox();
       return;
     }
@@ -715,26 +743,29 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       (extents) => {
         if (extents) {
           const { minX, minY, maxX, maxY } = extents;
-          this.nodeRect = { ...rect };
-          this.pixelRect = {
+          this.$nodeRect.set({ ...rect });
+          this.$pixelRect.set({
             x: Math.round(rect.x) + minX,
             y: Math.round(rect.y) + minY,
             width: maxX - minX,
             height: maxY - minY,
-          };
+          });
         } else {
-          this.nodeRect = getEmptyRect();
-          this.pixelRect = getEmptyRect();
+          this.$nodeRect.set(getEmptyRect());
+          this.$pixelRect.set(getEmptyRect());
         }
-        this.log.trace({ nodeRect: this.nodeRect, pixelRect: this.pixelRect, extents }, `Got bbox from worker`);
-        this.isPendingRectCalculation = false;
+        this.log.trace(
+          { nodeRect: this.$nodeRect.get(), pixelRect: this.$pixelRect.get(), extents },
+          `Got bbox from worker`
+        );
+        this.$isPendingRectCalculation.set(false);
         this.updateBbox();
       }
     );
   }, this.config.RECT_CALC_DEBOUNCE_MS);
 
   requestRectCalculation = () => {
-    this.isPendingRectCalculation = true;
+    this.$isPendingRectCalculation.set(true);
     this.syncInteractionState();
     this.calculateRect();
   };
@@ -744,27 +775,27 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   };
 
   _enableTransform = () => {
-    this.isTransformEnabled = true;
+    this.$isTransformEnabled.set(true);
     this.konva.transformer.visible(true);
     this.konva.transformer.listening(true);
     this.konva.transformer.nodes([this.konva.proxyRect]);
   };
 
   _disableTransform = () => {
-    this.isTransformEnabled = false;
+    this.$isTransformEnabled.set(false);
     this.konva.transformer.visible(false);
     this.konva.transformer.listening(false);
     this.konva.transformer.nodes([]);
   };
 
   _enableDrag = () => {
-    this.isDragEnabled = true;
+    this.$isDragEnabled.set(true);
     this.konva.proxyRect.visible(true);
     this.konva.proxyRect.listening(true);
   };
 
   _disableDrag = () => {
-    this.isDragEnabled = false;
+    this.$isDragEnabled.set(false);
     this.konva.proxyRect.visible(false);
     this.konva.proxyRect.listening(false);
   };
@@ -782,9 +813,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       id: this.id,
       type: this.type,
       path: this.path,
-      mode: this.interactionMode,
-      isTransformEnabled: this.isTransformEnabled,
-      isDragEnabled: this.isDragEnabled,
+      nodeRect: this.$nodeRect.get(),
+      pixelRect: this.$pixelRect.get(),
+      isPendingRectCalculation: this.$isPendingRectCalculation.get(),
+      isTransforming: this.$isTransforming.get(),
+      interactionMode: this.$interactionMode.get(),
+      isDragEnabled: this.$isDragEnabled.get(),
+      isTransformEnabled: this.$isTransformEnabled.get(),
+      isProcessing: this.$isProcessing.get(),
     };
   };
 
