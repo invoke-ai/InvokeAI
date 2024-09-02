@@ -8,7 +8,7 @@ import {
 import { useEntityAdapter } from 'features/controlLayers/hooks/useEntityAdapter';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiCheckBold, PiXBold } from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiArrowsOutBold, PiCheckBold, PiXBold } from 'react-icons/pi';
 
 const TransformBox = memo(() => {
   const { t } = useTranslation();
@@ -30,9 +30,19 @@ const TransformBox = memo(() => {
       transitionDuration="normal"
     >
       <Heading size="md" color="base.300" userSelect="none">
-        {t('controlLayers.tool.transform')}
+        {t('controlLayers.transform.transform')}
       </Heading>
       <ButtonGroup isAttached={false} size="sm" w="full">
+        <Button
+          leftIcon={<PiArrowsOutBold />}
+          onClick={adapter.transformer.fitProxyRectToBbox}
+          isLoading={isProcessing}
+          loadingText={t('controlLayers.transform.reset')}
+          variant="ghost"
+        >
+          {t('controlLayers.transform.fitToBbox')}
+        </Button>
+        <Spacer />
         <Button
           leftIcon={<PiArrowsCounterClockwiseBold />}
           onClick={adapter.transformer.resetTransform}
@@ -40,9 +50,8 @@ const TransformBox = memo(() => {
           loadingText={t('controlLayers.reset')}
           variant="ghost"
         >
-          {t('accessibility.reset')}
+          {t('controlLayers.transform.reset')}
         </Button>
-        <Spacer />
         <Button
           leftIcon={<PiCheckBold />}
           onClick={adapter.transformer.applyTransform}
@@ -50,7 +59,7 @@ const TransformBox = memo(() => {
           loadingText={t('common.apply')}
           variant="ghost"
         >
-          {t('common.apply')}
+          {t('controlLayers.transform.apply')}
         </Button>
         <Button
           leftIcon={<PiXBold />}
@@ -59,7 +68,7 @@ const TransformBox = memo(() => {
           loadingText={t('common.cancel')}
           variant="ghost"
         >
-          {t('common.cancel')}
+          {t('controlLayers.transform.cancel')}
         </Button>
       </ButtonGroup>
     </Flex>
