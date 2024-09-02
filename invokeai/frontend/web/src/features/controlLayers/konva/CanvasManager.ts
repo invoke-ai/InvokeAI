@@ -111,16 +111,15 @@ export class CanvasManager extends CanvasModuleBase {
     };
     this.stage.addLayer(this.konva.previewLayer);
 
-    this.stagingArea = new CanvasStagingAreaModule(this);
-    this.konva.previewLayer.add(this.stagingArea.konva.group);
-
-    this.progressImage = new CanvasProgressImageModule(this);
-    this.konva.previewLayer.add(this.progressImage.konva.group);
-
-    this.bbox = new CanvasBboxModule(this);
-    this.konva.previewLayer.add(this.bbox.konva.group);
-
     this.tool = new CanvasToolModule(this);
+    this.stagingArea = new CanvasStagingAreaModule(this);
+    this.progressImage = new CanvasProgressImageModule(this);
+    this.bbox = new CanvasBboxModule(this);
+
+    // Must add in this order for correct z-index
+    this.konva.previewLayer.add(this.stagingArea.konva.group);
+    this.konva.previewLayer.add(this.progressImage.konva.group);
+    this.konva.previewLayer.add(this.bbox.konva.group);
     this.konva.previewLayer.add(this.tool.konva.group);
   }
 
