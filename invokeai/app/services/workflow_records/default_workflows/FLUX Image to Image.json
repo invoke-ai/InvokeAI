@@ -12,16 +12,24 @@
       "fieldName": "model"
     },
     {
-      "nodeId": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
-      "fieldName": "prompt"
-    },
-    {
       "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
       "fieldName": "t5_encoder_model"
     },
     {
+      "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "fieldName": "clip_embed_model"
+    },
+    {
+      "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "fieldName": "vae_model"
+    },
+    {
       "nodeId": "ace0258f-67d7-4eee-a218-6fff27065214",
       "fieldName": "denoising_start"
+    },
+    {
+      "nodeId": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "fieldName": "prompt"
     },
     {
       "nodeId": "ace0258f-67d7-4eee-a218-6fff27065214",
@@ -32,7 +40,6 @@
     "version": "3.0.0",
     "category": "default"
   },
-  "id": "0a91fc4c-5f93-469c-a6ad-e87bf47b68bf",
   "nodes": [
     {
       "id": "2981a67c-480f-4237-9384-26b68dbf912b",
@@ -49,7 +56,10 @@
         "inputs": {
           "image": {
             "name": "image",
-            "label": ""
+            "label": "",
+            "value": {
+              "image_name": "8a5c62aa-9335-45d2-9c71-89af9fc1f8d4.png"
+            }
           },
           "vae": {
             "name": "vae",
@@ -202,7 +212,7 @@
             "name": "clip_embed_model",
             "label": "",
             "value": {
-              "key": "076fa0b4-6e06-413a-bfca-61ab6f8b26db",
+              "key": "fa23a584-b623-415d-832a-21b5098ff1a1",
               "hash": "blake3:17c19f0ef941c3b7609a9c94a659ca5364de0be364a91d4179f0e39ba17c3b70",
               "name": "clip-vit-large-patch14",
               "base": "any",
@@ -213,7 +223,7 @@
             "name": "vae_model",
             "label": "",
             "value": {
-              "key": "0bfe1765-2895-4a93-87e3-00277c04545d",
+              "key": "74fc82ba-c0a8-479d-a890-2126f82da758",
               "hash": "blake3:ce21cb76364aa6e2421311cf4a4b5eb052a76c4f1cd207b50703d8978198a068",
               "name": "FLUX.1-schnell_ae",
               "base": "flux",

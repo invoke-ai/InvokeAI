@@ -12,12 +12,20 @@
       "fieldName": "model"
     },
     {
-      "nodeId": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
-      "fieldName": "prompt"
+      "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "fieldName": "t5_encoder_model"
     },
     {
       "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
-      "fieldName": "t5_encoder_model"
+      "fieldName": "clip_embed_model"
+    },
+    {
+      "nodeId": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "fieldName": "vae_model"
+    },
+    {
+      "nodeId": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "fieldName": "prompt"
     },
     {
       "nodeId": "4fe24f07-f906-4f55-ab2c-9beee56ef5bd",
