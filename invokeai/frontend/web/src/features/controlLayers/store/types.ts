@@ -688,7 +688,7 @@ export type StagingAreaImage = {
 export type CanvasState = {
   _version: 3;
   selectedEntityIdentifier: CanvasEntityIdentifier | null;
-  quickSwitchEntityIdentifier: CanvasEntityIdentifier | null;
+  bookmarkedEntityIdentifier: CanvasEntityIdentifier | null;
   inpaintMasks: {
     isHidden: boolean;
     entities: CanvasInpaintMaskState[];
