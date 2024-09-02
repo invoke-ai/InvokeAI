@@ -119,7 +119,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       isDrawableEntity(selectedEntity.state);
 
     // Update the stage's pointer style
-    if (Boolean(this.manager.stateApi.$transformingEntity.get()) || renderedEntityCount === 0) {
+    if (this.manager.stateApi.$isTranforming.get() || renderedEntityCount === 0) {
       // We are transforming and/or have no layers, so we should not render any tool
       stage.container.style.cursor = 'default';
     } else if (tool === 'view') {
