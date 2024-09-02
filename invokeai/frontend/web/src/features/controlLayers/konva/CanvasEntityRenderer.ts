@@ -125,6 +125,15 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
     } | null;
   };
 
+  /**
+   * The entity's object group as a canvas element along with the pixel rect of the entity at the time the canvas was
+   * drawn.
+   *
+   * Technically, this is an internal Konva object, created when a Konva node's `.cache()` method is called. We cache
+   * the object group after every update, so we get this as a "free" side effect.
+   *
+   * This is used to render the entity's preview in the control layer.
+   */
   $canvasCache = atom<{ canvas: HTMLCanvasElement; rect: Rect } | null>(null);
 
   constructor(parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter) {
@@ -557,6 +566,7 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
       return;
     }
     try {
+      // TODO(psyche): This is an internal Konva method, so it may break in the future. Can we make this API public?
       const canvas = this.konva.objectGroup._getCachedSceneCanvas()._canvas as HTMLCanvasElement | undefined | null;
       if (canvas) {
         const nodeRect = this.parent.transformer.$nodeRect.get();
