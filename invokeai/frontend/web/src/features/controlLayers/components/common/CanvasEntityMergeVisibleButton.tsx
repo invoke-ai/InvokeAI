@@ -3,6 +3,7 @@ import { logger } from 'app/logging/logger';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { isOk, withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useEntityTypeCount } from 'features/controlLayers/hooks/useEntityTypeCount';
 import { inpaintMaskAdded, rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -22,6 +23,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const canvasManager = useCanvasManager();
+  const entityCount = useEntityTypeCount(type);
   const onClick = useCallback(async () => {
     if (type === 'raster_layer') {
       const rect = canvasManager.stage.getVisibleRect('raster_layer');
@@ -81,6 +83,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
       icon={<PiStackBold />}
       onClick={onClick}
       alignSelf="stretch"
+      isDisabled={entityCount <= 1}
     />
   );
 });
