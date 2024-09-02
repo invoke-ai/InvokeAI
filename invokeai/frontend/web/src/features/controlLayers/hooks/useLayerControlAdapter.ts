@@ -48,7 +48,6 @@ export const useDefaultControlAdapter = (): ControlNetConfig | T2IAdapterConfig 
   return defaultControlAdapter;
 };
 
-/** @knipignore */
 export const useDefaultIPAdapter = (): IPAdapterConfig => {
   const [modelConfigs] = useIPAdapterModels();
 
