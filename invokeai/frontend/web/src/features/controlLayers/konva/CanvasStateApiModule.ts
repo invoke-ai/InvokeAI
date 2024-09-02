@@ -43,7 +43,7 @@ import type {
 } from 'features/controlLayers/store/types';
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import type { WritableAtom } from 'nanostores';
-import { atom } from 'nanostores';
+import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig } from 'services/api/types';
@@ -245,7 +245,8 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     }
   };
 
-  $transformingEntity = atom<CanvasEntityIdentifier | null>(null);
+  $transformingAdapter = atom<CanvasEntityLayerAdapter | CanvasEntityMaskAdapter | null>(null);
+  $isTranforming = computed(this.$transformingAdapter, (transformingAdapter) => Boolean(transformingAdapter));
 
   $toolState: WritableAtom<ToolState> = atom();
   $currentFill: WritableAtom<RgbaColor> = atom();

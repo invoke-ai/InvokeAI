@@ -573,7 +573,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const shouldListen = this.manager.stateApi.$tool.get() !== 'view';
     this.parent.konva.layer.listening(shouldListen);
     this.setInteractionMode('all');
-    this.manager.stateApi.$transformingEntity.set(this.parent.getEntityIdentifier());
+    this.manager.stateApi.$transformingAdapter.set(this.parent);
   };
 
   /**
@@ -608,7 +608,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     // canceled a transformation. In either case, the scale should be reset.
     this.resetTransform();
     this.syncInteractionState();
-    this.manager.stateApi.$transformingEntity.set(null);
+    this.manager.stateApi.$transformingAdapter.set(null);
     this.$isProcessing.set(false);
   };
 

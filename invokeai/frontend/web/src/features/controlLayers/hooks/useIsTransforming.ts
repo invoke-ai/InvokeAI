@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 
 export const useIsTransforming = () => {
   const canvasManager = useCanvasManager();
-  const transformingEntity = useStore(canvasManager.stateApi.$transformingEntity);
+  const transformingEntity = useStore(canvasManager.stateApi.$transformingAdapter);
   const isTransforming = useMemo(() => {
     return Boolean(transformingEntity);
   }, [transformingEntity]);

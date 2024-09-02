@@ -1,19 +1,14 @@
 import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import {
-  EntityIdentifierContext,
-  useEntityIdentifierContext,
-} from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useEntityAdapter } from 'features/controlLayers/hooks/useEntityAdapter';
+import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
+import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsCounterClockwiseBold, PiArrowsOutBold, PiCheckBold, PiXBold } from 'react-icons/pi';
 
-const TransformBox = memo(() => {
+const TransformBox = memo(({ adapter }: { adapter: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter }) => {
   const { t } = useTranslation();
-  const entityIdentifier = useEntityIdentifierContext();
-  const adapter = useEntityAdapter(entityIdentifier);
   const isProcessing = useStore(adapter.transformer.$isProcessing);
 
   return (
@@ -79,15 +74,11 @@ TransformBox.displayName = 'Transform';
 
 export const Transform = () => {
   const canvasManager = useCanvasManager();
-  const transformingEntity = useStore(canvasManager.stateApi.$transformingEntity);
+  const adapter = useStore(canvasManager.stateApi.$transformingAdapter);
 
-  if (!transformingEntity) {
+  if (!adapter) {
     return null;
   }
 
-  return (
-    <EntityIdentifierContext.Provider value={transformingEntity}>
-      <TransformBox />
-    </EntityIdentifierContext.Provider>
-  );
+  return <TransformBox adapter={adapter} />;
 };

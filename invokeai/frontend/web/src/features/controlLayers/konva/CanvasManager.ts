@@ -137,7 +137,7 @@ export class CanvasManager extends CanvasModuleBase {
     this.log.debug('Initializing canvas manager module');
 
     // These atoms require the canvas manager to be set up before we can provide their initial values
-    this.stateApi.$transformingEntity.set(null);
+    this.stateApi.$transformingAdapter.set(null);
     this.stateApi.$toolState.set(this.stateApi.getToolState());
     this.stateApi.$selectedEntityIdentifier.set(this.stateApi.getCanvasState().selectedEntityIdentifier);
     this.stateApi.$currentFill.set(this.stateApi.getCurrentFill());

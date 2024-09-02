@@ -12,14 +12,14 @@ export const CanvasEntityMenuItemsTransform = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
   const canvasManager = useCanvasManager();
   const adapter = useEntityAdapter(entityIdentifier);
-  const transformingEntity = useStore(canvasManager.stateApi.$transformingEntity);
+  const isTransforming = useStore(canvasManager.stateApi.$isTranforming);
 
   const onClick = useCallback(() => {
     adapter.transformer.startTransform();
   }, [adapter.transformer]);
 
   return (
-    <MenuItem onClick={onClick} icon={<PiFrameCornersBold />} isDisabled={Boolean(transformingEntity)}>
+    <MenuItem onClick={onClick} icon={<PiFrameCornersBold />} isDisabled={isTransforming}>
       {t('controlLayers.transform.transform')}
     </MenuItem>
   );
