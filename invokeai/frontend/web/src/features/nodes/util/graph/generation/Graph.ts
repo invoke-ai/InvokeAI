@@ -373,6 +373,21 @@ export class Graph {
   }
 
   /**
+   * Adds an edge from a node to a metadata field. Use this when the metadata value is dynamic depending on a node.
+   * @param fromNode The node to add an edge from
+   * @param fromField The field of the node to add an edge from
+   * @param metadataField The metadata field to add an edge to (will overwrite hard-coded metadata)
+   * @returns
+   */
+  addEdgeToMetadata<TFrom extends AnyInvocation>(
+    fromNode: TFrom,
+    fromField: OutputFields<TFrom>,
+    metadataField: string
+  ): Edge {
+    // @ts-expect-error `Graph` excludes `core_metadata` nodes due to its excessively wide typing
+    return this.addEdge(fromNode, fromField, this._getMetadataNode(), metadataField);
+  }
+  /**
    * Set the node that should receive metadata. All other edges from the metadata node are deleted.
    * @param node The node to set as the receiving node
    */

@@ -42,6 +42,7 @@ const DepthAnythingProcessor = (props: Props) => {
 
   const options: { label: string; value: DepthAnythingModelSize }[] = useMemo(
     () => [
+      { label: t('controlnet.depthAnythingSmallV2'), value: 'small_v2' },
       { label: t('controlnet.small'), value: 'small' },
       { label: t('controlnet.base'), value: 'base' },
       { label: t('controlnet.large'), value: 'large' },

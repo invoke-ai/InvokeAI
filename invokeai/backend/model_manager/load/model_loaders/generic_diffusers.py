@@ -18,8 +18,8 @@ from invokeai.backend.model_manager import (
     SubModelType,
 )
 from invokeai.backend.model_manager.config import DiffusersConfigBase
-
-from .. import ModelLoader, ModelLoaderRegistry
+from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)
@@ -78,7 +78,12 @@ class GenericDiffusersLoader(ModelLoader):
 
     # TO DO: Add exception handling
     def _hf_definition_to_type(self, module: str, class_name: str) -> ModelMixin:  # fix with correct type
-        if module in ["diffusers", "transformers"]:
+        if module in [
+            "diffusers",
+            "transformers",
+            "invokeai.backend.quantization.fast_quantized_transformers_model",
+            "invokeai.backend.quantization.fast_quantized_diffusion_model",
+        ]:
             res_type = sys.modules[module]
         else:
             res_type = sys.modules["diffusers"].pipelines

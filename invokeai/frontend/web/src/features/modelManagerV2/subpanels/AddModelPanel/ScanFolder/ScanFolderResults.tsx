@@ -14,7 +14,7 @@ import {
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import type { ChangeEvent, ChangeEventHandler } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import type { ScanFolderResponse } from 'services/api/endpoints/models';
@@ -25,7 +25,7 @@ type ScanModelResultsProps = {
   results: ScanFolderResponse;
 };
 
-export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
+export const ScanModelsResults = memo(({ results }: ScanModelResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [inplace, setInplace] = useState(true);
@@ -116,4 +116,6 @@ export const ScanModelsResults = ({ results }: ScanModelResultsProps) => {
       </Flex>
     </>
   );
-};
+});
+
+ScanModelsResults.displayName = 'ScanModelsResults';

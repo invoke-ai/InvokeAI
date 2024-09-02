@@ -10,38 +10,110 @@ import {
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 
+// Type inference doesn't work for this if you inline it in the listener for some reason
+const matchAnyBoardDeleted = isAnyOf(
+  imagesApi.endpoints.deleteBoard.matchFulfilled,
+  imagesApi.endpoints.deleteBoardAndImages.matchFulfilled
+);
+
 export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartListening) => {
+  /**
+   * The auto-add board shouldn't be set to an archived board or deleted board. When we archive a board, delete
+   * a board, or change a the archived board visibility flag, we may need to reset the auto-add board.
+   */
   startAppListening({
-    matcher: isAnyOf(
-      // Updating a board may change its archived status
-      boardsApi.endpoints.updateBoard.matchFulfilled,
-      // If the selected/auto-add board was deleted from a different session, we'll only know during the list request,
-      boardsApi.endpoints.listAllBoards.matchFulfilled,
-      // If a board is deleted, we'll need to reset the auto-add board
-      imagesApi.endpoints.deleteBoard.matchFulfilled,
-      imagesApi.endpoints.deleteBoardAndImages.matchFulfilled,
-      // When we change the visibility of archived boards, we may need to reset the auto-add board
-      shouldShowArchivedBoardsChanged
-    ),
+    matcher: matchAnyBoardDeleted,
     effect: async (action, { dispatch, getState }) => {
-      /**
-       * The auto-add board shouldn't be set to an archived board or deleted board. When we archive a board, delete
-       * a board, or change a the archived board visibility flag, we may need to reset the auto-add board.
-       */
+      const state = getState();
+      const deletedBoardId = action.meta.arg.originalArgs;
+      const { autoAddBoardId, selectedBoardId } = state.gallery;
+
+      // If the deleted board was currently selected, we should reset the selected board to uncategorized
+      if (deletedBoardId === selectedBoardId) {
+        dispatch(boardIdSelected({ boardId: 'none' }));
+        dispatch(galleryViewChanged('images'));
+      }
+
+      // If the deleted board was selected for auto-add, we should reset the auto-add board to uncategorized
+      if (deletedBoardId === autoAddBoardId) {
+        dispatch(autoAddBoardIdChanged('none'));
+      }
+    },
+  });
+
+  // If we archived a board, it may end up hidden. If it's selected or the auto-add board, we should reset those.
+  startAppListening({
+    matcher: boardsApi.endpoints.updateBoard.matchFulfilled,
+    effect: async (action, { dispatch, getState }) => {
+      const state = getState();
+      const { shouldShowArchivedBoards } = state.gallery;
+
+      const wasArchived = action.meta.arg.originalArgs.changes.archived === true;
+
+      if (wasArchived && !shouldShowArchivedBoards) {
+        dispatch(autoAddBoardIdChanged('none'));
+        dispatch(boardIdSelected({ boardId: 'none' }));
+        dispatch(galleryViewChanged('images'));
+      }
+    },
+  });
+
+  // When we hide archived boards, if the selected or the auto-add board is archived, we should reset those.
+  startAppListening({
+    actionCreator: shouldShowArchivedBoardsChanged,
+    effect: async (action, { dispatch, getState }) => {
+      const shouldShowArchivedBoards = action.payload;
+
+      // We only need to take action if we have just hidden archived boards.
+      if (shouldShowArchivedBoards) {
+        return;
+      }
 
       const state = getState();
       const queryArgs = selectListBoardsQueryArgs(state);
       const queryResult = boardsApi.endpoints.listAllBoards.select(queryArgs)(state);
-      const autoAddBoardId = state.gallery.autoAddBoardId;
+      const { selectedBoardId, autoAddBoardId } = state.gallery;
 
       if (!queryResult.data) {
         return;
       }
 
-      if (!queryResult.data.find((board) => board.board_id === autoAddBoardId)) {
-        dispatch(autoAddBoardIdChanged('none'));
+      // Handle the case where selected board is archived
+      const selectedBoard = queryResult.data.find((b) => b.board_id === selectedBoardId);
+      if (!selectedBoard || selectedBoard.archived) {
+        // If we can't find the selected board or it's archived, we should reset the selected board to uncategorized
         dispatch(boardIdSelected({ boardId: 'none' }));
         dispatch(galleryViewChanged('images'));
+      }
+
+      // Handle the case where auto-add board is archived
+      const autoAddBoard = queryResult.data.find((b) => b.board_id === autoAddBoardId);
+      if (!autoAddBoard || autoAddBoard.archived) {
+        // If we can't find the auto-add board or it's archived, we should reset the selected board to uncategorized
+        dispatch(autoAddBoardIdChanged('none'));
+      }
+    },
+  });
+
+  /**
+   * When listing boards, if the selected or auto-add boards are no longer in the list, we should reset them.
+   */
+  startAppListening({
+    matcher: boardsApi.endpoints.listAllBoards.matchFulfilled,
+    effect: async (action, { dispatch, getState }) => {
+      const boards = action.payload;
+      const state = getState();
+      const { selectedBoardId, autoAddBoardId } = state.gallery;
+
+      // Handle the case where selected board isn't in the list of boards
+      if (!boards.find((b) => b.board_id === selectedBoardId)) {
+        dispatch(boardIdSelected({ boardId: 'none' }));
+        dispatch(galleryViewChanged('images'));
+      }
+
+      // Handle the case where auto-add board isn't in the list of boards
+      if (!boards.find((b) => b.board_id === autoAddBoardId)) {
+        dispatch(autoAddBoardIdChanged('none'));
       }
     },
   });

@@ -17,6 +17,10 @@ export type UsePanelOptions =
        */
       minSize: number;
       /**
+       * The default size of the panel as a percentage.
+       */
+      defaultSize?: number;
+      /**
        * The unit of the minSize
        */
       unit: 'percentages';
@@ -26,6 +30,10 @@ export type UsePanelOptions =
        * The minimum size of the panel in pixels.
        */
       minSize: number;
+      /**
+       * The default size of the panel in pixels.
+       */
+      defaultSize?: number;
       /**
        * The unit of the minSize.
        */
@@ -50,6 +58,10 @@ export type UsePanelReturn = {
    * The dynamically calculated minimum size of the panel.
    */
   minSize: number;
+  /**
+   * The dynamically calculated default size of the panel.
+   */
+  defaultSize: number;
   /**
    * Whether the panel is collapsed.
    */
@@ -94,6 +106,7 @@ export type UsePanelReturn = {
 export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
   const panelHandleRef = useRef<ImperativePanelHandle>(null);
   const [_minSize, _setMinSize] = useState<number>(arg.unit === 'percentages' ? arg.minSize : 0);
+  const [_defaultSize, _setDefaultSize] = useState<number>(arg.defaultSize ?? arg.minSize);
 
   // If the units are pixels, we need to calculate the min size as a percentage of the available space,
   // then resize the panel if it is too small.
@@ -113,18 +126,16 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
       }
 
       const minSizePct = getSizeAsPercentage(arg.minSize, arg.panelGroupRef, arg.panelGroupDirection);
-
       _setMinSize(minSizePct);
 
-      /**
-       * TODO(psyche): Ideally, we only resize the panel if there is not enough room for it in the
-       * panel group. This is a bit tricky, though. We'd need to track the last known panel size
-       * and compare it to the new size before resizing. This introduces some complexity that I'd
-       * rather not need to maintain.
-       *
-       * For now, we'll just resize the panel to the min size every time the panel group is resized.
-       */
-      if (!panelHandleRef.current.isCollapsed()) {
+      const defaultSizePct = getSizeAsPercentage(
+        arg.defaultSize ?? arg.minSize,
+        arg.panelGroupRef,
+        arg.panelGroupDirection
+      );
+      _setDefaultSize(defaultSizePct);
+
+      if (!panelHandleRef.current.isCollapsed() && panelHandleRef.current.getSize() < minSizePct && minSizePct > 0) {
         panelHandleRef.current.resize(minSizePct);
       }
     });
@@ -133,8 +144,12 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
     panelGroupHandleElements.forEach((el) => resizeObserver.observe(el));
 
     // Resize the panel to the min size once on startup
-    const minSizePct = getSizeAsPercentage(arg.minSize, arg.panelGroupRef, arg.panelGroupDirection);
-    panelHandleRef.current?.resize(minSizePct);
+    const defaultSizePct = getSizeAsPercentage(
+      arg.defaultSize ?? arg.minSize,
+      arg.panelGroupRef,
+      arg.panelGroupDirection
+    );
+    panelHandleRef.current?.resize(defaultSizePct);
 
     return () => {
       resizeObserver.disconnect();
@@ -188,14 +203,14 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
 
   const onDoubleClickHandle = useCallback(() => {
     // If the panel is really super close to the min size, collapse it
-    if (Math.abs((panelHandleRef.current?.getSize() ?? 0) - _minSize) < 0.01) {
+    if (Math.abs((panelHandleRef.current?.getSize() ?? 0) - _defaultSize) < 0.01) {
       collapse();
       return;
     }
 
     // Otherwise, resize to the min size
-    panelHandleRef.current?.resize(_minSize);
-  }, [_minSize, collapse]);
+    panelHandleRef.current?.resize(_defaultSize);
+  }, [_defaultSize, collapse]);
 
   return {
     ref: panelHandleRef,
@@ -209,6 +224,7 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
     collapse,
     resize,
     onDoubleClickHandle,
+    defaultSize: _defaultSize,
   };
 };
 

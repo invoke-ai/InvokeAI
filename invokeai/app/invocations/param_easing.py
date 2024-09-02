@@ -39,11 +39,10 @@ from easing_functions import (
 )
 from matplotlib.ticker import MaxNLocator
 
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.fields import InputField
 from invokeai.app.invocations.primitives import FloatCollectionOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-
-from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField
 
 
 @invocation(

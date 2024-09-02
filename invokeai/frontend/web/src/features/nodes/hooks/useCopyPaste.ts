@@ -59,15 +59,17 @@ const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
     for (const edge of copiedEdges) {
       if (edge.source === node.id) {
         edge.source = id;
-        edge.id = edge.id.replace(node.data.id, id);
-      }
-      if (edge.target === node.id) {
+      } else if (edge.target === node.id) {
         edge.target = id;
-        edge.id = edge.id.replace(node.data.id, id);
       }
     }
     node.id = id;
     node.data.id = id;
+  });
+
+  copiedEdges.forEach((edge) => {
+    // Copied edges need a fresh id too
+    edge.id = uuidv4();
   });
 
   const nodeChanges: NodeChange[] = [];

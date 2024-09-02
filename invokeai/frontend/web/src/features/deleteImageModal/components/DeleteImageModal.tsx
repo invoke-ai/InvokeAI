@@ -56,7 +56,6 @@ const DeleteImageModal = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const shouldConfirmOnDelete = useAppSelector((s) => s.system.shouldConfirmOnDelete);
-  const canRestoreDeletedImagesFromBin = useAppSelector((s) => s.config.canRestoreDeletedImagesFromBin);
   const isModalOpen = useAppSelector((s) => s.deleteImageModal.isModalOpen);
   const { imagesToDelete, imagesUsage, imageUsageSummary } = useAppSelector(selectImageUsages);
 
@@ -90,7 +89,7 @@ const DeleteImageModal = () => {
       <Flex direction="column" gap={3}>
         <ImageUsageMessage imageUsage={imageUsageSummary} />
         <Divider />
-        <Text>{canRestoreDeletedImagesFromBin ? t('gallery.deleteImageBin') : t('gallery.deleteImagePermanent')}</Text>
+        <Text>{t('gallery.deleteImagePermanent')}</Text>
         <Text>{t('common.areYouSure')}</Text>
         <FormControl>
           <FormLabel>{t('common.dontAskMeAgain')}</FormLabel>

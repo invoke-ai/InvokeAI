@@ -3,7 +3,9 @@ from typing import Literal, get_args
 
 from PIL import Image
 
-from invokeai.app.invocations.fields import ColorField, ImageField
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.fields import ColorField, ImageField, InputField, WithBoard, WithMetadata
+from invokeai.app.invocations.image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
@@ -13,10 +15,6 @@ from invokeai.backend.image_util.infill_methods.mosaic import infill_mosaic
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch, infill_patchmatch
 from invokeai.backend.image_util.infill_methods.tile import infill_tile
 from invokeai.backend.util.logging import InvokeAILogger
-
-from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField, WithBoard, WithMetadata
-from .image import PIL_RESAMPLING_MAP, PIL_RESAMPLING_MODES
 
 logger = InvokeAILogger.get_logger()
 

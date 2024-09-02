@@ -4,50 +4,37 @@ title: Installing with Docker
 
 # :fontawesome-brands-docker: Docker
 
-!!! warning "macOS and AMD GPU Users"
+!!! warning "macOS users"
 
-    We highly recommend to Install InvokeAI locally using [these instructions](INSTALLATION.md),
-    because Docker containers can not access the GPU on macOS.
-
-!!! warning "AMD GPU Users"
-
-    Container support for AMD GPUs has been reported to work by the community, but has not received
-    extensive testing. Please make sure to set the `GPU_DRIVER=rocm` environment variable (see below), and
-    use the `build.sh` script to build the image for this to take effect at build time.
+    Docker can not access the GPU on macOS, so your generation speeds will be slow. [Install InvokeAI](INSTALLATION.md) instead.
 
 !!! tip "Linux and Windows Users"
 
-    For optimal performance, configure your Docker daemon to access your machine's GPU.
+    Configure Docker to access your machine's GPU.
     Docker Desktop on Windows [includes GPU support](https://www.docker.com/blog/wsl-2-gpu-support-for-docker-desktop-on-nvidia-gpus/).
-    Linux users should install and configure the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-
-## Why containers?
-
-They provide a flexible, reliable way to build and deploy InvokeAI.
-See [Processes](https://12factor.net/processes) under the Twelve-Factor App
-methodology for details on why running applications in such a stateless fashion is important.
-
-The container is configured for CUDA by default, but can be built to support AMD GPUs
-by setting the `GPU_DRIVER=rocm` environment variable at Docker image build time.
-
-Developers on Apple silicon (M1/M2/M3): You
-[can't access your GPU cores from Docker containers](https://github.com/pytorch/pytorch/issues/81224)
-and performance is reduced compared with running it directly on macOS but for
-development purposes it's fine. Once you're done with development tasks on your
-laptop you can build for the target platform and architecture and deploy to
-another environment with NVIDIA GPUs on-premises or in the cloud.
+    Linux users should follow the [NVIDIA](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) or [AMD](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html) documentation.
 
 ## TL;DR
 
-This assumes properly configured Docker on Linux or Windows/WSL2. Read on for detailed customization options.
+Ensure your Docker setup is able to use your GPU. Then:
 
     ```bash
-    # docker compose commands should be run from the `docker` directory
+    docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai
+    ```
+
+Once the container starts up, open http://localhost:9090 in your browser, install some models, and start generating.
+
+## Build-It-Yourself
+
+All the docker materials are located inside the [docker](https://github.com/invoke-ai/InvokeAI/tree/main/docker) directory in the Git repo.
+
+    ```bash
     cd docker
+    cp .env.sample .env
     docker compose up
     ```
 
-## Installation in a Linux container (desktop)
+We also ship the `run.sh` convenience script. See the `docker/README.md` file for detailed instructions on how to customize the docker setup to your needs.
 
 ### Prerequisites
 
@@ -58,18 +45,9 @@ Preferences, Resources, Advanced. Increase the CPUs and Memory to avoid this
 [Issue](https://github.com/invoke-ai/InvokeAI/issues/342). You may need to
 increase Swap and Disk image size too.
 
-#### Get a Huggingface-Token
-
-Besides the Docker Agent you will need an Account on
-[huggingface.co](https://huggingface.co/join).
-
-After you succesfully registered your account, go to
-[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens), create
-a token and copy it, since you will need in for the next step.
-
 ### Setup
 
-Set up your environmnent variables. In the `docker` directory, make a copy of `.env.sample` and name it `.env`. Make changes as necessary.
+Set up your environment variables. In the `docker` directory, make a copy of `.env.sample` and name it `.env`. Make changes as necessary.
 
 Any environment variables supported by InvokeAI can be set here - please see the [CONFIGURATION](../features/CONFIGURATION.md) for further detail.
 
@@ -103,10 +81,9 @@ Once the container starts up (and configures the InvokeAI root directory if this
 ## Troubleshooting / FAQ
 
 - Q: I am running on Windows under WSL2, and am seeing a "no such file or directory" error.
-- A: Your `docker-entrypoint.sh` file likely has Windows (CRLF) as opposed to Unix (LF) line endings,
-    and you may have cloned this repository before the issue was fixed. To solve this, please change
-    the line endings in the `docker-entrypoint.sh` file to `LF`. You can do this in VSCode
+- A: Your `docker-entrypoint.sh` might have has Windows (CRLF) line endings, depending how you cloned the repository.
+    To solve this, change the line endings in the `docker-entrypoint.sh` file to `LF`. You can do this in VSCode
     (`Ctrl+P` and search for "line endings"), or by using the `dos2unix` utility in WSL.
     Finally, you may delete `docker-entrypoint.sh` followed by  `git pull; git checkout docker/docker-entrypoint.sh`
     to reset the file to its most recent version.
-    For more information on this issue, please see the [Docker Desktop documentation](https://docs.docker.com/desktop/troubleshoot/topics/#avoid-unexpected-syntax-errors-use-unix-style-line-endings-for-files-in-containers)
+    For more information on this issue, see [Docker Desktop documentation](https://docs.docker.com/desktop/troubleshoot/topics/#avoid-unexpected-syntax-errors-use-unix-style-line-endings-for-files-in-containers)

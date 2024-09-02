@@ -4,7 +4,7 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import type { ControlNetOrT2IAdapterDefaultSettingsFormData } from 'features/modelManagerV2/subpanels/ModelPanel/ControlNetOrT2IAdapterDefaultSettings/ControlNetOrT2IAdapterDefaultSettings';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { SettingToggle } from 'features/modelManagerV2/subpanels/ModelPanel/SettingToggle';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import type { UseControllerProps } from 'react-hook-form';
 import { useController } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -28,7 +28,7 @@ const OPTIONS = [
 
 type DefaultSchedulerType = ControlNetOrT2IAdapterDefaultSettingsFormData['preprocessor'];
 
-export function DefaultPreprocessor(props: UseControllerProps<ControlNetOrT2IAdapterDefaultSettingsFormData>) {
+export const DefaultPreprocessor = memo((props: UseControllerProps<ControlNetOrT2IAdapterDefaultSettingsFormData>) => {
   const { t } = useTranslation();
   const { field } = useController(props);
 
@@ -63,4 +63,6 @@ export function DefaultPreprocessor(props: UseControllerProps<ControlNetOrT2IAda
       <Combobox isDisabled={isDisabled} value={value} options={OPTIONS} onChange={onChange} />
     </FormControl>
   );
-}
+});
+
+DefaultPreprocessor.displayName = 'DefaultPreprocessor';

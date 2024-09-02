@@ -522,6 +522,21 @@ describe('Graph', () => {
       });
     });
 
+    describe('addEdgeToMetadata', () => {
+      it('should add an edge to the metadata node', () => {
+        const g = new Graph();
+        const n1 = g.addNode({
+          id: 'n1',
+          type: 'img_resize',
+        });
+        g.upsertMetadata({ test: 'test' });
+        g.addEdgeToMetadata(n1, 'width', 'width');
+        const metadata = g._getMetadataNode();
+        expect(g.getEdgesFrom(n1).length).toBe(1);
+        expect(g.getEdgesTo(metadata as unknown as AnyInvocation).length).toBe(1);
+      });
+    });
+
     describe('setMetadataReceivingNode', () => {
       it('should set the metadata receiving node', () => {
         const g = new Graph();

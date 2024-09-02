@@ -1,7 +1,7 @@
 import { Button, Checkbox, Flex, FormControl, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import { t } from 'i18next';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 
@@ -10,7 +10,7 @@ type SimpleImportModelConfig = {
   inplace: boolean;
 };
 
-export const InstallModelForm = () => {
+export const InstallModelForm = memo(() => {
   const [installModel, { isLoading }] = useInstallModel();
 
   const { register, handleSubmit, formState, reset } = useForm<SimpleImportModelConfig>({
@@ -74,4 +74,6 @@ export const InstallModelForm = () => {
       </Flex>
     </form>
   );
-};
+});
+
+InstallModelForm.displayName = 'InstallModelForm';

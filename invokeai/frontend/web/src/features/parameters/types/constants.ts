@@ -9,6 +9,7 @@ export const MODEL_TYPE_MAP = {
   'sd-2': 'Stable Diffusion 2.x',
   sdxl: 'Stable Diffusion XL',
   'sdxl-refiner': 'Stable Diffusion XL Refiner',
+  flux: 'Flux',
 };
 
 /**
@@ -20,6 +21,7 @@ export const MODEL_TYPE_SHORT_MAP = {
   'sd-2': 'SD2.X',
   sdxl: 'SDXL',
   'sdxl-refiner': 'SDXLR',
+  flux: 'FLUX',
 };
 
 /**
@@ -46,34 +48,44 @@ export const CLIP_SKIP_MAP = {
     maxClip: 24,
     markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
   },
+  flux: {
+    maxClip: 0,
+    markers: [],
+  },
 };
 
 /**
  * Mapping of schedulers to human readable name
  */
 export const SCHEDULER_OPTIONS: ComboboxOption[] = [
-  { value: 'euler', label: 'Euler' },
-  { value: 'deis', label: 'DEIS' },
   { value: 'ddim', label: 'DDIM' },
   { value: 'ddpm', label: 'DDPM' },
-  { value: 'dpmpp_sde', label: 'DPM++ SDE' },
+  { value: 'deis', label: 'DEIS' },
+  { value: 'deis_k', label: 'DEIS Karras' },
   { value: 'dpmpp_2s', label: 'DPM++ 2S' },
-  { value: 'dpmpp_2m', label: 'DPM++ 2M' },
-  { value: 'dpmpp_2m_sde', label: 'DPM++ 2M SDE' },
-  { value: 'heun', label: 'Heun' },
-  { value: 'kdpm_2', label: 'KDPM 2' },
-  { value: 'lms', label: 'LMS' },
-  { value: 'pndm', label: 'PNDM' },
-  { value: 'unipc', label: 'UniPC' },
-  { value: 'euler_k', label: 'Euler Karras' },
-  { value: 'dpmpp_sde_k', label: 'DPM++ SDE Karras' },
   { value: 'dpmpp_2s_k', label: 'DPM++ 2S Karras' },
+  { value: 'dpmpp_2m', label: 'DPM++ 2M' },
   { value: 'dpmpp_2m_k', label: 'DPM++ 2M Karras' },
+  { value: 'dpmpp_2m_sde', label: 'DPM++ 2M SDE' },
   { value: 'dpmpp_2m_sde_k', label: 'DPM++ 2M SDE Karras' },
-  { value: 'heun_k', label: 'Heun Karras' },
-  { value: 'lms_k', label: 'LMS Karras' },
+  { value: 'dpmpp_3m', label: 'DPM++ 3M' },
+  { value: 'dpmpp_3m_k', label: 'DPM++ 3M Karras' },
+  { value: 'dpmpp_sde', label: 'DPM++ SDE' },
+  { value: 'dpmpp_sde_k', label: 'DPM++ SDE Karras' },
+  { value: 'euler', label: 'Euler' },
+  { value: 'euler_k', label: 'Euler Karras' },
   { value: 'euler_a', label: 'Euler Ancestral' },
+  { value: 'heun', label: 'Heun' },
+  { value: 'heun_k', label: 'Heun Karras' },
+  { value: 'kdpm_2', label: 'KDPM 2' },
+  { value: 'kdpm_2_k', label: 'KDPM 2 Karras' },
   { value: 'kdpm_2_a', label: 'KDPM 2 Ancestral' },
+  { value: 'kdpm_2_a_k', label: 'KDPM 2 Ancestral Karras' },
   { value: 'lcm', label: 'LCM' },
+  { value: 'lms', label: 'LMS' },
+  { value: 'lms_k', label: 'LMS Karras' },
+  { value: 'pndm', label: 'PNDM' },
   { value: 'tcd', label: 'TCD' },
-].sort((a, b) => a.label.localeCompare(b.label));
+  { value: 'unipc', label: 'UniPC' },
+  { value: 'unipc_k', label: 'UniPC Karras' },
+];

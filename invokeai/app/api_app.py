@@ -20,14 +20,9 @@ from torch.backends.mps import is_available as is_mps_available
 # noinspection PyUnresolvedReferences
 import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 import invokeai.frontend.web as web_dir
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
-from invokeai.app.services.config.config_default import get_config
-from invokeai.app.util.custom_openapi import get_openapi_func
-from invokeai.backend.util.devices import TorchDevice
-
-from ..backend.util.logging import InvokeAILogger
-from .api.dependencies import ApiDependencies
-from .api.routers import (
+from invokeai.app.api.routers import (
     app_info,
     board_images,
     boards,
@@ -35,10 +30,15 @@ from .api.routers import (
     images,
     model_manager,
     session_queue,
+    style_presets,
     utilities,
     workflows,
 )
-from .api.sockets import SocketIO
+from invokeai.app.api.sockets import SocketIO
+from invokeai.app.services.config.config_default import get_config
+from invokeai.app.util.custom_openapi import get_openapi_func
+from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.logging import InvokeAILogger
 
 app_config = get_config()
 
@@ -56,11 +56,13 @@ mimetypes.add_type("text/css", ".css")
 torch_device_name = TorchDevice.get_torch_device_name()
 logger.info(f"Using torch device: {torch_device_name}")
 
+loop = asyncio.new_event_loop()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Add startup event to load dependencies
-    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, logger=logger)
+    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, loop=loop, logger=logger)
     yield
     # Shut down threads
     ApiDependencies.shutdown()
@@ -107,6 +109,7 @@ app.include_router(board_images.board_images_router, prefix="/api")
 app.include_router(app_info.app_router, prefix="/api")
 app.include_router(session_queue.session_queue_router, prefix="/api")
 app.include_router(workflows.workflows_router, prefix="/api")
+app.include_router(style_presets.style_presets_router, prefix="/api")
 
 app.openapi = get_openapi_func(app)
 
@@ -162,6 +165,7 @@ def invoke_api() -> None:
         # Taken from https://waylonwalker.com/python-find-available-port/, thanks Waylon!
         # https://github.com/WaylonWalker
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
             if s.connect_ex(("localhost", port)) == 0:
                 return find_port(port=port + 1)
             else:
@@ -184,8 +188,6 @@ def invoke_api() -> None:
 
     check_cudnn(logger)
 
-    # Start our own event loop for eventing usage
-    loop = asyncio.new_event_loop()
     config = uvicorn.Config(
         app=app,
         host=app_config.host,

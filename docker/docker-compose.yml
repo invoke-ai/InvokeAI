@@ -1,7 +1,5 @@
 # Copyright (c) 2023 Eugene Brodsky https://github.com/ebr
 
-version: '3.8'
-
 x-invokeai: &invokeai
     image: "local/invokeai:latest"
     build:
@@ -32,7 +30,7 @@ x-invokeai: &invokeai
 
 
 services:
-  invokeai-nvidia:
+  invokeai-cuda:
     <<: *invokeai
     deploy:
       resources:

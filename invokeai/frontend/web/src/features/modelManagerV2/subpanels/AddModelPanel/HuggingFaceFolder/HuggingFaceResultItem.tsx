@@ -1,13 +1,13 @@
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 
 type Props = {
   result: string;
 };
-export const HuggingFaceResultItem = ({ result }: Props) => {
+export const HuggingFaceResultItem = memo(({ result }: Props) => {
   const { t } = useTranslation();
 
   const [installModel] = useInstallModel();
@@ -27,4 +27,6 @@ export const HuggingFaceResultItem = ({ result }: Props) => {
       <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={onClick} size="sm" />
     </Flex>
   );
-};
+});
+
+HuggingFaceResultItem.displayName = 'HuggingFaceResultItem';

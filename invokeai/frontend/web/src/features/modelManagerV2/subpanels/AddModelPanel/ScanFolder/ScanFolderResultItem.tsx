@@ -1,5 +1,5 @@
 import { Badge, Box, Flex, IconButton, Text } from '@invoke-ai/ui-library';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import type { ScanFolderResponse } from 'services/api/endpoints/models';
@@ -8,7 +8,7 @@ type Props = {
   result: ScanFolderResponse[number];
   installModel: (source: string) => void;
 };
-export const ScanModelResultItem = ({ result, installModel }: Props) => {
+export const ScanModelResultItem = memo(({ result, installModel }: Props) => {
   const { t } = useTranslation();
 
   const handleInstall = useCallback(() => {
@@ -30,4 +30,6 @@ export const ScanModelResultItem = ({ result, installModel }: Props) => {
       </Box>
     </Flex>
   );
-};
+});
+
+ScanModelResultItem.displayName = 'ScanModelResultItem';

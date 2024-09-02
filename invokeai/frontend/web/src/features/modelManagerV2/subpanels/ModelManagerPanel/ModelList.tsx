@@ -5,13 +5,16 @@ import type { FilterableModelType } from 'features/modelManagerV2/store/modelMan
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  useClipEmbedModels,
   useControlNetModels,
   useEmbeddingModels,
   useIPAdapterModels,
   useLoRAModels,
   useMainModels,
   useRefinerModels,
+  useSpandrelImageToImageModels,
   useT2IAdapterModels,
+  useT5EncoderModels,
   useVAEModels,
 } from 'services/api/hooks/modelsByType';
 import type { AnyModelConfig } from 'services/api/types';
@@ -20,7 +23,8 @@ import { FetchingModelsLoader } from './FetchingModelsLoader';
 import { ModelListWrapper } from './ModelListWrapper';
 
 const ModelList = () => {
-  const { searchTerm, filteredModelType } = useAppSelector((s) => s.modelmanagerV2);
+  const filteredModelType = useAppSelector((s) => s.modelmanagerV2.filteredModelType);
+  const searchTerm = useAppSelector((s) => s.modelmanagerV2.searchTerm);
   const { t } = useTranslation();
 
   const [mainModels, { isLoading: isLoadingMainModels }] = useMainModels();
@@ -71,6 +75,25 @@ const ModelList = () => {
     [vaeModels, searchTerm, filteredModelType]
   );
 
+  const [t5EncoderModels, { isLoading: isLoadingT5EncoderModels }] = useT5EncoderModels();
+  const filteredT5EncoderModels = useMemo(
+    () => modelsFilter(t5EncoderModels, searchTerm, filteredModelType),
+    [t5EncoderModels, searchTerm, filteredModelType]
+  );
+
+  const [clipEmbedModels, { isLoading: isLoadingClipEmbedModels }] = useClipEmbedModels();
+  const filteredClipEmbedModels = useMemo(
+    () => modelsFilter(clipEmbedModels, searchTerm, filteredModelType),
+    [clipEmbedModels, searchTerm, filteredModelType]
+  );
+
+  const [spandrelImageToImageModels, { isLoading: isLoadingSpandrelImageToImageModels }] =
+    useSpandrelImageToImageModels();
+  const filteredSpandrelImageToImageModels = useMemo(
+    () => modelsFilter(spandrelImageToImageModels, searchTerm, filteredModelType),
+    [spandrelImageToImageModels, searchTerm, filteredModelType]
+  );
+
   const totalFilteredModels = useMemo(() => {
     return (
       filteredMainModels.length +
@@ -80,7 +103,10 @@ const ModelList = () => {
       filteredControlNetModels.length +
       filteredT2IAdapterModels.length +
       filteredIPAdapterModels.length +
-      filteredVAEModels.length
+      filteredVAEModels.length +
+      filteredSpandrelImageToImageModels.length +
+      t5EncoderModels.length +
+      clipEmbedModels.length
     );
   }, [
     filteredControlNetModels.length,
@@ -91,6 +117,9 @@ const ModelList = () => {
     filteredRefinerModels.length,
     filteredT2IAdapterModels.length,
     filteredVAEModels.length,
+    filteredSpandrelImageToImageModels.length,
+    t5EncoderModels.length,
+    clipEmbedModels.length,
   ]);
 
   return (
@@ -142,6 +171,27 @@ const ModelList = () => {
         {isLoadingT2IAdapterModels && <FetchingModelsLoader loadingMessage="Loading T2I Adapters..." />}
         {!isLoadingT2IAdapterModels && filteredT2IAdapterModels.length > 0 && (
           <ModelListWrapper title={t('common.t2iAdapter')} modelList={filteredT2IAdapterModels} key="t2i-adapters" />
+        )}
+        {/* T5 Encoders List */}
+        {isLoadingT5EncoderModels && <FetchingModelsLoader loadingMessage="Loading T5 Encoder Models..." />}
+        {!isLoadingT5EncoderModels && filteredT5EncoderModels.length > 0 && (
+          <ModelListWrapper title={t('modelManager.t5Encoder')} modelList={filteredT5EncoderModels} key="t5-encoder" />
+        )}
+        {/* Clip Embed List */}
+        {isLoadingClipEmbedModels && <FetchingModelsLoader loadingMessage="Loading Clip Embed Models..." />}
+        {!isLoadingClipEmbedModels && filteredClipEmbedModels.length > 0 && (
+          <ModelListWrapper title={t('modelManager.clipEmbed')} modelList={filteredClipEmbedModels} key="clip-embed" />
+        )}
+        {/* Spandrel Image to Image List */}
+        {isLoadingSpandrelImageToImageModels && (
+          <FetchingModelsLoader loadingMessage="Loading Image-to-Image Models..." />
+        )}
+        {!isLoadingSpandrelImageToImageModels && filteredSpandrelImageToImageModels.length > 0 && (
+          <ModelListWrapper
+            title={t('modelManager.spandrelImageToImage')}
+            modelList={filteredSpandrelImageToImageModels}
+            key="spandrel-image-to-image"
+          />
         )}
         {totalFilteredModels === 0 && (
           <Flex w="full" h="full" alignItems="center" justifyContent="center">

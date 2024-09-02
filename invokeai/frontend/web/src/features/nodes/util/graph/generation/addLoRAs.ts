@@ -8,7 +8,7 @@ import type { Invocation, S } from 'services/api/types';
 export const addLoRAs = (
   state: RootState,
   g: Graph,
-  denoise: Invocation<'denoise_latents'>,
+  denoise: Invocation<'denoise_latents'> | Invocation<'tiled_multi_diffusion_denoise_latents'>,
   modelLoader: Invocation<'main_model_loader'>,
   seamless: Invocation<'seamless'> | null,
   clipSkip: Invocation<'clip_skip'>,

@@ -62,6 +62,10 @@ export type CanvasInitialImageDropData = BaseDropData & {
   actionType: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
+type UpscaleInitialImageDropData = BaseDropData & {
+  actionType: 'SET_UPSCALE_INITIAL_IMAGE';
+};
+
 type NodesImageDropData = BaseDropData & {
   actionType: 'SET_NODES_IMAGE';
   context: {
@@ -98,7 +102,8 @@ export type TypesafeDroppableData =
   | IPALayerImageDropData
   | RGLayerIPAdapterImageDropData
   | IILayerImageDropData
-  | SelectForCompareDropData;
+  | SelectForCompareDropData
+  | UpscaleInitialImageDropData;
 
 type BaseDragData = {
   id: string;

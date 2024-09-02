@@ -23,18 +23,18 @@ usermod -u ${USER_ID} ${USER} 1>/dev/null
 # but it is useful to have the full SSH server e.g. on Runpod.
 # (use SCP to copy files to/from the image, etc)
 if [[ -v "PUBLIC_KEY" ]] && [[ ! -d "${HOME}/.ssh" ]]; then
-    apt-get update
-    apt-get install -y openssh-server
-    pushd "$HOME"
-    mkdir -p .ssh
-    echo "${PUBLIC_KEY}" > .ssh/authorized_keys
-    chmod -R 700 .ssh
-    popd
-    service ssh start
+  apt-get update
+  apt-get install -y openssh-server
+  pushd "$HOME"
+  mkdir -p .ssh
+  echo "${PUBLIC_KEY}" >.ssh/authorized_keys
+  chmod -R 700 .ssh
+  popd
+  service ssh start
 fi
 
 mkdir -p "${INVOKEAI_ROOT}"
-chown --recursive ${USER} "${INVOKEAI_ROOT}"
+chown --recursive ${USER} "${INVOKEAI_ROOT}" || true
 cd "${INVOKEAI_ROOT}"
 
 # Run the CMD as the Container User (not root).

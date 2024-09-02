@@ -1,14 +1,14 @@
 import { Button, Flex, Heading } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 
 import ModelList from './ModelManagerPanel/ModelList';
 import { ModelListNavigation } from './ModelManagerPanel/ModelListNavigation';
 
-export const ModelManager = () => {
+export const ModelManager = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const handleClickAddModel = useCallback(() => {
@@ -29,4 +29,6 @@ export const ModelManager = () => {
       </Flex>
     </Flex>
   );
-};
+});
+
+ModelManager.displayName = 'ModelManager';

@@ -32,6 +32,7 @@ export const zSchedulerField = z.enum([
   'ddpm',
   'dpmpp_2s',
   'dpmpp_2m',
+  'dpmpp_3m',
   'dpmpp_2m_sde',
   'dpmpp_sde',
   'heun',
@@ -40,12 +41,17 @@ export const zSchedulerField = z.enum([
   'pndm',
   'unipc',
   'euler_k',
+  'deis_k',
   'dpmpp_2s_k',
   'dpmpp_2m_k',
+  'dpmpp_3m_k',
   'dpmpp_2m_sde_k',
   'dpmpp_sde_k',
   'heun_k',
+  'kdpm_2_k',
+  'kdpm_2_a_k',
   'lms_k',
+  'unipc_k',
   'euler_a',
   'kdpm_2_a',
   'lcm',
@@ -55,7 +61,7 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 // #endregion
 
 // #region Model-related schemas
-const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner']);
+const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner', 'flux']);
 const zModelType = z.enum([
   'main',
   'vae',
@@ -66,9 +72,13 @@ const zModelType = z.enum([
   'embedding',
   'onnx',
   'clip_vision',
+  'spandrel_image_to_image',
+  't5_encoder',
+  'clip_embed',
 ]);
 const zSubModelType = z.enum([
   'unet',
+  'transformer',
   'text_encoder',
   'text_encoder_2',
   'tokenizer',

@@ -5,7 +5,7 @@ import psutil
 import torch
 from typing_extensions import Self
 
-from ..util.libc_util import LibcUtil, Struct_mallinfo2
+from invokeai.backend.model_manager.util.libc_util import LibcUtil, Struct_mallinfo2
 
 GB = 2**30  # 1 GB
 

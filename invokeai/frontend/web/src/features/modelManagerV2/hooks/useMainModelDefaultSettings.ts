@@ -1,12 +1,9 @@
-import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { isNil } from 'lodash-es';
 import { useMemo } from 'react';
-import { useGetModelConfigWithTypeGuard } from 'services/api/hooks/useGetModelConfigWithTypeGuard';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
+import type { MainModelConfig } from 'services/api/types';
 
 const initialStatesSelector = createMemoizedSelector(selectConfigSlice, (config) => {
   const { steps, guidance, scheduler, cfgRescaleMultiplier, vaePrecision, width, height } = config.sd;
@@ -22,9 +19,7 @@ const initialStatesSelector = createMemoizedSelector(selectConfigSlice, (config)
   };
 });
 
-export const useMainModelDefaultSettings = (modelKey?: string | null) => {
-  const { modelConfig, isLoading } = useGetModelConfigWithTypeGuard(modelKey ?? skipToken, isNonRefinerMainModelConfig);
-
+export const useMainModelDefaultSettings = (modelConfig: MainModelConfig) => {
   const {
     initialSteps,
     initialCfg,
@@ -81,5 +76,5 @@ export const useMainModelDefaultSettings = (modelKey?: string | null) => {
     initialHeight,
   ]);
 
-  return { defaultSettingsDefaults, isLoading, optimalDimension: getOptimalDimension(modelConfig) };
+  return defaultSettingsDefaults;
 };

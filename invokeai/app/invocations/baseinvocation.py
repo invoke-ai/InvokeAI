@@ -40,7 +40,7 @@ from invokeai.app.util.misc import uuid_string
 from invokeai.backend.util.logging import InvokeAILogger
 
 if TYPE_CHECKING:
-    from ..services.invocation_services import InvocationServices
+    from invokeai.app.services.invocation_services import InvocationServices
 
 logger = InvokeAILogger.get_logger()
 

@@ -39,9 +39,10 @@ type DeleteModelImageResponse = void;
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
-type InstallModelArg = {
+export type InstallModelArg = {
   source: paths['/api/v2/models/install']['post']['parameters']['query']['source'];
   inplace?: paths['/api/v2/models/install']['post']['parameters']['query']['inplace'];
+  config?: paths['/api/v2/models/install']['post']['requestBody']['content']['application/json'];
 };
 type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']['201']['content']['application/json'];
 
@@ -124,11 +125,12 @@ export const modelsApi = api.injectEndpoints({
       invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     installModel: build.mutation<InstallModelResponse, InstallModelArg>({
-      query: ({ source, inplace = true }) => {
+      query: ({ source, inplace = true, config }) => {
         return {
           url: buildModelsUrl('install'),
           params: { source, inplace },
           method: 'POST',
+          body: config,
         };
       },
       invalidatesTags: ['ModelInstalls'],
@@ -240,7 +242,6 @@ export const modelsApi = api.injectEndpoints({
         }
         return tags;
       },
-      keepUnusedDataFor: 60 * 60 * 1000 * 24, // 1 day (infinite)
       transformResponse: (response: GetModelConfigsResponse) => {
         return modelConfigsAdapter.setAll(modelConfigsAdapter.getInitialState(), response.models);
       },

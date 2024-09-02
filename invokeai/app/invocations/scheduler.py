@@ -1,5 +1,4 @@
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
-from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     InputField,
@@ -7,6 +6,7 @@ from invokeai.app.invocations.fields import (
     UIType,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 
 
 @invocation_output("scheduler_output")

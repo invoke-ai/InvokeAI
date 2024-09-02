@@ -27,6 +27,8 @@ export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?
       return payloadType === 'IMAGE_DTO';
     case 'SET_CANVAS_INITIAL_IMAGE':
       return payloadType === 'IMAGE_DTO';
+    case 'SET_UPSCALE_INITIAL_IMAGE':
+      return payloadType === 'IMAGE_DTO';
     case 'SET_NODES_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'SELECT_FOR_COMPARE':

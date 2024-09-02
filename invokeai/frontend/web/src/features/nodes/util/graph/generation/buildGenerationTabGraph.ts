@@ -22,7 +22,7 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import type { GraphType } from 'features/nodes/util/graph/generation/Graph';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { getBoardField } from 'features/nodes/util/graph/graphBuilderUtils';
+import { getBoardField, getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -40,10 +40,11 @@ export const buildGenerationTabGraph = async (state: RootState): Promise<GraphTy
     seed,
     vae,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
   const { width, height } = state.controlLayers.present.size;
 
   assert(model, 'No model found in state');
+
+  const { positivePrompt, negativePrompt } = getPresetModifiedPrompts(state);
 
   const g = new Graph(CONTROL_LAYERS_GRAPH);
   const modelLoader = g.addNode({

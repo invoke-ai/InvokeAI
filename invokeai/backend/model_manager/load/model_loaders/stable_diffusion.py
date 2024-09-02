@@ -25,10 +25,9 @@ from invokeai.backend.model_manager.config import (
     DiffusersConfigBase,
     MainCheckpointConfig,
 )
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.util.silence_warnings import SilenceWarnings
-
-from .. import ModelLoaderRegistry
-from .generic_diffusers import GenericDiffusersLoader
 
 VARIANT_TO_IN_CHANNEL_MAP = {
     ModelVariantType.Normal: 4,
@@ -37,8 +36,18 @@ VARIANT_TO_IN_CHANNEL_MAP = {
 }
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Diffusers)
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusionXL, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusionXLRefiner, type=ModelType.Main, format=ModelFormat.Diffusers
+)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion1, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusion2, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.StableDiffusionXL, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.StableDiffusionXLRefiner, type=ModelType.Main, format=ModelFormat.Checkpoint
+)
 class StableDiffusionDiffusersModel(GenericDiffusersLoader):
     """Class to load main models."""
 
@@ -98,6 +107,9 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             BaseModelType.StableDiffusionXL: {
                 ModelVariantType.Normal: StableDiffusionXLPipeline,
                 ModelVariantType.Inpaint: StableDiffusionXLInpaintPipeline,
+            },
+            BaseModelType.StableDiffusionXLRefiner: {
+                ModelVariantType.Normal: StableDiffusionXLPipeline,
             },
         }
         assert isinstance(config, MainCheckpointConfig)

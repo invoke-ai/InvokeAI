@@ -1,4 +1,5 @@
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
+import { memo } from 'react';
 import type { AnyModelConfig } from 'services/api/types';
 
 import ModelListItem from './ModelListItem';
@@ -8,7 +9,7 @@ type ModelListWrapperProps = {
   modelList: AnyModelConfig[];
 };
 
-export const ModelListWrapper = (props: ModelListWrapperProps) => {
+export const ModelListWrapper = memo((props: ModelListWrapperProps) => {
   const { title, modelList } = props;
   return (
     <StickyScrollable title={title} contentSx={{ gap: 1, p: 2 }}>
@@ -17,4 +18,6 @@ export const ModelListWrapper = (props: ModelListWrapperProps) => {
       ))}
     </StickyScrollable>
   );
-};
+});
+
+ModelListWrapper.displayName = 'ModelListWrapper';

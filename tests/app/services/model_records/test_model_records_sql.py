@@ -40,7 +40,7 @@ def store(
     config._root = datadir
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
-    return ModelRecordServiceSQL(db)
+    return ModelRecordServiceSQL(db, logger)
 
 
 def example_ti_config(key: Optional[str] = None) -> TextualInversionFileConfig:

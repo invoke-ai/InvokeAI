@@ -1,26 +1,40 @@
 /* eslint-disable no-console */
 import fs from 'node:fs';
 
-import openapiTS from 'openapi-typescript';
+import openapiTS, { astToString } from 'openapi-typescript';
+import ts from 'typescript';
 
 const OPENAPI_URL = 'http://127.0.0.1:9090/openapi.json';
 const OUTPUT_FILE = 'src/services/api/schema.ts';
 
 async function generateTypes(schema) {
   process.stdout.write(`Generating types ${OUTPUT_FILE}...`);
+
+  // Use https://ts-ast-viewer.com to figure out how to create these AST nodes - define a type and use the bottom-left pane's output
+  // `Blob` type
+  const BLOB = ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Blob'));
+  // `null` type
+  const NULL = ts.factory.createLiteralTypeNode(ts.factory.createNull());
+  // `Record<string, unknown>` type
+  const RECORD_STRING_UNKNOWN = ts.factory.createTypeReferenceNode(ts.factory.createIdentifier('Record'), [
+    ts.factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword),
+    ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword),
+  ]);
+
   const types = await openapiTS(schema, {
     exportType: true,
     transform: (schemaObject) => {
       if ('format' in schemaObject && schemaObject.format === 'binary') {
-        return schemaObject.nullable ? 'Blob | null' : 'Blob';
+        return schemaObject.nullable ? ts.factory.createUnionTypeNode([BLOB, NULL]) : BLOB;
       }
       if (schemaObject.title === 'MetadataField') {
         // This is `Record<string, never>` by default, but it actually accepts any a dict of any valid JSON value.
-        return 'Record<string, unknown>';
+        return RECORD_STRING_UNKNOWN;
       }
     },
+    defaultNonNullable: false,
   });
-  fs.writeFileSync(OUTPUT_FILE, types);
+  fs.writeFileSync(OUTPUT_FILE, astToString(types));
   process.stdout.write(`\nOK!\r\n`);
 }
 

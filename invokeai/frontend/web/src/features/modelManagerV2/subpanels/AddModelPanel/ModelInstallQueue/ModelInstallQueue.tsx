@@ -2,12 +2,12 @@ import { Box, Button, Flex, Heading } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useListModelInstallsQuery, usePruneCompletedModelInstallsMutation } from 'services/api/endpoints/models';
 
 import { ModelInstallQueueItem } from './ModelInstallQueueItem';
 
-export const ModelInstallQueue = () => {
+export const ModelInstallQueue = memo(() => {
   const { data } = useListModelInstallsQuery();
 
   const [_pruneCompletedModelInstalls] = usePruneCompletedModelInstallsMutation();
@@ -61,4 +61,6 @@ export const ModelInstallQueue = () => {
       </Box>
     </Flex>
   );
-};
+});
+
+ModelInstallQueue.displayName = 'ModelInstallQueue';

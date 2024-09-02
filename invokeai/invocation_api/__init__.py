@@ -11,9 +11,9 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.constants import SCHEDULER_NAME_VALUES
 from invokeai.app.invocations.fields import (
     BoardField,
+    BoundingBoxField,
     ColorField,
     ConditioningField,
     DenoiseMaskField,
@@ -47,6 +47,7 @@ from invokeai.app.invocations.model import (
 from invokeai.app.invocations.primitives import (
     BooleanCollectionOutput,
     BooleanOutput,
+    BoundingBoxOutput,
     ColorCollectionOutput,
     ColorOutput,
     ConditioningCollectionOutput,
@@ -78,6 +79,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     SDXLConditioningInfo,
 )
+from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import CPU_DEVICE, CUDA_DEVICE, MPS_DEVICE, choose_precision, choose_torch_device
 from invokeai.version import __version__
 
@@ -92,6 +94,7 @@ __all__ = [
     "InvocationContext",
     # invokeai.app.invocations.fields
     "BoardField",
+    "BoundingBoxField",
     "ColorField",
     "ConditioningField",
     "DenoiseMaskField",
@@ -128,6 +131,7 @@ __all__ = [
     # invokeai.app.invocations.primitives
     "BooleanCollectionOutput",
     "BooleanOutput",
+    "BoundingBoxOutput",
     "ColorCollectionOutput",
     "ColorOutput",
     "ConditioningCollectionOutput",
@@ -163,7 +167,7 @@ __all__ = [
     "BaseModelType",
     "ModelType",
     "SubModelType",
-    # invokeai.app.invocations.constants
+    # invokeai.backend.stable_diffusion.schedulers.schedulers
     "SCHEDULER_NAME_VALUES",
     # invokeai.version
     "__version__",

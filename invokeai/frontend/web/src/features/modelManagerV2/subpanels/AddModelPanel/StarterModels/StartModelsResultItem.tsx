@@ -1,36 +1,57 @@
 import { Badge, Box, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
+import type { AnyModelConfig } from 'services/api/types';
 
 type Props = {
   result: GetStarterModelsResponse[number];
+  modelList: AnyModelConfig[];
 };
-export const StarterModelsResultItem = ({ result }: Props) => {
+export const StarterModelsResultItem = memo(({ result, modelList }: Props) => {
   const { t } = useTranslation();
   const allSources = useMemo(() => {
-    const _allSources = [result.source];
+    const _allSources = [
+      {
+        source: result.source,
+        config: {
+          name: result.name,
+          description: result.description,
+          type: result.type,
+          base: result.base,
+          format: result.format,
+        },
+      },
+    ];
     if (result.dependencies) {
-      _allSources.push(...result.dependencies.map((d) => d.source));
+      for (const d of result.dependencies) {
+        _allSources.push({
+          source: d.source,
+          config: { name: d.name, description: d.description, type: d.type, base: d.base, format: d.format },
+        });
+      }
     }
     return _allSources;
   }, [result]);
   const [installModel] = useInstallModel();
 
   const onClick = useCallback(() => {
-    for (const source of allSources) {
-      installModel({ source });
+    for (const { config, source } of allSources) {
+      if (modelList.some((mc) => config.base === mc.base && config.name === mc.name && config.type === mc.type)) {
+        continue;
+      }
+      installModel({ config, source });
     }
-  }, [allSources, installModel]);
+  }, [modelList, allSources, installModel]);
 
   return (
     <Flex alignItems="center" justifyContent="space-between" w="100%" gap={3}>
       <Flex fontSize="sm" flexDir="column">
         <Flex gap={3}>
-          <Badge h="min-content">{result.type.replace('_', ' ')}</Badge>
+          <Badge h="min-content">{result.type.replaceAll('_', ' ')}</Badge>
           <ModelBaseBadge base={result.base} />
           <Text fontWeight="semibold">{result.name}</Text>
         </Flex>
@@ -45,4 +66,6 @@ export const StarterModelsResultItem = ({ result }: Props) => {
       </Box>
     </Flex>
   );
-};
+});
+
+StarterModelsResultItem.displayName = 'StarterModelsResultItem';

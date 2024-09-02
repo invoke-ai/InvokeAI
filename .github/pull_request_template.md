@@ -8,7 +8,7 @@
 
 ## QA Instructions
 
-<!--WHEN APPLICABLE: Describe how we can test the changes in this PR.-->
+<!--WHEN APPLICABLE: Describe how you have tested the changes in this PR. Provide enough detail that a reviewer can reproduce your tests.-->
 
 ## Merge Plan
 

@@ -160,10 +160,6 @@
             "title": "Restaurar Rostos",
             "desc": "Restaurar a imagem atual"
         },
-        "upscale": {
-            "title": "Redimensionar",
-            "desc": "Redimensionar a imagem atual"
-        },
         "showInfo": {
             "title": "Mostrar Informações",
             "desc": "Mostrar metadados de informações da imagem atual"
@@ -275,8 +271,6 @@
         "showOptionsPanel": "Mostrar Painel de Opções",
         "strength": "Força",
         "upscaling": "Redimensionando",
-        "upscale": "Redimensionar",
-        "upscaleImage": "Redimensionar Imagem",
         "scaleBeforeProcessing": "Escala Antes do Processamento",
         "images": "Imagems",
         "steps": "Passos",

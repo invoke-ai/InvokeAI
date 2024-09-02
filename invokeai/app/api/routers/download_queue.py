@@ -8,12 +8,11 @@ from fastapi.routing import APIRouter
 from pydantic.networks import AnyHttpUrl
 from starlette.exceptions import HTTPException
 
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.download import (
     DownloadJob,
     UnknownJobIDException,
 )
-
-from ..dependencies import ApiDependencies
 
 download_queue_router = APIRouter(prefix="/v1/download_queue", tags=["download_queue"])
 

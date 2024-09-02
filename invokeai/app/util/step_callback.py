@@ -5,9 +5,8 @@ from PIL import Image
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException, ProgressImage
 from invokeai.backend.model_manager.config import BaseModelType
-
-from ...backend.stable_diffusion import PipelineIntermediateState
-from ...backend.util.util import image_to_dataURL
+from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.util.util import image_to_dataURL
 
 if TYPE_CHECKING:
     from invokeai.app.services.events.events_base import EventServiceBase

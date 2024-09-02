@@ -14,6 +14,7 @@ import ParamMainModelSelect from 'features/parameters/components/MainModel/Param
 import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
+import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { filter } from 'lodash-es';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +27,7 @@ const formLabelProps: FormLabelProps = {
 export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const modelConfig = useSelectedModelConfig();
+  const activeTabName = useAppSelector(activeTabNameSelector);
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(selectLoraSlice, (lora) => {
@@ -42,8 +44,8 @@ export const GenerationSettingsAccordion = memo(() => {
     defaultIsOpen: false,
   });
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
-    id: 'generation-settings',
-    defaultIsOpen: true,
+    id: `generation-settings-${activeTabName}`,
+    defaultIsOpen: activeTabName !== 'upscaling',
   });
 
   return (

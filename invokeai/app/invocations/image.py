@@ -6,6 +6,7 @@ import cv2
 import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import (
     ColorField,
@@ -20,8 +21,6 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
-
-from .baseinvocation import BaseInvocation, Classification, invocation
 
 
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.1")

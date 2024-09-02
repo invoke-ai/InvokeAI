@@ -3,7 +3,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from pydantic.networks import AnyHttpUrl
 
@@ -12,7 +12,7 @@ from invokeai.app.services.download import DownloadQueueServiceBase
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
-from invokeai.app.services.model_records import ModelRecordServiceBase
+from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceBase
 from invokeai.backend.model_manager import AnyModelConfig
 
 
@@ -64,7 +64,7 @@ class ModelInstallServiceBase(ABC):
     def register_path(
         self,
         model_path: Union[Path, str],
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[ModelRecordChanges] = None,
     ) -> str:
         """
         Probe and register the model at model_path.
@@ -72,7 +72,7 @@ class ModelInstallServiceBase(ABC):
         This keeps the model in its current location.
 
         :param model_path: Filesystem Path to the model.
-        :param config: Dict of attributes that will override autoassigned values.
+        :param config: ModelRecordChanges object that will override autoassigned model record values.
         :returns id: The string ID of the registered model.
         """
 
@@ -92,7 +92,7 @@ class ModelInstallServiceBase(ABC):
     def install_path(
         self,
         model_path: Union[Path, str],
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[ModelRecordChanges] = None,
     ) -> str:
         """
         Probe, register and install the model in the models directory.
@@ -101,7 +101,7 @@ class ModelInstallServiceBase(ABC):
         the models directory handled by InvokeAI.
 
         :param model_path: Filesystem Path to the model.
-        :param config: Dict of attributes that will override autoassigned values.
+        :param config: ModelRecordChanges object that will override autoassigned model record values.
         :returns id: The string ID of the registered model.
         """
 
@@ -109,14 +109,14 @@ class ModelInstallServiceBase(ABC):
     def heuristic_import(
         self,
         source: str,
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[ModelRecordChanges] = None,
         access_token: Optional[str] = None,
         inplace: Optional[bool] = False,
     ) -> ModelInstallJob:
         r"""Install the indicated model using heuristics to interpret user intentions.
 
         :param source: String source
-        :param config: Optional dict. Any fields in this dict
+        :param config: Optional ModelRecordChanges object. Any fields in this object
          will override corresponding autoassigned probe fields in the
          model's config record as described in `import_model()`.
         :param access_token: Optional access token for remote sources.
@@ -147,7 +147,7 @@ class ModelInstallServiceBase(ABC):
     def import_model(
         self,
         source: ModelSource,
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[ModelRecordChanges] = None,
     ) -> ModelInstallJob:
         """Install the indicated model.
 

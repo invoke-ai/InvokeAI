@@ -1,8 +1,7 @@
 from typing import Optional
 
+from invokeai.app.services.board_images.board_images_base import BoardImagesServiceABC
 from invokeai.app.services.invoker import Invoker
-
-from .board_images_base import BoardImagesServiceABC
 
 
 class BoardImagesService(BoardImagesServiceABC):

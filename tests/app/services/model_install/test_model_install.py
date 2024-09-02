@@ -18,6 +18,7 @@ from invokeai.app.services.events.events_common import (
     ModelInstallDownloadProgressEvent,
     ModelInstallDownloadsCompleteEvent,
     ModelInstallDownloadStartedEvent,
+    ModelInstallErrorEvent,
     ModelInstallStartedEvent,
 )
 from invokeai.app.services.model_install import (
@@ -71,14 +72,16 @@ def test_registration_meta(mm2_installer: ModelInstallServiceBase, embedding_fil
 def test_registration_meta_override_fail(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     key = None
     with pytest.raises((ValidationError, InvalidModelConfigException)):
-        key = mm2_installer.register_path(embedding_file, {"name": "banana_sushi", "type": ModelType("lora")})
+        key = mm2_installer.register_path(
+            embedding_file, ModelRecordChanges(name="banana_sushi", type=ModelType("lora"))
+        )
     assert key is None
 
 
 def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBase, embedding_file: Path) -> None:
     store = mm2_installer.record_store
     key = mm2_installer.register_path(
-        embedding_file, {"name": "banana_sushi", "source": "fake/repo_id", "key": "xyzzy"}
+        embedding_file, ModelRecordChanges(name="banana_sushi", source="fake/repo_id", key="xyzzy")
     )
     model_record = store.get_model(key)
     assert model_record.name == "banana_sushi"
@@ -130,7 +133,7 @@ def test_background_install(
     path: Path = request.getfixturevalue(fixture_name)
     description = "Test of metadata assignment"
     source = LocalModelSource(path=path, inplace=False)
-    job = mm2_installer.import_model(source, config={"description": description})
+    job = mm2_installer.import_model(source, config=ModelRecordChanges(description=description))
     assert job is not None
     assert isinstance(job, ModelInstallJob)
 
@@ -339,7 +342,13 @@ def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: In
     assert job.error_type == "HTTPError"
     assert job.error
     assert "NOT FOUND" in job.error
+    assert job.error_traceback is not None
     assert job.error_traceback.startswith("Traceback")
+    bus = mm2_installer.event_bus
+    assert bus is not None
+    assert hasattr(bus, "events")  # the dummyeventservice has this
+    event_types = [type(x) for x in bus.events]
+    assert ModelInstallErrorEvent in event_types
 
 
 def test_other_error_during_install(

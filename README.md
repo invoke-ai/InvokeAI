@@ -49,6 +49,33 @@ Invoke is available in two editions:
 
 More detail, including hardware requirements and manual install instructions, are available in the [installation documentation][installation docs].
 
+## Docker Container
+
+We publish official container images in Github Container Registry: https://github.com/invoke-ai/InvokeAI/pkgs/container/invokeai. Both CUDA and ROCm images are available. Check the above link for relevant tags.
+
+> [!IMPORTANT]
+> Ensure that Docker is set up to use the GPU. Refer to [NVIDIA][nvidia docker docs] or [AMD][amd docker docs] documentation.
+
+### Generate!
+
+Run the container, modifying the command as necessary:
+
+```bash
+docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai
+```
+
+Then open `http://localhost:9090` and install some models using the Model Manager tab to begin generating.
+
+For ROCm, add `--device /dev/kfd --device /dev/dri` to the `docker run` command.
+
+### Persist your data
+
+You will likely want to persist your workspace outside of the container. Use the `--volume /home/myuser/invokeai:/invokeai` flag to mount some local directory (using its **absolute** path) to the `/invokeai` path inside the container. Your generated images and models will reside there. You can use this directory with other InvokeAI installations, or switch between runtime directories as needed.
+
+### DIY
+
+Build your own image and customize the environment to match your needs using our `docker-compose` stack. See [README.md](./docker/README.md) in the [docker](./docker) directory.
+
 ## Troubleshooting, FAQ and Support
 
 Please review our [FAQ][faq] for solutions to common installation problems and other issues.
@@ -126,3 +153,5 @@ Original portions of the software are Copyright © 2024 by respective contributo
 [latest release link]: https://github.com/invoke-ai/InvokeAI/releases/latest
 [translation status badge]: https://hosted.weblate.org/widgets/invokeai/-/svg-badge.svg
 [translation status link]: https://hosted.weblate.org/engage/invokeai/
+[nvidia docker docs]: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+[amd docker docs]: https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html

@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecord
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-
-from .board_records_common import BoardChanges, BoardRecord
 
 
 class BoardRecordStorageBase(ABC):

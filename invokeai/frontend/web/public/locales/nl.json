@@ -97,7 +97,6 @@
         "noImagesInGallery": "Geen afbeeldingen om te tonen",
         "deleteImage_one": "Verwijder afbeelding",
         "deleteImage_other": "",
-        "deleteImageBin": "Verwijderde afbeeldingen worden naar de prullenbak van je besturingssysteem gestuurd.",
         "deleteImagePermanent": "Verwijderde afbeeldingen kunnen niet worden hersteld.",
         "assets": "Eigen onderdelen",
         "autoAssignBoardOnClick": "Ken automatisch bord toe bij klikken",
@@ -167,10 +166,6 @@
         "restoreFaces": {
             "title": "Herstel gezichten",
             "desc": "Herstelt de huidige afbeelding"
-        },
-        "upscale": {
-            "title": "Schaal op",
-            "desc": "Schaalt de huidige afbeelding op"
         },
         "showInfo": {
             "title": "Toon info",
@@ -412,8 +407,6 @@
         "type": "Soort",
         "strength": "Sterkte",
         "upscaling": "Opschalen",
-        "upscale": "Vergroot (Shift + U)",
-        "upscaleImage": "Schaal afbeelding op",
         "scale": "Schaal",
         "imageFit": "Pas initiële afbeelding in uitvoergrootte",
         "scaleBeforeProcessing": "Schalen voor verwerking",
@@ -472,10 +465,6 @@
                 "ipAdapterNoModelSelected": "geen IP-adapter geselecteerd"
             },
             "imageNotProcessedForControlAdapter": "De afbeelding van controle-adapter #{{number}} is niet verwerkt"
-        },
-        "isAllowedToUpscale": {
-            "useX2Model": "Afbeelding is te groot om te vergroten met het x4-model. Gebruik hiervoor het x2-model",
-            "tooLarge": "Afbeelding is te groot om te vergoten. Kies een kleinere afbeelding"
         },
         "patchmatchDownScaleSize": "Verklein",
         "useCpuNoise": "Gebruik CPU-ruis",

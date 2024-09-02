@@ -27,8 +27,7 @@ from invokeai.app.services.shared.graph import (
     NodeNotFoundError,
     are_connections_compatible,
 )
-
-from .test_nodes import (
+from tests.test_nodes import (
     AnyTypeTestInvocation,
     ImageToImageTestInvocation,
     ListPassThroughInvocation,

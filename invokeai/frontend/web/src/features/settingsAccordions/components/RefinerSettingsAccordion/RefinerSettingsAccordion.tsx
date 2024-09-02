@@ -62,7 +62,7 @@ const RefinerSettingsAccordionContent: React.FC = memo(() => {
 
   return (
     <FormControlGroup isDisabled={!isRefinerModelSelected}>
-      <Flex p={4} gap={4} flexDir="column">
+      <Flex p={4} gap={4} flexDir="column" minW={0}>
         <ParamSDXLRefinerModelSelect />
         <FormControlGroup formLabelProps={stepsScaleLabelProps} isDisabled={!isRefinerModelSelected}>
           <ParamSDXLRefinerScheduler />

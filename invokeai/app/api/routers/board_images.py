@@ -2,7 +2,7 @@ from fastapi import Body, HTTPException
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
-from ..dependencies import ApiDependencies
+from invokeai.app.api.dependencies import ApiDependencies
 
 board_images_router = APIRouter(prefix="/v1/board_images", tags=["boards"])
 

@@ -2,7 +2,7 @@
   "name": "Face Detailer with IP-Adapter & Canny (See Note in Details)",
   "author": "kosmoskatten",
   "description": "A workflow to add detail to and improve faces. This workflow is most effective when used with a model that creates realistic outputs. ",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "contact": "invoke@invoke.ai",
   "tags": "face detailer, IP-Adapter, Canny",
   "notes": "Set this image as the blur mask: https://i.imgur.com/Gxi61zP.png",
@@ -37,16 +37,219 @@
     }
   ],
   "meta": {
-    "category": "default",
-    "version": "3.0.0"
+    "version": "3.0.0",
+    "category": "default"
   },
   "nodes": [
     {
-      "id": "44f2c190-eb03-460d-8d11-a94d13b33f19",
+      "id": "c6359181-6479-40ec-bf3a-b7e8451683b8",
       "type": "invocation",
       "data": {
-        "id": "44f2c190-eb03-460d-8d11-a94d13b33f19",
-        "version": "1.1.1",
+        "id": "c6359181-6479-40ec-bf3a-b7e8451683b8",
+        "version": "1.0.3",
+        "label": "",
+        "notes": "",
+        "type": "main_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 2031.5518710051792,
+        "y": -492.1742944307074
+      }
+    },
+    {
+      "id": "8fe598c6-d447-44fa-a165-4975af77d080",
+      "type": "invocation",
+      "data": {
+        "id": "8fe598c6-d447-44fa-a165-4975af77d080",
+        "version": "1.3.3",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "canny_image_processor",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "detect_resolution": {
+            "name": "detect_resolution",
+            "label": "",
+            "value": 512
+          },
+          "image_resolution": {
+            "name": "image_resolution",
+            "label": "",
+            "value": 512
+          },
+          "low_threshold": {
+            "name": "low_threshold",
+            "label": "",
+            "value": 100
+          },
+          "high_threshold": {
+            "name": "high_threshold",
+            "label": "",
+            "value": 200
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 3519.4131037388597,
+        "y": 576.7946795840575
+      }
+    },
+    {
+      "id": "f60b6161-8f26-42f6-89ff-545e6011e501",
+      "type": "invocation",
+      "data": {
+        "id": "f60b6161-8f26-42f6-89ff-545e6011e501",
+        "version": "1.1.2",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "controlnet",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "control_model": {
+            "name": "control_model",
+            "label": "Control Model (select canny)",
+            "value": {
+              "key": "5bdaacf7-a7a3-4fb8-b394-cc0ffbb8941d",
+              "hash": "blake3:260c7f8e10aefea9868cfc68d89970e91033bd37132b14b903e70ee05ebf530e",
+              "name": "sd-controlnet-canny",
+              "base": "sd-1",
+              "type": "controlnet"
+            }
+          },
+          "control_weight": {
+            "name": "control_weight",
+            "label": "",
+            "value": 0.5
+          },
+          "begin_step_percent": {
+            "name": "begin_step_percent",
+            "label": "",
+            "value": 0
+          },
+          "end_step_percent": {
+            "name": "end_step_percent",
+            "label": "",
+            "value": 0.5
+          },
+          "control_mode": {
+            "name": "control_mode",
+            "label": "",
+            "value": "balanced"
+          },
+          "resize_mode": {
+            "name": "resize_mode",
+            "label": "",
+            "value": "just_resize"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 3950,
+        "y": 150
+      }
+    },
+    {
+      "id": "22b750db-b85e-486b-b278-ac983e329813",
+      "type": "invocation",
+      "data": {
+        "id": "22b750db-b85e-486b-b278-ac983e329813",
+        "version": "1.4.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "ip_adapter",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "ip_adapter_model": {
+            "name": "ip_adapter_model",
+            "label": "IP-Adapter Model (select IP Adapter Face)",
+            "value": {
+              "key": "1cc210bb-4d0a-4312-b36c-b5d46c43768e",
+              "hash": "blake3:3d669dffa7471b357b4df088b99ffb6bf4d4383d5e0ef1de5ec1c89728a3d5a5",
+              "name": "ip_adapter_sd15",
+              "base": "sd-1",
+              "type": "ip_adapter"
+            }
+          },
+          "clip_vision_model": {
+            "name": "clip_vision_model",
+            "label": "",
+            "value": "ViT-H"
+          },
+          "weight": {
+            "name": "weight",
+            "label": "",
+            "value": 0.5
+          },
+          "method": {
+            "name": "method",
+            "label": "",
+            "value": "full"
+          },
+          "begin_step_percent": {
+            "name": "begin_step_percent",
+            "label": "",
+            "value": 0
+          },
+          "end_step_percent": {
+            "name": "end_step_percent",
+            "label": "",
+            "value": 0.8
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 3575,
+        "y": -200
+      }
+    },
+    {
+      "id": "f4d15b64-c4a6-42a5-90fc-e4ed07a0ca65",
+      "type": "invocation",
+      "data": {
+        "id": "f4d15b64-c4a6-42a5-90fc-e4ed07a0ca65",
+        "version": "1.2.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -59,6 +262,140 @@
           },
           "clip": {
             "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 2550,
+        "y": -525
+      }
+    },
+    {
+      "id": "2224ed72-2453-4252-bd89-3085240e0b6f",
+      "type": "invocation",
+      "data": {
+        "id": "2224ed72-2453-4252-bd89-3085240e0b6f",
+        "version": "1.3.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "l2i",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "value": 0
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": true
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true
+      },
+      "position": {
+        "x": 4980.1395106966565,
+        "y": -255.9158921745602
+      }
+    },
+    {
+      "id": "de8b1a48-a2e4-42ca-90bb-66058bffd534",
+      "type": "invocation",
+      "data": {
+        "id": "de8b1a48-a2e4-42ca-90bb-66058bffd534",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "i2l",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "value": 0
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": true
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 3100,
+        "y": -275
+      }
+    },
+    {
+      "id": "44f2c190-eb03-460d-8d11-a94d13b33f19",
+      "type": "invocation",
+      "data": {
+        "id": "44f2c190-eb03-460d-8d11-a94d13b33f19",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "compel",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "value": ""
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
             "label": ""
           }
         },
@@ -252,45 +589,6 @@
       }
     },
     {
-      "id": "de8b1a48-a2e4-42ca-90bb-66058bffd534",
-      "type": "invocation",
-      "data": {
-        "id": "de8b1a48-a2e4-42ca-90bb-66058bffd534",
-        "version": "1.0.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "i2l",
-        "inputs": {
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          },
-          "tiled": {
-            "name": "tiled",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "name": "fp32",
-            "label": "",
-            "value": true
-          }
-        },
-        "isOpen": false,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 3100,
-        "y": -275
-      }
-    },
-    {
       "id": "bd06261d-a74a-4d1f-8374-745ed6194bc2",
       "type": "invocation",
       "data": {
@@ -416,53 +714,6 @@
       "position": {
         "x": 4025,
         "y": -175
-      }
-    },
-    {
-      "id": "2224ed72-2453-4252-bd89-3085240e0b6f",
-      "type": "invocation",
-      "data": {
-        "id": "2224ed72-2453-4252-bd89-3085240e0b6f",
-        "version": "1.2.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "l2i",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "latents": {
-            "name": "latents",
-            "label": ""
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          },
-          "tiled": {
-            "name": "tiled",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "name": "fp32",
-            "label": "",
-            "value": true
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": false,
-        "useCache": true
-      },
-      "position": {
-        "x": 4980.1395106966565,
-        "y": -255.9158921745602
       }
     },
     {
@@ -693,201 +944,6 @@
       }
     },
     {
-      "id": "f4d15b64-c4a6-42a5-90fc-e4ed07a0ca65",
-      "type": "invocation",
-      "data": {
-        "id": "f4d15b64-c4a6-42a5-90fc-e4ed07a0ca65",
-        "version": "1.1.1",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "compel",
-        "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "",
-            "value": ""
-          },
-          "clip": {
-            "name": "clip",
-            "label": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 2550,
-        "y": -525
-      }
-    },
-    {
-      "id": "22b750db-b85e-486b-b278-ac983e329813",
-      "type": "invocation",
-      "data": {
-        "id": "22b750db-b85e-486b-b278-ac983e329813",
-        "version": "1.2.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "ip_adapter",
-        "inputs": {
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "ip_adapter_model": {
-            "name": "ip_adapter_model",
-            "label": "IP-Adapter Model (select IP Adapter Face)",
-            "value": {
-              "key": "1cc210bb-4d0a-4312-b36c-b5d46c43768e",
-              "hash": "blake3:3d669dffa7471b357b4df088b99ffb6bf4d4383d5e0ef1de5ec1c89728a3d5a5",
-              "name": "ip_adapter_sd15",
-              "base": "sd-1",
-              "type": "ip_adapter"
-            }
-          },
-          "weight": {
-            "name": "weight",
-            "label": "",
-            "value": 0.5
-          },
-          "begin_step_percent": {
-            "name": "begin_step_percent",
-            "label": "",
-            "value": 0
-          },
-          "end_step_percent": {
-            "name": "end_step_percent",
-            "label": "",
-            "value": 0.8
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 3575,
-        "y": -200
-      }
-    },
-    {
-      "id": "f60b6161-8f26-42f6-89ff-545e6011e501",
-      "type": "invocation",
-      "data": {
-        "id": "f60b6161-8f26-42f6-89ff-545e6011e501",
-        "version": "1.1.1",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "controlnet",
-        "inputs": {
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "control_model": {
-            "name": "control_model",
-            "label": "Control Model (select canny)",
-            "value": {
-              "key": "5bdaacf7-a7a3-4fb8-b394-cc0ffbb8941d",
-              "hash": "blake3:260c7f8e10aefea9868cfc68d89970e91033bd37132b14b903e70ee05ebf530e",
-              "name": "sd-controlnet-canny",
-              "base": "sd-1",
-              "type": "controlnet"
-            }
-          },
-          "control_weight": {
-            "name": "control_weight",
-            "label": "",
-            "value": 0.5
-          },
-          "begin_step_percent": {
-            "name": "begin_step_percent",
-            "label": "",
-            "value": 0
-          },
-          "end_step_percent": {
-            "name": "end_step_percent",
-            "label": "",
-            "value": 0.5
-          },
-          "control_mode": {
-            "name": "control_mode",
-            "label": "",
-            "value": "balanced"
-          },
-          "resize_mode": {
-            "name": "resize_mode",
-            "label": "",
-            "value": "just_resize"
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 3950,
-        "y": 150
-      }
-    },
-    {
-      "id": "8fe598c6-d447-44fa-a165-4975af77d080",
-      "type": "invocation",
-      "data": {
-        "id": "8fe598c6-d447-44fa-a165-4975af77d080",
-        "version": "1.3.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "canny_image_processor",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "detect_resolution": {
-            "name": "detect_resolution",
-            "label": "",
-            "value": 512
-          },
-          "image_resolution": {
-            "name": "image_resolution",
-            "label": "",
-            "value": 512
-          },
-          "low_threshold": {
-            "name": "low_threshold",
-            "label": "",
-            "value": 100
-          },
-          "high_threshold": {
-            "name": "high_threshold",
-            "label": "",
-            "value": 200
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 3519.4131037388597,
-        "y": 576.7946795840575
-      }
-    },
-    {
       "id": "4bd4ae80-567f-4366-b8c6-3bb06f4fb46a",
       "type": "invocation",
       "data": {
@@ -1034,30 +1090,6 @@
       "position": {
         "x": 2578.2364832140506,
         "y": 78.7948456497351
-      }
-    },
-    {
-      "id": "c6359181-6479-40ec-bf3a-b7e8451683b8",
-      "type": "invocation",
-      "data": {
-        "id": "c6359181-6479-40ec-bf3a-b7e8451683b8",
-        "version": "1.0.2",
-        "label": "",
-        "notes": "",
-        "type": "main_model_loader",
-        "inputs": {
-          "model": {
-            "name": "model",
-            "label": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 2031.5518710051792,
-        "y": -492.1742944307074
       }
     }
   ],

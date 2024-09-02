@@ -10,13 +10,12 @@ from fastapi import Body
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.invocations.upscale import ESRGAN_MODELS
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.util.logging import logging
 from invokeai.version import __version__
-
-from ..dependencies import ApiDependencies
 
 
 class LogLevel(int, Enum):

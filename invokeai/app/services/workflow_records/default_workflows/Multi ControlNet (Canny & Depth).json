@@ -2,7 +2,7 @@
   "name": "Multi ControlNet (Canny & Depth)",
   "author": "InvokeAI",
   "description": "A sample workflow using canny & depth ControlNets to guide the generation process. ",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "contact": "invoke@invoke.ai",
   "tags": "ControlNet, canny, depth",
   "notes": "",
@@ -37,140 +37,104 @@
     }
   ],
   "meta": {
-    "category": "default",
-    "version": "3.0.0"
+    "version": "3.0.0",
+    "category": "default"
   },
   "nodes": [
     {
-      "id": "8e860e51-5045-456e-bf04-9a62a2a5c49e",
+      "id": "9db25398-c869-4a63-8815-c6559341ef12",
       "type": "invocation",
       "data": {
-        "id": "8e860e51-5045-456e-bf04-9a62a2a5c49e",
-        "version": "1.0.2",
+        "id": "9db25398-c869-4a63-8815-c6559341ef12",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
-        "type": "image",
+        "type": "l2i",
         "inputs": {
-          "image": {
-            "name": "image",
-            "label": "Depth Input Image"
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 3666.135718057363,
-        "y": 186.66887319822808
-      }
-    },
-    {
-      "id": "a33199c2-8340-401e-b8a2-42ffa875fc1c",
-      "type": "invocation",
-      "data": {
-        "id": "a33199c2-8340-401e-b8a2-42ffa875fc1c",
-        "version": "1.1.1",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "controlnet",
-        "inputs": {
-          "image": {
-            "name": "image",
+          "board": {
+            "name": "board",
             "label": ""
           },
-          "control_model": {
-            "name": "control_model",
-            "label": "Control Model (select depth)",
-            "value": {
-              "key": "87e8855c-671f-4c9e-bbbb-8ed47ccb4aac",
-              "hash": "blake3:2550bf22a53942dfa28ab2fed9d10d80851112531f44d977168992edf9d0534c",
-              "name": "control_v11f1p_sd15_depth",
-              "base": "sd-1",
-              "type": "controlnet"
-            }
+          "metadata": {
+            "name": "metadata",
+            "label": ""
           },
-          "control_weight": {
-            "name": "control_weight",
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
             "label": "",
-            "value": 1
+            "value": false
           },
-          "begin_step_percent": {
-            "name": "begin_step_percent",
+          "tile_size": {
+            "name": "tile_size",
             "label": "",
             "value": 0
           },
-          "end_step_percent": {
-            "name": "end_step_percent",
+          "fp32": {
+            "name": "fp32",
             "label": "",
-            "value": 1
-          },
-          "control_mode": {
-            "name": "control_mode",
-            "label": "",
-            "value": "balanced"
-          },
-          "resize_mode": {
-            "name": "resize_mode",
-            "label": "",
-            "value": "just_resize"
+            "value": false
           }
         },
         "isOpen": true,
-        "isIntermediate": true,
+        "isIntermediate": false,
         "useCache": true
       },
       "position": {
-        "x": 4477.604342844504,
-        "y": -49.39005411272677
-      }
-    },
-    {
-      "id": "273e3f96-49ea-4dc5-9d5b-9660390f14e1",
-      "type": "invocation",
-      "data": {
-        "id": "273e3f96-49ea-4dc5-9d5b-9660390f14e1",
-        "version": "1.1.1",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "compel",
-        "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "Negative Prompt",
-            "value": ""
-          },
-          "clip": {
-            "name": "clip",
-            "label": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 4075,
+        "x": 5675,
         "y": -825
       }
     },
     {
-      "id": "54486974-835b-4d81-8f82-05f9f32ce9e9",
+      "id": "c826ba5e-9676-4475-b260-07b85e88753c",
       "type": "invocation",
       "data": {
-        "id": "54486974-835b-4d81-8f82-05f9f32ce9e9",
-        "version": "1.0.2",
+        "id": "c826ba5e-9676-4475-b260-07b85e88753c",
+        "version": "1.3.3",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
-        "type": "main_model_loader",
+        "type": "canny_image_processor",
         "inputs": {
-          "model": {
-            "name": "model",
+          "board": {
+            "name": "board",
             "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "detect_resolution": {
+            "name": "detect_resolution",
+            "label": "",
+            "value": 512
+          },
+          "image_resolution": {
+            "name": "image_resolution",
+            "label": "",
+            "value": 512
+          },
+          "low_threshold": {
+            "name": "low_threshold",
+            "label": "",
+            "value": 100
+          },
+          "high_threshold": {
+            "name": "high_threshold",
+            "label": "",
+            "value": 200
           }
         },
         "isOpen": true,
@@ -178,29 +142,52 @@
         "useCache": true
       },
       "position": {
-        "x": 3600,
-        "y": -1000
+        "x": 4095.757337055795,
+        "y": -455.63440891935863
       }
     },
     {
-      "id": "7ce68934-3419-42d4-ac70-82cfc9397306",
+      "id": "018b1214-c2af-43a7-9910-fb687c6726d7",
       "type": "invocation",
       "data": {
-        "id": "7ce68934-3419-42d4-ac70-82cfc9397306",
-        "version": "1.1.1",
+        "id": "018b1214-c2af-43a7-9910-fb687c6726d7",
+        "version": "1.2.4",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
-        "type": "compel",
+        "type": "midas_depth_image_processor",
         "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "Positive Prompt",
-            "value": ""
-          },
-          "clip": {
-            "name": "clip",
+          "board": {
+            "name": "board",
             "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "a_mult": {
+            "name": "a_mult",
+            "label": "",
+            "value": 2
+          },
+          "bg_th": {
+            "name": "bg_th",
+            "label": "",
+            "value": 0.1
+          },
+          "detect_resolution": {
+            "name": "detect_resolution",
+            "label": "",
+            "value": 512
+          },
+          "image_resolution": {
+            "name": "image_resolution",
+            "label": "",
+            "value": 512
           }
         },
         "isOpen": true,
@@ -208,8 +195,8 @@
         "useCache": true
       },
       "position": {
-        "x": 4075,
-        "y": -1125
+        "x": 4082.783145980783,
+        "y": 0.01629251229994111
       }
     },
     {
@@ -217,7 +204,7 @@
       "type": "invocation",
       "data": {
         "id": "d204d184-f209-4fae-a0a1-d152800844e1",
-        "version": "1.1.1",
+        "version": "1.1.2",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -274,6 +261,185 @@
       }
     },
     {
+      "id": "7ce68934-3419-42d4-ac70-82cfc9397306",
+      "type": "invocation",
+      "data": {
+        "id": "7ce68934-3419-42d4-ac70-82cfc9397306",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "compel",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Positive Prompt",
+            "value": ""
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 4075,
+        "y": -1125
+      }
+    },
+    {
+      "id": "54486974-835b-4d81-8f82-05f9f32ce9e9",
+      "type": "invocation",
+      "data": {
+        "id": "54486974-835b-4d81-8f82-05f9f32ce9e9",
+        "version": "1.0.3",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "main_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 3600,
+        "y": -1000
+      }
+    },
+    {
+      "id": "273e3f96-49ea-4dc5-9d5b-9660390f14e1",
+      "type": "invocation",
+      "data": {
+        "id": "273e3f96-49ea-4dc5-9d5b-9660390f14e1",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "compel",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Negative Prompt",
+            "value": ""
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 4075,
+        "y": -825
+      }
+    },
+    {
+      "id": "a33199c2-8340-401e-b8a2-42ffa875fc1c",
+      "type": "invocation",
+      "data": {
+        "id": "a33199c2-8340-401e-b8a2-42ffa875fc1c",
+        "version": "1.1.2",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "controlnet",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "control_model": {
+            "name": "control_model",
+            "label": "Control Model (select depth)",
+            "value": {
+              "key": "87e8855c-671f-4c9e-bbbb-8ed47ccb4aac",
+              "hash": "blake3:2550bf22a53942dfa28ab2fed9d10d80851112531f44d977168992edf9d0534c",
+              "name": "control_v11f1p_sd15_depth",
+              "base": "sd-1",
+              "type": "controlnet"
+            }
+          },
+          "control_weight": {
+            "name": "control_weight",
+            "label": "",
+            "value": 1
+          },
+          "begin_step_percent": {
+            "name": "begin_step_percent",
+            "label": "",
+            "value": 0
+          },
+          "end_step_percent": {
+            "name": "end_step_percent",
+            "label": "",
+            "value": 1
+          },
+          "control_mode": {
+            "name": "control_mode",
+            "label": "",
+            "value": "balanced"
+          },
+          "resize_mode": {
+            "name": "resize_mode",
+            "label": "",
+            "value": "just_resize"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 4477.604342844504,
+        "y": -49.39005411272677
+      }
+    },
+    {
+      "id": "8e860e51-5045-456e-bf04-9a62a2a5c49e",
+      "type": "invocation",
+      "data": {
+        "id": "8e860e51-5045-456e-bf04-9a62a2a5c49e",
+        "version": "1.0.2",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "image",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": "Depth Input Image"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 3666.135718057363,
+        "y": 186.66887319822808
+      }
+    },
+    {
       "id": "c4b23e64-7986-40c4-9cad-46327b12e204",
       "type": "invocation",
       "data": {
@@ -320,159 +486,6 @@
       "position": {
         "x": 4875,
         "y": -575
-      }
-    },
-    {
-      "id": "018b1214-c2af-43a7-9910-fb687c6726d7",
-      "type": "invocation",
-      "data": {
-        "id": "018b1214-c2af-43a7-9910-fb687c6726d7",
-        "version": "1.2.3",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "midas_depth_image_processor",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "a_mult": {
-            "name": "a_mult",
-            "label": "",
-            "value": 2
-          },
-          "bg_th": {
-            "name": "bg_th",
-            "label": "",
-            "value": 0.1
-          },
-          "detect_resolution": {
-            "name": "detect_resolution",
-            "label": "",
-            "value": 512
-          },
-          "image_resolution": {
-            "name": "image_resolution",
-            "label": "",
-            "value": 512
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 4082.783145980783,
-        "y": 0.01629251229994111
-      }
-    },
-    {
-      "id": "c826ba5e-9676-4475-b260-07b85e88753c",
-      "type": "invocation",
-      "data": {
-        "id": "c826ba5e-9676-4475-b260-07b85e88753c",
-        "version": "1.3.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "canny_image_processor",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "image": {
-            "name": "image",
-            "label": ""
-          },
-          "detect_resolution": {
-            "name": "detect_resolution",
-            "label": "",
-            "value": 512
-          },
-          "image_resolution": {
-            "name": "image_resolution",
-            "label": "",
-            "value": 512
-          },
-          "low_threshold": {
-            "name": "low_threshold",
-            "label": "",
-            "value": 100
-          },
-          "high_threshold": {
-            "name": "high_threshold",
-            "label": "",
-            "value": 200
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 4095.757337055795,
-        "y": -455.63440891935863
-      }
-    },
-    {
-      "id": "9db25398-c869-4a63-8815-c6559341ef12",
-      "type": "invocation",
-      "data": {
-        "id": "9db25398-c869-4a63-8815-c6559341ef12",
-        "version": "1.2.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "l2i",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "latents": {
-            "name": "latents",
-            "label": ""
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          },
-          "tiled": {
-            "name": "tiled",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "name": "fp32",
-            "label": "",
-            "value": false
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": false,
-        "useCache": true
-      },
-      "position": {
-        "x": 5675,
-        "y": -825
       }
     },
     {

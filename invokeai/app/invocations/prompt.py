@@ -5,11 +5,10 @@ import numpy as np
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from pydantic import field_validator
 
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.fields import InputField, UIComponent
 from invokeai.app.invocations.primitives import StringCollectionOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-
-from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField, UIComponent
 
 
 @invocation(

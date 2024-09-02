@@ -7,9 +7,6 @@ from pathlib import Path
 
 from PIL import Image
 
-# actual size of a gig
-GIG = 1073741824
-
 
 def slugify(value: str, allow_unicode: bool = False) -> str:
     """

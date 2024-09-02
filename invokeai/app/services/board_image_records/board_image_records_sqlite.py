@@ -2,11 +2,10 @@ import sqlite3
 import threading
 from typing import Optional, cast
 
+from invokeai.app.services.board_image_records.board_image_records_base import BoardImageRecordStorageBase
 from invokeai.app.services.image_records.image_records_common import ImageRecord, deserialize_image_record
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-
-from .board_image_records_base import BoardImageRecordStorageBase
 
 
 class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):

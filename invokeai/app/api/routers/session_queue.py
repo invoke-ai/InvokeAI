@@ -4,6 +4,7 @@ from fastapi import Body, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
@@ -18,8 +19,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
-
-from ..dependencies import ApiDependencies
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 

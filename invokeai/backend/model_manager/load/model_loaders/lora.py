@@ -15,9 +15,9 @@ from invokeai.backend.model_manager import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
-
-from .. import ModelLoader, ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.Diffusers)

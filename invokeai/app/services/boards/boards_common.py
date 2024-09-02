@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import Field
 
-from ..board_records.board_records_common import BoardRecord
+from invokeai.app.services.board_records.board_records_common import BoardRecord
 
 
 class BoardDTO(BoardRecord):

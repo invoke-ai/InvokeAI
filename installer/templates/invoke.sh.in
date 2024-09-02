@@ -17,7 +17,7 @@
 set -eu
 
 # Ensure we're in the correct folder in case user's CWD is somewhere else
-scriptdir=$(dirname "$0")
+scriptdir=$(dirname $(readlink -f "$0"))
 cd "$scriptdir"
 
 . .venv/bin/activate

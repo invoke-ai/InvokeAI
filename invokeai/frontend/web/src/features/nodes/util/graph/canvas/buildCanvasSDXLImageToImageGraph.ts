@@ -16,7 +16,11 @@ import {
   SDXL_REFINER_SEAMLESS,
   SEAMLESS,
 } from 'features/nodes/util/graph/constants';
-import { getBoardField, getIsIntermediate, getSDXLStylePrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  getBoardField,
+  getIsIntermediate,
+  getPresetModifiedPrompts,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { ImageDTO, Invocation, NonNullableGraph } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
@@ -51,7 +55,6 @@ export const buildCanvasSDXLImageToImageGraph = async (
     seamlessYAxis,
     img2imgStrength: strength,
   } = state.generation;
-  const { positivePrompt, negativePrompt } = state.controlLayers.present;
 
   const { refinerModel, refinerStart } = state.sdxl;
 
@@ -75,7 +78,7 @@ export const buildCanvasSDXLImageToImageGraph = async (
   const use_cpu = shouldUseCpuNoise;
 
   // Construct Style Prompt
-  const { positiveStylePrompt, negativeStylePrompt } = getSDXLStylePrompts(state);
+  const { positivePrompt, negativePrompt, positiveStylePrompt, negativeStylePrompt } = getPresetModifiedPrompts(state);
 
   /**
    * The easiest way to build linear graphs is to do it in the node editor, then copy and paste the

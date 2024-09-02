@@ -24,8 +24,7 @@ from requests.sessions import Session
 from typing_extensions import Annotated
 
 from invokeai.backend.model_manager import ModelRepoVariant
-
-from ..util import select_hf_files
+from invokeai.backend.model_manager.util.select_hf_files import filter_files
 
 
 class UnknownMetadataException(Exception):
@@ -112,9 +111,7 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         session = session or Session()
         configure_http_backend(backend_factory=lambda: session)  # used in testing
 
-        paths = select_hf_files.filter_files(
-            [x.path for x in self.files], variant, subfolder
-        )  #  all files in the model
+        paths = filter_files([x.path for x in self.files], variant, subfolder)  #  all files in the model
         prefix = f"{subfolder}/" if subfolder else ""
         # the next step reads model_index.json to determine which subdirectories belong
         # to the model

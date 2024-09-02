@@ -2,7 +2,7 @@
   "name": "Prompt from File",
   "author": "InvokeAI",
   "description": "Sample workflow using Prompt from File node",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "contact": "invoke@invoke.ai",
   "tags": "text2image, prompt from file, default",
   "notes": "",
@@ -37,16 +37,68 @@
     }
   ],
   "meta": {
-    "category": "default",
-    "version": "3.0.0"
+    "version": "3.0.0",
+    "category": "default"
   },
   "nodes": [
     {
-      "id": "c2eaf1ba-5708-4679-9e15-945b8b432692",
+      "id": "491ec988-3c77-4c37-af8a-39a0c4e7a2a1",
       "type": "invocation",
       "data": {
-        "id": "c2eaf1ba-5708-4679-9e15-945b8b432692",
-        "version": "1.1.1",
+        "id": "491ec988-3c77-4c37-af8a-39a0c4e7a2a1",
+        "version": "1.3.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "l2i",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "value": 0
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": false
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 2037.861329274915,
+        "y": -329.8393457509562
+      }
+    },
+    {
+      "id": "fc9d0e35-a6de-4a19-84e1-c72497c823f6",
+      "type": "invocation",
+      "data": {
+        "id": "fc9d0e35-a6de-4a19-84e1-c72497c823f6",
+        "version": "1.2.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -59,6 +111,69 @@
           },
           "clip": {
             "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 925,
+        "y": -275
+      }
+    },
+    {
+      "id": "d6353b7f-b447-4e17-8f2e-80a88c91d426",
+      "type": "invocation",
+      "data": {
+        "id": "d6353b7f-b447-4e17-8f2e-80a88c91d426",
+        "version": "1.0.3",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "main_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": -375
+      }
+    },
+    {
+      "id": "c2eaf1ba-5708-4679-9e15-945b8b432692",
+      "type": "invocation",
+      "data": {
+        "id": "c2eaf1ba-5708-4679-9e15-945b8b432692",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "compel",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "value": ""
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
             "label": ""
           }
         },
@@ -142,61 +257,6 @@
       }
     },
     {
-      "id": "d6353b7f-b447-4e17-8f2e-80a88c91d426",
-      "type": "invocation",
-      "data": {
-        "id": "d6353b7f-b447-4e17-8f2e-80a88c91d426",
-        "version": "1.0.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "main_model_loader",
-        "inputs": {
-          "model": {
-            "name": "model",
-            "label": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 0,
-        "y": -375
-      }
-    },
-    {
-      "id": "fc9d0e35-a6de-4a19-84e1-c72497c823f6",
-      "type": "invocation",
-      "data": {
-        "id": "fc9d0e35-a6de-4a19-84e1-c72497c823f6",
-        "version": "1.1.1",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "compel",
-        "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "",
-            "value": ""
-          },
-          "clip": {
-            "name": "clip",
-            "label": ""
-          }
-        },
-        "isOpen": false,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 925,
-        "y": -275
-      }
-    },
-    {
       "id": "0eb5f3f5-1b91-49eb-9ef0-41d67c7eae77",
       "type": "invocation",
       "data": {
@@ -266,53 +326,6 @@
       "position": {
         "x": 925,
         "y": -50
-      }
-    },
-    {
-      "id": "491ec988-3c77-4c37-af8a-39a0c4e7a2a1",
-      "type": "invocation",
-      "data": {
-        "id": "491ec988-3c77-4c37-af8a-39a0c4e7a2a1",
-        "version": "1.2.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "l2i",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "latents": {
-            "name": "latents",
-            "label": ""
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          },
-          "tiled": {
-            "name": "tiled",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "name": "fp32",
-            "label": "",
-            "value": false
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 2037.861329274915,
-        "y": -329.8393457509562
       }
     },
     {

@@ -2,13 +2,14 @@ import re
 import traceback
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Set, Union
+from typing import Literal, Optional, Set, Union
 
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic.networks import AnyHttpUrl
 from typing_extensions import Annotated
 
 from invokeai.app.services.download import DownloadJob, MultiFileDownloadJob
+from invokeai.app.services.model_records import ModelRecordChanges
 from invokeai.backend.model_manager import AnyModelConfig, ModelRepoVariant
 from invokeai.backend.model_manager.config import ModelSourceType
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
@@ -102,7 +103,7 @@ class HFModelSource(StringLikeSource):
         if self.variant:
             base += f":{self.variant or ''}"
         if self.subfolder:
-            base += f":{self.subfolder}"
+            base += f"::{self.subfolder.as_posix()}"
         return base
 
 
@@ -133,8 +134,9 @@ class ModelInstallJob(BaseModel):
     id: int = Field(description="Unique ID for this job")
     status: InstallStatus = Field(default=InstallStatus.WAITING, description="Current status of install process")
     error_reason: Optional[str] = Field(default=None, description="Information about why the job failed")
-    config_in: Dict[str, Any] = Field(
-        default_factory=dict, description="Configuration information (e.g. 'description') to apply to model."
+    config_in: ModelRecordChanges = Field(
+        default_factory=ModelRecordChanges,
+        description="Configuration information (e.g. 'description') to apply to model.",
     )
     config_out: Optional[AnyModelConfig] = Field(
         default=None, description="After successful installation, this will hold the configuration object."

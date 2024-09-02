@@ -124,7 +124,7 @@ const Content = () => {
   }, [calculateNewLimit, container, dispatch]);
 
   return (
-    <Box position="relative" w="full" h="full">
+    <Box position="relative" w="full" h="full" mt={2}>
       <Box
         ref={containerRef}
         position="absolute"

@@ -29,12 +29,14 @@ const MODEL_FIELD_TYPES = [
   'ModelIdentifier',
   'MainModelField',
   'SDXLMainModelField',
+  'FluxMainModelField',
   'SDXLRefinerModelField',
   'VAEModelField',
   'LoRAModelField',
   'ControlNetModelField',
   'IPAdapterModelField',
   'T2IAdapterModelField',
+  'SpandrelImageToImageModelField',
 ];
 
 /**

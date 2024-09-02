@@ -25,9 +25,10 @@ import { nodesPersistConfig, nodesSlice, nodesUndoableConfig } from 'features/no
 import { workflowSettingsPersistConfig, workflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { workflowPersistConfig, workflowSlice } from 'features/nodes/store/workflowSlice';
 import { generationPersistConfig, generationSlice } from 'features/parameters/store/generationSlice';
-import { postprocessingPersistConfig, postprocessingSlice } from 'features/parameters/store/postprocessingSlice';
+import { upscalePersistConfig, upscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { queueSlice } from 'features/queue/store/queueSlice';
 import { sdxlPersistConfig, sdxlSlice } from 'features/sdxl/store/sdxlSlice';
+import { stylePresetPersistConfig, stylePresetSlice } from 'features/stylePresets/store/stylePresetSlice';
 import { configSlice } from 'features/system/store/configSlice';
 import { systemPersistConfig, systemSlice } from 'features/system/store/systemSlice';
 import { uiPersistConfig, uiSlice } from 'features/ui/store/uiSlice';
@@ -52,7 +53,6 @@ const allReducers = {
   [gallerySlice.name]: gallerySlice.reducer,
   [generationSlice.name]: generationSlice.reducer,
   [nodesSlice.name]: undoable(nodesSlice.reducer, nodesUndoableConfig),
-  [postprocessingSlice.name]: postprocessingSlice.reducer,
   [systemSlice.name]: systemSlice.reducer,
   [configSlice.name]: configSlice.reducer,
   [uiSlice.name]: uiSlice.reducer,
@@ -69,6 +69,8 @@ const allReducers = {
   [controlLayersSlice.name]: undoable(controlLayersSlice.reducer, controlLayersUndoableConfig),
   [workflowSettingsSlice.name]: workflowSettingsSlice.reducer,
   [api.reducerPath]: api.reducer,
+  [upscaleSlice.name]: upscaleSlice.reducer,
+  [stylePresetSlice.name]: stylePresetSlice.reducer,
 };
 
 const rootReducer = combineReducers(allReducers);
@@ -102,7 +104,6 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [galleryPersistConfig.name]: galleryPersistConfig,
   [generationPersistConfig.name]: generationPersistConfig,
   [nodesPersistConfig.name]: nodesPersistConfig,
-  [postprocessingPersistConfig.name]: postprocessingPersistConfig,
   [systemPersistConfig.name]: systemPersistConfig,
   [workflowPersistConfig.name]: workflowPersistConfig,
   [uiPersistConfig.name]: uiPersistConfig,
@@ -114,6 +115,8 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [hrfPersistConfig.name]: hrfPersistConfig,
   [controlLayersPersistConfig.name]: controlLayersPersistConfig,
   [workflowSettingsPersistConfig.name]: workflowSettingsPersistConfig,
+  [upscalePersistConfig.name]: upscalePersistConfig,
+  [stylePresetPersistConfig.name]: stylePresetPersistConfig,
 };
 
 const unserialize: UnserializeFunction = (data, key) => {
@@ -164,8 +167,8 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
-        serializableCheck: false,
-        immutableCheck: false,
+        serializableCheck: import.meta.env.MODE === 'development',
+        immutableCheck: import.meta.env.MODE === 'development',
       })
         .concat(api.middleware)
         .concat(dynamicMiddlewares)

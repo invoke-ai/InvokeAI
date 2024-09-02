@@ -5,12 +5,10 @@ import cv2 as cv
 import numpy
 from PIL import Image, ImageOps
 
-from invokeai.app.invocations.fields import ImageField
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.fields import ImageField, InputField, WithBoard, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-
-from .baseinvocation import BaseInvocation, invocation
-from .fields import InputField, WithBoard, WithMetadata
 
 
 @invocation("cv_inpaint", title="OpenCV Inpaint", tags=["opencv", "inpaint"], category="inpaint", version="1.3.1")

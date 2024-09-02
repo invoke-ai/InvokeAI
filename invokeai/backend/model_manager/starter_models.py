@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from invokeai.backend.model_manager.config import BaseModelType, ModelType
+from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType
 
 
 class StarterModelWithoutDependencies(BaseModel):
@@ -11,6 +11,7 @@ class StarterModelWithoutDependencies(BaseModel):
     name: str
     base: BaseModelType
     type: ModelType
+    format: Optional[ModelFormat] = None
     is_installed: bool = False
 
 
@@ -51,10 +52,76 @@ cyberrealistic_negative = StarterModel(
     type=ModelType.TextualInversion,
 )
 
+t5_base_encoder = StarterModel(
+    name="t5_base_encoder",
+    base=BaseModelType.Any,
+    source="InvokeAI/t5-v1_1-xxl::bfloat16",
+    description="T5-XXL text encoder (used in FLUX pipelines). ~8GB",
+    type=ModelType.T5Encoder,
+)
+
+t5_8b_quantized_encoder = StarterModel(
+    name="t5_bnb_int8_quantized_encoder",
+    base=BaseModelType.Any,
+    source="InvokeAI/t5-v1_1-xxl::bnb_llm_int8",
+    description="T5-XXL text encoder with bitsandbytes LLM.int8() quantization (used in FLUX pipelines). ~5GB",
+    type=ModelType.T5Encoder,
+    format=ModelFormat.BnbQuantizedLlmInt8b,
+)
+
+clip_l_encoder = StarterModel(
+    name="clip-vit-large-patch14",
+    base=BaseModelType.Any,
+    source="InvokeAI/clip-vit-large-patch14-text-encoder::bfloat16",
+    description="CLIP-L text encoder (used in FLUX pipelines). ~250MB",
+    type=ModelType.CLIPEmbed,
+)
+
+flux_vae = StarterModel(
+    name="FLUX.1-schnell_ae",
+    base=BaseModelType.Flux,
+    source="black-forest-labs/FLUX.1-schnell::ae.safetensors",
+    description="FLUX VAE compatible with both schnell and dev variants.",
+    type=ModelType.VAE,
+)
+
+
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
     # region: Main
+    StarterModel(
+        name="FLUX Schnell (Quantized)",
+        base=BaseModelType.Flux,
+        source="InvokeAI/flux_schnell::transformer/bnb_nf4/flux1-schnell-bnb_nf4.safetensors",
+        description="FLUX schnell transformer quantized to bitsandbytes NF4 format. Total size with dependencies: ~12GB",
+        type=ModelType.Main,
+        dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
+    ),
+    StarterModel(
+        name="FLUX Dev (Quantized)",
+        base=BaseModelType.Flux,
+        source="InvokeAI/flux_dev::transformer/bnb_nf4/flux1-dev-bnb_nf4.safetensors",
+        description="FLUX dev transformer quantized to bitsandbytes NF4 format. Total size with dependencies: ~12GB",
+        type=ModelType.Main,
+        dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
+    ),
+    StarterModel(
+        name="FLUX Schnell",
+        base=BaseModelType.Flux,
+        source="InvokeAI/flux_schnell::transformer/base/flux1-schnell.safetensors",
+        description="FLUX schnell transformer in bfloat16. Total size with dependencies: ~33GB",
+        type=ModelType.Main,
+        dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+    ),
+    StarterModel(
+        name="FLUX Dev",
+        base=BaseModelType.Flux,
+        source="InvokeAI/flux_dev::transformer/base/flux1-dev.safetensors",
+        description="FLUX dev transformer in bfloat16. Total size with dependencies: ~33GB",
+        type=ModelType.Main,
+        dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+    ),
     StarterModel(
         name="CyberRealistic v4.1",
         base=BaseModelType.StableDiffusion1,
@@ -125,6 +192,7 @@ STARTER_MODELS: list[StarterModel] = [
     # endregion
     # region VAE
     sdxl_fp16_vae_fix,
+    flux_vae,
     # endregion
     # region LoRA
     StarterModel(
@@ -187,157 +255,171 @@ STARTER_MODELS: list[StarterModel] = [
     # endregion
     # region ControlNet
     StarterModel(
-        name="QRCode Monster",
+        name="QRCode Monster v2 (SD1.5)",
         base=BaseModelType.StableDiffusion1,
-        source="monster-labs/control_v1p_sd15_qrcode_monster",
-        description="Controlnet model that generates scannable creative QR codes",
+        source="monster-labs/control_v1p_sd15_qrcode_monster::v2",
+        description="ControlNet model that generates scannable creative QR codes",
+        type=ModelType.ControlNet,
+    ),
+    StarterModel(
+        name="QRCode Monster (SDXL)",
+        base=BaseModelType.StableDiffusionXL,
+        source="monster-labs/control_v1p_sdxl_qrcode_monster",
+        description="ControlNet model that generates scannable creative QR codes",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="canny",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11p_sd15_canny",
-        description="Controlnet weights trained on sd-1.5 with canny conditioning.",
+        description="ControlNet weights trained on sd-1.5 with canny conditioning.",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="inpaint",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11p_sd15_inpaint",
-        description="Controlnet weights trained on sd-1.5 with canny conditioning, inpaint version",
+        description="ControlNet weights trained on sd-1.5 with canny conditioning, inpaint version",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="mlsd",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11p_sd15_mlsd",
-        description="Controlnet weights trained on sd-1.5 with canny conditioning, MLSD version",
+        description="ControlNet weights trained on sd-1.5 with canny conditioning, MLSD version",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="depth",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11f1p_sd15_depth",
-        description="Controlnet weights trained on sd-1.5 with depth conditioning",
+        description="ControlNet weights trained on sd-1.5 with depth conditioning",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="normal_bae",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11p_sd15_normalbae",
-        description="Controlnet weights trained on sd-1.5 with normalbae image conditioning",
+        description="ControlNet weights trained on sd-1.5 with normalbae image conditioning",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="seg",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11p_sd15_seg",
-        description="Controlnet weights trained on sd-1.5 with seg image conditioning",
+        description="ControlNet weights trained on sd-1.5 with seg image conditioning",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="lineart",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11p_sd15_lineart",
-        description="Controlnet weights trained on sd-1.5 with lineart image conditioning",
+        description="ControlNet weights trained on sd-1.5 with lineart image conditioning",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="lineart_anime",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11p_sd15s2_lineart_anime",
-        description="Controlnet weights trained on sd-1.5 with anime image conditioning",
+        description="ControlNet weights trained on sd-1.5 with anime image conditioning",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="openpose",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11p_sd15_openpose",
-        description="Controlnet weights trained on sd-1.5 with openpose image conditioning",
+        description="ControlNet weights trained on sd-1.5 with openpose image conditioning",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="scribble",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11p_sd15_scribble",
-        description="Controlnet weights trained on sd-1.5 with scribble image conditioning",
+        description="ControlNet weights trained on sd-1.5 with scribble image conditioning",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="softedge",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11p_sd15_softedge",
-        description="Controlnet weights trained on sd-1.5 with soft edge conditioning",
+        description="ControlNet weights trained on sd-1.5 with soft edge conditioning",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="shuffle",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11e_sd15_shuffle",
-        description="Controlnet weights trained on sd-1.5 with shuffle image conditioning",
+        description="ControlNet weights trained on sd-1.5 with shuffle image conditioning",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="tile",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11f1e_sd15_tile",
-        description="Controlnet weights trained on sd-1.5 with tiled image conditioning",
+        description="ControlNet weights trained on sd-1.5 with tiled image conditioning",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="ip2p",
         base=BaseModelType.StableDiffusion1,
         source="lllyasviel/control_v11e_sd15_ip2p",
-        description="Controlnet weights trained on sd-1.5 with ip2p conditioning.",
+        description="ControlNet weights trained on sd-1.5 with ip2p conditioning.",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="canny-sdxl",
         base=BaseModelType.StableDiffusionXL,
-        source="xinsir/controlnet-canny-sdxl-1.0",
-        description="Controlnet weights trained on sdxl-1.0 with canny conditioning, by Xinsir.",
+        source="xinsir/controlNet-canny-sdxl-1.0",
+        description="ControlNet weights trained on sdxl-1.0 with canny conditioning, by Xinsir.",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="depth-sdxl",
         base=BaseModelType.StableDiffusionXL,
-        source="diffusers/controlnet-depth-sdxl-1.0",
-        description="Controlnet weights trained on sdxl-1.0 with depth conditioning.",
+        source="diffusers/controlNet-depth-sdxl-1.0",
+        description="ControlNet weights trained on sdxl-1.0 with depth conditioning.",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="softedge-dexined-sdxl",
         base=BaseModelType.StableDiffusionXL,
-        source="SargeZT/controlnet-sd-xl-1.0-softedge-dexined",
-        description="Controlnet weights trained on sdxl-1.0 with dexined soft edge preprocessing.",
+        source="SargeZT/controlNet-sd-xl-1.0-softedge-dexined",
+        description="ControlNet weights trained on sdxl-1.0 with dexined soft edge preprocessing.",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="depth-16bit-zoe-sdxl",
         base=BaseModelType.StableDiffusionXL,
-        source="SargeZT/controlnet-sd-xl-1.0-depth-16bit-zoe",
-        description="Controlnet weights trained on sdxl-1.0 with Zoe's preprocessor (16 bits).",
+        source="SargeZT/controlNet-sd-xl-1.0-depth-16bit-zoe",
+        description="ControlNet weights trained on sdxl-1.0 with Zoe's preprocessor (16 bits).",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="depth-zoe-sdxl",
         base=BaseModelType.StableDiffusionXL,
-        source="diffusers/controlnet-zoe-depth-sdxl-1.0",
-        description="Controlnet weights trained on sdxl-1.0 with Zoe's preprocessor (32 bits).",
+        source="diffusers/controlNet-zoe-depth-sdxl-1.0",
+        description="ControlNet weights trained on sdxl-1.0 with Zoe's preprocessor (32 bits).",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="openpose-sdxl",
         base=BaseModelType.StableDiffusionXL,
-        source="xinsir/controlnet-openpose-sdxl-1.0",
-        description="Controlnet weights trained on sdxl-1.0 compatible with the DWPose processor by Xinsir.",
+        source="xinsir/controlNet-openpose-sdxl-1.0",
+        description="ControlNet weights trained on sdxl-1.0 compatible with the DWPose processor by Xinsir.",
         type=ModelType.ControlNet,
     ),
     StarterModel(
         name="scribble-sdxl",
         base=BaseModelType.StableDiffusionXL,
-        source="xinsir/controlnet-scribble-sdxl-1.0",
-        description="Controlnet weights trained on sdxl-1.0 compatible with various lineart processors and black/white sketches by Xinsir.",
+        source="xinsir/controlNet-scribble-sdxl-1.0",
+        description="ControlNet weights trained on sdxl-1.0 compatible with various lineart processors and black/white sketches by Xinsir.",
+        type=ModelType.ControlNet,
+    ),
+    StarterModel(
+        name="tile-sdxl",
+        base=BaseModelType.StableDiffusionXL,
+        source="xinsir/controlNet-tile-sdxl-1.0",
+        description="ControlNet weights trained on sdxl-1.0 with tiled image conditioning",
         type=ModelType.ControlNet,
     ),
     # endregion
@@ -398,6 +480,48 @@ STARTER_MODELS: list[StarterModel] = [
         description="T2I Adapter weights trained on sdxl-1.0 with sketch conditioning.",
         type=ModelType.T2IAdapter,
     ),
+    # endregion
+    # region SpandrelImageToImage
+    StarterModel(
+        name="RealESRGAN_x4plus_anime_6B",
+        base=BaseModelType.Any,
+        source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+        description="A Real-ESRGAN 4x upscaling model (optimized for anime images).",
+        type=ModelType.SpandrelImageToImage,
+    ),
+    StarterModel(
+        name="RealESRGAN_x4plus",
+        base=BaseModelType.Any,
+        source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+        description="A Real-ESRGAN 4x upscaling model (general-purpose).",
+        type=ModelType.SpandrelImageToImage,
+    ),
+    StarterModel(
+        name="ESRGAN_SRx4_DF2KOST_official",
+        base=BaseModelType.Any,
+        source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
+        description="The official ESRGAN 4x upscaling model.",
+        type=ModelType.SpandrelImageToImage,
+    ),
+    StarterModel(
+        name="RealESRGAN_x2plus",
+        base=BaseModelType.Any,
+        source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
+        description="A Real-ESRGAN 2x upscaling model (general-purpose).",
+        type=ModelType.SpandrelImageToImage,
+    ),
+    StarterModel(
+        name="SwinIR - realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN",
+        base=BaseModelType.Any,
+        source="https://github.com/JingyunLiang/SwinIR/releases/download/v0.0/003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN-with-dict-keys-params-and-params_ema.pth",
+        description="A SwinIR 4x upscaling model.",
+        type=ModelType.SpandrelImageToImage,
+    ),
+    # endregion
+    # region TextEncoders
+    t5_base_encoder,
+    t5_8b_quantized_encoder,
+    clip_l_encoder,
     # endregion
 ]
 

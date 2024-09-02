@@ -136,7 +136,12 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
           if (data) {
             const deletedImageIndex = data.items.findIndex((i) => i.image_name === imageDTO.image_name);
             const nextImage = data.items[deletedImageIndex + 1] ?? data.items[0] ?? null;
-            dispatch(imageSelected(nextImage));
+            if (nextImage?.image_name === imageDTO.image_name) {
+              // If the next image is the same as the deleted one, it means it was the last image, reset selection
+              dispatch(imageSelected(null));
+            } else {
+              dispatch(imageSelected(nextImage));
+            }
           }
         }
 
@@ -176,6 +181,8 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
           const queryArgs = selectListImagesQueryArgs(state);
           const { data } = imagesApi.endpoints.listImages.select(queryArgs)(state);
           if (data) {
+            // When we delete multiple images, we clear the selection. Then, the the next time we load images, we will
+            // select the first one. This is handled below in the listener for `imagesApi.endpoints.listImages.matchFulfilled`.
             dispatch(imageSelected(null));
           }
         }

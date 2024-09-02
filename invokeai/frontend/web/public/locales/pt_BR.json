@@ -80,10 +80,6 @@
             "title": "Restaurar Rostos",
             "desc": "Restaurar a imagem atual"
         },
-        "upscale": {
-            "title": "Redimensionar",
-            "desc": "Redimensionar a imagem atual"
-        },
         "showInfo": {
             "title": "Mostrar Informações",
             "desc": "Mostrar metadados de informações da imagem atual"
@@ -268,8 +264,6 @@
         "type": "Tipo",
         "strength": "Força",
         "upscaling": "Redimensionando",
-        "upscale": "Redimensionar",
-        "upscaleImage": "Redimensionar Imagem",
         "scale": "Escala",
         "imageFit": "Caber Imagem Inicial No Tamanho de Saída",
         "scaleBeforeProcessing": "Escala Antes do Processamento",

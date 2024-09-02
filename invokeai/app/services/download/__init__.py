@@ -1,13 +1,13 @@
 """Init file for download queue."""
 
-from .download_base import (
+from invokeai.app.services.download.download_base import (
     DownloadJob,
     DownloadJobStatus,
     DownloadQueueServiceBase,
     MultiFileDownloadJob,
     UnknownJobIDException,
 )
-from .download_default import DownloadQueueService, TqdmProgress
+from invokeai.app.services.download.download_default import DownloadQueueService, TqdmProgress
 
 __all__ = [
     "DownloadJob",

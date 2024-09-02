@@ -1,7 +1,8 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { ConfirmationAlertDialog, Flex, IconButton, Spacer, Text, useDisclosure } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import { selectModelManagerV2Slice, setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelBaseBadge';
 import ModelFormatBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/ModelFormatBadge';
 import { toast } from 'features/toast/toast';
@@ -23,14 +24,20 @@ const sx: SystemStyleObject = {
   "&[aria-selected='true']": { bg: 'base.700' },
 };
 
-const ModelListItem = (props: ModelListItemProps) => {
+const ModelListItem = ({ model }: ModelListItemProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
+  const selectIsSelected = useMemo(
+    () =>
+      createSelector(
+        selectModelManagerV2Slice,
+        (modelManagerV2Slice) => modelManagerV2Slice.selectedModelKey === model.key
+      ),
+    [model.key]
+  );
+  const isSelected = useAppSelector(selectIsSelected);
   const [deleteModel] = useDeleteModelsMutation();
   const { isOpen, onOpen, onClose } = useDisclosure();
-
-  const { model } = props;
 
   const handleSelectModel = useCallback(() => {
     dispatch(setSelectedModelKey(model.key));
@@ -43,11 +50,6 @@ const ModelListItem = (props: ModelListItemProps) => {
     },
     [onOpen]
   );
-
-  const isSelected = useMemo(() => {
-    return selectedModelKey === model.key;
-  }, [selectedModelKey, model.key]);
-
   const handleModelDelete = useCallback(() => {
     deleteModel({ key: model.key })
       .unwrap()

@@ -52,8 +52,8 @@ const IAIDropOverlay = (props: Props) => {
           bottom={0.5}
           opacity={1}
           borderWidth={2}
-          borderColor={isOver ? 'base.50' : 'base.300'}
-          borderRadius="lg"
+          borderColor={isOver ? 'base.300' : 'base.500'}
+          borderRadius="base"
           borderStyle="dashed"
           transitionProperty="common"
           transitionDuration="0.1s"

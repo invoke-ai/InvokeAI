@@ -21,6 +21,10 @@ const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (ac
     postUploadAction = { type: 'SET_CANVAS_INITIAL_IMAGE' };
   }
 
+  if (activeTabName === 'upscaling') {
+    postUploadAction = { type: 'SET_UPSCALE_INITIAL_IMAGE' };
+  }
+
   return postUploadAction;
 });
 

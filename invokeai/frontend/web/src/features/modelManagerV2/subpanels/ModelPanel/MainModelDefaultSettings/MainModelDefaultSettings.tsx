@@ -1,16 +1,18 @@
-import { Button, Flex, Heading, SimpleGrid, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useMainModelDefaultSettings } from 'features/modelManagerV2/hooks/useMainModelDefaultSettings';
 import { DefaultHeight } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultHeight';
 import { DefaultWidth } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultWidth';
 import type { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
+import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { toast } from 'features/toast/toast';
-import { useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';
+import type { MainModelConfig } from 'services/api/types';
 
 import { DefaultCfgRescaleMultiplier } from './DefaultCfgRescaleMultiplier';
 import { DefaultCfgScale } from './DefaultCfgScale';
@@ -35,16 +37,16 @@ export type MainModelDefaultSettingsFormData = {
   height: FormField<number>;
 };
 
-export const MainModelDefaultSettings = () => {
+type Props = {
+  modelConfig: MainModelConfig;
+};
+
+export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const selectedModelKey = useAppSelector((s) => s.modelmanagerV2.selectedModelKey);
   const { t } = useTranslation();
 
-  const {
-    defaultSettingsDefaults,
-    isLoading: isLoadingDefaultSettings,
-    optimalDimension,
-  } = useMainModelDefaultSettings(selectedModelKey);
-
+  const defaultSettingsDefaults = useMainModelDefaultSettings(modelConfig);
+  const optimalDimension = useMemo(() => getOptimalDimension(modelConfig), [modelConfig]);
   const [updateModel, { isLoading: isLoadingUpdateModel }] = useUpdateModelMutation();
 
   const { handleSubmit, control, formState, reset } = useForm<MainModelDefaultSettingsFormData>({
@@ -94,10 +96,6 @@ export const MainModelDefaultSettings = () => {
     [selectedModelKey, reset, updateModel, t]
   );
 
-  if (isLoadingDefaultSettings) {
-    return <Text>{t('common.loading')}</Text>;
-  }
-
   return (
     <>
       <Flex gap="4" justifyContent="space-between" w="full" pb={4}>
@@ -126,4 +124,6 @@ export const MainModelDefaultSettings = () => {
       </SimpleGrid>
     </>
   );
-};
+});
+
+MainModelDefaultSettings.displayName = 'MainModelDefaultSettings';

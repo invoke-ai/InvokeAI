@@ -55,6 +55,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 FROM node:20-slim AS web-builder
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack use pnpm@8.x
 RUN corepack enable
 
 WORKDIR /build

@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig } from 'app/store/store';
+import type { PersistConfig, RootState } from 'app/store/store';
 import type { ModelType } from 'services/api/types';
 
 export type FilterableModelType = Exclude<ModelType, 'onnx' | 'clip_vision'> | 'refiner';
@@ -49,6 +49,8 @@ export const modelManagerV2Slice = createSlice({
 
 export const { setSelectedModelKey, setSearchTerm, setFilteredModelType, setSelectedModelMode, setScanPath } =
   modelManagerV2Slice.actions;
+
+export const selectModelManagerV2Slice = (state: RootState) => state.modelmanagerV2;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateModelManagerState = (state: any): any => {

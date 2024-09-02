@@ -2,16 +2,10 @@
 
 import re
 
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
+from invokeai.app.invocations.fields import InputField, OutputField, UIComponent
+from invokeai.app.invocations.primitives import StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-
-from .baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    invocation,
-    invocation_output,
-)
-from .fields import InputField, OutputField, UIComponent
-from .primitives import StringOutput
 
 
 @invocation_output("string_pos_neg_output")

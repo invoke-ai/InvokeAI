@@ -6,10 +6,10 @@ Init file for the model loader.
 from importlib import import_module
 from pathlib import Path
 
-from .load_base import LoadedModel, LoadedModelWithoutConfig, ModelLoaderBase
-from .load_default import ModelLoader
-from .model_cache.model_cache_default import ModelCache
-from .model_loader_registry import ModelLoaderRegistry, ModelLoaderRegistryBase
+from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig, ModelLoaderBase
+from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.model_cache.model_cache_default import ModelCache
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry, ModelLoaderRegistryBase
 
 # This registers the subclasses that implement loaders of specific model types
 loaders = [x.stem for x in Path(Path(__file__).parent, "model_loaders").glob("*.py") if x.stem != "__init__"]

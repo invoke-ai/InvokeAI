@@ -8,7 +8,7 @@ import traceback
 from copy import deepcopy
 from enum import Enum
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, List, Optional, Type
+from typing import List, Optional, Type
 
 from fastapi import Body, Path, Query, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
@@ -18,6 +18,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
+from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config import get_config
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
@@ -38,8 +39,6 @@ from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFac
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel, StarterModelWithoutDependencies
-
-from ..dependencies import ApiDependencies
 
 model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
 
@@ -442,13 +441,11 @@ async def delete_model_image(
 async def install_model(
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
     inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
-    # TODO(MM2): Can we type this?
-    config: Optional[Dict[str, Any]] = Body(
-        description="Dict of fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
-        default=None,
+    access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
+    config: ModelRecordChanges = Body(
+        description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         example={"name": "string", "description": "string"},
     ),
-    access_token: Optional[str] = None,
 ) -> ModelInstallJob:
     """Install a model using a string identifier.
 
@@ -463,8 +460,9 @@ async def install_model(
        - model/name:fp16:path/to/model.safetensors
        - model/name::path/to/model.safetensors
 
-    `config` is an optional dict containing model configuration values that will override
-    the ones that are probed automatically.
+    `config` is a ModelRecordChanges object. Fields in this object will override
+    the ones that are probed automatically. Pass an empty object to accept
+    all the defaults.
 
     `access_token` is an optional access token for use with Urls that require
     authentication.
@@ -749,7 +747,7 @@ async def convert_model(
         # write the converted file to the convert path
         raw_model = converted_model.model
         assert hasattr(raw_model, "save_pretrained")
-        raw_model.save_pretrained(convert_path)
+        raw_model.save_pretrained(convert_path)  # type: ignore
         assert convert_path.exists()
 
         # temporarily rename the original safetensors file so that there is no naming conflict
@@ -762,12 +760,12 @@ async def convert_model(
         try:
             new_key = installer.install_path(
                 convert_path,
-                config={
-                    "name": original_name,
-                    "description": model_config.description,
-                    "hash": model_config.hash,
-                    "source": model_config.source,
-                },
+                config=ModelRecordChanges(
+                    name=original_name,
+                    description=model_config.description,
+                    hash=model_config.hash,
+                    source=model_config.source,
+                ),
             )
         except Exception as e:
             logger.error(str(e))
@@ -821,12 +819,12 @@ async def get_starter_models() -> list[StarterModel]:
 async def get_cache_size(cache_type: CacheType = Query(description="The cache type", default=CacheType.RAM)) -> float:
     """Return the current RAM or VRAM cache size setting (in GB)."""
     cache = ApiDependencies.invoker.services.model_manager.load.ram_cache
+    value = 0.0
     if cache_type == CacheType.RAM:
-        return cache.max_cache_size
+        value = cache.max_cache_size
     elif cache_type == CacheType.VRAM:
-        return cache.max_vram_cache_size
-    else:
-        raise ValueError(f"Unexpected {cache_type=}.")
+        value = cache.max_vram_cache_size
+    return value
 
 
 @model_manager_router.put(

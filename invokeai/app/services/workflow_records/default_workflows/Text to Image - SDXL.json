@@ -2,7 +2,7 @@
   "name": "Text to Image - SDXL",
   "author": "InvokeAI",
   "description": "Sample text to image workflow for SDXL",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "contact": "invoke@invoke.ai",
   "tags": "text2image, SDXL, default",
   "notes": "",
@@ -29,10 +29,271 @@
     }
   ],
   "meta": {
-    "category": "default",
-    "version": "3.0.0"
+    "version": "3.0.0",
+    "category": "default"
   },
   "nodes": [
+    {
+      "id": "0093692f-9cf4-454d-a5b8-62f0e3eb3bb8",
+      "type": "invocation",
+      "data": {
+        "id": "0093692f-9cf4-454d-a5b8-62f0e3eb3bb8",
+        "version": "1.0.3",
+        "label": "",
+        "notes": "",
+        "type": "vae_loader",
+        "inputs": {
+          "vae_model": {
+            "name": "vae_model",
+            "label": "VAE (use the FP16 model)",
+            "value": {
+              "key": "f20f9e5c-1bce-4c46-a84d-34ebfa7df069",
+              "hash": "blake3:9705ab1c31fa96b308734214fb7571a958621c7a9247eed82b7d277145f8d9fa",
+              "name": "sdxl-vae-fp16-fix",
+              "base": "sdxl",
+              "type": "vae"
+            }
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 375,
+        "y": -225
+      }
+    },
+    {
+      "id": "63e91020-83b2-4f35-b174-ad9692aabb48",
+      "type": "invocation",
+      "data": {
+        "id": "63e91020-83b2-4f35-b174-ad9692aabb48",
+        "version": "1.3.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "l2i",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "value": 0
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": false
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": false
+      },
+      "position": {
+        "x": 1475,
+        "y": -500
+      }
+    },
+    {
+      "id": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
+      "type": "invocation",
+      "data": {
+        "id": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "SDXL Positive Compel Prompt",
+        "notes": "",
+        "type": "sdxl_compel_prompt",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Positive Prompt",
+            "value": ""
+          },
+          "style": {
+            "name": "style",
+            "label": "Positive Style",
+            "value": ""
+          },
+          "original_width": {
+            "name": "original_width",
+            "label": "",
+            "value": 1024
+          },
+          "original_height": {
+            "name": "original_height",
+            "label": "",
+            "value": 1024
+          },
+          "crop_top": {
+            "name": "crop_top",
+            "label": "",
+            "value": 0
+          },
+          "crop_left": {
+            "name": "crop_left",
+            "label": "",
+            "value": 0
+          },
+          "target_width": {
+            "name": "target_width",
+            "label": "",
+            "value": 1024
+          },
+          "target_height": {
+            "name": "target_height",
+            "label": "",
+            "value": 1024
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "clip2": {
+            "name": "clip2",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 750,
+        "y": -175
+      }
+    },
+    {
+      "id": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
+      "type": "invocation",
+      "data": {
+        "id": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
+        "version": "1.0.3",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "sdxl_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "",
+            "value": {
+              "key": "4a63b226-e8ff-4da4-854e-0b9f04b562ba",
+              "hash": "blake3:d279309ea6e5ee6e8fd52504275865cc280dac71cbf528c5b07c98b888bddaba",
+              "name": "dreamshaper-xl-v2-turbo",
+              "base": "sdxl",
+              "type": "main"
+            }
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 375,
+        "y": -500
+      }
+    },
+    {
+      "id": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
+      "type": "invocation",
+      "data": {
+        "id": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "SDXL Negative Compel Prompt",
+        "notes": "",
+        "type": "sdxl_compel_prompt",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Negative Prompt",
+            "value": ""
+          },
+          "style": {
+            "name": "style",
+            "label": "Negative Style",
+            "value": ""
+          },
+          "original_width": {
+            "name": "original_width",
+            "label": "",
+            "value": 1024
+          },
+          "original_height": {
+            "name": "original_height",
+            "label": "",
+            "value": 1024
+          },
+          "crop_top": {
+            "name": "crop_top",
+            "label": "",
+            "value": 0
+          },
+          "crop_left": {
+            "name": "crop_left",
+            "label": "",
+            "value": 0
+          },
+          "target_width": {
+            "name": "target_width",
+            "label": "",
+            "value": 1024
+          },
+          "target_height": {
+            "name": "target_height",
+            "label": "",
+            "value": 1024
+          },
+          "clip": {
+            "name": "clip",
+            "label": ""
+          },
+          "clip2": {
+            "name": "clip2",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
+            "label": ""
+          }
+        },
+        "isOpen": false,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 750,
+        "y": 200
+      }
+    },
     {
       "id": "3774ec24-a69e-4254-864c-097d07a6256f",
       "type": "invocation",
@@ -86,75 +347,6 @@
       "position": {
         "x": 750,
         "y": -125
-      }
-    },
-    {
-      "id": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
-      "type": "invocation",
-      "data": {
-        "id": "3193ad09-a7c2-4bf4-a3a9-1c61cc33a204",
-        "version": "1.1.1",
-        "nodePack": "invokeai",
-        "label": "SDXL Negative Compel Prompt",
-        "notes": "",
-        "type": "sdxl_compel_prompt",
-        "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "Negative Prompt",
-            "value": ""
-          },
-          "style": {
-            "name": "style",
-            "label": "Negative Style",
-            "value": ""
-          },
-          "original_width": {
-            "name": "original_width",
-            "label": "",
-            "value": 1024
-          },
-          "original_height": {
-            "name": "original_height",
-            "label": "",
-            "value": 1024
-          },
-          "crop_top": {
-            "name": "crop_top",
-            "label": "",
-            "value": 0
-          },
-          "crop_left": {
-            "name": "crop_left",
-            "label": "",
-            "value": 0
-          },
-          "target_width": {
-            "name": "target_width",
-            "label": "",
-            "value": 1024
-          },
-          "target_height": {
-            "name": "target_height",
-            "label": "",
-            "value": 1024
-          },
-          "clip": {
-            "name": "clip",
-            "label": ""
-          },
-          "clip2": {
-            "name": "clip2",
-            "label": ""
-          }
-        },
-        "isOpen": false,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 750,
-        "y": 200
       }
     },
     {
@@ -227,154 +419,6 @@
       "position": {
         "x": 375,
         "y": -50
-      }
-    },
-    {
-      "id": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
-      "type": "invocation",
-      "data": {
-        "id": "30d3289c-773c-4152-a9d2-bd8a99c8fd22",
-        "version": "1.0.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "sdxl_model_loader",
-        "inputs": {
-          "model": {
-            "name": "model",
-            "label": "",
-            "value": {
-              "key": "4a63b226-e8ff-4da4-854e-0b9f04b562ba",
-              "hash": "blake3:d279309ea6e5ee6e8fd52504275865cc280dac71cbf528c5b07c98b888bddaba",
-              "name": "dreamshaper-xl-v2-turbo",
-              "base": "sdxl",
-              "type": "main"
-            }
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 375,
-        "y": -500
-      }
-    },
-    {
-      "id": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
-      "type": "invocation",
-      "data": {
-        "id": "faf965a4-7530-427b-b1f3-4ba6505c2a08",
-        "version": "1.1.1",
-        "nodePack": "invokeai",
-        "label": "SDXL Positive Compel Prompt",
-        "notes": "",
-        "type": "sdxl_compel_prompt",
-        "inputs": {
-          "prompt": {
-            "name": "prompt",
-            "label": "Positive Prompt",
-            "value": ""
-          },
-          "style": {
-            "name": "style",
-            "label": "Positive Style",
-            "value": ""
-          },
-          "original_width": {
-            "name": "original_width",
-            "label": "",
-            "value": 1024
-          },
-          "original_height": {
-            "name": "original_height",
-            "label": "",
-            "value": 1024
-          },
-          "crop_top": {
-            "name": "crop_top",
-            "label": "",
-            "value": 0
-          },
-          "crop_left": {
-            "name": "crop_left",
-            "label": "",
-            "value": 0
-          },
-          "target_width": {
-            "name": "target_width",
-            "label": "",
-            "value": 1024
-          },
-          "target_height": {
-            "name": "target_height",
-            "label": "",
-            "value": 1024
-          },
-          "clip": {
-            "name": "clip",
-            "label": ""
-          },
-          "clip2": {
-            "name": "clip2",
-            "label": ""
-          }
-        },
-        "isOpen": false,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 750,
-        "y": -175
-      }
-    },
-    {
-      "id": "63e91020-83b2-4f35-b174-ad9692aabb48",
-      "type": "invocation",
-      "data": {
-        "id": "63e91020-83b2-4f35-b174-ad9692aabb48",
-        "version": "1.2.2",
-        "nodePack": "invokeai",
-        "label": "",
-        "notes": "",
-        "type": "l2i",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "latents": {
-            "name": "latents",
-            "label": ""
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          },
-          "tiled": {
-            "name": "tiled",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "name": "fp32",
-            "label": "",
-            "value": false
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": false,
-        "useCache": false
-      },
-      "position": {
-        "x": 1475,
-        "y": -500
       }
     },
     {
@@ -462,37 +506,6 @@
       "position": {
         "x": 1125,
         "y": -500
-      }
-    },
-    {
-      "id": "0093692f-9cf4-454d-a5b8-62f0e3eb3bb8",
-      "type": "invocation",
-      "data": {
-        "id": "0093692f-9cf4-454d-a5b8-62f0e3eb3bb8",
-        "version": "1.0.2",
-        "label": "",
-        "notes": "",
-        "type": "vae_loader",
-        "inputs": {
-          "vae_model": {
-            "name": "vae_model",
-            "label": "VAE (use the FP16 model)",
-            "value": {
-              "key": "f20f9e5c-1bce-4c46-a84d-34ebfa7df069",
-              "hash": "blake3:9705ab1c31fa96b308734214fb7571a958621c7a9247eed82b7d277145f8d9fa",
-              "name": "sdxl-vae-fp16-fix",
-              "base": "sdxl",
-              "type": "vae"
-            }
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 375,
-        "y": -225
       }
     },
     {

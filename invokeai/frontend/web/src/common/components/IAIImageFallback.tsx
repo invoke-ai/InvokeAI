@@ -47,6 +47,7 @@ export const IAINoContentFallback = memo((props: IAINoImageFallbackProps) => {
       userSelect: 'none',
       opacity: 0.7,
       color: 'base.500',
+      fontSize: 'md',
       ...sx,
     }),
     [sx]
@@ -55,11 +56,7 @@ export const IAINoContentFallback = memo((props: IAINoImageFallbackProps) => {
   return (
     <Flex sx={styles} {...rest}>
       {icon && <Icon as={icon} boxSize={boxSize} opacity={0.7} />}
-      {props.label && (
-        <Text textAlign="center" fontSize="md">
-          {props.label}
-        </Text>
-      )}
+      {props.label && <Text textAlign="center">{props.label}</Text>}
     </Flex>
   );
 });

@@ -14,8 +14,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
-
-from ...version import __version__
+from invokeai.version.invokeai_version import __version__
 
 
 class MetadataItemField(BaseModel):

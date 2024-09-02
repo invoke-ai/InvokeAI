@@ -2,7 +2,7 @@
   "name": "Text to Image with LoRA",
   "author": "InvokeAI",
   "description": "Simple text to image workflow with a LoRA",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "contact": "invoke@invoke.ai",
   "tags": "text to image, lora, default",
   "notes": "",
@@ -37,27 +37,82 @@
     }
   ],
   "meta": {
-    "category": "default",
-    "version": "3.0.0"
+    "version": "3.0.0",
+    "category": "default"
   },
   "nodes": [
     {
-      "id": "85b77bb2-c67a-416a-b3e8-291abe746c44",
+      "id": "a9683c0a-6b1f-4a5e-8187-c57e764b3400",
       "type": "invocation",
       "data": {
-        "id": "85b77bb2-c67a-416a-b3e8-291abe746c44",
-        "version": "1.1.1",
+        "id": "a9683c0a-6b1f-4a5e-8187-c57e764b3400",
+        "version": "1.3.0",
+        "label": "",
+        "notes": "",
+        "type": "l2i",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          },
+          "tiled": {
+            "name": "tiled",
+            "label": "",
+            "value": false
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "value": 0
+          },
+          "fp32": {
+            "name": "fp32",
+            "label": "",
+            "value": false
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true
+      },
+      "position": {
+        "x": 4450,
+        "y": -550
+      }
+    },
+    {
+      "id": "c3fa6872-2599-4a82-a596-b3446a66cf8b",
+      "type": "invocation",
+      "data": {
+        "id": "c3fa6872-2599-4a82-a596-b3446a66cf8b",
+        "version": "1.2.0",
         "label": "",
         "notes": "",
         "type": "compel",
         "inputs": {
           "prompt": {
             "name": "prompt",
-            "label": "Negative Prompt",
-            "value": ""
+            "label": "Positive Prompt",
+            "value": "super cute tiger cub"
           },
           "clip": {
             "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
             "label": ""
           }
         },
@@ -67,31 +122,7 @@
       },
       "position": {
         "x": 3425,
-        "y": -300
-      }
-    },
-    {
-      "id": "24e9d7ed-4836-4ec4-8f9e-e747721f9818",
-      "type": "invocation",
-      "data": {
-        "id": "24e9d7ed-4836-4ec4-8f9e-e747721f9818",
-        "version": "1.0.2",
-        "label": "",
-        "notes": "",
-        "type": "main_model_loader",
-        "inputs": {
-          "model": {
-            "name": "model",
-            "label": ""
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true
-      },
-      "position": {
-        "x": 2500,
-        "y": -600
+        "y": -575
       }
     },
     {
@@ -99,7 +130,7 @@
       "type": "invocation",
       "data": {
         "id": "c41e705b-f2e3-4d1a-83c4-e34bb9344966",
-        "version": "1.0.2",
+        "version": "1.0.3",
         "label": "",
         "notes": "",
         "type": "lora_loader",
@@ -132,22 +163,50 @@
       }
     },
     {
-      "id": "c3fa6872-2599-4a82-a596-b3446a66cf8b",
+      "id": "24e9d7ed-4836-4ec4-8f9e-e747721f9818",
       "type": "invocation",
       "data": {
-        "id": "c3fa6872-2599-4a82-a596-b3446a66cf8b",
-        "version": "1.1.1",
+        "id": "24e9d7ed-4836-4ec4-8f9e-e747721f9818",
+        "version": "1.0.3",
+        "label": "",
+        "notes": "",
+        "type": "main_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 2500,
+        "y": -600
+      }
+    },
+    {
+      "id": "85b77bb2-c67a-416a-b3e8-291abe746c44",
+      "type": "invocation",
+      "data": {
+        "id": "85b77bb2-c67a-416a-b3e8-291abe746c44",
+        "version": "1.2.0",
         "label": "",
         "notes": "",
         "type": "compel",
         "inputs": {
           "prompt": {
             "name": "prompt",
-            "label": "Positive Prompt",
-            "value": "super cute tiger cub"
+            "label": "Negative Prompt",
+            "value": ""
           },
           "clip": {
             "name": "clip",
+            "label": ""
+          },
+          "mask": {
+            "name": "mask",
             "label": ""
           }
         },
@@ -157,7 +216,7 @@
       },
       "position": {
         "x": 3425,
-        "y": -575
+        "y": -300
       }
     },
     {
@@ -314,52 +373,6 @@
       "position": {
         "x": 3425,
         "y": 0
-      }
-    },
-    {
-      "id": "a9683c0a-6b1f-4a5e-8187-c57e764b3400",
-      "type": "invocation",
-      "data": {
-        "id": "a9683c0a-6b1f-4a5e-8187-c57e764b3400",
-        "version": "1.2.2",
-        "label": "",
-        "notes": "",
-        "type": "l2i",
-        "inputs": {
-          "board": {
-            "name": "board",
-            "label": ""
-          },
-          "metadata": {
-            "name": "metadata",
-            "label": ""
-          },
-          "latents": {
-            "name": "latents",
-            "label": ""
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          },
-          "tiled": {
-            "name": "tiled",
-            "label": "",
-            "value": false
-          },
-          "fp32": {
-            "name": "fp32",
-            "label": "",
-            "value": false
-          }
-        },
-        "isOpen": true,
-        "isIntermediate": false,
-        "useCache": true
-      },
-      "position": {
-        "x": 4450,
-        "y": -550
       }
     }
   ],

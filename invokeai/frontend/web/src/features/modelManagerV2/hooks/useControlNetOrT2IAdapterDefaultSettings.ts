@@ -1,15 +1,10 @@
-import { skipToken } from '@reduxjs/toolkit/query';
 import { isNil } from 'lodash-es';
 import { useMemo } from 'react';
-import { useGetModelConfigWithTypeGuard } from 'services/api/hooks/useGetModelConfigWithTypeGuard';
-import { isControlNetOrT2IAdapterModelConfig } from 'services/api/types';
+import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
-export const useControlNetOrT2IAdapterDefaultSettings = (modelKey?: string | null) => {
-  const { modelConfig, isLoading } = useGetModelConfigWithTypeGuard(
-    modelKey ?? skipToken,
-    isControlNetOrT2IAdapterModelConfig
-  );
-
+export const useControlNetOrT2IAdapterDefaultSettings = (
+  modelConfig: ControlNetModelConfig | T2IAdapterModelConfig
+) => {
   const defaultSettingsDefaults = useMemo(() => {
     return {
       preprocessor: {
@@ -19,5 +14,5 @@ export const useControlNetOrT2IAdapterDefaultSettings = (modelKey?: string | nul
     };
   }, [modelConfig?.default_settings]);
 
-  return { defaultSettingsDefaults, isLoading };
+  return defaultSettingsDefaults;
 };

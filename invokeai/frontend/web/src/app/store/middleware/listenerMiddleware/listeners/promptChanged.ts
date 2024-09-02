@@ -11,6 +11,9 @@ import {
   promptsChanged,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
+import { getPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
+import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
+import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 import { utilitiesApi } from 'services/api/endpoints/utilities';
 import { socketConnected } from 'services/events/actions';
 
@@ -19,7 +22,11 @@ const matcher = isAnyOf(
   combinatorialToggled,
   maxPromptsChanged,
   maxPromptsReset,
-  socketConnected
+  socketConnected,
+  activeStylePresetIdChanged,
+  stylePresetsApi.endpoints.deleteStylePreset.matchFulfilled,
+  stylePresetsApi.endpoints.updateStylePreset.matchFulfilled,
+  stylePresetsApi.endpoints.listStylePresets.matchFulfilled
 );
 
 export const addDynamicPromptsListener = (startAppListening: AppStartListening) => {
@@ -28,7 +35,7 @@ export const addDynamicPromptsListener = (startAppListening: AppStartListening) 
     effect: async (action, { dispatch, getState, cancelActiveListeners, delay }) => {
       cancelActiveListeners();
       const state = getState();
-      const { positivePrompt } = state.controlLayers.present;
+      const { positivePrompt } = getPresetModifiedPrompts(state);
       const { maxPrompts } = state.dynamicPrompts;
 
       if (state.config.disabledFeatures.includes('dynamicPrompting')) {
