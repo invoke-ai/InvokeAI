@@ -246,7 +246,6 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   };
 
   $transformingEntity = atom<CanvasEntityIdentifier | null>(null);
-  $isProcessingTransform = atom<boolean>(false);
 
   $toolState: WritableAtom<ToolState> = atom();
   $currentFill: WritableAtom<RgbaColor> = atom();
