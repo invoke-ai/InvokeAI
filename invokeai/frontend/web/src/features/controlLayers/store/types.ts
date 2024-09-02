@@ -478,6 +478,11 @@ const zRect = z.object({
 });
 export type Rect = z.infer<typeof zRect>;
 
+const zRectWithRotation = zRect.extend({
+  rotation: z.number(),
+});
+export type RectWithRotation = z.infer<typeof zRectWithRotation>;
+
 const zCanvasBrushLineState = z.object({
   id: zId,
   type: z.literal('brush_line'),

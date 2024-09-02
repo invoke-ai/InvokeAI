@@ -3,7 +3,7 @@ import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/Canva
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
-import type { Coordinate, Rect } from 'features/controlLayers/store/types';
+import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import { debounce, get } from 'lodash-es';
@@ -182,100 +182,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
         anchorSize: this.config.SCALE_ANCHOR_SIZE,
         anchorCornerRadius: this.config.SCALE_ANCHOR_SIZE * this.config.SCALE_ANCHOR_CORNER_RADIUS_RATIO,
         // This function is called for each anchor to style it (and do anything else you might want to do).
-        anchorStyleFunc: (anchor) => {
-          // Give the rotater special styling
-          if (anchor.hasName('rotater')) {
-            anchor.setAttrs({
-              height: this.config.ROTATE_ANCHOR_SIZE,
-              width: this.config.ROTATE_ANCHOR_SIZE,
-              cornerRadius: this.config.ROTATE_ANCHOR_SIZE * this.config.SCALE_ANCHOR_CORNER_RADIUS_RATIO,
-              fill: this.config.ROTATE_ANCHOR_FILL_COLOR,
-              stroke: this.config.SCALE_ANCHOR_FILL_COLOR,
-              offsetX: this.config.ROTATE_ANCHOR_SIZE / 2,
-              offsetY: this.config.ROTATE_ANCHOR_SIZE / 2,
-            });
-          }
-          // Add some padding to the hit area of the anchors
-          anchor.hitFunc((context) => {
-            context.beginPath();
-            context.rect(
-              -this.config.ANCHOR_HIT_PADDING,
-              -this.config.ANCHOR_HIT_PADDING,
-              anchor.width() + this.config.ANCHOR_HIT_PADDING * 2,
-              anchor.height() + this.config.ANCHOR_HIT_PADDING * 2
-            );
-            context.closePath();
-            context.fillStrokeShape(anchor);
-          });
-        },
-        anchorDragBoundFunc: (oldPos: Coordinate, newPos: Coordinate) => {
-          // The anchorDragBoundFunc callback puts constraints on the movement of the transformer anchors, which in
-          // turn constrain the transformation. It is called on every anchor move. We'll use this to snap the anchors
-          // to the nearest pixel.
-
-          // If we are rotating, no need to do anything - just let the rotation happen.
-          if (this.konva.transformer.getActiveAnchor() === 'rotater') {
-            return newPos;
-          }
-
-          // We need to snap the anchor to the nearest pixel, but the positions provided to this callback are absolute,
-          // scaled coordinates. They need to be converted to stage coordinates, snapped, then converted back to absolute
-          // before returning them.
-          const stageScale = this.manager.stage.getScale();
-          const stagePos = this.manager.stage.getPosition();
-
-          // Unscale and round the target position to the nearest pixel.
-          const targetX = Math.round(newPos.x / stageScale);
-          const targetY = Math.round(newPos.y / stageScale);
-
-          // The stage may be offset a fraction of a pixel. To ensure the anchor snaps to the nearest pixel, we need to
-          // calculate that offset and add it back to the target position.
-
-          // Calculate the offset. It's the remainder of the stage position divided by the scale * desired grid size. In
-          // this case, the grid size is 1px. For example, if we wanted to snap to the nearest 8px, the calculation would
-          // be `stagePos.x % (stageScale * 8)`.
-          const scaledOffsetX = stagePos.x % stageScale;
-          const scaledOffsetY = stagePos.y % stageScale;
-
-          // Unscale the target position and add the offset to get the absolute position for this anchor.
-          const scaledTargetX = targetX * stageScale + scaledOffsetX;
-          const scaledTargetY = targetY * stageScale + scaledOffsetY;
-
-          this.log.trace(
-            {
-              oldPos,
-              newPos,
-              stageScale,
-              stagePos,
-              targetX,
-              targetY,
-              scaledOffsetX,
-              scaledOffsetY,
-              scaledTargetX,
-              scaledTargetY,
-            },
-            'Anchor drag bound'
-          );
-
-          return { x: scaledTargetX, y: scaledTargetY };
-        },
-        boundBoxFunc: (oldBoundBox, newBoundBox) => {
-          // Bail if we are not rotating, we don't need to do anything.
-          if (this.konva.transformer.getActiveAnchor() !== 'rotater') {
-            return newBoundBox;
-          }
-
-          // This transform constraint operates on the bounding box of the transformer. This box has x, y, width, and
-          // height in stage coordinates, and rotation in radians. This can be used to snap the transformer rotation to
-          // the nearest 45 degrees when shift is held.
-          if (this.manager.stateApi.$shiftKey.get()) {
-            if (Math.abs(newBoundBox.rotation % (Math.PI / 4)) > 0) {
-              return oldBoundBox;
-            }
-          }
-
-          return newBoundBox;
-        },
+        anchorStyleFunc: this.anchorStyleFunc,
+        anchorDragBoundFunc: this.anchorDragBoundFunc,
+        boundBoxFunc: this.boxBoundFunc,
       }),
       proxyRect: new Konva.Rect({
         name: `${this.type}:proxy_rect`,
@@ -284,128 +193,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       }),
     };
 
-    this.konva.transformer.on('transformstart', () => {
-      // Just logging in this callback. Called on mouse down of a transform anchor.
-      this.log.trace(
-        {
-          x: this.konva.proxyRect.x(),
-          y: this.konva.proxyRect.y(),
-          scaleX: this.konva.proxyRect.scaleX(),
-          scaleY: this.konva.proxyRect.scaleY(),
-          rotation: this.konva.proxyRect.rotation(),
-        },
-        'Transform started'
-      );
-    });
+    this.konva.transformer.on('transform', this.syncObjectGroupWithProxyRect);
+    this.konva.transformer.on('transformend', this.snapProxyRectToPixelGrid);
+    this.konva.proxyRect.on('dragmove', this.onDragMove);
+    this.konva.proxyRect.on('dragend', this.onDragEnd);
 
-    this.konva.transformer.on('transform', () => {
-      // This is called when a transform anchor is dragged. By this time, the transform constraints in the above
-      // callbacks have been enforced, and the transformer has updated its nodes' attributes. We need to pass the
-      // updated attributes to the object group, propagating the transformation on down.
-      this.syncObjectGroupWithProxyRect();
-    });
-
-    this.konva.transformer.on('transformend', () => {
-      // Called on mouse up on an anchor. We'll do some final snapping to ensure the transformer is pixel-perfect.
-
-      // Snap the position to the nearest pixel.
-      const x = this.konva.proxyRect.x();
-      const y = this.konva.proxyRect.y();
-      const snappedX = Math.round(x);
-      const snappedY = Math.round(y);
-
-      // The transformer doesn't modify the width and height. It only modifies scale. We'll need to apply the scale to
-      // the width and height, round them to the nearest pixel, and finally calculate a new scale that will result in
-      // the snapped width and height.
-      const width = this.konva.proxyRect.width();
-      const height = this.konva.proxyRect.height();
-      const scaleX = this.konva.proxyRect.scaleX();
-      const scaleY = this.konva.proxyRect.scaleY();
-
-      // Determine the target width and height, rounded to the nearest pixel. Must be >= 1. Because the scales can be
-      // negative, we need to take the absolute value of the width and height.
-      const targetWidth = Math.max(Math.abs(Math.round(width * scaleX)), 1);
-      const targetHeight = Math.max(Math.abs(Math.round(height * scaleY)), 1);
-
-      // Calculate the scale we need to use to get the target width and height. Restore the sign of the scales.
-      const snappedScaleX = (targetWidth / width) * Math.sign(scaleX);
-      const snappedScaleY = (targetHeight / height) * Math.sign(scaleY);
-
-      // Update interaction rect and object group attributes.
-      this.konva.proxyRect.setAttrs({
-        x: snappedX,
-        y: snappedY,
-        scaleX: snappedScaleX,
-        scaleY: snappedScaleY,
-      });
-      this.parent.renderer.konva.objectGroup.setAttrs({
-        x: snappedX,
-        y: snappedY,
-        scaleX: snappedScaleX,
-        scaleY: snappedScaleY,
-      });
-
-      // Rotation is only retrieved for logging purposes.
-      const rotation = this.konva.proxyRect.rotation();
-
-      this.log.trace(
-        {
-          x,
-          y,
-          width,
-          height,
-          scaleX,
-          scaleY,
-          rotation,
-          snappedX,
-          snappedY,
-          targetWidth,
-          targetHeight,
-          snappedScaleX,
-          snappedScaleY,
-        },
-        'Transform ended'
-      );
-    });
-
-    this.konva.proxyRect.on('dragmove', () => {
-      // Snap the interaction rect to the nearest pixel
-      this.konva.proxyRect.x(Math.round(this.konva.proxyRect.x()));
-      this.konva.proxyRect.y(Math.round(this.konva.proxyRect.y()));
-
-      // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
-      // and border
-      this.konva.outlineRect.setAttrs({
-        x: this.konva.proxyRect.x() - this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING),
-        y: this.konva.proxyRect.y() - this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING),
-      });
-
-      // The object group is translated by the difference between the interaction rect's new and old positions (which is
-      // stored as this.pixelRect)
-      this.parent.renderer.konva.objectGroup.setAttrs({
-        x: this.konva.proxyRect.x(),
-        y: this.konva.proxyRect.y(),
-      });
-    });
-    this.konva.proxyRect.on('dragend', () => {
-      if (this.isTransforming) {
-        // If we are transforming the entity, we should not push the new position to the state. This will trigger a
-        // re-render of the entity and bork the transformation.
-        return;
-      }
-
-      const position = {
-        x: this.konva.proxyRect.x() - this.pixelRect.x,
-        y: this.konva.proxyRect.y() - this.pixelRect.y,
-      };
-
-      this.log.trace({ position }, 'Position changed');
-      this.manager.stateApi.setEntityPosition({ entityIdentifier: this.parent.getEntityIdentifier(), position });
-    });
-
+    // When the stage scale changes, we may need to re-scale some of the transformer's components. For example,
+    // the bbox outline should always be 1 screen pixel wide, so we need to update its stroke width.
     this.subscriptions.add(
-      // When the stage scale changes, we may need to re-scale some of the transformer's components. For example,
-      // the bbox outline should always be 1 screen pixel wide, so we need to update its stroke width.
       this.manager.stateApi.$stageAttrs.listen((newVal, oldVal) => {
         if (newVal.scale !== oldVal.scale) {
           this.syncScale();
@@ -431,6 +226,163 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.parent.konva.layer.add(this.konva.proxyRect);
     this.parent.konva.layer.add(this.konva.transformer);
   }
+
+  anchorStyleFunc = (anchor: Konva.Rect): void => {
+    // Give the rotater special styling
+    if (anchor.hasName('rotater')) {
+      anchor.setAttrs({
+        height: this.config.ROTATE_ANCHOR_SIZE,
+        width: this.config.ROTATE_ANCHOR_SIZE,
+        cornerRadius: this.config.ROTATE_ANCHOR_SIZE * this.config.SCALE_ANCHOR_CORNER_RADIUS_RATIO,
+        fill: this.config.ROTATE_ANCHOR_FILL_COLOR,
+        stroke: this.config.SCALE_ANCHOR_FILL_COLOR,
+        offsetX: this.config.ROTATE_ANCHOR_SIZE / 2,
+        offsetY: this.config.ROTATE_ANCHOR_SIZE / 2,
+      });
+    }
+    // Add some padding to the hit area of the anchors
+    anchor.hitFunc((context) => {
+      context.beginPath();
+      context.rect(
+        -this.config.ANCHOR_HIT_PADDING,
+        -this.config.ANCHOR_HIT_PADDING,
+        anchor.width() + this.config.ANCHOR_HIT_PADDING * 2,
+        anchor.height() + this.config.ANCHOR_HIT_PADDING * 2
+      );
+      context.closePath();
+      context.fillStrokeShape(anchor);
+    });
+  };
+
+  anchorDragBoundFunc = (oldPos: Coordinate, newPos: Coordinate) => {
+    // The anchorDragBoundFunc callback puts constraints on the movement of the transformer anchors, which in
+    // turn constrain the transformation. It is called on every anchor move. We'll use this to snap the anchors
+    // to the nearest pixel.
+
+    // If we are rotating, no need to do anything - just let the rotation happen.
+    if (this.konva.transformer.getActiveAnchor() === 'rotater') {
+      return newPos;
+    }
+
+    // We need to snap the anchor to the nearest pixel, but the positions provided to this callback are absolute,
+    // scaled coordinates. They need to be converted to stage coordinates, snapped, then converted back to absolute
+    // before returning them.
+    const stageScale = this.manager.stage.getScale();
+    const stagePos = this.manager.stage.getPosition();
+
+    // Unscale and round the target position to the nearest pixel.
+    const targetX = Math.round(newPos.x / stageScale);
+    const targetY = Math.round(newPos.y / stageScale);
+
+    // The stage may be offset a fraction of a pixel. To ensure the anchor snaps to the nearest pixel, we need to
+    // calculate that offset and add it back to the target position.
+
+    // Calculate the offset. It's the remainder of the stage position divided by the scale * desired grid size. In
+    // this case, the grid size is 1px. For example, if we wanted to snap to the nearest 8px, the calculation would
+    // be `stagePos.x % (stageScale * 8)`.
+    const scaledOffsetX = stagePos.x % stageScale;
+    const scaledOffsetY = stagePos.y % stageScale;
+
+    // Unscale the target position and add the offset to get the absolute position for this anchor.
+    const scaledTargetX = targetX * stageScale + scaledOffsetX;
+    const scaledTargetY = targetY * stageScale + scaledOffsetY;
+
+    return { x: scaledTargetX, y: scaledTargetY };
+  };
+
+  boxBoundFunc = (oldBoundBox: RectWithRotation, newBoundBox: RectWithRotation) => {
+    // Bail if we are not rotating, we don't need to do anything.
+    if (this.konva.transformer.getActiveAnchor() !== 'rotater') {
+      return newBoundBox;
+    }
+
+    // This transform constraint operates on the bounding box of the transformer. This box has x, y, width, and
+    // height in stage coordinates, and rotation in radians. This can be used to snap the transformer rotation to
+    // the nearest 45 degrees when shift is held.
+    if (this.manager.stateApi.$shiftKey.get()) {
+      if (Math.abs(newBoundBox.rotation % (Math.PI / 4)) > 0) {
+        return oldBoundBox;
+      }
+    }
+
+    return newBoundBox;
+  };
+
+  /**
+   * Snaps the proxy rect to the nearest pixel, syncing the object group with the proxy rect.
+   */
+  snapProxyRectToPixelGrid = () => {
+    // Called on mouse up on an anchor. We'll do some final snapping to ensure the transformer is pixel-perfect.
+
+    // Snap the position to the nearest pixel.
+    const x = this.konva.proxyRect.x();
+    const y = this.konva.proxyRect.y();
+    const snappedX = Math.round(x);
+    const snappedY = Math.round(y);
+
+    // The transformer doesn't modify the width and height. It only modifies scale. We'll need to apply the scale to
+    // the width and height, round them to the nearest pixel, and finally calculate a new scale that will result in
+    // the snapped width and height.
+    const width = this.konva.proxyRect.width();
+    const height = this.konva.proxyRect.height();
+    const scaleX = this.konva.proxyRect.scaleX();
+    const scaleY = this.konva.proxyRect.scaleY();
+
+    // Determine the target width and height, rounded to the nearest pixel. Must be >= 1. Because the scales can be
+    // negative, we need to take the absolute value of the width and height.
+    const targetWidth = Math.max(Math.abs(Math.round(width * scaleX)), 1);
+    const targetHeight = Math.max(Math.abs(Math.round(height * scaleY)), 1);
+
+    // Calculate the scale we need to use to get the target width and height. Restore the sign of the scales.
+    const snappedScaleX = (targetWidth / width) * Math.sign(scaleX);
+    const snappedScaleY = (targetHeight / height) * Math.sign(scaleY);
+
+    // Update interaction rect and object group attributes.
+    this.konva.proxyRect.setAttrs({
+      x: snappedX,
+      y: snappedY,
+      scaleX: snappedScaleX,
+      scaleY: snappedScaleY,
+    });
+
+    this.syncObjectGroupWithProxyRect();
+  };
+
+  onDragMove = () => {
+    // Snap the interaction rect to the nearest pixel
+    this.konva.proxyRect.x(Math.round(this.konva.proxyRect.x()));
+    this.konva.proxyRect.y(Math.round(this.konva.proxyRect.y()));
+
+    // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
+    // and border
+    this.konva.outlineRect.setAttrs({
+      x: this.konva.proxyRect.x() - this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING),
+      y: this.konva.proxyRect.y() - this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING),
+    });
+
+    // The object group is translated by the difference between the interaction rect's new and old positions (which is
+    // stored as this.pixelRect)
+    this.parent.renderer.konva.objectGroup.setAttrs({
+      x: this.konva.proxyRect.x(),
+      y: this.konva.proxyRect.y(),
+    });
+  };
+
+  onDragEnd = () => {
+    if (this.isTransforming) {
+      // If we are transforming the entity, we should not push the new position to the state. This will trigger a
+      // re-render of the entity and bork the transformation.
+      return;
+    }
+
+    const position = {
+      x: this.konva.proxyRect.x() - this.pixelRect.x,
+      y: this.konva.proxyRect.y() - this.pixelRect.y,
+    };
+
+    this.log.trace({ position }, 'Position changed');
+    this.manager.stateApi.setEntityPosition({ entityIdentifier: this.parent.getEntityIdentifier(), position });
+  };
 
   // TODO(psyche): These don't work when the entity is rotated, need to do some math to offset the flip after rotation
   // flipHorizontal = () => {
