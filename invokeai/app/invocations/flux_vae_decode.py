@@ -21,7 +21,7 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "flux_vae_decode",
-    title="FLUX VAE Decode",
+    title="FLUX Latents to Image",
     tags=["latents", "image", "vae", "l2i", "flux"],
     category="latents",
     version="1.0.0",
