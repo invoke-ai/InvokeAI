@@ -348,6 +348,23 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.syncObjectGroupWithProxyRect();
   };
 
+  /**
+   * Fits the proxy rect to the bounding box of the parent entity, then syncs the object group with the proxy rect.
+   */
+  fitProxyRectToBbox = () => {
+    const { rect } = this.manager.stateApi.getBbox();
+    const scaleX = rect.width / this.konva.proxyRect.width();
+    const scaleY = rect.height / this.konva.proxyRect.height();
+    this.konva.proxyRect.setAttrs({
+      x: rect.x,
+      y: rect.y,
+      scaleX,
+      scaleY,
+      rotation: 0,
+    });
+    this.syncObjectGroupWithProxyRect();
+  };
+
   onDragMove = () => {
     // Snap the interaction rect to the nearest pixel
     this.konva.proxyRect.x(Math.round(this.konva.proxyRect.x()));

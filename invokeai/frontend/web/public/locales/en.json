@@ -1781,7 +1781,6 @@
             "bbox": "Bbox",
             "move": "Move",
             "view": "View",
-            "transform": "Transform",
             "colorPicker": "Color Picker"
         },
         "filter": {
@@ -1789,6 +1788,13 @@
             "filters": "Filters",
             "filterType": "Filter Type",
             "preview": "Preview",
+            "apply": "Apply",
+            "cancel": "Cancel"
+        },
+        "transform": {
+            "transform": "Transform",
+            "fitToBbox": "Fit to Bbox",
+            "reset": "Reset",
             "apply": "Apply",
             "cancel": "Cancel"
         }
