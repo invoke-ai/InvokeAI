@@ -69,7 +69,7 @@ export const CanvasEntityPreviewImage = memo(() => {
       ctx.globalCompositeOperation = 'source-in';
       ctx.fillRect(0, 0, rect.width, rect.height);
     }
-  }, [adapter.transformer, adapter.transformer.nodeRect, adapter.transformer.pixelRect, cache, maskColor]);
+  }, [cache, maskColor]);
 
   return (
     <Flex

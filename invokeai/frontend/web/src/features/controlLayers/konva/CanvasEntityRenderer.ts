@@ -549,17 +549,17 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
   };
 
   updatePreviewCanvas = debounce(() => {
-    if (this.parent.transformer.isPendingRectCalculation) {
+    if (this.parent.transformer.$isPendingRectCalculation.get()) {
       return;
     }
-    if (this.parent.transformer.pixelRect.width === 0 || this.parent.transformer.pixelRect.height === 0) {
+    const pixelRect = this.parent.transformer.$pixelRect.get();
+    if (pixelRect.width === 0 || pixelRect.height === 0) {
       return;
     }
     try {
       const canvas = this.konva.objectGroup._getCachedSceneCanvas()._canvas as HTMLCanvasElement | undefined | null;
       if (canvas) {
-        const nodeRect = this.parent.transformer.nodeRect;
-        const pixelRect = this.parent.transformer.pixelRect;
+        const nodeRect = this.parent.transformer.$nodeRect.get();
         const rect = {
           x: pixelRect.x - nodeRect.x,
           y: pixelRect.y - nodeRect.y,
