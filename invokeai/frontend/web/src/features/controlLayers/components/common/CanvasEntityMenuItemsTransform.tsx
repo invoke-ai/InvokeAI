@@ -20,7 +20,7 @@ export const CanvasEntityMenuItemsTransform = memo(() => {
 
   return (
     <MenuItem onClick={onClick} icon={<PiFrameCornersBold />} isDisabled={Boolean(transformingEntity)}>
-      {t('controlLayers.tool.transform')}
+      {t('controlLayers.transform.transform')}
     </MenuItem>
   );
 });
