@@ -500,6 +500,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
 
+    if (this.manager.$isBusy.get()) {
+      // If the canvas is busy, we can't interact with the transformer
+      this.parent.konva.layer.listening(false);
+      this.setInteractionMode('off');
+      return;
+    }
+
     const pixelRect = this.$pixelRect.get();
     const isPendingRectCalculation = this.$isPendingRectCalculation.get();
 

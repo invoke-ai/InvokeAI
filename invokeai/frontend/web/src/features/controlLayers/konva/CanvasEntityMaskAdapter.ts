@@ -170,6 +170,10 @@ export class CanvasEntityMaskAdapter extends CanvasModuleBase {
     return canvas;
   };
 
+  isInteractable = (): boolean => {
+    return this.state.isEnabled && !this.state.isLocked;
+  };
+
   destroy = () => {
     this.log.debug('Destroying module');
     this.transformer.destroy();

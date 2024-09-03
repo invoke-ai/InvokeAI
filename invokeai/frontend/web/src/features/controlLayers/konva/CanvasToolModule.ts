@@ -143,46 +143,29 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   syncCursorStyle = () => {
+    this.log.trace('Syncing cursor style');
     const stage = this.manager.stage;
-    const renderedEntityCount = this.manager.stateApi.getRenderedEntityCount();
-    const selectedEntity = this.manager.stateApi.getSelectedEntity();
     const isMouseDown = this.$isMouseDown.get();
     const tool = this.$tool.get();
 
-    const isDrawable =
-      !!selectedEntity &&
-      selectedEntity.state.isEnabled &&
-      !selectedEntity.state.isLocked &&
-      isDrawableEntity(selectedEntity.state);
-
-    // Update the stage's pointer style
-    if (this.manager.stateApi.$isTranforming.get() || renderedEntityCount === 0) {
-      // We are transforming and/or have no layers, so we should not render any tool
-      stage.container.style.cursor = 'default';
-    } else if (tool === 'view') {
-      // view tool gets a hand
-      stage.container.style.cursor = isMouseDown ? 'grabbing' : 'grab';
-      // Bbox tool gets default
-    } else if (tool === 'bbox') {
-      stage.container.style.cursor = 'default';
-    } else if (tool === 'colorPicker') {
-      // Color picker gets none
-      stage.container.style.cursor = 'none';
-    } else if (isDrawable) {
-      if (tool === 'move') {
-        // Move gets default arrow
-        stage.container.style.cursor = 'default';
-      } else if (tool === 'rect') {
-        // Rect gets a crosshair
-        stage.container.style.cursor = 'crosshair';
-      } else if (tool === 'brush' || tool === 'eraser') {
-        // Hide the native cursor and use the konva-rendered brush preview
-        stage.container.style.cursor = 'none';
-      }
+    if (tool === 'view') {
+      stage.setCursor(isMouseDown ? 'grabbing' : 'grab');
+    } else if (this.manager.stateApi.getRenderedEntityCount() === 0) {
+      stage.setCursor('not-allowed');
+    } else if (this.manager.stateApi.$isTranforming.get()) {
+      stage.setCursor('not-allowed');
+    } else if (this.manager.filter.$isFiltering.get()) {
+      stage.setCursor('not-allowed');
+    } else if (!this.manager.stateApi.getSelectedEntity()?.adapter.isInteractable()) {
+      stage.setCursor('not-allowed');
+    } else if (tool === 'colorPicker' || tool === 'brush' || tool === 'eraser') {
+      stage.setCursor('none');
+    } else if (tool === 'move' || tool === 'bbox') {
+      stage.setCursor('default');
+    } else if (tool === 'rect') {
+      stage.setCursor('crosshair');
     } else {
-      // isDrawable === 'false'
-      // Non-drawable layers don't have tools
-      stage.container.style.cursor = 'not-allowed';
+      stage.setCursor('not-allowed');
     }
   };
 
@@ -302,7 +285,25 @@ export class CanvasToolModule extends CanvasModuleBase {
     };
   };
 
+  getCanDraw = (): boolean => {
+    if (this.manager.stateApi.getRenderedEntityCount() === 0) {
+      return false;
+    } else if (this.manager.stateApi.$isTranforming.get()) {
+      return false;
+    } else if (this.manager.filter.$isFiltering.get()) {
+      return false;
+    } else if (!this.manager.stateApi.getSelectedEntity()?.adapter.isInteractable()) {
+      return false;
+    } else {
+      return true;
+    }
+  };
+
   onStageMouseEnter = async (_: KonvaEventObject<MouseEvent>) => {
+    if (!this.getCanDraw()) {
+      return;
+    }
+
     const cursorPos = this.syncLastCursorPos();
     try {
       const isMouseDown = this.$isMouseDown.get();
@@ -356,6 +357,10 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStageMouseDown = async (e: KonvaEventObject<MouseEvent>) => {
+    if (!this.getCanDraw()) {
+      return;
+    }
+
     this.$isMouseDown.set(getIsPrimaryMouseDown(e));
     const cursorPos = this.syncLastCursorPos();
 
@@ -473,6 +478,10 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStageMouseUp = (_: KonvaEventObject<MouseEvent>) => {
+    if (!this.getCanDraw()) {
+      return;
+    }
+
     try {
       this.$isMouseDown.set(false);
       const cursorPos = this.syncLastCursorPos();
@@ -516,6 +525,10 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStageMouseMove = async (_: KonvaEventObject<MouseEvent>) => {
+    if (!this.getCanDraw()) {
+      return;
+    }
+
     try {
       const tool = this.$tool.get();
       const cursorPos = this.syncLastCursorPos();
@@ -595,6 +608,10 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStageMouseLeave = (_: KonvaEventObject<MouseEvent>) => {
+    if (!this.getCanDraw()) {
+      return;
+    }
+
     this.$lastCursorPos.set(null);
     this.$lastMouseDownPos.set(null);
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
@@ -607,6 +624,10 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStageMouseWheel = (e: KonvaEventObject<WheelEvent>) => {
+    if (!this.getCanDraw()) {
+      return;
+    }
+
     e.evt.preventDefault();
 
     if (!e.evt.ctrlKey && !e.evt.metaKey) {
