@@ -226,7 +226,15 @@ class ModelProbe(object):
         ckpt = ckpt.get("state_dict", ckpt)
 
         for key in [str(k) for k in ckpt.keys()]:
-            if key.startswith(("cond_stage_model.", "first_stage_model.", "model.diffusion_model.", "double_blocks.")):
+            if key.startswith(
+                (
+                    "cond_stage_model.",
+                    "first_stage_model.",
+                    "model.diffusion_model.",
+                    "double_blocks.",
+                    "model.diffusion_model.double_blocks.",
+                )
+            ):
                 # Keys starting with double_blocks are associated with Flux models
                 return ModelType.Main
             elif key.startswith(("encoder.conv_in", "decoder.conv_in")):
@@ -337,7 +345,10 @@ class ModelProbe(object):
                 # TODO: Decide between dev/schnell
                 checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
                 state_dict = checkpoint.get("state_dict") or checkpoint
-                if "guidance_in.out_layer.weight" in state_dict:
+                if (
+                    "guidance_in.out_layer.weight" in state_dict
+                    or "model.diffusion_model.guidance_in.out_layer.weight" in state_dict
+                ):
                     # For flux, this is a key in invokeai.backend.flux.util.params
                     #   Due to model type and format being the descriminator for model configs this
                     #   is used rather than attempting to support flux with separate model types and format
@@ -452,7 +463,10 @@ class CheckpointProbeBase(ProbeBase):
 
     def get_format(self) -> ModelFormat:
         state_dict = self.checkpoint.get("state_dict") or self.checkpoint
-        if "double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict:
+        if (
+            "double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict
+            or "model.diffusion_model.double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict
+        ):
             return ModelFormat.BnbQuantizednf4b
         return ModelFormat("checkpoint")
 
@@ -479,7 +493,10 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
     def get_base_type(self) -> BaseModelType:
         checkpoint = self.checkpoint
         state_dict = self.checkpoint.get("state_dict") or checkpoint
-        if "double_blocks.0.img_attn.norm.key_norm.scale" in state_dict:
+        if (
+            "double_blocks.0.img_attn.norm.key_norm.scale" in state_dict
+            or "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in state_dict
+        ):
             return BaseModelType.Flux
         key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
         if key_name in state_dict and state_dict[key_name].shape[-1] == 768:

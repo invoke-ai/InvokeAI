@@ -133,3 +133,16 @@ def lora_token_vector_length(checkpoint: Dict[str, torch.Tensor]) -> Optional[in
             break
 
     return lora_token_vector_length
+
+
+def convert_bundle_to_flux_transformer_checkpoint(
+    transformer_state_dict: dict[str, torch.Tensor],
+) -> dict[str, torch.Tensor]:
+    original_state_dict: dict[str, torch.Tensor] = {}
+    for k, v in transformer_state_dict.items():
+        if not k.startswith("model.diffusion_model"):
+            continue
+        if k.endswith("scale"):
+            v = v.to(dtype=torch.bfloat16)
+        original_state_dict[k.replace("model.diffusion_model.", "")] = v
+    return original_state_dict
