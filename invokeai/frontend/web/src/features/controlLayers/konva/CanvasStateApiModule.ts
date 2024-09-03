@@ -46,7 +46,7 @@ import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
 
 type EntityStateAndAdapter =
   | {
-  id: string;
+      id: string;
       type: CanvasRasterLayerState['type'];
       state: CanvasRasterLayerState;
       adapter: CanvasEntityLayerAdapter;
@@ -255,24 +255,32 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    *
    * Both state and adapter must exist for the entity to be returned.
    */
-  getEntity(identifier: CanvasEntityIdentifier): EntityStateAndAdapter | null {
+  getEntity<T extends CanvasEntityIdentifier>({
+    id,
+    type,
+  }: T): Extract<EntityStateAndAdapter, { type: T['type'] }> | null {
     const state = this.getCanvasState();
 
-    let entityState: EntityStateAndAdapter['state'] | null = null;
-    let entityAdapter: EntityStateAndAdapter['adapter'] | null = null;
+    let entityState: EntityStateAndAdapter['state'] | undefined = undefined;
+    let entityAdapter: EntityStateAndAdapter['adapter'] | undefined = undefined;
 
-    if (identifier.type === 'raster_layer') {
-      entityState = state.rasterLayers.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.manager.adapters.rasterLayers.get(identifier.id) ?? null;
-    } else if (identifier.type === 'control_layer') {
-      entityState = state.controlLayers.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.manager.adapters.controlLayers.get(identifier.id) ?? null;
-    } else if (identifier.type === 'regional_guidance') {
-      entityState = state.regions.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.manager.adapters.regionMasks.get(identifier.id) ?? null;
-    } else if (identifier.type === 'inpaint_mask') {
-      entityState = state.inpaintMasks.entities.find((i) => i.id === identifier.id) ?? null;
-      entityAdapter = this.manager.adapters.inpaintMasks.get(identifier.id) ?? null;
+    switch (type) {
+      case 'raster_layer':
+        entityState = state.rasterLayers.entities.find((i) => i.id === id);
+        entityAdapter = this.manager.adapters.rasterLayers.get(id);
+        break;
+      case 'control_layer':
+        entityState = state.controlLayers.entities.find((i) => i.id === id);
+        entityAdapter = this.manager.adapters.controlLayers.get(id);
+        break;
+      case 'regional_guidance':
+        entityState = state.regions.entities.find((i) => i.id === id);
+        entityAdapter = this.manager.adapters.regionMasks.get(id);
+        break;
+      case 'inpaint_mask':
+        entityState = state.inpaintMasks.entities.find((i) => i.id === id);
+        entityAdapter = this.manager.adapters.inpaintMasks.get(id);
+        break;
     }
 
     if (entityState && entityAdapter) {
@@ -281,7 +289,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
         type: entityState.type,
         state: entityState,
         adapter: entityAdapter,
-      } as EntityStateAndAdapter; // TODO(psyche): make TS happy w/o this cast
+      } as Extract<EntityStateAndAdapter, { type: T['type'] }>; // TODO(psyche): make TS happy w/o this cast
     }
 
     return null;
