@@ -8,12 +8,11 @@ import type { Logger } from 'roarr';
 
 export class CanvasObjectEraserLineRenderer extends CanvasModuleBase {
   readonly type = 'object_eraser_line_renderer';
-
-  id: string;
-  path: string[];
-  parent: CanvasEntityRenderer;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasEntityRenderer;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   state: CanvasEraserLineState;
   konva: {

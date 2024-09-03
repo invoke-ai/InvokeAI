@@ -37,12 +37,11 @@ const DEFAULT_CONFIG: CanvasStageModuleConfig = {
 
 export class CanvasStageModule extends CanvasModuleBase {
   readonly type = 'stage';
-
-  id: string;
-  path: string[];
-  parent: CanvasManager;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   container: HTMLDivElement;
   konva: { stage: Konva.Stage };

@@ -2,7 +2,14 @@ import type { SerializableObject } from 'common/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { Logger } from 'roarr';
 
+/**
+ * Base class for all canvas modules.
+ */
 export abstract class CanvasModuleBase {
+  /**
+   * The type of the module.
+   */
+  abstract readonly type: string;
   /**
    * The unique identifier of the module.
    *
@@ -15,11 +22,7 @@ export abstract class CanvasModuleBase {
    * // this.id -> "raster_layer:aS2NREsrlz"
    * ```
    */
-  abstract id: string;
-  /**
-   * The type of the module.
-   */
-  abstract type: string;
+  abstract readonly id: string;
   /**
    * The path of the module in the canvas module tree.
    *
@@ -31,15 +34,15 @@ export abstract class CanvasModuleBase {
    * // this.path -> ["manager:3PWJWmHbou", "raster_layer:aS2NREsrlz", "entity_renderer:sfLO4j1B0n", "brush_line:Zrsu8gpZMd"]
    * ```
    */
-  abstract path: string[];
-  /**
-   * The canvas manager.
-   */
-  abstract manager: CanvasManager;
+  abstract readonly path: string[];
   /**
    * The parent module. This may be the canvas manager or another module.
    */
-  abstract parent: CanvasModuleBase;
+  abstract readonly parent: CanvasModuleBase;
+  /**
+   * The canvas manager.
+   */
+  abstract readonly manager: CanvasManager;
   /**
    * The logger for the module. The logger must be a `ROARR` logger.
    *
@@ -50,7 +53,7 @@ export abstract class CanvasModuleBase {
    * this.log = this.manager.buildLogger(this);
    * ```
    */
-  abstract log: Logger;
+  abstract readonly log: Logger;
 
   /**
    * Returns a logging context object that includes relevant information about the module.

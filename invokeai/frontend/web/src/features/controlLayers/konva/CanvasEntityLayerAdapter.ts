@@ -33,12 +33,11 @@ import { assert } from 'tsafe';
  */
 export class CanvasEntityLayerAdapter extends CanvasModuleBase {
   readonly type = 'entity_layer_adapter';
-
-  id: string;
-  path: string[];
-  manager: CanvasManager;
-  parent: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly manager: CanvasManager;
+  readonly parent: CanvasManager;
+  readonly log: Logger;
 
   /**
    * The last known state of the entity.

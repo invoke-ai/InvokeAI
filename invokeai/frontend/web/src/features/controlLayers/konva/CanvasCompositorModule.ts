@@ -23,12 +23,11 @@ import { assert } from 'tsafe';
  */
 export class CanvasCompositorModule extends CanvasModuleBase {
   readonly type = 'compositor';
-
-  id: string;
-  path: string[];
-  log: Logger;
-  parent: CanvasManager;
-  manager: CanvasManager;
+  readonly id: string;
+  readonly path: string[];
+  readonly log: Logger;
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
 
   constructor(manager: CanvasManager) {
     super();

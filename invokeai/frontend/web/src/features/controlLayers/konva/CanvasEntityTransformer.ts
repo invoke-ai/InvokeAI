@@ -78,12 +78,11 @@ const DEFAULT_CONFIG: CanvasEntityTransformerConfig = {
 
 export class CanvasEntityTransformer extends CanvasModuleBase {
   readonly type = 'entity_transformer';
-
-  id: string;
-  path: string[];
-  parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   config: CanvasEntityTransformerConfig = DEFAULT_CONFIG;
 

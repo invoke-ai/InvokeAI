@@ -26,12 +26,11 @@ const NO_ANCHORS: string[] = [];
  */
 export class CanvasBboxModule extends CanvasModuleBase {
   readonly type = 'bbox';
-
-  id: string;
-  path: string[];
-  parent: CanvasManager;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   subscriptions: Set<() => void> = new Set();
 

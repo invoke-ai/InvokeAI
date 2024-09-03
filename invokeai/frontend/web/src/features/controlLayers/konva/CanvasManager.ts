@@ -28,12 +28,11 @@ export const $canvasManager = atom<CanvasManager | null>(null);
 
 export class CanvasManager extends CanvasModuleBase {
   readonly type = 'manager';
-
-  id: string;
-  path: string[];
-  manager: CanvasManager;
-  parent: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly manager: CanvasManager;
+  readonly parent: CanvasManager;
+  readonly log: Logger;
 
   store: AppStore;
   socket: AppSocket;

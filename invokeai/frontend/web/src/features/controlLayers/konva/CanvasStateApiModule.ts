@@ -46,7 +46,7 @@ import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
 
 type EntityStateAndAdapter =
   | {
-      id: string;
+  id: string;
       type: CanvasRasterLayerState['type'];
       state: CanvasRasterLayerState;
       adapter: CanvasEntityLayerAdapter;
@@ -72,12 +72,11 @@ type EntityStateAndAdapter =
 
 export class CanvasStateApiModule extends CanvasModuleBase {
   readonly type = 'state_api';
-
-  id: string;
-  path: string[];
-  parent: CanvasManager;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   /**
    * The redux store.

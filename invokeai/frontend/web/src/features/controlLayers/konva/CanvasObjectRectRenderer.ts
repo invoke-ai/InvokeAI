@@ -9,12 +9,11 @@ import type { Logger } from 'roarr';
 
 export class CanvasObjectRectRenderer extends CanvasModuleBase {
   readonly type = 'object_rect_renderer';
-
-  id: string;
-  path: string[];
-  parent: CanvasEntityRenderer;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasEntityRenderer;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   state: CanvasRectState;
   konva: {
