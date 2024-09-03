@@ -191,6 +191,8 @@ class FluxCheckpointModel(ModelLoader):
         with SilenceWarnings():
             model = Flux(params[config.config_path])
             sd = load_file(model_path)
+            if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
+                sd = convert_bundle_to_flux_transformer_checkpoint(sd)
             model.load_state_dict(sd, assign=True)
         return model
 
