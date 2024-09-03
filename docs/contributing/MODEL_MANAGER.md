@@ -1468,7 +1468,7 @@ to load several different diffusers types:
 from pathlib import Path
 from typing import Optional
 
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.config import (
     AnyModel,
     BaseModelType,
     ModelFormat,

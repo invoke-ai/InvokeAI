@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import get_args
 
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
-from invokeai.backend.model_manager import InvalidModelConfigException, ModelProbe
+from invokeai.backend.model_manager.config import InvalidModelConfigException
+from invokeai.backend.model_manager.probe import ModelProbe
 
 algos = ", ".join(set(get_args(HASHING_ALGORITHMS)))
 

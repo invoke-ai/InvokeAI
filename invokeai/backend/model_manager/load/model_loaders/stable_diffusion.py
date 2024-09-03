@@ -11,19 +11,17 @@ from diffusers import (
     StableDiffusionXLPipeline,
 )
 
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
     BaseModelType,
+    CheckpointConfigBase,
+    DiffusersConfigBase,
+    MainCheckpointConfig,
     ModelFormat,
     ModelType,
     ModelVariantType,
     SubModelType,
-)
-from invokeai.backend.model_manager.config import (
-    CheckpointConfigBase,
-    DiffusersConfigBase,
-    MainCheckpointConfig,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader

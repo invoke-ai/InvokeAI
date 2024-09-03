@@ -3,8 +3,13 @@ from pathlib import Path
 import pytest
 from torch import tensor
 
-from invokeai.backend.model_manager import BaseModelType, ModelRepoVariant
-from invokeai.backend.model_manager.config import InvalidModelConfigException, MainDiffusersConfig, ModelVariantType
+from invokeai.backend.model_manager.config import (
+    BaseModelType,
+    InvalidModelConfigException,
+    MainDiffusersConfig,
+    ModelRepoVariant,
+    ModelVariantType,
+)
 from invokeai.backend.model_manager.probe import (
     CkptType,
     ModelProbe,

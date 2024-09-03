@@ -13,7 +13,7 @@ from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob, ModelSource
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceBase
-from invokeai.backend.model_manager import AnyModelConfig
+from invokeai.backend.model_manager.config import AnyModelConfig
 
 
 class ModelInstallServiceBase(ABC):

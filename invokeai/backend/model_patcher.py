@@ -14,7 +14,7 @@ from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokeniz
 
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_manager import AnyModel
+from invokeai.backend.model_manager.config import AnyModel
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 from invokeai.backend.stable_diffusion.extensions.lora import LoRAExt

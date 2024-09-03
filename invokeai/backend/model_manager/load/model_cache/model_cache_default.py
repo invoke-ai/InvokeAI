@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 
 import torch
 
-from invokeai.backend.model_manager import AnyModel, SubModelType
+from invokeai.backend.model_manager.config import AnyModel, SubModelType
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot, get_pretty_snapshot_diff
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import (
     CacheRecord,

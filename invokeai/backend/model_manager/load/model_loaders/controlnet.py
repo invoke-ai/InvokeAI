@@ -5,14 +5,15 @@ from typing import Optional
 
 from diffusers import ControlNetModel
 
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
     BaseModelType,
+    ControlNetCheckpointConfig,
     ModelFormat,
     ModelType,
+    SubModelType,
 )
-from invokeai.backend.model_manager.config import ControlNetCheckpointConfig, SubModelType
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 

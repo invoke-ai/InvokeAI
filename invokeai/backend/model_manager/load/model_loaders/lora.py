@@ -7,7 +7,7 @@ from typing import Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
     BaseModelType,

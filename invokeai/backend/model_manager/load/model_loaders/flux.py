@@ -13,19 +13,17 @@ from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.util import ae_params, params
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
     BaseModelType,
-    ModelFormat,
-    ModelType,
-    SubModelType,
-)
-from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
     CLIPEmbedDiffusersConfig,
     MainBnbQuantized4bCheckpointConfig,
     MainCheckpointConfig,
+    ModelFormat,
+    ModelType,
+    SubModelType,
     T5EncoderBnbQuantizedLlmInt8bConfig,
     T5EncoderConfig,
     VAECheckpointConfig,

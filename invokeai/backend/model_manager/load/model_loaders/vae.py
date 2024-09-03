@@ -5,13 +5,15 @@ from typing import Optional
 
 from diffusers import AutoencoderKL
 
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.config import (
+    AnyModel,
     AnyModelConfig,
     BaseModelType,
     ModelFormat,
     ModelType,
+    SubModelType,
+    VAECheckpointConfig,
 )
-from invokeai.backend.model_manager.config import AnyModel, SubModelType, VAECheckpointConfig
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 

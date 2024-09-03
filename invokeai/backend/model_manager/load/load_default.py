@@ -6,13 +6,13 @@ from pathlib import Path
 from typing import Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
+    DiffusersConfigBase,
     InvalidModelConfigException,
     SubModelType,
 )
-from invokeai.backend.model_manager.config import DiffusersConfigBase
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase, ModelLockerBase
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs

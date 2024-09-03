@@ -10,7 +10,7 @@ from safetensors.torch import load_file
 from typing_extensions import Self
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.model_manager import BaseModelType
+from invokeai.backend.model_manager.config import BaseModelType
 from invokeai.backend.raw_model import RawModel
 
 

@@ -6,7 +6,7 @@ from typing import Dict, Optional
 
 import torch
 
-from invokeai.backend.model_manager import AnyModel
+from invokeai.backend.model_manager.config import AnyModel
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import (
     CacheRecord,
     ModelCacheBase,

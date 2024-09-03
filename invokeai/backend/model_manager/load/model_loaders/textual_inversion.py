@@ -4,7 +4,7 @@
 from pathlib import Path
 from typing import Optional
 
-from invokeai.backend.model_manager import (
+from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
     BaseModelType,

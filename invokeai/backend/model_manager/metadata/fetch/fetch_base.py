@@ -17,7 +17,7 @@ from typing import Optional
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 
-from invokeai.backend.model_manager import ModelRepoVariant
+from invokeai.backend.model_manager.config import ModelRepoVariant
 from invokeai.backend.model_manager.metadata.metadata_base import (
     AnyModelRepoMetadata,
     AnyModelRepoMetadataValidator,
