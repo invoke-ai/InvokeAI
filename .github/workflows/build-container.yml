@@ -13,6 +13,12 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      push-to-registry:
+        description: Push the built image to the container registry
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
