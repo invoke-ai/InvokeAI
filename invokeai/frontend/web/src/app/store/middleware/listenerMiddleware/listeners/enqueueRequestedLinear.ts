@@ -31,7 +31,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       let didStartStaging = false;
 
-      if (!state.canvasSession.isStaging && state.canvasSession.sendToCanvas) {
+      if (!state.canvasSession.isStaging && state.canvasSettings.sendToCanvas) {
         dispatch(sessionStartedStaging());
         didStartStaging = true;
       }
@@ -70,7 +70,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       const { g, noise, posCond } = buildGraphResult.value;
 
-      const destination = state.canvasSession.sendToCanvas ? 'canvas' : 'gallery';
+      const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
 
       const prepareBatchResult = withResult(() =>
         prepareLinearUIBatch(state, g, prepend, noise, posCond, 'generation', destination)

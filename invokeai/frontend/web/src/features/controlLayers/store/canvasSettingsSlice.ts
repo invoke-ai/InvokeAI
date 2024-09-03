@@ -1,32 +1,71 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import type { RgbaColor } from 'features/controlLayers/store/types';
 
 export type CanvasSettingsState = {
-  imageSmoothing: boolean;
+  /**
+   * Whether to show HUD (Heads-Up Display) on the canvas.
+   */
   showHUD: boolean;
+  /**
+   * Whether to automatically save canvas generations to the gallery. If in Save to Gallery mode, this setting will be
+   * ignored, and all generations will be saved.
+   */
   autoSave: boolean;
-  preserveMaskedArea: boolean;
-  cropToBboxOnSave: boolean;
+  /**
+   * Whether to clip lines and shapes to the generation bounding box. If disabled, lines and shapes will be clipped to
+   * the canvas bounds.
+   */
   clipToBbox: boolean;
+  /**
+   * Whether to show a dynamic grid on the canvas. If disabled, a checkerboard pattern will be shown instead.
+   */
   dynamicGrid: boolean;
+  /**
+   * Whether to invert the scroll direction when adjusting the brush or eraser width with the scroll wheel.
+   */
+  invertScrollForToolWidth: boolean;
+  /**
+   * The width of the brush tool.
+   */
+  brushWidth: number;
+  /**
+   * The width of the eraser tool.
+   */
+  eraserWidth: number;
+  /**
+   * The color to use when drawing lines or filling shapes.
+   */
+  color: RgbaColor;
+  /**
+   * Whether to send generated images to canvas staging area. When disabled, generated images will be sent directly to
+   * the gallery.
+   */
+  sendToCanvas: boolean;
+
+  // TODO(psyche): These are copied from old canvas state, need to be implemented
+  // imageSmoothing: boolean;
+  // preserveMaskedArea: boolean;
+  // cropToBboxOnSave: boolean;
 };
 
 const initialState: CanvasSettingsState = {
-  // TODO(psyche): These are copied from old canvas state, need to be implemented
   autoSave: false,
-  imageSmoothing: true,
-  preserveMaskedArea: false,
   showHUD: true,
   clipToBbox: false,
-  cropToBboxOnSave: false,
   dynamicGrid: false,
+  brushWidth: 50,
+  eraserWidth: 50,
+  invertScrollForToolWidth: false,
+  color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
+  sendToCanvas: false,
 };
 
 export const canvasSettingsSlice = createSlice({
   name: 'canvasSettings',
   initialState,
   reducers: {
-    clipToBboxChanged: (state, action: PayloadAction<boolean>) => {
+    settingsClipToBboxChanged: (state, action: PayloadAction<boolean>) => {
       state.clipToBbox = action.payload;
     },
     settingsDynamicGridToggled: (state) => {
@@ -38,11 +77,35 @@ export const canvasSettingsSlice = createSlice({
     settingsShowHUDToggled: (state) => {
       state.showHUD = !state.showHUD;
     },
+    settingsBrushWidthChanged: (state, action: PayloadAction<number>) => {
+      state.brushWidth = Math.round(action.payload);
+    },
+    settingsEraserWidthChanged: (state, action: PayloadAction<number>) => {
+      state.eraserWidth = Math.round(action.payload);
+    },
+    settingsColorChanged: (state, action: PayloadAction<RgbaColor>) => {
+      state.color = action.payload;
+    },
+    settingsInvertScrollForToolWidthChanged: (state, action: PayloadAction<boolean>) => {
+      state.invertScrollForToolWidth = action.payload;
+    },
+    settingsSendToCanvasChanged: (state, action: PayloadAction<boolean>) => {
+      state.sendToCanvas = action.payload;
+    },
   },
 });
 
-export const { clipToBboxChanged, settingsAutoSaveToggled, settingsDynamicGridToggled, settingsShowHUDToggled } =
-  canvasSettingsSlice.actions;
+export const {
+  settingsClipToBboxChanged,
+  settingsAutoSaveToggled,
+  settingsDynamicGridToggled,
+  settingsShowHUDToggled,
+  settingsBrushWidthChanged,
+  settingsEraserWidthChanged,
+  settingsColorChanged,
+  settingsInvertScrollForToolWidthChanged,
+  settingsSendToCanvasChanged,
+} = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrate = (state: any): any => {

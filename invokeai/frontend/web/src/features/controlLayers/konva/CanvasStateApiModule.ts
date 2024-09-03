@@ -5,6 +5,13 @@ import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/Canva
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import type {
+  CanvasSettingsState} from 'features/controlLayers/store/canvasSettingsSlice';
+import {
+  settingsBrushWidthChanged,
+  settingsColorChanged,
+  settingsEraserWidthChanged,
+} from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   bboxChanged,
   entityBrushLineAdded,
@@ -15,12 +22,6 @@ import {
   entityReset,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectAllRenderableEntities, selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import {
-  brushWidthChanged,
-  eraserWidthChanged,
-  fillChanged,
-  type ToolState,
-} from 'features/controlLayers/store/toolSlice';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
@@ -158,21 +159,21 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Sets the brush width, pushing state to redux.
    */
   setBrushWidth = (width: number) => {
-    this.store.dispatch(brushWidthChanged(width));
+    this.store.dispatch(settingsBrushWidthChanged(width));
   };
 
   /**
    * Sets the eraser width, pushing state to redux.
    */
   setEraserWidth = (width: number) => {
-    this.store.dispatch(eraserWidthChanged(width));
+    this.store.dispatch(settingsEraserWidthChanged(width));
   };
 
   /**
-   * Sets the fill color, pushing state to redux.
+   * Sets the drawing color, pushing state to redux.
    */
-  setFill = (fill: RgbaColor) => {
-    return this.store.dispatch(fillChanged(fill));
+  setColor = (color: RgbaColor) => {
+    return this.store.dispatch(settingsColorChanged(color));
   };
 
   /**
@@ -191,13 +192,6 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   getBbox = () => {
     return this.getCanvasState().bbox;
-  };
-
-  /**
-   * Gets the tool state from redux.
-   */
-  getToolState = () => {
-    return this.store.getState().tool;
   };
 
   /**
@@ -322,37 +316,36 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   };
 
   /**
-   * Gets the current fill color. The fill color is determined by the tool state and the selected entity.
+   * Gets the current drawing color.
    *
-   * The fill color is determined by the tool state, except when the selected entity is a regional guidance or inpaint
-   * mask. In that case, the fill color is always black.
+   * The color is determined by the tool state, except when the selected entity is a regional guidance or inpaint mask.
+   * In that case, the color is always black.
    *
    * Regional guidance and inpaint mask entities use a compositing rect to draw with their selected color and texture,
-   * so the fill color for lines and rects doesn't matter - it is never seen. The only requirement is that it is opaque.
-   * For consistency with conventional black and white mask images, we use black as the fill color for these entities.
+   * so the color for lines and rects doesn't matter - it is never seen. The only requirement is that it is opaque. For
+   * consistency with conventional black and white mask images, we use black as the color for these entities.
    */
-  getCurrentFill = () => {
-    let currentFill: RgbaColor = this.getToolState().fill;
+  getCurrentColor = () => {
+    let color: RgbaColor = this.getSettings().color;
     const selectedEntity = this.getSelectedEntity();
     if (selectedEntity) {
       // These two entity types use a compositing rect for opacity. Their fill is always a solid color.
       if (selectedEntity.state.type === 'regional_guidance' || selectedEntity.state.type === 'inpaint_mask') {
-        currentFill = RGBA_BLACK;
+        color = RGBA_BLACK;
       }
     }
-    return currentFill;
+    return color;
   };
 
   /**
-   * Gets the brush preview fill color. The brush preview fill color is determined by the tool state and the selected
-   * entity.
+   * Gets the brush preview color. The brush preview color is determined by the tool state and the selected entity.
    *
-   * The color is the tool state's fill color, except when the selected entity is a regional guidance or inpaint mask.
+   * The color is the tool state's color, except when the selected entity is a regional guidance or inpaint mask.
    *
-   * These entities have their own fill color and texture, so the brush preview should use those instead of the tool
-   * state's fill color.
+   * These entities have their own color and texture, so the brush preview should use those instead of the tool state's
+   * color.
    */
-  getBrushPreviewFill = (): RgbaColor => {
+  getBrushPreviewColor = (): RgbaColor => {
     const selectedEntity = this.getSelectedEntity();
     if (selectedEntity?.state.type === 'regional_guidance' || selectedEntity?.state.type === 'inpaint_mask') {
       // TODO(psyche): If we move the brush preview's Konva nodes to the selected entity renderer, we can draw them
@@ -361,7 +354,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
       // selected entity's fill color with 50% opacity.
       return { ...selectedEntity.state.fill.color, a: 0.5 };
     } else {
-      return this.getToolState().fill;
+      return this.getSettings().color;
     }
   };
 
@@ -376,9 +369,9 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   $isTranforming = computed(this.$transformingAdapter, (transformingAdapter) => Boolean(transformingAdapter));
 
   /**
-   * A nanostores atom, kept in sync with the redux store's tool state.
+   * A nanostores atom, kept in sync with the redux store's settings state.
    */
-  $toolState: WritableAtom<ToolState> = atom();
+  $settingsState: WritableAtom<CanvasSettingsState> = atom();
 
   /**
    * The current fill color, derived from the tool state and the selected entity.
