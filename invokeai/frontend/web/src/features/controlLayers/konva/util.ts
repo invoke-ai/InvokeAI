@@ -96,6 +96,13 @@ export const snapPosToStage = (pos: Vector2d, stage: Konva.Stage, snapPx = 10): 
   return snappedPos;
 };
 
+export const floorCoord = (coord: Coordinate): Coordinate => {
+  return {
+    x: Math.floor(coord.x),
+    y: Math.floor(coord.y),
+  };
+};
+
 /**
  * Snaps a position to the edge of the given rect if within a threshold of the edge
  * @param pos The position to snap
@@ -170,13 +177,13 @@ export const calculateNewBrushSizeFromWheelDelta = (brushSize: number, delta: nu
 };
 
 /**
- * Validates a candidate point by checking if it is at least `minDistance` away from the last point.
+ * Checks if a candidate point is at least `minDistance` away from the last point. If there is no last point, returns true.
  * @param candidatePoint The candidate point
  * @param lastPoint The last point
  * @param minDistance The minimum distance between points
- * @returns
+ * @returns Whether the candidate point is at least `minDistance` away from the last point
  */
-export const validateCandidatePoint = (
+export const isDistanceMoreThanMin = (
   candidatePoint: Coordinate,
   lastPoint: Coordinate | null,
   minDistance: number
