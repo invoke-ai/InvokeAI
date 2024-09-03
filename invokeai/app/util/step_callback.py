@@ -38,6 +38,25 @@ SD1_5_LATENT_RGB_FACTORS = [
     [-0.1307, -0.1874, -0.7445],  # L4
 ]
 
+FLUX_LATENT_RGB_FACTORS = [
+    [-0.0412, 0.0149, 0.0521],
+    [0.0056, 0.0291, 0.0768],
+    [0.0342, -0.0681, -0.0427],
+    [-0.0258, 0.0092, 0.0463],
+    [0.0863, 0.0784, 0.0547],
+    [-0.0017, 0.0402, 0.0158],
+    [0.0501, 0.1058, 0.1152],
+    [-0.0209, -0.0218, -0.0329],
+    [-0.0314, 0.0083, 0.0896],
+    [0.0851, 0.0665, -0.0472],
+    [-0.0534, 0.0238, -0.0024],
+    [0.0452, -0.0026, 0.0048],
+    [0.0892, 0.0831, 0.0881],
+    [-0.1117, -0.0304, -0.0789],
+    [0.0027, -0.0479, -0.0043],
+    [-0.1146, -0.0827, -0.0598],
+]
+
 
 def sample_to_lowres_estimated_image(
     samples: torch.Tensor, latent_rgb_factors: torch.Tensor, smooth_matrix: Optional[torch.Tensor] = None
@@ -86,6 +105,35 @@ def stable_diffusion_step_callback(
     width *= 8
     height *= 8
 
+    dataURL = image_to_dataURL(image, image_format="JPEG")
+
+    events.emit_invocation_denoise_progress(
+        context_data.queue_item,
+        context_data.invocation,
+        intermediate_state,
+        ProgressImage(dataURL=dataURL, width=width, height=height),
+    )
+
+
+def flux_step_callback(
+    context_data: "InvocationContextData",
+    intermediate_state: PipelineIntermediateState,
+    events: "EventServiceBase",
+    is_canceled: Callable[[], bool],
+) -> None:
+    if is_canceled():
+        raise CanceledException
+    sample = intermediate_state.latents
+    latent_rgb_factors = torch.tensor(FLUX_LATENT_RGB_FACTORS, dtype=sample.dtype, device=sample.device)
+    latent_image_perm = sample.permute(1, 2, 0).to(dtype=sample.dtype, device=sample.device)
+    latent_image = latent_image_perm @ latent_rgb_factors
+    latents_ubyte = (
+        ((latent_image + 1) / 2).clamp(0, 1).mul(0xFF)  # change scale from -1..1 to 0..1  # to 0..255
+    ).to(device="cpu", dtype=torch.uint8)
+    image = Image.fromarray(latents_ubyte.cpu().numpy())
+    (width, height) = image.size
+    width *= 8
+    height *= 8
     dataURL = image_to_dataURL(image, image_format="JPEG")
 
     events.emit_invocation_denoise_progress(
