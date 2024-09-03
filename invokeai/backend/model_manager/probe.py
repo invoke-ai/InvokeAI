@@ -231,7 +231,10 @@ class ModelProbe(object):
                     "cond_stage_model.",
                     "first_stage_model.",
                     "model.diffusion_model.",
+                    # FLUX models in the official BFL format contain keys with the "double_blocks." prefix.
                     "double_blocks.",
+                    # Some FLUX checkpoint files contain transformer keys prefixed with "model.diffusion_model".
+                    # This prefix is typically used to distinguish between multiple models bundled in a single file.
                     "model.diffusion_model.double_blocks.",
                 )
             ):
