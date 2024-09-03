@@ -60,14 +60,14 @@ export abstract class CanvasModuleBase {
    * Canvas modules may override this method to include additional information in the logging context, but should
    * always include the parent's logging context.
    *
-   * The default implementation includes the parent context and the module's path.
+   * The default implementation includes the parent context and the module's path as a string.
    *
    * @example
    * ```ts
    * getLoggingContext = () => {
    *   return {
    *     ...this.parent.getLoggingContext(),
-   *     path: this.path,
+   *     path: this.path.join(' > '),
    *     someImportantValue: this.someImportantValue,
    *   };
    * };
@@ -76,7 +76,7 @@ export abstract class CanvasModuleBase {
   getLoggingContext: () => SerializableObject = () => {
     return {
       ...this.parent.getLoggingContext(),
-      path: this.path,
+      path: this.path.join(' > '),
     };
   };
 
