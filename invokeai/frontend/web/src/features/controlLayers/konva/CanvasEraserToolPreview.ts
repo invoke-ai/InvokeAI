@@ -78,7 +78,7 @@ export class CanvasEraserToolPreview extends CanvasModuleBase {
   }
 
   render = () => {
-    const cursorPos = this.manager.tool.$lastCursorPos.get();
+    const cursorPos = this.manager.tool.$cursorPos.get();
 
     if (!cursorPos) {
       return;
