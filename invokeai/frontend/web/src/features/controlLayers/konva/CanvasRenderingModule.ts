@@ -71,6 +71,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     await this.renderInpaintMasks(state, prevState);
     await this.renderBbox(state, prevState);
     this.arrangeEntities(state, prevState);
+    this.manager.tool.syncCursorStyle();
   };
 
   renderSettings = () => {

@@ -2,6 +2,7 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   rgIPAdapterAdded,
   rgNegativePromptChanged,
@@ -15,6 +16,7 @@ export const RegionalGuidanceMenuItemsAddPromptsAndIPAdapter = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const isBusy = useCanvasIsBusy();
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectCanvasSlice, (canvas) => {
@@ -39,13 +41,15 @@ export const RegionalGuidanceMenuItemsAddPromptsAndIPAdapter = memo(() => {
 
   return (
     <>
-      <MenuItem onClick={addPositivePrompt} isDisabled={!validActions.canAddPositivePrompt}>
+      <MenuItem onClick={addPositivePrompt} isDisabled={!validActions.canAddPositivePrompt || isBusy}>
         {t('controlLayers.addPositivePrompt')}
       </MenuItem>
-      <MenuItem onClick={addNegativePrompt} isDisabled={!validActions.canAddNegativePrompt}>
+      <MenuItem onClick={addNegativePrompt} isDisabled={!validActions.canAddNegativePrompt || isBusy}>
         {t('controlLayers.addNegativePrompt')}
       </MenuItem>
-      <MenuItem onClick={addIPAdapter}>{t('controlLayers.addIPAdapter')}</MenuItem>
+      <MenuItem onClick={addIPAdapter} isDisabled={isBusy}>
+        {t('controlLayers.addIPAdapter')}
+      </MenuItem>
     </>
   );
 });

@@ -1,7 +1,6 @@
 import { MenuItem } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityAdapter } from 'features/controlLayers/hooks/useEntityAdapter';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,16 +9,15 @@ import { PiFrameCornersBold } from 'react-icons/pi';
 export const CanvasEntityMenuItemsTransform = memo(() => {
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
-  const canvasManager = useCanvasManager();
   const adapter = useEntityAdapter(entityIdentifier);
-  const isTransforming = useStore(canvasManager.stateApi.$isTranforming);
+  const isBusy = useCanvasIsBusy();
 
   const onClick = useCallback(() => {
     adapter.transformer.startTransform();
   }, [adapter.transformer]);
 
   return (
-    <MenuItem onClick={onClick} icon={<PiFrameCornersBold />} isDisabled={isTransforming}>
+    <MenuItem onClick={onClick} icon={<PiFrameCornersBold />} isDisabled={isBusy}>
       {t('controlLayers.transform.transform')}
     </MenuItem>
   );

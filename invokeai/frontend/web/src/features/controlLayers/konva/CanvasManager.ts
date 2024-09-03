@@ -16,7 +16,8 @@ import { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule'
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
-import { atom } from 'nanostores';
+import type { Atom } from 'nanostores';
+import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 
 import { CanvasBackgroundModule } from './CanvasBackgroundModule';
@@ -73,6 +74,11 @@ export class CanvasManager extends CanvasModuleBase {
 
   _isDebugging: boolean = false;
 
+  /**
+   * Whether the canvas is currently busy with a transformation or filtering operation.
+   */
+  $isBusy: Atom<boolean>;
+
   constructor(stage: Konva.Stage, container: HTMLDivElement, store: AppStore, socket: AppSocket) {
     super();
     this.id = getPrefixedId(this.type);
@@ -120,6 +126,10 @@ export class CanvasManager extends CanvasModuleBase {
     this.konva.previewLayer.add(this.progressImage.konva.group);
     this.konva.previewLayer.add(this.bbox.konva.group);
     this.konva.previewLayer.add(this.tool.konva.group);
+
+    this.$isBusy = computed([this.filter.$isFiltering, this.stateApi.$isTranforming], (isFiltering, isTransforming) => {
+      return isFiltering || isTransforming;
+    });
   }
 
   enableDebugging() {

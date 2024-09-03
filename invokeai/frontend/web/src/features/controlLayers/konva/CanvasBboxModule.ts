@@ -126,7 +126,8 @@ export class CanvasBboxModule extends CanvasModuleBase {
     this.konva.group.visible(true);
 
     // We need to reach up to the preview layer to enable/disable listening so that the bbox can be interacted with.
-    this.manager.konva.previewLayer.listening(tool === 'bbox');
+    // If the mangaer is busy, we disable listening so the bbox cannot be interacted with.
+    this.manager.konva.previewLayer.listening(tool === 'bbox' && !this.manager.$isBusy.get());
 
     this.konva.proxyRect.setAttrs({
       x,

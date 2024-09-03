@@ -1,3 +1,4 @@
+import type { Property } from 'csstype';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
@@ -304,6 +305,10 @@ export class CanvasStageModule extends CanvasModuleBase {
    */
   getScaledPixels = (pixels: number): number => {
     return pixels / this.getScale();
+  };
+
+  setCursor = (cursor: Property.Cursor) => {
+    this.container.style.cursor = cursor;
   };
 
   setIsDraggable = (isDraggable: boolean) => {
