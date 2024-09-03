@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.lora import LoRAModelRaw
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
@@ -18,6 +17,7 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.peft.lora import LoRAModelRaw
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.Diffusers)
