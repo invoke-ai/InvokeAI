@@ -500,8 +500,15 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
 
-    if (this.manager.$isBusy.get()) {
-      // If the canvas is busy, we can't interact with the transformer
+    if (this.manager.filter.$isFiltering.get()) {
+      // May not interact with the entity when the filter is active
+      this.parent.konva.layer.listening(false);
+      this.setInteractionMode('off');
+      return;
+    }
+
+    if (this.manager.stateApi.$isTranforming.get() && !this.$isTransforming.get()) {
+      // If another entity is being transformed, we can't interact with this transformer
       this.parent.konva.layer.listening(false);
       this.setInteractionMode('off');
       return;
@@ -520,7 +527,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const tool = this.manager.tool.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
 
-    if (!this.parent.renderer.hasObjects() || this.parent.state.isLocked || !this.parent.state.isEnabled) {
+    if (!this.parent.renderer.hasObjects() || !this.parent.isInteractable()) {
       // The layer is totally empty, we can just disable the layer
       this.parent.konva.layer.listening(false);
       this.setInteractionMode('off');
@@ -531,15 +538,18 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       // We are moving this layer, it must be listening
       this.parent.konva.layer.listening(true);
       this.setInteractionMode('drag');
-    } else if (isSelected && this.$isTransforming.get()) {
+      return;
+    }
+
+    if (isSelected && this.$isTransforming.get()) {
       // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer is
       // active, it will interrupt the stage drag events. So we should disable listening when the view tool is selected.
-      if (tool !== 'view') {
-        this.parent.konva.layer.listening(true);
-        this.setInteractionMode('all');
-      } else {
+      if (tool === 'view') {
         this.parent.konva.layer.listening(false);
         this.setInteractionMode('off');
+      } else {
+        this.parent.konva.layer.listening(true);
+        this.setInteractionMode('all');
       }
     } else {
       // The layer is not selected, or we are using a tool that doesn't need the layer to be listening - disable interaction stuff
