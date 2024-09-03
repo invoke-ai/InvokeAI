@@ -1673,6 +1673,7 @@
         "clearCaches": "Clear Caches",
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
+        "compositeMaskedRegions": "Composite Masked Regions",
         "addLayer": "Add Layer",
         "duplicate": "Duplicate",
         "moveToFront": "Move to Front",

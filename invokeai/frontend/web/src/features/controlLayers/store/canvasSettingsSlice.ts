@@ -8,8 +8,9 @@ export type CanvasSettingsState = {
    */
   showHUD: boolean;
   /**
-   * Whether to automatically save canvas generations to the gallery. If in Save to Gallery mode, this setting will be
-   * ignored, and all generations will be saved.
+   * Whether to automatically save canvas generations to the gallery.
+   *
+   * When `sendToCanvas` is disabled, this setting is ignored, and images are always saved to the gallery.
    */
   autoSave: boolean;
   /**
@@ -42,6 +43,14 @@ export type CanvasSettingsState = {
    * the gallery.
    */
   sendToCanvas: boolean;
+  /**
+   * Whether to composite inpainted/outpainted regions back onto the source image when saving canvas generations.
+   *
+   * If disabled, inpainted/outpainted regions will be saved with a transparent background.
+   *
+   * When `sendToCanvas` is disabled, this setting is ignored, masked regions will always be composited.
+   */
+  compositeMaskedRegions: boolean;
 
   // TODO(psyche): These are copied from old canvas state, need to be implemented
   // imageSmoothing: boolean;
@@ -59,6 +68,7 @@ const initialState: CanvasSettingsState = {
   invertScrollForToolWidth: false,
   color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
   sendToCanvas: false,
+  compositeMaskedRegions: false,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -92,6 +102,9 @@ export const canvasSettingsSlice = createSlice({
     settingsSendToCanvasChanged: (state, action: PayloadAction<boolean>) => {
       state.sendToCanvas = action.payload;
     },
+    settingsCompositeMaskedRegionsChanged: (state, action: PayloadAction<boolean>) => {
+      state.compositeMaskedRegions = action.payload;
+    },
   },
 });
 
@@ -105,6 +118,7 @@ export const {
   settingsColorChanged,
   settingsInvertScrollForToolWidthChanged,
   settingsSendToCanvasChanged,
+  settingsCompositeMaskedRegionsChanged,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
