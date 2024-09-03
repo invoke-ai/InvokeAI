@@ -143,6 +143,8 @@ def convert_bundle_to_flux_transformer_checkpoint(
         if not k.startswith("model.diffusion_model"):
             continue
         if k.endswith("scale"):
+            # Scale math must be done at bfloat16 due to our current flux model
+            # support limitations at inference time
             v = v.to(dtype=torch.bfloat16)
         original_state_dict[k.replace("model.diffusion_model.", "")] = v
     return original_state_dict
