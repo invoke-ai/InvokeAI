@@ -501,7 +501,8 @@
         "noModelsInstalled": "Нет установленных моделей",
         "noModelsInstalledDesc1": "Установите модели с помощью",
         "noMatchingModels": "Нет подходящих моделей",
-        "ipAdapters": "IP адаптеры"
+        "ipAdapters": "IP адаптеры",
+        "starterModelsInModelManager": "Стартовые модели можно найти в Менеджере моделей"
     },
     "parameters": {
         "images": "Изображения",
@@ -1758,7 +1759,8 @@
         "postProcessingModel": "Модель постобработки",
         "tileControlNetModelDesc": "Модель ControlNet для выбранной архитектуры основной модели",
         "missingModelsWarning": "Зайдите в <LinkComponent>Менеджер моделей</LinkComponent> чтоб установить необходимые модели:",
-        "postProcessingMissingModelWarning": "Посетите <LinkComponent>Менеджер моделей</LinkComponent>, чтобы установить модель постобработки (img2img)."
+        "postProcessingMissingModelWarning": "Посетите <LinkComponent>Менеджер моделей</LinkComponent>, чтобы установить модель постобработки (img2img).",
+        "upscale": "Увеличить"
     },
     "stylePresets": {
         "noMatchingTemplates": "Нет подходящих шаблонов",
@@ -1804,7 +1806,8 @@
         "noTemplates": "Нет шаблонов",
         "promptTemplatesDesc2": "Используйте строку-заполнитель <Pre>{{placeholder}}</Pre>, чтобы указать место, куда должен быть включен ваш запрос в шаблоне.",
         "searchByName": "Поиск по имени",
-        "shared": "Общий"
+        "shared": "Общий",
+        "promptTemplateCleared": "Шаблон запроса создан"
     },
     "upsell": {
         "inviteTeammates": "Пригласите членов команды",
