@@ -27,12 +27,11 @@ const DEFAULT_CONFIG: BrushToolPreviewConfig = {
  */
 export class CanvasBrushToolPreview extends CanvasModuleBase {
   readonly type = 'brush_tool_preview';
-
-  id: string;
-  path: string[];
-  parent: CanvasToolModule;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasToolModule;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   config: BrushToolPreviewConfig = DEFAULT_CONFIG;
 

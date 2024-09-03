@@ -32,12 +32,11 @@ const DEFAULT_CONFIG: CanvasCacheModuleConfig = {
  */
 export class CanvasCacheModule extends CanvasModuleBase {
   readonly type = 'cache';
-
-  id: string;
-  path: string[];
-  log: Logger;
-  parent: CanvasManager;
-  manager: CanvasManager;
+  readonly id: string;
+  readonly path: string[];
+  readonly log: Logger;
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
 
   config: CanvasCacheModuleConfig = DEFAULT_CONFIG;
 

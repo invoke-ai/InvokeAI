@@ -10,12 +10,11 @@ import type { Logger } from 'roarr';
 
 export class CanvasRenderingModule extends CanvasModuleBase {
   readonly type = 'canvas_renderer';
-
-  id: string;
-  path: string[];
-  log: Logger;
-  parent: CanvasManager;
-  manager: CanvasManager;
+  readonly id: string;
+  readonly path: string[];
+  readonly log: Logger;
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
 
   state: CanvasState | null = null;
   settings: CanvasSettingsState | null = null;

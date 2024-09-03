@@ -23,12 +23,11 @@ import stableHash from 'stable-hash';
 
 export class CanvasEntityMaskAdapter extends CanvasModuleBase {
   readonly type = 'entity_mask_adapter';
-
-  id: string;
-  path: string[];
-  parent: CanvasManager;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   state: CanvasInpaintMaskState | CanvasRegionalGuidanceState;
 

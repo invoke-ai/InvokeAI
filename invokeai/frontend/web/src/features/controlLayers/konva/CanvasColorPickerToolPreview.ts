@@ -68,12 +68,11 @@ const DEFAULT_CONFIG: ColorPickerToolConfig = {
  */
 export class CanvasColorPickerToolPreview extends CanvasModuleBase {
   readonly type = 'color_picker_tool_preview';
-
-  id: string;
-  path: string[];
-  parent: CanvasToolModule;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasToolModule;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   config: ColorPickerToolConfig = DEFAULT_CONFIG;
 

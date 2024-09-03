@@ -22,12 +22,11 @@ const DEFAULT_CONFIG: CanvasBackgroundModuleConfig = {
  */
 export class CanvasBackgroundModule extends CanvasModuleBase {
   readonly type = 'background';
-
-  id: string;
-  path: string[];
-  parent: CanvasManager;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   subscriptions = new Set<() => void>();
   config: CanvasBackgroundModuleConfig = DEFAULT_CONFIG;

@@ -23,12 +23,11 @@ const DEFAULT_CONFIG: EraserToolPreviewConfig = {
 
 export class CanvasEraserToolPreview extends CanvasModuleBase {
   readonly type = 'eraser_tool_preview';
-
-  id: string;
-  path: string[];
-  parent: CanvasToolModule;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasToolModule;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   config: EraserToolPreviewConfig = DEFAULT_CONFIG;
 

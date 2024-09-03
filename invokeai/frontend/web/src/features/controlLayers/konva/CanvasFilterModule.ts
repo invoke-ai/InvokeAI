@@ -13,12 +13,11 @@ import { assert } from 'tsafe';
 
 export class CanvasFilterModule extends CanvasModuleBase {
   readonly type = 'canvas_filter';
-
-  id: string;
-  path: string[];
-  parent: CanvasManager;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   imageState: CanvasImageState | null = null;
 
