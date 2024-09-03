@@ -55,10 +55,10 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     const prevState = this.state;
     this.state = state;
 
-    this.manager.stateApi.$toolState.set(this.manager.stateApi.getToolState());
+    this.manager.stateApi.$settingsState.set(this.manager.stateApi.getSettings());
     this.manager.stateApi.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
     this.manager.stateApi.$selectedEntity.set(this.manager.stateApi.getSelectedEntity());
-    this.manager.stateApi.$currentFill.set(this.manager.stateApi.getCurrentFill());
+    this.manager.stateApi.$currentFill.set(this.manager.stateApi.getCurrentColor());
 
     if (prevState === state) {
       // No changes to state - no need to render

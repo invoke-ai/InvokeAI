@@ -84,9 +84,9 @@ export class CanvasEraserToolPreview extends CanvasModuleBase {
       return;
     }
 
-    const toolState = this.manager.stateApi.getToolState();
-    const alignedCursorPos = alignCoordForTool(cursorPos, toolState.eraser.width);
-    const radius = toolState.eraser.width / 2;
+    const settings = this.manager.stateApi.getSettings();
+    const alignedCursorPos = alignCoordForTool(cursorPos, settings.eraserWidth);
+    const radius = settings.eraserWidth / 2;
 
     // The circle is scaled
     this.konva.cutoutCircle.setAttrs({

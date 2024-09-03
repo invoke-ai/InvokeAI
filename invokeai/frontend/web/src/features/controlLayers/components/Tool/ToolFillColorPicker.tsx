@@ -3,20 +3,20 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIColorPicker from 'common/components/IAIColorPicker';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
-import { fillChanged, selectToolSlice } from 'features/controlLayers/store/toolSlice';
+import { selectCanvasSettingsSlice, settingsColorChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectFill = createSelector(selectToolSlice, (tool) => tool.fill);
+const selectColor = createSelector(selectCanvasSettingsSlice, (settings) => settings.color);
 
-export const ToolFillColorPicker = memo(() => {
+export const ToolColorPicker = memo(() => {
   const { t } = useTranslation();
-  const fill = useAppSelector(selectFill);
+  const fill = useAppSelector(selectColor);
   const dispatch = useAppDispatch();
   const onChange = useCallback(
     (color: RgbaColor) => {
-      dispatch(fillChanged(color));
+      dispatch(settingsColorChanged(color));
     },
     [dispatch]
   );
@@ -40,4 +40,4 @@ export const ToolFillColorPicker = memo(() => {
   );
 });
 
-ToolFillColorPicker.displayName = 'ToolFillColorPicker';
+ToolColorPicker.displayName = 'ToolFillColorPicker';

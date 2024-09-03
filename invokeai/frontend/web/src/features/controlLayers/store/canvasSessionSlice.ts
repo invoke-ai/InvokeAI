@@ -4,14 +4,12 @@ import { canvasSlice } from 'features/controlLayers/store/canvasSlice';
 import type { StagingAreaImage } from 'features/controlLayers/store/types';
 
 export type CanvasSessionState = {
-  sendToCanvas: boolean;
   isStaging: boolean;
   stagedImages: StagingAreaImage[];
   selectedStagedImageIndex: number;
 };
 
 const initialState: CanvasSessionState = {
-  sendToCanvas: false,
   isStaging: false,
   stagedImages: [],
   selectedStagedImageIndex: 0,
@@ -51,9 +49,6 @@ export const canvasSessionSlice = createSlice({
       state.stagedImages = [];
       state.selectedStagedImageIndex = 0;
     },
-    sessionSendToCanvasChanged: (state, action: PayloadAction<boolean>) => {
-      state.sendToCanvas = action.payload;
-    },
   },
 });
 
@@ -64,7 +59,6 @@ export const {
   sessionStagingAreaReset,
   sessionNextStagedImageSelected,
   sessionPrevStagedImageSelected,
-  sessionSendToCanvasChanged,
 } = canvasSessionSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -85,7 +79,3 @@ export const sessionStagingAreaImageAccepted = createAction<{ index: number }>(
 export const selectCanvasSessionSlice = (s: RootState) => s.canvasSession;
 
 export const selectIsStaging = createSelector(selectCanvasSessionSlice, (canvasSession) => canvasSession.isStaging);
-export const selectIsComposing = createSelector(
-  selectCanvasSessionSlice,
-  (canvasSession) => canvasSession.sendToCanvas
-);

@@ -1,7 +1,7 @@
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasSessionSlice';
+import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
@@ -25,11 +25,11 @@ export const addInpaint = async (
   denoise.denoising_start = denoising_start;
 
   const params = selectParamsSlice(state);
-  const canvasSession = selectCanvasSessionSlice(state);
+  const canvasSettings = selectCanvasSettingsSlice(state);
   const canvas = selectCanvasSlice(state);
 
   const { bbox } = canvas;
-  const { sendToCanvas: isComposing } = canvasSession;
+  const { sendToCanvas } = canvasSettings;
 
   const initialImage = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
   const maskImage = await manager.compositor.getCompositeInpaintMaskImageDTO(bbox.rect);
@@ -99,7 +99,7 @@ export const addInpaint = async (
     g.addEdge(resizeImageToOriginalSize, 'image', canvasPasteBack, 'generated_image');
     g.addEdge(resizeMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
 
-    if (!isComposing) {
+    if (!sendToCanvas) {
       canvasPasteBack.source_image = { image_name: initialImage.image_name };
     }
 
@@ -143,7 +143,7 @@ export const addInpaint = async (
 
     g.addEdge(l2i, 'image', canvasPasteBack, 'generated_image');
 
-    if (!isComposing) {
+    if (!sendToCanvas) {
       canvasPasteBack.source_image = { image_name: initialImage.image_name };
     }
 

@@ -112,12 +112,12 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
     this.subscriptions.add(
-      this.manager.stateApi.$toolState.listen((value, oldValue) => {
+      this.manager.stateApi.$settingsState.listen((settings, prevSettings) => {
         if (
-          value !== oldValue ||
-          value.brush.width !== oldValue.brush.width ||
-          value.eraser.width !== oldValue.eraser.width ||
-          value.fill !== oldValue.fill
+          settings !== prevSettings ||
+          settings.brushWidth !== prevSettings.brushWidth ||
+          settings.eraserWidth !== prevSettings.eraserWidth ||
+          settings.color !== prevSettings.color
         ) {
           this.render();
         }
@@ -306,7 +306,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     const cursorPos = this.syncLastCursorPos();
     try {
       const isMouseDown = this.$isMouseDown.get();
-      const toolState = this.manager.stateApi.getToolState();
+      const settings = this.manager.stateApi.getSettings();
       const tool = this.$tool.get();
       const selectedEntity = this.manager.stateApi.getSelectedEntity();
 
@@ -321,13 +321,13 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       if (tool === 'brush') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
-        const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+        const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
         await selectedEntity.adapter.renderer.setBuffer({
           id: getPrefixedId('brush_line'),
           type: 'brush_line',
           points: [alignedPoint.x, alignedPoint.y],
-          strokeWidth: toolState.brush.width,
-          color: this.manager.stateApi.getCurrentFill(),
+          strokeWidth: settings.brushWidth,
+          color: this.manager.stateApi.getCurrentColor(),
           clip: this.getClip(selectedEntity.state),
         });
         this.$lastAddedPoint.set(alignedPoint);
@@ -336,7 +336,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       if (tool === 'eraser') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
-        const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+        const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
         if (selectedEntity.adapter.renderer.bufferState) {
           selectedEntity.adapter.renderer.commitBuffer();
         }
@@ -344,7 +344,7 @@ export class CanvasToolModule extends CanvasModuleBase {
           id: getPrefixedId('eraser_line'),
           type: 'eraser_line',
           points: [alignedPoint.x, alignedPoint.y],
-          strokeWidth: toolState.eraser.width,
+          strokeWidth: settings.eraserWidth,
           clip: this.getClip(selectedEntity.state),
         });
         this.$lastAddedPoint.set(alignedPoint);
@@ -361,12 +361,12 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     try {
       const tool = this.$tool.get();
-      const toolState = this.manager.stateApi.getToolState();
+      const settings = this.manager.stateApi.getSettings();
 
       if (tool === 'colorPicker') {
         const color = this.getColorUnderCursor();
         if (color) {
-          this.manager.stateApi.setFill({ ...toolState.fill, ...color });
+          this.manager.stateApi.setColor({ ...settings.color, ...color });
         }
         return;
       }
@@ -382,7 +382,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       if (tool === 'brush') {
         const lastLinePoint = selectedEntity.adapter.getLastPointOfLastLine('brush_line');
-        const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+        const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
           if (selectedEntity.adapter.renderer.bufferState) {
@@ -399,8 +399,8 @@ export class CanvasToolModule extends CanvasModuleBase {
               alignedPoint.x,
               alignedPoint.y,
             ],
-            strokeWidth: toolState.brush.width,
-            color: this.manager.stateApi.getCurrentFill(),
+            strokeWidth: settings.brushWidth,
+            color: this.manager.stateApi.getCurrentColor(),
             clip: this.getClip(selectedEntity.state),
           });
         } else {
@@ -411,8 +411,8 @@ export class CanvasToolModule extends CanvasModuleBase {
             id: getPrefixedId('brush_line'),
             type: 'brush_line',
             points: [alignedPoint.x, alignedPoint.y],
-            strokeWidth: toolState.brush.width,
-            color: this.manager.stateApi.getCurrentFill(),
+            strokeWidth: settings.brushWidth,
+            color: this.manager.stateApi.getCurrentColor(),
             clip: this.getClip(selectedEntity.state),
           });
         }
@@ -421,7 +421,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       if (tool === 'eraser') {
         const lastLinePoint = selectedEntity.adapter.getLastPointOfLastLine('eraser_line');
-        const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
+        const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
           if (selectedEntity.adapter.renderer.bufferState) {
@@ -437,7 +437,7 @@ export class CanvasToolModule extends CanvasModuleBase {
               alignedPoint.x,
               alignedPoint.y,
             ],
-            strokeWidth: toolState.eraser.width,
+            strokeWidth: settings.eraserWidth,
             clip: this.getClip(selectedEntity.state),
           });
         } else {
@@ -448,7 +448,7 @@ export class CanvasToolModule extends CanvasModuleBase {
             id: getPrefixedId('eraser_line'),
             type: 'eraser_line',
             points: [alignedPoint.x, alignedPoint.y],
-            strokeWidth: toolState.eraser.width,
+            strokeWidth: settings.eraserWidth,
             clip: this.getClip(selectedEntity.state),
           });
         }
@@ -463,7 +463,7 @@ export class CanvasToolModule extends CanvasModuleBase {
           id: getPrefixedId('rect'),
           type: 'rect',
           rect: { x: Math.round(normalizedPoint.x), y: Math.round(normalizedPoint.y), width: 0, height: 0 },
-          color: this.manager.stateApi.getCurrentFill(),
+          color: this.manager.stateApi.getCurrentColor(),
         });
       }
     } finally {
@@ -542,17 +542,17 @@ export class CanvasToolModule extends CanvasModuleBase {
         return;
       }
 
-      const toolState = this.manager.stateApi.getToolState();
+      const settings = this.manager.stateApi.getSettings();
 
       if (tool === 'brush' && bufferState.type === 'brush_line') {
         const lastPoint = getLastPointOfLine(bufferState.points);
-        const minDistance = toolState.brush.width * this.config.BRUSH_SPACING_TARGET_SCALE;
+        const minDistance = settings.brushWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
         if (!lastPoint || !isDistanceMoreThanMin(cursorPos, lastPoint, minDistance)) {
           return;
         }
 
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
-        const alignedPoint = alignCoordForTool(normalizedPoint, toolState.brush.width);
+        const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
         if (lastPoint.x === alignedPoint.x && lastPoint.y === alignedPoint.y) {
           // Do not add duplicate points
@@ -564,13 +564,13 @@ export class CanvasToolModule extends CanvasModuleBase {
         this.$lastAddedPoint.set(alignedPoint);
       } else if (tool === 'eraser' && bufferState.type === 'eraser_line') {
         const lastPoint = getLastPointOfLine(bufferState.points);
-        const minDistance = toolState.eraser.width * this.config.BRUSH_SPACING_TARGET_SCALE;
+        const minDistance = settings.eraserWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
         if (!lastPoint || !isDistanceMoreThanMin(cursorPos, lastPoint, minDistance)) {
           return;
         }
 
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
-        const alignedPoint = alignCoordForTool(normalizedPoint, toolState.eraser.width);
+        const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
 
         if (lastPoint.x === alignedPoint.x && lastPoint.y === alignedPoint.y) {
           // Do not add duplicate points
@@ -613,20 +613,20 @@ export class CanvasToolModule extends CanvasModuleBase {
       return;
     }
 
-    const toolState = this.manager.stateApi.getToolState();
+    const settings = this.manager.stateApi.getSettings();
     const tool = this.$tool.get();
 
     let delta = e.evt.deltaY;
 
-    if (toolState.invertScroll) {
+    if (settings.invertScrollForToolWidth) {
       delta = -delta;
     }
 
     // Holding ctrl or meta while scrolling changes the brush size
     if (tool === 'brush') {
-      this.manager.stateApi.setBrushWidth(calculateNewBrushSizeFromWheelDelta(toolState.brush.width, delta));
+      this.manager.stateApi.setBrushWidth(calculateNewBrushSizeFromWheelDelta(settings.brushWidth, delta));
     } else if (tool === 'eraser') {
-      this.manager.stateApi.setEraserWidth(calculateNewBrushSizeFromWheelDelta(toolState.eraser.width, delta));
+      this.manager.stateApi.setEraserWidth(calculateNewBrushSizeFromWheelDelta(settings.eraserWidth, delta));
     }
 
     this.render();

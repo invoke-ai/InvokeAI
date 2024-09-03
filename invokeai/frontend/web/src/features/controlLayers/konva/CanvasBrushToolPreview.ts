@@ -94,10 +94,10 @@ export class CanvasBrushToolPreview extends CanvasModuleBase {
       return;
     }
 
-    const toolState = this.manager.stateApi.getToolState();
-    const brushPreviewFill = this.manager.stateApi.getBrushPreviewFill();
-    const alignedCursorPos = alignCoordForTool(cursorPos, toolState.brush.width);
-    const radius = toolState.brush.width / 2;
+    const settings = this.manager.stateApi.getSettings();
+    const brushPreviewFill = this.manager.stateApi.getBrushPreviewColor();
+    const alignedCursorPos = alignCoordForTool(cursorPos, settings.brushWidth);
+    const radius = settings.brushWidth / 2;
 
     // The circle is scaled
     this.konva.fillCircle.setAttrs({

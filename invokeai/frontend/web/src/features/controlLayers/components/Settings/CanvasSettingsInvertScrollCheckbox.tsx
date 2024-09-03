@@ -1,25 +1,30 @@
 import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { invertScrollChanged, selectToolSlice } from 'features/controlLayers/store/toolSlice';
+import { selectCanvasSettingsSlice, settingsInvertScrollForToolWidthChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectInvertScroll = createSelector(selectToolSlice, (tool) => tool.invertScroll);
+const selectInvertScrollForToolWidth = createSelector(
+  selectCanvasSettingsSlice,
+  (settings) => settings.invertScrollForToolWidth
+);
 
 export const CanvasSettingsInvertScrollCheckbox = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const invertScroll = useAppSelector(selectInvertScroll);
+  const invertScrollForToolWidth = useAppSelector(selectInvertScrollForToolWidth);
   const onChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => dispatch(invertScrollChanged(e.target.checked)),
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(settingsInvertScrollForToolWidthChanged(e.target.checked));
+    },
     [dispatch]
   );
   return (
     <FormControl w="full">
       <FormLabel flexGrow={1}>{t('unifiedCanvas.invertBrushSizeScrollDirection')}</FormLabel>
-      <Checkbox isChecked={invertScroll} onChange={onChange} />
+      <Checkbox isChecked={invertScrollForToolWidth} onChange={onChange} />
     </FormControl>
   );
 });
