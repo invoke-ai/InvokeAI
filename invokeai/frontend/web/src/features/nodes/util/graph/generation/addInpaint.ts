@@ -29,7 +29,6 @@ export const addInpaint = async (
   const canvas = selectCanvasSlice(state);
 
   const { bbox } = canvas;
-  const { sendToCanvas } = canvasSettings;
 
   const initialImage = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
   const maskImage = await manager.compositor.getCompositeInpaintMaskImageDTO(bbox.rect);
@@ -99,7 +98,7 @@ export const addInpaint = async (
     g.addEdge(resizeImageToOriginalSize, 'image', canvasPasteBack, 'generated_image');
     g.addEdge(resizeMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
 
-    if (!sendToCanvas) {
+    if (!canvasSettings.sendToCanvas || canvasSettings.compositeMaskedRegions) {
       canvasPasteBack.source_image = { image_name: initialImage.image_name };
     }
 
@@ -143,7 +142,7 @@ export const addInpaint = async (
 
     g.addEdge(l2i, 'image', canvasPasteBack, 'generated_image');
 
-    if (!sendToCanvas) {
+    if (!canvasSettings.sendToCanvas || canvasSettings.compositeMaskedRegions) {
       canvasPasteBack.source_image = { image_name: initialImage.image_name };
     }
 

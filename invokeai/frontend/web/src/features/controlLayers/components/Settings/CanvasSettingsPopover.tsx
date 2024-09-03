@@ -13,6 +13,7 @@ import { CanvasSettingsAutoSaveCheckbox } from 'features/controlLayers/component
 import { CanvasSettingsClearCachesButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearCachesButton';
 import { CanvasSettingsClearHistoryButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearHistoryButton';
 import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsClipToBboxCheckbox';
+import { CanvasSettingsCompositeMaskedRegionsCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsCompositeMaskedRegionsCheckbox';
 import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsDynamicGridSwitch';
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
 import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
@@ -37,6 +38,7 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsAutoSaveCheckbox />
             <CanvasSettingsInvertScrollCheckbox />
             <CanvasSettingsClipToBboxCheckbox />
+            <CanvasSettingsCompositeMaskedRegionsCheckbox />
             <CanvasSettingsDynamicGridSwitch />
             <CanvasSettingsShowHUDSwitch />
             <CanvasSettingsResetButton />
