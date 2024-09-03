@@ -127,7 +127,14 @@
         "bulkDownloadRequestedDesc": "Dein Download wird vorbereitet. Dies kann ein paar Momente dauern.",
         "bulkDownloadRequestFailed": "Problem beim Download vorbereiten",
         "bulkDownloadFailed": "Download fehlgeschlagen",
-        "alwaysShowImageSizeBadge": "Zeige immer Bilder Größe Abzeichen"
+        "alwaysShowImageSizeBadge": "Zeige immer Bilder Größe Abzeichen",
+        "selectForCompare": "Zum Vergleichen auswählen",
+        "compareImage": "Bilder vergleichen",
+        "exitSearch": "Suche beenden",
+        "newestFirst": "Neueste zuerst",
+        "oldestFirst": "Älteste zuerst",
+        "openInViewer": "Im Viewer öffnen",
+        "swapImages": "Bilder tauschen"
     },
     "hotkeys": {
         "keyboardShortcuts": "Tastenkürzel",
@@ -631,7 +638,8 @@
         "archived": "Archiviert",
         "noBoards": "Kein {boardType}} Ordner",
         "hideBoards": "Ordner verstecken",
-        "viewBoards": "Ordner ansehen"
+        "viewBoards": "Ordner ansehen",
+        "deletedPrivateBoardsCannotbeRestored": "Gelöschte Boards können nicht wiederhergestellt werden. Wenn Sie „Nur Board löschen“ wählen, werden die Bilder in einen privaten, nicht kategorisierten Status für den Ersteller des Bildes versetzt."
     },
     "controlnet": {
         "showAdvanced": "Zeige Erweitert",
@@ -781,7 +789,9 @@
         "batchFieldValues": "Stapelverarbeitungswerte",
         "batchQueued": "Stapelverarbeitung eingereiht",
         "graphQueued": "Graph eingereiht",
-        "graphFailedToQueue": "Fehler beim Einreihen des Graphen"
+        "graphFailedToQueue": "Fehler beim Einreihen des Graphen",
+        "generations_one": "Generation",
+        "generations_other": "Generationen"
     },
     "metadata": {
         "negativePrompt": "Negativ Beschreibung",
@@ -1146,5 +1156,10 @@
         "noMatchingTriggers": "Keine passenden Trigger",
         "addPromptTrigger": "Prompt-Trigger hinzufügen",
         "compatibleEmbeddings": "Kompatible Einbettungen"
+    },
+    "ui": {
+        "tabs": {
+            "queue": "Warteschlange"
+        }
     }
 }
