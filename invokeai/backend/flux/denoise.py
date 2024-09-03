@@ -18,7 +18,7 @@ def denoise(
     vec: torch.Tensor,
     # sampling parameters
     timesteps: list[float],
-    step_callback: Callable[[torch.Tensor, PipelineIntermediateState], None],
+    step_callback: Callable[[PipelineIntermediateState], None],
     guidance: float,
     inpaint_extension: InpaintExtension | None,
 ):
@@ -43,7 +43,6 @@ def denoise(
             img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
 
         step_callback(
-            img,
             PipelineIntermediateState(
                 step=step,
                 order=1,

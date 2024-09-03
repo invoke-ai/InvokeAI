@@ -14,7 +14,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
-from invokeai.app.util.step_callback import stable_diffusion_step_callback
+from invokeai.app.util.step_callback import flux_step_callback, stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import (
     AnyModel,
     AnyModelConfig,
@@ -553,6 +553,24 @@ class UtilInterface(InvocationContextInterface):
             context_data=self._data,
             intermediate_state=intermediate_state,
             base_model=base_model,
+            events=self._services.events,
+            is_canceled=self.is_canceled,
+        )
+
+    def flux_step_callback(self, intermediate_state: PipelineIntermediateState) -> None:
+        """
+        The step callback emits a progress event with the current step, the total number of
+        steps, a preview image, and some other internal metadata.
+
+        This should be called after each denoising step.
+
+        Args:
+            intermediate_state: The intermediate state of the diffusion pipeline.
+        """
+
+        flux_step_callback(
+            context_data=self._data,
+            intermediate_state=intermediate_state,
             events=self._services.events,
             is_canceled=self.is_canceled,
         )
