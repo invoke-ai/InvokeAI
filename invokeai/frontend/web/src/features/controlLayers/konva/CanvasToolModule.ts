@@ -62,21 +62,13 @@ export class CanvasToolModule extends CanvasModuleBase {
    */
   $toolBuffer = atom<Tool | null>(null);
   /**
-   * The last point added to the current entity.
-   */
-  $lastAddedPoint = atom<Coordinate | null>(null);
-  /**
    * Whether the mouse is currently down.
    */
   $isMouseDown = atom<boolean>(false);
   /**
-   * The last position where the mouse was down.
-   */
-  $lastMouseDownPos = atom<Coordinate | null>(null);
-  /**
    * The last cursor position.
    */
-  $lastCursorPos = atom<Coordinate | null>(null);
+  $cursorPos = atom<Coordinate | null>(null);
   /**
    * The color currently under the cursor. Only has a value when the color picker tool is active.
    */
@@ -152,9 +144,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       stage.setCursor(isMouseDown ? 'grabbing' : 'grab');
     } else if (this.manager.stateApi.getRenderedEntityCount() === 0) {
       stage.setCursor('not-allowed');
-    } else if (this.manager.stateApi.$isTranforming.get()) {
-      stage.setCursor('not-allowed');
-    } else if (this.manager.filter.$isFiltering.get()) {
+    } else if (this.manager.$isBusy.get()) {
       stage.setCursor('not-allowed');
     } else if (!this.manager.stateApi.getSelectedEntity()?.adapter.isInteractable()) {
       stage.setCursor('not-allowed');
@@ -173,7 +163,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     const stage = this.manager.stage;
     const renderedEntityCount = this.manager.stateApi.getRenderedEntityCount();
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
-    const cursorPos = this.$lastCursorPos.get();
+    const cursorPos = this.$cursorPos.get();
     const tool = this.$tool.get();
 
     const isDrawable =
@@ -207,7 +197,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   syncLastCursorPos = (): Coordinate | null => {
     const pos = getScaledCursorPosition(this.konva.stage);
-    this.$lastCursorPos.set(pos);
+    this.$cursorPos.set(pos);
     return pos;
   };
 
@@ -331,7 +321,6 @@ export class CanvasToolModule extends CanvasModuleBase {
           color: this.manager.stateApi.getCurrentColor(),
           clip: this.getClip(selectedEntity.state),
         });
-        this.$lastAddedPoint.set(alignedPoint);
         return;
       }
 
@@ -348,7 +337,6 @@ export class CanvasToolModule extends CanvasModuleBase {
           strokeWidth: settings.eraserWidth,
           clip: this.getClip(selectedEntity.state),
         });
-        this.$lastAddedPoint.set(alignedPoint);
         return;
       }
     } finally {
@@ -421,7 +409,6 @@ export class CanvasToolModule extends CanvasModuleBase {
             clip: this.getClip(selectedEntity.state),
           });
         }
-        this.$lastAddedPoint.set(alignedPoint);
       }
 
       if (tool === 'eraser') {
@@ -457,7 +444,6 @@ export class CanvasToolModule extends CanvasModuleBase {
             clip: this.getClip(selectedEntity.state),
           });
         }
-        this.$lastAddedPoint.set(alignedPoint);
       }
 
       if (tool === 'rect') {
@@ -472,7 +458,6 @@ export class CanvasToolModule extends CanvasModuleBase {
         });
       }
     } finally {
-      this.$lastMouseDownPos.set(cursorPos);
       this.render();
     }
   };
@@ -519,7 +504,6 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
       }
     } finally {
-      this.$lastMouseDownPos.set(null);
       this.render();
     }
   };
@@ -574,7 +558,6 @@ export class CanvasToolModule extends CanvasModuleBase {
 
         bufferState.points.push(alignedPoint.x, alignedPoint.y);
         await selectedEntity.adapter.renderer.setBuffer(bufferState);
-        this.$lastAddedPoint.set(alignedPoint);
       } else if (tool === 'eraser' && bufferState.type === 'eraser_line') {
         const lastPoint = getLastPointOfLine(bufferState.points);
         const minDistance = settings.eraserWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
@@ -592,7 +575,6 @@ export class CanvasToolModule extends CanvasModuleBase {
 
         bufferState.points.push(alignedPoint.x, alignedPoint.y);
         await selectedEntity.adapter.renderer.setBuffer(bufferState);
-        this.$lastAddedPoint.set(alignedPoint);
       } else if (tool === 'rect' && bufferState.type === 'rect') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
         const alignedPoint = floorCoord(normalizedPoint);
@@ -612,8 +594,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return;
     }
 
-    this.$lastCursorPos.set(null);
-    this.$lastMouseDownPos.set(null);
+    this.$cursorPos.set(null);
     const selectedEntity = this.manager.stateApi.getSelectedEntity();
 
     if (selectedEntity && selectedEntity.adapter.renderer.bufferState?.type !== 'rect') {
@@ -676,7 +657,6 @@ export class CanvasToolModule extends CanvasModuleBase {
       const selectedEntity = this.manager.stateApi.getSelectedEntity();
       if (selectedEntity) {
         selectedEntity.adapter.renderer.clearBuffer();
-        this.$lastMouseDownPos.set(null);
       }
       return;
     }
@@ -686,8 +666,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.$toolBuffer.set(this.$tool.get());
       this.$tool.set('view');
       this.manager.stateApi.$spaceKey.set(true);
-      this.$lastCursorPos.set(null);
-      this.$lastMouseDownPos.set(null);
+      this.$cursorPos.set(null);
       return;
     }
 
