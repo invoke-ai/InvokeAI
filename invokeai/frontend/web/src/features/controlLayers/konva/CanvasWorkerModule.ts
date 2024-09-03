@@ -6,12 +6,11 @@ import type { Logger } from 'roarr';
 
 export class CanvasWorkerModule extends CanvasModuleBase {
   readonly type = 'worker';
-
-  id: string;
-  path: string[];
-  log: Logger;
-  parent: CanvasManager;
-  manager: CanvasManager;
+  readonly id: string;
+  readonly path: string[];
+  readonly log: Logger;
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
 
   worker: Worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'worker' });
   tasks: Map<string, { task: GetBboxTask; onComplete: (extents: Extents | null) => void }> = new Map();

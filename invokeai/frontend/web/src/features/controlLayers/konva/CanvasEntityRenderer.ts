@@ -62,12 +62,11 @@ type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImage
  */
 export class CanvasEntityRenderer extends CanvasModuleBase {
   readonly type = 'entity_renderer';
-
-  id: string;
-  path: string[];
-  parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   /**
    * A set of subscriptions that should be cleaned up when the transformer is destroyed.

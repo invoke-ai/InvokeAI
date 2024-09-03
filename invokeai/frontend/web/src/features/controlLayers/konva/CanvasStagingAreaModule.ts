@@ -9,12 +9,11 @@ import type { Logger } from 'roarr';
 
 export class CanvasStagingAreaModule extends CanvasModuleBase {
   readonly type = 'staging_area';
-
-  id: string;
-  path: string[];
-  parent: CanvasManager;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   subscriptions: Set<() => void> = new Set();
   konva: { group: Konva.Group };

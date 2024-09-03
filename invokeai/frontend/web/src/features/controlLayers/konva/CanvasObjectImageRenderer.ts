@@ -14,12 +14,11 @@ import { getImageDTO } from 'services/api/endpoints/images';
 
 export class CanvasObjectImageRenderer extends CanvasModuleBase {
   readonly type = 'object_image_renderer';
-
-  id: string;
-  path: string[];
-  parent: CanvasEntityRenderer | CanvasStagingAreaModule | CanvasFilterModule;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasEntityRenderer | CanvasStagingAreaModule | CanvasFilterModule;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
 
   state: CanvasImageState;
   konva: {

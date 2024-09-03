@@ -38,12 +38,11 @@ const DEFAULT_CONFIG: CanvasToolModuleConfig = {
 
 export class CanvasToolModule extends CanvasModuleBase {
   readonly type = 'tool';
-
-  id: string;
-  path: string[];
-  parent: CanvasManager;
-  manager: CanvasManager;
-  log: Logger;
+  readonly id: string;
+  readonly path: string[];
+  readonly parent: CanvasManager;
+  readonly manager: CanvasManager;
+  readonly log: Logger;
   subscriptions: Set<() => void> = new Set();
 
   config: CanvasToolModuleConfig = DEFAULT_CONFIG;
