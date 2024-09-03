@@ -36,7 +36,7 @@ def denoise(
             timesteps=t_vec,
             guidance=guidance_vec,
         )
-
+        preview_img = img - t_curr * pred
         img = img + (t_prev - t_curr) * pred
 
         if inpaint_extension is not None:
@@ -48,7 +48,7 @@ def denoise(
                 order=1,
                 total_steps=len(timesteps),
                 timestep=int(t_curr),
-                latents=img,
+                latents=preview_img,
             ),
         )
         step += 1
