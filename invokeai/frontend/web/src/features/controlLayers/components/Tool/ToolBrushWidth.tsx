@@ -15,7 +15,7 @@ import {
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
-import { brushWidthChanged, selectToolSlice } from 'features/controlLayers/store/toolSlice';
+import { selectCanvasSettingsSlice, settingsBrushWidthChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import { clamp } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
@@ -23,7 +23,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
-const selectBrushWidth = createSelector(selectToolSlice, (tool) => tool.brush.width);
+const selectBrushWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.brushWidth);
 const formatPx = (v: number | string) => `${v} px`;
 
 function mapSliderValueToRawValue(value: number) {
@@ -73,7 +73,7 @@ export const ToolBrushWidth = memo(() => {
   const [localValue, setLocalValue] = useState(width);
   const onChange = useCallback(
     (v: number) => {
-      dispatch(brushWidthChanged(clamp(Math.round(v), 1, 600)));
+      dispatch(settingsBrushWidthChanged(clamp(Math.round(v), 1, 600)));
     },
     [dispatch]
   );

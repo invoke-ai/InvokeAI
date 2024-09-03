@@ -15,7 +15,7 @@ import {
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
-import { eraserWidthChanged, selectToolSlice } from 'features/controlLayers/store/toolSlice';
+import { selectCanvasSettingsSlice, settingsEraserWidthChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import { clamp } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
@@ -23,7 +23,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
-const selectEraserWidth = createSelector(selectToolSlice, (tool) => tool.eraser.width);
+const selectEraserWidth = createSelector(selectCanvasSettingsSlice, (settings) => settings.eraserWidth);
 const formatPx = (v: number | string) => `${v} px`;
 
 function mapSliderValueToRawValue(value: number) {
@@ -73,7 +73,7 @@ export const ToolEraserWidth = memo(() => {
   const [localValue, setLocalValue] = useState(width);
   const onChange = useCallback(
     (v: number) => {
-      dispatch(eraserWidthChanged(clamp(Math.round(v), 1, 600)));
+      dispatch(settingsEraserWidthChanged(clamp(Math.round(v), 1, 600)));
     },
     [dispatch]
   );

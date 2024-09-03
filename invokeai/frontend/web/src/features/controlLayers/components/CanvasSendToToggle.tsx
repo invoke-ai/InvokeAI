@@ -1,7 +1,11 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IconSwitch } from 'common/components/IconSwitch';
-import { selectIsComposing, sessionSendToCanvasChanged } from 'features/controlLayers/store/canvasSessionSlice';
+import {
+  selectCanvasSettingsSlice,
+  settingsSendToCanvasChanged,
+} from 'features/controlLayers/store/canvasSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold, PiPaintBrushBold } from 'react-icons/pi';
@@ -32,20 +36,22 @@ const TooltipSendToCanvas = memo(() => {
 
 TooltipSendToCanvas.displayName = 'TooltipSendToCanvas';
 
+const selectSendToCanvas = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.sendToCanvas);
+
 export const CanvasSendToToggle = memo(() => {
   const dispatch = useAppDispatch();
-  const isComposing = useAppSelector(selectIsComposing);
+  const sendToCanvas = useAppSelector(selectSendToCanvas);
 
   const onChange = useCallback(
     (isChecked: boolean) => {
-      dispatch(sessionSendToCanvasChanged(isChecked));
+      dispatch(settingsSendToCanvasChanged(isChecked));
     },
     [dispatch]
   );
 
   return (
     <IconSwitch
-      isChecked={isComposing}
+      isChecked={sendToCanvas}
       onChange={onChange}
       iconUnchecked={<PiImageBold />}
       tooltipUnchecked={<TooltipSendToGallery />}

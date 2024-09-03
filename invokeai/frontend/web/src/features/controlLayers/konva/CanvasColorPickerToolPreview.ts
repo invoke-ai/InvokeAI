@@ -198,7 +198,7 @@ export class CanvasColorPickerToolPreview extends CanvasModuleBase {
       return;
     }
 
-    const toolState = this.manager.stateApi.getToolState();
+    const settings = this.manager.stateApi.getSettings();
     const colorUnderCursor = this.parent.$colorUnderCursor.get();
     const colorPickerInnerRadius = this.manager.stage.getScaledPixels(this.config.RING_INNER_RADIUS);
     const colorPickerOuterRadius = this.manager.stage.getScaledPixels(this.config.RING_OUTER_RADIUS);
@@ -215,7 +215,7 @@ export class CanvasColorPickerToolPreview extends CanvasModuleBase {
     this.konva.ringCurrentColor.setAttrs({
       x: cursorPos.x,
       y: cursorPos.y,
-      fill: rgbColorToString(toolState.fill),
+      fill: rgbColorToString(settings.color),
       innerRadius: colorPickerInnerRadius,
       outerRadius: colorPickerOuterRadius,
     });

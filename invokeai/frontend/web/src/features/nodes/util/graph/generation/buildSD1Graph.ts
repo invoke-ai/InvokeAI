@@ -2,7 +2,6 @@ import { logger } from 'app/logging/logger';
 import type { RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasSessionSlice';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
@@ -36,7 +35,6 @@ export const buildSD1Graph = async (
   log.debug({ generationMode }, 'Building SD1/SD2 graph');
 
   const params = selectParamsSlice(state);
-  const canvasSession = selectCanvasSessionSlice(state);
   const canvasSettings = selectCanvasSettingsSlice(state);
   const canvas = selectCanvasSlice(state);
 
@@ -282,7 +280,7 @@ export const buildSD1Graph = async (
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  const shouldSaveToGallery = !canvasSession.sendToCanvas || canvasSettings.autoSave;
+  const shouldSaveToGallery = !canvasSettings.sendToCanvas || canvasSettings.autoSave;
 
   g.updateNode(canvasOutput, {
     id: getPrefixedId('canvas_output'),
