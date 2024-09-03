@@ -12,7 +12,7 @@ from invokeai.backend.util.devices import TorchDevice
 if TYPE_CHECKING:
     from invokeai.app.invocations.model import ModelIdentifierField
     from invokeai.app.services.shared.invocation_context import InvocationContext
-    from invokeai.backend.lora import LoRAModelRaw
+    from invokeai.backend.peft.lora import LoRAModelRaw
     from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
 
