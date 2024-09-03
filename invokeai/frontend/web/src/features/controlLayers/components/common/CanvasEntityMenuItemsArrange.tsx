@@ -2,6 +2,7 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   entityArrangedBackwardOne,
   entityArrangedForwardOne,
@@ -55,6 +56,7 @@ export const CanvasEntityMenuItemsArrange = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext();
+  const isBusy = useCanvasIsBusy();
   const selectValidActions = useMemo(
     () =>
       createMemoizedSelector(selectCanvasSlice, (canvas) => {
@@ -86,16 +88,24 @@ export const CanvasEntityMenuItemsArrange = memo(() => {
 
   return (
     <>
-      <MenuItem onClick={moveToFront} isDisabled={!validActions.canMoveToFront} icon={<PiArrowLineUpBold />}>
+      <MenuItem onClick={moveToFront} isDisabled={!validActions.canMoveToFront || isBusy} icon={<PiArrowLineUpBold />}>
         {t('controlLayers.moveToFront')}
       </MenuItem>
-      <MenuItem onClick={moveForwardOne} isDisabled={!validActions.canMoveForwardOne} icon={<PiArrowUpBold />}>
+      <MenuItem
+        onClick={moveForwardOne}
+        isDisabled={!validActions.canMoveForwardOne || isBusy}
+        icon={<PiArrowUpBold />}
+      >
         {t('controlLayers.moveForward')}
       </MenuItem>
-      <MenuItem onClick={moveBackwardOne} isDisabled={!validActions.canMoveBackwardOne} icon={<PiArrowDownBold />}>
+      <MenuItem
+        onClick={moveBackwardOne}
+        isDisabled={!validActions.canMoveBackwardOne || isBusy}
+        icon={<PiArrowDownBold />}
+      >
         {t('controlLayers.moveBackward')}
       </MenuItem>
-      <MenuItem onClick={moveToBack} isDisabled={!validActions.canMoveToBack} icon={<PiArrowLineDownBold />}>
+      <MenuItem onClick={moveToBack} isDisabled={!validActions.canMoveToBack || isBusy} icon={<PiArrowLineDownBold />}>
         {t('controlLayers.moveToBack')}
       </MenuItem>
     </>

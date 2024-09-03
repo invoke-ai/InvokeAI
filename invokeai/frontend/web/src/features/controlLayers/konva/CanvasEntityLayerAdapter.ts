@@ -207,6 +207,10 @@ export class CanvasEntityLayerAdapter extends CanvasModuleBase {
     return null;
   };
 
+  isInteractable = (): boolean => {
+    return this.state.isEnabled && !this.state.isLocked;
+  };
+
   destroy = (): void => {
     this.log.debug('Destroying module');
     this.renderer.destroy();
