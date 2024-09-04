@@ -1,6 +1,6 @@
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
-import { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
+import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -39,7 +39,7 @@ export abstract class CanvasEntityAdapterBase<
   /**
    * The renderer for this entity adapter.
    */
-  renderer: CanvasEntityRenderer;
+  renderer: CanvasEntityObjectRenderer;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<T['type']>, manager: CanvasManager, adapterType: string) {
     super();
@@ -61,7 +61,7 @@ export abstract class CanvasEntityAdapterBase<
       }),
     };
 
-    this.renderer = new CanvasEntityRenderer(this);
+    this.renderer = new CanvasEntityObjectRenderer(this);
     this.transformer = new CanvasEntityTransformer(this);
   }
 
