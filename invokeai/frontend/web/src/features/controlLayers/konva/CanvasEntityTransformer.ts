@@ -1,7 +1,9 @@
-import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
-import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
+import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
+import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import type { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
+import type { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
 import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -80,7 +82,11 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   readonly type = 'entity_transformer';
   readonly id: string;
   readonly path: string[];
-  readonly parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter;
+  readonly parent:
+    | CanvasRasterLayerAdapter
+    | CanvasControlLayerAdapter
+    | CanvasInpaintMaskAdapter
+    | CanvasRegionalGuidanceAdapter;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
@@ -402,7 +408,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     };
 
     this.log.trace({ position }, 'Position changed');
-    this.manager.stateApi.setEntityPosition({ entityIdentifier: this.parent.getEntityIdentifier(), position });
+    this.manager.stateApi.setEntityPosition({ entityIdentifier: this.parent.entityIdentifier, position });
   };
 
   syncObjectGroupWithProxyRect = () => {
@@ -653,7 +659,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       // If the layer already has no objects, we don't need to reset the entity state. This would cause a push to the
       // undo stack and clear the redo stack.
       if (this.parent.renderer.hasObjects()) {
-        this.manager.stateApi.resetEntity({ entityIdentifier: this.parent.getEntityIdentifier() });
+        this.manager.stateApi.resetEntity({ entityIdentifier: this.parent.entityIdentifier });
         this.syncInteractionState();
       }
     } else {

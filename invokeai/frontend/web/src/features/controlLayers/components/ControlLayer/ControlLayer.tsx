@@ -7,7 +7,7 @@ import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/c
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { ControlLayerBadges } from 'features/controlLayers/components/ControlLayer/ControlLayerBadges';
 import { ControlLayerControlAdapter } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapter';
-import { EntityLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
+import { ControlLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
@@ -21,7 +21,7 @@ export const ControlLayer = memo(({ id }: Props) => {
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <EntityLayerAdapterGate>
+      <ControlLayerAdapterGate>
         <CanvasEntityContainer>
           <CanvasEntityHeader>
             <CanvasEntityPreviewImage />
@@ -34,7 +34,7 @@ export const ControlLayer = memo(({ id }: Props) => {
             <ControlLayerControlAdapter />
           </CanvasEntitySettingsWrapper>
         </CanvasEntityContainer>
-      </EntityLayerAdapterGate>
+      </ControlLayerAdapterGate>
     </EntityIdentifierContext.Provider>
   );
 });

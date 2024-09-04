@@ -1,12 +1,14 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
-import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
+import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
+import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectBrushLineRenderer } from 'features/controlLayers/konva/CanvasObjectBrushLineRenderer';
 import { CanvasObjectEraserLineRenderer } from 'features/controlLayers/konva/CanvasObjectEraserLineRenderer';
 import { CanvasObjectImageRenderer } from 'features/controlLayers/konva/CanvasObjectImageRenderer';
 import { CanvasObjectRectRenderer } from 'features/controlLayers/konva/CanvasObjectRectRenderer';
+import type { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
+import type { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
@@ -64,7 +66,11 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
   readonly type = 'entity_renderer';
   readonly id: string;
   readonly path: string[];
-  readonly parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter;
+  readonly parent:
+    | CanvasRasterLayerAdapter
+    | CanvasControlLayerAdapter
+    | CanvasInpaintMaskAdapter
+    | CanvasRegionalGuidanceAdapter;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
@@ -135,7 +141,13 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
    */
   $canvasCache = atom<{ canvas: HTMLCanvasElement; rect: Rect } | null>(null);
 
-  constructor(parent: CanvasEntityLayerAdapter | CanvasEntityMaskAdapter) {
+  constructor(
+    parent:
+      | CanvasRasterLayerAdapter
+      | CanvasControlLayerAdapter
+      | CanvasInpaintMaskAdapter
+      | CanvasRegionalGuidanceAdapter
+  ) {
     super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
@@ -183,7 +195,10 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
     // need to update the compositing rect to match the stage.
     this.subscriptions.add(
       this.manager.stage.$stageAttrs.listen(() => {
-        if (this.konva.compositing && this.parent.type === 'entity_mask_adapter') {
+        if (
+          this.konva.compositing &&
+          (this.parent.type === 'inpaint_mask_adapter' || this.parent.type === 'regional_guidance_adapter')
+        ) {
           this.updateCompositingRectSize();
         }
       })
@@ -449,7 +464,7 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
     this.renderers.set(this.bufferState.id, this.bufferRenderer);
 
     if (pushToState) {
-      const entityIdentifier = this.parent.getEntityIdentifier();
+      const entityIdentifier = this.parent.entityIdentifier;
       if (this.bufferState.type === 'brush_line') {
         this.manager.stateApi.addBrushLine({ entityIdentifier, brushLine: this.bufferState });
       } else if (this.bufferState.type === 'eraser_line') {
@@ -546,7 +561,7 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
       this.commitBuffer({ pushToState: false });
     }
     this.manager.stateApi.rasterizeEntity({
-      entityIdentifier: this.parent.getEntityIdentifier(),
+      entityIdentifier: this.parent.entityIdentifier,
       imageObject,
       rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: imageDTO.width, height: imageDTO.height },
       replaceObjects,

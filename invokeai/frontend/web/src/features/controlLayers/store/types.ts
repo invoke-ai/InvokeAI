@@ -523,6 +523,7 @@ const zCanvasObjectState = z.discriminatedUnion('type', [
   zCanvasEraserLineState,
   zCanvasRectState,
 ]);
+export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
 
 const zIPAdapterConfig = z.object({
   image: zImageWithDims.nullable(),

@@ -1,11 +1,13 @@
-import { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
-import { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
+import { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
+import { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
+import { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasSessionState } from 'features/controlLayers/store/canvasSessionSlice';
 import type { CanvasSettingsState } from 'features/controlLayers/store/canvasSettingsSlice';
-import type { CanvasState } from 'features/controlLayers/store/types';
+import { type CanvasState, getEntityIdentifier } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
 
 export class CanvasRenderingModule extends CanvasModuleBase {
@@ -49,7 +51,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     }
   };
 
-  renderCanvas = async () => {
+  renderCanvas = () => {
     const state = this.manager.stateApi.getCanvasState();
 
     const prevState = this.state;
@@ -65,11 +67,11 @@ export class CanvasRenderingModule extends CanvasModuleBase {
       return;
     }
 
-    await this.renderRasterLayers(state, prevState);
-    await this.renderControlLayers(prevState, state);
-    await this.renderRegionalGuidance(prevState, state);
-    await this.renderInpaintMasks(state, prevState);
-    await this.renderBbox(state, prevState);
+    this.renderRasterLayers(state, prevState);
+    this.renderControlLayers(prevState, state);
+    this.renderRegionalGuidance(prevState, state);
+    this.renderInpaintMasks(state, prevState);
+    this.renderBbox(state, prevState);
     this.arrangeEntities(state, prevState);
     this.manager.tool.syncCursorStyle();
   };
@@ -136,11 +138,11 @@ export class CanvasRenderingModule extends CanvasModuleBase {
       for (const entityState of state.rasterLayers.entities) {
         let adapter = adapterMap.get(entityState.id);
         if (!adapter) {
-          adapter = new CanvasEntityLayerAdapter(entityState, this.manager);
+          adapter = new CanvasRasterLayerAdapter(getEntityIdentifier(entityState), this.manager);
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
-        await adapter.update({ state: entityState });
+        adapter.state = entityState;
       }
     }
   };
@@ -165,16 +167,16 @@ export class CanvasRenderingModule extends CanvasModuleBase {
       for (const entityState of state.controlLayers.entities) {
         let adapter = adapterMap.get(entityState.id);
         if (!adapter) {
-          adapter = new CanvasEntityLayerAdapter(entityState, this.manager);
+          adapter = new CanvasControlLayerAdapter(getEntityIdentifier(entityState), this.manager);
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
-        await adapter.update({ state: entityState });
+        adapter.state = entityState;
       }
     }
   };
 
-  renderRegionalGuidance = async (prevState: CanvasState | null, state: CanvasState) => {
+  renderRegionalGuidance = (prevState: CanvasState | null, state: CanvasState) => {
     const adapterMap = this.manager.adapters.regionMasks;
 
     if (!prevState || state.regions.isHidden !== prevState.regions.isHidden) {
@@ -199,16 +201,16 @@ export class CanvasRenderingModule extends CanvasModuleBase {
       for (const entityState of state.regions.entities) {
         let adapter = adapterMap.get(entityState.id);
         if (!adapter) {
-          adapter = new CanvasEntityMaskAdapter(entityState, this.manager);
+          adapter = new CanvasRegionalGuidanceAdapter(getEntityIdentifier(entityState), this.manager);
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
-        await adapter.update({ state: entityState });
+        adapter.state = entityState;
       }
     }
   };
 
-  renderInpaintMasks = async (state: CanvasState, prevState: CanvasState | null) => {
+  renderInpaintMasks = (state: CanvasState, prevState: CanvasState | null) => {
     const adapterMap = this.manager.adapters.inpaintMasks;
 
     if (!prevState || state.inpaintMasks.isHidden !== prevState.inpaintMasks.isHidden) {
@@ -233,11 +235,11 @@ export class CanvasRenderingModule extends CanvasModuleBase {
       for (const entityState of state.inpaintMasks.entities) {
         let adapter = adapterMap.get(entityState.id);
         if (!adapter) {
-          adapter = new CanvasEntityMaskAdapter(entityState, this.manager);
+          adapter = new CanvasInpaintMaskAdapter(getEntityIdentifier(entityState), this.manager);
           adapterMap.set(adapter.id, adapter);
           this.manager.stage.addLayer(adapter.konva.layer);
         }
-        await adapter.update({ state: entityState });
+        adapter.state = entityState;
       }
     }
   };

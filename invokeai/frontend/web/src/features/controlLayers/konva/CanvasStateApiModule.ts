@@ -1,12 +1,13 @@
 import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
 import type { AppStore } from 'app/store/store';
-import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
-import type { CanvasEntityMaskAdapter } from 'features/controlLayers/konva/CanvasEntityMaskAdapter';
+import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
+import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import type { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
+import type { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type {
-  CanvasSettingsState} from 'features/controlLayers/store/canvasSettingsSlice';
+import type { CanvasSettingsState } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   settingsBrushWidthChanged,
   settingsColorChanged,
@@ -50,25 +51,25 @@ type EntityStateAndAdapter =
       id: string;
       type: CanvasRasterLayerState['type'];
       state: CanvasRasterLayerState;
-      adapter: CanvasEntityLayerAdapter;
+      adapter: CanvasRasterLayerAdapter;
     }
   | {
       id: string;
       type: CanvasControlLayerState['type'];
       state: CanvasControlLayerState;
-      adapter: CanvasEntityLayerAdapter;
+      adapter: CanvasControlLayerAdapter;
     }
   | {
       id: string;
       type: CanvasInpaintMaskState['type'];
       state: CanvasInpaintMaskState;
-      adapter: CanvasEntityMaskAdapter;
+      adapter: CanvasInpaintMaskAdapter;
     }
   | {
       id: string;
       type: CanvasRegionalGuidanceState['type'];
       state: CanvasRegionalGuidanceState;
-      adapter: CanvasEntityMaskAdapter;
+      adapter: CanvasRegionalGuidanceAdapter;
     };
 
 export class CanvasStateApiModule extends CanvasModuleBase {
@@ -361,7 +362,13 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   /**
    * The entity adapter being transformed, if any.
    */
-  $transformingAdapter = atom<CanvasEntityLayerAdapter | CanvasEntityMaskAdapter | null>(null);
+  $transformingAdapter = atom<
+    | CanvasRasterLayerAdapter
+    | CanvasControlLayerAdapter
+    | CanvasInpaintMaskAdapter
+    | CanvasRegionalGuidanceAdapter
+    | null
+  >(null);
 
   /**
    * Whether an entity is currently being transformed. Derived from `$transformingAdapter`.
