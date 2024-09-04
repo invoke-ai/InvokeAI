@@ -6,7 +6,7 @@ from typing import Optional
 
 from diffusers import ControlNetModel
 
-import invokeai.backend.assets.sd_base_conf_files as conf_file_cache
+import invokeai.backend.assets.model_base_conf_files as conf_file_cache
 from invokeai.backend.model_manager import (
     AnyModel,
     AnyModelConfig,
