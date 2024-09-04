@@ -8,6 +8,7 @@ import {
   calculateNewBrushSizeFromWheelDelta,
   floorCoord,
   getIsPrimaryMouseDown,
+  getLastPointOfLastLine,
   getLastPointOfLine,
   getPrefixedId,
   getScaledCursorPosition,
@@ -374,7 +375,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
 
       if (tool === 'brush') {
-        const lastLinePoint = selectedEntity.adapter.getLastPointOfLastLine('brush_line');
+        const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'brush_line');
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
@@ -412,7 +413,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'eraser') {
-        const lastLinePoint = selectedEntity.adapter.getLastPointOfLastLine('eraser_line');
+        const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'eraser_line');
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point

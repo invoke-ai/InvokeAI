@@ -1,4 +1,4 @@
-import type { CanvasEntityIdentifier, Coordinate, Rect } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CanvasObjectState, Coordinate, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -463,4 +463,20 @@ export const getRectUnion = (...rects: Rect[]): Rect => {
  */
 export const exhaustiveCheck = (value: never): never => {
   assert(false, `Unhandled value: ${value}`);
+};
+
+export const getLastPointOfLastLine = (
+  objects: CanvasObjectState[],
+  type: 'brush_line' | 'eraser_line'
+): Coordinate | null => {
+  const lastObject = objects[objects.length - 1];
+  if (!lastObject) {
+    return null;
+  }
+
+  if (lastObject.type === type) {
+    return getLastPointOfLine(lastObject.points);
+  }
+
+  return null;
 };

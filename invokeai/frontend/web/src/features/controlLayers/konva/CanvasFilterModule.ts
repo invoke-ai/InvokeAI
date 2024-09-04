@@ -1,7 +1,10 @@
 import type { SerializableObject } from 'common/types';
-import type { CanvasEntityLayerAdapter } from 'features/controlLayers/konva/CanvasEntityLayerAdapter';
+import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
+import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import type { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
+import type { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, CanvasImageState, FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -21,7 +24,13 @@ export class CanvasFilterModule extends CanvasModuleBase {
 
   imageState: CanvasImageState | null = null;
 
-  $adapter = atom<CanvasEntityLayerAdapter | null>(null);
+  $adapter = atom<
+    | CanvasRasterLayerAdapter
+    | CanvasControlLayerAdapter
+    | CanvasInpaintMaskAdapter
+    | CanvasRegionalGuidanceAdapter
+    | null
+  >(null);
   $isFiltering = computed(this.$adapter, (adapter) => Boolean(adapter));
   $isProcessing = atom<boolean>(false);
   $config = atom<FilterConfig>(IMAGE_FILTERS.canny_image_processor.buildDefaults());
@@ -112,7 +121,7 @@ export class CanvasFilterModule extends CanvasModuleBase {
     adapter.renderer.commitBuffer();
     const rect = adapter.transformer.getRelativeRect();
     this.manager.stateApi.rasterizeEntity({
-      entityIdentifier: adapter.getEntityIdentifier(),
+      entityIdentifier: adapter.entityIdentifier,
       imageObject: imageState,
       rect: {
         x: Math.round(rect.x),
