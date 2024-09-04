@@ -39,7 +39,7 @@ def test_apply_lora(device):
             },
         )
     }
-    lora = LoRAModelRaw("lora_name", lora_layers)
+    lora = LoRAModelRaw(lora_layers)
 
     lora_weight = 0.5
     orig_linear_weight = model["linear_layer_1"].weight.data.detach().clone()
@@ -83,7 +83,7 @@ def test_apply_lora_change_device():
             },
         )
     }
-    lora = LoRAModelRaw("lora_name", lora_layers)
+    lora = LoRAModelRaw(lora_layers)
 
     orig_linear_weight = model["linear_layer_1"].weight.data.detach().clone()
 
