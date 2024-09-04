@@ -46,11 +46,7 @@ function setFillPatternImage(shape: Konva.Shape, ...args: Parameters<typeof getP
 /**
  * Union of all object renderers.
  */
-type AnyObjectRenderer =
-  | CanvasObjectBrushLine
-  | CanvasObjectEraserLine
-  | CanvasObjectRect
-  | CanvasObjectImage;
+type AnyObjectRenderer = CanvasObjectBrushLine | CanvasObjectEraserLine | CanvasObjectRect | CanvasObjectImage;
 /**
  * Union of all object states.
  */
@@ -193,14 +189,14 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   }
 
   /**
-   * Renders the given objects.
-   * @param objectStates The objects to render.
+   * Renders the entity's objects.
    * @returns A promise that resolves to a boolean, indicating if any of the objects were rendered.
    */
-  render = async (objectStates: AnyObjectState[]): Promise<boolean> => {
+  render = async (): Promise<boolean> => {
     let didRender = false;
 
-    const objectIds = objectStates.map((objectState) => objectState.id);
+    const objects = this.parent.state.objects;
+    const objectIds = objects.map((obj) => obj.id);
 
     for (const renderer of this.renderers.values()) {
       if (!objectIds.includes(renderer.id)) {
@@ -210,8 +206,8 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       }
     }
 
-    for (const objectState of objectStates) {
-      didRender = (await this.renderObject(objectState)) || didRender;
+    for (const obj of objects) {
+      didRender = (await this.renderObject(obj)) || didRender;
     }
 
     this.syncCache(didRender);
@@ -231,9 +227,11 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     }
   };
 
-  updateTransparencyEffect = (withTransparencyEffect: boolean) => {
-    const filters = withTransparencyEffect ? [LightnessToAlphaFilter] : [];
-    this.konva.objectGroup.filters(filters);
+  updateTransparencyEffect = () => {
+    if (this.parent.state.type === 'control_layer') {
+      const filters = this.parent.state.withTransparencyEffect ? [LightnessToAlphaFilter] : [];
+      this.konva.objectGroup.filters(filters);
+    }
   };
 
   updateCompositingRectFill = (fill: Fill) => {
@@ -269,8 +267,13 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     });
   };
 
-  updateOpacity = (opacity: number) => {
+  updateOpacity = () => {
     this.log.trace('Updating opacity');
+
+    const opacity = this.manager.stateApi.getIsTypeHidden(this.parent.entityIdentifier.type)
+      ? 0
+      : this.parent.state.opacity;
+
     if (this.konva.compositing) {
       this.konva.compositing.group.opacity(opacity);
     } else {
