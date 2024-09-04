@@ -24,7 +24,7 @@ import type {
   RgbColor,
   Tool,
 } from 'features/controlLayers/store/types';
-import { isDrawableEntity, RGBA_BLACK } from 'features/controlLayers/store/types';
+import { isRenderableEntity, RGBA_BLACK } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
@@ -171,7 +171,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       !!selectedEntity &&
       selectedEntity.state.isEnabled &&
       !selectedEntity.state.isLocked &&
-      isDrawableEntity(selectedEntity.state);
+      isRenderableEntity(selectedEntity.state);
 
     this.syncCursorStyle();
 

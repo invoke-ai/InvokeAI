@@ -1,9 +1,6 @@
-import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
-import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
+import type { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapterBase';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import type { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
-import type { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
 import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -82,11 +79,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   readonly type = 'entity_transformer';
   readonly id: string;
   readonly path: string[];
-  readonly parent:
-    | CanvasRasterLayerAdapter
-    | CanvasControlLayerAdapter
-    | CanvasInpaintMaskAdapter
-    | CanvasRegionalGuidanceAdapter;
+  readonly parent: CanvasEntityAdapterBase;
   readonly manager: CanvasManager;
   readonly log: Logger;
 

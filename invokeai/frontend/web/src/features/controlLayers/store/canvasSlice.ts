@@ -56,7 +56,7 @@ import {
   imageDTOToImageWithDims,
   initialControlNet,
   initialIPAdapter,
-  isDrawableEntity,
+  isRenderableEntity,
 } from './types';
 
 const DEFAULT_MASK_COLORS: RgbColor[] = [
@@ -818,7 +818,7 @@ export const canvasSlice = createSlice({
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
-      } else if (isDrawableEntity(entity)) {
+      } else if (isRenderableEntity(entity)) {
         entity.isEnabled = true;
         entity.objects = [];
         entity.position = { x: 0, y: 0 };
@@ -907,7 +907,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      if (isDrawableEntity(entity)) {
+      if (isRenderableEntity(entity)) {
         entity.position = position;
       }
     },
@@ -918,7 +918,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      if (isDrawableEntity(entity)) {
+      if (isRenderableEntity(entity)) {
         if (replaceObjects) {
           entity.objects = [imageObject];
           entity.position = { x: rect.x, y: rect.y };
@@ -932,7 +932,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      if (!isDrawableEntity(entity)) {
+      if (!isRenderableEntity(entity)) {
         assert(false, `Cannot add a brush line to a non-drawable entity of type ${entity.type}`);
       }
 
@@ -947,7 +947,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      if (!isDrawableEntity(entity)) {
+      if (!isRenderableEntity(entity)) {
         assert(false, `Cannot add a eraser line to a non-drawable entity of type ${entity.type}`);
       }
 
@@ -962,7 +962,7 @@ export const canvasSlice = createSlice({
         return;
       }
 
-      if (!isDrawableEntity(entity)) {
+      if (!isRenderableEntity(entity)) {
         assert(false, `Cannot add a rect to a non-drawable entity of type ${entity.type}`);
       }
 

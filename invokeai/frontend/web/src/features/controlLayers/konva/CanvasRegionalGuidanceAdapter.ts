@@ -1,61 +1,21 @@
 import type { SerializableObject } from 'common/types';
-import { deepClone } from 'common/util/deepClone';
-import { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
-import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
+import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapterBase';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasEntityIdentifier, CanvasRegionalGuidanceState, Rect } from 'features/controlLayers/store/types';
-import { getEntityIdentifier } from 'features/controlLayers/store/types';
-import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import { omit } from 'lodash-es';
-import type { Logger } from 'roarr';
-import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
-export class CanvasRegionalGuidanceAdapter extends CanvasModuleBase {
-  readonly type = 'regional_guidance_adapter';
-  readonly id: string;
-  readonly path: string[];
-  readonly parent: CanvasManager;
-  readonly manager: CanvasManager;
-  readonly log: Logger;
-
-  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>;
+export class CanvasRegionalGuidanceAdapter extends CanvasEntityAdapterBase<CanvasRegionalGuidanceState> {
+  static TYPE = 'regional_guidance_adapter';
 
   /**
    * The last known state of the entity.
    */
   private _state: CanvasRegionalGuidanceState | null = null;
 
-  transformer: CanvasEntityTransformer;
-  renderer: CanvasEntityRenderer;
-
-  konva: {
-    layer: Konva.Layer;
-  };
-
   constructor(entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>, manager: CanvasManager) {
-    super();
-    this.id = entityIdentifier.id;
-    this.entityIdentifier = entityIdentifier;
-    this.parent = manager;
-    this.manager = manager;
-    this.path = this.manager.buildPath(this);
-    this.log = this.manager.buildLogger(this);
-
-    this.log.debug('Creating module');
-
-    this.konva = {
-      layer: new Konva.Layer({
-        name: `${this.type}:layer`,
-        listening: false,
-        imageSmoothingEnabled: false,
-      }),
-    };
-
-    this.renderer = new CanvasEntityRenderer(this);
-    this.transformer = new CanvasEntityTransformer(this);
+    super(entityIdentifier, manager, CanvasRegionalGuidanceAdapter.TYPE);
   }
 
   get state(): CanvasRegionalGuidanceState {
@@ -68,20 +28,12 @@ export class CanvasRegionalGuidanceAdapter extends CanvasModuleBase {
   }
 
   set state(state: CanvasRegionalGuidanceState) {
+    const prevState = this._state;
     this._state = state;
+    this.render(state, prevState);
   }
 
-  /**
-   * Get this entity's entity identifier
-   */
-  getEntityIdentifier = (): CanvasEntityIdentifier => {
-    return getEntityIdentifier(this.state);
-  };
-
-  update = async (state: CanvasRegionalGuidanceState) => {
-    const prevState = this.state;
-    this.state = state;
-
+  render = async (state: CanvasRegionalGuidanceState, prevState: CanvasRegionalGuidanceState | null) => {
     if (prevState && prevState === state) {
       this.log.trace('State unchanged, skipping update');
       return;
@@ -125,39 +77,11 @@ export class CanvasRegionalGuidanceAdapter extends CanvasModuleBase {
     return omit(this.state, keysToOmit);
   };
 
-  hash = (extra?: SerializableObject): string => {
-    const arg = {
-      state: this.getHashableState(),
-      extra,
-    };
-    return stableHash(arg);
-  };
-
   getCanvas = (rect?: Rect): HTMLCanvasElement => {
     // The opacity may have been changed in response to user selecting a different entity category, and the mask regions
     // should be fully opaque - set opacity to 1 before rendering the canvas
     const attrs: GroupConfig = { opacity: 1 };
     const canvas = this.renderer.getCanvas(rect, attrs);
     return canvas;
-  };
-
-  isInteractable = (): boolean => {
-    return this.state.isEnabled && !this.state.isLocked;
-  };
-
-  destroy = () => {
-    this.log.debug('Destroying module');
-    this.transformer.destroy();
-    this.renderer.destroy();
-    this.konva.layer.destroy();
-  };
-
-  repr = () => {
-    return {
-      id: this.id,
-      type: this.type,
-      path: this.path,
-      state: deepClone(this.state),
-    };
   };
 }

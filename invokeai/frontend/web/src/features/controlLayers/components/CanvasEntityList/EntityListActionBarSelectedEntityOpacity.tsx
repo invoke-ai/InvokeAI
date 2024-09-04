@@ -22,7 +22,7 @@ import {
   selectEntity,
   selectSelectedEntityIdentifier,
 } from 'features/controlLayers/store/selectors';
-import { isDrawableEntity } from 'features/controlLayers/store/types';
+import { isRenderableEntity } from 'features/controlLayers/store/types';
 import { clamp, round } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
@@ -70,7 +70,7 @@ const selectOpacity = createSelector(selectCanvasSlice, (canvas) => {
   if (!selectedEntity) {
     return 1; // fallback to 100% opacity
   }
-  if (!isDrawableEntity(selectedEntity)) {
+  if (!isRenderableEntity(selectedEntity)) {
     return 1; // fallback to 100% opacity
   }
   // Opacity is a float from 0-1, but we want to display it as a percentage
