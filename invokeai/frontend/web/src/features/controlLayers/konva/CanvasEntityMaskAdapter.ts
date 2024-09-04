@@ -54,9 +54,6 @@ export class CanvasEntityMaskAdapter extends CanvasModuleBase {
 
     this.konva = {
       layer: new Konva.Layer({
-        // We need the ID on the layer to help with building the composite initial image
-        // See `getCompositeLayerStageClone()`
-        id: this.id,
         name: `${this.type}:layer`,
         listening: false,
         imageSmoothingEnabled: false,
