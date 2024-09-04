@@ -20,9 +20,11 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.peft.conversions.flux_lora_conversion_utils import convert_flux_kohya_state_dict_to_invoke_format
+from invokeai.backend.peft.conversions.flux_lora_conversion_utils import (
+    lora_model_from_flux_kohya_state_dict,
+)
+from invokeai.backend.peft.conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.peft.conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
-from invokeai.backend.peft.lora import LoRAModelRaw
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.LoRA, format=ModelFormat.Diffusers)
@@ -60,17 +62,18 @@ class LoRALoader(ModelLoader):
         # Apply state_dict key conversions, if necessary.
         if self._model_base == BaseModelType.StableDiffusionXL:
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
+            model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.Flux:
-            state_dict = convert_flux_kohya_state_dict_to_invoke_format(state_dict)
+            model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
             # Currently, we don't apply any conversions for SD1 and SD2 LoRA models.
-            pass
+            model = lora_model_from_sd_state_dict(state_dict=state_dict)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 
-        return LoRAModelRaw.from_state_dict(state_dict=state_dict, dtype=self._torch_dtype)
+        model.to(dtype=self._torch_dtype)
+        return model
 
-    # override
     def _get_model_path(self, config: AnyModelConfig) -> Path:
         # cheating a little - we remember this variable for using in the subsequent call to _load_model()
         self._model_base = config.base
