@@ -195,7 +195,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             PeftPatcher.apply_peft_patches(
                 model=transformer,
                 patches=self._lora_iterator(context),
-                prefix="transformer",
+                prefix="",
                 cached_weights=cached_weights,
             ),
         ):
