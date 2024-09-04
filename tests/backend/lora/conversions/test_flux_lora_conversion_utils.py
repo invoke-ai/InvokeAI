@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from invokeai.backend.flux.model import Flux
@@ -37,3 +38,15 @@ def test_convert_flux_kohya_state_dict_to_invoke_format():
                 break
         if not found_match:
             raise AssertionError(f"Could not find a match for the converted key prefix: {converted_key_prefix}")
+
+
+def test_convert_flux_kohya_state_dict_to_invoke_format_error():
+    """Test that an error is raised by convert_flux_kohya_state_dict_to_invoke_format() if the input state_dict contains
+    unexpected keys.
+    """
+    state_dict = {
+        "unexpected_key.lora_up.weight": torch.empty(1),
+    }
+
+    with pytest.raises(ValueError):
+        convert_flux_kohya_state_dict_to_invoke_format(state_dict)
