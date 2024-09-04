@@ -123,7 +123,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
 
     if (!prevState || state.rasterLayers.isHidden !== prevState.rasterLayers.isHidden) {
       for (const adapter of adapterMap.values()) {
-        adapter.renderer.updateOpacity(state.rasterLayers.isHidden ? 0 : adapter.state.opacity);
+        adapter.renderer.updateOpacity();
       }
     }
 
@@ -152,7 +152,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
 
     if (!prevState || state.controlLayers.isHidden !== prevState.controlLayers.isHidden) {
       for (const adapter of adapterMap.values()) {
-        adapter.renderer.updateOpacity(state.controlLayers.isHidden ? 0 : adapter.state.opacity);
+        adapter.renderer.updateOpacity();
       }
     }
 
@@ -181,7 +181,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
 
     if (!prevState || state.regions.isHidden !== prevState.regions.isHidden) {
       for (const adapter of adapterMap.values()) {
-        adapter.renderer.updateOpacity(state.regions.isHidden ? 0 : adapter.state.opacity);
+        adapter.renderer.updateOpacity();
       }
     }
 
@@ -215,7 +215,7 @@ export class CanvasRenderingModule extends CanvasModuleBase {
 
     if (!prevState || state.inpaintMasks.isHidden !== prevState.inpaintMasks.isHidden) {
       for (const adapter of adapterMap.values()) {
-        adapter.renderer.updateOpacity(state.inpaintMasks.isHidden ? 0 : adapter.state.opacity);
+        adapter.renderer.updateOpacity();
       }
     }
 
