@@ -6,23 +6,20 @@ import { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRas
 import { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasSessionState } from 'features/controlLayers/store/canvasSessionSlice';
-import type { CanvasSettingsState } from 'features/controlLayers/store/canvasSettingsSlice';
 import { type CanvasState, getEntityIdentifier } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
 
-export class CanvasRenderingModule extends CanvasModuleBase {
-  readonly type = 'canvas_renderer';
+export class CanvasEntityRendererModule extends CanvasModuleBase {
+  readonly type = 'entity_renderer';
   readonly id: string;
   readonly path: string[];
   readonly log: Logger;
   readonly parent: CanvasManager;
   readonly manager: CanvasManager;
 
-  state: CanvasState | null = null;
-  settings: CanvasSettingsState | null = null;
-  session: CanvasSessionState | null = null;
+  private _state: CanvasState | null = null;
 
-  isFirstRender = true;
+  subscriptions = new Set<() => void>();
 
   constructor(manager: CanvasManager) {
     super();
@@ -33,29 +30,15 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating module');
+
+    this.subscriptions.add(this.manager.stateApi.store.subscribe(this.render));
   }
 
   render = () => {
-    if (!this.state || !this.settings || !this.session) {
-      this.log.trace('First render');
-    }
-
-    this.renderCanvas();
-    this.renderSettings();
-    this.renderSession();
-
-    // We have no prev state for the first render
-    if (this.isFirstRender) {
-      this.isFirstRender = false;
-      this.manager.setCanvasManager();
-    }
-  };
-
-  renderCanvas = () => {
     const state = this.manager.stateApi.getCanvasState();
 
-    const prevState = this.state;
-    this.state = state;
+    const prevState = this._state;
+    this._state = state;
 
     this.manager.stateApi.$settingsState.set(this.manager.stateApi.getSettings());
     this.manager.stateApi.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
@@ -74,48 +57,6 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     this.renderBbox(state, prevState);
     this.arrangeEntities(state, prevState);
     this.manager.tool.syncCursorStyle();
-  };
-
-  renderSettings = () => {
-    const settings = this.manager.stateApi.getSettings();
-
-    if (!this.settings) {
-      this.log.trace('First settings render');
-    }
-
-    const prevSettings = this.settings;
-    this.settings = settings;
-
-    if (prevSettings === settings) {
-      // No changes to state - no need to render
-      return;
-    }
-
-    this.renderBackground(settings, prevSettings);
-  };
-
-  renderSession = async () => {
-    const session = this.manager.stateApi.getSession();
-
-    if (!this.session) {
-      this.log.trace('First session render');
-    }
-
-    const prevSession = this.session;
-    this.session = session;
-
-    if (prevSession === session) {
-      // No changes to state - no need to render
-      return;
-    }
-
-    await this.renderStagingArea(session, prevSession);
-  };
-
-  renderBackground = (settings: CanvasSettingsState, prevSettings: CanvasSettingsState | null) => {
-    if (!prevSettings || settings.dynamicGrid !== prevSettings.dynamicGrid) {
-      this.manager.background.render();
-    }
   };
 
   renderRasterLayers = async (state: CanvasState, prevState: CanvasState | null) => {
@@ -297,5 +238,11 @@ export class CanvasRenderingModule extends CanvasModuleBase {
 
       this.manager.konva.previewLayer.zIndex(++zIndex);
     }
+  };
+
+  destroy = () => {
+    this.log.trace('Destroying module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
   };
 }
