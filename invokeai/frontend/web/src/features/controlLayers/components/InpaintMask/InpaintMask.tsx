@@ -4,7 +4,7 @@ import { CanvasEntityHeader } from 'features/controlLayers/components/common/Can
 import { CanvasEntityHeaderCommonActions } from 'features/controlLayers/components/common/CanvasEntityHeaderCommonActions';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
-import { EntityMaskAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
+import { InpaintMaskAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
@@ -18,7 +18,7 @@ export const InpaintMask = memo(({ id }: Props) => {
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <EntityMaskAdapterGate>
+      <InpaintMaskAdapterGate>
         <CanvasEntityContainer>
           <CanvasEntityHeader>
             <CanvasEntityPreviewImage />
@@ -27,7 +27,7 @@ export const InpaintMask = memo(({ id }: Props) => {
             <CanvasEntityHeaderCommonActions />
           </CanvasEntityHeader>
         </CanvasEntityContainer>
-      </EntityMaskAdapterGate>
+      </InpaintMaskAdapterGate>
     </EntityIdentifierContext.Provider>
   );
 });

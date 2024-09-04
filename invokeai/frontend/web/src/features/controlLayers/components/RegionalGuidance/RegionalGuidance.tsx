@@ -6,7 +6,7 @@ import { CanvasEntityPreviewImage } from 'features/controlLayers/components/comm
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { RegionalGuidanceBadges } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceBadges';
 import { RegionalGuidanceSettings } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceSettings';
-import { EntityMaskAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
+import { RegionalGuidanceAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useMemo } from 'react';
@@ -20,7 +20,7 @@ export const RegionalGuidance = memo(({ id }: Props) => {
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <EntityMaskAdapterGate>
+      <RegionalGuidanceAdapterGate>
         <CanvasEntityContainer>
           <CanvasEntityHeader>
             <CanvasEntityPreviewImage />
@@ -31,7 +31,7 @@ export const RegionalGuidance = memo(({ id }: Props) => {
           </CanvasEntityHeader>
           <RegionalGuidanceSettings />
         </CanvasEntityContainer>
-      </EntityMaskAdapterGate>
+      </RegionalGuidanceAdapterGate>
     </EntityIdentifierContext.Provider>
   );
 });
