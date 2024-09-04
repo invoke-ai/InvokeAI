@@ -89,8 +89,6 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   /**
    * The rect of the parent, _including_ transparent regions.
    * It is calculated via Konva's getClientRect method, which is fast but includes transparent regions.
-   *
-   * Stored as a nanostores atom for easy reactivity.
    */
   $nodeRect = atom<Rect>(getEmptyRect());
 
@@ -99,15 +97,11 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * If the parent's nodes have no possibility of transparent regions, this will be calculated the same way as nodeRect.
    * If the parent's nodes may have transparent regions, this will be calculated manually by rasterizing the parent and
    * checking the pixel data.
-   *
-   * Stored as a nanostores atom for easy reactivity.
    */
   $pixelRect = atom<Rect>(getEmptyRect());
 
   /**
    * Whether the transformer is currently calculating the rect of the parent.
-   *
-   * Stored as a nanostores atom for easy reactivity.
    */
   $isPendingRectCalculation = atom<boolean>(true);
 
@@ -118,8 +112,6 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   /**
    * Whether the transformer is currently transforming the entity.
-   *
-   * Stored as a nanostores atom for easy reactivity.
    */
   $isTransforming = atom<boolean>(false);
 
@@ -128,29 +120,21 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * - 'all': The entity can be moved, resized, and rotated.
    * - 'drag': The entity can be moved.
    * - 'off': The transformer is not interactable.
-   *
-   * Stored as a nanostores atom for easy reactivity.
    */
   $interactionMode = atom<'all' | 'drag' | 'off'>('off');
 
   /**
    * Whether dragging is enabled. Dragging is enabled in both 'all' and 'drag' interaction modes.
-   *
-   * Stored as a nanostores atom for easy reactivity.
    */
   $isDragEnabled = atom<boolean>(false);
 
   /**
    * Whether transforming is enabled. Transforming is enabled only in 'all' interaction mode.
-   *
-   * Stored as a nanostores atom for easy reactivity.
    */
   $isTransformEnabled = atom<boolean>(false);
 
   /**
    * Whether the transformer is currently processing (rasterizing and uploading) the transformed entity.
-   *
-   * Stored as a nanostores atom for easy reactivity.
    */
   $isProcessing = atom(false);
 
