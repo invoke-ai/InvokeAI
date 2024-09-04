@@ -7,8 +7,17 @@ from typing import Optional
 import accelerate
 import torch
 from safetensors.torch import load_file
-from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
+from transformers import (
+    AutoConfig,
+    AutoModelForTextEncoding,
+    CLIPTextConfig,
+    CLIPTextModel,
+    CLIPTokenizer,
+    T5EncoderModel,
+    T5Tokenizer,
+)
 
+import invokeai.backend.assets.model_base_conf_files as model_conf_files
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
@@ -23,6 +32,7 @@ from invokeai.backend.model_manager import (
 )
 from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
+    CLIPEmbedCheckpointConfig,
     CLIPEmbedDiffusersConfig,
     MainBnbQuantized4bCheckpointConfig,
     MainCheckpointConfig,
@@ -69,7 +79,7 @@ class FluxVAELoader(ModelLoader):
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPEmbed, format=ModelFormat.Diffusers)
-class ClipCheckpointModel(ModelLoader):
+class ClipDiffusersModel(ModelLoader):
     """Class to load main models."""
 
     def _load_model(
@@ -85,6 +95,39 @@ class ClipCheckpointModel(ModelLoader):
                 return CLIPTokenizer.from_pretrained(Path(config.path) / "tokenizer")
             case SubModelType.TextEncoder:
                 return CLIPTextModel.from_pretrained(Path(config.path) / "text_encoder")
+
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPEmbed, format=ModelFormat.Checkpoint)
+class ClipCheckpointModel(ModelLoader):
+    """Class to load main models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, CLIPEmbedCheckpointConfig):
+            raise ValueError("Only CLIPEmbedCheckpointConfig models are currently supported here.")
+
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                # Clip embedding checkpoints don't have an integrated tokenizer, so we cheat and fetch it into the HuggingFace cache
+                # TODO: Fix this ugly workaround
+                return CLIPTokenizer.from_pretrained(
+                    "InvokeAI/clip-vit-large-patch14-text-encoder", subfolder="bfloat16/tokenizer"
+                )
+            case SubModelType.TextEncoder:
+                config_json = CLIPTextConfig.from_json_file(Path(model_conf_files.__path__[0], config.config_path))
+                model = CLIPTextModel(config_json)
+                state_dict = load_file(config.path)
+                new_dict = {key: value for (key, value) in state_dict.items() if key.startswith("text_model.")}
+                model.load_state_dict(new_dict)
+                model.eval()
+                return model
 
         raise ValueError(
             f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"

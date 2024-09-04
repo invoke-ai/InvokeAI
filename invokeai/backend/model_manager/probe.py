@@ -8,7 +8,6 @@ import spandrel
 import torch
 from picklescan.scanner import scan_file_path
 
-import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.config import (
@@ -27,6 +26,7 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
+from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 CkptType = Dict[str | int, Any]
@@ -180,7 +180,9 @@ class ModelProbe(object):
             fields["repo_variant"] = fields.get("repo_variant") or probe.get_repo_variant()
 
         # additional fields needed for main and controlnet models
-        if fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE] and fields["format"] in [
+        if fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE, ModelType.CLIPEmbed] and fields[
+            "format"
+        ] in [
             ModelFormat.Checkpoint,
             ModelFormat.BnbQuantizednf4b,
         ]:
@@ -203,7 +205,6 @@ class ModelProbe(object):
                 fields["base"] == BaseModelType.StableDiffusion2
                 and fields["prediction_type"] == SchedulerPredictionType.VPrediction
             )
-
         model_info = ModelConfigFactory.make_config(fields)  # , key=fields.get("key", None))
         return model_info
 
@@ -252,6 +253,8 @@ class ModelProbe(object):
                 return ModelType.IPAdapter
             elif key in {"emb_params", "string_to_param"}:
                 return ModelType.TextualInversion
+            elif key.startswith(("text_model.embeddings", "text_model.encoder")):
+                return ModelType.CLIPEmbed
 
         # diffusers-ti
         if len(ckpt) < 10 and all(isinstance(v, torch.Tensor) for v in ckpt.values()):
@@ -388,6 +391,8 @@ class ModelProbe(object):
                 if base_type is BaseModelType.StableDiffusionXL
                 else "stable-diffusion/v2-inference.yaml"
             )
+        elif model_type is ModelType.CLIPEmbed:
+            return Path("clip_text_model", "config.json")
         else:
             raise InvalidModelConfigException(
                 f"{model_path}: Unrecognized combination of model_type={model_type}, base_type={base_type}"
@@ -650,6 +655,11 @@ class CLIPVisionCheckpointProbe(CheckpointProbeBase):
         raise NotImplementedError()
 
 
+class CLIPEmbedCheckpointProbe(CheckpointProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Any
+
+
 class T2IAdapterCheckpointProbe(CheckpointProbeBase):
     def get_base_type(self) -> BaseModelType:
         raise NotImplementedError()
@@ -807,7 +817,7 @@ class ONNXFolderProbe(PipelineFolderProbe):
         if (self.model_path / "unet" / "config.json").exists():
             return super().get_base_type()
         else:
-            logger.warning('Base type probing is not implemented for ONNX models. Assuming "sd-1"')
+            InvokeAILogger.get_logger().warning('Base type probing is not implemented for ONNX models. Assuming "sd-1"')
             return BaseModelType.StableDiffusion1
 
     def get_format(self) -> ModelFormat:
@@ -941,6 +951,7 @@ ModelProbe.register_probe("checkpoint", ModelType.TextualInversion, TextualInver
 ModelProbe.register_probe("checkpoint", ModelType.ControlNet, ControlNetCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.IPAdapter, IPAdapterCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.CLIPVision, CLIPVisionCheckpointProbe)
+ModelProbe.register_probe("checkpoint", ModelType.CLIPEmbed, CLIPEmbedCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.T2IAdapter, T2IAdapterCheckpointProbe)
 ModelProbe.register_probe("checkpoint", ModelType.SpandrelImageToImage, SpandrelImageToImageCheckpointProbe)
 
