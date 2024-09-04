@@ -5,6 +5,9 @@ from logging import Logger
 from pathlib import Path
 from typing import Optional
 
+import torch
+from safetensors.torch import load_file
+
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager import (
     AnyModel,
@@ -17,6 +20,7 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.peft.conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
 from invokeai.backend.peft.lora import LoRAModelRaw
 
 
@@ -45,12 +49,18 @@ class LoRALoader(ModelLoader):
             raise ValueError("There are no submodels in a LoRA model.")
         model_path = Path(config.path)
         assert self._model_base is not None
-        model = LoRAModelRaw.from_checkpoint(
-            file_path=model_path,
-            dtype=self._torch_dtype,
-            base_model=self._model_base,
-        )
-        return model
+
+        # Load the state dict from the model file.
+        if model_path.suffix == ".safetensors":
+            state_dict = load_file(model_path.absolute().as_posix(), device="cpu")
+        else:
+            state_dict = torch.load(model_path, map_location="cpu")
+
+        # TODO(ryand): Add conversions for other base models and raise if an unsupported base model is used.
+        if self._model_base == BaseModelType.StableDiffusionXL:
+            state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
+
+        return LoRAModelRaw.from_state_dict(state_dict=state_dict, dtype=self._torch_dtype)
 
     # override
     def _get_model_path(self, config: AnyModelConfig) -> Path:
