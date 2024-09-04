@@ -27,6 +27,7 @@ import { selectAllRenderableEntities, selectCanvasSlice } from 'features/control
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
+  CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
@@ -46,6 +47,7 @@ import type { Logger } from 'roarr';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig } from 'services/api/types';
 import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
+import { assert } from 'tsafe';
 
 type EntityStateAndAdapter =
   | {
@@ -243,6 +245,24 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   getIsSelected = (id: string): boolean => {
     return this.getCanvasState().selectedEntityIdentifier?.id === id;
+  };
+
+  /**
+   * Checks if an entity type is hidden. Individual entities are not hidden; the entire entity type is hidden.
+   */
+  getIsTypeHidden = (type: CanvasEntityType): boolean => {
+    switch (type) {
+      case 'raster_layer':
+        return this.getRasterLayersState().isHidden;
+      case 'control_layer':
+        return this.getControlLayersState().isHidden;
+      case 'inpaint_mask':
+        return this.getInpaintMasksState().isHidden;
+      case 'regional_guidance':
+        return this.getRegionsState().isHidden;
+      default:
+        assert(false, 'Unhandled entity type');
+    }
   };
 
   /**

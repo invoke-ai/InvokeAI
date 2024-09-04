@@ -45,7 +45,7 @@ export class CanvasRegionalGuidanceAdapter extends CanvasEntityAdapterBase<Canva
       this.renderer.syncCache(state.isEnabled);
     }
     if (!prevState || state.objects !== prevState.objects) {
-      const didRender = await this.renderer.render(this.state.objects);
+      const didRender = await this.renderer.render();
       if (didRender) {
         this.transformer.requestRectCalculation();
       }
@@ -54,7 +54,7 @@ export class CanvasRegionalGuidanceAdapter extends CanvasEntityAdapterBase<Canva
       this.transformer.updatePosition();
     }
     if (!prevState || state.opacity !== prevState.opacity) {
-      this.renderer.updateOpacity(state.opacity);
+      this.renderer.updateOpacity();
     }
     if (!prevState || state.isLocked !== prevState.isLocked) {
       this.transformer.syncInteractionState();

@@ -44,7 +44,7 @@ export class CanvasControlLayerAdapter extends CanvasEntityAdapterBase<CanvasCon
       this.transformer.syncInteractionState();
     }
     if (!prevState || state.objects !== prevState.objects) {
-      const didRender = await this.renderer.render(this.state.objects);
+      const didRender = await this.renderer.render();
       if (didRender) {
         this.transformer.requestRectCalculation();
       }
@@ -53,10 +53,10 @@ export class CanvasControlLayerAdapter extends CanvasEntityAdapterBase<CanvasCon
       this.transformer.updatePosition();
     }
     if (!prevState || state.opacity !== prevState.opacity) {
-      this.renderer.updateOpacity(state.opacity);
+      this.renderer.updateOpacity();
     }
     if (!prevState || state.withTransparencyEffect !== prevState.withTransparencyEffect) {
-      this.renderer.updateTransparencyEffect(state.withTransparencyEffect);
+      this.renderer.updateTransparencyEffect();
     }
 
     if (!prevState) {
