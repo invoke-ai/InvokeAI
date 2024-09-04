@@ -193,6 +193,10 @@ class FluxCheckpointModel(ModelLoader):
             sd = load_file(model_path)
             if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
                 sd = convert_bundle_to_flux_transformer_checkpoint(sd)
+            for k, v in sd.items():
+                if v.dtype == torch.bfloat16:
+                    continue
+                sd[k] = v.to(dtype=torch.bfloat16)
             model.load_state_dict(sd, assign=True)
         return model
 
