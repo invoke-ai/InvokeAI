@@ -143,6 +143,7 @@ def convert_bundle_to_flux_transformer_checkpoint(
 
     for k, v in transformer_state_dict.items():
         if not k.startswith("model.diffusion_model"):
+            keys_to_remove.append(k)  # This can be removed in the future if we only want to delete transformer keys
             continue
         if k.endswith("scale"):
             # Scale math must be done at bfloat16 due to our current flux model
