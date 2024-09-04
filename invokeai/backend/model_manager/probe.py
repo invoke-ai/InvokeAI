@@ -108,6 +108,8 @@ class ModelProbe(object):
         "CLIPVisionModelWithProjection": ModelType.CLIPVision,
         "T2IAdapter": ModelType.T2IAdapter,
         "CLIPModel": ModelType.CLIPEmbed,
+        "CLIPTextModel": ModelType.CLIPEmbed,
+        "T5EncoderModel": ModelType.T5Encoder,
     }
 
     @classmethod
@@ -224,7 +226,18 @@ class ModelProbe(object):
         ckpt = ckpt.get("state_dict", ckpt)
 
         for key in [str(k) for k in ckpt.keys()]:
-            if key.startswith(("cond_stage_model.", "first_stage_model.", "model.diffusion_model.", "double_blocks.")):
+            if key.startswith(
+                (
+                    "cond_stage_model.",
+                    "first_stage_model.",
+                    "model.diffusion_model.",
+                    # FLUX models in the official BFL format contain keys with the "double_blocks." prefix.
+                    "double_blocks.",
+                    # Some FLUX checkpoint files contain transformer keys prefixed with "model.diffusion_model".
+                    # This prefix is typically used to distinguish between multiple models bundled in a single file.
+                    "model.diffusion_model.double_blocks.",
+                )
+            ):
                 # Keys starting with double_blocks are associated with Flux models
                 return ModelType.Main
             elif key.startswith(("encoder.conv_in", "decoder.conv_in")):
@@ -283,9 +296,16 @@ class ModelProbe(object):
         if (folder_path / "image_encoder.txt").exists():
             return ModelType.IPAdapter
 
-        i = folder_path / "model_index.json"
-        c = folder_path / "config.json"
-        config_path = i if i.exists() else c if c.exists() else None
+        config_path = None
+        for p in [
+            folder_path / "model_index.json",  # pipeline
+            folder_path / "config.json",  # most diffusers
+            folder_path / "text_encoder_2" / "config.json",  # T5 text encoder
+            folder_path / "text_encoder" / "config.json",  # T5 CLIP
+        ]:
+            if p.exists():
+                config_path = p
+                break
 
         if config_path:
             with open(config_path, "r") as file:
@@ -328,7 +348,10 @@ class ModelProbe(object):
                 # TODO: Decide between dev/schnell
                 checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
                 state_dict = checkpoint.get("state_dict") or checkpoint
-                if "guidance_in.out_layer.weight" in state_dict:
+                if (
+                    "guidance_in.out_layer.weight" in state_dict
+                    or "model.diffusion_model.guidance_in.out_layer.weight" in state_dict
+                ):
                     # For flux, this is a key in invokeai.backend.flux.util.params
                     #   Due to model type and format being the descriminator for model configs this
                     #   is used rather than attempting to support flux with separate model types and format
@@ -336,7 +359,7 @@ class ModelProbe(object):
                     config_file = "flux-dev"
                 else:
                     # For flux, this is a key in invokeai.backend.flux.util.params
-                    #   Due to model type and format being the descriminator for model configs this
+                    #   Due to model type and format being the discriminator for model configs this
                     #   is used rather than attempting to support flux with separate model types and format
                     #   If changed in the future, please fix me
                     config_file = "flux-schnell"
@@ -443,7 +466,10 @@ class CheckpointProbeBase(ProbeBase):
 
     def get_format(self) -> ModelFormat:
         state_dict = self.checkpoint.get("state_dict") or self.checkpoint
-        if "double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict:
+        if (
+            "double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict
+            or "model.diffusion_model.double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict
+        ):
             return ModelFormat.BnbQuantizednf4b
         return ModelFormat("checkpoint")
 
@@ -470,7 +496,10 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
     def get_base_type(self) -> BaseModelType:
         checkpoint = self.checkpoint
         state_dict = self.checkpoint.get("state_dict") or checkpoint
-        if "double_blocks.0.img_attn.norm.key_norm.scale" in state_dict:
+        if (
+            "double_blocks.0.img_attn.norm.key_norm.scale" in state_dict
+            or "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in state_dict
+        ):
             return BaseModelType.Flux
         key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
         if key_name in state_dict and state_dict[key_name].shape[-1] == 768:
@@ -749,8 +778,27 @@ class TextualInversionFolderProbe(FolderProbeBase):
 
 
 class T5EncoderFolderProbe(FolderProbeBase):
+    def get_base_type(self) -> BaseModelType:
+        return BaseModelType.Any
+
     def get_format(self) -> ModelFormat:
-        return ModelFormat.T5Encoder
+        path = self.model_path / "text_encoder_2"
+        if (path / "model.safetensors.index.json").exists():
+            return ModelFormat.T5Encoder
+        files = list(path.glob("*.safetensors"))
+        if len(files) == 0:
+            raise InvalidModelConfigException(f"{self.model_path.as_posix()}: no .safetensors files found")
+
+        # shortcut: look for the quantization in the name
+        if any(x for x in files if "llm_int8" in x.as_posix()):
+            return ModelFormat.BnbQuantizedLlmInt8b
+
+        # more reliable path: probe contents for a 'SCB' key
+        ckpt = read_checkpoint_meta(files[0], scan=True)
+        if any("SCB" in x for x in ckpt.keys()):
+            return ModelFormat.BnbQuantizedLlmInt8b
+
+        raise InvalidModelConfigException(f"{self.model_path.as_posix()}: unknown model format")
 
 
 class ONNXFolderProbe(PipelineFolderProbe):

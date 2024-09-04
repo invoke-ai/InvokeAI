@@ -32,6 +32,7 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.util.model_util import convert_bundle_to_flux_transformer_checkpoint
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 try:
@@ -190,6 +191,8 @@ class FluxCheckpointModel(ModelLoader):
         with SilenceWarnings():
             model = Flux(params[config.config_path])
             sd = load_file(model_path)
+            if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
+                sd = convert_bundle_to_flux_transformer_checkpoint(sd)
             model.load_state_dict(sd, assign=True)
         return model
 
@@ -230,5 +233,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
                 model = Flux(params[config.config_path])
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=torch.bfloat16)
             sd = load_file(model_path)
+            if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
+                sd = convert_bundle_to_flux_transformer_checkpoint(sd)
             model.load_state_dict(sd, assign=True)
         return model
