@@ -8,7 +8,7 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMainModels } from 'services/api/hooks/modelsByType';
+import { useSDMainModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
 
 const selectModel = createMemoizedSelector(selectGenerationSlice, (generation) => generation.model);
@@ -17,7 +17,7 @@ const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectedModel = useAppSelector(selectModel);
-  const [modelConfigs, { isLoading }] = useMainModels();
+  const [modelConfigs, { isLoading }] = useSDMainModels();
   const tooltipLabel = useMemo(() => {
     if (!modelConfigs.length || !selectedModel) {
       return;

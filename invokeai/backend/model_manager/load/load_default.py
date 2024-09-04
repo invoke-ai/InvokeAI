@@ -66,12 +66,14 @@ class ModelLoader(ModelLoaderBase):
         return (model_base / config.path).resolve()
 
     def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> ModelLockerBase:
+        stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
         try:
-            return self._ram_cache.get(config.key, submodel_type)
+            return self._ram_cache.get(config.key, submodel_type, stats_name=stats_name)
         except IndexError:
             pass
 
         config.path = str(self._get_model_path(config))
+        self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
         loaded_model = self._load_model(config, submodel_type)
 
         self._ram_cache.put(
@@ -83,7 +85,7 @@ class ModelLoader(ModelLoaderBase):
         return self._ram_cache.get(
             key=config.key,
             submodel_type=submodel_type,
-            stats_name=":".join([config.base, config.type, config.name, (submodel_type or "")]),
+            stats_name=stats_name,
         )
 
     def get_size_fs(

@@ -6,11 +6,13 @@ import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
   BooleanFieldValue,
+  CLIPEmbedModelFieldValue,
   ColorFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
   FieldValue,
   FloatFieldValue,
+  FluxVAEModelFieldValue,
   ImageFieldValue,
   IntegerFieldValue,
   IPAdapterModelFieldValue,
@@ -23,15 +25,18 @@ import type {
   StatefulFieldValue,
   StringFieldValue,
   T2IAdapterModelFieldValue,
+  T5EncoderModelFieldValue,
   VAEModelFieldValue,
 } from 'features/nodes/types/field';
 import {
   zBoardFieldValue,
   zBooleanFieldValue,
+  zCLIPEmbedModelFieldValue,
   zColorFieldValue,
   zControlNetModelFieldValue,
   zEnumFieldValue,
   zFloatFieldValue,
+  zFluxVAEModelFieldValue,
   zImageFieldValue,
   zIntegerFieldValue,
   zIPAdapterModelFieldValue,
@@ -44,6 +49,7 @@ import {
   zStatefulFieldValue,
   zStringFieldValue,
   zT2IAdapterModelFieldValue,
+  zT5EncoderModelFieldValue,
   zVAEModelFieldValue,
 } from 'features/nodes/types/field';
 import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
@@ -341,6 +347,15 @@ export const nodesSlice = createSlice({
     ) => {
       fieldValueReducer(state, action, zSpandrelImageToImageModelFieldValue);
     },
+    fieldT5EncoderValueChanged: (state, action: FieldValueAction<T5EncoderModelFieldValue>) => {
+      fieldValueReducer(state, action, zT5EncoderModelFieldValue);
+    },
+    fieldCLIPEmbedValueChanged: (state, action: FieldValueAction<CLIPEmbedModelFieldValue>) => {
+      fieldValueReducer(state, action, zCLIPEmbedModelFieldValue);
+    },
+    fieldFluxVAEModelValueChanged: (state, action: FieldValueAction<FluxVAEModelFieldValue>) => {
+      fieldValueReducer(state, action, zFluxVAEModelFieldValue);
+    },
     fieldEnumModelValueChanged: (state, action: FieldValueAction<EnumFieldValue>) => {
       fieldValueReducer(state, action, zEnumFieldValue);
     },
@@ -402,6 +417,9 @@ export const {
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
+  fieldT5EncoderValueChanged,
+  fieldCLIPEmbedValueChanged,
+  fieldFluxVAEModelValueChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
@@ -514,6 +532,9 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldSchedulerValueChanged,
   fieldStringValueChanged,
   fieldVaeModelValueChanged,
+  fieldT5EncoderValueChanged,
+  fieldCLIPEmbedValueChanged,
+  fieldFluxVAEModelValueChanged,
   nodesChanged,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,

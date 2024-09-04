@@ -9,6 +9,7 @@ export const MODEL_TYPE_MAP = {
   'sd-2': 'Stable Diffusion 2.x',
   sdxl: 'Stable Diffusion XL',
   'sdxl-refiner': 'Stable Diffusion XL Refiner',
+  flux: 'Flux',
 };
 
 /**
@@ -20,6 +21,7 @@ export const MODEL_TYPE_SHORT_MAP = {
   'sd-2': 'SD2.X',
   sdxl: 'SDXL',
   'sdxl-refiner': 'SDXLR',
+  flux: 'FLUX',
 };
 
 /**
@@ -45,6 +47,10 @@ export const CLIP_SKIP_MAP = {
   'sdxl-refiner': {
     maxClip: 24,
     markers: [0, 1, 2, 3, 5, 10, 15, 20, 24],
+  },
+  flux: {
+    maxClip: 0,
+    markers: [],
   },
 };
 

@@ -77,6 +77,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
     type: Optional[ModelType] = Field(description="Type of model", default=None)
     key: Optional[str] = Field(description="Database ID for this model", default=None)
     hash: Optional[str] = Field(description="hash of model file", default=None)
+    format: Optional[str] = Field(description="format of model file", default=None)
     trigger_phrases: Optional[set[str]] = Field(description="Set of trigger phrases for this model", default=None)
     default_settings: Optional[MainModelDefaultSettings | ControlAdapterDefaultSettings] = Field(
         description="Default settings for this model", default=None

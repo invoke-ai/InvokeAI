@@ -133,3 +133,29 @@ def lora_token_vector_length(checkpoint: Dict[str, torch.Tensor]) -> Optional[in
             break
 
     return lora_token_vector_length
+
+
+def convert_bundle_to_flux_transformer_checkpoint(
+    transformer_state_dict: dict[str, torch.Tensor],
+) -> dict[str, torch.Tensor]:
+    original_state_dict: dict[str, torch.Tensor] = {}
+    keys_to_remove: list[str] = []
+
+    for k, v in transformer_state_dict.items():
+        if not k.startswith("model.diffusion_model"):
+            keys_to_remove.append(k)  # This can be removed in the future if we only want to delete transformer keys
+            continue
+        if k.endswith("scale"):
+            # Scale math must be done at bfloat16 due to our current flux model
+            # support limitations at inference time
+            v = v.to(dtype=torch.bfloat16)
+        new_key = k.replace("model.diffusion_model.", "")
+        original_state_dict[new_key] = v
+        keys_to_remove.append(k)
+
+    # Remove processed keys from the original dictionary, leaving others in case
+    # other model state dicts need to be pulled
+    for k in keys_to_remove:
+        del transformer_state_dict[k]
+
+    return original_state_dict
