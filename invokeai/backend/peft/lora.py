@@ -21,20 +21,8 @@ from invokeai.backend.raw_model import RawModel
 
 
 class LoRAModelRaw(RawModel):  # (torch.nn.Module):
-    _name: str
-    layers: Dict[str, AnyLoRALayer]
-
-    def __init__(
-        self,
-        name: str,
-        layers: Dict[str, AnyLoRALayer],
-    ):
-        self._name = name
+    def __init__(self, layers: Dict[str, AnyLoRALayer]):
         self.layers = layers
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         # TODO: try revert if exception?
@@ -61,10 +49,7 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
         if isinstance(file_path, str):
             file_path = Path(file_path)
 
-        model = cls(
-            name=file_path.stem,
-            layers={},
-        )
+        model = cls(layers={})
 
         if file_path.suffix == ".safetensors":
             sd = load_file(file_path.absolute().as_posix(), device="cpu")
@@ -105,8 +90,7 @@ class LoRAModelRaw(RawModel):  # (torch.nn.Module):
                 layer = NormLayer(layer_key, values)
 
             else:
-                print(f">> Encountered unknown lora layer module in {model.name}: {layer_key} - {list(values.keys())}")
-                raise Exception("Unknown lora format!")
+                raise ValueError(f"Unsupported lora format: {layer_key} - {list(values.keys())}")
 
             # lower memory consumption by removing already parsed layer values
             state_dict[layer_key].clear()
