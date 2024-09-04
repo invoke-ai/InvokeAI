@@ -3,8 +3,28 @@ import torch
 
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.util import params
-from invokeai.backend.peft.conversions.flux_lora_conversion_utils import convert_flux_kohya_state_dict_to_invoke_format
+from invokeai.backend.peft.conversions.flux_lora_conversion_utils import (
+    convert_flux_kohya_state_dict_to_invoke_format,
+    is_state_dict_likely_in_flux_kohya_format,
+)
 from tests.backend.peft.conversions.lora_state_dicts.flux_lora_kohya_format import state_dict_keys
+
+
+def test_is_state_dict_likely_in_flux_kohya_format_true():
+    """Test that is_state_dict_likely_in_flux_kohya_format() can identify a state dict in the Kohya FLUX LoRA format."""
+    # Construct a state dict that is in the Kohya FLUX LoRA format.
+    state_dict: dict[str, torch.Tensor] = {}
+    for k in state_dict_keys:
+        state_dict[k] = torch.empty(1)
+    assert is_state_dict_likely_in_flux_kohya_format(state_dict)
+
+
+def test_is_state_dict_likely_in_flux_kohya_format_false():
+    """Test that is_state_dict_likely_in_flux_kohya_format() returns False for a state dict that is not in the Kohya FLUX LoRA format."""
+    state_dict: dict[str, torch.Tensor] = {
+        "unexpected_key.lora_up.weight": torch.empty(1),
+    }
+    assert not is_state_dict_likely_in_flux_kohya_format(state_dict)
 
 
 def test_convert_flux_kohya_state_dict_to_invoke_format():
