@@ -9,6 +9,7 @@ import torch
 from safetensors.torch import load_file
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.backend.lora.conversions.flux_lora_conversion_utils import convert_flux_kohya_state_dict_to_invoke_format
 from invokeai.backend.lora.conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.model_manager import (
@@ -56,9 +57,16 @@ class LoRALoader(ModelLoader):
         else:
             state_dict = torch.load(model_path, map_location="cpu")
 
-        # TODO(ryand): Add conversions for other base models and raise if an unsupported base model is used.
+        # Apply state_dict key conversions, if necessary.
         if self._model_base == BaseModelType.StableDiffusionXL:
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
+        elif self._model_base == BaseModelType.Flux:
+            state_dict = convert_flux_kohya_state_dict_to_invoke_format(state_dict)
+        elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
+            # Currently, we don't apply any conversions for SD1 and SD2 LoRA models.
+            pass
+        else:
+            raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 
         return LoRAModelRaw.from_state_dict(state_dict=state_dict, dtype=self._torch_dtype)
 
