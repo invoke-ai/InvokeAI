@@ -7,13 +7,13 @@ import { CanvasBboxModule } from 'features/controlLayers/konva/CanvasBboxModule'
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import { CanvasCompositorModule } from 'features/controlLayers/konva/CanvasCompositorModule';
 import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
+import { CanvasEntityRendererModule } from 'features/controlLayers/konva/CanvasEntityRendererModule';
 import { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
 import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasProgressImageModule } from 'features/controlLayers/konva/CanvasProgressImageModule';
 import type { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
 import type { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
-import { CanvasRenderingModule } from 'features/controlLayers/konva/CanvasRenderingModule';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
 import { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
@@ -39,8 +39,6 @@ export class CanvasManager extends CanvasModuleBase {
 
   store: AppStore;
   socket: AppSocket;
-
-  subscriptions = new Set<() => void>();
 
   adapters = {
     rasterLayers: new SyncableMap<string, CanvasRasterLayerAdapter>(),
@@ -68,7 +66,7 @@ export class CanvasManager extends CanvasModuleBase {
   stage: CanvasStageModule;
   worker: CanvasWorkerModule;
   cache: CanvasCacheModule;
-  renderer: CanvasRenderingModule;
+  entityRenderer: CanvasEntityRendererModule;
   compositor: CanvasCompositorModule;
   tool: CanvasToolModule;
   bbox: CanvasBboxModule;
@@ -110,7 +108,7 @@ export class CanvasManager extends CanvasModuleBase {
     this.stage = new CanvasStageModule(stage, container, this);
     this.worker = new CanvasWorkerModule(this);
     this.cache = new CanvasCacheModule(this);
-    this.renderer = new CanvasRenderingModule(this);
+    this.entityRenderer = new CanvasEntityRendererModule(this);
     this.filter = new CanvasFilterModule(this);
 
     this.compositor = new CanvasCompositorModule(this);
@@ -158,14 +156,12 @@ export class CanvasManager extends CanvasModuleBase {
     this.stateApi.$currentFill.set(this.stateApi.getCurrentColor());
     this.stateApi.$selectedEntity.set(this.stateApi.getSelectedEntity());
 
-    this.subscriptions.add(this.store.subscribe(this.renderer.render));
     this.stage.initialize();
+    $canvasManager.set(this);
   };
 
   destroy = () => {
     this.log.debug('Destroying module');
-
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
 
     for (const adapter of this.adapters.getAll()) {
       adapter.destroy();
@@ -181,16 +177,11 @@ export class CanvasManager extends CanvasModuleBase {
     this.background.destroy();
     this.filter.destroy();
     this.worker.destroy();
-    this.renderer.destroy();
+    this.entityRenderer.destroy();
     this.compositor.destroy();
     this.stage.destroy();
 
     $canvasManager.set(null);
-  };
-
-  setCanvasManager = () => {
-    this.log.debug('Setting canvas manager global');
-    $canvasManager.set(this);
   };
 
   repr = () => {
@@ -210,7 +201,7 @@ export class CanvasManager extends CanvasModuleBase {
       background: this.background.repr(),
       filter: this.filter.repr(),
       worker: this.worker.repr(),
-      renderer: this.renderer.repr(),
+      entityRenderer: this.entityRenderer.repr(),
       compositor: this.compositor.repr(),
       stage: this.stage.repr(),
     };

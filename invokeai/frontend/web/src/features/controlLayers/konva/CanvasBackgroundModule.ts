@@ -28,6 +28,8 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
   readonly manager: CanvasManager;
   readonly log: Logger;
 
+  private _dynamicGrid: boolean | null = null;
+
   subscriptions = new Set<() => void>();
   config: CanvasBackgroundModuleConfig = DEFAULT_CONFIG;
 
@@ -60,15 +62,33 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
      * - size
      */
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
+    this.subscriptions.add(this.manager.stateApi.store.subscribe(this.sync));
+  }
+
+  sync = (): boolean => {
+    this._dynamicGrid = this.manager.stateApi.getSettings().dynamicGrid;
+    return this._dynamicGrid;
+  };
+
+  get dynamicGrid(): boolean {
+    if (this._dynamicGrid === null) {
+      return this.sync();
+    }
+    return this._dynamicGrid;
+  }
+
+  set dynamicGrid(dynamicGrid: boolean) {
+    if (this._dynamicGrid !== dynamicGrid) {
+      this._dynamicGrid = dynamicGrid;
+      this.render();
+    }
   }
 
   /**
    * Renders the background grid.
    */
   render = () => {
-    const settings = this.manager.stateApi.getSettings();
-
-    if (!settings.dynamicGrid) {
+    if (!this.dynamicGrid) {
       this.konva.layer.visible(false);
       return;
     }
