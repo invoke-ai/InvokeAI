@@ -1,6 +1,6 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { CanvasObjectImageRenderer } from 'features/controlLayers/konva/CanvasObjectImageRenderer';
+import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObjectImage';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -17,7 +17,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
   subscriptions: Set<() => void> = new Set();
   konva: { group: Konva.Group };
-  image: CanvasObjectImageRenderer | null;
+  image: CanvasObjectImage | null;
   selectedImage: StagingAreaImage | null;
 
   $shouldShowStagedImage = atom<boolean>(true);
@@ -53,7 +53,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
       if (!this.image) {
         const { image_name } = imageDTO;
-        this.image = new CanvasObjectImageRenderer(
+        this.image = new CanvasObjectImage(
           {
             id: 'staging-area-image',
             type: 'image',

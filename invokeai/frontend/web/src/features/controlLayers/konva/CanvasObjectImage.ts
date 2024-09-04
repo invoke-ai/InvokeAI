@@ -1,6 +1,6 @@
 import { Mutex } from 'async-mutex';
 import { deepClone } from 'common/util/deepClone';
-import type { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
+import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import type { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -12,11 +12,11 @@ import Konva from 'konva';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
 
-export class CanvasObjectImageRenderer extends CanvasModuleBase {
-  readonly type = 'object_image_renderer';
+export class CanvasObjectImage extends CanvasModuleBase {
+  readonly type = 'object_image';
   readonly id: string;
   readonly path: string[];
-  readonly parent: CanvasEntityRenderer | CanvasStagingAreaModule | CanvasFilterModule;
+  readonly parent: CanvasEntityObjectRenderer | CanvasStagingAreaModule | CanvasFilterModule;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
@@ -31,7 +31,7 @@ export class CanvasObjectImageRenderer extends CanvasModuleBase {
   isError: boolean = false;
   mutex = new Mutex();
 
-  constructor(state: CanvasImageState, parent: CanvasEntityRenderer | CanvasStagingAreaModule | CanvasFilterModule) {
+  constructor(state: CanvasImageState, parent: CanvasEntityObjectRenderer | CanvasStagingAreaModule | CanvasFilterModule) {
     super();
     this.id = state.id;
     this.parent = parent;
