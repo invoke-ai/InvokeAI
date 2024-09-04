@@ -1,73 +1,20 @@
 import type { SerializableObject } from 'common/types';
-import { deepClone } from 'common/util/deepClone';
-import { CanvasEntityRenderer } from 'features/controlLayers/konva/CanvasEntityRenderer';
-import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
+import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapterBase';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasEntityIdentifier, CanvasRasterLayerState, Rect } from 'features/controlLayers/store/types';
-import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import { omit } from 'lodash-es';
-import type { Logger } from 'roarr';
-import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
-export class CanvasRasterLayerAdapter extends CanvasModuleBase {
-  readonly type = 'raster_layer_adapter';
-  readonly id: string;
-  readonly path: string[];
-  readonly manager: CanvasManager;
-  readonly parent: CanvasManager;
-  readonly log: Logger;
-
-  entityIdentifier: CanvasEntityIdentifier<'raster_layer'>;
-
+export class CanvasRasterLayerAdapter extends CanvasEntityAdapterBase<CanvasRasterLayerState> {
+  static TYPE = 'raster_layer_adapter';
   /**
    * The last known state of the entity.
    */
   private _state: CanvasRasterLayerState | null = null;
 
-  /**
-   * The Konva nodes that make up the entity layer:
-   * - A layer to hold the everything
-   *
-   * Note that the transformer and object renderer have their own Konva nodes, but they are not stored here.
-   */
-  konva: {
-    layer: Konva.Layer;
-  };
-
-  /**
-   * The transformer for this entity layer.
-   */
-  transformer: CanvasEntityTransformer;
-
-  /**
-   * The renderer for this entity layer.
-   */
-  renderer: CanvasEntityRenderer;
-
   constructor(entityIdentifier: CanvasEntityIdentifier<'raster_layer'>, manager: CanvasManager) {
-    super();
-    this.id = entityIdentifier.id;
-    this.entityIdentifier = entityIdentifier;
-    this.manager = manager;
-    this.parent = manager;
-    this.path = this.manager.buildPath(this);
-    this.log = this.manager.buildLogger(this);
-
-    this.log.debug('Creating module');
-
-    this.konva = {
-      layer: new Konva.Layer({
-        name: `${this.type}:layer`,
-        listening: false,
-        imageSmoothingEnabled: false,
-      }),
-    };
-
-    this.renderer = new CanvasEntityRenderer(this);
-    this.transformer = new CanvasEntityTransformer(this);
+    super(entityIdentifier, manager, CanvasRasterLayerAdapter.TYPE);
   }
 
   get state(): CanvasRasterLayerState {
@@ -126,38 +73,8 @@ export class CanvasRasterLayerAdapter extends CanvasModuleBase {
     return canvas;
   };
 
-  isInteractable = (): boolean => {
-    return this.state.isEnabled && !this.state.isLocked;
-  };
-
   getHashableState = (): SerializableObject => {
     const keysToOmit: (keyof CanvasRasterLayerState)[] = ['name'];
     return omit(this.state, keysToOmit);
-  };
-
-  hash = (extra?: SerializableObject): string => {
-    const arg = {
-      state: this.getHashableState(),
-      extra,
-    };
-    return stableHash(arg);
-  };
-
-  destroy = (): void => {
-    this.log.debug('Destroying module');
-    this.renderer.destroy();
-    this.transformer.destroy();
-    this.konva.layer.destroy();
-  };
-
-  repr = () => {
-    return {
-      id: this.id,
-      type: this.type,
-      path: this.path,
-      state: deepClone(this.state),
-      transformer: this.transformer.repr(),
-      renderer: this.renderer.repr(),
-    };
   };
 }
