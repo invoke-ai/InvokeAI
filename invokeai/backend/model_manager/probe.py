@@ -26,6 +26,7 @@ from invokeai.backend.model_manager.config import (
     SchedulerPredictionType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
+from invokeai.backend.peft.conversions.flux_lora_conversion_utils import is_state_dict_likely_in_flux_kohya_format
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
@@ -528,9 +529,11 @@ class LoRACheckpointProbe(CheckpointProbeBase):
         return ModelFormat("lycoris")
 
     def get_base_type(self) -> BaseModelType:
-        checkpoint = self.checkpoint
-        token_vector_length = lora_token_vector_length(checkpoint)
+        if is_state_dict_likely_in_flux_kohya_format(self.checkpoint):
+            return BaseModelType.Flux
 
+        # If we've gotten here, we assume that the model is a Stable Diffusion model.
+        token_vector_length = lora_token_vector_length(self.checkpoint)
         if token_vector_length == 768:
             return BaseModelType.StableDiffusion1
         elif token_vector_length == 1024:
