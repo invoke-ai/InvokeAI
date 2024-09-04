@@ -195,7 +195,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             LoRAPatcher.apply_lora_patches(
                 model=transformer,
                 patches=self._lora_iterator(context),
-                prefix="transformer",
+                prefix="",
                 cached_weights=cached_weights,
             ),
         ):
