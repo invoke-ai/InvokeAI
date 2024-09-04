@@ -35,14 +35,14 @@ export class CanvasRenderingModule extends CanvasModuleBase {
     this.log.debug('Creating module');
   }
 
-  render = async () => {
+  render = () => {
     if (!this.state || !this.settings || !this.session) {
       this.log.trace('First render');
     }
 
-    await this.renderCanvas();
+    this.renderCanvas();
     this.renderSettings();
-    await this.renderSession();
+    this.renderSession();
 
     // We have no prev state for the first render
     if (this.isFirstRender) {
