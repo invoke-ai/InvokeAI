@@ -2,6 +2,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObjectImage';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import type { CanvasSessionState } from 'features/controlLayers/store/canvasSessionSlice';
 import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
@@ -14,6 +15,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   readonly parent: CanvasManager;
   readonly manager: CanvasManager;
   readonly log: Logger;
+
+  private _state: CanvasSessionState | null = null;
 
   subscriptions: Set<() => void> = new Set();
   konva: { group: Konva.Group };
@@ -37,15 +40,34 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.selectedImage = null;
 
     this.subscriptions.add(this.$shouldShowStagedImage.listen(this.render));
+    this.subscriptions.add(this.manager.stateApi.store.subscribe(this.sync));
+  }
+
+  sync = (): CanvasSessionState => {
+    this.state = this.manager.stateApi.getSession();
+    return this.state;
+  };
+
+  get state(): CanvasSessionState {
+    if (!this._state) {
+      return this.manager.stateApi.getSession();
+    }
+    return this._state;
+  }
+
+  set state(state: CanvasSessionState) {
+    if (this._state !== state) {
+      this._state = state;
+      this.render();
+    }
   }
 
   render = async () => {
     this.log.trace('Rendering staging area');
-    const session = this.manager.stateApi.getSession();
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
     const shouldShowStagedImage = this.$shouldShowStagedImage.get();
 
-    this.selectedImage = session.stagedImages[session.selectedStagedImageIndex] ?? null;
+    this.selectedImage = this.state.stagedImages[this.state.selectedStagedImageIndex] ?? null;
     this.konva.group.position({ x, y });
 
     if (this.selectedImage) {
