@@ -675,6 +675,12 @@ export type CanvasEntityState =
   | CanvasInpaintMaskState
   | CanvasIPAdapterState;
 
+export type CanvasRenderableEntityState =
+  | CanvasRasterLayerState
+  | CanvasControlLayerState
+  | CanvasRegionalGuidanceState
+  | CanvasInpaintMaskState;
+
 export type CanvasEntityType = CanvasEntityState['type'];
 export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
 
@@ -773,7 +779,9 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
-export function isDrawableEntityType(entityType: CanvasEntityState['type']) {
+export function isDrawableEntityType(
+  entityType: CanvasEntityState['type']
+): entityType is CanvasRenderableEntityState['type'] {
   return (
     entityType === 'raster_layer' ||
     entityType === 'control_layer' ||
@@ -782,9 +790,7 @@ export function isDrawableEntityType(entityType: CanvasEntityState['type']) {
   );
 }
 
-export function isDrawableEntity(
-  entity: CanvasEntityState
-): entity is CanvasRasterLayerState | CanvasControlLayerState | CanvasRegionalGuidanceState | CanvasInpaintMaskState {
+export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {
   return isDrawableEntityType(entity.type);
 }
 

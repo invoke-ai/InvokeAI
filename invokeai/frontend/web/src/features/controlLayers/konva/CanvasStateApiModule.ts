@@ -1,6 +1,7 @@
 import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
 import type { AppStore } from 'app/store/store';
 import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
+import type { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapterBase';
 import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -362,13 +363,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   /**
    * The entity adapter being transformed, if any.
    */
-  $transformingAdapter = atom<
-    | CanvasRasterLayerAdapter
-    | CanvasControlLayerAdapter
-    | CanvasInpaintMaskAdapter
-    | CanvasRegionalGuidanceAdapter
-    | null
-  >(null);
+  $transformingAdapter = atom<CanvasEntityAdapterBase | null>(null);
 
   /**
    * Whether an entity is currently being transformed. Derived from `$transformingAdapter`.

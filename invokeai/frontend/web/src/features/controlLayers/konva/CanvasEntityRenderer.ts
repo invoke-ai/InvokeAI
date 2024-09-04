@@ -1,14 +1,11 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
-import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
+import type { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapterBase';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectBrushLineRenderer } from 'features/controlLayers/konva/CanvasObjectBrushLineRenderer';
 import { CanvasObjectEraserLineRenderer } from 'features/controlLayers/konva/CanvasObjectEraserLineRenderer';
 import { CanvasObjectImageRenderer } from 'features/controlLayers/konva/CanvasObjectImageRenderer';
 import { CanvasObjectRectRenderer } from 'features/controlLayers/konva/CanvasObjectRectRenderer';
-import type { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
-import type { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
@@ -66,11 +63,7 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
   readonly type = 'entity_renderer';
   readonly id: string;
   readonly path: string[];
-  readonly parent:
-    | CanvasRasterLayerAdapter
-    | CanvasControlLayerAdapter
-    | CanvasInpaintMaskAdapter
-    | CanvasRegionalGuidanceAdapter;
+  readonly parent: CanvasEntityAdapterBase;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
@@ -141,13 +134,7 @@ export class CanvasEntityRenderer extends CanvasModuleBase {
    */
   $canvasCache = atom<{ canvas: HTMLCanvasElement; rect: Rect } | null>(null);
 
-  constructor(
-    parent:
-      | CanvasRasterLayerAdapter
-      | CanvasControlLayerAdapter
-      | CanvasInpaintMaskAdapter
-      | CanvasRegionalGuidanceAdapter
-  ) {
+  constructor(parent: CanvasEntityAdapterBase) {
     super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
