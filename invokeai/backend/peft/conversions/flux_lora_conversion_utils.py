@@ -1,7 +1,11 @@
 import re
-from typing import Any, Dict
+from typing import Any, Dict, TypeVar
 
 import torch
+
+from invokeai.backend.peft.layers.any_lora_layer import AnyLoRALayer
+from invokeai.backend.peft.layers.utils import peft_layer_from_state_dict
+from invokeai.backend.peft.lora import LoRAModelRaw
 
 # A regex pattern that matches all of the keys in the Kohya FLUX LoRA format.
 # Example keys:
@@ -25,25 +29,54 @@ def is_state_dict_likely_in_flux_kohya_format(state_dict: Dict[str, Any]) -> boo
     return True
 
 
-def convert_flux_kohya_state_dict_to_invoke_format(state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRAModelRaw:
+    # Group keys by layer.
+    grouped_state_dict: dict[str, dict[str, torch.Tensor]] = {}
+    for key, value in state_dict.items():
+        layer_name, param_name = key.split(".", 1)
+        if layer_name not in grouped_state_dict:
+            grouped_state_dict[layer_name] = {}
+        grouped_state_dict[layer_name][param_name] = value
+
+    # Convert the state dict to the InvokeAI format.
+    grouped_state_dict = convert_flux_kohya_state_dict_to_invoke_format(grouped_state_dict)
+
+    # Create LoRA layers.
+    layers: dict[str, AnyLoRALayer] = {}
+    for layer_key, layer_state_dict in grouped_state_dict.items():
+        layer = peft_layer_from_state_dict(layer_key, layer_state_dict)
+        layers[layer_key] = layer
+
+    # Create and return the LoRAModelRaw.
+    return LoRAModelRaw(layers=layers)
+
+
+T = TypeVar("T")
+
+
+def convert_flux_kohya_state_dict_to_invoke_format(state_dict: Dict[str, T]) -> Dict[str, T]:
     """Converts a state dict from the Kohya FLUX LoRA format to LoRA weight format used internally by InvokeAI.
 
     Example key conversions:
-    "lora_unet_double_blocks_0_img_attn_proj.alpha" -> "double_blocks.0.img_attn.proj.alpha
-    "lora_unet_double_blocks_0_img_attn_proj.lora_down.weight" -> "double_blocks.0.img_attn.proj.lora_down.weight"
-    "lora_unet_double_blocks_0_img_attn_proj.lora_up.weight" -> "double_blocks.0.img_attn.proj.lora_up.weight"
-    "lora_unet_double_blocks_0_img_attn_qkv.alpha" -> "double_blocks.0.img_attn.qkv.alpha"
-    "lora_unet_double_blocks_0_img_attn_qkv.lora_down.weight" -> "double_blocks.0.img.attn.qkv.lora_down.weight"
-    "lora_unet_double_blocks_0_img_attn_qkv.lora_up.weight" -> "double_blocks.0.img.attn.qkv.lora_up.weight"
-
+    "lora_unet_double_blocks_0_img_attn_proj" -> "double_blocks.0.img_attn.proj"
+    "lora_unet_double_blocks_0_img_attn_proj" -> "double_blocks.0.img_attn.proj"
+    "lora_unet_double_blocks_0_img_attn_proj" -> "double_blocks.0.img_attn.proj"
+    "lora_unet_double_blocks_0_img_attn_qkv" -> "double_blocks.0.img_attn.qkv"
+    "lora_unet_double_blocks_0_img_attn_qkv" -> "double_blocks.0.img.attn.qkv"
+    "lora_unet_double_blocks_0_img_attn_qkv" -> "double_blocks.0.img.attn.qkv"
     """
-    replacement = r"\1.\2.\3.\4"
 
-    converted_dict: dict[str, torch.Tensor] = {}
+    def replace_func(match: re.Match[str]) -> str:
+        s = f"{match.group(1)}.{match.group(2)}.{match.group(3)}"
+        if match.group(4):
+            s += f".{match.group(4)}"
+        return s
+
+    converted_dict: dict[str, T] = {}
     for k, v in state_dict.items():
         match = re.match(FLUX_KOHYA_KEY_REGEX, k)
         if match:
-            new_key = re.sub(FLUX_KOHYA_KEY_REGEX, replacement, k)
+            new_key = re.sub(FLUX_KOHYA_KEY_REGEX, replace_func, k)
             converted_dict[new_key] = v
         else:
             raise ValueError(f"Key '{k}' does not match the expected pattern for FLUX LoRA weights.")
