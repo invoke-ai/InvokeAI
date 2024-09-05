@@ -9,7 +9,7 @@ import torch
 from safetensors.torch import load_file
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.lora.conversions.flux_lora_conversion_utils import (
+from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import (
     lora_model_from_flux_kohya_state_dict,
 )
 from invokeai.backend.lora.conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
