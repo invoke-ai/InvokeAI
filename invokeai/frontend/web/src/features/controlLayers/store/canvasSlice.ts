@@ -1078,10 +1078,17 @@ export const canvasSlice = createSlice({
       state.selectedEntityIdentifier = deepClone(initialState.selectedEntityIdentifier);
     },
     canvasReset: (state) => {
+      // We need to keep the bbox state that is dependent on the model/optimal dimension
       const { width, height } = state.bbox.rect;
-      const scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.optimalDimension);
+      const optimalDimension = state.bbox.optimalDimension;
+      const scaledSize = getScaledBoundingBoxDimensions({ width, height }, optimalDimension);
       const newState = deepClone(initialState);
+      const rect = calculateNewSize(newState.bbox.aspectRatio.value, optimalDimension * optimalDimension);
+      newState.bbox.rect.width = rect.width;
+      newState.bbox.rect.height = rect.height;
+      newState.bbox.optimalDimension = optimalDimension;
       newState.bbox.scaledSize = scaledSize;
+
       return newState;
     },
     canvasUndo: () => {},
