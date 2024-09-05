@@ -1,7 +1,3 @@
-# test that if the model's device changes while the lora is applied, the weights can still be restored
-
-# test that LoRA patching works on both CPU and CUDA
-
 import pytest
 import torch
 
@@ -18,7 +14,7 @@ from invokeai.backend.model_patcher import ModelPatcher
     ],
 )
 @torch.no_grad()
-def test_apply_lora(device):
+def test_apply_lora(device: str):
     """Test the basic behavior of ModelPatcher.apply_lora(...). Check that patching and unpatching produce the correct
     result, and that model/LoRA tensors are moved between devices as expected.
     """
