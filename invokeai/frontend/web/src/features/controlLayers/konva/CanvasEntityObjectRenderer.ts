@@ -558,7 +558,12 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Rasterized entity');
     }
-    imageDTO = await uploadImage(blob, `${this.id}_rasterized.png`, 'other', true);
+    imageDTO = await uploadImage({
+      blob,
+      fileName: `${this.id}_rasterized.png`,
+      image_category: 'other',
+      is_intermediate: true,
+    });
     const imageObject = imageDTOToImageObject(imageDTO);
     if (replaceObjects) {
       await this.setBuffer(imageObject);
