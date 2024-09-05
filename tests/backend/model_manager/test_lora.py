@@ -1,12 +1,9 @@
-# test that if the model's device changes while the lora is applied, the weights can still be restored
-
-# test that LoRA patching works on both CPU and CUDA
-
 import pytest
 import torch
 
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.peft.lora import LoRALayer, LoRAModelRaw
+from invokeai.backend.peft.layers.lora_layer import LoRALayer
+from invokeai.backend.peft.lora import LoRAModelRaw
 
 
 @pytest.mark.parametrize(
