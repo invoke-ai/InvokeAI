@@ -552,7 +552,6 @@ const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizonta
 export type FillStyle = z.infer<typeof zFillStyle>;
 export const isFillStyle = (v: unknown): v is FillStyle => zFillStyle.safeParse(v).success;
 const zFill = z.object({ style: zFillStyle, color: zRgbColor });
-export type Fill = z.infer<typeof zFill>;
 
 const zRegionalGuidanceIPAdapterConfig = z.object({
   id: zId,
@@ -779,7 +778,7 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
-export function isDrawableEntityType(
+function isDrawableEntityType(
   entityType: CanvasEntityState['type']
 ): entityType is CanvasRenderableEntityState['type'] {
   return (

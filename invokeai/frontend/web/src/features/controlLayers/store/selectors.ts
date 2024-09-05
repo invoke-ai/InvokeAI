@@ -11,7 +11,6 @@ import type {
   CanvasRegionalGuidanceState,
   CanvasState,
 } from 'features/controlLayers/store/types';
-import { isDrawableEntityType } from 'features/controlLayers/store/types';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { assert } from 'tsafe';
 
@@ -187,16 +186,6 @@ export const selectSelectedEntityIdentifier = createSelector(
 export const selectBookmarkedEntityIdentifier = createSelector(
   selectCanvasSlice,
   (canvas) => canvas.bookmarkedEntityIdentifier
-);
-
-export const selectIsSelectedEntityDrawable = createSelector(
-  selectSelectedEntityIdentifier,
-  (selectedEntityIdentifier) => {
-    if (!selectedEntityIdentifier) {
-      return false;
-    }
-    return isDrawableEntityType(selectedEntityIdentifier.type);
-  }
 );
 
 export const selectCanvasMayUndo = (state: RootState) => state.canvas.past.length > 0;

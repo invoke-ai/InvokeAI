@@ -3,7 +3,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { canvasSlice } from 'features/controlLayers/store/canvasSlice';
 import type { StagingAreaImage } from 'features/controlLayers/store/types';
 
-export type CanvasSessionState = {
+type CanvasSessionState = {
   isStaging: boolean;
   stagedImages: StagingAreaImage[];
   selectedStagedImageIndex: number;

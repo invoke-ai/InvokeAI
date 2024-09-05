@@ -31,7 +31,10 @@ export class CanvasObjectImage extends CanvasModuleBase {
   isError: boolean = false;
   mutex = new Mutex();
 
-  constructor(state: CanvasImageState, parent: CanvasEntityObjectRenderer | CanvasStagingAreaModule | CanvasFilterModule) {
+  constructor(
+    state: CanvasImageState,
+    parent: CanvasEntityObjectRenderer | CanvasStagingAreaModule | CanvasFilterModule
+  ) {
     super();
     this.id = state.id;
     this.parent = parent;
