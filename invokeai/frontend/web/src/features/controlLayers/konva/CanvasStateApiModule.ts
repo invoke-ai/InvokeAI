@@ -1,9 +1,10 @@
 import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
-import type { AppStore } from 'app/store/store';
+import type { Selector } from '@reduxjs/toolkit';
+import type { AppStore, RootState } from 'app/store/store';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasSettingsState } from 'features/controlLayers/store/canvasSettingsSlice';
+import type { SubscriptionHandler } from 'features/controlLayers/konva/util';
+import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   settingsBrushWidthChanged,
   settingsColorChanged,
@@ -20,7 +21,6 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { selectAllRenderableEntities, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type {
-  CanvasEntityIdentifier,
   CanvasEntityType,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
@@ -32,7 +32,6 @@ import type {
   RgbaColor,
 } from 'features/controlLayers/store/types';
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
-import type { WritableAtom } from 'nanostores';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -67,6 +66,14 @@ export class CanvasStateApiModule extends CanvasModuleBase {
 
     this.store = store;
   }
+
+  runSelector = <T>(selector: Selector<RootState, T>) => {
+    return selector(this.store.getState());
+  };
+
+  createStoreSubscription = <T>(selector: Selector<RootState, T>, handler: SubscriptionHandler<T>) => {
+    return createReduxSubscription(this.store, selector, handler);
+  };
 
   /**
    * Gets the canvas slice.
@@ -309,21 +316,6 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Whether an entity is currently being transformed. Derived from `$transformingAdapter`.
    */
   $isTranforming = computed(this.$transformingAdapter, (transformingAdapter) => Boolean(transformingAdapter));
-
-  /**
-   * A nanostores atom, kept in sync with the redux store's settings state.
-   */
-  $settingsState: WritableAtom<CanvasSettingsState> = atom();
-
-  /**
-   * The current fill color, derived from the tool state and the selected entity.
-   */
-  $currentFill: WritableAtom<RgbaColor> = atom();
-
-  /**
-   * The currently selected entity's identifier, if an entity is selected.
-   */
-  $selectedEntityIdentifier: WritableAtom<CanvasEntityIdentifier | null> = atom();
 
   /**
    * The last canvas progress event. This is set in a global event listener. The staging area may set it to null when it

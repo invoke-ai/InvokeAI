@@ -56,6 +56,14 @@ export abstract class CanvasModuleBase {
   abstract readonly log: Logger;
 
   /**
+   * An optional method that initializes the module. This method is called after all modules have been created.
+   *
+   * Use this method to perform any setup that requires all modules to be created. For example, setting some initial
+   * state or doing an initial render.
+   */
+  initialize?: () => void = undefined;
+
+  /**
    * Returns a logging context object that includes relevant information about the module.
    * Canvas modules may override this method to include additional information in the logging context, but should
    * always include the parent's logging context.

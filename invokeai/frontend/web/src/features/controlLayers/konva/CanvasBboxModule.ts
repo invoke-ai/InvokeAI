@@ -1,10 +1,9 @@
-import { createSelector } from '@reduxjs/toolkit';
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { CanvasState, Coordinate, Rect } from 'features/controlLayers/store/types';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectBbox } from 'features/controlLayers/store/selectors';
+import type { Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -52,9 +51,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
    * Buffer to store the last aspect ratio of the bbox. When the users holds shift while transforming the bbox, this is
    * used to lock the aspect ratio.
    */
-  $aspectRatioBuffer = atom(0);
-
-  state: CanvasState['bbox'];
+  $aspectRatioBuffer = atom(1);
 
   constructor(manager: CanvasManager) {
     super();
@@ -110,17 +107,17 @@ export class CanvasBboxModule extends CanvasModuleBase {
     this.subscriptions.add(this.manager.tool.$tool.listen(this.render));
 
     // Also listen to redux state to update the bbox's position and dimensions.
-    const selectBbox = createSelector(selectCanvasSlice, (canvas) => canvas.bbox);
-    this.state = selectBbox(this.manager.stateApi.store.getState());
-    this.$aspectRatioBuffer.set(this.state.rect.width / this.state.rect.height);
-    this.render();
-    this.subscriptions.add(
-      createReduxSubscription(this.manager.stateApi.store, selectBbox, (bbox) => {
-        this.state = bbox;
-        this.render();
-      })
-    );
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectBbox, this.render));
   }
+
+  initialize = () => {
+    this.log.debug('Initializing module');
+    // We need to retain a copy of the bbox state because
+    const { width, height } = this.manager.stateApi.runSelector(selectBbox).rect;
+    // Update the aspect ratio buffer with the initial aspect ratio
+    this.$aspectRatioBuffer.set(width / height);
+    this.render();
+  };
 
   /**
    * Renders the bbox. The bbox is only visible when the tool is set to 'bbox'.
@@ -128,7 +125,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
   render = () => {
     this.log.trace('Rendering');
 
-    const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
+    const { x, y, width, height } = this.manager.stateApi.runSelector(selectBbox).rect;
     const tool = this.manager.tool.$tool.get();
 
     this.konva.group.visible(true);

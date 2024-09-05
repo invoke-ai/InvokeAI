@@ -46,7 +46,7 @@ export class CanvasFilterModule extends CanvasModuleBase {
     this.log.debug('Creating filter module');
   }
 
-  initialize = (entityIdentifier: CanvasEntityIdentifier) => {
+  startFilter = (entityIdentifier: CanvasEntityIdentifier) => {
     this.log.trace('Initializing filter');
     const adapter = this.manager.getAdapter(entityIdentifier);
     if (!adapter) {

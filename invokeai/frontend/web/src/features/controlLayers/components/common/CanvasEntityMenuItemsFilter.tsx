@@ -13,7 +13,7 @@ export const CanvasEntityMenuItemsFilter = memo(() => {
   const isBusy = useCanvasIsBusy();
 
   const onClick = useCallback(() => {
-    canvasManager.filter.initialize(entityIdentifier);
+    canvasManager.filter.startFilter(entityIdentifier);
   }, [canvasManager.filter, entityIdentifier]);
 
   return (
