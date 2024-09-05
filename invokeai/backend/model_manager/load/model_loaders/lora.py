@@ -20,7 +20,7 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.peft.conversions.flux_lora_conversion_utils import (
+from invokeai.backend.peft.conversions.flux_kohya_lora_conversion_utils import (
     lora_model_from_flux_kohya_state_dict,
 )
 from invokeai.backend.peft.conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict

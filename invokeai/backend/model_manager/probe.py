@@ -26,7 +26,7 @@ from invokeai.backend.model_manager.config import (
     SchedulerPredictionType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
-from invokeai.backend.peft.conversions.flux_lora_conversion_utils import is_state_dict_likely_in_flux_kohya_format
+from invokeai.backend.peft.conversions.flux_kohya_lora_conversion_utils import is_state_dict_likely_in_flux_kohya_format
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
