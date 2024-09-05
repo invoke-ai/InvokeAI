@@ -1,11 +1,13 @@
 # Copyright (c) 2024, Brandon W. Rising and the InvokeAI Development Team
 """Class for Flux model loading in InvokeAI."""
 
+import gc
 from pathlib import Path
 from typing import Optional
 
 import accelerate
 import torch
+from pympler import asizeof
 from safetensors.torch import load_file
 from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
@@ -32,7 +34,10 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.model_manager.util.model_util import convert_bundle_to_flux_transformer_checkpoint
+from invokeai.backend.model_manager.util.model_util import (
+    convert_bundle_to_flux_transformer_checkpoint,
+    convert_sd_entry_to_bfloat16,
+)
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 try:
@@ -193,11 +198,27 @@ class FluxCheckpointModel(ModelLoader):
             sd = load_file(model_path)
             if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
                 sd = convert_bundle_to_flux_transformer_checkpoint(sd)
-            for k, v in sd.items():
-                if v.dtype == torch.bfloat16:
-                    continue
-                sd[k] = v.to(dtype=torch.bfloat16)
+            futures: list[torch.jit.Future[tuple[str, torch.Tensor]]] = []
+            sd_size = asizeof.asizeof(sd)
+            cache_updated = False
+            for k in sd.keys():
+                v = sd[k]
+                if v.dtype != torch.bfloat16:
+                    if not cache_updated:
+                        self._ram_cache.make_room(sd_size)
+                        cache_updated = True
+                    futures.append(torch.jit.fork(convert_sd_entry_to_bfloat16, k, v))
+                # Clean up unused variables
+                del v
+            gc.collect()  # Force garbage collection to free memory
+            for future in futures:
+                k, v = torch.jit.wait(future)
+                sd[k] = v
+                del k, v
+            del futures
+            gc.collect()  # Force garbage collection to free memory
             model.load_state_dict(sd, assign=True)
+
         return model
 
 
