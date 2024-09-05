@@ -1,10 +1,10 @@
 import type { SerializableObject } from 'common/types';
-import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntityAdapterControlLayer';
-import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntityAdapterInpaintMask';
+import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterControlLayer';
+import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterInpaintMask';
+import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterRasterLayer';
+import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterRegionalGuidance';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntityAdapterRasterLayer';
-import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntityAdapterRegionalGuidance';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, CanvasImageState, FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -48,16 +48,16 @@ export class CanvasFilterModule extends CanvasModuleBase {
 
   initialize = (entityIdentifier: CanvasEntityIdentifier) => {
     this.log.trace('Initializing filter');
-    const entity = this.manager.stateApi.getEntity(entityIdentifier);
-    if (!entity) {
+    const adapter = this.manager.getAdapter(entityIdentifier);
+    if (!adapter) {
       this.log.warn({ entityIdentifier }, 'Unable to find entity');
       return;
     }
-    if (entity.type !== 'raster_layer' && entity.type !== 'control_layer') {
+    if (adapter.entityIdentifier.type !== 'raster_layer' && adapter.entityIdentifier.type !== 'control_layer') {
       this.log.warn({ entityIdentifier }, 'Unsupported entity type');
       return;
     }
-    this.$adapter.set(entity.adapter);
+    this.$adapter.set(adapter);
     this.manager.tool.$tool.set('view');
   };
 

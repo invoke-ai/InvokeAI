@@ -1,5 +1,5 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import type { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapterBase';
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObjectBrushLine';
@@ -58,7 +58,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   readonly type = 'object_renderer';
   readonly id: string;
   readonly path: string[];
-  readonly parent: CanvasEntityAdapterBase;
+  readonly parent: CanvasEntityAdapter;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
@@ -129,7 +129,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
    */
   $canvasCache = atom<{ canvas: HTMLCanvasElement; rect: Rect } | null>(null);
 
-  constructor(parent: CanvasEntityAdapterBase) {
+  constructor(parent: CanvasEntityAdapter) {
     super();
     this.id = getPrefixedId(this.type);
     this.parent = parent;
