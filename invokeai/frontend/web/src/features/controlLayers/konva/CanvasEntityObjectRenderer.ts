@@ -147,7 +147,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     this.parent.konva.layer.add(this.konva.objectGroup);
     this.parent.konva.layer.add(this.konva.bufferGroup);
 
-    if (this.parent.state.type === 'inpaint_mask' || this.parent.state.type === 'regional_guidance') {
+    if (
+      this.parent.entityIdentifier.type === 'inpaint_mask' ||
+      this.parent.entityIdentifier.type === 'regional_guidance'
+    ) {
       const rect = new Konva.Rect({
         name: `${this.type}:compositing_rect`,
         globalCompositeOperation: 'source-in',
@@ -256,6 +259,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
 
   updateCompositingRectSize = () => {
     this.log.trace('Updating compositing rect size');
+
     assert(this.konva.compositing, 'Missing compositing rect');
 
     const { x, y, width, height, scale } = this.manager.stage.$stageAttrs.get();

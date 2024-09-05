@@ -1,7 +1,9 @@
+import { createSelector } from '@reduxjs/toolkit';
 import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
@@ -64,10 +66,6 @@ export class CanvasBboxModule extends CanvasModuleBase {
 
     this.log.debug('Creating bbox module');
 
-    // Set the initial aspect ratio buffer per app state.
-    this.state = this.manager.stateApi.getBbox();
-    this.$aspectRatioBuffer.set(this.state.rect.width / this.state.rect.height);
-
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:group`, listening: true }),
       // We will use a Konva.Transformer for the generation bbox. Transformers need some shape to transform, so we will
@@ -77,10 +75,6 @@ export class CanvasBboxModule extends CanvasModuleBase {
         listening: false,
         strokeEnabled: false,
         draggable: true,
-        x: this.state.rect.x,
-        y: this.state.rect.y,
-        width: this.state.rect.width,
-        height: this.state.rect.height,
       }),
       transformer: new Konva.Transformer({
         name: `${this.type}:transformer`,
@@ -114,17 +108,19 @@ export class CanvasBboxModule extends CanvasModuleBase {
 
     // We will listen to the tool state to determine if the bbox should be visible or not.
     this.subscriptions.add(this.manager.tool.$tool.listen(this.render));
-    this.subscriptions.add(this.manager.stateApi.store.subscribe(this.sync));
+
+    // Also listen to redux state to update the bbox's position and dimensions.
+    const selectBbox = createSelector(selectCanvasSlice, (canvas) => canvas.bbox);
+    this.state = selectBbox(this.manager.stateApi.store.getState());
+    this.$aspectRatioBuffer.set(this.state.rect.width / this.state.rect.height);
+    this.render();
+    this.subscriptions.add(
+      createReduxSubscription(this.manager.stateApi.store, selectBbox, (bbox) => {
+        this.state = bbox;
+        this.render();
+      })
+    );
   }
-
-  sync = () => {
-    const prevState = this.state;
-    this.state = this.manager.stateApi.getBbox();
-
-    if (this.state !== prevState) {
-      this.render();
-    }
-  };
 
   /**
    * Renders the bbox. The bbox is only visible when the tool is set to 'bbox'.

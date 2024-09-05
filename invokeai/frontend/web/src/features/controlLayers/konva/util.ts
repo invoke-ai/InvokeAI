@@ -1,3 +1,4 @@
+import type { Selector, Store } from '@reduxjs/toolkit';
 import type { CanvasEntityIdentifier, CanvasObjectState, Coordinate, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -479,4 +480,23 @@ export const getLastPointOfLastLine = (
   }
 
   return null;
+};
+
+type SubscriptionHandler<T> = (value: T, prevValue: T) => void;
+
+export const createReduxSubscription = <T, U>(
+  store: Store<T>,
+  selector: Selector<T, U>,
+  handler: SubscriptionHandler<U>
+) => {
+  let prevValue: U = selector(store.getState());
+  const unsubscribe = store.subscribe(() => {
+    const value = selector(store.getState());
+    if (value !== prevValue) {
+      handler(value, prevValue);
+      prevValue = value;
+    }
+  });
+
+  return unsubscribe;
 };
