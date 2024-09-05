@@ -199,6 +199,9 @@ class FluxCheckpointModel(ModelLoader):
             if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
                 sd = convert_bundle_to_flux_transformer_checkpoint(sd)
             futures: list[torch.jit.Future[tuple[str, torch.Tensor]]] = []
+            # For the first iteration we are just requesting the current size of the state dict
+            # This is due to an expected doubling of the tensor sizes in memory after converting float8 -> float16
+            # This should be refined in the future if not removed entirely when we support more data types
             sd_size = asizeof.asizeof(sd)
             cache_updated = False
             for k in sd.keys():
