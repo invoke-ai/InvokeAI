@@ -145,6 +145,7 @@ export class CanvasFilterModule extends CanvasModuleBase {
       adapter.renderer.clearBuffer();
       adapter.renderer.showObjects();
       adapter.transformer.updatePosition();
+      adapter.renderer.syncCache(true);
       this.$adapter.set(null);
     }
     this.imageState = null;

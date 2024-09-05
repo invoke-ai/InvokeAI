@@ -636,7 +636,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.$isMouseDown.set(false);
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (selectedEntity && selectedEntity.renderer.hasBuffer()) {
+    if (selectedEntity && selectedEntity.renderer.hasBuffer() && !this.manager.$isBusy.get()) {
       selectedEntity.renderer.commitBuffer();
     }
   };
