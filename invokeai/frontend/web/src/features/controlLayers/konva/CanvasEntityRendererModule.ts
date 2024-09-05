@@ -37,7 +37,6 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
 
     this.manager.stateApi.$settingsState.set(this.manager.stateApi.getSettings());
     this.manager.stateApi.$selectedEntityIdentifier.set(state.selectedEntityIdentifier);
-    this.manager.stateApi.$selectedEntity.set(this.manager.stateApi.getSelectedEntity());
     this.manager.stateApi.$currentFill.set(this.manager.stateApi.getCurrentColor());
 
     if (prevState === state) {

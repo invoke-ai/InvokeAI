@@ -146,7 +146,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       stage.setCursor('not-allowed');
     } else if (this.manager.$isBusy.get()) {
       stage.setCursor('not-allowed');
-    } else if (!this.manager.stateApi.getSelectedEntity()?.adapter.getIsInteractable()) {
+    } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.getIsInteractable()) {
       stage.setCursor('not-allowed');
     } else if (tool === 'colorPicker' || tool === 'brush' || tool === 'eraser') {
       stage.setCursor('none');
@@ -162,7 +162,7 @@ export class CanvasToolModule extends CanvasModuleBase {
   render = () => {
     const stage = this.manager.stage;
     const renderedEntityCount = this.manager.stateApi.getRenderedEntityCount();
-    const selectedEntity = this.manager.stateApi.getSelectedEntity();
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
     const cursorPos = this.$cursorPos.get();
     const tool = this.$tool.get();
 
@@ -282,7 +282,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return false;
     } else if (this.manager.filter.$isFiltering.get()) {
       return false;
-    } else if (!this.manager.stateApi.getSelectedEntity()?.adapter.getIsInteractable()) {
+    } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.getIsInteractable()) {
       return false;
     } else {
       return true;
@@ -299,21 +299,21 @@ export class CanvasToolModule extends CanvasModuleBase {
       const isMouseDown = this.$isMouseDown.get();
       const settings = this.manager.stateApi.getSettings();
       const tool = this.$tool.get();
-      const selectedEntity = this.manager.stateApi.getSelectedEntity();
+      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
       if (!cursorPos || !isMouseDown || !selectedEntity?.state.isEnabled || selectedEntity.state.isLocked) {
         return;
       }
 
-      if (selectedEntity.adapter.renderer.bufferState?.type !== 'rect') {
-        selectedEntity.adapter.renderer.commitBuffer();
+      if (selectedEntity.renderer.bufferState?.type !== 'rect') {
+        selectedEntity.renderer.commitBuffer();
         return;
       }
 
       if (tool === 'brush') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-        await selectedEntity.adapter.renderer.setBuffer({
+        await selectedEntity.renderer.setBuffer({
           id: getPrefixedId('brush_line'),
           type: 'brush_line',
           points: [alignedPoint.x, alignedPoint.y],
@@ -327,10 +327,10 @@ export class CanvasToolModule extends CanvasModuleBase {
       if (tool === 'eraser') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-        if (selectedEntity.adapter.renderer.bufferState) {
-          selectedEntity.adapter.renderer.commitBuffer();
+        if (selectedEntity.renderer.bufferState) {
+          selectedEntity.renderer.commitBuffer();
         }
-        await selectedEntity.adapter.renderer.setBuffer({
+        await selectedEntity.renderer.setBuffer({
           id: getPrefixedId('eraser_line'),
           type: 'eraser_line',
           points: [alignedPoint.x, alignedPoint.y],
@@ -365,7 +365,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       const isMouseDown = this.$isMouseDown.get();
-      const selectedEntity = this.manager.stateApi.getSelectedEntity();
+      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
       if (!cursorPos || !isMouseDown || !selectedEntity?.state.isEnabled || selectedEntity?.state.isLocked) {
         return;
@@ -378,11 +378,11 @@ export class CanvasToolModule extends CanvasModuleBase {
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
-          if (selectedEntity.adapter.renderer.bufferState) {
-            selectedEntity.adapter.renderer.commitBuffer();
+          if (selectedEntity.renderer.bufferState) {
+            selectedEntity.renderer.commitBuffer();
           }
 
-          await selectedEntity.adapter.renderer.setBuffer({
+          await selectedEntity.renderer.setBuffer({
             id: getPrefixedId('brush_line'),
             type: 'brush_line',
             points: [
@@ -397,10 +397,10 @@ export class CanvasToolModule extends CanvasModuleBase {
             clip: this.getClip(selectedEntity.state),
           });
         } else {
-          if (selectedEntity.adapter.renderer.bufferState) {
-            selectedEntity.adapter.renderer.commitBuffer();
+          if (selectedEntity.renderer.bufferState) {
+            selectedEntity.renderer.commitBuffer();
           }
-          await selectedEntity.adapter.renderer.setBuffer({
+          await selectedEntity.renderer.setBuffer({
             id: getPrefixedId('brush_line'),
             type: 'brush_line',
             points: [alignedPoint.x, alignedPoint.y],
@@ -416,10 +416,10 @@ export class CanvasToolModule extends CanvasModuleBase {
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
-          if (selectedEntity.adapter.renderer.bufferState) {
-            selectedEntity.adapter.renderer.commitBuffer();
+          if (selectedEntity.renderer.bufferState) {
+            selectedEntity.renderer.commitBuffer();
           }
-          await selectedEntity.adapter.renderer.setBuffer({
+          await selectedEntity.renderer.setBuffer({
             id: getPrefixedId('eraser_line'),
             type: 'eraser_line',
             points: [
@@ -433,10 +433,10 @@ export class CanvasToolModule extends CanvasModuleBase {
             clip: this.getClip(selectedEntity.state),
           });
         } else {
-          if (selectedEntity.adapter.renderer.bufferState) {
-            selectedEntity.adapter.renderer.commitBuffer();
+          if (selectedEntity.renderer.bufferState) {
+            selectedEntity.renderer.commitBuffer();
           }
-          await selectedEntity.adapter.renderer.setBuffer({
+          await selectedEntity.renderer.setBuffer({
             id: getPrefixedId('eraser_line'),
             type: 'eraser_line',
             points: [alignedPoint.x, alignedPoint.y],
@@ -447,10 +447,10 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'rect') {
-        if (selectedEntity.adapter.renderer.bufferState) {
-          selectedEntity.adapter.renderer.commitBuffer();
+        if (selectedEntity.renderer.bufferState) {
+          selectedEntity.renderer.commitBuffer();
         }
-        await selectedEntity.adapter.renderer.setBuffer({
+        await selectedEntity.renderer.setBuffer({
           id: getPrefixedId('rect'),
           type: 'rect',
           rect: { x: Math.round(normalizedPoint.x), y: Math.round(normalizedPoint.y), width: 0, height: 0 },
@@ -473,7 +473,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       if (!cursorPos) {
         return;
       }
-      const selectedEntity = this.manager.stateApi.getSelectedEntity();
+      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
       if (!isDrawable) {
         return;
@@ -481,26 +481,26 @@ export class CanvasToolModule extends CanvasModuleBase {
       const tool = this.$tool.get();
 
       if (tool === 'brush') {
-        if (selectedEntity.adapter.renderer.bufferState?.type === 'brush_line') {
-          selectedEntity.adapter.renderer.commitBuffer();
+        if (selectedEntity.renderer.bufferState?.type === 'brush_line') {
+          selectedEntity.renderer.commitBuffer();
         } else {
-          selectedEntity.adapter.renderer.clearBuffer();
+          selectedEntity.renderer.clearBuffer();
         }
       }
 
       if (tool === 'eraser') {
-        if (selectedEntity.adapter.renderer.bufferState?.type === 'eraser_line') {
-          selectedEntity.adapter.renderer.commitBuffer();
+        if (selectedEntity.renderer.bufferState?.type === 'eraser_line') {
+          selectedEntity.renderer.commitBuffer();
         } else {
-          selectedEntity.adapter.renderer.clearBuffer();
+          selectedEntity.renderer.clearBuffer();
         }
       }
 
       if (tool === 'rect') {
-        if (selectedEntity.adapter.renderer.bufferState?.type === 'rect') {
-          selectedEntity.adapter.renderer.commitBuffer();
+        if (selectedEntity.renderer.bufferState?.type === 'rect') {
+          selectedEntity.renderer.commitBuffer();
         } else {
-          selectedEntity.adapter.renderer.clearBuffer();
+          selectedEntity.renderer.clearBuffer();
         }
       }
     } finally {
@@ -526,14 +526,14 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       const isMouseDown = this.$isMouseDown.get();
-      const selectedEntity = this.manager.stateApi.getSelectedEntity();
+      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked && cursorPos && isMouseDown;
 
       if (!isDrawable) {
         return;
       }
 
-      const bufferState = selectedEntity.adapter.renderer.bufferState;
+      const bufferState = selectedEntity.renderer.bufferState;
 
       if (!bufferState) {
         return;
@@ -557,7 +557,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
 
         bufferState.points.push(alignedPoint.x, alignedPoint.y);
-        await selectedEntity.adapter.renderer.setBuffer(bufferState);
+        await selectedEntity.renderer.setBuffer(bufferState);
       } else if (tool === 'eraser' && bufferState.type === 'eraser_line') {
         const lastPoint = getLastPointOfLine(bufferState.points);
         const minDistance = settings.eraserWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
@@ -574,15 +574,15 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
 
         bufferState.points.push(alignedPoint.x, alignedPoint.y);
-        await selectedEntity.adapter.renderer.setBuffer(bufferState);
+        await selectedEntity.renderer.setBuffer(bufferState);
       } else if (tool === 'rect' && bufferState.type === 'rect') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
         const alignedPoint = floorCoord(normalizedPoint);
         bufferState.rect.width = Math.round(alignedPoint.x - bufferState.rect.x);
         bufferState.rect.height = Math.round(alignedPoint.y - bufferState.rect.y);
-        await selectedEntity.adapter.renderer.setBuffer(bufferState);
+        await selectedEntity.renderer.setBuffer(bufferState);
       } else {
-        selectedEntity?.adapter.renderer.clearBuffer();
+        selectedEntity?.renderer.clearBuffer();
       }
     } finally {
       this.render();
@@ -595,10 +595,10 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     this.$cursorPos.set(null);
-    const selectedEntity = this.manager.stateApi.getSelectedEntity();
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (selectedEntity && selectedEntity.adapter.renderer.bufferState?.type !== 'rect') {
-      selectedEntity.adapter.renderer.commitBuffer();
+    if (selectedEntity && selectedEntity.renderer.bufferState?.type !== 'rect') {
+      selectedEntity.renderer.commitBuffer();
     }
 
     this.render();
@@ -636,10 +636,10 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   onWindowPointerUp = () => {
     this.$isMouseDown.set(false);
-    const selectedEntity = this.manager.stateApi.getSelectedEntity();
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (selectedEntity && selectedEntity.adapter.renderer.hasBuffer()) {
-      selectedEntity.adapter.renderer.commitBuffer();
+    if (selectedEntity && selectedEntity.renderer.hasBuffer()) {
+      selectedEntity.renderer.commitBuffer();
     }
   };
 
@@ -654,9 +654,9 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     if (e.key === 'Escape') {
       // Cancel shape drawing on escape
-      const selectedEntity = this.manager.stateApi.getSelectedEntity();
+      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       if (selectedEntity) {
-        selectedEntity.adapter.renderer.clearBuffer();
+        selectedEntity.renderer.clearBuffer();
       }
       return;
     }

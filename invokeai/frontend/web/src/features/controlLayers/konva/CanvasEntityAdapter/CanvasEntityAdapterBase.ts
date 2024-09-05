@@ -1,7 +1,7 @@
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
-import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
-import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
+import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
+import type { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { selectEntity } from 'features/controlLayers/store/selectors';
@@ -36,12 +36,12 @@ export abstract class CanvasEntityAdapterBase<
   /**
    * The transformer for this entity adapter.
    */
-  transformer: CanvasEntityTransformer;
+  abstract transformer: CanvasEntityTransformer;
 
   /**
    * The renderer for this entity adapter.
    */
-  renderer: CanvasEntityObjectRenderer;
+  abstract renderer: CanvasEntityObjectRenderer;
 
   /**
    * The entity's state.
@@ -79,9 +79,6 @@ export abstract class CanvasEntityAdapterBase<
     const initialState = this.getSnapshot();
     assert(initialState !== undefined, 'Missing entity state on creation');
     this.state = initialState;
-
-    this.renderer = new CanvasEntityObjectRenderer(this);
-    this.transformer = new CanvasEntityTransformer(this);
   }
 
   /**

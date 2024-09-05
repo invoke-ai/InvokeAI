@@ -1,15 +1,24 @@
 import type { SerializableObject } from 'common/types';
-import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapterBase';
+import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterBase';
+import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
+import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import type { CanvasEntityIdentifier, CanvasInpaintMaskState, Rect } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CanvasRegionalGuidanceState, Rect } from 'features/controlLayers/store/types';
 import type { GroupConfig } from 'konva/lib/Group';
 import { omit } from 'lodash-es';
 
-export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<CanvasInpaintMaskState> {
-  static TYPE = 'inpaint_mask_adapter';
+export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase<CanvasRegionalGuidanceState> {
+  static TYPE = 'regional_guidance_adapter';
 
-  constructor(entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>, manager: CanvasManager) {
-    super(entityIdentifier, manager, CanvasEntityAdapterInpaintMask.TYPE);
+  transformer: CanvasEntityTransformer;
+  renderer: CanvasEntityObjectRenderer;
+
+  constructor(entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>, manager: CanvasManager) {
+    super(entityIdentifier, manager, CanvasEntityAdapterRegionalGuidance.TYPE);
+
+    this.transformer = new CanvasEntityTransformer(this);
+    this.renderer = new CanvasEntityObjectRenderer(this);
+
     this.subscriptions.add(this.manager.stateApi.store.subscribe(this.sync));
     this.sync(true);
   }
@@ -61,7 +70,7 @@ export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<Canv
   };
 
   getHashableState = (): SerializableObject => {
-    const keysToOmit: (keyof CanvasInpaintMaskState)[] = ['fill', 'name', 'opacity'];
+    const keysToOmit: (keyof CanvasRegionalGuidanceState)[] = ['fill', 'name', 'opacity'];
     return omit(this.state, keysToOmit);
   };
 

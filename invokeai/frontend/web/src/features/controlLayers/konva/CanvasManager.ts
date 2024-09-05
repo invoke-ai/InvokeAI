@@ -6,10 +6,11 @@ import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import { CanvasBboxModule } from 'features/controlLayers/konva/CanvasBboxModule';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import { CanvasCompositorModule } from 'features/controlLayers/konva/CanvasCompositorModule';
-import { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntityAdapterControlLayer';
-import { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntityAdapterInpaintMask';
-import { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntityAdapterRasterLayer';
-import { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntityAdapterRegionalGuidance';
+import { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterControlLayer';
+import { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterInpaintMask';
+import { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterRasterLayer';
+import { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterRegionalGuidance';
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
 import { CanvasEntityRendererModule } from 'features/controlLayers/konva/CanvasEntityRendererModule';
 import { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -132,6 +133,21 @@ export class CanvasManager extends CanvasModuleBase {
     });
   }
 
+  getAdapter = (entityIdentifier: CanvasEntityIdentifier): CanvasEntityAdapter | null => {
+    switch (entityIdentifier.type) {
+      case 'raster_layer':
+        return this.adapters.rasterLayers.get(entityIdentifier.id) ?? null;
+      case 'control_layer':
+        return this.adapters.controlLayers.get(entityIdentifier.id) ?? null;
+      case 'regional_guidance':
+        return this.adapters.regionMasks.get(entityIdentifier.id) ?? null;
+      case 'inpaint_mask':
+        return this.adapters.inpaintMasks.get(entityIdentifier.id) ?? null;
+      default:
+        return null;
+    }
+  };
+
   deleteAdapter = (entityIdentifier: CanvasEntityIdentifier): boolean => {
     switch (entityIdentifier.type) {
       case 'raster_layer':
@@ -147,12 +163,7 @@ export class CanvasManager extends CanvasModuleBase {
     }
   };
 
-  getAllAdapters = (): (
-    | CanvasEntityAdapterRasterLayer
-    | CanvasEntityAdapterControlLayer
-    | CanvasEntityAdapterRegionalGuidance
-    | CanvasEntityAdapterInpaintMask
-  )[] => {
+  getAllAdapters = (): CanvasEntityAdapter[] => {
     return [
       ...this.adapters.rasterLayers.values(),
       ...this.adapters.controlLayers.values(),
@@ -196,7 +207,6 @@ export class CanvasManager extends CanvasModuleBase {
     this.stateApi.$settingsState.set(this.stateApi.getSettings());
     this.stateApi.$selectedEntityIdentifier.set(this.stateApi.getCanvasState().selectedEntityIdentifier);
     this.stateApi.$currentFill.set(this.stateApi.getCurrentColor());
-    this.stateApi.$selectedEntity.set(this.stateApi.getSelectedEntity());
 
     this.stage.initialize();
     $canvasManager.set(this);
