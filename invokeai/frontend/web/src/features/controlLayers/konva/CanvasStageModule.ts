@@ -86,7 +86,7 @@ export class CanvasStageModule extends CanvasModuleBase {
   };
 
   initialize = () => {
-    this.log.debug('Initializing stage');
+    this.log.debug('Initializing module');
     this.konva.stage.container(this.container);
     const resizeObserver = new ResizeObserver(this.fitStageToContainer);
     resizeObserver.observe(this.container);

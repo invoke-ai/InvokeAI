@@ -482,7 +482,7 @@ export const getLastPointOfLastLine = (
   return null;
 };
 
-type SubscriptionHandler<T> = (value: T, prevValue: T) => void;
+export type SubscriptionHandler<T> = (value: T, prevValue: T) => void;
 
 export const createReduxSubscription = <T, U>(
   store: Store<T>,

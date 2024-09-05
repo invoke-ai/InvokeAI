@@ -15,6 +15,8 @@ import {
   isDistanceMoreThanMin,
   offsetCoord,
 } from 'features/controlLayers/konva/util';
+import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
   CanvasInpaintMaskState,
@@ -104,18 +106,8 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.group.add(this.colorPickerToolPreview.konva.group);
 
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
-    this.subscriptions.add(
-      this.manager.stateApi.$settingsState.listen((settings, prevSettings) => {
-        if (
-          settings !== prevSettings ||
-          settings.brushWidth !== prevSettings.brushWidth ||
-          settings.eraserWidth !== prevSettings.eraserWidth ||
-          settings.color !== prevSettings.color
-        ) {
-          this.render();
-        }
-      })
-    );
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSettingsSlice, this.render));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.syncCursorStyle));
     this.subscriptions.add(
       this.$tool.listen(() => {
         // On tool switch, reset mouse state
@@ -128,6 +120,12 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     this.subscriptions.add(cleanupListeners);
   }
+
+  initialize = () => {
+    this.log.debug('Initializing module');
+    this.render();
+    this.syncCursorStyle();
+  };
 
   setToolVisibility = (tool: Tool, isDrawable: boolean) => {
     this.brushToolPreview.setVisibility(isDrawable && tool === 'brush');

@@ -1,8 +1,8 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObjectImage';
-import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
-import { type CanvasSessionState, selectCanvasSessionSlice } from 'features/controlLayers/store/canvasSessionSlice';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasSessionSlice';
 import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
@@ -15,8 +15,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   readonly parent: CanvasManager;
   readonly manager: CanvasManager;
   readonly log: Logger;
-
-  state: CanvasSessionState;
 
   subscriptions: Set<() => void> = new Set();
   konva: { group: Konva.Group };
@@ -40,22 +38,21 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.selectedImage = null;
 
     this.subscriptions.add(this.$shouldShowStagedImage.listen(this.render));
-
-    this.state = selectCanvasSessionSlice(this.manager.stateApi.store.getState());
-    this.subscriptions.add(
-      createReduxSubscription(this.manager.stateApi.store, selectCanvasSessionSlice, (session) => {
-        this.state = session;
-        this.render();
-      })
-    );
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSessionSlice, this.render));
   }
+
+  initialize = () => {
+    this.log.debug('Initializing module');
+    this.render();
+  };
 
   render = async () => {
     this.log.trace('Rendering staging area');
+    const stagingArea = this.manager.stateApi.runSelector(selectCanvasSessionSlice);
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
     const shouldShowStagedImage = this.$shouldShowStagedImage.get();
 
-    this.selectedImage = this.state.stagedImages[this.state.selectedStagedImageIndex] ?? null;
+    this.selectedImage = stagingArea.stagedImages[stagingArea.selectedStagedImageIndex] ?? null;
     this.konva.group.position({ x, y });
 
     if (this.selectedImage) {

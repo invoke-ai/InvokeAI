@@ -1,6 +1,5 @@
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { createSelector } from '@reduxjs/toolkit';
 import { $socket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/nanostores/store';
@@ -9,7 +8,7 @@ import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import Konva from 'konva';
 import { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
@@ -46,9 +45,6 @@ const useStageRenderer = (stage: Konva.Stage, container: HTMLDivElement | null) 
     Konva.pixelRatio = dpr;
   }, [dpr]);
 };
-
-const selectDynamicGrid = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.dynamicGrid);
-const selectShowHUD = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.showHUD);
 
 export const StageComponent = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);

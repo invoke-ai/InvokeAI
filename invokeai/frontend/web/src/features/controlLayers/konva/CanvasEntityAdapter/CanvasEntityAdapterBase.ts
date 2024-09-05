@@ -1,10 +1,11 @@
+import { createSelector } from '@reduxjs/toolkit';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import type { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { selectEntity } from 'features/controlLayers/store/selectors';
+import { getIsHiddenSelector, selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, CanvasRenderableEntityState, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
@@ -24,16 +25,6 @@ export abstract class CanvasEntityAdapterBase<
   readonly entityIdentifier: CanvasEntityIdentifier<T['type']>;
 
   /**
-   * The Konva nodes that make up the entity adapter:
-   * - A Konva.Layer to hold the everything
-   *
-   * Note that the transformer and object renderer have their own Konva nodes, but they are not stored here.
-   */
-  konva: {
-    layer: Konva.Layer;
-  };
-
-  /**
    * The transformer for this entity adapter.
    */
   abstract transformer: CanvasEntityTransformer;
@@ -42,6 +33,38 @@ export abstract class CanvasEntityAdapterBase<
    * The renderer for this entity adapter.
    */
   abstract renderer: CanvasEntityObjectRenderer;
+
+  /**
+   * Synchronizes the entity state with the canvas. This includes rendering the entity's objects, handling visibility,
+   * positioning, opacity, locked state, and any other properties.
+   *
+   * Implementations should be minimal and should only update the canvas if the state has changed.
+   *
+   * If `state` is undefined, the entity was just deleted and the adapter should destroy itself.
+   *
+   * If `prevState` is undefined, this is the first time the entity is being synced.
+   */
+  abstract sync: (state: T | undefined, prevState: T | undefined) => void;
+
+  /**
+   * Gets the canvas element for the entity. If `rect` is provided, the canvas will be clipped to that rectangle.
+   */
+  abstract getCanvas: (rect?: Rect) => HTMLCanvasElement;
+
+  /**
+   * Gets a hashable representation of the entity's state.
+   */
+  abstract getHashableState: () => SerializableObject;
+
+  /**
+   * The Konva nodes that make up the entity adapter:
+   * - A Konva.Layer to hold the everything
+   *
+   * Note that the transformer and object renderer have their own Konva nodes, but they are not stored here.
+   */
+  konva: {
+    layer: Konva.Layer;
+  };
 
   /**
    * The entity's state.
@@ -75,39 +98,35 @@ export abstract class CanvasEntityAdapterBase<
 
     this.manager.stage.addLayer(this.konva.layer);
 
-    // On creation, we need to get the latest snapshot of the entity's state from the store.
-    const initialState = this.getSnapshot();
-    assert(initialState !== undefined, 'Missing entity state on creation');
-    this.state = initialState;
+    // We must have the entity state on creation.
+    const state = this.manager.stateApi.runSelector(this.selectState);
+    assert(state !== undefined, 'Missing entity state on creation');
+    this.state = state;
+
+    // When the hidden flag is updated, we need to update the entity's visibility and transformer interaction state,
+    // which will show/hide the entity's selection outline
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(getIsHiddenSelector(this.entityIdentifier.type), () => {
+        this.syncOpacity();
+        this.transformer.syncInteractionState();
+      })
+    );
   }
 
   /**
-   * Gets the latest snapshot of the entity's state from the store. If the entity does not exist, returns undefined.
+   * A redux selector that selects the entity's state from the canvas slice.
    */
-  getSnapshot = (): T | undefined => {
-    return selectEntity(this.manager.stateApi.getCanvasState(), this.entityIdentifier) as T | undefined;
+  selectState = createSelector(
+    selectCanvasSlice,
+    (canvas) => selectEntity(canvas, this.entityIdentifier) as T | undefined
+  );
+
+  initialize = async () => {
+    this.log.debug('Initializing module');
+    await this.sync(this.manager.stateApi.runSelector(this.selectState), undefined);
+    this.transformer.initialize();
+    await this.renderer.initialize();
   };
-
-  /**
-   * Syncs the entity state with the canvas. This includes rendering the entity's objects, handling visibility,
-   * positioning, opacity, locked state, and any other properties.
-   *
-   * Implementations should be minimal and should only update the canvas if the state has changed. However, if `force`
-   * is true, the entity should be updated regardless of whether the state has changed.
-   *
-   * If the entity cannot be rendered, it should be destroyed.
-   */
-  abstract sync: (force?: boolean) => void;
-
-  /**
-   * Gets the canvas element for the entity. If `rect` is provided, the canvas will be clipped to that rectangle.
-   */
-  abstract getCanvas: (rect?: Rect) => HTMLCanvasElement;
-
-  /**
-   * Gets a hashable representation of the entity's state.
-   */
-  abstract getHashableState: () => SerializableObject;
 
   /**
    * Synchronizes the enabled state of the entity with the canvas.
@@ -116,18 +135,18 @@ export abstract class CanvasEntityAdapterBase<
     this.log.trace('Updating visibility');
     this.konva.layer.visible(this.state.isEnabled);
     this.renderer.syncCache(this.state.isEnabled);
+    this.transformer.syncInteractionState();
   };
 
   /**
    * Synchronizes the entity's objects with the canvas.
    */
-  syncObjects = () => {
-    this.renderer.render().then((didRender) => {
-      if (didRender) {
-        // If the objects have changed, we need to recalculate the transformer's bounding box.
-        this.transformer.requestRectCalculation();
-      }
-    });
+  syncObjects = async () => {
+    const didRender = await this.renderer.render();
+    if (didRender) {
+      // If the objects have changed, we need to recalculate the transformer's bounding box.
+      this.transformer.requestRectCalculation();
+    }
   };
 
   /**

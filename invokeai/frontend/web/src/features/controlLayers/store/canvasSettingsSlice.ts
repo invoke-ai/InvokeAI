@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 
@@ -132,4 +132,12 @@ export const canvasSettingsPersistConfig: PersistConfig<CanvasSettingsState> = {
   migrate,
   persistDenylist: [],
 };
+
 export const selectCanvasSettingsSlice = (s: RootState) => s.canvasSettings;
+
+export const selectDynamicGrid = createSelector(
+  selectCanvasSettingsSlice,
+  (canvasSettings) => canvasSettings.dynamicGrid
+);
+
+export const selectShowHUD = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.showHUD);
