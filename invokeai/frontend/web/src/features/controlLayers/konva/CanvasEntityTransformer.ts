@@ -2,6 +2,7 @@ import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEnt
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
@@ -221,12 +222,19 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.subscriptions.add(this.manager.tool.$tool.listen(this.syncInteractionState));
 
     // When the selected entity changes, we need to update the transformer's interaction state.
-    this.subscriptions.add(this.manager.stateApi.$selectedEntityIdentifier.listen(this.syncInteractionState));
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectSelectedEntityIdentifier, this.syncInteractionState)
+    );
 
     this.parent.konva.layer.add(this.konva.outlineRect);
     this.parent.konva.layer.add(this.konva.proxyRect);
     this.parent.konva.layer.add(this.konva.transformer);
   }
+
+  initialize = () => {
+    this.log.debug('Initializing module');
+    this.syncInteractionState();
+  };
 
   anchorStyleFunc = (anchor: Konva.Rect): void => {
     // Give the rotater special styling

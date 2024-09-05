@@ -15,16 +15,14 @@ export class CanvasEntityAdapterControlLayer extends CanvasEntityAdapterBase<Can
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'control_layer'>, manager: CanvasManager) {
     super(entityIdentifier, manager, CanvasEntityAdapterControlLayer.TYPE);
+
     this.transformer = new CanvasEntityTransformer(this);
     this.renderer = new CanvasEntityObjectRenderer(this);
-    this.subscriptions.add(this.manager.stateApi.store.subscribe(this.sync));
-    this.sync(true);
+
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectState, this.sync));
   }
 
-  sync = (force?: boolean) => {
-    const prevState = this.state;
-    const state = this.getSnapshot();
-
+  sync = async (state: CanvasControlLayerState | undefined, prevState: CanvasControlLayerState | undefined) => {
     if (!state) {
       this.destroy();
       return;
@@ -32,26 +30,26 @@ export class CanvasEntityAdapterControlLayer extends CanvasEntityAdapterBase<Can
 
     this.state = state;
 
-    if (!force && prevState === this.state) {
+    if (prevState && prevState === this.state) {
       return;
     }
 
-    if (force || this.state.isEnabled !== prevState.isEnabled) {
+    if (!prevState || this.state.isEnabled !== prevState.isEnabled) {
       this.syncIsEnabled();
     }
-    if (force || this.state.isLocked !== prevState.isLocked) {
+    if (!prevState || this.state.isLocked !== prevState.isLocked) {
       this.syncIsLocked();
     }
-    if (force || this.state.objects !== prevState.objects) {
-      this.syncObjects();
+    if (!prevState || this.state.objects !== prevState.objects) {
+      await this.syncObjects();
     }
-    if (force || this.state.position !== prevState.position) {
+    if (!prevState || this.state.position !== prevState.position) {
       this.syncPosition();
     }
-    if (force || this.state.opacity !== prevState.opacity) {
+    if (!prevState || this.state.opacity !== prevState.opacity) {
       this.syncOpacity();
     }
-    if (force || this.state.withTransparencyEffect !== prevState.withTransparencyEffect) {
+    if (!prevState || this.state.withTransparencyEffect !== prevState.withTransparencyEffect) {
       this.renderer.updateTransparencyEffect();
     }
   };

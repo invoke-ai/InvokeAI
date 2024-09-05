@@ -47,7 +47,7 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
         } else {
           canvasManager.filter.$config.set(IMAGE_FILTERS.canny_image_processor.buildDefaults(modelConfig.base));
         }
-        canvasManager.filter.initialize(entityIdentifier);
+        canvasManager.filter.startFilter(entityIdentifier);
         canvasManager.filter.previewFilter();
       }
     },

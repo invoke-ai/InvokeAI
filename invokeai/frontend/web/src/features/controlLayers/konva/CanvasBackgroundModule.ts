@@ -1,9 +1,8 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectDynamicGrid } from 'features/controlLayers/store/canvasSettingsSlice';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
@@ -29,8 +28,6 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
   readonly parent: CanvasManager;
   readonly manager: CanvasManager;
   readonly log: Logger;
-
-  dynamicGrid: boolean;
 
   subscriptions = new Set<() => void>();
   config: CanvasBackgroundModuleConfig = DEFAULT_CONFIG;
@@ -65,21 +62,24 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
      */
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
 
-    const selectDynamicGrid = createSelector(selectCanvasSettingsSlice, (settings) => settings.dynamicGrid);
-    this.dynamicGrid = selectDynamicGrid(this.manager.stateApi.store.getState());
-    this.subscriptions.add(
-      createReduxSubscription(this.manager.stateApi.store, selectDynamicGrid, (dynamicGrid) => {
-        this.dynamicGrid = dynamicGrid;
-        this.render();
-      })
-    );
+    /**
+     * The background grid should be rendered when the dynamic grid setting changes.
+     */
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectDynamicGrid, this.render));
   }
+
+  initialize = () => {
+    this.log.debug('Initializing module');
+    this.render();
+  };
 
   /**
    * Renders the background grid.
    */
   render = () => {
-    if (!this.dynamicGrid) {
+    const dynamicGrid = this.manager.stateApi.runSelector(selectDynamicGrid);
+
+    if (!dynamicGrid) {
       this.konva.layer.visible(false);
       return;
     }

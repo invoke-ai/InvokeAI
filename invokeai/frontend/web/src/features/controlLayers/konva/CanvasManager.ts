@@ -172,19 +172,23 @@ export class CanvasManager extends CanvasModuleBase {
     ];
   };
 
-  createAdapter = (entityIdentifier: CanvasEntityIdentifier): void => {
+  createAdapter = (entityIdentifier: CanvasEntityIdentifier): CanvasEntityAdapter => {
     if (isRasterLayerEntityIdentifier(entityIdentifier)) {
       const adapter = new CanvasEntityAdapterRasterLayer(entityIdentifier, this);
       this.adapters.rasterLayers.set(adapter.id, adapter);
+      return adapter;
     } else if (isControlLayerEntityIdentifier(entityIdentifier)) {
       const adapter = new CanvasEntityAdapterControlLayer(entityIdentifier, this);
       this.adapters.controlLayers.set(adapter.id, adapter);
+      return adapter;
     } else if (isRegionalGuidanceEntityIdentifier(entityIdentifier)) {
       const adapter = new CanvasEntityAdapterRegionalGuidance(entityIdentifier, this);
       this.adapters.regionMasks.set(adapter.id, adapter);
+      return adapter;
     } else if (isInpaintMaskEntityIdentifier(entityIdentifier)) {
       const adapter = new CanvasEntityAdapterInpaintMask(entityIdentifier, this);
       this.adapters.inpaintMasks.set(adapter.id, adapter);
+      return adapter;
     } else {
       assert(false, 'Unhandled entity type');
     }
@@ -199,16 +203,29 @@ export class CanvasManager extends CanvasModuleBase {
     this._isDebugging = false;
   }
 
+  getAllModules = (): CanvasModuleBase[] => {
+    return [
+      this.bbox,
+      this.stagingArea,
+      this.tool,
+      this.progressImage,
+      this.stateApi,
+      this.background,
+      this.filter,
+      this.worker,
+      this.entityRenderer,
+      this.compositor,
+      this.stage,
+    ];
+  };
+
   initialize = () => {
-    this.log.debug('Initializing canvas manager module');
+    this.log.debug('Initializing');
 
-    // These atoms require the canvas manager to be set up before we can provide their initial values
-    this.stateApi.$transformingAdapter.set(null);
-    this.stateApi.$settingsState.set(this.stateApi.getSettings());
-    this.stateApi.$selectedEntityIdentifier.set(this.stateApi.getCanvasState().selectedEntityIdentifier);
-    this.stateApi.$currentFill.set(this.stateApi.getCurrentColor());
+    for (const canvasModule of this.getAllModules()) {
+      canvasModule.initialize?.();
+    }
 
-    this.stage.initialize();
     $canvasManager.set(this);
   };
 
@@ -219,19 +236,9 @@ export class CanvasManager extends CanvasModuleBase {
       adapter.destroy();
     }
 
-    this.bbox.destroy();
-    this.stagingArea.destroy();
-    this.tool.destroy();
-    this.progressImage.destroy();
-    this.konva.previewLayer.destroy();
-
-    this.stateApi.destroy();
-    this.background.destroy();
-    this.filter.destroy();
-    this.worker.destroy();
-    this.entityRenderer.destroy();
-    this.compositor.destroy();
-    this.stage.destroy();
+    for (const canvasModule of this.getAllModules()) {
+      canvasModule.destroy();
+    }
 
     $canvasManager.set(null);
   };

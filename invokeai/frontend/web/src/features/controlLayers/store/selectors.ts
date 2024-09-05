@@ -5,6 +5,7 @@ import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
   CanvasEntityState,
+  CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
@@ -176,6 +177,8 @@ export function selectRegionalGuidanceIPAdapter(
   return entity.ipAdapters.find((ipAdapter) => ipAdapter.id === ipAdapterId);
 }
 
+export const selectBbox = createSelector(selectCanvasSlice, (canvas) => canvas.bbox);
+
 export const selectSelectedEntityIdentifier = createSelector(
   selectCanvasSlice,
   (canvas) => canvas.selectedEntityIdentifier
@@ -215,3 +218,26 @@ export const selectSelectedEntityFill = createSelector(
     return entity.fill;
   }
 );
+
+const selectRasterLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.rasterLayers.isHidden);
+const selectControlLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.controlLayers.isHidden);
+const selectInpaintMasksIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.inpaintMasks.isHidden);
+const selectRegionalGuidanceIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.regions.isHidden);
+
+/**
+ * Returns the hidden selector for the given entity type.
+ */
+export const getIsHiddenSelector = (type: CanvasEntityType) => {
+  switch (type) {
+    case 'raster_layer':
+      return selectRasterLayersIsHidden;
+    case 'control_layer':
+      return selectControlLayersIsHidden;
+    case 'inpaint_mask':
+      return selectInpaintMasksIsHidden;
+    case 'regional_guidance':
+      return selectRegionalGuidanceIsHidden;
+    default:
+      assert(false, 'Unhandled entity type');
+  }
+};
