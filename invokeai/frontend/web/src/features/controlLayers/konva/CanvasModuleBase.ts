@@ -101,6 +101,7 @@ export abstract class CanvasModuleBase {
    * destroy = () => {
    *  this.log('Destroying module');
    *  this.subscriptions.forEach((unsubscribe) => unsubscribe());
+   *  this.subscriptions.clear();
    *  this.konva.group.destroy();
    * };
    * ```

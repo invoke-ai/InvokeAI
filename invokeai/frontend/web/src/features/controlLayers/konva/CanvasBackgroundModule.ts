@@ -196,6 +196,7 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
   destroy = () => {
     this.log.trace('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
     this.konva.layer.destroy();
   };
 }
