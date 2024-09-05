@@ -2,7 +2,7 @@ import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolki
 import type { PersistConfig, RootState } from 'app/store/store';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 
-export type CanvasSettingsState = {
+type CanvasSettingsState = {
   /**
    * Whether to show HUD (Heads-Up Display) on the canvas.
    */

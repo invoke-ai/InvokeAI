@@ -9,7 +9,11 @@ import { createContext, memo, useContext, useMemo, useSyncExternalStore } from '
 import { assert } from 'tsafe';
 
 const EntityAdapterContext = createContext<
-  CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer | CanvasEntityAdapterInpaintMask | CanvasEntityAdapterRegionalGuidance | null
+  | CanvasEntityAdapterRasterLayer
+  | CanvasEntityAdapterControlLayer
+  | CanvasEntityAdapterInpaintMask
+  | CanvasEntityAdapterRegionalGuidance
+  | null
 >(null);
 
 export const RasterLayerAdapterGate = memo(({ children }: PropsWithChildren) => {
