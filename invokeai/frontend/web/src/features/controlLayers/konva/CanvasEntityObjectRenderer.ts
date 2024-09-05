@@ -172,7 +172,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     // to pan _before_ releasing the mouse button, which would cause the buffer to be lost if we didn't commit it.
     this.subscriptions.add(
       this.manager.tool.$tool.listen(() => {
-        if (this.hasBuffer()) {
+        if (this.hasBuffer() && !this.manager.$isBusy.get()) {
           this.commitBuffer();
         }
       })
@@ -447,6 +447,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       this.bufferRenderer?.destroy();
       this.bufferRenderer = null;
       this.bufferState = null;
+      this.syncCache(true);
     }
   };
 
