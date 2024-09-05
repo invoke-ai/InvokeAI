@@ -9,6 +9,7 @@ import {
   previewBlob,
 } from 'features/controlLayers/konva/util';
 import type { GenerationMode, Rect } from 'features/controlLayers/store/types';
+import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -134,7 +135,13 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       previewBlob(blob, 'Composite raster layer canvas');
     }
 
-    return uploadImage(blob, 'composite-raster-layer.png', 'general', !saveToGallery);
+    return uploadImage({
+      blob,
+      fileName: 'composite-raster-layer.png',
+      image_category: 'general',
+      is_intermediate: !saveToGallery,
+      board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
+    });
   };
 
   /**
@@ -258,7 +265,13 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       previewBlob(blob, 'Composite inpaint mask canvas');
     }
 
-    return uploadImage(blob, 'composite-inpaint-mask.png', 'general', !saveToGallery);
+    return uploadImage({
+      blob,
+      fileName: 'composite-inpaint-mask.png',
+      image_category: 'general',
+      is_intermediate: !saveToGallery,
+      board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
+    });
   };
 
   /**
