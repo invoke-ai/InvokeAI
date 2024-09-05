@@ -1,8 +1,8 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObjectImage';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasSessionState } from 'features/controlLayers/store/canvasSessionSlice';
+import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
+import { type CanvasSessionState, selectCanvasSessionSlice } from 'features/controlLayers/store/canvasSessionSlice';
 import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
@@ -16,7 +16,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   readonly manager: CanvasManager;
   readonly log: Logger;
 
-  private _state: CanvasSessionState | null = null;
+  state: CanvasSessionState;
 
   subscriptions: Set<() => void> = new Set();
   konva: { group: Konva.Group };
@@ -40,26 +40,14 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.selectedImage = null;
 
     this.subscriptions.add(this.$shouldShowStagedImage.listen(this.render));
-    this.subscriptions.add(this.manager.stateApi.store.subscribe(this.sync));
-  }
 
-  sync = (): CanvasSessionState => {
-    this.state = this.manager.stateApi.getSession();
-    return this.state;
-  };
-
-  get state(): CanvasSessionState {
-    if (!this._state) {
-      return this.manager.stateApi.getSession();
-    }
-    return this._state;
-  }
-
-  set state(state: CanvasSessionState) {
-    if (this._state !== state) {
-      this._state = state;
-      this.render();
-    }
+    this.state = selectCanvasSessionSlice(this.manager.stateApi.store.getState());
+    this.subscriptions.add(
+      createReduxSubscription(this.manager.stateApi.store, selectCanvasSessionSlice, (session) => {
+        this.state = session;
+        this.render();
+      })
+    );
   }
 
   render = async () => {

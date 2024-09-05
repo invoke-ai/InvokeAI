@@ -4,7 +4,6 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { getPrefixedId, loadImage } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
-import type { S } from 'services/api/types';
 
 export class CanvasProgressImageModule extends CanvasModuleBase {
   readonly type = 'progress_image';
@@ -23,7 +22,7 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
   isError: boolean = false;
   imageElement: HTMLImageElement | null = null;
 
-  lastProgressEvent: S['InvocationDenoiseProgressEvent'] | null = null;
+  subscriptions = new Set<() => void>();
 
   mutex: Mutex = new Mutex();
 
@@ -42,10 +41,7 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
       image: null,
     };
 
-    this.manager.stateApi.$lastCanvasProgressEvent.listen((event) => {
-      this.lastProgressEvent = event;
-      this.render();
-    });
+    this.subscriptions.add(this.manager.stateApi.$lastCanvasProgressEvent.listen(this.render));
   }
 
   getNodes = () => {
@@ -55,7 +51,9 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
   render = async () => {
     const release = await this.mutex.acquire();
 
-    if (!this.lastProgressEvent) {
+    const event = this.manager.stateApi.$lastCanvasProgressEvent.get();
+
+    if (!event) {
       this.konva.group.visible(false);
       this.imageElement = null;
       this.isLoading = false;
@@ -67,7 +65,7 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
     this.isLoading = true;
 
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
-    const { dataURL } = this.lastProgressEvent.progress_image;
+    const { dataURL } = event.progress_image;
     try {
       this.imageElement = await loadImage(dataURL);
       if (this.konva.image) {
@@ -101,6 +99,8 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
 
   destroy = () => {
     this.log.debug('Destroying module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
     this.konva.group.destroy();
   };
 }
