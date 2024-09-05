@@ -30,14 +30,14 @@ export const CanvasEditor = memo(() => {
     >
       <CanvasToolbar />
       <StageComponent />
-      <Flex position="absolute" bottom={8} gap={2} align="center" justify="center">
+      <Flex position="absolute" bottom={4} gap={2} align="center" justify="center">
         <CanvasManagerProviderGate>
           <StagingAreaIsStagingGate>
             <StagingAreaToolbar />
           </StagingAreaIsStagingGate>
         </CanvasManagerProviderGate>
       </Flex>
-      <Flex position="absolute" bottom={8}>
+      <Flex position="absolute" bottom={4}>
         <CanvasManagerProviderGate>
           <Filter />
           <Transform />
