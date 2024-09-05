@@ -86,15 +86,15 @@
         "loadMore": "Cargar más",
         "noImagesInGallery": "No hay imágenes para mostrar",
         "deleteImage_one": "Eliminar Imagen",
-        "deleteImage_many": "",
-        "deleteImage_other": "",
+        "deleteImage_many": "Eliminar {{count}} Imágenes",
+        "deleteImage_other": "Eliminar {{count}} Imágenes",
         "deleteImagePermanent": "Las imágenes eliminadas no se pueden restaurar.",
         "assets": "Activos",
         "autoAssignBoardOnClick": "Asignación automática de tableros al hacer clic"
     },
     "hotkeys": {
         "keyboardShortcuts": "Atajos de teclado",
-        "appHotkeys": "Atajos de applicación",
+        "appHotkeys": "Atajos de aplicación",
         "generalHotkeys": "Atajos generales",
         "galleryHotkeys": "Atajos de galería",
         "unifiedCanvasHotkeys": "Atajos de lienzo unificado",
@@ -535,7 +535,7 @@
         "bottomMessage": "Al eliminar este panel y las imágenes que contiene, se restablecerán las funciones que los estén utilizando actualmente.",
         "deleteBoardAndImages": "Borrar el panel y las imágenes",
         "loading": "Cargando...",
-        "deletedBoardsCannotbeRestored": "Los paneles eliminados no se pueden restaurar",
+        "deletedBoardsCannotbeRestored": "Los paneles eliminados no se pueden restaurar. Al Seleccionar 'Borrar Solo el Panel' transferirá las imágenes a un estado sin categorizar.",
         "move": "Mover",
         "menuItemAutoAdd": "Agregar automáticamente a este panel",
         "searchBoard": "Buscando paneles…",
@@ -549,7 +549,13 @@
         "imagesWithCount_other": "{{count}} imágenes",
         "assetsWithCount_one": "{{count}} activo",
         "assetsWithCount_many": "{{count}} activos",
-        "assetsWithCount_other": "{{count}} activos"
+        "assetsWithCount_other": "{{count}} activos",
+        "hideBoards": "Ocultar Paneles",
+        "addPrivateBoard": "Agregar un tablero privado",
+        "addSharedBoard": "Agregar Panel Compartido",
+        "boards": "Paneles",
+        "archiveBoard": "Archivar Panel",
+        "archived": "Archivado"
     },
     "accordions": {
         "compositing": {

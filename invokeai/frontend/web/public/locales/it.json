@@ -496,7 +496,9 @@
         "main": "Principali",
         "noModelsInstalledDesc1": "Installa i modelli con",
         "ipAdapters": "Adattatori IP",
-        "noMatchingModels": "Nessun modello corrispondente"
+        "noMatchingModels": "Nessun modello corrispondente",
+        "starterModelsInModelManager": "I modelli iniziali possono essere trovati in Gestione Modelli",
+        "spandrelImageToImage": "Immagine a immagine (Spandrel)"
     },
     "parameters": {
         "images": "Immagini",
@@ -510,7 +512,7 @@
         "perlinNoise": "Rumore Perlin",
         "type": "Tipo",
         "strength": "Forza",
-        "upscaling": "Ampliamento",
+        "upscaling": "Amplia",
         "scale": "Scala",
         "imageFit": "Adatta l'immagine iniziale alle dimensioni di output",
         "scaleBeforeProcessing": "Scala prima dell'elaborazione",
@@ -593,7 +595,7 @@
         "globalPositivePromptPlaceholder": "Prompt positivo globale",
         "globalNegativePromptPlaceholder": "Prompt negativo globale",
         "processImage": "Elabora Immagine",
-        "sendToUpscale": "Invia a Ampliare",
+        "sendToUpscale": "Invia a Amplia",
         "postProcessing": "Post-elaborazione (Shift + U)"
     },
     "settings": {
@@ -1420,7 +1422,7 @@
         "paramUpscaleMethod": {
             "heading": "Metodo di ampliamento",
             "paragraphs": [
-                "Metodo utilizzato per eseguire l'ampliamento dell'immagine per la correzione ad alta risoluzione."
+                "Metodo utilizzato per ampliare l'immagine per la correzione ad alta risoluzione."
             ]
         },
         "patchmatchDownScaleSize": {
@@ -1528,7 +1530,7 @@
         },
         "upscaleModel": {
             "paragraphs": [
-                "Il modello di ampliamento (Upscale), scala l'immagine alle dimensioni di uscita prima di aggiungere i dettagli. È possibile utilizzare qualsiasi modello di ampliamento supportato, ma alcuni sono specializzati per diversi tipi di immagini, come foto o disegni al tratto."
+                "Il modello di ampliamento, scala l'immagine alle dimensioni di uscita prima di aggiungere i dettagli. È possibile utilizzare qualsiasi modello di ampliamento supportato, ma alcuni sono specializzati per diversi tipi di immagini, come foto o disegni al tratto."
             ],
             "heading": "Modello di ampliamento"
         },
@@ -1720,26 +1722,27 @@
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
             "queue": "Coda",
             "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
-            "upscaling": "Ampliamento",
+            "upscaling": "Amplia",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
         }
     },
     "upscaling": {
         "creativity": "Creatività",
         "structure": "Struttura",
-        "upscaleModel": "Modello di Ampliamento",
+        "upscaleModel": "Modello di ampliamento",
         "scale": "Scala",
         "missingModelsWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare i modelli richiesti:",
         "mainModelDesc": "Modello principale (architettura SD1.5 o SDXL)",
         "tileControlNetModelDesc": "Modello Tile ControlNet per l'architettura del modello principale scelto",
-        "upscaleModelDesc": "Modello per l'ampliamento (da immagine a immagine)",
+        "upscaleModelDesc": "Modello per l'ampliamento (immagine a immagine)",
         "missingUpscaleInitialImage": "Immagine iniziale mancante per l'ampliamento",
         "missingUpscaleModel": "Modello per l’ampliamento mancante",
         "missingTileControlNetModel": "Nessun modello ControlNet Tile valido installato",
         "postProcessingModel": "Modello di post-elaborazione",
         "postProcessingMissingModelWarning": "Visita <LinkComponent>Gestione modelli</LinkComponent> per installare un modello di post-elaborazione (da immagine a immagine).",
         "exceedsMaxSize": "Le impostazioni di ampliamento superano il limite massimo delle dimensioni",
-        "exceedsMaxSizeDetails": "Il limite massimo di ampliamento è {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixel. Prova un'immagine più piccola o diminuisci la scala selezionata."
+        "exceedsMaxSizeDetails": "Il limite massimo di ampliamento è {{maxUpscaleDimension}}x{{maxUpscaleDimension}} pixel. Prova un'immagine più piccola o diminuisci la scala selezionata.",
+        "upscale": "Amplia"
     },
     "upsell": {
         "inviteTeammates": "Invita collaboratori",
@@ -1789,6 +1792,7 @@
         "positivePromptColumn": "'prompt' o 'positive_prompt'",
         "noTemplates": "Nessun modello",
         "acceptedColumnsKeys": "Colonne/chiavi accettate:",
-        "templateActions": "Azioni modello"
+        "templateActions": "Azioni modello",
+        "promptTemplateCleared": "Modello di prompt cancellato"
     }
 }
