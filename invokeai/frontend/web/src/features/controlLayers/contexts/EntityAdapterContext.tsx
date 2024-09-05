@@ -1,15 +1,15 @@
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
-import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
-import type { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
-import type { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
+import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntityAdapterControlLayer';
+import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntityAdapterInpaintMask';
+import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntityAdapterRasterLayer';
+import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntityAdapterRegionalGuidance';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useMemo, useSyncExternalStore } from 'react';
 import { assert } from 'tsafe';
 
 const EntityAdapterContext = createContext<
-  CanvasRasterLayerAdapter | CanvasControlLayerAdapter | CanvasInpaintMaskAdapter | CanvasRegionalGuidanceAdapter | null
+  CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer | CanvasEntityAdapterInpaintMask | CanvasEntityAdapterRegionalGuidance | null
 >(null);
 
 export const RasterLayerAdapterGate = memo(({ children }: PropsWithChildren) => {
@@ -93,10 +93,10 @@ export const RegionalGuidanceAdapterGate = memo(({ children }: PropsWithChildren
 RegionalGuidanceAdapterGate.displayName = 'RegionalGuidanceAdapterGate';
 
 export const useEntityAdapter = ():
-  | CanvasRasterLayerAdapter
-  | CanvasControlLayerAdapter
-  | CanvasInpaintMaskAdapter
-  | CanvasRegionalGuidanceAdapter => {
+  | CanvasEntityAdapterRasterLayer
+  | CanvasEntityAdapterControlLayer
+  | CanvasEntityAdapterInpaintMask
+  | CanvasEntityAdapterRegionalGuidance => {
   const adapter = useContext(EntityAdapterContext);
   assert(adapter, 'useEntityAdapter must be used within a CanvasRasterLayerAdapterGate');
   return adapter;

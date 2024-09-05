@@ -136,7 +136,6 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   syncCursorStyle = () => {
-    this.log.trace('Syncing cursor style');
     const stage = this.manager.stage;
     const isMouseDown = this.$isMouseDown.get();
     const tool = this.$tool.get();
@@ -147,7 +146,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       stage.setCursor('not-allowed');
     } else if (this.manager.$isBusy.get()) {
       stage.setCursor('not-allowed');
-    } else if (!this.manager.stateApi.getSelectedEntity()?.adapter.isInteractable()) {
+    } else if (!this.manager.stateApi.getSelectedEntity()?.adapter.getIsInteractable()) {
       stage.setCursor('not-allowed');
     } else if (tool === 'colorPicker' || tool === 'brush' || tool === 'eraser') {
       stage.setCursor('none');
@@ -283,7 +282,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return false;
     } else if (this.manager.filter.$isFiltering.get()) {
       return false;
-    } else if (!this.manager.stateApi.getSelectedEntity()?.adapter.isInteractable()) {
+    } else if (!this.manager.stateApi.getSelectedEntity()?.adapter.getIsInteractable()) {
       return false;
     } else {
       return true;
@@ -708,6 +707,7 @@ export class CanvasToolModule extends CanvasModuleBase {
   destroy = () => {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
     this.konva.group.destroy();
   };
 }

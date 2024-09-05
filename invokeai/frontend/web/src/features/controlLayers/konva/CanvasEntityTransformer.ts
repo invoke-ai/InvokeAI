@@ -472,7 +472,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const tool = this.manager.tool.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
 
-    if (!this.parent.renderer.hasObjects() || !this.parent.isInteractable()) {
+    if (!this.parent.renderer.hasObjects() || !this.parent.getIsInteractable()) {
       // The layer is totally empty, we can just disable the layer
       this.parent.konva.layer.listening(false);
       this.setInteractionMode('off');
@@ -788,6 +788,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   destroy = () => {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
     this.konva.outlineRect.destroy();
     this.konva.transformer.destroy();
     this.konva.proxyRect.destroy();

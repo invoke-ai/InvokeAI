@@ -2,7 +2,7 @@ import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMult
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { Coordinate, Rect } from 'features/controlLayers/store/types';
+import type { CanvasState, Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -52,6 +52,8 @@ export class CanvasBboxModule extends CanvasModuleBase {
    */
   $aspectRatioBuffer = atom(0);
 
+  state: CanvasState['bbox'];
+
   constructor(manager: CanvasManager) {
     super();
     this.id = getPrefixedId(this.type);
@@ -63,8 +65,8 @@ export class CanvasBboxModule extends CanvasModuleBase {
     this.log.debug('Creating bbox module');
 
     // Set the initial aspect ratio buffer per app state.
-    const bbox = this.manager.stateApi.getBbox();
-    this.$aspectRatioBuffer.set(bbox.rect.width / bbox.rect.height);
+    this.state = this.manager.stateApi.getBbox();
+    this.$aspectRatioBuffer.set(this.state.rect.width / this.state.rect.height);
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:group`, listening: true }),
@@ -75,10 +77,10 @@ export class CanvasBboxModule extends CanvasModuleBase {
         listening: false,
         strokeEnabled: false,
         draggable: true,
-        x: bbox.rect.x,
-        y: bbox.rect.y,
-        width: bbox.rect.width,
-        height: bbox.rect.height,
+        x: this.state.rect.x,
+        y: this.state.rect.y,
+        width: this.state.rect.width,
+        height: this.state.rect.height,
       }),
       transformer: new Konva.Transformer({
         name: `${this.type}:transformer`,
@@ -112,7 +114,17 @@ export class CanvasBboxModule extends CanvasModuleBase {
 
     // We will listen to the tool state to determine if the bbox should be visible or not.
     this.subscriptions.add(this.manager.tool.$tool.listen(this.render));
+    this.subscriptions.add(this.manager.stateApi.store.subscribe(this.sync));
   }
+
+  sync = () => {
+    const prevState = this.state;
+    this.state = this.manager.stateApi.getBbox();
+
+    if (this.state !== prevState) {
+      this.render();
+    }
+  };
 
   /**
    * Renders the bbox. The bbox is only visible when the tool is set to 'bbox'.
@@ -147,6 +159,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
   destroy = () => {
     this.log.trace('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
     this.konva.group.destroy();
   };
 

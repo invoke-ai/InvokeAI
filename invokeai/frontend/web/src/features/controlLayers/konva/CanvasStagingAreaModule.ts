@@ -107,6 +107,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   destroy = () => {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
     if (this.image) {
       this.image.destroy();
     }

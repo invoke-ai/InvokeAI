@@ -1,11 +1,6 @@
-import { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
-import { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
-import { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasSessionState } from 'features/controlLayers/store/canvasSessionSlice';
 import { type CanvasState, getEntityIdentifier } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
 
@@ -54,65 +49,42 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
     this.renderControlLayers(prevState, state);
     this.renderRegionalGuidance(prevState, state);
     this.renderInpaintMasks(state, prevState);
-    this.renderBbox(state, prevState);
     this.arrangeEntities(state, prevState);
     this.manager.tool.syncCursorStyle();
   };
 
-  renderRasterLayers = async (state: CanvasState, prevState: CanvasState | null) => {
+  renderRasterLayers = (state: CanvasState, prevState: CanvasState | null) => {
     const adapterMap = this.manager.adapters.rasterLayers;
 
     if (!prevState || state.rasterLayers.isHidden !== prevState.rasterLayers.isHidden) {
       for (const adapter of adapterMap.values()) {
-        adapter.renderer.updateOpacity();
+        adapter.syncOpacity();
       }
     }
 
     if (!prevState || state.rasterLayers.entities !== prevState.rasterLayers.entities) {
-      for (const entityAdapter of adapterMap.values()) {
-        if (!state.rasterLayers.entities.find((l) => l.id === entityAdapter.id)) {
-          await entityAdapter.destroy();
-          adapterMap.delete(entityAdapter.id);
-        }
-      }
-
       for (const entityState of state.rasterLayers.entities) {
-        let adapter = adapterMap.get(entityState.id);
-        if (!adapter) {
-          adapter = new CanvasRasterLayerAdapter(getEntityIdentifier(entityState), this.manager);
-          adapterMap.set(adapter.id, adapter);
-          this.manager.stage.addLayer(adapter.konva.layer);
+        if (!adapterMap.has(entityState.id)) {
+          this.manager.createAdapter(getEntityIdentifier(entityState));
         }
-        adapter.state = entityState;
       }
     }
   };
 
-  renderControlLayers = async (prevState: CanvasState | null, state: CanvasState) => {
+  renderControlLayers = (prevState: CanvasState | null, state: CanvasState) => {
     const adapterMap = this.manager.adapters.controlLayers;
 
     if (!prevState || state.controlLayers.isHidden !== prevState.controlLayers.isHidden) {
       for (const adapter of adapterMap.values()) {
-        adapter.renderer.updateOpacity();
+        adapter.syncOpacity();
       }
     }
 
     if (!prevState || state.controlLayers.entities !== prevState.controlLayers.entities) {
-      for (const entityAdapter of adapterMap.values()) {
-        if (!state.controlLayers.entities.find((l) => l.id === entityAdapter.id)) {
-          await entityAdapter.destroy();
-          adapterMap.delete(entityAdapter.id);
-        }
-      }
-
       for (const entityState of state.controlLayers.entities) {
-        let adapter = adapterMap.get(entityState.id);
-        if (!adapter) {
-          adapter = new CanvasControlLayerAdapter(getEntityIdentifier(entityState), this.manager);
-          adapterMap.set(adapter.id, adapter);
-          this.manager.stage.addLayer(adapter.konva.layer);
+        if (!adapterMap.has(entityState.id)) {
+          this.manager.createAdapter(getEntityIdentifier(entityState));
         }
-        adapter.state = entityState;
       }
     }
   };
@@ -122,31 +94,15 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
 
     if (!prevState || state.regions.isHidden !== prevState.regions.isHidden) {
       for (const adapter of adapterMap.values()) {
-        adapter.renderer.updateOpacity();
+        adapter.syncOpacity();
       }
     }
 
-    if (
-      !prevState ||
-      state.regions.entities !== prevState.regions.entities ||
-      state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
-    ) {
-      // Destroy the konva nodes for nonexistent entities
-      for (const canvasRegion of adapterMap.values()) {
-        if (!state.regions.entities.find((rg) => rg.id === canvasRegion.id)) {
-          canvasRegion.destroy();
-          adapterMap.delete(canvasRegion.id);
-        }
-      }
-
+    if (!prevState || state.regions.entities !== prevState.regions.entities) {
       for (const entityState of state.regions.entities) {
-        let adapter = adapterMap.get(entityState.id);
-        if (!adapter) {
-          adapter = new CanvasRegionalGuidanceAdapter(getEntityIdentifier(entityState), this.manager);
-          adapterMap.set(adapter.id, adapter);
-          this.manager.stage.addLayer(adapter.konva.layer);
+        if (!adapterMap.has(entityState.id)) {
+          this.manager.createAdapter(getEntityIdentifier(entityState));
         }
-        adapter.state = entityState;
       }
     }
   };
@@ -156,44 +112,16 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
 
     if (!prevState || state.inpaintMasks.isHidden !== prevState.inpaintMasks.isHidden) {
       for (const adapter of adapterMap.values()) {
-        adapter.renderer.updateOpacity();
+        adapter.syncOpacity();
       }
     }
 
-    if (
-      !prevState ||
-      state.inpaintMasks.entities !== prevState.inpaintMasks.entities ||
-      state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
-    ) {
-      // Destroy the konva nodes for nonexistent entities
-      for (const adapter of adapterMap.values()) {
-        if (!state.inpaintMasks.entities.find((rg) => rg.id === adapter.id)) {
-          adapter.destroy();
-          adapterMap.delete(adapter.id);
-        }
-      }
-
+    if (!prevState || state.inpaintMasks.entities !== prevState.inpaintMasks.entities) {
       for (const entityState of state.inpaintMasks.entities) {
-        let adapter = adapterMap.get(entityState.id);
-        if (!adapter) {
-          adapter = new CanvasInpaintMaskAdapter(getEntityIdentifier(entityState), this.manager);
-          adapterMap.set(adapter.id, adapter);
-          this.manager.stage.addLayer(adapter.konva.layer);
+        if (!adapterMap.has(entityState.id)) {
+          this.manager.createAdapter(getEntityIdentifier(entityState));
         }
-        adapter.state = entityState;
       }
-    }
-  };
-
-  renderBbox = (state: CanvasState, prevState: CanvasState | null) => {
-    if (!prevState || state.bbox !== prevState.bbox) {
-      this.manager.bbox.render();
-    }
-  };
-
-  renderStagingArea = async (session: CanvasSessionState, prevSession: CanvasSessionState | null) => {
-    if (!prevSession || session !== prevSession) {
-      await this.manager.stagingArea.render();
     }
   };
 
