@@ -159,8 +159,3 @@ def convert_bundle_to_flux_transformer_checkpoint(
         del transformer_state_dict[k]
 
     return original_state_dict
-
-
-@torch.jit.script
-def convert_sd_entry_to_bfloat16(key: str, tensor: torch.Tensor) -> tuple[str, torch.Tensor]:
-    return key, tensor.to(torch.bfloat16, copy=False)
