@@ -1,4 +1,4 @@
-import type { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapterBase';
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
@@ -79,7 +79,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   readonly type = 'entity_transformer';
   readonly id: string;
   readonly path: string[];
-  readonly parent: CanvasEntityAdapterBase;
+  readonly parent: CanvasEntityAdapter;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
