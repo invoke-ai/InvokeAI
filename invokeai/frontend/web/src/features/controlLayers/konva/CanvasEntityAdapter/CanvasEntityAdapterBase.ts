@@ -197,7 +197,13 @@ export abstract class CanvasEntityAdapterBase<
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.subscriptions.clear();
     this.renderer.destroy();
+    if (this.transformer.$isTransforming.get()) {
+      this.transformer.stopTransform();
+    }
     this.transformer.destroy();
+    if (this.manager.filter.$adapter.get()?.id === this.id) {
+      this.manager.filter.cancelFilter();
+    }
     this.konva.layer.destroy();
     this.manager.deleteAdapter(this.entityIdentifier);
   };
