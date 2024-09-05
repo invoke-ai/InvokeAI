@@ -1656,6 +1656,7 @@
     "controlLayers": {
         "bookmark": "Bookmark for Quick Switch",
         "removeBookmark": "Remove Bookmark",
+        "saveCanvasToGallery": "Save Canvas To Gallery",
         "saveBboxToGallery": "Save Bbox To Gallery",
         "savedToGalleryOk": "Saved to Gallery",
         "savedToGalleryError": "Error saving to gallery",
