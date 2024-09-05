@@ -20,7 +20,6 @@ import type {
   CanvasEraserLineState,
   CanvasImageState,
   CanvasRectState,
-  Fill,
   Rect,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -234,9 +233,13 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     }
   };
 
-  updateCompositingRectFill = (fill: Fill) => {
+  updateCompositingRectFill = () => {
     this.log.trace('Updating compositing rect fill');
+
     assert(this.konva.compositing, 'Missing compositing rect');
+    assert(this.parent.state.type === 'inpaint_mask' || this.parent.state.type === 'regional_guidance');
+
+    const fill = this.parent.state.fill;
 
     if (fill.style === 'solid') {
       this.konva.compositing.rect.setAttrs({
@@ -621,6 +624,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   destroy = () => {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
     for (const renderer of this.renderers.values()) {
       renderer.destroy();
     }

@@ -790,6 +790,30 @@ export function isDrawableEntityType(
   );
 }
 
+export function isRasterLayerEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> {
+  return entityIdentifier.type === 'raster_layer';
+}
+
+export function isControlLayerEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasEntityIdentifier<'control_layer'> {
+  return entityIdentifier.type === 'control_layer';
+}
+
+export function isInpaintMaskEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasEntityIdentifier<'inpaint_mask'> {
+  return entityIdentifier.type === 'inpaint_mask';
+}
+
+export function isRegionalGuidanceEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasEntityIdentifier<'regional_guidance'> {
+  return entityIdentifier.type === 'regional_guidance';
+}
+
 export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {
   return isDrawableEntityType(entity.type);
 }
@@ -803,5 +827,5 @@ export const getEntityIdentifier = <T extends CanvasEntityType>(
 export const isMaskEntityIdentifier = (
   entityIdentifier: CanvasEntityIdentifier
 ): entityIdentifier is CanvasEntityIdentifier<'inpaint_mask' | 'regional_guidance'> => {
-  return entityIdentifier.type === 'inpaint_mask' || entityIdentifier.type === 'regional_guidance';
+  return isInpaintMaskEntityIdentifier(entityIdentifier) || isRegionalGuidanceEntityIdentifier(entityIdentifier);
 };

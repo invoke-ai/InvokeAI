@@ -1,10 +1,10 @@
 import type { SerializableObject } from 'common/types';
-import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
-import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
+import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntityAdapterControlLayer';
+import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntityAdapterInpaintMask';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import type { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
-import type { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
+import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntityAdapterRasterLayer';
+import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntityAdapterRegionalGuidance';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, CanvasImageState, FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -25,10 +25,10 @@ export class CanvasFilterModule extends CanvasModuleBase {
   imageState: CanvasImageState | null = null;
 
   $adapter = atom<
-    | CanvasRasterLayerAdapter
-    | CanvasControlLayerAdapter
-    | CanvasInpaintMaskAdapter
-    | CanvasRegionalGuidanceAdapter
+    | CanvasEntityAdapterRasterLayer
+    | CanvasEntityAdapterControlLayer
+    | CanvasEntityAdapterInpaintMask
+    | CanvasEntityAdapterRegionalGuidance
     | null
   >(null);
   $isFiltering = computed(this.$adapter, (adapter) => Boolean(adapter));

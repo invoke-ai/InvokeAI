@@ -7,7 +7,7 @@ export const CanvasSettingsRecalculateRectsButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const onClick = useCallback(() => {
-    for (const adapter of canvasManager.adapters.getAll()) {
+    for (const adapter of canvasManager.getAllAdapters()) {
       adapter.transformer.requestRectCalculation();
     }
   }, [canvasManager]);

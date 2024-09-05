@@ -6,23 +6,31 @@ import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import { CanvasBboxModule } from 'features/controlLayers/konva/CanvasBboxModule';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import { CanvasCompositorModule } from 'features/controlLayers/konva/CanvasCompositorModule';
-import type { CanvasControlLayerAdapter } from 'features/controlLayers/konva/CanvasControlLayerAdapter';
+import { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntityAdapterControlLayer';
+import { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntityAdapterInpaintMask';
+import { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntityAdapterRasterLayer';
+import { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntityAdapterRegionalGuidance';
 import { CanvasEntityRendererModule } from 'features/controlLayers/konva/CanvasEntityRendererModule';
 import { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
-import type { CanvasInpaintMaskAdapter } from 'features/controlLayers/konva/CanvasInpaintMaskAdapter';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasProgressImageModule } from 'features/controlLayers/konva/CanvasProgressImageModule';
-import type { CanvasRasterLayerAdapter } from 'features/controlLayers/konva/CanvasRasterLayerAdapter';
-import type { CanvasRegionalGuidanceAdapter } from 'features/controlLayers/konva/CanvasRegionalGuidanceAdapter';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
 import { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import {
+  type CanvasEntityIdentifier,
+  isControlLayerEntityIdentifier,
+  isInpaintMaskEntityIdentifier,
+  isRasterLayerEntityIdentifier,
+  isRegionalGuidanceEntityIdentifier,
+} from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Atom } from 'nanostores';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
+import { assert } from 'tsafe';
 
 import { CanvasBackgroundModule } from './CanvasBackgroundModule';
 import { CanvasStateApiModule } from './CanvasStateApiModule';
@@ -41,23 +49,10 @@ export class CanvasManager extends CanvasModuleBase {
   socket: AppSocket;
 
   adapters = {
-    rasterLayers: new SyncableMap<string, CanvasRasterLayerAdapter>(),
-    controlLayers: new SyncableMap<string, CanvasControlLayerAdapter>(),
-    regionMasks: new SyncableMap<string, CanvasRegionalGuidanceAdapter>(),
-    inpaintMasks: new SyncableMap<string, CanvasInpaintMaskAdapter>(),
-    getAll: (): (
-      | CanvasRasterLayerAdapter
-      | CanvasControlLayerAdapter
-      | CanvasRegionalGuidanceAdapter
-      | CanvasInpaintMaskAdapter
-    )[] => {
-      return [
-        ...this.adapters.rasterLayers.values(),
-        ...this.adapters.controlLayers.values(),
-        ...this.adapters.regionMasks.values(),
-        ...this.adapters.inpaintMasks.values(),
-      ];
-    },
+    rasterLayers: new SyncableMap<string, CanvasEntityAdapterRasterLayer>(),
+    controlLayers: new SyncableMap<string, CanvasEntityAdapterControlLayer>(),
+    regionMasks: new SyncableMap<string, CanvasEntityAdapterRegionalGuidance>(),
+    inpaintMasks: new SyncableMap<string, CanvasEntityAdapterInpaintMask>(),
   };
 
   stateApi: CanvasStateApiModule;
@@ -137,6 +132,53 @@ export class CanvasManager extends CanvasModuleBase {
     });
   }
 
+  deleteAdapter = (entityIdentifier: CanvasEntityIdentifier): boolean => {
+    switch (entityIdentifier.type) {
+      case 'raster_layer':
+        return this.adapters.rasterLayers.delete(entityIdentifier.id);
+      case 'control_layer':
+        return this.adapters.controlLayers.delete(entityIdentifier.id);
+      case 'regional_guidance':
+        return this.adapters.regionMasks.delete(entityIdentifier.id);
+      case 'inpaint_mask':
+        return this.adapters.inpaintMasks.delete(entityIdentifier.id);
+      default:
+        return false;
+    }
+  };
+
+  getAllAdapters = (): (
+    | CanvasEntityAdapterRasterLayer
+    | CanvasEntityAdapterControlLayer
+    | CanvasEntityAdapterRegionalGuidance
+    | CanvasEntityAdapterInpaintMask
+  )[] => {
+    return [
+      ...this.adapters.rasterLayers.values(),
+      ...this.adapters.controlLayers.values(),
+      ...this.adapters.regionMasks.values(),
+      ...this.adapters.inpaintMasks.values(),
+    ];
+  };
+
+  createAdapter = (entityIdentifier: CanvasEntityIdentifier): void => {
+    if (isRasterLayerEntityIdentifier(entityIdentifier)) {
+      const adapter = new CanvasEntityAdapterRasterLayer(entityIdentifier, this);
+      this.adapters.rasterLayers.set(adapter.id, adapter);
+    } else if (isControlLayerEntityIdentifier(entityIdentifier)) {
+      const adapter = new CanvasEntityAdapterControlLayer(entityIdentifier, this);
+      this.adapters.controlLayers.set(adapter.id, adapter);
+    } else if (isRegionalGuidanceEntityIdentifier(entityIdentifier)) {
+      const adapter = new CanvasEntityAdapterRegionalGuidance(entityIdentifier, this);
+      this.adapters.regionMasks.set(adapter.id, adapter);
+    } else if (isInpaintMaskEntityIdentifier(entityIdentifier)) {
+      const adapter = new CanvasEntityAdapterInpaintMask(entityIdentifier, this);
+      this.adapters.inpaintMasks.set(adapter.id, adapter);
+    } else {
+      assert(false, 'Unhandled entity type');
+    }
+  };
+
   enableDebugging() {
     this._isDebugging = true;
     this.logDebugInfo();
@@ -163,7 +205,7 @@ export class CanvasManager extends CanvasModuleBase {
   destroy = () => {
     this.log.debug('Destroying module');
 
-    for (const adapter of this.adapters.getAll()) {
+    for (const adapter of this.getAllAdapters()) {
       adapter.destroy();
     }
 

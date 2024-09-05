@@ -116,7 +116,7 @@ export class CanvasStageModule extends CanvasModuleBase {
   getVisibleRect = (type?: Exclude<CanvasEntityIdentifier['type'], 'ip_adapter'>): Rect => {
     const rects = [];
 
-    for (const adapter of this.manager.adapters.getAll()) {
+    for (const adapter of this.manager.getAllAdapters()) {
       if (!adapter.state.isEnabled) {
         continue;
       }
@@ -322,6 +322,7 @@ export class CanvasStageModule extends CanvasModuleBase {
   destroy = () => {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
     this.konva.stage.destroy();
   };
 }
