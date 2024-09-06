@@ -16,10 +16,10 @@ type UseGetAndLoadEmbeddedWorkflowReturn = {
 };
 
 type UseGetAndLoadEmbeddedWorkflow = (
-  options: UseGetAndLoadEmbeddedWorkflowOptions
+  options?: UseGetAndLoadEmbeddedWorkflowOptions
 ) => UseGetAndLoadEmbeddedWorkflowReturn;
 
-export const useGetAndLoadEmbeddedWorkflow: UseGetAndLoadEmbeddedWorkflow = ({ onSuccess, onError }) => {
+export const useGetAndLoadEmbeddedWorkflow: UseGetAndLoadEmbeddedWorkflow = (options) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const [_getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult] = useLazyGetImageWorkflowQuery();
@@ -30,7 +30,7 @@ export const useGetAndLoadEmbeddedWorkflow: UseGetAndLoadEmbeddedWorkflow = ({ o
         if (data) {
           dispatch(workflowLoadRequested({ data, asCopy: true }));
           // No toast - the listener for this action does that after the workflow is loaded
-          onSuccess && onSuccess();
+          options?.onSuccess && options?.onSuccess();
         } else {
           toast({
             id: 'PROBLEM_RETRIEVING_WORKFLOW',
@@ -44,10 +44,10 @@ export const useGetAndLoadEmbeddedWorkflow: UseGetAndLoadEmbeddedWorkflow = ({ o
           title: t('toast.problemRetrievingWorkflow'),
           status: 'error',
         });
-        onError && onError();
+        options?.onError && options?.onError();
       }
     },
-    [_getAndLoadEmbeddedWorkflow, dispatch, onSuccess, t, onError]
+    [_getAndLoadEmbeddedWorkflow, dispatch, options, t]
   );
 
   return { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult };
