@@ -6,11 +6,11 @@ import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { HrfSettings } from 'features/hrf/components/HrfSettings';
 import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
-import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
-import ParamScaledHeight from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledHeight';
-import ParamScaledWidth from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledWidth';
+import BboxScaledHeight from 'features/parameters/components/Bbox/BboxScaledHeight';
+import BboxScaledWidth from 'features/parameters/components/Bbox/BboxScaledWidth';
+import BboxScaleMethod from 'features/parameters/components/Bbox/BboxScaleMethod';
+import { BboxSettings } from 'features/parameters/components/Bbox/BboxSettings';
 import ParamImageToImageStrength from 'features/parameters/components/Canvas/ParamImageToImageStrength';
-import { DocumentSize } from 'features/parameters/components/DocumentSize/DocumentSize';
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
@@ -73,7 +73,7 @@ export const ImageSettingsAccordion = memo(() => {
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
         <Flex flexDir="column" gap={4}>
-          <DocumentSize />
+          <BboxSettings />
           <ParamImageToImageStrength />
         </Flex>
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
@@ -84,10 +84,10 @@ export const ImageSettingsAccordion = memo(() => {
               <ParamSeedRandomize />
             </Flex>
             {!isSDXL && <HrfSettings />}
-            <ParamScaleBeforeProcessing />
+            <BboxScaleMethod />
             <FormControlGroup formLabelProps={scalingLabelProps}>
-              <ParamScaledWidth />
-              <ParamScaledHeight />
+              <BboxScaledWidth />
+              <BboxScaledHeight />
             </FormControlGroup>
           </Flex>
         </Expander>

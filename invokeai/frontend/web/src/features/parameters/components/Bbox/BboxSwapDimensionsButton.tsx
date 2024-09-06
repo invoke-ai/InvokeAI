@@ -5,7 +5,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsDownUpBold } from 'react-icons/pi';
 
-export const SwapDimensionsButton = memo(() => {
+export const BboxSwapDimensionsButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
@@ -23,4 +23,4 @@ export const SwapDimensionsButton = memo(() => {
   );
 });
 
-SwapDimensionsButton.displayName = 'SwapDimensionsButton';
+BboxSwapDimensionsButton.displayName = 'BboxSwapDimensionsButton';

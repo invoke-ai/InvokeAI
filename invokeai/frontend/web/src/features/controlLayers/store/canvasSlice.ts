@@ -21,9 +21,9 @@ import type {
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
-import { ASPECT_RATIO_MAP, initialAspectRatioState } from 'features/parameters/components/DocumentSize/constants';
-import type { AspectRatioID } from 'features/parameters/components/DocumentSize/types';
+import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
+import { ASPECT_RATIO_MAP, initialAspectRatioState } from 'features/parameters/components/Bbox/constants';
+import type { AspectRatioID } from 'features/parameters/components/Bbox/types';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import { isEqual, merge, omit } from 'lodash-es';

@@ -13,7 +13,7 @@ import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, refinerModelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
-import { calculateNewSize } from 'features/parameters/components/DocumentSize/calculateNewSize';
+import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';

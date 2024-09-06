@@ -230,3 +230,8 @@ export const getIsHiddenSelector = (type: CanvasEntityType) => {
       assert(false, 'Unhandled entity type');
   }
 };
+
+export const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);
+export const selectHeight = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.height);
+export const selectAspectRatioID = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.id);
+export const selectAspectRatioValue = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.value);

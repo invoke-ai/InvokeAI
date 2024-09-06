@@ -9,7 +9,7 @@ import { PiLockSimpleFill, PiLockSimpleOpenBold } from 'react-icons/pi';
 
 const selectAspectRatioIsLocked = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.isLocked);
 
-export const LockAspectRatioButton = memo(() => {
+export const BboxLockAspectRatioButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isLocked = useAppSelector(selectAspectRatioIsLocked);
@@ -29,4 +29,4 @@ export const LockAspectRatioButton = memo(() => {
   );
 });
 
-LockAspectRatioButton.displayName = 'LockAspectRatioButton';
+BboxLockAspectRatioButton.displayName = 'BboxLockAspectRatioButton';
