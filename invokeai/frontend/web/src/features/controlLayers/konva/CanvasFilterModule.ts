@@ -70,7 +70,7 @@ export class CanvasFilterModule extends CanvasModuleBase {
     const config = this.$config.get();
     this.log.trace({ config }, 'Previewing filter');
     const rect = adapter.transformer.getRelativeRect();
-    const imageDTO = await adapter.renderer.rasterize({ rect });
+    const imageDTO = await adapter.renderer.rasterize({ rect, attrs: { filters: [] } });
     const nodeId = getPrefixedId('filter_node');
     const batch = this.buildBatchConfig(imageDTO, config, nodeId);
 
