@@ -1,5 +1,4 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
-import { EntityListSelectedEntityActionBarDeleteButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarDeleteButton';
 import { EntityListSelectedEntityActionBarDuplicateButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarDuplicateButton';
 import { EntityListSelectedEntityActionBarFill } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFill';
 import { EntityListSelectedEntityActionBarFilterButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFilterButton';
@@ -17,7 +16,6 @@ export const EntityListSelectedEntityActionBar = memo(() => {
         <EntityListSelectedEntityActionBarFilterButton />
         <EntityListSelectedEntityActionBarTransformButton />
         <EntityListSelectedEntityActionBarDuplicateButton />
-        <EntityListSelectedEntityActionBarDeleteButton />
       </Flex>
     </Flex>
   );
