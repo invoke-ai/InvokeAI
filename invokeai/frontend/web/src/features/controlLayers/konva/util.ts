@@ -304,8 +304,24 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
   });
 };
 
-export const konvaNodeToCanvas = (node: Konva.Node, bbox?: Rect): HTMLCanvasElement => {
-  return node.toCanvas({ ...(bbox ?? {}) });
+export const konvaNodeToCanvas = (arg: { node: Konva.Node; rect?: Rect; bg?: string }): HTMLCanvasElement => {
+  const { node, rect, bg } = arg;
+  const canvas = node.toCanvas({ ...(rect ?? {}) });
+
+  if (!bg) {
+    return canvas;
+  }
+
+  // We need to draw the canvas onto a new canvas with the specified background color
+  const bgCanvas = document.createElement('canvas');
+  bgCanvas.width = canvas.width;
+  bgCanvas.height = canvas.height;
+  const bgCtx = bgCanvas.getContext('2d');
+  assert(bgCtx !== null, 'bgCtx is null');
+  bgCtx.fillStyle = bg;
+  bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+  bgCtx.drawImage(canvas, 0, 0);
+  return bgCanvas;
 };
 
 /**
@@ -335,22 +351,24 @@ export const canvasToImageData = (canvas: HTMLCanvasElement): ImageData => {
 /**
  * Converts a Konva node to an ImageData object
  * @param node - The Konva node to convert to an ImageData object
- * @param bbox - The bounding box to crop to
+ * @param rect - The bounding box to crop to
  * @returns A Promise that resolves with ImageData object of the node cropped to the bounding box
  */
-export const konvaNodeToImageData = (node: Konva.Node, bbox?: Rect): ImageData => {
-  const canvas = konvaNodeToCanvas(node, bbox);
+export const konvaNodeToImageData = (arg: { node: Konva.Node; rect?: Rect; bg?: string }): ImageData => {
+  const { node, rect, bg } = arg;
+  const canvas = konvaNodeToCanvas({ node, rect, bg });
   return canvasToImageData(canvas);
 };
 
 /**
  * Converts a Konva node to a Blob
  * @param node - The Konva node to convert to a Blob
- * @param bbox - The bounding box to crop to
+ * @param rect - The bounding box to crop to
  * @returns A Promise that resolves to the Blob or null,
  */
-export const konvaNodeToBlob = (node: Konva.Node, bbox?: Rect): Promise<Blob> => {
-  const canvas = konvaNodeToCanvas(node, bbox);
+export const konvaNodeToBlob = (arg: { node: Konva.Node; rect?: Rect; bg?: string }): Promise<Blob> => {
+  const { node, rect, bg } = arg;
+  const canvas = konvaNodeToCanvas({ node, rect, bg });
   return canvasToBlob(canvas);
 };
 
