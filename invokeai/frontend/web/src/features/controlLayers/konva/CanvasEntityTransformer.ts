@@ -172,8 +172,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
         rotateEnabled: true,
         // When dragging a transform anchor across either the x or y axis, the nodes will be flipped across the axis
         flipEnabled: true,
-        // Transforming will retain aspect ratio only when shift is held
-        keepRatio: false,
+        // Transforming will allow free aspect ratio only when shift is held
+        keepRatio: true,
+        shiftBehavior: 'inverted',
         // The padding is the distance between the transformer bbox and the nodes
         padding: this.config.OUTLINE_PADDING,
         // This is `invokeBlue.400`
