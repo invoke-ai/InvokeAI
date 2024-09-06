@@ -705,7 +705,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     }
 
     // We have eraser strokes - we must calculate the bbox using pixel data
-    const canvas = this.parent.renderer.getCanvas({ attrs: { opacity: 1 } });
+    const canvas = this.parent.renderer.getCanvas({ attrs: { opacity: 1, filters: [] } });
     const imageData = canvasToImageData(canvas);
     this.manager.worker.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
