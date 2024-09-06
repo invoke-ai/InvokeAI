@@ -2,25 +2,25 @@ import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types'
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const useEntityTypeString = (type: CanvasEntityIdentifier['type']): string => {
+export const useEntityTypeString = (type: CanvasEntityIdentifier['type'], plural: boolean = false): string => {
   const { t } = useTranslation();
 
   const typeString = useMemo(() => {
     switch (type) {
       case 'control_layer':
-        return t('controlLayers.controlLayer');
+        return plural ? t('controlLayers.controlLayer_withCount_other') : t('controlLayers.controlLayer');
       case 'raster_layer':
-        return t('controlLayers.rasterLayer');
+        return plural ? t('controlLayers.rasterLayer_withCount_other') : t('controlLayers.rasterLayer');
       case 'inpaint_mask':
-        return t('controlLayers.inpaintMask');
+        return plural ? t('controlLayers.inpaintMask_withCount_other') : t('controlLayers.inpaintMask');
       case 'regional_guidance':
-        return t('controlLayers.regionalGuidance');
+        return plural ? t('controlLayers.regionalGuidance_withCount_other') : t('controlLayers.regionalGuidance');
       case 'ip_adapter':
-        return t('controlLayers.globalIPAdapter');
+        return plural ? t('controlLayers.globalIPAdapter_withCount_other') : t('controlLayers.globalIPAdapter');
       default:
         return '';
     }
-  }, [type, t]);
+  }, [type, plural, t]);
 
   return typeString;
 };
