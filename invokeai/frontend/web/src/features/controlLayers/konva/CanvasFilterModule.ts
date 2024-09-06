@@ -46,7 +46,7 @@ export class CanvasFilterModule extends CanvasModuleBase {
     this.log.debug('Creating filter module');
   }
 
-  startFilter = (entityIdentifier: CanvasEntityIdentifier) => {
+  startFilter = (entityIdentifier: CanvasEntityIdentifier<'raster_layer' | 'control_layer'>) => {
     this.log.trace('Initializing filter');
     const adapter = this.manager.getAdapter(entityIdentifier);
     if (!adapter) {

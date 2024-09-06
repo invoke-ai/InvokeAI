@@ -12,7 +12,7 @@ type Props = {
   onChange: (v: number) => void;
 };
 
-const ImageToImageStrength = ({ value, onChange }: Props) => {
+export const DenoisingStrength = memo(({ value, onChange }: Props) => {
   const config = useAppSelector(selectImg2imgStrengthConfig);
   const { t } = useTranslation();
 
@@ -42,6 +42,6 @@ const ImageToImageStrength = ({ value, onChange }: Props) => {
       />
     </FormControl>
   );
-};
+});
 
-export default memo(ImageToImageStrength);
+DenoisingStrength.displayName = 'DenoisingStrength';

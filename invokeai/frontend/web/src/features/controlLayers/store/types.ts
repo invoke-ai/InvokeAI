@@ -778,7 +778,7 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
-function isDrawableEntityType(
+export function isRenderableEntityType(
   entityType: CanvasEntityState['type']
 ): entityType is CanvasRenderableEntityState['type'] {
   return (
@@ -813,8 +813,29 @@ export function isRegionalGuidanceEntityIdentifier(
   return entityIdentifier.type === 'regional_guidance';
 }
 
+export function isFilterableEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> | CanvasEntityIdentifier<'control_layer'> {
+  return isRasterLayerEntityIdentifier(entityIdentifier) || isControlLayerEntityIdentifier(entityIdentifier);
+}
+
+export function isTransformableEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is
+  | CanvasEntityIdentifier<'raster_layer'>
+  | CanvasEntityIdentifier<'control_layer'>
+  | CanvasEntityIdentifier<'inpaint_mask'>
+  | CanvasEntityIdentifier<'regional_guidance'> {
+  return (
+    isRasterLayerEntityIdentifier(entityIdentifier) ||
+    isControlLayerEntityIdentifier(entityIdentifier) ||
+    isInpaintMaskEntityIdentifier(entityIdentifier) ||
+    isRegionalGuidanceEntityIdentifier(entityIdentifier)
+  );
+}
+
 export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {
-  return isDrawableEntityType(entity.type);
+  return isRenderableEntityType(entity.type);
 }
 
 export const getEntityIdentifier = <T extends CanvasEntityType>(

@@ -1,6 +1,6 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectImg2imgStrength, setImg2imgStrength } from 'features/controlLayers/store/paramsSlice';
-import ImageToImageStrength from 'features/parameters/components/ImageToImage/ImageToImageStrength';
+import { DenoisingStrength } from 'features/parameters/components/ImageToImage/ImageToImageStrength';
 import { memo, useCallback } from 'react';
 
 const ParamImageToImageStrength = () => {
@@ -14,7 +14,7 @@ const ParamImageToImageStrength = () => {
     [dispatch]
   );
 
-  return <ImageToImageStrength value={img2imgStrength} onChange={onChange} />;
+  return <DenoisingStrength value={img2imgStrength} onChange={onChange} />;
 };
 
 export default memo(ParamImageToImageStrength);

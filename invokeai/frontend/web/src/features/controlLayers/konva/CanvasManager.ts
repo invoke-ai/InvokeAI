@@ -20,8 +20,8 @@ import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStag
 import { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import {
-  type CanvasEntityIdentifier,
   isControlLayerEntityIdentifier,
   isInpaintMaskEntityIdentifier,
   isRasterLayerEntityIdentifier,
@@ -133,16 +133,38 @@ export class CanvasManager extends CanvasModuleBase {
     });
   }
 
-  getAdapter = (entityIdentifier: CanvasEntityIdentifier): CanvasEntityAdapter | null => {
+  getAdapter = <T extends CanvasEntityType = CanvasEntityType>(
+    entityIdentifier: CanvasEntityIdentifier<T>
+  ): Extract<CanvasEntityAdapter, { state: { type: T } }> | null => {
     switch (entityIdentifier.type) {
       case 'raster_layer':
-        return this.adapters.rasterLayers.get(entityIdentifier.id) ?? null;
+        return (
+          (this.adapters.rasterLayers.get(entityIdentifier.id) as Extract<
+            CanvasEntityAdapter,
+            { state: { type: T } }
+          >) ?? null
+        );
       case 'control_layer':
-        return this.adapters.controlLayers.get(entityIdentifier.id) ?? null;
+        return (
+          (this.adapters.controlLayers.get(entityIdentifier.id) as Extract<
+            CanvasEntityAdapter,
+            { state: { type: T } }
+          >) ?? null
+        );
       case 'regional_guidance':
-        return this.adapters.regionMasks.get(entityIdentifier.id) ?? null;
+        return (
+          (this.adapters.regionMasks.get(entityIdentifier.id) as Extract<
+            CanvasEntityAdapter,
+            { state: { type: T } }
+          >) ?? null
+        );
       case 'inpaint_mask':
-        return this.adapters.inpaintMasks.get(entityIdentifier.id) ?? null;
+        return (
+          (this.adapters.inpaintMasks.get(entityIdentifier.id) as Extract<
+            CanvasEntityAdapter,
+            { state: { type: T } }
+          >) ?? null
+        );
       default:
         return null;
     }

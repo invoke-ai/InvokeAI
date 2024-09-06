@@ -9,7 +9,7 @@ import { type FillStyle, isMaskEntityIdentifier, type RgbColor } from 'features/
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const EntityListActionBarSelectedEntityFill = memo(() => {
+export const EntityListSelectedEntityActionBarFill = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
@@ -67,4 +67,4 @@ export const EntityListActionBarSelectedEntityFill = memo(() => {
   );
 });
 
-EntityListActionBarSelectedEntityFill.displayName = 'EntityListActionBarSelectedEntityFill';
+EntityListSelectedEntityActionBarFill.displayName = 'EntityListSelectedEntityActionBarFill';
