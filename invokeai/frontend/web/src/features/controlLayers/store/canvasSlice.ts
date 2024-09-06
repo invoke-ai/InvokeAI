@@ -1147,7 +1147,7 @@ export const {
   entityArrangedBackwardOne,
   entityArrangedToBack,
   entityOpacityChanged,
-  allEntitiesDeleted,
+  // allEntitiesDeleted, // currently unused
   allEntitiesOfTypeIsHiddenToggled,
   // bbox
   bboxChanged,

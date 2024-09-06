@@ -29,7 +29,7 @@ export const selectCanvasSlice = (state: RootState) => state.canvas.present;
  *
  * It does not check for validity of the entities.
  */
-export const selectEntityCount = createSelector(selectCanvasSlice, (canvas) => {
+const selectEntityCount = createSelector(selectCanvasSlice, (canvas) => {
   return (
     canvas.regions.entities.length +
     canvas.ipAdapters.entities.length +
