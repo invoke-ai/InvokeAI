@@ -1104,7 +1104,7 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/queue/{queue_id}/cancel_by_origin": {
+    "/api/v1/queue/{queue_id}/cancel_by_destination": {
         parameters: {
             query?: never;
             header?: never;
@@ -1113,10 +1113,10 @@ export type paths = {
         };
         get?: never;
         /**
-         * Cancel By Origin
+         * Cancel By Destination
          * @description Immediately cancels all queue items with the given origin
          */
-        put: operations["cancel_by_origin"];
+        put: operations["cancel_by_destination"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3052,10 +3052,10 @@ export type components = {
             canceled: number;
         };
         /**
-         * CancelByOriginResult
-         * @description Result of canceling by list of batch ids
+         * CancelByDestinationResult
+         * @description Result of canceling by a destination
          */
-        CancelByOriginResult: {
+        CancelByDestinationResult: {
             /**
              * Canceled
              * @description Number of queue items canceled
@@ -18561,11 +18561,11 @@ export interface operations {
             };
         };
     };
-    cancel_by_origin: {
+    cancel_by_destination: {
         parameters: {
             query: {
-                /** @description The origin to cancel all queue items for */
-                origin: string;
+                /** @description The destination to cancel all queue items for */
+                destination: string;
             };
             header?: never;
             path: {
