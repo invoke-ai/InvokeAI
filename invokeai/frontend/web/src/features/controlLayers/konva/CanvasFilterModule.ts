@@ -163,9 +163,8 @@ export class CanvasFilterModule extends CanvasModuleBase {
           nodes: {
             [node.id]: {
               ...node,
-              // Control images are always intermediate - do not save to gallery
-              // is_intermediate: true,
-              is_intermediate: false, // false for testing
+              // filtered images are always intermediate - do not save to gallery
+              is_intermediate: true,
             },
           },
           edges: [],
