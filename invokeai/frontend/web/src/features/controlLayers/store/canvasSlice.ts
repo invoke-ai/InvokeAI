@@ -1078,16 +1078,18 @@ export const canvasSlice = createSlice({
       state.selectedEntityIdentifier = deepClone(initialState.selectedEntityIdentifier);
     },
     canvasReset: (state) => {
-      // We need to keep the bbox state that is dependent on the model/optimal dimension
-      const { width, height } = state.bbox.rect;
-      const optimalDimension = state.bbox.optimalDimension;
-      const scaledSize = getScaledBoundingBoxDimensions({ width, height }, optimalDimension);
       const newState = deepClone(initialState);
-      const rect = calculateNewSize(newState.bbox.aspectRatio.value, optimalDimension * optimalDimension);
+
+      // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
+      // from the old state, then recalculate the bbox size & scaled size.
+      newState.bbox.optimalDimension = state.bbox.optimalDimension;
+      const rect = calculateNewSize(
+        newState.bbox.aspectRatio.value,
+        newState.bbox.optimalDimension * newState.bbox.optimalDimension
+      );
       newState.bbox.rect.width = rect.width;
       newState.bbox.rect.height = rect.height;
-      newState.bbox.optimalDimension = optimalDimension;
-      newState.bbox.scaledSize = scaledSize;
+      syncScaledSize(newState);
 
       return newState;
     },
