@@ -1,10 +1,11 @@
+import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import {
   sessionStagingAreaImageAccepted,
   sessionStagingAreaReset,
 } from 'features/controlLayers/store/canvasSessionSlice';
-import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
+import { canvasReset, rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -16,14 +17,16 @@ import { assert } from 'tsafe';
 
 const log = logger('canvas');
 
+const matchCanvasOrStagingAreaRest = isAnyOf(sessionStagingAreaReset, canvasReset);
+
 export const addStagingListeners = (startAppListening: AppStartListening) => {
   startAppListening({
-    actionCreator: sessionStagingAreaReset,
+    matcher: matchCanvasOrStagingAreaRest,
     effect: async (_, { dispatch }) => {
       try {
         const req = dispatch(
-          queueApi.endpoints.cancelByBatchOrigin.initiate(
-            { origin: 'canvas' },
+          queueApi.endpoints.cancelByBatchDestination.initiate(
+            { destination: 'canvas' },
             { fixedCacheKey: 'cancelByBatchOrigin' }
           )
         );
