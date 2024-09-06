@@ -55,7 +55,7 @@ import {
 } from 'features/nodes/types/field';
 import type { AnyNode, InvocationNodeEdge } from 'features/nodes/types/invocation';
 import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
-import { atom } from 'nanostores';
+import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
 import type { Edge, EdgeChange, NodeChange, Viewport, XYPosition } from 'reactflow';
 import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, getOutgoers } from 'reactflow';
@@ -435,6 +435,7 @@ export const {
 
 export const $cursorPos = atom<XYPosition | null>(null);
 export const $templates = atom<Templates>({});
+export const $hasTemplates = computed($templates, (templates) => Object.keys(templates).length > 0);
 export const $copiedNodes = atom<AnyNode[]>([]);
 export const $copiedEdges = atom<InvocationNodeEdge[]>([]);
 export const $edgesToCopiedNodes = atom<InvocationNodeEdge[]>([]);

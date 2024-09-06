@@ -9,14 +9,12 @@ import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteIm
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
-import { sentImageToImg2Img } from 'features/gallery/store/actions';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { size } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
@@ -65,14 +63,6 @@ const CurrentImageButtons = () => {
   const handleUseSize = useCallback(() => {
     parseAndRecallImageDimensions(lastSelectedImage);
   }, [lastSelectedImage]);
-  const handleSendToImageToImage = useCallback(() => {
-    if (!imageDTO) {
-      return;
-    }
-    // TODO(psyche): restore send to img2img functionality
-    dispatch(sentImageToImg2Img());
-    dispatch(setActiveTab('generation'));
-  }, [dispatch, imageDTO]);
   const handleClickUpscale = useCallback(() => {
     if (!imageDTO) {
       return;
@@ -93,9 +83,8 @@ const CurrentImageButtons = () => {
   useHotkeys('p', recallPrompts, { enabled: isImageViewerActive }, [recallPrompts, isImageViewerActive]);
   useHotkeys('r', remix, { enabled: isImageViewerActive }, [remix, isImageViewerActive]);
   useHotkeys('d', handleUseSize, { enabled: isImageViewerActive }, [handleUseSize, isImageViewerActive]);
-  useHotkeys('shift+i', handleSendToImageToImage, { enabled: isImageViewerActive }, [imageDTO, isImageViewerActive]);
   useHotkeys(
-    'Shift+U',
+    'shift+u',
     handleClickUpscale,
     { enabled: Boolean(isUpscalingEnabled && isImageViewerActive && isConnected) },
     [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected, isImageViewerActive]
