@@ -17,7 +17,7 @@ export const addControlNets = async (
   manager: CanvasManager,
   layers: CanvasControlLayerState[],
   g: Graph,
-  bbox: Rect,
+  rect: Rect,
   collector: Invocation<'collect'>,
   base: BaseModelType
 ): Promise<AddControlNetsResult> => {
@@ -35,7 +35,7 @@ export const addControlNets = async (
 
     const adapter = manager.adapters.controlLayers.get(layer.id);
     assert(adapter, 'Adapter not found');
-    const imageDTO = await adapter.renderer.rasterize({ rect: bbox, attrs: { opacity: 1, filters: [] } });
+    const imageDTO = await adapter.renderer.rasterize({ rect, attrs: { opacity: 1, filters: [] }, bg: 'black' });
     addControlNetToGraph(g, layer, imageDTO, collector);
   }
 
@@ -50,7 +50,7 @@ export const addT2IAdapters = async (
   manager: CanvasManager,
   layers: CanvasControlLayerState[],
   g: Graph,
-  bbox: Rect,
+  rect: Rect,
   collector: Invocation<'collect'>,
   base: BaseModelType
 ): Promise<AddT2IAdaptersResult> => {
@@ -68,7 +68,7 @@ export const addT2IAdapters = async (
 
     const adapter = manager.adapters.controlLayers.get(layer.id);
     assert(adapter, 'Adapter not found');
-    const imageDTO = await adapter.renderer.rasterize({ rect: bbox, attrs: { opacity: 1, filters: [] } });
+    const imageDTO = await adapter.renderer.rasterize({ rect, attrs: { opacity: 1, filters: [], bg: 'black' } });
     addT2IAdapterToGraph(g, layer, imageDTO, collector);
   }
 

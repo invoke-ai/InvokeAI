@@ -74,7 +74,7 @@ export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<Canv
     // The opacity may have been changed in response to user selecting a different entity category, and the mask regions
     // should be fully opaque - set opacity to 1 before rendering the canvas
     const attrs: GroupConfig = { opacity: 1 };
-    const canvas = this.renderer.getCanvas(rect, attrs);
+    const canvas = this.renderer.getCanvas({ rect, attrs });
     return canvas;
   };
 }

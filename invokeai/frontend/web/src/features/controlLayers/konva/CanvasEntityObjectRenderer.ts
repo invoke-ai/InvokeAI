@@ -539,10 +539,16 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
    * @param rect The rect to rasterize. If omitted, the entity's full rect will be used.
    * @returns A promise that resolves to the rasterized image DTO.
    */
-  rasterize = async (options: { rect: Rect; replaceObjects?: boolean; attrs?: GroupConfig }): Promise<ImageDTO> => {
-    const { rect, replaceObjects, attrs } = { replaceObjects: false, attrs: {}, ...options };
+  rasterize = async (options: {
+    rect: Rect;
+    replaceObjects?: boolean;
+    attrs?: GroupConfig;
+    bg?: string;
+  }): Promise<ImageDTO> => {
+    const { rect, replaceObjects, attrs, bg } = { replaceObjects: false, attrs: {}, ...options };
     let imageDTO: ImageDTO | null = null;
-    const hash = this.parent.hash({ rect, attrs });
+    const rasterizeArgs = { rect, attrs, bg };
+    const hash = this.parent.hash(rasterizeArgs);
     const cachedImageName = this.manager.cache.imageNameCache.get(hash);
 
     if (cachedImageName) {
@@ -553,9 +559,9 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       }
     }
 
-    this.log.trace({ rect }, 'Rasterizing entity');
+    this.log.trace({ rasterizeArgs }, 'Rasterizing entity');
 
-    const blob = await this.getBlob(rect, attrs);
+    const blob = await this.getBlob(rasterizeArgs);
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Rasterized entity');
     }
@@ -608,32 +614,35 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     }
   }, 300);
 
-  cloneObjectGroup = (attrs?: GroupConfig): Konva.Group => {
+  cloneObjectGroup = (arg: { attrs?: GroupConfig } = {}): Konva.Group => {
+    const { attrs } = arg;
     const clone = this.konva.objectGroup.clone();
-    clone.cache();
     if (attrs) {
       clone.setAttrs(attrs);
     }
+    clone.cache();
     return clone;
   };
 
-  getCanvas = (rect?: Rect, attrs?: GroupConfig): HTMLCanvasElement => {
-    const clone = this.cloneObjectGroup(attrs);
-    const canvas = konvaNodeToCanvas(clone, rect);
+  getCanvas = (arg: { rect?: Rect; attrs?: GroupConfig; bg?: string } = {}): HTMLCanvasElement => {
+    const { rect, attrs, bg } = arg;
+    const clone = this.cloneObjectGroup({ attrs });
+    const canvas = konvaNodeToCanvas({ node: clone, rect, bg });
     clone.destroy();
     return canvas;
   };
 
-  getBlob = async (rect?: Rect, attrs?: GroupConfig): Promise<Blob> => {
-    const clone = this.cloneObjectGroup(attrs);
-    const blob = await konvaNodeToBlob(clone, rect);
-    clone.destroy();
+  getBlob = async (arg: { rect?: Rect; attrs?: GroupConfig; bg?: string } = {}): Promise<Blob> => {
+    const { rect, attrs, bg } = arg;
+    const clone = this.cloneObjectGroup({ attrs });
+    const blob = await konvaNodeToBlob({ node: clone, rect, bg });
     return blob;
   };
 
-  getImageData = (rect?: Rect, attrs?: GroupConfig): ImageData => {
-    const clone = this.cloneObjectGroup(attrs);
-    const imageData = konvaNodeToImageData(clone, rect);
+  getImageData = (arg: { rect?: Rect; attrs?: GroupConfig; bg?: string } = {}): ImageData => {
+    const { rect, attrs, bg } = arg;
+    const clone = this.cloneObjectGroup({ attrs });
+    const imageData = konvaNodeToImageData({ node: clone, rect, bg });
     clone.destroy();
     return imageData;
   };
