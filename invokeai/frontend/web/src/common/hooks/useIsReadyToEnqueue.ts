@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react';
 import { $isConnected } from 'app/hooks/useSocketIO';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
@@ -17,6 +18,7 @@ import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
+import { atom } from 'nanostores';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
 
@@ -28,7 +30,7 @@ const LAYER_TYPE_TO_TKEY = {
   control_layer: 'controlLayers.globalControlAdapter',
 } as const;
 
-const createSelector = (templates: Templates, isConnected: boolean) =>
+const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy: boolean) =>
   createMemoizedSelector(
     [
       selectSystemSlice,
@@ -117,6 +119,10 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
           reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
         }
       } else {
+        if (canvasIsBusy) {
+          reasons.push({ content: i18n.t('parameters.invoke.canvasBusy') });
+        }
+
         if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
           reasons.push({ content: i18n.t('parameters.invoke.noPrompts') });
         }
@@ -240,10 +246,17 @@ const createSelector = (templates: Templates, isConnected: boolean) =>
     }
   );
 
+const dummyAtom = atom(true);
+
 export const useIsReadyToEnqueue = () => {
   const templates = useStore($templates);
   const isConnected = useStore($isConnected);
-  const selector = useMemo(() => createSelector(templates, isConnected), [templates, isConnected]);
+  const canvasManager = useCanvasManagerSafe();
+  const canvasIsBusy = useStore(canvasManager?.$isBusy ?? dummyAtom);
+  const selector = useMemo(
+    () => createSelector(templates, isConnected, canvasIsBusy),
+    [templates, isConnected, canvasIsBusy]
+  );
   const value = useAppSelector(selector);
   return value;
 };
