@@ -687,6 +687,13 @@ export const canvasSlice = createSlice({
     },
     bboxChanged: (state, action: PayloadAction<IRect>) => {
       state.bbox.rect = action.payload;
+
+      if (!state.bbox.aspectRatio.isLocked) {
+        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+        state.bbox.aspectRatio.id = 'Free';
+        state.bbox.aspectRatio.isLocked = false;
+      }
+
       syncScaledSize(state);
     },
     bboxWidthChanged: (
