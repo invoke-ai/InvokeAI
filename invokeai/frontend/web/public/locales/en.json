@@ -1015,6 +1015,8 @@
             "noModelForControlAdapter": "Control Adapter #{{number}} has no model selected.",
             "incompatibleBaseModelForControlAdapter": "Control Adapter #{{number}} model is incompatible with main model.",
             "noModelSelected": "No model selected",
+            "canvasManagerNotLoaded": "Canvas Manager not loaded",
+            "canvasBusy": "Canvas is busy",
             "noPrompts": "No prompts generated",
             "noNodesInGraph": "No nodes in graph",
             "systemDisconnected": "System disconnected",
