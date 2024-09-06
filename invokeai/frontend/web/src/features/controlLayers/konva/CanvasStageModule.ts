@@ -100,10 +100,26 @@ export class CanvasStageModule extends CanvasModuleBase {
     });
   };
 
-  fitStageToContainer = () => {
+  /**
+   * Fits the stage to the container element.
+   */
+  fitStageToContainer = (): void => {
     this.log.trace('Fitting stage to container');
-    this.konva.stage.width(this.konva.stage.container().offsetWidth);
-    this.konva.stage.height(this.konva.stage.container().offsetHeight);
+    const containerWidth = this.konva.stage.container().offsetWidth;
+    const containerHeight = this.konva.stage.container().offsetHeight;
+
+    // If the container has no size, the following calculations will be reaallll funky and bork the stage
+    if (containerWidth === 0 || containerHeight === 0) {
+      return;
+    }
+
+    // If the stage _had_ no size just before this function was called, that means we've just mounted the stage or
+    // maybe un-hidden it. In that case, the user is about to see the stage for the first time, so we should fit the
+    // layers to the stage. If we don't do this, the layers will not be centered.
+    const shouldFitLayersAfterFittingStage = this.konva.stage.width() === 0 || this.konva.stage.height() === 0;
+
+    this.konva.stage.width(containerWidth);
+    this.konva.stage.height(containerHeight);
     this.$stageAttrs.set({
       x: this.konva.stage.x(),
       y: this.konva.stage.y(),
@@ -111,6 +127,10 @@ export class CanvasStageModule extends CanvasModuleBase {
       height: this.konva.stage.height(),
       scale: this.konva.stage.scaleX(),
     });
+
+    if (shouldFitLayersAfterFittingStage) {
+      this.fitLayersToStage();
+    }
   };
 
   getVisibleRect = (type?: Exclude<CanvasEntityIdentifier['type'], 'ip_adapter'>): Rect => {
@@ -129,13 +149,19 @@ export class CanvasStageModule extends CanvasModuleBase {
     return getRectUnion(...rects);
   };
 
-  fitBboxToStage = () => {
+  /**
+   * Fits the bbox to the stage. This will center the bbox and scale it to fit the stage with some padding.
+   */
+  fitBboxToStage = (): void => {
     const { rect } = this.manager.stateApi.getBbox();
     this.log.trace({ rect }, 'Fitting bbox to stage');
     this.fitRect(rect);
   };
 
-  fitLayersToStage() {
+  /**
+   * Fits the visible canvas to the stage. This will center the canvas and scale it to fit the stage with some padding.
+   */
+  fitLayersToStage = (): void => {
     const rect = this.getVisibleRect();
     if (rect.width === 0 || rect.height === 0) {
       this.fitBboxToStage();
@@ -143,17 +169,31 @@ export class CanvasStageModule extends CanvasModuleBase {
       this.log.trace({ rect }, 'Fitting layers to stage');
       this.fitRect(rect);
     }
-  }
+  };
 
-  fitRect = (rect: Rect) => {
+  /**
+   * Fits a rectangle to the stage. The rectangle will be centered and scaled to fit the stage with some padding.
+   *
+   * The max scale is 1, but the stage can be scaled down to fit the rect.
+   */
+  fitRect = (rect: Rect): void => {
     const { width, height } = this.getSize();
+
+    // If the stage has no size, we can't fit anything to it
+    if (width === 0 || height === 0) {
+      return;
+    }
 
     const padding = 20; // Padding in absolute pixels
 
     const availableWidth = width - padding * 2;
     const availableHeight = height - padding * 2;
 
-    const scale = Math.min(Math.min(availableWidth / rect.width, availableHeight / rect.height), 1);
+    // Make sure we don't accidentally set the scale to something nonsensical, like a negative number, 0 or something
+    // outside the valid range
+    const scale = this.constrainScale(
+      Math.min(Math.min(availableWidth / rect.width, availableHeight / rect.height), 1)
+    );
     const x = -rect.x * scale + padding + (availableWidth - rect.width * scale) / 2;
     const y = -rect.y * scale + padding + (availableHeight - rect.height * scale) / 2;
 
@@ -194,13 +234,20 @@ export class CanvasStageModule extends CanvasModuleBase {
   };
 
   /**
+   * Constrains a scale to be within the valid range
+   */
+  constrainScale = (scale: number): number => {
+    return clamp(Math.round(scale * 100) / 100, this.config.MIN_SCALE, this.config.MAX_SCALE);
+  };
+
+  /**
    * Sets the scale of the stage. If center is provided, the stage will zoom in/out on that point.
    * @param scale The new scale to set
    * @param center The center of the stage to zoom in/out on
    */
-  setScale = (scale: number, center: Coordinate = this.getCenter(true)) => {
+  setScale = (scale: number, center: Coordinate = this.getCenter(true)): void => {
     this.log.trace('Setting scale');
-    const newScale = clamp(Math.round(scale * 100) / 100, this.config.MIN_SCALE, this.config.MAX_SCALE);
+    const newScale = this.constrainScale(scale);
 
     const { x, y } = this.getPosition();
     const oldScale = this.getScale();
