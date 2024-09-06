@@ -346,10 +346,10 @@ class CancelByBatchIDsResult(BaseModel):
     canceled: int = Field(..., description="Number of queue items canceled")
 
 
-class CancelByOriginResult(BaseModel):
-    """Result of canceling by list of batch ids"""
+class CancelByDestinationResult(CancelByBatchIDsResult):
+    """Result of canceling by a destination"""
 
-    canceled: int = Field(..., description="Number of queue items canceled")
+    pass
 
 
 class CancelByQueueIDResult(CancelByBatchIDsResult):

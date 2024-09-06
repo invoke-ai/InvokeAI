@@ -10,7 +10,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     BatchStatus,
     CancelByBatchIDsResult,
-    CancelByOriginResult,
+    CancelByDestinationResult,
     CancelByQueueIDResult,
     ClearResult,
     EnqueueBatchResult,
@@ -426,19 +426,19 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.release()
         return CancelByBatchIDsResult(canceled=count)
 
-    def cancel_by_origin(self, queue_id: str, origin: str) -> CancelByOriginResult:
+    def cancel_by_destination(self, queue_id: str, destination: str) -> CancelByDestinationResult:
         try:
             current_queue_item = self.get_current(queue_id)
             self.__lock.acquire()
             where = """--sql
                 WHERE
                   queue_id == ?
-                  AND origin == ?
+                  AND destination == ?
                   AND status != 'canceled'
                   AND status != 'completed'
                   AND status != 'failed'
                 """
-            params = (queue_id, origin)
+            params = (queue_id, destination)
             self.__cursor.execute(
                 f"""--sql
                 SELECT COUNT(*)
@@ -457,14 +457,14 @@ class SqliteSessionQueue(SessionQueueBase):
                 params,
             )
             self.__conn.commit()
-            if current_queue_item is not None and current_queue_item.origin == origin:
+            if current_queue_item is not None and current_queue_item.destination == destination:
                 self._set_queue_item_status(current_queue_item.item_id, "canceled")
         except Exception:
             self.__conn.rollback()
             raise
         finally:
             self.__lock.release()
-        return CancelByOriginResult(canceled=count)
+        return CancelByDestinationResult(canceled=count)
 
     def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
         try:
