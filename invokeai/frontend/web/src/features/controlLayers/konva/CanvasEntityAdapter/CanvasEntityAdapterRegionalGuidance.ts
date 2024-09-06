@@ -16,8 +16,8 @@ export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase
   constructor(entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>, manager: CanvasManager) {
     super(entityIdentifier, manager, CanvasEntityAdapterRegionalGuidance.TYPE);
 
-    this.transformer = new CanvasEntityTransformer(this);
     this.renderer = new CanvasEntityObjectRenderer(this);
+    this.transformer = new CanvasEntityTransformer(this);
 
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectState, this.sync));
   }

@@ -16,8 +16,8 @@ export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<Canv
   constructor(entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>, manager: CanvasManager) {
     super(entityIdentifier, manager, CanvasEntityAdapterInpaintMask.TYPE);
 
-    this.transformer = new CanvasEntityTransformer(this);
     this.renderer = new CanvasEntityObjectRenderer(this);
+    this.transformer = new CanvasEntityTransformer(this);
 
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectState, this.sync));
   }
