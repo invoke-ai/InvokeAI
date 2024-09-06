@@ -17,7 +17,7 @@ export const CanvasEntityTypeIsHiddenToggle = memo(({ type }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isHidden = useEntityTypeIsHidden(type);
-  const typeString = useEntityTypeString(type);
+  const typeString = useEntityTypeString(type, true);
   const onClick = useCallback<MouseEventHandler>(
     (e) => {
       e.stopPropagation();
