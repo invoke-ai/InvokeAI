@@ -1,17 +1,13 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectOptimalDimension } from 'features/controlLayers/store/selectors';
-import { selectConfigSlice } from 'features/system/store/configSlice';
+import { selectOptimalDimension, selectWidth } from 'features/controlLayers/store/selectors';
+import { selectWidthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);
-const selectWidthConfig = createSelector(selectConfigSlice, (config) => config.sd.width);
-
-export const ParamWidth = memo(() => {
+export const BboxWidth = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const width = useAppSelector(selectWidth);
@@ -58,4 +54,4 @@ export const ParamWidth = memo(() => {
   );
 });
 
-ParamWidth.displayName = 'ParamWidth';
+BboxWidth.displayName = 'BboxWidth';

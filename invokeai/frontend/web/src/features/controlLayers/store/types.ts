@@ -1,7 +1,7 @@
 import type { SerializableObject } from 'common/types';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import type { AspectRatioState } from 'features/parameters/components/DocumentSize/types';
+import type { AspectRatioState } from 'features/parameters/components/Bbox/types';
 import type { ParameterHeight, ParameterLoRAModel, ParameterWidth } from 'features/parameters/types/parameterSchemas';
 import { zParameterNegativePrompt, zParameterPositivePrompt } from 'features/parameters/types/parameterSchemas';
 import type { AnyInvocation, BaseModelType, ImageDTO, S } from 'services/api/types';

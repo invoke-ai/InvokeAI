@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 const selectScaleMethod = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.scaleMethod);
 
-const ParamScaleBeforeProcessing = () => {
+const BboxScaleMethod = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const scaleMethod = useAppSelector(selectScaleMethod);
@@ -47,4 +47,4 @@ const ParamScaleBeforeProcessing = () => {
   );
 };
 
-export default memo(ParamScaleBeforeProcessing);
+export default memo(BboxScaleMethod);

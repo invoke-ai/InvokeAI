@@ -11,7 +11,7 @@ import { RiSparklingFill } from 'react-icons/ri';
 const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);
 const selectHeight = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.height);
 
-export const SetOptimalSizeButton = memo(() => {
+export const BboxSetOptimalSizeButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const width = useAppSelector(selectWidth);
@@ -51,4 +51,4 @@ export const SetOptimalSizeButton = memo(() => {
   );
 });
 
-SetOptimalSizeButton.displayName = 'SetOptimalSizeButton';
+BboxSetOptimalSizeButton.displayName = 'BboxSetOptimalSizeButton';

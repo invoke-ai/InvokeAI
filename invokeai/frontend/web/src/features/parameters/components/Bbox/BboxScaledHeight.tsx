@@ -14,7 +14,7 @@ const selectScaledBoundingBoxHeightConfig = createSelector(
   (config) => config.sd.scaledBoundingBoxHeight
 );
 
-const ParamScaledHeight = () => {
+const BboxScaledHeight = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const optimalDimension = useAppSelector(selectOptimalDimension);
@@ -55,4 +55,4 @@ const ParamScaledHeight = () => {
   );
 };
 
-export default memo(ParamScaledHeight);
+export default memo(BboxScaledHeight);
