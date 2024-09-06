@@ -1,9 +1,11 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { isOk, withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityTypeCount } from 'features/controlLayers/hooks/useEntityTypeCount';
+import { selectIsStaging } from 'features/controlLayers/store/canvasSessionSlice';
 import { inpaintMaskAdded, rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -23,6 +25,8 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const canvasManager = useCanvasManager();
+  const isStaging = useAppSelector(selectIsStaging);
+  const isBusy = useCanvasIsBusy();
   const entityCount = useEntityTypeCount(type);
   const onClick = useCallback(async () => {
     if (type === 'raster_layer') {
@@ -83,7 +87,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
       icon={<PiStackBold />}
       onClick={onClick}
       alignSelf="stretch"
-      isDisabled={entityCount <= 1}
+      isDisabled={entityCount <= 1 || isStaging || isBusy}
     />
   );
 });

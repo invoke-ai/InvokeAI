@@ -2,6 +2,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { selectIsStaging } from 'features/controlLayers/store/canvasSessionSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { isTransformableEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
@@ -12,7 +13,7 @@ export const EntityListSelectedEntityActionBarTransformButton = memo(() => {
   const { t } = useTranslation();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const canvasManager = useCanvasManager();
-
+  const isStaging = useAppSelector(selectIsStaging);
   const isBusy = useCanvasIsBusy();
 
   const onClick = useCallback(() => {
@@ -40,7 +41,7 @@ export const EntityListSelectedEntityActionBarTransformButton = memo(() => {
   return (
     <IconButton
       onClick={onClick}
-      isDisabled={isBusy}
+      isDisabled={isBusy || isStaging}
       size="sm"
       variant="link"
       alignSelf="stretch"
