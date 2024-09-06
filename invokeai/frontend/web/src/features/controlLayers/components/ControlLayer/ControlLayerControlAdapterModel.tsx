@@ -4,7 +4,12 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
-import { IMAGE_FILTERS, isFilterType } from 'features/controlLayers/store/types';
+import {
+  IMAGE_FILTERS,
+  isControlLayerEntityIdentifier,
+  isFilterType,
+  isRasterLayerEntityIdentifier,
+} from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useControlNetAndT2IAdapterModels } from 'services/api/hooks/modelsByType';
@@ -39,6 +44,11 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
 
       // Open the filter popup by setting this entity as the filtering entity
       if (!canvasManager.filter.$adapter.get()) {
+        // Can only filter raster and control layers
+        if (!isRasterLayerEntityIdentifier(entityIdentifier) && !isControlLayerEntityIdentifier(entityIdentifier)) {
+          return;
+        }
+
         // Update the filter, preferring the model's default
         if (isFilterType(modelConfig.default_settings?.preprocessor)) {
           canvasManager.filter.$config.set(
@@ -47,6 +57,7 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
         } else {
           canvasManager.filter.$config.set(IMAGE_FILTERS.canny_image_processor.buildDefaults(modelConfig.base));
         }
+
         canvasManager.filter.startFilter(entityIdentifier);
         canvasManager.filter.previewFilter();
       }

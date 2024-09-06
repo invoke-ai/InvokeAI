@@ -77,7 +77,7 @@ const selectOpacity = createSelector(selectCanvasSlice, (canvas) => {
   return selectedEntity.opacity;
 });
 
-export const SelectedEntityOpacity = memo(() => {
+export const EntityListSelectedEntityActionBarOpacity = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
@@ -193,4 +193,4 @@ export const SelectedEntityOpacity = memo(() => {
   );
 });
 
-SelectedEntityOpacity.displayName = 'SelectedEntityOpacity';
+EntityListSelectedEntityActionBarOpacity.displayName = 'EntityListSelectedEntityActionBarOpacity';
