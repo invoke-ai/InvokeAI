@@ -11,7 +11,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     BatchStatus,
     CancelByBatchIDsResult,
-    CancelByOriginResult,
+    CancelByDestinationResult,
     ClearResult,
     EnqueueBatchResult,
     PruneResult,
@@ -107,16 +107,18 @@ async def cancel_by_batch_ids(
 
 
 @session_queue_router.put(
-    "/{queue_id}/cancel_by_origin",
-    operation_id="cancel_by_origin",
+    "/{queue_id}/cancel_by_destination",
+    operation_id="cancel_by_destination",
     responses={200: {"model": CancelByBatchIDsResult}},
 )
-async def cancel_by_origin(
+async def cancel_by_destination(
     queue_id: str = Path(description="The queue id to perform this operation on"),
-    origin: str = Query(description="The origin to cancel all queue items for"),
-) -> CancelByOriginResult:
+    destination: str = Query(description="The destination to cancel all queue items for"),
+) -> CancelByDestinationResult:
     """Immediately cancels all queue items with the given origin"""
-    return ApiDependencies.invoker.services.session_queue.cancel_by_origin(queue_id=queue_id, origin=origin)
+    return ApiDependencies.invoker.services.session_queue.cancel_by_destination(
+        queue_id=queue_id, destination=destination
+    )
 
 
 @session_queue_router.put(
