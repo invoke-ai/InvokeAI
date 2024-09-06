@@ -1,4 +1,9 @@
-import { roundToMultiple, roundToMultipleMin } from 'common/util/roundDownToMultiple';
+import {
+  roundDownToMultiple,
+  roundToMultiple,
+  roundToMultipleMin,
+  roundUpToMultiple,
+} from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -293,6 +298,29 @@ export class CanvasBboxModule extends CanvasModuleBase {
       anchor.width(8);
       anchor.offsetX(4);
     }
+  };
+
+  fitToLayers = (): void => {
+    const visibleRect = this.manager.stage.getVisibleRect();
+
+    // Can't fit the bbox to nothing
+    if (visibleRect.height === 0 || visibleRect.width === 0) {
+      return;
+    }
+
+    // Determine the bbox size that fits within the visible rect. The bbox must be at least 64px in width and height,
+    // and its width and height must be multiples of 8px.
+    const gridSize = 8;
+
+    // To be conservative, we will round up the x and y to the nearest grid size, and round down the width and height.
+    // This ensures the bbox is never _larger_ than the visible rect. If the bbox is larger than the visible, we
+    // will always trigger the outpainting workflow, which is not what the user wants.
+    const x = roundUpToMultiple(visibleRect.x, gridSize);
+    const y = roundUpToMultiple(visibleRect.y, gridSize);
+    const width = roundDownToMultiple(visibleRect.width, gridSize);
+    const height = roundDownToMultiple(visibleRect.height, gridSize);
+
+    this.manager.stateApi.setGenerationBbox({ x, y, width, height });
   };
 
   /**
