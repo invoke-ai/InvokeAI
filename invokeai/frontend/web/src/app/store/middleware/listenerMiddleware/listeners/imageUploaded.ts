@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { ipaImageChanged, rgIPAdapterImageChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { boardIdSelected, galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
@@ -44,6 +45,8 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         if (!autoAddBoardId || autoAddBoardId === 'none') {
           const title = postUploadAction.title || DEFAULT_UPLOADED_TOAST.title;
           toast({ ...DEFAULT_UPLOADED_TOAST, title });
+          dispatch(boardIdSelected({ boardId: 'none' }));
+          dispatch(galleryViewChanged('assets'));
         } else {
           // Add this image to the board
           dispatch(
@@ -67,6 +70,8 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
             ...DEFAULT_UPLOADED_TOAST,
             description,
           });
+          dispatch(boardIdSelected({ boardId: autoAddBoardId }));
+          dispatch(galleryViewChanged('assets'));
         }
         return;
       }
