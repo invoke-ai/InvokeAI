@@ -1,6 +1,7 @@
 import { createAction, createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { canvasSlice } from 'features/controlLayers/store/canvasSlice';
+import { deepClone } from 'common/util/deepClone';
+import { canvasReset, canvasSlice } from 'features/controlLayers/store/canvasSlice';
 import type { StagingAreaImage } from 'features/controlLayers/store/types';
 
 type CanvasSessionState = {
@@ -49,6 +50,9 @@ export const canvasSessionSlice = createSlice({
       state.stagedImages = [];
       state.selectedStagedImageIndex = 0;
     },
+  },
+  extraReducers(builder) {
+    builder.addCase(canvasReset, () => deepClone(initialState));
   },
 });
 
