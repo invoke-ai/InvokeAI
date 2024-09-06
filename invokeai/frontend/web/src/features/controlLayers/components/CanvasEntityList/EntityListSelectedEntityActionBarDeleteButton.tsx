@@ -31,4 +31,4 @@ export const EntityListSelectedEntityActionBarDeleteButton = memo(() => {
   );
 });
 
-EntityListSelectedEntityActionBarDeleteButton.displayName = 'EntityListActionBarDeleteButton';
+EntityListSelectedEntityActionBarDeleteButton.displayName = 'EntityListSelectedEntityActionBarDeleteButton';
