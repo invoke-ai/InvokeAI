@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Flex, Heading } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { FilterSettings } from 'features/controlLayers/components/Filters/FilterSettings';
 import { FilterTypeSelect } from 'features/controlLayers/components/Filters/FilterTypeSelect';
@@ -51,7 +51,7 @@ export const Filter = memo(() => {
       </Heading>
       <FilterTypeSelect filterType={config.type} onChange={onChangeFilterType} />
       <FilterSettings filterConfig={config} onChange={onChangeFilterConfig} />
-      <ButtonGroup isAttached={false} size="sm" alignSelf="self-end">
+      <ButtonGroup isAttached={false} size="sm" w="full">
         <Button
           variant="ghost"
           leftIcon={<PiShootingStarBold />}
@@ -61,6 +61,7 @@ export const Filter = memo(() => {
         >
           {t('controlLayers.filter.preview')}
         </Button>
+        <Spacer />
         <Button
           variant="ghost"
           leftIcon={<PiCheckBold />}
