@@ -27,7 +27,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
 
   return (
     <Flex flexDir="column" w="full">
-      <Flex w="full">
+      <Flex w="full" px={1}>
         <Flex
           flexGrow={1}
           as={Button}
@@ -59,8 +59,8 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
           <Spacer />
         </Flex>
         {canMergeVisible && <CanvasEntityMergeVisibleButton type={type} />}
-        <CanvasEntityAddOfTypeButton type={type} />
         {canHideAll && <CanvasEntityTypeIsHiddenToggle type={type} />}
+        <CanvasEntityAddOfTypeButton type={type} />
       </Flex>
       <Collapse in={collapse.isTrue}>
         <Flex flexDir="column" gap={2} pt={2}>
