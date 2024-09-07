@@ -1,4 +1,4 @@
-import type { CanvasIPAdapterState, IPAdapterConfig } from 'features/controlLayers/store/types';
+import type { CanvasIPAdapterState } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -13,7 +13,7 @@ export const addIPAdapters = (
   collector: Invocation<'collect'>,
   base: BaseModelType
 ): AddIPAdaptersResult => {
-  const validIPAdapters = ipAdapters.filter((entity) => isValidIPAdapter(entity.ipAdapter, base));
+  const validIPAdapters = ipAdapters.filter((entity) => isValidIPAdapter(entity, base));
 
   const result: AddIPAdaptersResult = {
     addedIPAdapters: 0,
@@ -50,10 +50,10 @@ const addIPAdapter = (entity: CanvasIPAdapterState, g: Graph, collector: Invocat
   g.addEdge(ipAdapterNode, 'ip_adapter', collector, 'item');
 };
 
-export const isValidIPAdapter = (ipAdapter: IPAdapterConfig, base: BaseModelType): boolean => {
+const isValidIPAdapter = ({ isEnabled, ipAdapter }: CanvasIPAdapterState, base: BaseModelType): boolean => {
   // Must be have a model that matches the current base and must have a control image
   const hasModel = Boolean(ipAdapter.model);
   const modelMatchesBase = ipAdapter.model?.base === base;
   const hasImage = Boolean(ipAdapter.image);
-  return hasModel && modelMatchesBase && hasImage;
+  return isEnabled && hasModel && modelMatchesBase && hasImage;
 };
