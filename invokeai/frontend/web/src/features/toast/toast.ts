@@ -1,5 +1,6 @@
 import type { UseToastOptions } from '@invoke-ai/ui-library';
 import { createStandaloneToast, theme, TOAST_OPTIONS } from '@invoke-ai/ui-library';
+import { nanoid } from 'features/controlLayers/konva/util';
 import { map } from 'nanostores';
 
 const toastApi = createStandaloneToast({
@@ -67,7 +68,7 @@ const getGetState = (id: string) => () => $toastMap.get()[id] ?? null;
  */
 export const toast = (arg: ToastArg): ToastApi => {
   // All toasts need an id, set a random one if not provided
-  const id = arg.id ?? crypto.randomUUID();
+  const id = arg.id ?? nanoid();
   if (!arg.id) {
     arg.id = id;
   }
