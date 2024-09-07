@@ -22,6 +22,7 @@ import {
   entityRectAdded,
   entityReset,
 } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasStagingAreaSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectAllRenderableEntities, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityType,
@@ -210,10 +211,10 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   };
 
   /**
-   * Gets the canvas session state from redux.
+   * Gets the canvas staging area state from redux.
    */
-  getSession = () => {
-    return this.store.getState().canvasSession;
+  getStagingArea = () => {
+    return selectCanvasStagingAreaSlice(this.store.getState());
   };
 
   /**

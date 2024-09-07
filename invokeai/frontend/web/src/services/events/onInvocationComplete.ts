@@ -2,7 +2,7 @@ import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
-import { sessionImageStaged } from 'features/controlLayers/store/canvasSessionSlice';
+import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
@@ -124,9 +124,9 @@ export const buildOnInvocationComplete = (
       if (isCanvasOutputNode(data)) {
         if (data.result.type === 'canvas_v2_mask_and_crop_output') {
           const { offset_x, offset_y } = data.result;
-          dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
+          dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
         } else if (data.result.type === 'image_output') {
-          dispatch(sessionImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
+          dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
         }
       }
     } else {

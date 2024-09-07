@@ -5,13 +5,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { INTERACTION_SCOPES, useScopeOnMount } from 'common/hooks/interactionScopes';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import {
-  selectCanvasSessionSlice,
-  sessionNextStagedImageSelected,
-  sessionPrevStagedImageSelected,
-  sessionStagedImageDiscarded,
-  sessionStagingAreaImageAccepted,
-  sessionStagingAreaReset,
-} from 'features/controlLayers/store/canvasSessionSlice';
+  selectCanvasStagingAreaSlice,
+  stagingAreaImageAccepted,
+  stagingAreaNextStagedImageSelected,
+  stagingAreaPrevStagedImageSelected,
+  stagingAreaReset,
+  stagingAreaStagedImageDiscarded,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -28,16 +28,16 @@ import {
 import { useChangeImageIsIntermediateMutation } from 'services/api/endpoints/images';
 
 const selectStagedImageIndex = createSelector(
-  selectCanvasSessionSlice,
-  (canvasSession) => canvasSession.selectedStagedImageIndex
+  selectCanvasStagingAreaSlice,
+  (stagingArea) => stagingArea.selectedStagedImageIndex
 );
 
 const selectSelectedImage = createSelector(
-  [selectCanvasSessionSlice, selectStagedImageIndex],
-  (canvasSession, index) => canvasSession.stagedImages[index] ?? null
+  [selectCanvasStagingAreaSlice, selectStagedImageIndex],
+  (stagingArea, index) => stagingArea.stagedImages[index] ?? null
 );
 
-const selectImageCount = createSelector(selectCanvasSessionSlice, (canvasSession) => canvasSession.stagedImages.length);
+const selectImageCount = createSelector(selectCanvasStagingAreaSlice, (stagingArea) => stagingArea.stagedImages.length);
 
 export const StagingAreaToolbar = memo(() => {
   const dispatch = useAppDispatch();
@@ -53,18 +53,18 @@ export const StagingAreaToolbar = memo(() => {
   const { t } = useTranslation();
 
   const onPrev = useCallback(() => {
-    dispatch(sessionPrevStagedImageSelected());
+    dispatch(stagingAreaPrevStagedImageSelected());
   }, [dispatch]);
 
   const onNext = useCallback(() => {
-    dispatch(sessionNextStagedImageSelected());
+    dispatch(stagingAreaNextStagedImageSelected());
   }, [dispatch]);
 
   const onAccept = useCallback(() => {
     if (!selectedImage) {
       return;
     }
-    dispatch(sessionStagingAreaImageAccepted({ index }));
+    dispatch(stagingAreaImageAccepted({ index }));
   }, [dispatch, index, selectedImage]);
 
   const onDiscardOne = useCallback(() => {
@@ -72,14 +72,14 @@ export const StagingAreaToolbar = memo(() => {
       return;
     }
     if (imageCount === 1) {
-      dispatch(sessionStagingAreaReset());
+      dispatch(stagingAreaReset());
     } else {
-      dispatch(sessionStagedImageDiscarded({ index }));
+      dispatch(stagingAreaStagedImageDiscarded({ index }));
     }
   }, [selectedImage, imageCount, dispatch, index]);
 
   const onDiscardAll = useCallback(() => {
-    dispatch(sessionStagingAreaReset());
+    dispatch(stagingAreaReset());
   }, [dispatch]);
 
   const onToggleShouldShowStagedImage = useCallback(() => {

@@ -6,9 +6,12 @@ import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
-import { canvasSessionPersistConfig, canvasSessionSlice } from 'features/controlLayers/store/canvasSessionSlice';
 import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasPersistConfig, canvasSlice, canvasUndoableConfig } from 'features/controlLayers/store/canvasSlice';
+import {
+  canvasStagingAreaPersistConfig,
+  canvasStagingAreaSlice,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { lorasPersistConfig, lorasSlice } from 'features/controlLayers/store/lorasSlice';
 import { paramsPersistConfig, paramsSlice } from 'features/controlLayers/store/paramsSlice';
 import { deleteImageModalSlice } from 'features/deleteImageModal/store/slice';
@@ -63,7 +66,7 @@ const allReducers = {
   [stylePresetSlice.name]: stylePresetSlice.reducer,
   [paramsSlice.name]: paramsSlice.reducer,
   [canvasSettingsSlice.name]: canvasSettingsSlice.reducer,
-  [canvasSessionSlice.name]: canvasSessionSlice.reducer,
+  [canvasStagingAreaSlice.name]: canvasStagingAreaSlice.reducer,
   [lorasSlice.name]: lorasSlice.reducer,
 };
 
@@ -108,7 +111,7 @@ const persistConfigs: { [key in keyof typeof allReducers]?: PersistConfig } = {
   [stylePresetPersistConfig.name]: stylePresetPersistConfig,
   [paramsPersistConfig.name]: paramsPersistConfig,
   [canvasSettingsPersistConfig.name]: canvasSettingsPersistConfig,
-  [canvasSessionPersistConfig.name]: canvasSessionPersistConfig,
+  [canvasStagingAreaPersistConfig.name]: canvasStagingAreaPersistConfig,
   [lorasPersistConfig.name]: lorasPersistConfig,
 };
 

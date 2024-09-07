@@ -6,7 +6,7 @@ import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityAdapterSafe } from 'features/controlLayers/hooks/useEntityAdapter';
 import type { AnyObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import { getEmptyRect } from 'features/controlLayers/konva/util';
-import { selectIsStaging } from 'features/controlLayers/store/canvasSessionSlice';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { CanvasEntityIdentifier, Rect } from 'features/controlLayers/store/types';
 import { isFilterableEntityIdentifier } from 'features/controlLayers/store/types';
 import { atom } from 'nanostores';

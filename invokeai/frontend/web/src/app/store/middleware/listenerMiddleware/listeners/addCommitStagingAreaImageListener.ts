@@ -1,11 +1,8 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import {
-  sessionStagingAreaImageAccepted,
-  sessionStagingAreaReset,
-} from 'features/controlLayers/store/canvasSessionSlice';
 import { canvasReset, rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
+import { stagingAreaImageAccepted, stagingAreaReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
@@ -16,7 +13,7 @@ import { assert } from 'tsafe';
 
 const log = logger('canvas');
 
-const matchCanvasOrStagingAreaRest = isAnyOf(sessionStagingAreaReset, canvasReset);
+const matchCanvasOrStagingAreaRest = isAnyOf(stagingAreaReset, canvasReset);
 
 export const addStagingListeners = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -52,11 +49,11 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
   });
 
   startAppListening({
-    actionCreator: sessionStagingAreaImageAccepted,
+    actionCreator: stagingAreaImageAccepted,
     effect: (action, api) => {
       const { index } = action.payload;
       const state = api.getState();
-      const stagingAreaImage = state.canvasSession.stagedImages[index];
+      const stagingAreaImage = state.canvasStagingArea.stagedImages[index];
 
       assert(stagingAreaImage, 'No staged image found to accept');
       const { x, y } = selectCanvasSlice(state).bbox.rect;
@@ -69,7 +66,7 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
       };
 
       api.dispatch(rasterLayerAdded({ overrides, isSelected: false }));
-      api.dispatch(sessionStagingAreaReset());
+      api.dispatch(stagingAreaReset());
     },
   });
 };

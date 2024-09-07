@@ -17,7 +17,7 @@ import type { ImageDTO } from 'services/api/types';
 
 const log = logger('gallery');
 
-//TODO(psyche): handle image deletion (canvas sessions?)
+//TODO(psyche): handle image deletion (canvas staging area?)
 
 // Some utils to delete images from different parts of the app
 const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
