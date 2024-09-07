@@ -16,6 +16,14 @@ module.exports = {
     'no-promise-executor-return': 'error',
     // https://eslint.org/docs/latest/rules/require-await
     'require-await': 'error',
+    'no-restricted-properties': [
+      'error',
+      {
+        object: 'crypto',
+        property: 'randomUUID',
+        message: 'Use of crypto.randomUUID is not allowed as it is not available in all browsers.',
+      },
+    ],
   },
   overrides: [
     /**
