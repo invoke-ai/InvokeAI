@@ -1,8 +1,12 @@
+import { addAppListener } from 'app/store/middleware/listenerMiddleware';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObjectImage';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasStagingAreaSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import {
+  selectCanvasStagingAreaSlice,
+  stagingAreaStartedStaging,
+} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
@@ -38,7 +42,17 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.selectedImage = null;
 
     this.subscriptions.add(this.$shouldShowStagedImage.listen(this.render));
-    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasStagingAreaSlice, this.render));
+    this.subscriptions.add(
+      this.manager.stateApi.store.dispatch(
+        addAppListener({
+          actionCreator: stagingAreaStartedStaging,
+          effect: () => {
+            this.$shouldShowStagedImage.set(true);
+            this.render();
+          },
+        })
+      )
+    );
   }
 
   initialize = () => {

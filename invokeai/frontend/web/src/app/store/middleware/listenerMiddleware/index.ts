@@ -1,5 +1,5 @@
 import type { TypedStartListening } from '@reduxjs/toolkit';
-import { createListenerMiddleware } from '@reduxjs/toolkit';
+import { addListener, createListenerMiddleware } from '@reduxjs/toolkit';
 import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { addStagingListeners } from 'app/store/middleware/listenerMiddleware/listeners/addCommitStagingAreaImageListener';
 import { addAnyEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/anyEnqueued';
@@ -40,6 +40,8 @@ export const listenerMiddleware = createListenerMiddleware();
 export type AppStartListening = TypedStartListening<RootState, AppDispatch>;
 
 const startAppListening = listenerMiddleware.startListening as AppStartListening;
+
+export const addAppListener = addListener.withTypes<RootState, AppDispatch>();
 
 /**
  * The RTK listener middleware is a lightweight alternative sagas/observables.

@@ -1,5 +1,6 @@
 import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
 import type { Selector } from '@reduxjs/toolkit';
+import { addAppListener } from 'app/store/middleware/listenerMiddleware';
 import type { AppStore, RootState } from 'app/store/store';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterRasterLayer';
@@ -70,12 +71,39 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     this.store = store;
   }
 
+  /**
+   * Runs a selector on the redux store.
+   */
   runSelector = <T>(selector: Selector<RootState, T>) => {
     return selector(this.store.getState());
   };
 
+  /**
+   * Creates a subscription to the redux store.
+   */
   createStoreSubscription = <T>(selector: Selector<RootState, T>, handler: SubscriptionHandler<T>) => {
     return createReduxSubscription(this.store, selector, handler);
+  };
+
+  /**
+   * Adds a redux listener middleware listener.
+   *
+   * TODO(psyche): Unfortunately, this wrapper does not work correctly, due to a TS limitation.
+   *
+   * For a reason I do not understand, TS cannot resolve the parameter and return types of overloaded functions. It
+   * only resolves one of the overload signatures.
+   *
+   * `addAppListener` has an overloaded type signature, so `Parameters<typeof addAppListener>[0]` resolves to only one
+   * of the 5 possible arg types for the function. Unfortunately, you can't use this wrapper in the same way you could
+   * if you called `addAppListener` directly.
+   *
+   * There are a number of proposed solutions but none worked for me. I think there may be limitations with the use of
+   * generics? See:
+   * - https://github.com/microsoft/TypeScript/issues/32164
+   * - https://github.com/microsoft/TypeScript/issues/29732
+   */
+  addStoreListener = (arg: Parameters<typeof addAppListener>[0]) => {
+    return this.store.dispatch(addAppListener(arg));
   };
 
   /**
