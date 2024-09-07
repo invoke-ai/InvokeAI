@@ -656,6 +656,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     if (e.key === 'Escape') {
       // Cancel shape drawing on escape
+      e.preventDefault();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       if (selectedEntity) {
         selectedEntity.renderer.clearBuffer();
@@ -665,6 +666,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     if (e.key === ' ') {
       // Select the view tool on space key down
+      e.preventDefault();
       this.$toolBuffer.set(this.$tool.get());
       this.$tool.set('view');
       this.manager.stateApi.$spaceKey.set(true);
@@ -674,6 +676,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     if (e.key === 'Alt') {
       // Select the color picker on alt key down
+      e.preventDefault();
       this.$toolBuffer.set(this.$tool.get());
       this.$tool.set('colorPicker');
     }
@@ -690,6 +693,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     if (e.key === ' ') {
       // Revert the tool to the previous tool on space key up
+      e.preventDefault();
       const toolBuffer = this.$toolBuffer.get();
       this.$tool.set(toolBuffer ?? 'move');
       this.$toolBuffer.set(null);
@@ -699,6 +703,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     if (e.key === 'Alt') {
       // Revert the tool to the previous tool on alt key up
+      e.preventDefault();
       const toolBuffer = this.$toolBuffer.get();
       this.$tool.set(toolBuffer ?? 'move');
       this.$toolBuffer.set(null);
