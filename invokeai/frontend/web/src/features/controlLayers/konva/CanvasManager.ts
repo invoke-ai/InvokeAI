@@ -12,7 +12,6 @@ import { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/Can
 import { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterRegionalGuidance';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
 import { CanvasEntityRendererModule } from 'features/controlLayers/konva/CanvasEntityRendererModule';
-import { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasProgressImageModule } from 'features/controlLayers/konva/CanvasProgressImageModule';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
@@ -58,7 +57,6 @@ export class CanvasManager extends CanvasModuleBase {
 
   stateApi: CanvasStateApiModule;
   background: CanvasBackgroundModule;
-  filter: CanvasFilterModule;
   stage: CanvasStageModule;
   worker: CanvasWorkerModule;
   cache: CanvasCacheModule;
@@ -105,7 +103,6 @@ export class CanvasManager extends CanvasModuleBase {
     this.worker = new CanvasWorkerModule(this);
     this.cache = new CanvasCacheModule(this);
     this.entityRenderer = new CanvasEntityRendererModule(this);
-    this.filter = new CanvasFilterModule(this);
 
     this.compositor = new CanvasCompositorModule(this);
 
@@ -128,9 +125,12 @@ export class CanvasManager extends CanvasModuleBase {
     this.konva.previewLayer.add(this.bbox.konva.group);
     this.konva.previewLayer.add(this.tool.konva.group);
 
-    this.$isBusy = computed([this.filter.$isFiltering, this.stateApi.$isTranforming], (isFiltering, isTransforming) => {
-      return isFiltering || isTransforming;
-    });
+    this.$isBusy = computed(
+      [this.stateApi.$isFiltering, this.stateApi.$isTranforming],
+      (isFiltering, isTransforming) => {
+        return isFiltering || isTransforming;
+      }
+    );
   }
 
   getAdapter = <T extends CanvasEntityType = CanvasEntityType>(
@@ -233,7 +233,6 @@ export class CanvasManager extends CanvasModuleBase {
       this.progressImage,
       this.stateApi,
       this.background,
-      this.filter,
       this.worker,
       this.entityRenderer,
       this.compositor,
@@ -280,7 +279,6 @@ export class CanvasManager extends CanvasModuleBase {
       tool: this.tool.repr(),
       progressImage: this.progressImage.repr(),
       background: this.background.repr(),
-      filter: this.filter.repr(),
       worker: this.worker.repr(),
       entityRenderer: this.entityRenderer.repr(),
       compositor: this.compositor.repr(),

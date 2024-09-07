@@ -51,7 +51,10 @@ type CanvasSettingsState = {
    * When `sendToCanvas` is disabled, this setting is ignored, masked regions will always be composited.
    */
   compositeMaskedRegions: boolean;
-
+  /**
+   * Whether to automatically preview the filter when the filter configuration changes.
+   */
+  autoPreviewFilter: boolean;
   // TODO(psyche): These are copied from old canvas state, need to be implemented
   // imageSmoothing: boolean;
   // preserveMaskedArea: boolean;
@@ -69,6 +72,7 @@ const initialState: CanvasSettingsState = {
   color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
   sendToCanvas: false,
   compositeMaskedRegions: false,
+  autoPreviewFilter: true,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -105,6 +109,9 @@ export const canvasSettingsSlice = createSlice({
     settingsCompositeMaskedRegionsChanged: (state, action: PayloadAction<boolean>) => {
       state.compositeMaskedRegions = action.payload;
     },
+    settingsAutoPreviewFilterToggled: (state) => {
+      state.autoPreviewFilter = !state.autoPreviewFilter;
+    },
   },
 });
 
@@ -119,6 +126,7 @@ export const {
   settingsInvertScrollForToolWidthChanged,
   settingsSendToCanvasChanged,
   settingsCompositeMaskedRegionsChanged,
+  settingsAutoPreviewFilterToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -141,3 +149,7 @@ export const selectDynamicGrid = createSelector(
 );
 
 export const selectShowHUD = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.showHUD);
+export const selectAutoPreviewFilter = createSelector(
+  selectCanvasSettingsSlice,
+  (canvasSettings) => canvasSettings.autoPreviewFilter
+);

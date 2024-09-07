@@ -12,6 +12,7 @@ export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<Canv
 
   transformer: CanvasEntityTransformer;
   renderer: CanvasEntityObjectRenderer;
+  filterer = undefined;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>, manager: CanvasManager) {
     super(entityIdentifier, manager, CanvasEntityAdapterInpaintMask.TYPE);

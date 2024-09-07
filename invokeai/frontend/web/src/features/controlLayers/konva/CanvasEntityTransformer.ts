@@ -454,7 +454,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
 
-    if (this.manager.filter.$isFiltering.get()) {
+    // Not all entities have a filterer - only raster layer and control layer adapters
+    if (this.parent.filterer?.$isFiltering.get()) {
       // May not interact with the entity when the filter is active
       this.parent.konva.layer.listening(false);
       this._setInteractionMode('off');

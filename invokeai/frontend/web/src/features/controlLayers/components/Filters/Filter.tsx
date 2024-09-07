@@ -1,37 +1,44 @@
-import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FilterSettings } from 'features/controlLayers/components/Filters/FilterSettings';
 import { FilterTypeSelect } from 'features/controlLayers/components/Filters/FilterTypeSelect';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterControlLayer';
+import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterRasterLayer';
+import {
+  selectAutoPreviewFilter,
+  settingsAutoPreviewFilterToggled,
+} from 'features/controlLayers/store/canvasSettingsSlice';
 import { type FilterConfig, IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold, PiShootingStarBold, PiXBold } from 'react-icons/pi';
 
-export const Filter = memo(() => {
+const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
   const { t } = useTranslation();
-  const canvasManager = useCanvasManager();
-  const config = useStore(canvasManager.filter.$config);
-  const isFiltering = useStore(canvasManager.filter.$isFiltering);
-  const isProcessing = useStore(canvasManager.filter.$isProcessing);
+  const dispatch = useAppDispatch();
+  const config = useStore(adapter.filterer.$filterConfig);
+  const isProcessing = useStore(adapter.filterer.$isProcessing);
+  const autoPreviewFilter = useAppSelector(selectAutoPreviewFilter);
 
   const onChangeFilterConfig = useCallback(
     (filterConfig: FilterConfig) => {
-      canvasManager.filter.$config.set(filterConfig);
+      adapter.filterer.$filterConfig.set(filterConfig);
     },
-    [canvasManager.filter.$config]
+    [adapter.filterer.$filterConfig]
   );
 
   const onChangeFilterType = useCallback(
     (filterType: FilterConfig['type']) => {
-      canvasManager.filter.$config.set(IMAGE_FILTERS[filterType].buildDefaults());
+      adapter.filterer.$filterConfig.set(IMAGE_FILTERS[filterType].buildDefaults());
     },
-    [canvasManager.filter.$config]
+    [adapter.filterer.$filterConfig]
   );
 
-  if (!isFiltering) {
-    return null;
-  }
+  const onChangeAutoPreviewFilter = useCallback(() => {
+    dispatch(settingsAutoPreviewFilterToggled());
+  }, [dispatch]);
 
   return (
     <Flex
@@ -46,16 +53,23 @@ export const Filter = memo(() => {
       transitionProperty="height"
       transitionDuration="normal"
     >
-      <Heading size="md" color="base.300" userSelect="none">
-        {t('controlLayers.filter.filter')}
-      </Heading>
+      <Flex w="full">
+        <Heading size="md" color="base.300" userSelect="none">
+          {t('controlLayers.filter.filter')}
+        </Heading>
+        <Spacer />
+        <FormControl w="min-content">
+          <FormLabel m={0}>{t('controlLayers.autoPreviewFilter')}</FormLabel>
+          <Switch size="sm" isChecked={autoPreviewFilter} onChange={onChangeAutoPreviewFilter} />
+        </FormControl>
+      </Flex>
       <FilterTypeSelect filterType={config.type} onChange={onChangeFilterType} />
       <FilterSettings filterConfig={config} onChange={onChangeFilterConfig} />
       <ButtonGroup isAttached={false} size="sm" w="full">
         <Button
           variant="ghost"
           leftIcon={<PiShootingStarBold />}
-          onClick={canvasManager.filter.previewFilter}
+          onClick={adapter.filterer.previewFilter}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.preview')}
         >
@@ -65,7 +79,7 @@ export const Filter = memo(() => {
         <Button
           variant="ghost"
           leftIcon={<PiCheckBold />}
-          onClick={canvasManager.filter.applyFilter}
+          onClick={adapter.filterer.applyFilter}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.apply')}
         >
@@ -74,7 +88,7 @@ export const Filter = memo(() => {
         <Button
           variant="ghost"
           leftIcon={<PiXBold />}
-          onClick={canvasManager.filter.cancelFilter}
+          onClick={adapter.filterer.cancelFilter}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.cancel')}
         >
@@ -84,5 +98,17 @@ export const Filter = memo(() => {
     </Flex>
   );
 });
+
+FilterBox.displayName = 'FilterBox';
+
+export const Filter = () => {
+  const canvasManager = useCanvasManager();
+  const adapter = useStore(canvasManager.stateApi.$filteringAdapter);
+  if (!adapter) {
+    return null;
+  }
+
+  return <FilterBox adapter={adapter} />;
+};
 
 Filter.displayName = 'Filter';

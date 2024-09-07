@@ -12,6 +12,7 @@ export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase
 
   transformer: CanvasEntityTransformer;
   renderer: CanvasEntityObjectRenderer;
+  filterer = undefined;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>, manager: CanvasManager) {
     super(entityIdentifier, manager, CanvasEntityAdapterRegionalGuidance.TYPE);

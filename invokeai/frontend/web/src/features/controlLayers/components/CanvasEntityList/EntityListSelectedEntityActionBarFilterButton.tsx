@@ -23,8 +23,11 @@ export const EntityListSelectedEntityActionBarFilterButton = memo(() => {
     if (!isFilterableEntityIdentifier(selectedEntityIdentifier)) {
       return;
     }
-
-    canvasManager.filter.startFilter(selectedEntityIdentifier);
+    const adapter = canvasManager.getAdapter(selectedEntityIdentifier);
+    if (!adapter) {
+      return;
+    }
+    adapter.filterer.startFilter();
   }, [canvasManager, selectedEntityIdentifier]);
 
   if (!selectedEntityIdentifier) {

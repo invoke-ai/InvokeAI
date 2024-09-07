@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
+import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntityFilterer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import type { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -25,14 +26,22 @@ export abstract class CanvasEntityAdapterBase<
   readonly entityIdentifier: CanvasEntityIdentifier<T['type']>;
 
   /**
-   * The transformer for this entity adapter.
+   * The transformer for this entity adapter. All entities must have a transformer.
    */
   abstract transformer: CanvasEntityTransformer;
 
   /**
-   * The renderer for this entity adapter.
+   * The renderer for this entity adapter. All entities must have a renderer.
    */
   abstract renderer: CanvasEntityObjectRenderer;
+
+  /**
+   * The filterer for this entity adapter. Entities that support filtering should implement this property.
+   */
+  // TODO(psyche): This is in the ABC and not in the concrete classes to allow all adapters to share the `destroy`
+  // method. If it wasn't in this ABC, we'd get a TS error in `destroy`. Maybe there's a better way to handle this
+  // without requiring all adapters to implement this property and their own `destroy`?
+  abstract filterer?: CanvasEntityFilterer;
 
   /**
    * Synchronizes the entity state with the canvas. This includes rendering the entity's objects, handling visibility,
@@ -201,8 +210,8 @@ export abstract class CanvasEntityAdapterBase<
       this.transformer.stopTransform();
     }
     this.transformer.destroy();
-    if (this.manager.filter.$adapter.get()?.id === this.id) {
-      this.manager.filter.cancelFilter();
+    if (this.filterer?.$isFiltering.get()) {
+      this.filterer.cancelFilter();
     }
     this.konva.layer.destroy();
     this.manager.deleteAdapter(this.entityIdentifier);
