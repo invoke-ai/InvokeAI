@@ -107,7 +107,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
     this.subscriptions.add(this.manager.stateApi.$isTranforming.listen(this.render));
-    this.subscriptions.add(this.manager.filter.$isFiltering.listen(this.render));
+    this.subscriptions.add(this.manager.stateApi.$isFiltering.listen(this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSettingsSlice, this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.syncCursorStyle));
     this.subscriptions.add(
@@ -146,7 +146,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       stage.setCursor('not-allowed');
     } else if (this.manager.stateApi.$isTranforming.get()) {
       stage.setCursor('default');
-    } else if (this.manager.filter.$isFiltering.get()) {
+    } else if (this.manager.stateApi.$isFiltering.get()) {
       stage.setCursor('not-allowed');
     } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.getIsInteractable()) {
       stage.setCursor('not-allowed');
@@ -282,7 +282,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return false;
     } else if (this.manager.stateApi.$isTranforming.get()) {
       return false;
-    } else if (this.manager.filter.$isFiltering.get()) {
+    } else if (this.manager.stateApi.$isFiltering.get()) {
       return false;
     } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.getIsInteractable()) {
       return false;

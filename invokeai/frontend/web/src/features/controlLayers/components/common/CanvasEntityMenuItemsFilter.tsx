@@ -23,8 +23,12 @@ export const CanvasEntityMenuItemsFilter = memo(() => {
     if (!isFilterableEntityIdentifier(entityIdentifier)) {
       return;
     }
-    canvasManager.filter.startFilter(entityIdentifier);
-  }, [canvasManager.filter, entityIdentifier]);
+    const adapter = canvasManager.getAdapter(entityIdentifier);
+    if (!adapter) {
+      return;
+    }
+    adapter.filterer.startFilter();
+  }, [canvasManager, entityIdentifier]);
 
   return (
     <MenuItem onClick={onClick} icon={<PiShootingStarBold />} isDisabled={isBusy || isStaging}>

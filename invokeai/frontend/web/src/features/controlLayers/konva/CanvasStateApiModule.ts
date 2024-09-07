@@ -1,6 +1,8 @@
 import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
 import type { Selector } from '@reduxjs/toolkit';
 import type { AppStore, RootState } from 'app/store/store';
+import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterControlLayer';
+import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterRasterLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { SubscriptionHandler } from 'features/controlLayers/konva/util';
@@ -306,6 +308,16 @@ export class CanvasStateApiModule extends CanvasModuleBase {
       return this.getSettings().color;
     }
   };
+
+  /**
+   * The entity adapter being filtered, if any.
+   */
+  $filteringAdapter = atom<CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer | null>(null);
+
+  /**
+   * Whether an entity is currently being filtered. Derived from `$filteringAdapter`.
+   */
+  $isFiltering = computed(this.$filteringAdapter, (filteringAdapter) => Boolean(filteringAdapter));
 
   /**
    * The entity adapter being transformed, if any.

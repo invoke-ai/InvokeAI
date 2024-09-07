@@ -1,7 +1,7 @@
 import { Mutex } from 'async-mutex';
 import { deepClone } from 'common/util/deepClone';
+import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntityFilterer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
-import type { CanvasFilterModule } from 'features/controlLayers/konva/CanvasFilterModule';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
@@ -16,7 +16,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
   readonly type = 'object_image';
   readonly id: string;
   readonly path: string[];
-  readonly parent: CanvasEntityObjectRenderer | CanvasStagingAreaModule | CanvasFilterModule;
+  readonly parent: CanvasEntityObjectRenderer | CanvasStagingAreaModule | CanvasEntityFilterer;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
@@ -33,7 +33,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
 
   constructor(
     state: CanvasImageState,
-    parent: CanvasEntityObjectRenderer | CanvasStagingAreaModule | CanvasFilterModule
+    parent: CanvasEntityObjectRenderer | CanvasStagingAreaModule | CanvasEntityFilterer
   ) {
     super();
     this.id = state.id;

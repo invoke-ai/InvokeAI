@@ -1,5 +1,6 @@
 import type { SerializableObject } from 'common/types';
 import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterBase';
+import { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntityFilterer';
 import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -12,12 +13,14 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<Canv
 
   transformer: CanvasEntityTransformer;
   renderer: CanvasEntityObjectRenderer;
+  filterer: CanvasEntityFilterer;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'raster_layer'>, manager: CanvasManager) {
     super(entityIdentifier, manager, CanvasEntityAdapterRasterLayer.TYPE);
 
     this.renderer = new CanvasEntityObjectRenderer(this);
     this.transformer = new CanvasEntityTransformer(this);
+    this.filterer = new CanvasEntityFilterer(this);
 
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectState, this.sync));
   }
