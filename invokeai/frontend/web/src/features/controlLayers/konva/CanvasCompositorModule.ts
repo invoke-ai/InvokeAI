@@ -42,17 +42,23 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
   /**
    * Gets the entity IDs of all raster layers that should be included in the composite raster layer.
-   * A raster layer is included if it is enabled and has objects.
+   * A raster layer is included if it is enabled and has objects. The ids are sorted by draw order.
    * @returns An array of raster layer entity IDs
    */
   getCompositeRasterLayerEntityIds = (): string[] => {
-    const ids = [];
-    for (const adapter of this.manager.adapters.rasterLayers.values()) {
-      if (adapter.state.isEnabled && adapter.renderer.hasObjects()) {
-        ids.push(adapter.id);
+    const validSortedIds = [];
+    const sortedIds = this.manager.stateApi.getRasterLayersState().entities.map(({ id }) => id);
+    for (const id of sortedIds) {
+      const adapter = this.manager.adapters.rasterLayers.get(id);
+      if (!adapter) {
+        this.log.warn({ id }, 'Raster layer adapter not found');
+        continue;
+      }
+      if (adapter.state.isEnabled && adapter.state.objects.length > 0) {
+        validSortedIds.push(adapter.id);
       }
     }
-    return ids;
+    return validSortedIds;
   };
 
   /**
@@ -62,17 +68,22 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * @returns A hash for the composite raster layer
    */
   getCompositeRasterLayerHash = (extra: SerializableObject): string => {
-    const data: Record<string, SerializableObject> = {
-      extra,
-    };
+    const adapterHashes: SerializableObject[] = [];
+
     for (const id of this.getCompositeRasterLayerEntityIds()) {
       const adapter = this.manager.adapters.rasterLayers.get(id);
       if (!adapter) {
         this.log.warn({ id }, 'Raster layer adapter not found');
         continue;
       }
-      data[id] = adapter.getHashableState();
+      adapterHashes.push(adapter.getHashableState());
     }
+
+    const data: SerializableObject = {
+      extra,
+      adapterHashes,
+    };
+
     return stableHash(data);
   };
 
@@ -173,17 +184,23 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
   /**
    * Gets the entity IDs of all inpaint masks that should be included in the composite inpaint mask.
-   * An inpaint mask is included if it is enabled and has objects.
+   * An inpaint mask is included if it is enabled and has objects. The ids are sorted by draw order.
    * @returns An array of inpaint mask entity IDs
    */
   getCompositeInpaintMaskEntityIds = (): string[] => {
-    const ids = [];
-    for (const adapter of this.manager.adapters.inpaintMasks.values()) {
-      if (adapter.state.isEnabled && adapter.renderer.hasObjects()) {
-        ids.push(adapter.id);
+    const validSortedIds = [];
+    const sortedIds = this.manager.stateApi.getInpaintMasksState().entities.map(({ id }) => id);
+    for (const id of sortedIds) {
+      const adapter = this.manager.adapters.inpaintMasks.get(id);
+      if (!adapter) {
+        this.log.warn({ id }, 'Inpaint mask adapter not found');
+        continue;
+      }
+      if (adapter.state.isEnabled && adapter.state.objects.length > 0) {
+        validSortedIds.push(adapter.id);
       }
     }
-    return ids;
+    return validSortedIds;
   };
 
   /**
@@ -193,17 +210,22 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * @returns A hash for the composite inpaint mask
    */
   getCompositeInpaintMaskHash = (extra: SerializableObject): string => {
-    const data: Record<string, SerializableObject> = {
-      extra,
-    };
+    const adapterHashes: SerializableObject[] = [];
+
     for (const id of this.getCompositeInpaintMaskEntityIds()) {
       const adapter = this.manager.adapters.inpaintMasks.get(id);
       if (!adapter) {
         this.log.warn({ id }, 'Inpaint mask adapter not found');
         continue;
       }
-      data[id] = adapter.getHashableState();
+      adapterHashes.push(adapter.getHashableState());
     }
+
+    const data: SerializableObject = {
+      extra,
+      adapterHashes,
+    };
+
     return stableHash(data);
   };
 
