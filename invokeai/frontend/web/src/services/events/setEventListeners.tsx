@@ -8,6 +8,7 @@ import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
+import { $lastCanvasProgressEvent } from 'features/controlLayers/store/canvasSlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/ErrorToastDescription';
@@ -37,7 +38,6 @@ type SetEventListenersArg = {
 const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 const nodeTypeDenylist = ['load_image', 'image'];
 export const $lastProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
-export const $lastCanvasProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
 export const $hasProgress = computed($lastProgressEvent, (val) => Boolean(val));
 export const $progressImage = computed($lastProgressEvent, (val) => val?.progress_image ?? null);
 

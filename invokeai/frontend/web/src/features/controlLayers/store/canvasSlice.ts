@@ -27,8 +27,15 @@ import type { AspectRatioID } from 'features/parameters/components/Bbox/types';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import { isEqual, merge, omit } from 'lodash-es';
+import { atom } from 'nanostores';
 import type { UndoableOptions } from 'redux-undo';
-import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import type {
+  ControlNetModelConfig,
+  ImageDTO,
+  IPAdapterModelConfig,
+  S,
+  T2IAdapterModelConfig,
+} from 'services/api/types';
 import { assert } from 'tsafe';
 
 import type {
@@ -1269,3 +1276,5 @@ function actionsThrottlingFilter(action: UnknownAction) {
   }, THROTTLE_MS);
   return true;
 }
+
+export const $lastCanvasProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
