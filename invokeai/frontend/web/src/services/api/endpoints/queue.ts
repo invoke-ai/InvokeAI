@@ -70,7 +70,7 @@ export const queueApi = api.injectEndpoints({
         body: arg,
         method: 'POST',
       }),
-      invalidatesTags: ['CurrentSessionQueueItem', 'NextSessionQueueItem'],
+      invalidatesTags: ['SessionQueueStatus', 'CurrentSessionQueueItem', 'NextSessionQueueItem'],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
         try {
