@@ -457,14 +457,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     if (this.manager.filter.$isFiltering.get()) {
       // May not interact with the entity when the filter is active
       this.parent.konva.layer.listening(false);
-      this.setInteractionMode('off');
+      this._setInteractionMode('off');
       return;
     }
 
     if (this.manager.stateApi.$isTranforming.get() && !this.$isTransforming.get()) {
       // If another entity is being transformed, we can't interact with this transformer
       this.parent.konva.layer.listening(false);
-      this.setInteractionMode('off');
+      this._setInteractionMode('off');
       return;
     }
 
@@ -474,7 +474,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     if (isPendingRectCalculation || pixelRect.width === 0 || pixelRect.height === 0) {
       // If the rect is being calculated, or if the rect has no width or height, we can't interact with the transformer
       this.parent.konva.layer.listening(false);
-      this.setInteractionMode('off');
+      this._setInteractionMode('off');
       return;
     }
 
@@ -484,14 +484,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     if (!this.parent.renderer.hasObjects() || !this.parent.getIsInteractable()) {
       // The layer is totally empty, we can just disable the layer
       this.parent.konva.layer.listening(false);
-      this.setInteractionMode('off');
+      this._setInteractionMode('off');
       return;
     }
 
     if (isSelected && !this.$isTransforming.get() && tool === 'move') {
       // We are moving this layer, it must be listening
       this.parent.konva.layer.listening(true);
-      this.setInteractionMode('drag');
+      this._setInteractionMode('drag');
       return;
     }
 
@@ -500,15 +500,15 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       // active, it will interrupt the stage drag events. So we should disable listening when the view tool is selected.
       if (tool === 'view') {
         this.parent.konva.layer.listening(false);
-        this.setInteractionMode('off');
+        this._setInteractionMode('off');
       } else {
         this.parent.konva.layer.listening(true);
-        this.setInteractionMode('all');
+        this._setInteractionMode('all');
       }
     } else {
       // The layer is not selected, or we are using a tool that doesn't need the layer to be listening - disable interaction stuff
       this.parent.konva.layer.listening(false);
-      this.setInteractionMode('off');
+      this._setInteractionMode('off');
     }
   };
 
@@ -535,15 +535,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   startTransform = () => {
     this.log.debug('Starting transform');
     this.$isTransforming.set(true);
-    this.manager.tool.$tool.set('move');
-    // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer or
-    // interaction rect are listening, it will interrupt the stage's drag events. So we should disable listening
-    // when the view tool is selected
-    // TODO(psyche): We just set the tool to 'move', why would it be 'view'? Investigate and figure out if this is needed
-    const shouldListen = this.manager.tool.$tool.get() !== 'view';
-    this.parent.konva.layer.listening(shouldListen);
-    this.setInteractionMode('all');
     this.manager.stateApi.$transformingAdapter.set(this.parent);
+    this.syncInteractionState();
   };
 
   /**
@@ -572,7 +565,6 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.log.debug('Stopping transform');
 
     this.$isTransforming.set(false);
-    this.setInteractionMode('off');
 
     // Reset the transform of the the entity. We've either replaced the transformed objects with a rasterized image, or
     // canceled a transformation. In either case, the scale should be reset.
@@ -621,13 +613,15 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   };
 
   /**
-   * Sets the transformer to a specific interaction mode.
+   * Sets the transformer to a specific interaction mode. This internal method shouldn't be used. Instead, use
+   * `syncInteractionState` to update the transformer's interaction state.
+   *
    * @param interactionMode The mode to set the transformer to. The transformer can be in one of three modes:
    * - 'all': The entity can be moved, resized, and rotated.
    * - 'drag': The entity can be moved.
    * - 'off': The transformer is not interactable.
    */
-  setInteractionMode = (interactionMode: 'all' | 'drag' | 'off') => {
+  _setInteractionMode = (interactionMode: 'all' | 'drag' | 'off') => {
     this.$interactionMode.set(interactionMode);
     if (interactionMode === 'drag') {
       this._enableDrag();
