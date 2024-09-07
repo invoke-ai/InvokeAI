@@ -1,20 +1,34 @@
 import { Flex } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { createMemoizedAppSelector } from 'app/store/createMemoizedSelector';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { ControlLayerControlAdapterControlMode } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterControlMode';
 import { ControlLayerControlAdapterModel } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useControlLayerControlAdapter } from 'features/controlLayers/hooks/useLayerControlAdapter';
 import {
   controlLayerBeginEndStepPctChanged,
   controlLayerControlModeChanged,
   controlLayerModelChanged,
   controlLayerWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import type { ControlModeV2 } from 'features/controlLayers/store/types';
-import { memo, useCallback } from 'react';
+import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import type { CanvasEntityIdentifier, ControlModeV2 } from 'features/controlLayers/store/types';
+import { memo, useCallback, useMemo } from 'react';
 import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+
+const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) => {
+  const selectControlAdapter = useMemo(
+    () =>
+      createMemoizedAppSelector(selectCanvasSlice, (canvas) => {
+        const layer = selectEntityOrThrow(canvas, entityIdentifier);
+        return layer.controlAdapter;
+      }),
+    [entityIdentifier]
+  );
+  const controlAdapter = useAppSelector(selectControlAdapter);
+  return controlAdapter;
+};
 
 export const ControlLayerControlAdapter = memo(() => {
   const dispatch = useAppDispatch();

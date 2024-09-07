@@ -1,12 +1,11 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
 import {
-  controlLayerAdded,
-  inpaintMaskAdded,
-  ipaAdded,
-  rasterLayerAdded,
-  rgAdded,
-} from 'features/controlLayers/store/canvasSlice';
+  useAddControlLayer,
+  useAddInpaintMask,
+  useAddIPAdapter,
+  useAddRasterLayer,
+  useAddRegionalGuidance,
+} from 'features/controlLayers/hooks/addLayerHooks';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,26 +17,31 @@ type Props = {
 
 export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const addInpaintMask = useAddInpaintMask();
+  const addRegionalGuidance = useAddRegionalGuidance();
+  const addRasterLayer = useAddRasterLayer();
+  const addControlLayer = useAddControlLayer();
+  const addIPAdapter = useAddIPAdapter();
+
   const onClick = useCallback(() => {
     switch (type) {
       case 'inpaint_mask':
-        dispatch(inpaintMaskAdded({ isSelected: true }));
+        addInpaintMask();
         break;
       case 'regional_guidance':
-        dispatch(rgAdded({ isSelected: true }));
+        addRegionalGuidance();
         break;
       case 'raster_layer':
-        dispatch(rasterLayerAdded({ isSelected: true }));
+        addRasterLayer();
         break;
       case 'control_layer':
-        dispatch(controlLayerAdded({ isSelected: true }));
+        addControlLayer();
         break;
       case 'ip_adapter':
-        dispatch(ipaAdded({ isSelected: true }));
+        addIPAdapter();
         break;
     }
-  }, [dispatch, type]);
+  }, [addControlLayer, addIPAdapter, addInpaintMask, addRasterLayer, addRegionalGuidance, type]);
 
   const label = useMemo(() => {
     switch (type) {

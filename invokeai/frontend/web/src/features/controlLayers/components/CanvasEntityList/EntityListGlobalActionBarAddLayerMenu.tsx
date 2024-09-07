@@ -1,37 +1,22 @@
 import { IconButton, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { useDefaultIPAdapter } from 'features/controlLayers/hooks/useLayerControlAdapter';
 import {
-  controlLayerAdded,
-  inpaintMaskAdded,
-  ipaAdded,
-  rasterLayerAdded,
-  rgAdded,
-} from 'features/controlLayers/store/canvasSlice';
-import { memo, useCallback } from 'react';
+  useAddControlLayer,
+  useAddInpaintMask,
+  useAddIPAdapter,
+  useAddRasterLayer,
+  useAddRegionalGuidance,
+} from 'features/controlLayers/hooks/addLayerHooks';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 
 export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const defaultIPAdapter = useDefaultIPAdapter();
-  const addInpaintMask = useCallback(() => {
-    dispatch(inpaintMaskAdded({ isSelected: true }));
-  }, [dispatch]);
-  const addRegionalGuidance = useCallback(() => {
-    dispatch(rgAdded({ isSelected: true }));
-  }, [dispatch]);
-  const addRasterLayer = useCallback(() => {
-    dispatch(rasterLayerAdded({ isSelected: true }));
-  }, [dispatch]);
-  const addControlLayer = useCallback(() => {
-    dispatch(controlLayerAdded({ isSelected: true }));
-  }, [dispatch]);
-  const addIPAdapter = useCallback(() => {
-    const overrides = { ipAdapter: defaultIPAdapter };
-    dispatch(ipaAdded({ isSelected: true, overrides }));
-  }, [defaultIPAdapter, dispatch]);
+  const addInpaintMask = useAddInpaintMask();
+  const addRegionalGuidance = useAddRegionalGuidance();
+  const addRasterLayer = useAddRasterLayer();
+  const addControlLayer = useAddControlLayer();
+  const addIPAdapter = useAddIPAdapter();
 
   return (
     <Menu>
