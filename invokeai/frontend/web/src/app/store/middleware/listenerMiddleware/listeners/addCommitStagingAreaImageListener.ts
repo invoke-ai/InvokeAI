@@ -12,7 +12,6 @@ import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
-import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
 import { assert } from 'tsafe';
 
 const log = logger('canvas');
@@ -32,8 +31,6 @@ export const addStagingListeners = (startAppListening: AppStartListening) => {
         );
         const { canceled } = await req.unwrap();
         req.reset();
-
-        $lastCanvasProgressEvent.set(null);
 
         if (canceled > 0) {
           log.debug(`Canceled ${canceled} canvas batches`);
