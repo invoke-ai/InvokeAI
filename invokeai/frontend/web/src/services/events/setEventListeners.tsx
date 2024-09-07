@@ -1,6 +1,7 @@
 import { ExternalLink } from '@invoke-ai/ui-library';
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
+import { getIsCancelled } from 'app/store/middleware/listenerMiddleware/listeners/cancellationsListeners';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
@@ -39,7 +40,6 @@ export const $lastProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | nul
 export const $lastCanvasProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
 export const $hasProgress = computed($lastProgressEvent, (val) => Boolean(val));
 export const $progressImage = computed($lastProgressEvent, (val) => val?.progress_image ?? null);
-const cancellations = new Set<string>();
 
 export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }: SetEventListenersArg) => {
   socket.on('connect', () => {
@@ -54,7 +54,6 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
     }
     $lastProgressEvent.set(null);
     $lastCanvasProgressEvent.set(null);
-    cancellations.clear();
   });
 
   socket.on('connect_error', (error) => {
@@ -73,7 +72,6 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
         });
       }
     }
-    cancellations.clear();
   });
 
   socket.on('disconnect', () => {
@@ -81,7 +79,6 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
     $lastProgressEvent.set(null);
     $lastCanvasProgressEvent.set(null);
     setIsConnected(false);
-    cancellations.clear();
   });
 
   socket.on('invocation_started', (data) => {
@@ -92,7 +89,6 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
       nes.status = zNodeStatus.enum.IN_PROGRESS;
       upsertExecutionState(nes.nodeId, nes);
     }
-    cancellations.clear();
   });
 
   socket.on('invocation_denoise_progress', (data) => {
@@ -106,9 +102,10 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
       destination,
       percentage,
       session_id,
+      batch_id,
     } = data;
 
-    if (cancellations.has(session_id)) {
+    if (getIsCancelled({ session_id, batch_id, destination })) {
       // Do not update the progress if this session has been cancelled. This prevents a race condition where we get a
       // progress update after the session has been cancelled.
       return;
@@ -131,7 +128,8 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
       }
     }
 
-    if (origin === 'generation' && destination === 'canvas') {
+    // This event is only relevant for the canvas
+    if (destination === 'canvas') {
       $lastCanvasProgressEvent.set(data);
     }
   });
@@ -464,16 +462,13 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
           />
         ),
       });
-      cancellations.add(session_id);
     } else if (status === 'canceled') {
       $lastProgressEvent.set(null);
       if (origin === 'canvas') {
         $lastCanvasProgressEvent.set(null);
       }
-      cancellations.add(session_id);
     } else if (status === 'completed') {
       $lastProgressEvent.set(null);
-      cancellations.add(session_id);
     }
   });
 
