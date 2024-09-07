@@ -3,10 +3,10 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
   CanvasRegionalGuidanceState,
+  IPAdapterConfig,
   Rect,
   RegionalGuidanceIPAdapterConfig,
 } from 'features/controlLayers/store/types';
-import { isValidIPAdapter } from 'features/nodes/util/graph/generation/addIPAdapters';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -233,4 +233,12 @@ export const addRegions = async (
   g.upsertMetadata({ regions: validRegions });
 
   return results;
+};
+
+const isValidIPAdapter = (ipAdapter: IPAdapterConfig, base: BaseModelType): boolean => {
+  // Must be have a model that matches the current base and must have a control image
+  const hasModel = Boolean(ipAdapter.model);
+  const modelMatchesBase = ipAdapter.model?.base === base;
+  const hasImage = Boolean(ipAdapter.image);
+  return hasModel && modelMatchesBase && hasImage;
 };
