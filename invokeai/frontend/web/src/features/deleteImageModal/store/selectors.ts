@@ -9,7 +9,7 @@ import { isInvocationNode } from 'features/nodes/types/invocation';
 import { some } from 'lodash-es';
 
 import type { ImageUsage } from './types';
-// TODO(psyche): handle image deletion (canvas sessions?)
+// TODO(psyche): handle image deletion (canvas staging area?)
 export const getImageUsage = (nodes: NodesState, canvas: CanvasState, image_name: string) => {
   const isNodesImage = nodes.nodes
     .filter(isInvocationNode)

@@ -1,7 +1,7 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { selectIsStaging } from 'features/controlLayers/store/canvasSessionSlice';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';

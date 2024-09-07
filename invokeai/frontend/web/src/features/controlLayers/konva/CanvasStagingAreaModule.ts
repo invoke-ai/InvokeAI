@@ -2,7 +2,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObjectImage';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSessionSlice } from 'features/controlLayers/store/canvasSessionSlice';
+import { selectCanvasStagingAreaSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom } from 'nanostores';
@@ -38,7 +38,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.selectedImage = null;
 
     this.subscriptions.add(this.$shouldShowStagedImage.listen(this.render));
-    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSessionSlice, this.render));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasStagingAreaSlice, this.render));
   }
 
   initialize = () => {
@@ -48,7 +48,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
   render = async () => {
     this.log.trace('Rendering staging area');
-    const stagingArea = this.manager.stateApi.runSelector(selectCanvasSessionSlice);
+    const stagingArea = this.manager.stateApi.runSelector(selectCanvasStagingAreaSlice);
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
     const shouldShowStagedImage = this.$shouldShowStagedImage.get();
 
