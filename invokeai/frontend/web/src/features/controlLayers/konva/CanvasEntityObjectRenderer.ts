@@ -1,4 +1,5 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
+import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -45,7 +46,7 @@ function setFillPatternImage(shape: Konva.Shape, ...args: Parameters<typeof getP
 /**
  * Union of all object renderers.
  */
-type AnyObjectRenderer = CanvasObjectBrushLine | CanvasObjectEraserLine | CanvasObjectRect | CanvasObjectImage;
+export type AnyObjectRenderer = CanvasObjectBrushLine | CanvasObjectEraserLine | CanvasObjectRect | CanvasObjectImage;
 /**
  * Union of all object states.
  */
@@ -82,8 +83,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   bufferRenderer: AnyObjectRenderer | null = null;
   /**
    * A map of object renderers, keyed by their ID.
+   *
+   * This map can be used with React.useSyncExternalStore to sync the object renderers with a React component.
    */
-  renderers: Map<string, AnyObjectRenderer> = new Map();
+  renderers = new SyncableMap<string, AnyObjectRenderer>();
 
   /**
    * A object containing singleton Konva nodes.
