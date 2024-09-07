@@ -106,6 +106,8 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.group.add(this.colorPickerToolPreview.konva.group);
 
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
+    this.subscriptions.add(this.manager.stateApi.$isTranforming.listen(this.render));
+    this.subscriptions.add(this.manager.filter.$isFiltering.listen(this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSettingsSlice, this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.syncCursorStyle));
     this.subscriptions.add(
@@ -142,7 +144,9 @@ export class CanvasToolModule extends CanvasModuleBase {
       stage.setCursor(isMouseDown ? 'grabbing' : 'grab');
     } else if (this.manager.stateApi.getRenderedEntityCount() === 0) {
       stage.setCursor('not-allowed');
-    } else if (this.manager.$isBusy.get()) {
+    } else if (this.manager.stateApi.$isTranforming.get()) {
+      stage.setCursor('default');
+    } else if (this.manager.filter.$isFiltering.get()) {
       stage.setCursor('not-allowed');
     } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.getIsInteractable()) {
       stage.setCursor('not-allowed');

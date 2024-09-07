@@ -58,7 +58,6 @@ export class CanvasFilterModule extends CanvasModuleBase {
       return;
     }
     this.$adapter.set(adapter);
-    this.manager.tool.$tool.set('view');
   };
 
   previewFilter = async () => {
