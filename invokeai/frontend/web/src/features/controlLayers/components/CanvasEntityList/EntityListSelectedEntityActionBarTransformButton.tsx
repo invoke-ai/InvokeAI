@@ -1,34 +1,16 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { selectIsStaging } from 'features/controlLayers/store/canvasSessionSlice';
+import { useEntityTransform } from 'features/controlLayers/hooks/useEntityTransform';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { isTransformableEntityIdentifier } from 'features/controlLayers/store/types';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFrameCornersBold } from 'react-icons/pi';
 
 export const EntityListSelectedEntityActionBarTransformButton = memo(() => {
   const { t } = useTranslation();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
-  const canvasManager = useCanvasManager();
-  const isStaging = useAppSelector(selectIsStaging);
-  const isBusy = useCanvasIsBusy();
-
-  const onClick = useCallback(() => {
-    if (!selectedEntityIdentifier) {
-      return;
-    }
-    if (!isTransformableEntityIdentifier(selectedEntityIdentifier)) {
-      return;
-    }
-    const adapter = canvasManager.getAdapter(selectedEntityIdentifier);
-    if (!adapter) {
-      return;
-    }
-    adapter.transformer.startTransform();
-  }, [canvasManager, selectedEntityIdentifier]);
+  const transform = useEntityTransform(selectedEntityIdentifier);
 
   if (!selectedEntityIdentifier) {
     return null;
@@ -40,8 +22,8 @@ export const EntityListSelectedEntityActionBarTransformButton = memo(() => {
 
   return (
     <IconButton
-      onClick={onClick}
-      isDisabled={isBusy || isStaging}
+      onClick={transform.start}
+      isDisabled={transform.isDisabled}
       size="sm"
       variant="link"
       alignSelf="stretch"
