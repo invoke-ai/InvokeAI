@@ -278,3 +278,5 @@ export const {
   usePruneCompletedModelInstallsMutation,
   useGetStarterModelsQuery,
 } = modelsApi;
+
+export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();

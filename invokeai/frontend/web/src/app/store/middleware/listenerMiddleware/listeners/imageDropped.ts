@@ -1,6 +1,7 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { selectDefaultControlAdapter } from 'features/controlLayers/hooks/addLayerHooks';
 import {
   controlLayerAdded,
   ipaImageChanged,
@@ -103,11 +104,14 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
+        const state = getState();
         const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
-        const { x, y } = selectCanvasSlice(getState()).bbox.rect;
+        const { x, y } = selectCanvasSlice(state).bbox.rect;
+        const defaultControlAdapter = selectDefaultControlAdapter(state);
         const overrides: Partial<CanvasControlLayerState> = {
           objects: [imageObject],
           position: { x, y },
+          controlAdapter: defaultControlAdapter,
         };
         dispatch(controlLayerAdded({ overrides, isSelected: true }));
         return;

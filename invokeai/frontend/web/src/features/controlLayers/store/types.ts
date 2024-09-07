@@ -553,14 +553,8 @@ export type FillStyle = z.infer<typeof zFillStyle>;
 export const isFillStyle = (v: unknown): v is FillStyle => zFillStyle.safeParse(v).success;
 const zFill = z.object({ style: zFillStyle, color: zRgbColor });
 
-const zRegionalGuidanceIPAdapterConfig = z.object({
+const zRegionalGuidanceIPAdapterConfig = zIPAdapterConfig.extend({
   id: zId,
-  image: zImageWithDims.nullable(),
-  model: zModelIdentifierField.nullable(),
-  weight: z.number().gte(-1).lte(2),
-  beginEndStepPct: zBeginEndStepPct,
-  method: zIPMethodV2,
-  clipVisionModel: zCLIPVisionModelV2,
 });
 export type RegionalGuidanceIPAdapterConfig = z.infer<typeof zRegionalGuidanceIPAdapterConfig>;
 
