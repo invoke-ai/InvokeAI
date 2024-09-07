@@ -42,6 +42,7 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
     };
 
     this.subscriptions.add(this.manager.stateApi.$lastCanvasProgressEvent.listen(this.render));
+    this.subscriptions.add(this.manager.stagingArea.$shouldShowStagedImage.listen(this.render));
   }
 
   getNodes = () => {
@@ -88,7 +89,8 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
         });
         this.konva.group.add(this.konva.image);
       }
-      this.konva.group.visible(true);
+      // Should not be visible if the user has disabled showing staging images
+      this.konva.group.visible(this.manager.stagingArea.$shouldShowStagedImage.get());
     } catch {
       this.isError = true;
     } finally {
