@@ -127,10 +127,10 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasRasterLayerState>;
           isSelected?: boolean;
-          deleteOthers?: boolean;
+          isMergingVisible?: boolean;
         }>
       ) => {
-        const { id, overrides, isSelected, deleteOthers } = action.payload;
+        const { id, overrides, isSelected, isMergingVisible } = action.payload;
         const entity: CanvasRasterLayerState = {
           id,
           name: null,
@@ -143,11 +143,12 @@ export const canvasSlice = createSlice({
         };
         merge(entity, overrides);
 
-        if (deleteOthers) {
-          state.rasterLayers.entities = [entity];
-        } else {
-          state.rasterLayers.entities.push(entity);
+        if (isMergingVisible) {
+          // When merging visible, we delete all disabled layers
+          state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => !layer.isEnabled);
         }
+
+        state.rasterLayers.entities.push(entity);
 
         if (isSelected) {
           state.selectedEntityIdentifier = getEntityIdentifier(entity);
@@ -156,10 +157,7 @@ export const canvasSlice = createSlice({
       prepare: (payload: {
         overrides?: Partial<CanvasRasterLayerState>;
         isSelected?: boolean;
-        /**
-         * asdf
-         */
-        deleteOthers?: boolean;
+        isMergingVisible?: boolean;
       }) => ({
         payload: { ...payload, id: getPrefixedId('raster_layer') },
       }),
@@ -625,10 +623,10 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasInpaintMaskState>;
           isSelected?: boolean;
-          deleteOthers?: boolean;
+          isMergingVisible?: boolean;
         }>
       ) => {
-        const { id, overrides, isSelected, deleteOthers } = action.payload;
+        const { id, overrides, isSelected, isMergingVisible } = action.payload;
         const entity: CanvasInpaintMaskState = {
           id,
           name: null,
@@ -645,11 +643,12 @@ export const canvasSlice = createSlice({
         };
         merge(entity, overrides);
 
-        if (deleteOthers) {
-          state.inpaintMasks.entities = [entity];
-        } else {
-          state.inpaintMasks.entities.push(entity);
+        if (isMergingVisible) {
+          // When merging visible, we delete all disabled layers
+          state.inpaintMasks.entities = state.inpaintMasks.entities.filter((layer) => !layer.isEnabled);
         }
+
+        state.inpaintMasks.entities.push(entity);
 
         if (isSelected) {
           state.selectedEntityIdentifier = getEntityIdentifier(entity);
@@ -658,7 +657,7 @@ export const canvasSlice = createSlice({
       prepare: (payload?: {
         overrides?: Partial<CanvasInpaintMaskState>;
         isSelected?: boolean;
-        deleteOthers?: boolean;
+        isMergingVisible?: boolean;
       }) => ({
         payload: { ...payload, id: getPrefixedId('inpaint_mask') },
       }),

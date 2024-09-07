@@ -43,7 +43,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
               objects: [imageDTOToImageObject(result.value)],
               position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
             },
-            deleteOthers: true,
+            isMergingVisible: true,
           })
         );
         toast({ title: t('controlLayers.mergeVisibleOk') });
@@ -65,7 +65,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
               objects: [imageDTOToImageObject(result.value)],
               position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
             },
-            deleteOthers: true,
+            isMergingVisible: true,
           })
         );
         toast({ title: t('controlLayers.mergeVisibleOk') });
