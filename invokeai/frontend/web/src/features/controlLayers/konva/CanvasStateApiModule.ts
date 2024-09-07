@@ -13,6 +13,7 @@ import {
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
+  $lastCanvasProgressEvent,
   bboxChanged,
   entityBrushLineAdded,
   entityEraserLineAdded,
@@ -38,7 +39,6 @@ import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig } from 'services/api/types';
-import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
 import { assert } from 'tsafe';
 
 import type { CanvasEntityAdapter } from './CanvasEntityAdapter/types';

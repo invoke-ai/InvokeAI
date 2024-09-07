@@ -1,6 +1,6 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { $lastCanvasProgressEvent } from 'features/controlLayers/store/canvasSlice';
 import { queueApi } from 'services/api/endpoints/queue';
-import { $lastCanvasProgressEvent } from 'services/events/setEventListeners';
 
 /**
  * To prevent a race condition where a progress event arrives after a successful cancellation, we need to keep track of

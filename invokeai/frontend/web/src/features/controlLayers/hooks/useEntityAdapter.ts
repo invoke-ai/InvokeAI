@@ -4,6 +4,7 @@ import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types'
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
 
+/** @knipignore */
 export const useEntityAdapter = (entityIdentifier: CanvasEntityIdentifier): CanvasEntityAdapter => {
   const canvasManager = useCanvasManager();
 
