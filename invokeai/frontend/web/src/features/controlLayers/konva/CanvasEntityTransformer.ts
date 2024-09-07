@@ -547,7 +547,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.log.debug('Applying transform');
     this.$isProcessing.set(true);
     const rect = this.getRelativeRect();
-    await this.parent.renderer.rasterize({ rect, replaceObjects: true, attrs: { filters: [] } });
+    await this.parent.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1, filters: [] } });
     this.requestRectCalculation();
     this.stopTransform();
   };
