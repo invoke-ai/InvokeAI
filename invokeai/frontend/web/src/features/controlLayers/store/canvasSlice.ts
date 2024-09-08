@@ -1228,9 +1228,17 @@ export const canvasPersistConfig: PersistConfig<CanvasState> = {
 };
 
 const syncScaledSize = (state: CanvasState) => {
-  if (state.bbox.scaleMethod === 'auto' || (state.bbox.scaleMethod === 'manual' && state.bbox.aspectRatio.isLocked)) {
+  if (state.bbox.scaleMethod === 'auto') {
+    // Sync both aspect ratio and size
     const { width, height } = state.bbox.rect;
     state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.optimalDimension);
+  } else if (state.bbox.scaleMethod === 'manual' && state.bbox.aspectRatio.isLocked) {
+    // Only sync the aspect ratio if manual & locked
+    state.bbox.scaledSize = calculateNewSize(
+      state.bbox.aspectRatio.value,
+      state.bbox.scaledSize.width * state.bbox.scaledSize.height,
+      64
+    );
   }
 };
 
