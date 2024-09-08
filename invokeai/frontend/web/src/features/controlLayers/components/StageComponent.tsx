@@ -4,7 +4,7 @@ import { $socket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
-import { HeadsUpDisplay } from 'features/controlLayers/components/HeadsUpDisplay';
+import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -99,7 +99,7 @@ export const StageComponent = memo(() => {
       />
       {showHUD && (
         <Flex position="absolute" top={1} insetInlineStart={1} pointerEvents="none">
-          <HeadsUpDisplay />
+          <CanvasHUD />
         </Flex>
       )}
     </Flex>
