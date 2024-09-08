@@ -1,7 +1,7 @@
 import { addAppListener } from 'app/store/middleware/listenerMiddleware';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObjectImage';
+import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   selectCanvasStagingAreaSlice,
