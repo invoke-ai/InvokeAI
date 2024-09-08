@@ -1,6 +1,8 @@
-import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import type { RgbaColor } from 'features/controlLayers/store/types';
+import type { RgbaColor, Snap } from 'features/controlLayers/store/types';
+import { assert } from 'tsafe';
 
 type CanvasSettingsState = {
   /**
@@ -55,6 +57,10 @@ type CanvasSettingsState = {
    * Whether to automatically preview the filter when the filter configuration changes.
    */
   autoPreviewFilter: boolean;
+  /**
+   * The snap-to-grid setting for the canvas.
+   */
+  snapToGrid: Snap;
   // TODO(psyche): These are copied from old canvas state, need to be implemented
   // imageSmoothing: boolean;
   // preserveMaskedArea: boolean;
@@ -73,6 +79,7 @@ const initialState: CanvasSettingsState = {
   sendToCanvas: false,
   compositeMaskedRegions: false,
   autoPreviewFilter: true,
+  snapToGrid: '64',
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -112,6 +119,9 @@ export const canvasSettingsSlice = createSlice({
     settingsAutoPreviewFilterToggled: (state) => {
       state.autoPreviewFilter = !state.autoPreviewFilter;
     },
+    settingsSnapToGridChanged: (state, action: PayloadAction<Snap>) => {
+      state.snapToGrid = action.payload;
+    },
   },
 });
 
@@ -127,6 +137,7 @@ export const {
   settingsSendToCanvasChanged,
   settingsCompositeMaskedRegionsChanged,
   settingsAutoPreviewFilterToggled,
+  settingsSnapToGridChanged,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -142,14 +153,20 @@ export const canvasSettingsPersistConfig: PersistConfig<CanvasSettingsState> = {
 };
 
 export const selectCanvasSettingsSlice = (s: RootState) => s.canvasSettings;
+const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState, T>) =>
+  createSelector(selectCanvasSettingsSlice, selector);
 
-export const selectDynamicGrid = createSelector(
-  selectCanvasSettingsSlice,
-  (canvasSettings) => canvasSettings.dynamicGrid
-);
-
-export const selectShowHUD = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.showHUD);
-export const selectAutoPreviewFilter = createSelector(
-  selectCanvasSettingsSlice,
-  (canvasSettings) => canvasSettings.autoPreviewFilter
-);
+export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
+export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
+export const selectAutoPreviewFilter = createCanvasSettingsSelector((settings) => settings.autoPreviewFilter);
+export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
+export const selectSnapToGridPixelValue = createCanvasSettingsSelector((settings) => {
+  if (settings.snapToGrid === 'off') {
+    return 1;
+  } else if (settings.snapToGrid === '8') {
+    return 8;
+  } else if (settings.snapToGrid === '64') {
+    return 64;
+  }
+  assert(false, 'Invalid snapToGrid value');
+});

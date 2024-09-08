@@ -9,6 +9,8 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import type { SubscriptionHandler } from 'features/controlLayers/konva/util';
 import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
 import {
+  selectCanvasSettingsSlice,
+  selectSnapToGridPixelValue,
   settingsBrushWidthChanged,
   settingsColorChanged,
   settingsEraserWidthChanged,
@@ -24,9 +26,10 @@ import {
   entityReset,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasStagingAreaSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { selectAllRenderableEntities, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectAllRenderableEntities, selectBbox, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityType,
+  CanvasState,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
   EntityIdentifierPayload,
@@ -111,8 +114,8 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    *
    * The state is stored in redux.
    */
-  getCanvasState = () => {
-    return selectCanvasSlice(this.store.getState());
+  getCanvasState = (): CanvasState => {
+    return this.runSelector(selectCanvasSlice);
   };
 
   /**
@@ -200,14 +203,18 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Gets the generation bbox state from redux.
    */
   getBbox = () => {
-    return this.getCanvasState().bbox;
+    return this.runSelector(selectBbox);
   };
 
   /**
    * Gets the canvas settings from redux.
    */
   getSettings = () => {
-    return this.store.getState().canvasSettings;
+    return this.runSelector(selectCanvasSettingsSlice);
+  };
+
+  getSnapToGridPixelValue = (): number => {
+    return this.runSelector(selectSnapToGridPixelValue);
   };
 
   /**
@@ -242,7 +249,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Gets the canvas staging area state from redux.
    */
   getStagingArea = () => {
-    return selectCanvasStagingAreaSlice(this.store.getState());
+    return this.runSelector(selectCanvasStagingAreaSlice);
   };
 
   /**
