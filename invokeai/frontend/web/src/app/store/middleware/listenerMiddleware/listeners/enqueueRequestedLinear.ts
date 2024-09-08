@@ -4,7 +4,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { SerializableObject } from 'common/types';
 import type { Result } from 'common/util/result';
 import { isErr, withResult, withResultAsync } from 'common/util/result';
-import { $canvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
 import {
   selectIsStaging,
   stagingAreaReset,

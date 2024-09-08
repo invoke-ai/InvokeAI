@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react';
-import { $canvasManager, type CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext } from 'react';
 import { assert } from 'tsafe';

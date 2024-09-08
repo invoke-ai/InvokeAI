@@ -19,6 +19,7 @@ import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStag
 import { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import {
   isControlLayerEntityIdentifier,
@@ -28,14 +29,12 @@ import {
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Atom } from 'nanostores';
-import { atom, computed } from 'nanostores';
+import { computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { assert } from 'tsafe';
 
 import { CanvasBackgroundModule } from './CanvasBackgroundModule';
 import { CanvasStateApiModule } from './CanvasStateApiModule';
-
-export const $canvasManager = atom<CanvasManager | null>(null);
 
 export class CanvasManager extends CanvasModuleBase {
   readonly type = 'manager';
