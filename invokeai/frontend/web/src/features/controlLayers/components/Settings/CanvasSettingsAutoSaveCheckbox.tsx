@@ -1,9 +1,6 @@
 import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  selectAutoSave,
-  settingsAutoSaveToggled,
-} from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectAutoSave, settingsAutoSaveToggled } from 'features/controlLayers/store/canvasSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
