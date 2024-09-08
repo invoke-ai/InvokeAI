@@ -1657,7 +1657,6 @@
         "storeNotInitialized": "Store is not initialized"
     },
     "controlLayers": {
-        "autoPreviewFilter": "Auto Preview",
         "bookmark": "Bookmark for Quick Switch",
         "fitBboxToLayers": "Fit Bbox To Layers",
         "removeBookmark": "Remove Bookmark",
@@ -1794,7 +1793,9 @@
             "filter": "Filter",
             "filters": "Filters",
             "filterType": "Filter Type",
-            "preview": "Preview",
+            "autoProcess": "Auto Process",
+            "reset": "Reset",
+            "process": "Process",
             "apply": "Apply",
             "cancel": "Cancel",
             "spandrel": {

@@ -53,9 +53,9 @@ type CanvasSettingsState = {
    */
   compositeMaskedRegions: boolean;
   /**
-   * Whether to automatically preview the filter when the filter configuration changes.
+   * Whether to automatically process the filter when the filter configuration changes.
    */
-  autoPreviewFilter: boolean;
+  autoProcessFilter: boolean;
   /**
    * The snap-to-grid setting for the canvas.
    */
@@ -77,7 +77,7 @@ const initialState: CanvasSettingsState = {
   color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
   sendToCanvas: false,
   compositeMaskedRegions: false,
-  autoPreviewFilter: true,
+  autoProcessFilter: true,
   gridSize: 64,
 };
 
@@ -115,8 +115,8 @@ export const canvasSettingsSlice = createSlice({
     settingsCompositeMaskedRegionsChanged: (state, action: PayloadAction<boolean>) => {
       state.compositeMaskedRegions = action.payload;
     },
-    settingsAutoPreviewFilterToggled: (state) => {
-      state.autoPreviewFilter = !state.autoPreviewFilter;
+    settingsAutoProcessFilterToggled: (state) => {
+      state.autoProcessFilter = !state.autoProcessFilter;
     },
     settingsGridSizeChanged: (state, action: PayloadAction<GridSize>) => {
       state.gridSize = action.payload;
@@ -135,7 +135,7 @@ export const {
   settingsInvertScrollForToolWidthChanged,
   settingsSendToCanvasChanged,
   settingsCompositeMaskedRegionsChanged,
-  settingsAutoPreviewFilterToggled,
+  settingsAutoProcessFilterToggled,
   settingsGridSizeChanged,
 } = canvasSettingsSlice.actions;
 
@@ -158,5 +158,5 @@ const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState,
 export const selectAutoSave = createCanvasSettingsSelector((settings) => settings.autoSave);
 export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
-export const selectAutoPreviewFilter = createCanvasSettingsSelector((settings) => settings.autoPreviewFilter);
+export const selectAutoProcessFilter = createCanvasSettingsSelector((settings) => settings.autoProcessFilter);
 export const selectGridSize = createCanvasSettingsSelector((settings) => settings.gridSize);

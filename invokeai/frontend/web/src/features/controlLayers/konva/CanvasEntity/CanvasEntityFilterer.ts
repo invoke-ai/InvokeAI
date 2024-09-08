@@ -4,7 +4,7 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectAutoPreviewFilter } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectAutoProcessFilter } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { CanvasImageState, FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/store/types';
 import { debounce } from 'lodash-es';
@@ -41,31 +41,33 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
     this.subscriptions.add(
       this.$filterConfig.listen(() => {
-        if (this.manager.stateApi.getSettings().autoPreviewFilter && this.$isFiltering.get()) {
-          this.previewFilter();
+        if (this.manager.stateApi.getSettings().autoProcessFilter && this.$isFiltering.get()) {
+          this.process();
         }
       })
     );
     this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectAutoPreviewFilter, (autoPreviewFilter) => {
+      this.manager.stateApi.createStoreSubscription(selectAutoProcessFilter, (autoPreviewFilter) => {
         if (autoPreviewFilter && this.$isFiltering.get()) {
-          this.previewFilter();
+          this.process();
         }
       })
     );
   }
 
-  startFilter = (config?: FilterConfig) => {
+  start = (config?: FilterConfig) => {
     this.log.trace('Initializing filter');
     if (config) {
       this.$filterConfig.set(config);
     }
     this.$isFiltering.set(true);
     this.manager.stateApi.$filteringAdapter.set(this.parent);
-    this.previewFilter();
+    if (this.manager.stateApi.getSettings().autoProcessFilter) {
+      this.process();
+    }
   };
 
-  previewFilter = debounce(
+  process = debounce(
     async () => {
       const config = this.$filterConfig.get();
       const isValid = IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
@@ -113,7 +115,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     { leading: true, trailing: true }
   );
 
-  applyFilter = () => {
+  apply = () => {
     const imageState = this.imageState;
     if (!imageState) {
       this.log.warn('No image state to apply filter to');
@@ -138,14 +140,20 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.manager.stateApi.$filteringAdapter.set(null);
   };
 
-  cancelFilter = () => {
-    this.log.trace('Cancelling filter');
+  reset = () => {
+    this.log.trace('Resetting filter');
 
     this.parent.bufferRenderer.clearBuffer();
     this.parent.renderer.showObjects();
     this.parent.transformer.updatePosition();
     this.parent.renderer.syncCache(true);
     this.imageState = null;
+  };
+
+  cancel = () => {
+    this.log.trace('Cancelling filter');
+
+    this.reset();
     this.$isProcessing.set(false);
     this.$isFiltering.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
