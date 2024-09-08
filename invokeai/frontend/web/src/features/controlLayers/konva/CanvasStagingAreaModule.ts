@@ -42,6 +42,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.selectedImage = null;
 
     this.subscriptions.add(this.$shouldShowStagedImage.listen(this.render));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasStagingAreaSlice, this.render));
     this.subscriptions.add(
       this.manager.stateApi.store.dispatch(
         addAppListener({
