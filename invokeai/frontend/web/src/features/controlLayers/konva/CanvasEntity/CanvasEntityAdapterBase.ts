@@ -141,6 +141,20 @@ export abstract class CanvasEntityAdapterBase<
     await this.sync(this.manager.stateApi.runSelector(this.selectState), undefined);
     this.transformer.initialize();
     await this.renderer.initialize();
+    this.syncZIndices();
+  };
+
+  syncZIndices = () => {
+    this.log.trace('Updating z-indices');
+    let zIndex = 0;
+    this.renderer.konva.objectGroup.zIndex(zIndex++);
+    this.bufferRenderer.konva.group.zIndex(zIndex++);
+    if (this.renderer.konva.compositing) {
+      this.renderer.konva.compositing.group.zIndex(zIndex++);
+    }
+    this.transformer.konva.outlineRect.zIndex(zIndex++);
+    this.transformer.konva.proxyRect.zIndex(zIndex++);
+    this.transformer.konva.transformer.zIndex(zIndex++);
   };
 
   /**
