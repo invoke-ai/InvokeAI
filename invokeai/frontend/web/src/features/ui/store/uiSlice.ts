@@ -80,3 +80,5 @@ export const uiPersistConfig: PersistConfig<UIState> = {
 
 export const $isGalleryPanelOpen = atom(true);
 export const $isParametersPanelOpen = atom(true);
+export const TABS_WITH_GALLERY_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
+export const TABS_WITH_OPTIONS_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
