@@ -68,7 +68,7 @@ export const useEntityFilter = (entityIdentifier: CanvasEntityIdentifier | null)
     if (!adapter) {
       return;
     }
-    adapter.filterer.startFilter();
+    adapter.filterer.start();
   }, [isDisabled, entityIdentifier, canvasManager]);
 
   return { isDisabled, start } as const;

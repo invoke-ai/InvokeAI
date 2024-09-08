@@ -231,7 +231,7 @@ export abstract class CanvasEntityAdapterBase<
     }
     this.transformer.destroy();
     if (this.filterer?.$isFiltering.get()) {
-      this.filterer.cancelFilter();
+      this.filterer.cancel();
     }
     this.konva.layer.destroy();
     this.manager.deleteAdapter(this.entityIdentifier);
