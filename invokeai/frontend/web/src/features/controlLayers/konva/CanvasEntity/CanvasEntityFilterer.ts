@@ -26,6 +26,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   subscriptions = new Set<() => void>();
 
   $isFiltering = atom<boolean>(false);
+  $hasProcessed = atom<boolean>(false);
   $isProcessing = atom<boolean>(false);
   $filterConfig = atom<FilterConfig>(IMAGE_FILTERS.canny_image_processor.buildDefaults());
 
@@ -102,6 +103,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
         this.parent.renderer.hideObjects();
         this.$isProcessing.set(false);
+        this.$hasProcessed.set(true);
       };
 
       this.manager.socket.on('invocation_complete', listener);
@@ -137,6 +139,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     });
     this.imageState = null;
     this.$isFiltering.set(false);
+    this.$hasProcessed.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
   };
 
@@ -148,6 +151,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.parent.transformer.updatePosition();
     this.parent.renderer.syncCache(true);
     this.imageState = null;
+    this.$hasProcessed.set(false);
   };
 
   cancel = () => {
@@ -156,6 +160,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.reset();
     this.$isProcessing.set(false);
     this.$isFiltering.set(false);
+    this.$hasProcessed.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
   };
 
