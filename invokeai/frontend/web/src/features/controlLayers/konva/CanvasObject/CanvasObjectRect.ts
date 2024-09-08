@@ -1,7 +1,7 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
-import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntityBufferObjectRenderer';
-import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
+import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
+import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasRectState } from 'features/controlLayers/store/types';

@@ -1,12 +1,13 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
-import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLine';
 import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLine';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
+import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
@@ -27,8 +28,6 @@ import { serializeError } from 'serialize-error';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
-
-import type { AnyObjectRenderer, AnyObjectState } from './CanvasObject/types';
 
 function setFillPatternImage(shape: Konva.Shape, ...args: Parameters<typeof getPatternSVG>): HTMLImageElement {
   const imageElement = new Image();

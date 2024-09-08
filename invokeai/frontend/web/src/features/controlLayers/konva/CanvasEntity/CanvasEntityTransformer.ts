@@ -1,4 +1,4 @@
-import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';

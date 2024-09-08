@@ -1,8 +1,8 @@
 import type { SerializableObject } from 'common/types';
-import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterBase';
-import { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntityBufferObjectRenderer';
-import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
-import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
+import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterBase';
+import { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
+import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
+import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type { CanvasEntityIdentifier, CanvasInpaintMaskState, Rect } from 'features/controlLayers/store/types';
 import type { GroupConfig } from 'konva/lib/Group';

@@ -1,5 +1,5 @@
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
 import { assert } from 'tsafe';
