@@ -15,12 +15,12 @@ import { CanvasSettingsClearHistoryButton } from 'features/controlLayers/compone
 import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsClipToBboxCheckbox';
 import { CanvasSettingsCompositeMaskedRegionsCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsCompositeMaskedRegionsCheckbox';
 import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsDynamicGridSwitch';
+import { CanvasSettingsGridSize } from 'features/controlLayers/components/Settings/CanvasSettingsGridSize';
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
 import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsResetButton } from 'features/controlLayers/components/Settings/CanvasSettingsResetButton';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
-import { CanvasSettingsSnapToGrid } from 'features/controlLayers/components/Settings/CanvasSettingsSnapToGrid';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RiSettings4Fill } from 'react-icons/ri';
@@ -41,7 +41,7 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsClipToBboxCheckbox />
             <CanvasSettingsCompositeMaskedRegionsCheckbox />
             <CanvasSettingsDynamicGridSwitch />
-            <CanvasSettingsSnapToGrid />
+            <CanvasSettingsGridSize />
             <CanvasSettingsShowHUDSwitch />
             <CanvasSettingsResetButton />
             <DebugSettings />

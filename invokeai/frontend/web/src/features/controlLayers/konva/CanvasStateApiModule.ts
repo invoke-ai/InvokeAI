@@ -10,7 +10,6 @@ import type { SubscriptionHandler } from 'features/controlLayers/konva/util';
 import { createReduxSubscription, getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   selectCanvasSettingsSlice,
-  selectSnapToGridPixelValue,
   settingsBrushWidthChanged,
   settingsColorChanged,
   settingsEraserWidthChanged,
@@ -211,10 +210,6 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   getSettings = () => {
     return this.runSelector(selectCanvasSettingsSlice);
-  };
-
-  getSnapToGridPixelValue = (): number => {
-    return this.runSelector(selectSnapToGridPixelValue);
   };
 
   /**

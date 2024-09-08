@@ -1,15 +1,28 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectSnapToGrid, settingsSnapToGridChanged } from 'features/controlLayers/store/canvasSettingsSlice';
-import { isSnap } from 'features/controlLayers/store/types';
+import { selectGridSize, settingsGridSizeChanged } from 'features/controlLayers/store/canvasSettingsSlice';
+import { isGridSize } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const CanvasSettingsSnapToGrid = memo(() => {
+const getValue = (valueString: string) => {
+  switch (valueString) {
+    case 'off':
+      return 1;
+    case '8':
+      return 8;
+    case '64':
+      return 64;
+    default:
+      return null;
+  }
+};
+
+export const CanvasSettingsGridSize = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const snapToGrid = useAppSelector(selectSnapToGrid);
+  const gridSize = useAppSelector(selectGridSize);
   const options = useMemo<ComboboxOption[]>(
     () => [
       { label: t('controlLayers.settings.snapToGrid.off'), value: 'off' },
@@ -20,14 +33,18 @@ export const CanvasSettingsSnapToGrid = memo(() => {
   );
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
-      if (!isSnap(v?.value)) {
+      if (!v) {
         return;
       }
-      dispatch(settingsSnapToGridChanged(v.value));
+      const value = getValue(v.value);
+      if (!isGridSize(value)) {
+        return;
+      }
+      dispatch(settingsGridSizeChanged(value));
     },
     [dispatch]
   );
-  const value = useMemo(() => options.find((o) => o.value === snapToGrid), [options, snapToGrid]);
+  const value = useMemo(() => options.find((o) => getValue(o.value) === gridSize), [options, gridSize]);
 
   return (
     <FormControl>
@@ -39,4 +56,4 @@ export const CanvasSettingsSnapToGrid = memo(() => {
   );
 });
 
-CanvasSettingsSnapToGrid.displayName = 'CanvasSettingsSnapToGrid';
+CanvasSettingsGridSize.displayName = 'CanvasSettingsSnapToGrid';

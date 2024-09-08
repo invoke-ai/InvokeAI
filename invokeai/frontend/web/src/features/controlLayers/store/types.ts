@@ -18,9 +18,9 @@ const zImageWithDims = z.object({
 });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
 
-const zSnap = z.enum(['off', '8', '64']);
-export type Snap = z.infer<typeof zSnap>;
-export const isSnap = (v: unknown): v is Snap => zSnap.safeParse(v).success;
+const zGridSize = z.union([z.literal(1), z.literal(8), z.literal(64)]);
+export type GridSize = z.infer<typeof zGridSize>;
+export const isGridSize = (v: unknown): v is GridSize => zGridSize.safeParse(v).success;
 
 const zBeginEndStepPct = z
   .tuple([z.number().gte(0).lte(1), z.number().gte(0).lte(1)])

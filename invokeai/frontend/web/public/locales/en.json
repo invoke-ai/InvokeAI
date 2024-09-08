@@ -1815,14 +1815,13 @@
         },
         "settings": {
             "snapToGrid": {
-                "label": "Snap",
+                "label": "Snap to Grid",
                 "off": "Off",
                 "8": "8px",
                 "64": "64px"
             }
         },
         "HUD": {
-            "snapToGrid": "Snap",
             "bbox": "Bbox",
             "scaledBbox": "Scaled Bbox",
             "autoSave": "Auto Save"
