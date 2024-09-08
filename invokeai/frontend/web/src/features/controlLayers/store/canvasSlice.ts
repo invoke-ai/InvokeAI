@@ -4,6 +4,7 @@ import type { PersistConfig } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
+import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
@@ -1278,3 +1279,4 @@ function actionsThrottlingFilter(action: UnknownAction) {
 }
 
 export const $lastCanvasProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
+export const $canvasManager = atom<CanvasManager | null>(null);

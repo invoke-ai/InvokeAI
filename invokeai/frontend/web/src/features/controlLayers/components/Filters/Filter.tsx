@@ -1,13 +1,4 @@
-import {
-  Button,
-  ButtonGroup,
-  Flex,
-  FormControl,
-  FormLabel,
-  Heading,
-  Spacer,
-  Switch,
-} from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FilterSettings } from 'features/controlLayers/components/Filters/FilterSettings';
