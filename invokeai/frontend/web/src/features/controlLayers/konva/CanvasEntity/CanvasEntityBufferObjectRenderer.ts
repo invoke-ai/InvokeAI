@@ -91,6 +91,14 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
       return false;
     }
 
+    // If we are creating a new renderer, we need to destroy the old one. But, to prevent a flicker, we only destroy
+    // it after the new renderer has been created and rendered.
+    let rendererToDestroy: AnyObjectRenderer | null = null;
+    if (this.renderer && this.renderer.id !== this.state.id) {
+      rendererToDestroy = this.renderer;
+      this.renderer = null;
+    }
+
     if (this.state.type === 'brush_line') {
       assert(this.renderer instanceof CanvasObjectBrushLine || !this.renderer);
 
@@ -126,6 +134,10 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
         this.konva.group.add(this.renderer.konva.group);
       }
       didRender = await this.renderer.update(this.state, true);
+    }
+
+    if (rendererToDestroy) {
+      rendererToDestroy.destroy();
     }
 
     return didRender;
@@ -180,7 +192,7 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
       return;
     }
 
-    this.log.trace('Committing buffer');
+    this.log.trace({ buffer: this.renderer.repr() }, 'Committing buffer');
 
     // Move the buffer to the persistent objects group/renderers
     this.parent.renderer.adoptObjectRenderer(this.renderer);
