@@ -277,7 +277,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     // If the user is not holding shift, the transform is retaining aspect ratio. It's not possible to snap to the grid
     // in this case, because that would change the aspect ratio. So, we only snap to the grid when shift is held.
-    const snap = this.manager.stateApi.$shiftKey.get() ? this.manager.stateApi.getSnapToGridPixelValue() : 1;
+    const gridSize = this.manager.stateApi.$shiftKey.get() ? this.manager.stateApi.getSettings().gridSize : 1;
 
     // We need to snap the anchor to the selected grid size, but the positions provided to this callback are absolute,
     // scaled coordinates. They need to be converted to stage coordinates, snapped, then converted back to absolute
@@ -286,15 +286,15 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const stagePos = this.manager.stage.getPosition();
 
     // Unscale and snap the coordinate.
-    const targetX = roundToMultiple(newPos.x / stageScale, snap);
-    const targetY = roundToMultiple(newPos.y / stageScale, snap);
+    const targetX = roundToMultiple(newPos.x / stageScale, gridSize);
+    const targetY = roundToMultiple(newPos.y / stageScale, gridSize);
 
     // The stage may be offset by fraction of the grid snap size. To ensure the anchor snaps to the grid, we need to
     // calculate that offset and add it back to the target position.
 
     // Calculate the offset. It's the remainder of the stage position divided by the scale * grid snap value in pixels.
-    const scaledOffsetX = stagePos.x % (stageScale * snap);
-    const scaledOffsetY = stagePos.y % (stageScale * snap);
+    const scaledOffsetX = stagePos.x % (stageScale * gridSize);
+    const scaledOffsetY = stagePos.y % (stageScale * gridSize);
 
     // Unscale the target position and add the offset to get the absolute position for this anchor.
     const scaledTargetX = targetX * stageScale + scaledOffsetX;
@@ -380,9 +380,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   onDragMove = () => {
     // Snap the interaction rect to the grid
-    const snap = this.manager.stateApi.getSnapToGridPixelValue();
-    this.konva.proxyRect.x(roundToMultiple(this.konva.proxyRect.x(), snap));
-    this.konva.proxyRect.y(roundToMultiple(this.konva.proxyRect.y(), snap));
+    const { gridSize } = this.manager.stateApi.getSettings();
+    this.konva.proxyRect.x(roundToMultiple(this.konva.proxyRect.x(), gridSize));
+    this.konva.proxyRect.y(roundToMultiple(this.konva.proxyRect.y(), gridSize));
 
     // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
     // and border

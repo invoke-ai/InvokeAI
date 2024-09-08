@@ -1,8 +1,8 @@
 import { Grid } from '@invoke-ai/ui-library';
 import { CanvasHUDItemAutoSave } from 'features/controlLayers/components/HUD/CanvasHUDItemAutoSave';
 import { CanvasHUDItemBbox } from 'features/controlLayers/components/HUD/CanvasHUDItemBbox';
+import { CanvasHUDItemGridSize } from 'features/controlLayers/components/HUD/CanvasHUDItemGridSize';
 import { CanvasHUDItemScaledBbox } from 'features/controlLayers/components/HUD/CanvasHUDItemScaledBbox';
-import { CanvasHUDItemSnapToGrid } from 'features/controlLayers/components/HUD/CanvasHUDItemSnapToGrid';
 import { memo } from 'react';
 
 export const CanvasHUD = memo(() => {
@@ -19,7 +19,7 @@ export const CanvasHUD = memo(() => {
     >
       <CanvasHUDItemBbox />
       <CanvasHUDItemScaledBbox />
-      <CanvasHUDItemSnapToGrid />
+      <CanvasHUDItemGridSize />
       <CanvasHUDItemAutoSave />
     </Grid>
   );
