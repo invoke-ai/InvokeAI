@@ -4,7 +4,8 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/Bbox/types';
 import type { ParameterHeight, ParameterLoRAModel, ParameterWidth } from 'features/parameters/types/parameterSchemas';
 import { zParameterNegativePrompt, zParameterPositivePrompt } from 'features/parameters/types/parameterSchemas';
-import type { AnyInvocation, BaseModelType, ImageDTO, S } from 'services/api/types';
+import type { AnyInvocation, BaseModelType, ImageDTO, Invocation, S } from 'services/api/types';
+import { assert } from 'tsafe';
 import { z } from 'zod';
 
 const zId = z.string().min(1);
@@ -143,6 +144,15 @@ const zZoeDepthProcessorConfig = z.object({
 });
 export type ZoeDepthProcessorConfig = z.infer<typeof zZoeDepthProcessorConfig>;
 
+const zSpandrelFilterConfig = z.object({
+  id: zId,
+  type: z.literal('spandrel_filter'),
+  model: zModelIdentifierField.nullable(),
+  autoScale: z.boolean(),
+  scale: z.number().gte(1).lte(16),
+});
+export type SpandrelFilterConfig = z.infer<typeof zSpandrelFilterConfig>;
+
 const zFilterConfig = z.discriminatedUnion('type', [
   zCannyProcessorConfig,
   zColorMapProcessorConfig,
@@ -158,6 +168,7 @@ const zFilterConfig = z.discriminatedUnion('type', [
   zDWOpenposeProcessorConfig,
   zPidiProcessorConfig,
   zZoeDepthProcessorConfig,
+  zSpandrelFilterConfig,
 ]);
 export type FilterConfig = z.infer<typeof zFilterConfig>;
 
@@ -176,6 +187,7 @@ const zFilterType = z.enum([
   'dw_openpose_image_processor',
   'pidi_image_processor',
   'zoe_depth_image_processor',
+  'spandrel_filter',
 ]);
 export type FilterType = z.infer<typeof zFilterType>;
 export const isFilterType = (v: unknown): v is FilterType => zFilterType.safeParse(v).success;
@@ -187,7 +199,8 @@ type ImageFilterData<T extends FilterConfig['type']> = {
   labelTKey: string;
   descriptionTKey: string;
   buildDefaults(baseModel?: BaseModelType): Extract<FilterConfig, { type: T }>;
-  buildNode(imageDTO: ImageWithDims, config: Extract<FilterConfig, { type: T }>): Extract<AnyInvocation, { type: T }>;
+  buildNode(imageDTO: ImageWithDims, config: Extract<FilterConfig, { type: T }>): AnyInvocation;
+  validateConfig?(config: Extract<FilterConfig, { type: T }>): boolean;
 };
 
 /**
@@ -434,6 +447,49 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       ...config,
       image: { image_name: imageDTO.image_name },
     }),
+  },
+  spandrel_filter: {
+    type: 'spandrel_filter',
+    labelTKey: 'controlLayers.filter.spandrel.label',
+    descriptionTKey: 'controlLayers.filter.spandrel.description',
+    buildDefaults: (): SpandrelFilterConfig => ({
+      id: 'spandrel_filter',
+      type: 'spandrel_filter',
+      model: null,
+      autoScale: false,
+      scale: 2,
+    }),
+    buildNode: (
+      imageDTO: ImageDTO,
+      config: SpandrelFilterConfig
+    ): Invocation<'spandrel_image_to_image' | 'spandrel_image_to_image_autoscale'> => {
+      const { model, scale, autoScale } = config;
+      assert(model !== null);
+      if (autoScale) {
+        const node: Invocation<'spandrel_image_to_image_autoscale'> = {
+          id: config.id,
+          type: 'spandrel_image_to_image_autoscale',
+          image_to_image_model: model,
+          image: { image_name: imageDTO.image_name },
+          scale,
+        };
+        return node;
+      } else {
+        const node: Invocation<'spandrel_image_to_image'> = {
+          id: config.id,
+          type: 'spandrel_image_to_image',
+          image_to_image_model: model,
+          image: { image_name: imageDTO.image_name },
+        };
+        return node;
+      }
+    },
+    validateConfig: (config): boolean => {
+      if (!config.model) {
+        return false;
+      }
+      return true;
+    },
   },
 } as const;
 

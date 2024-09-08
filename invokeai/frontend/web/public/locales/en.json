@@ -1795,7 +1795,15 @@
             "filterType": "Filter Type",
             "preview": "Preview",
             "apply": "Apply",
-            "cancel": "Cancel"
+            "cancel": "Cancel",
+            "spandrel": {
+                "label": "Image-to-Image Model",
+                "description": "Run an image-to-image model on the selected layer.",
+                "paramModel": "Model",
+                "paramAutoScale": "Auto Scale",
+                "paramAutoScaleDesc": "The selected model will be run until the target scale is reached.",
+                "paramScale": "Target Scale"
+            }
         },
         "transform": {
             "transform": "Transform",
