@@ -1,5 +1,6 @@
 import type { SerializableObject } from 'common/types';
 import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterBase';
+import { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntityBufferObjectRenderer';
 import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -10,14 +11,16 @@ import { omit } from 'lodash-es';
 export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<CanvasInpaintMaskState> {
   static TYPE = 'inpaint_mask_adapter';
 
-  transformer: CanvasEntityTransformer;
   renderer: CanvasEntityObjectRenderer;
+  bufferRenderer: CanvasEntityBufferObjectRenderer;
+  transformer: CanvasEntityTransformer;
   filterer = undefined;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>, manager: CanvasManager) {
     super(entityIdentifier, manager, CanvasEntityAdapterInpaintMask.TYPE);
 
     this.renderer = new CanvasEntityObjectRenderer(this);
+    this.bufferRenderer = new CanvasEntityBufferObjectRenderer(this);
     this.transformer = new CanvasEntityTransformer(this);
 
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectState, this.sync));

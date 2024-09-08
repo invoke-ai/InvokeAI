@@ -1,5 +1,6 @@
 import type { SerializableObject } from 'common/types';
 import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntityAdapter/CanvasEntityAdapterBase';
+import { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntityBufferObjectRenderer';
 import { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntityFilterer';
 import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
@@ -11,14 +12,16 @@ import { omit } from 'lodash-es';
 export class CanvasEntityAdapterControlLayer extends CanvasEntityAdapterBase<CanvasControlLayerState> {
   static TYPE = 'control_layer_adapter';
 
-  transformer: CanvasEntityTransformer;
   renderer: CanvasEntityObjectRenderer;
+  bufferRenderer: CanvasEntityBufferObjectRenderer;
+  transformer: CanvasEntityTransformer;
   filterer: CanvasEntityFilterer;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'control_layer'>, manager: CanvasManager) {
     super(entityIdentifier, manager, CanvasEntityAdapterControlLayer.TYPE);
 
     this.renderer = new CanvasEntityObjectRenderer(this);
+    this.bufferRenderer = new CanvasEntityBufferObjectRenderer(this);
     this.transformer = new CanvasEntityTransformer(this);
     this.filterer = new CanvasEntityFilterer(this);
 

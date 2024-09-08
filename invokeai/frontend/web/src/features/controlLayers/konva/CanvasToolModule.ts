@@ -307,15 +307,15 @@ export class CanvasToolModule extends CanvasModuleBase {
         return;
       }
 
-      if (selectedEntity.renderer.bufferState?.type !== 'rect' && selectedEntity.renderer.hasBuffer()) {
-        selectedEntity.renderer.commitBuffer();
+      if (selectedEntity.bufferRenderer.state?.type !== 'rect' && selectedEntity.bufferRenderer.hasBuffer()) {
+        selectedEntity.bufferRenderer.commitBuffer();
         return;
       }
 
       if (tool === 'brush') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-        await selectedEntity.renderer.setBuffer({
+        await selectedEntity.bufferRenderer.setBuffer({
           id: getPrefixedId('brush_line'),
           type: 'brush_line',
           points: [alignedPoint.x, alignedPoint.y],
@@ -329,10 +329,10 @@ export class CanvasToolModule extends CanvasModuleBase {
       if (tool === 'eraser') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-        if (selectedEntity.renderer.bufferState && selectedEntity.renderer.hasBuffer()) {
-          selectedEntity.renderer.commitBuffer();
+        if (selectedEntity.bufferRenderer.state && selectedEntity.bufferRenderer.hasBuffer()) {
+          selectedEntity.bufferRenderer.commitBuffer();
         }
-        await selectedEntity.renderer.setBuffer({
+        await selectedEntity.bufferRenderer.setBuffer({
           id: getPrefixedId('eraser_line'),
           type: 'eraser_line',
           points: [alignedPoint.x, alignedPoint.y],
@@ -380,11 +380,11 @@ export class CanvasToolModule extends CanvasModuleBase {
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
-          if (selectedEntity.renderer.hasBuffer()) {
-            selectedEntity.renderer.commitBuffer();
+          if (selectedEntity.bufferRenderer.hasBuffer()) {
+            selectedEntity.bufferRenderer.commitBuffer();
           }
 
-          await selectedEntity.renderer.setBuffer({
+          await selectedEntity.bufferRenderer.setBuffer({
             id: getPrefixedId('brush_line'),
             type: 'brush_line',
             points: [
@@ -399,10 +399,10 @@ export class CanvasToolModule extends CanvasModuleBase {
             clip: this.getClip(selectedEntity.state),
           });
         } else {
-          if (selectedEntity.renderer.hasBuffer()) {
-            selectedEntity.renderer.commitBuffer();
+          if (selectedEntity.bufferRenderer.hasBuffer()) {
+            selectedEntity.bufferRenderer.commitBuffer();
           }
-          await selectedEntity.renderer.setBuffer({
+          await selectedEntity.bufferRenderer.setBuffer({
             id: getPrefixedId('brush_line'),
             type: 'brush_line',
             points: [alignedPoint.x, alignedPoint.y],
@@ -418,10 +418,10 @@ export class CanvasToolModule extends CanvasModuleBase {
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
         if (e.evt.shiftKey && lastLinePoint) {
           // Create a straight line from the last line point
-          if (selectedEntity.renderer.hasBuffer()) {
-            selectedEntity.renderer.commitBuffer();
+          if (selectedEntity.bufferRenderer.hasBuffer()) {
+            selectedEntity.bufferRenderer.commitBuffer();
           }
-          await selectedEntity.renderer.setBuffer({
+          await selectedEntity.bufferRenderer.setBuffer({
             id: getPrefixedId('eraser_line'),
             type: 'eraser_line',
             points: [
@@ -435,10 +435,10 @@ export class CanvasToolModule extends CanvasModuleBase {
             clip: this.getClip(selectedEntity.state),
           });
         } else {
-          if (selectedEntity.renderer.hasBuffer()) {
-            selectedEntity.renderer.commitBuffer();
+          if (selectedEntity.bufferRenderer.hasBuffer()) {
+            selectedEntity.bufferRenderer.commitBuffer();
           }
-          await selectedEntity.renderer.setBuffer({
+          await selectedEntity.bufferRenderer.setBuffer({
             id: getPrefixedId('eraser_line'),
             type: 'eraser_line',
             points: [alignedPoint.x, alignedPoint.y],
@@ -449,10 +449,10 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'rect') {
-        if (selectedEntity.renderer.hasBuffer()) {
-          selectedEntity.renderer.commitBuffer();
+        if (selectedEntity.bufferRenderer.hasBuffer()) {
+          selectedEntity.bufferRenderer.commitBuffer();
         }
-        await selectedEntity.renderer.setBuffer({
+        await selectedEntity.bufferRenderer.setBuffer({
           id: getPrefixedId('rect'),
           type: 'rect',
           rect: { x: Math.round(normalizedPoint.x), y: Math.round(normalizedPoint.y), width: 0, height: 0 },
@@ -483,26 +483,32 @@ export class CanvasToolModule extends CanvasModuleBase {
       const tool = this.$tool.get();
 
       if (tool === 'brush') {
-        if (selectedEntity.renderer.bufferState?.type === 'brush_line' && selectedEntity.renderer.hasBuffer()) {
-          selectedEntity.renderer.commitBuffer();
+        if (
+          selectedEntity.bufferRenderer.state?.type === 'brush_line' &&
+          selectedEntity.bufferRenderer.hasBuffer()
+        ) {
+          selectedEntity.bufferRenderer.commitBuffer();
         } else {
-          selectedEntity.renderer.clearBuffer();
+          selectedEntity.bufferRenderer.clearBuffer();
         }
       }
 
       if (tool === 'eraser') {
-        if (selectedEntity.renderer.bufferState?.type === 'eraser_line' && selectedEntity.renderer.hasBuffer()) {
-          selectedEntity.renderer.commitBuffer();
+        if (
+          selectedEntity.bufferRenderer.state?.type === 'eraser_line' &&
+          selectedEntity.bufferRenderer.hasBuffer()
+        ) {
+          selectedEntity.bufferRenderer.commitBuffer();
         } else {
-          selectedEntity.renderer.clearBuffer();
+          selectedEntity.bufferRenderer.clearBuffer();
         }
       }
 
       if (tool === 'rect') {
-        if (selectedEntity.renderer.bufferState?.type === 'rect' && selectedEntity.renderer.hasBuffer()) {
-          selectedEntity.renderer.commitBuffer();
+        if (selectedEntity.bufferRenderer.state?.type === 'rect' && selectedEntity.bufferRenderer.hasBuffer()) {
+          selectedEntity.bufferRenderer.commitBuffer();
         } else {
-          selectedEntity.renderer.clearBuffer();
+          selectedEntity.bufferRenderer.clearBuffer();
         }
       }
     } finally {
@@ -535,7 +541,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         return;
       }
 
-      const bufferState = selectedEntity.renderer.bufferState;
+      const bufferState = selectedEntity.bufferRenderer.state;
 
       if (!bufferState) {
         return;
@@ -559,7 +565,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
 
         bufferState.points.push(alignedPoint.x, alignedPoint.y);
-        await selectedEntity.renderer.setBuffer(bufferState);
+        await selectedEntity.bufferRenderer.setBuffer(bufferState);
       } else if (tool === 'eraser' && bufferState.type === 'eraser_line') {
         const lastPoint = getLastPointOfLine(bufferState.points);
         const minDistance = settings.eraserWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
@@ -576,15 +582,15 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
 
         bufferState.points.push(alignedPoint.x, alignedPoint.y);
-        await selectedEntity.renderer.setBuffer(bufferState);
+        await selectedEntity.bufferRenderer.setBuffer(bufferState);
       } else if (tool === 'rect' && bufferState.type === 'rect') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
         const alignedPoint = floorCoord(normalizedPoint);
         bufferState.rect.width = Math.round(alignedPoint.x - bufferState.rect.x);
         bufferState.rect.height = Math.round(alignedPoint.y - bufferState.rect.y);
-        await selectedEntity.renderer.setBuffer(bufferState);
+        await selectedEntity.bufferRenderer.setBuffer(bufferState);
       } else {
-        selectedEntity?.renderer.clearBuffer();
+        selectedEntity?.bufferRenderer.clearBuffer();
       }
     } finally {
       this.render();
@@ -599,8 +605,12 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.$cursorPos.set(null);
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (selectedEntity && selectedEntity.renderer.bufferState?.type !== 'rect' && selectedEntity.renderer.hasBuffer()) {
-      selectedEntity.renderer.commitBuffer();
+    if (
+      selectedEntity &&
+      selectedEntity.bufferRenderer.state?.type !== 'rect' &&
+      selectedEntity.bufferRenderer.hasBuffer()
+    ) {
+      selectedEntity.bufferRenderer.commitBuffer();
     }
 
     this.render();
@@ -640,8 +650,8 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.$isMouseDown.set(false);
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (selectedEntity && selectedEntity.renderer.hasBuffer() && !this.manager.$isBusy.get()) {
-      selectedEntity.renderer.commitBuffer();
+    if (selectedEntity && selectedEntity.bufferRenderer.hasBuffer() && !this.manager.$isBusy.get()) {
+      selectedEntity.bufferRenderer.commitBuffer();
     }
   };
 
@@ -659,7 +669,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       e.preventDefault();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       if (selectedEntity) {
-        selectedEntity.renderer.clearBuffer();
+        selectedEntity.bufferRenderer.clearBuffer();
       }
       return;
     }
