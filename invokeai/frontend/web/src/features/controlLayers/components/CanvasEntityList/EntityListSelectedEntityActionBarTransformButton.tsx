@@ -25,7 +25,7 @@ export const EntityListSelectedEntityActionBarTransformButton = memo(() => {
       onClick={transform.start}
       isDisabled={transform.isDisabled}
       size="sm"
-      variant="link"
+      variant="ghost"
       alignSelf="stretch"
       aria-label={t('controlLayers.transform.transform')}
       tooltip={t('controlLayers.transform.transform')}

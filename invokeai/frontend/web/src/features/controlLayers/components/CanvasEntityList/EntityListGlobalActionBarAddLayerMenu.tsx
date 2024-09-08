@@ -23,7 +23,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
       <MenuButton
         as={IconButton}
         size="sm"
-        variant="link"
+        variant="ghost"
         alignSelf="stretch"
         tooltip={t('controlLayers.addLayer')}
         aria-label={t('controlLayers.addLayer')}

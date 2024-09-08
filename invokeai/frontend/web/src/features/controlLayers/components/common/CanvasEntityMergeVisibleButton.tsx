@@ -83,7 +83,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
       size="sm"
       aria-label={t('controlLayers.mergeVisible')}
       tooltip={t('controlLayers.mergeVisible')}
-      variant="link"
+      variant="ghost"
       icon={<PiStackBold />}
       onClick={onClick}
       alignSelf="stretch"

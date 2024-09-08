@@ -21,8 +21,7 @@ export const CanvasEntityIsLockedToggle = memo(() => {
       size="sm"
       aria-label={t(isLocked ? 'controlLayers.locked' : 'controlLayers.unlocked')}
       tooltip={t(isLocked ? 'controlLayers.locked' : 'controlLayers.unlocked')}
-      variant="link"
-      alignSelf="stretch"
+      variant={isLocked ? 'outline' : 'ghost'}
       icon={isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}
       onClick={onClick}
     />

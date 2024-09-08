@@ -27,7 +27,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
 
   return (
     <Flex flexDir="column" w="full">
-      <Flex w="full" px={1}>
+      <Flex w="full" px={1} gap={0.5}>
         <Flex
           flexGrow={1}
           as={Button}

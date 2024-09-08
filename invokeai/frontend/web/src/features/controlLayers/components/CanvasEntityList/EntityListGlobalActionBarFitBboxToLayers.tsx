@@ -15,7 +15,7 @@ export const EntityListGlobalActionBarFitBboxToLayers = memo(() => {
     <IconButton
       onClick={onClick}
       size="sm"
-      variant="link"
+      variant="ghost"
       alignSelf="stretch"
       aria-label={t('controlLayers.fitBboxToLayers')}
       tooltip={t('controlLayers.fitBboxToLayers')}

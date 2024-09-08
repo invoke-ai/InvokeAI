@@ -10,7 +10,7 @@ export const CanvasEntityHeaderCommonActions = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
 
   return (
-    <Flex alignSelf="stretch">
+    <Flex alignSelf="stretch" alignItems="center" gap={0.5}>
       <CanvasEntityIsBookmarkedForQuickSwitchToggle />
       {entityIdentifier.type !== 'ip_adapter' && <CanvasEntityIsLockedToggle />}
       <CanvasEntityEnabledToggle />

@@ -4,7 +4,7 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiTrashSimpleFill } from 'react-icons/pi';
+import { PiTrashSimpleBold } from 'react-icons/pi';
 
 export const CanvasEntityDeleteButton = memo(() => {
   const { t } = useTranslation();
@@ -19,9 +19,8 @@ export const CanvasEntityDeleteButton = memo(() => {
       size="sm"
       aria-label={t('common.delete')}
       tooltip={t('common.delete')}
-      variant="link"
-      alignSelf="stretch"
-      icon={<PiTrashSimpleFill />}
+      variant="ghost"
+      icon={<PiTrashSimpleBold />}
       onClick={onClick}
       colorScheme="error"
     />

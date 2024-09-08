@@ -5,7 +5,7 @@ import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnab
 import { entityIsEnabledToggled } from 'features/controlLayers/store/canvasSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCircleBold, PiCircleFill } from 'react-icons/pi';
+import { PiCircleDashedBold, PiCircleFill } from 'react-icons/pi';
 
 export const CanvasEntityEnabledToggle = memo(() => {
   const { t } = useTranslation();
@@ -21,9 +21,8 @@ export const CanvasEntityEnabledToggle = memo(() => {
       size="sm"
       aria-label={t(isEnabled ? 'common.enabled' : 'common.disabled')}
       tooltip={t(isEnabled ? 'common.enabled' : 'common.disabled')}
-      variant="link"
-      alignSelf="stretch"
-      icon={isEnabled ? <PiCircleFill /> : <PiCircleBold />}
+      variant="ghost"
+      icon={isEnabled ? <PiCircleFill /> : <PiCircleDashedBold />}
       onClick={onClick}
     />
   );

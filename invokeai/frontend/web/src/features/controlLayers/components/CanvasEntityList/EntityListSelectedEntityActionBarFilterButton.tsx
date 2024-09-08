@@ -5,7 +5,7 @@ import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/sel
 import { isFilterableEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiShootingStarBold } from 'react-icons/pi';
+import { PiFunnelBold } from 'react-icons/pi';
 
 export const EntityListSelectedEntityActionBarFilterButton = memo(() => {
   const { t } = useTranslation();
@@ -25,11 +25,11 @@ export const EntityListSelectedEntityActionBarFilterButton = memo(() => {
       onClick={filter.start}
       isDisabled={filter.isDisabled}
       size="sm"
-      variant="link"
+      variant="ghost"
       alignSelf="stretch"
       aria-label={t('controlLayers.filter.filter')}
       tooltip={t('controlLayers.filter.filter')}
-      icon={<PiShootingStarBold />}
+      icon={<PiFunnelBold />}
     />
   );
 });

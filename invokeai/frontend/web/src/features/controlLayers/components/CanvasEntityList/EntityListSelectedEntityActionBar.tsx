@@ -11,8 +11,8 @@ export const EntityListSelectedEntityActionBar = memo(() => {
     <Flex w="full" py={1} px={1} gap={2} alignItems="center">
       <EntityListSelectedEntityActionBarOpacity />
       <Spacer />
-      <EntityListSelectedEntityActionBarFill />
-      <Flex>
+      <Flex gap={0.5}>
+        <EntityListSelectedEntityActionBarFill />
         <EntityListSelectedEntityActionBarFilterButton />
         <EntityListSelectedEntityActionBarTransformButton />
         <EntityListSelectedEntityActionBarDuplicateButton />

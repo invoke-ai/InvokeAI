@@ -31,7 +31,7 @@ export const CanvasEntityTypeIsHiddenToggle = memo(({ type }: Props) => {
       size="sm"
       aria-label={t(isHidden ? 'controlLayers.hidingType' : 'controlLayers.showingType', { type: typeString })}
       tooltip={t(isHidden ? 'controlLayers.hidingType' : 'controlLayers.showingType', { type: typeString })}
-      variant="link"
+      variant={isHidden ? 'outline' : 'ghost'}
       icon={isHidden ? <PiEyeClosedBold /> : <PiEyeBold />}
       onClick={onClick}
       alignSelf="stretch"

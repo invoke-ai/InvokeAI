@@ -9,7 +9,7 @@ export const EntityListGlobalActionBar = memo(() => {
     <Flex w="full" py={1} px={1} gap={2} alignItems="center">
       <EntityListGlobalActionBarDenoisingStrength />
       <Spacer />
-      <Flex>
+      <Flex gap={0.5}>
         <EntityListGlobalActionBarFitBboxToLayers />
         <EntityListGlobalActionBarAddLayerMenu />
       </Flex>

@@ -63,7 +63,7 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
       size="sm"
       aria-label={label}
       tooltip={label}
-      variant="link"
+      variant="ghost"
       icon={<PiPlusBold />}
       onClick={onClick}
       alignSelf="stretch"

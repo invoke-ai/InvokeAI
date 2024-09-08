@@ -25,8 +25,7 @@ export const CanvasEntityIsBookmarkedForQuickSwitchToggle = memo(() => {
       size="sm"
       aria-label={t(isBookmarked ? 'controlLayers.removeBookmark' : 'controlLayers.bookmark')}
       tooltip={t(isBookmarked ? 'controlLayers.removeBookmark' : 'controlLayers.bookmark')}
-      variant="link"
-      alignSelf="stretch"
+      variant={isBookmarked ? 'outline' : 'ghost'}
       icon={isBookmarked ? <PiBookmarkSimpleFill /> : <PiBookmarkSimpleBold />}
       onClick={onClick}
     />

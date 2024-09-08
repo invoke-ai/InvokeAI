@@ -22,7 +22,7 @@ export const EntityListSelectedEntityActionBarDuplicateButton = memo(() => {
       onClick={onClick}
       isDisabled={!selectedEntityIdentifier}
       size="sm"
-      variant="link"
+      variant="ghost"
       alignSelf="stretch"
       aria-label={t('controlLayers.duplicate')}
       tooltip={t('controlLayers.duplicate')}
