@@ -1,4 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
+import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntityBufferObjectRenderer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -10,7 +11,7 @@ export class CanvasObjectEraserLine extends CanvasModuleBase {
   readonly type = 'object_eraser_line';
   readonly id: string;
   readonly path: string[];
-  readonly parent: CanvasEntityObjectRenderer;
+  readonly parent: CanvasEntityObjectRenderer | CanvasEntityBufferObjectRenderer;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
@@ -20,7 +21,7 @@ export class CanvasObjectEraserLine extends CanvasModuleBase {
     line: Konva.Line;
   };
 
-  constructor(state: CanvasEraserLineState, parent: CanvasEntityObjectRenderer) {
+  constructor(state: CanvasEraserLineState, parent: CanvasEntityObjectRenderer | CanvasEntityBufferObjectRenderer) {
     super();
     this.id = state.id;
     this.parent = parent;

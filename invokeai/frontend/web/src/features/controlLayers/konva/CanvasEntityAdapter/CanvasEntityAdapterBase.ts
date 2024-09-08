@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
+import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntityBufferObjectRenderer';
 import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntityFilterer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import type { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntityTransformer';
@@ -34,6 +35,11 @@ export abstract class CanvasEntityAdapterBase<
    * The renderer for this entity adapter. All entities must have a renderer.
    */
   abstract renderer: CanvasEntityObjectRenderer;
+
+  /**
+   * The buffer renderer for this entity adapter. All entities must have a buffer renderer.
+   */
+  abstract bufferRenderer: CanvasEntityBufferObjectRenderer;
 
   /**
    * The filterer for this entity adapter. Entities that support filtering should implement this property.

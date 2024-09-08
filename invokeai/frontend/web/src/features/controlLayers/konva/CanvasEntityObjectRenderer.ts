@@ -69,19 +69,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   subscriptions: Set<() => void> = new Set();
 
   /**
-   * A buffer object state that is rendered separately from the other objects. This is used for objects that are being
-   * drawn in real-time, such as brush lines. The buffer object state only exists in this renderer and is not part of
-   * the application state until it is committed.
-   */
-  bufferState: AnyObjectState | null = null;
-
-  /**
-   * The object renderer for the buffer object state. It is created when the buffer object state is set and destroyed
-   * when the buffer object state is cleared. This is separate from the other object renderers to allow the buffer to
-   * be rendered separately.
-   */
-  bufferRenderer: AnyObjectRenderer | null = null;
-  /**
    * A map of object renderers, keyed by their ID.
    *
    * This map can be used with React.useSyncExternalStore to sync the object renderers with a React component.
@@ -96,10 +83,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
      * A Konva Group that holds all the object renderers.
      */
     objectGroup: Konva.Group;
-    /**
-     * A Konva Group that holds the buffer object renderer.
-     */
-    bufferGroup: Konva.Group;
     /**
      * The compositing rect is used to draw the inpaint mask as a single shape with a given opacity.
      *
@@ -143,12 +126,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
 
     this.konva = {
       objectGroup: new Konva.Group({ name: `${this.type}:object_group`, listening: false }),
-      bufferGroup: new Konva.Group({ name: `${this.type}:buffer_group`, listening: false }),
       compositing: null,
     };
 
     this.parent.konva.layer.add(this.konva.objectGroup);
-    this.parent.konva.layer.add(this.konva.bufferGroup);
 
     if (
       this.parent.entityIdentifier.type === 'inpaint_mask' ||
@@ -169,17 +150,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       this.konva.compositing.group.add(this.konva.compositing.rect);
       this.parent.konva.layer.add(this.konva.compositing.group);
     }
-
-    // When switching tool, commit the buffer. This is necessary to prevent the buffer from being lost when the
-    // user switches tool mid-drawing, for example by pressing space to pan the stage. It's easy to press space
-    // to pan _before_ releasing the mouse button, which would cause the buffer to be lost if we didn't commit it.
-    this.subscriptions.add(
-      this.manager.tool.$tool.listen(() => {
-        if (this.hasBuffer() && !this.manager.$isBusy.get()) {
-          this.commitBuffer();
-        }
-      })
-    );
 
     // The compositing rect must cover the whole stage at all times. When the stage is scaled, moved or resized, we
     // need to update the compositing rect to match the stage.
@@ -227,6 +197,11 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     return didRender;
   };
 
+  adoptObjectRenderer = (renderer: AnyObjectRenderer) => {
+    this.renderers.set(renderer.id, renderer);
+    renderer.konva.group.moveTo(this.konva.objectGroup);
+  };
+
   syncCache = (force: boolean = false) => {
     if (this.renderers.size === 0) {
       this.log.trace('Clearing object group cache');
@@ -234,7 +209,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     } else if (force || !this.konva.objectGroup.isCached()) {
       this.log.trace('Caching object group');
       this.konva.objectGroup.clearCache();
-      this.konva.objectGroup.cache({ pixelRatio: 1 });
+      this.konva.objectGroup.cache({ pixelRatio: 1, imageSmoothingEnabled: false });
       this.parent.renderer.updatePreviewCanvas();
     }
   };
@@ -295,8 +270,8 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       this.konva.compositing.group.opacity(opacity);
     } else {
       this.konva.objectGroup.opacity(opacity);
-      this.konva.bufferGroup.opacity(opacity);
     }
+    this.parent.bufferRenderer.konva.group.opacity(opacity);
   };
 
   /**
@@ -363,131 +338,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     return didRender;
   };
 
-  /**
-   * Renders the buffer object. If the buffer renderer does not exist, it will be created and its Konva group added to the
-   * parent entity's buffer object group.
-   * @returns A promise that resolves to a boolean, indicating if the object was rendered.
-   */
-  renderBufferObject = async (): Promise<boolean> => {
-    let didRender = false;
-
-    if (!this.bufferState) {
-      return false;
-    }
-
-    if (this.bufferState.type === 'brush_line') {
-      assert(this.bufferRenderer instanceof CanvasObjectBrushLine || !this.bufferRenderer);
-
-      if (!this.bufferRenderer) {
-        this.bufferRenderer = new CanvasObjectBrushLine(this.bufferState, this);
-        this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
-      }
-
-      didRender = this.bufferRenderer.update(this.bufferState, true);
-    } else if (this.bufferState.type === 'eraser_line') {
-      assert(this.bufferRenderer instanceof CanvasObjectEraserLine || !this.bufferRenderer);
-
-      if (!this.bufferRenderer) {
-        this.bufferRenderer = new CanvasObjectEraserLine(this.bufferState, this);
-        this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
-      }
-
-      didRender = this.bufferRenderer.update(this.bufferState, true);
-    } else if (this.bufferState.type === 'rect') {
-      assert(this.bufferRenderer instanceof CanvasObjectRect || !this.bufferRenderer);
-
-      if (!this.bufferRenderer) {
-        this.bufferRenderer = new CanvasObjectRect(this.bufferState, this);
-        this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
-      }
-
-      didRender = this.bufferRenderer.update(this.bufferState, true);
-    } else if (this.bufferState.type === 'image') {
-      assert(this.bufferRenderer instanceof CanvasObjectImage || !this.bufferRenderer);
-
-      if (!this.bufferRenderer) {
-        this.bufferRenderer = new CanvasObjectImage(this.bufferState, this);
-        this.konva.bufferGroup.add(this.bufferRenderer.konva.group);
-      }
-      didRender = await this.bufferRenderer.update(this.bufferState, true);
-    }
-
-    return didRender;
-  };
-
-  /**
-   * Determines if the renderer has a buffer object to render.
-   * @returns Whether the renderer has a buffer object to render.
-   */
-  hasBuffer = (): boolean => {
-    return this.bufferState !== null || this.bufferRenderer !== null;
-  };
-
-  /**
-   * Sets the buffer object state to render.
-   * @param objectState The object state to set as the buffer.
-   * @param resetBufferOffset Whether to reset the buffer's offset to 0,0. This is necessary when previewing filters.
-   * When previewing a filter, the buffer object is an image of the same size as the entity, so it should be rendered
-   * at the top-left corner of the entity.
-   * @returns A promise that resolves to a boolean, indicating if the object was rendered.
-   */
-  setBuffer = async (objectState: AnyObjectState, resetBufferOffset: boolean = false): Promise<boolean> => {
-    this.log.trace('Setting buffer');
-
-    this.bufferState = objectState;
-    if (resetBufferOffset) {
-      this.konva.bufferGroup.offset({ x: 0, y: 0 });
-    }
-    return await this.renderBufferObject();
-  };
-
-  /**
-   * Clears the buffer object state.
-   */
-  clearBuffer = () => {
-    if (this.bufferState || this.bufferRenderer) {
-      this.log.trace('Clearing buffer');
-      this.bufferRenderer?.destroy();
-      this.bufferRenderer = null;
-      this.bufferState = null;
-      this.syncCache(true);
-    }
-  };
-
-  /**
-   * Commits the current buffer object, pushing the buffer object state back to the application state.
-   */
-  commitBuffer = (options?: { pushToState?: boolean }) => {
-    const { pushToState } = { ...options, pushToState: true };
-
-    if (!this.bufferState || !this.bufferRenderer) {
-      this.log.trace('No buffer to commit');
-      return;
-    }
-
-    this.log.trace('Committing buffer');
-
-    // Move the buffer to the persistent objects group/renderers
-    this.bufferRenderer.konva.group.moveTo(this.konva.objectGroup);
-    this.renderers.set(this.bufferState.id, this.bufferRenderer);
-
-    if (pushToState) {
-      const entityIdentifier = this.parent.entityIdentifier;
-      if (this.bufferState.type === 'brush_line') {
-        this.manager.stateApi.addBrushLine({ entityIdentifier, brushLine: this.bufferState });
-      } else if (this.bufferState.type === 'eraser_line') {
-        this.manager.stateApi.addEraserLine({ entityIdentifier, eraserLine: this.bufferState });
-      } else if (this.bufferState.type === 'rect') {
-        this.manager.stateApi.addRect({ entityIdentifier, rect: this.bufferState });
-      } else {
-        this.log.warn({ buffer: this.bufferState }, 'Invalid buffer object type');
-      }
-    }
-
-    this.bufferRenderer = null;
-    this.bufferState = null;
-  };
-
   hideObjects = (except: string[] = []) => {
     for (const renderer of this.renderers.values()) {
       renderer.setVisibility(except.includes(renderer.id));
@@ -529,7 +379,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
    * @returns Whether the renderer has any objects to render.
    */
   hasObjects = (): boolean => {
-    return this.renderers.size > 0 || this.bufferState !== null || this.bufferRenderer !== null;
+    return this.renderers.size > 0 || this.parent.bufferRenderer.hasBuffer();
   };
 
   /**
@@ -576,8 +426,8 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     });
     const imageObject = imageDTOToImageObject(imageDTO);
     if (replaceObjects) {
-      await this.setBuffer(imageObject);
-      this.commitBuffer({ pushToState: false });
+      await this.parent.bufferRenderer.setBuffer(imageObject);
+      this.parent.bufferRenderer.commitBuffer({ pushToState: false });
     }
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.entityIdentifier,
@@ -667,7 +517,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       path: this.path,
       parent: this.parent.id,
       renderers: Array.from(this.renderers.values()).map((renderer) => renderer.repr()),
-      buffer: this.bufferRenderer?.repr(),
     };
   };
 }

@@ -96,7 +96,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
         this.imageState = imageDTOToImageObject(imageDTO);
 
-        await this.parent.renderer.setBuffer(this.imageState, true);
+        await this.parent.bufferRenderer.setBuffer(this.imageState, true);
 
         this.parent.renderer.hideObjects();
         this.$isProcessing.set(false);
@@ -120,7 +120,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       return;
     }
     this.log.trace('Applying filter');
-    this.parent.renderer.commitBuffer();
+    this.parent.bufferRenderer.commitBuffer();
     const rect = this.parent.transformer.getRelativeRect();
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.entityIdentifier,
@@ -142,7 +142,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   cancelFilter = () => {
     this.log.trace('Cancelling filter');
 
-    this.parent.renderer.clearBuffer();
+    this.parent.bufferRenderer.clearBuffer();
     this.parent.renderer.showObjects();
     this.parent.transformer.updatePosition();
     this.parent.renderer.syncCache(true);

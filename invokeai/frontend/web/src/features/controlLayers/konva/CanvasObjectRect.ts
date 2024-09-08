@@ -1,5 +1,6 @@
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { deepClone } from 'common/util/deepClone';
+import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntityBufferObjectRenderer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -11,7 +12,7 @@ export class CanvasObjectRect extends CanvasModuleBase {
   readonly type = 'object_rect';
   readonly id: string;
   readonly path: string[];
-  readonly parent: CanvasEntityObjectRenderer;
+  readonly parent: CanvasEntityObjectRenderer | CanvasEntityBufferObjectRenderer;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
@@ -22,7 +23,7 @@ export class CanvasObjectRect extends CanvasModuleBase {
   };
   isFirstRender: boolean = false;
 
-  constructor(state: CanvasRectState, parent: CanvasEntityObjectRenderer) {
+  constructor(state: CanvasRectState, parent: CanvasEntityObjectRenderer | CanvasEntityBufferObjectRenderer) {
     super();
     this.id = state.id;
     this.parent = parent;

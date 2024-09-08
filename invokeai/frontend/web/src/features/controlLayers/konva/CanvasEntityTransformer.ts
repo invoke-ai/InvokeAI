@@ -587,7 +587,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       rotation: 0,
     };
     this.parent.renderer.konva.objectGroup.setAttrs(attrs);
-    this.parent.renderer.konva.bufferGroup.setAttrs(attrs);
+    this.parent.bufferRenderer.konva.group.setAttrs(attrs);
     this.konva.outlineRect.setAttrs(attrs);
     this.konva.proxyRect.setAttrs(attrs);
   };
@@ -608,7 +608,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       offsetY: pixelRect.y,
     };
     this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
-    this.parent.renderer.konva.bufferGroup.setAttrs(groupAttrs);
+    this.parent.bufferRenderer.konva.group.setAttrs(groupAttrs);
 
     this.update(position, pixelRect);
   };
@@ -669,7 +669,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
         offsetY: pixelRect.y,
       };
       this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
-      this.parent.renderer.konva.bufferGroup.setAttrs(groupAttrs);
+      this.parent.bufferRenderer.konva.group.setAttrs(groupAttrs);
     }
 
     this.parent.renderer.updatePreviewCanvas();
