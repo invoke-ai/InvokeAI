@@ -3,24 +3,21 @@ import { Box, Flex, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/u
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { ControlLayersPanelContent } from 'features/controlLayers/components/ControlLayersPanelContent';
-import { $isPreviewVisible } from 'features/controlLayers/store/controlLayersSlice';
+import { CanvasPanelContent } from 'features/controlLayers/components/CanvasPanelContent';
+import { selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
-import QueueControls from 'features/queue/components/QueueControls';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
-import { ControlSettingsAccordion } from 'features/settingsAccordions/components/ControlSettingsAccordion/ControlSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { ImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/ImageSettingsAccordion';
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
 import { StylePresetMenu } from 'features/stylePresets/components/StylePresetMenu';
 import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePresetMenuTrigger';
 import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const overlayScrollbarsStyles: CSSProperties = {
@@ -43,21 +40,12 @@ const selectedStyles: ChakraProps['sx'] = {
 const ParametersPanelTextToImage = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const activeTabName = useAppSelector(activeTabNameSelector);
-  const controlLayersCount = useAppSelector((s) => s.controlLayers.present.layers.length);
-  const controlLayersTitle = useMemo(() => {
-    if (controlLayersCount === 0) {
-      return t('controlLayers.controlLayers');
-    }
-    return `${t('controlLayers.controlLayers')} (${controlLayersCount})`;
-  }, [controlLayersCount, t]);
-  const isSDXL = useAppSelector((s) => s.generation.model?.base === 'sdxl');
+  const isSDXL = useAppSelector(selectIsSDXL);
   const onChangeTabs = useCallback(
     (i: number) => {
       if (i === 1) {
         dispatch(isImageViewerOpenChanged(false));
       }
-      $isPreviewVisible.set(i === 0);
     },
     [dispatch]
   );
@@ -67,7 +55,6 @@ const ParametersPanelTextToImage = () => {
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
-      <QueueControls />
       <StylePresetMenuTrigger />
       <Flex w="full" h="full" position="relative">
         <Box position="absolute" top={0} left={0} right={0} bottom={0} ref={ref}>
@@ -91,7 +78,7 @@ const ParametersPanelTextToImage = () => {
                 gap={2}
                 onChange={onChangeTabs}
               >
-                <TabList gap={2} fontSize="sm" borderColor="base.800">
+                <TabList gap={2} fontSize="sm" borderColor="base.800" alignItems="center" w="full" pe={1}>
                   <Tab sx={baseStyles} _selected={selectedStyles} data-testid="generation-tab-settings-tab-button">
                     {t('common.settingsLabel')}
                   </Tab>
@@ -100,7 +87,7 @@ const ParametersPanelTextToImage = () => {
                     _selected={selectedStyles}
                     data-testid="generation-tab-control-layers-tab-button"
                   >
-                    {controlLayersTitle}
+                    {t('controlLayers.layer_other')}
                   </Tab>
                 </TabList>
                 <TabPanels w="full" h="full">
@@ -108,14 +95,13 @@ const ParametersPanelTextToImage = () => {
                     <Flex gap={2} flexDirection="column" h="full" w="full">
                       <ImageSettingsAccordion />
                       <GenerationSettingsAccordion />
-                      {activeTabName !== 'generation' && <ControlSettingsAccordion />}
-                      {activeTabName === 'canvas' && <CompositingSettingsAccordion />}
+                      <CompositingSettingsAccordion />
                       {isSDXL && <RefinerSettingsAccordion />}
                       <AdvancedSettingsAccordion />
                     </Flex>
                   </TabPanel>
                   <TabPanel p={0} w="full" h="full">
-                    <ControlLayersPanelContent />
+                    <CanvasPanelContent />
                   </TabPanel>
                 </TabPanels>
               </Tabs>

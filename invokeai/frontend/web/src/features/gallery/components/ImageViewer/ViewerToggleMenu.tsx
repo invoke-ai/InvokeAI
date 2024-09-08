@@ -1,69 +1,61 @@
-import {
-  Button,
-  Flex,
-  Icon,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverContent,
-  PopoverTrigger,
-  Text,
-} from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
+import { IconSwitch } from 'common/components/IconSwitch';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-import { PiCaretDownBold, PiCheckBold, PiEyeBold, PiPencilBold } from 'react-icons/pi';
+import { PiEyeBold, PiPencilBold } from 'react-icons/pi';
 
-export const ViewerToggleMenu = () => {
+const TooltipEdit = memo(() => {
   const { t } = useTranslation();
+
+  return (
+    <Flex flexDir="column">
+      <Text fontWeight="semibold">{t('common.edit')}</Text>
+      <Text fontWeight="normal">{t('common.editDesc')}</Text>
+    </Flex>
+  );
+});
+TooltipEdit.displayName = 'TooltipEdit';
+
+const TooltipView = memo(() => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex flexDir="column">
+      <Text fontWeight="semibold">{t('common.view')}</Text>
+      <Text fontWeight="normal">{t('common.viewDesc')}</Text>
+    </Flex>
+  );
+});
+TooltipView.displayName = 'TooltipView';
+
+export const ViewerToggle = memo(() => {
   const imageViewer = useImageViewer();
   useHotkeys('z', imageViewer.onToggle, [imageViewer]);
   useHotkeys('esc', imageViewer.onClose, [imageViewer]);
+  const onChange = useCallback(
+    (isChecked: boolean) => {
+      if (isChecked) {
+        imageViewer.onClose();
+      } else {
+        imageViewer.onOpen();
+      }
+    },
+    [imageViewer]
+  );
 
   return (
-    <Popover isLazy>
-      <PopoverTrigger>
-        <Button variant="outline" data-testid="toggle-viewer-menu-button" pointerEvents="auto">
-          <Flex gap={3} w="full" alignItems="center">
-            {imageViewer.isOpen ? <Icon as={PiEyeBold} /> : <Icon as={PiPencilBold} />}
-            <Text fontSize="md">{imageViewer.isOpen ? t('common.viewing') : t('common.editing')}</Text>
-            <Icon as={PiCaretDownBold} />
-          </Flex>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent p={2} pointerEvents="auto">
-        <PopoverArrow />
-        <PopoverBody>
-          <Flex flexDir="column">
-            <Button onClick={imageViewer.onOpen} variant="ghost" h="auto" w="auto" p={2}>
-              <Flex gap={2} w="full">
-                <Icon as={PiCheckBold} visibility={imageViewer.isOpen ? 'visible' : 'hidden'} />
-                <Flex flexDir="column" gap={2} alignItems="flex-start">
-                  <Text fontWeight="semibold" color="base.100">
-                    {t('common.viewing')}
-                  </Text>
-                  <Text fontWeight="normal" color="base.300">
-                    {t('common.viewingDesc')}
-                  </Text>
-                </Flex>
-              </Flex>
-            </Button>
-            <Button onClick={imageViewer.onClose} variant="ghost" h="auto" w="auto" p={2}>
-              <Flex gap={2} w="full">
-                <Icon as={PiCheckBold} visibility={imageViewer.isOpen ? 'hidden' : 'visible'} />
-                <Flex flexDir="column" gap={2} alignItems="flex-start">
-                  <Text fontWeight="semibold" color="base.100">
-                    {t('common.editing')}
-                  </Text>
-                  <Text fontWeight="normal" color="base.300">
-                    {t('common.editingDesc')}
-                  </Text>
-                </Flex>
-              </Flex>
-            </Button>
-          </Flex>
-        </PopoverBody>
-      </PopoverContent>
-    </Popover>
+    <IconSwitch
+      isChecked={!imageViewer.isOpen}
+      onChange={onChange}
+      iconUnchecked={<PiEyeBold />}
+      tooltipUnchecked={<TooltipView />}
+      iconChecked={<PiPencilBold />}
+      tooltipChecked={<TooltipEdit />}
+      ariaLabel="Toggle viewer"
+    />
   );
-};
+});
+
+ViewerToggle.displayName = 'ViewerToggle';

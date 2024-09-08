@@ -1,22 +1,20 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { setSteps } from 'features/parameters/store/generationSlice';
+import { selectSteps, setSteps } from 'features/controlLayers/store/paramsSlice';
+import { selectStepsConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ParamSteps = () => {
-  const steps = useAppSelector((s) => s.generation.steps);
-  const initial = useAppSelector((s) => s.config.sd.steps.initial);
-  const sliderMin = useAppSelector((s) => s.config.sd.steps.sliderMin);
-  const sliderMax = useAppSelector((s) => s.config.sd.steps.sliderMax);
-  const numberInputMin = useAppSelector((s) => s.config.sd.steps.numberInputMin);
-  const numberInputMax = useAppSelector((s) => s.config.sd.steps.numberInputMax);
-  const coarseStep = useAppSelector((s) => s.config.sd.steps.coarseStep);
-  const fineStep = useAppSelector((s) => s.config.sd.steps.fineStep);
+  const steps = useAppSelector(selectSteps);
+  const config = useAppSelector(selectStepsConfig);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const marks = useMemo(() => [sliderMin, Math.floor(sliderMax / 2), sliderMax], [sliderMax, sliderMin]);
+  const marks = useMemo(
+    () => [config.sliderMin, Math.floor(config.sliderMax / 2), config.sliderMax],
+    [config.sliderMax, config.sliderMin]
+  );
   const onChange = useCallback(
     (v: number) => {
       dispatch(setSteps(v));
@@ -31,21 +29,21 @@ const ParamSteps = () => {
       </InformationalPopover>
       <CompositeSlider
         value={steps}
-        defaultValue={initial}
-        min={sliderMin}
-        max={sliderMax}
-        step={coarseStep}
-        fineStep={fineStep}
+        defaultValue={config.initial}
+        min={config.sliderMin}
+        max={config.sliderMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
         onChange={onChange}
         marks={marks}
       />
       <CompositeNumberInput
         value={steps}
-        defaultValue={initial}
-        min={numberInputMin}
-        max={numberInputMax}
-        step={coarseStep}
-        fineStep={fineStep}
+        defaultValue={config.initial}
+        min={config.numberInputMin}
+        max={config.numberInputMax}
+        step={config.coarseStep}
+        fineStep={config.fineStep}
         onChange={onChange}
       />
     </FormControl>

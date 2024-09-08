@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { getEdgeStyles } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { $templates } from 'features/nodes/store/nodesSlice';
+import { selectShouldShowEdgeLabels } from 'features/nodes/store/workflowSettingsSlice';
 import { memo, useMemo } from 'react';
 import type { EdgeProps } from 'reactflow';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow';
@@ -30,7 +31,7 @@ const InvocationDefaultEdge = ({
   );
 
   const { shouldAnimateEdges, areConnectedNodesSelected, stroke, label } = useAppSelector(selector);
-  const shouldShowEdgeLabels = useAppSelector((s) => s.workflowSettings.shouldShowEdgeLabels);
+  const shouldShowEdgeLabels = useAppSelector(selectShouldShowEdgeLabels);
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,

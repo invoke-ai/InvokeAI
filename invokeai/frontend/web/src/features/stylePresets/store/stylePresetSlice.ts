@@ -1,6 +1,6 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
-import type { PersistConfig } from 'app/store/store';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
+import type { PersistConfig, RootState } from 'app/store/store';
 import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 
 import type { StylePresetState } from './types';
@@ -63,3 +63,13 @@ export const stylePresetPersistConfig: PersistConfig<StylePresetState> = {
   migrate: migrateStylePresetState,
   persistDenylist: [],
 };
+
+const selectStylePresetSlice = (state: RootState) => state.stylePreset;
+const createStylePresetSelector = <T>(selector: Selector<StylePresetState, T>) =>
+  createSelector(selectStylePresetSlice, selector);
+
+export const selectStylePresetActivePresetId = createStylePresetSelector(
+  (stylePreset) => stylePreset.activeStylePresetId
+);
+export const selectStylePresetViewMode = createStylePresetSelector((stylePreset) => stylePreset.viewMode);
+export const selectStylePresetSearchTerm = createStylePresetSelector((stylePreset) => stylePreset.searchTerm);

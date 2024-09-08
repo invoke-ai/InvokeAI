@@ -1,27 +1,35 @@
 import { Box } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { ImageComparisonDroppable } from 'features/gallery/components/ImageViewer/ImageComparisonDroppable';
-import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
+import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import NodeEditor from 'features/nodes/components/NodeEditor';
-import { memo } from 'react';
+import { selectWorkflowMode } from 'features/nodes/store/workflowSlice';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { memo, useRef } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 
 const NodesTab = () => {
-  const mode = useAppSelector((s) => s.workflow.mode);
-  if (mode === 'view') {
-    return (
-      <Box layerStyle="first" position="relative" w="full" h="full" p={2} borderRadius="base">
-        <ImageViewer />
-        <ImageComparisonDroppable />
-      </Box>
-    );
-  }
+  const mode = useAppSelector(selectWorkflowMode);
+  const activeTabName = useAppSelector(selectActiveTab);
+  const ref = useRef<HTMLDivElement>(null);
+  useScopeOnFocus('workflows', ref);
 
   return (
-    <Box layerStyle="first" position="relative" w="full" h="full" p={2} borderRadius="base">
-      <ReactFlowProvider>
-        <NodeEditor />
-      </ReactFlowProvider>
+    <Box
+      display={activeTabName === 'workflows' ? undefined : 'none'}
+      hidden={activeTabName !== 'workflows'}
+      ref={ref}
+      layerStyle="first"
+      position="relative"
+      w="full"
+      h="full"
+      p={2}
+      borderRadius="base"
+    >
+      {mode === 'edit' && (
+        <ReactFlowProvider>
+          <NodeEditor />
+        </ReactFlowProvider>
+      )}
     </Box>
   );
 };

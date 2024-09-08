@@ -1,4 +1,4 @@
-import type { InvokeTabName } from './tabMap';
+export type TabName = 'generation' | 'upscaling' | 'workflows' | 'models' | 'queue';
 
 export interface UIState {
   /**
@@ -8,7 +8,7 @@ export interface UIState {
   /**
    * The currently active tab.
    */
-  activeTab: InvokeTabName;
+  activeTab: TabName;
   /**
    * Whether or not to show image details, e.g. metadata, workflow, etc.
    */

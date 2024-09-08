@@ -6,13 +6,19 @@ import cv2
 import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    Classification,
+    invocation,
+    invocation_output,
+)
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import (
     ColorField,
     FieldDescriptions,
     ImageField,
     InputField,
+    OutputField,
     WithBoard,
     WithMetadata,
 )
@@ -1007,3 +1013,62 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
         image_dto = context.images.save(image=mask, image_category=ImageCategory.MASK)
 
         return ImageOutput.build(image_dto)
+
+
+@invocation_output("canvas_v2_mask_and_crop_output")
+class CanvasV2MaskAndCropOutput(ImageOutput):
+    offset_x: int = OutputField(description="The x offset of the image, after cropping")
+    offset_y: int = OutputField(description="The y offset of the image, after cropping")
+
+
+@invocation(
+    "canvas_v2_mask_and_crop",
+    title="Canvas V2 Mask and Crop",
+    tags=["image", "mask", "id"],
+    category="image",
+    version="1.0.0",
+    classification=Classification.Prototype,
+)
+class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Handles Canvas V2 image output masking and cropping"""
+
+    source_image: ImageField | None = InputField(
+        default=None,
+        description="The source image onto which the masked generated image is pasted. If omitted, the masked generated image is returned with transparency.",
+    )
+    generated_image: ImageField = InputField(description="The image to apply the mask to")
+    mask: ImageField = InputField(description="The mask to apply")
+    mask_blur: int = InputField(default=0, ge=0, description="The amount to blur the mask by")
+
+    def _prepare_mask(self, mask: Image.Image) -> Image.Image:
+        mask_array = numpy.array(mask)
+        kernel = numpy.ones((self.mask_blur, self.mask_blur), numpy.uint8)
+        dilated_mask_array = cv2.erode(mask_array, kernel, iterations=3)
+        dilated_mask = Image.fromarray(dilated_mask_array)
+        if self.mask_blur > 0:
+            mask = dilated_mask.filter(ImageFilter.GaussianBlur(self.mask_blur))
+        return ImageOps.invert(mask.convert("L"))
+
+    def invoke(self, context: InvocationContext) -> CanvasV2MaskAndCropOutput:
+        mask = self._prepare_mask(context.images.get_pil(self.mask.image_name))
+
+        if self.source_image:
+            generated_image = context.images.get_pil(self.generated_image.image_name)
+            source_image = context.images.get_pil(self.source_image.image_name)
+            source_image.paste(generated_image, (0, 0), mask)
+            image_dto = context.images.save(image=source_image)
+        else:
+            generated_image = context.images.get_pil(self.generated_image.image_name)
+            generated_image.putalpha(mask)
+            image_dto = context.images.save(image=generated_image)
+
+        # bbox = image.getbbox()
+        # image = image.crop(bbox)
+
+        return CanvasV2MaskAndCropOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            offset_x=0,
+            offset_y=0,
+            width=image_dto.width,
+            height=image_dto.height,
+        )

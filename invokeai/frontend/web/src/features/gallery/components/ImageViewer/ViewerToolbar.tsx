@@ -1,21 +1,23 @@
 import { Flex } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ToggleMetadataViewerButton } from 'features/gallery/components/ImageViewer/ToggleMetadataViewerButton';
 import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
 import CurrentImageButtons from './CurrentImageButtons';
-import { ViewerToggleMenu } from './ViewerToggleMenu';
+import { ViewerToggle } from './ViewerToggleMenu';
+
+const selectShowToggle = createSelector(selectActiveTab, (tab) => {
+  if (tab === 'upscaling' || tab === 'workflows') {
+    return false;
+  }
+  return true;
+});
 
 export const ViewerToolbar = memo(() => {
-  const showToggle = useAppSelector((s) => {
-    const tab = activeTabNameSelector(s);
-    if (tab === 'upscaling' || tab === 'workflows') {
-      return false;
-    }
-    return true;
-  });
+  const showToggle = useAppSelector(selectShowToggle);
   return (
     <Flex w="full" gap={2}>
       <Flex flex={1} justifyContent="center">
@@ -29,7 +31,7 @@ export const ViewerToolbar = memo(() => {
       </Flex>
       <Flex flex={1} justifyContent="center">
         <Flex gap={2} marginInlineStart="auto">
-          {showToggle && <ViewerToggleMenu />}
+          {showToggle && <ViewerToggle />}
         </Flex>
       </Flex>
     </Flex>

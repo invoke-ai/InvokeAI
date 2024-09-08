@@ -1,5 +1,5 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { AppConfig, NumericalParameterConfig, PartialAppConfig } from 'app/types/invokeai';
 import { merge } from 'lodash-es';
@@ -182,3 +182,27 @@ export const configSlice = createSlice({
 export const { configChanged } = configSlice.actions;
 
 export const selectConfigSlice = (state: RootState) => state.config;
+const createConfigSelector = <T>(selector: Selector<AppConfig, T>) => createSelector(selectConfigSlice, selector);
+
+export const selectWidthConfig = createConfigSelector((config) => config.sd.width);
+export const selectHeightConfig = createConfigSelector((config) => config.sd.height);
+export const selectStepsConfig = createConfigSelector((config) => config.sd.steps);
+export const selectCFGScaleConfig = createConfigSelector((config) => config.sd.guidance);
+export const selectCLIPSkipConfig = createConfigSelector((config) => config.sd.clipSkip);
+export const selectCFGRescaleMultiplierConfig = createConfigSelector((config) => config.sd.cfgRescaleMultiplier);
+export const selectCanvasCoherenceEdgeSizeConfig = createConfigSelector((config) => config.sd.canvasCoherenceEdgeSize);
+export const selectMaskBlurConfig = createConfigSelector((config) => config.sd.maskBlur);
+export const selectInfillPatchmatchDownscaleSizeConfig = createConfigSelector(
+  (config) => config.sd.infillPatchmatchDownscaleSize
+);
+export const selectInfillTileSizeConfig = createConfigSelector((config) => config.sd.infillTileSize);
+export const selectImg2imgStrengthConfig = createConfigSelector((config) => config.sd.img2imgStrength);
+export const selectMaxPromptsConfig = createConfigSelector((config) => config.sd.dynamicPrompts.maxPrompts);
+export const selectIterationsConfig = createConfigSelector((config) => config.sd.iterations);
+
+export const selectMaxUpscaleDimension = createConfigSelector((config) => config.maxUpscaleDimension);
+export const selectAllowPrivateStylePresets = createConfigSelector((config) => config.allowPrivateStylePresets);
+export const selectWorkflowFetchDebounce = createConfigSelector((config) => config.workflowFetchDebounce ?? 300);
+export const selectMetadataFetchDebounce = createConfigSelector((config) => config.metadataFetchDebounce ?? 300);
+
+export const selectIsModelsTabDisabled = createConfigSelector((config) => config.disabledTabs.includes('models'));

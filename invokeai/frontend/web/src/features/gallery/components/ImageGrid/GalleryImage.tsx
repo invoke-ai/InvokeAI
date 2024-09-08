@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Text, useShiftModifier } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
@@ -11,8 +12,13 @@ import type { GallerySelectionDraggableData, ImageDraggableData, TypesafeDraggab
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
-import { imageToCompareChanged, isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
-import type { MouseEvent } from 'react';
+import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
+import {
+  imageToCompareChanged,
+  isImageViewerOpenChanged,
+  selectGallerySlice,
+} from 'features/gallery/store/gallerySlice';
+import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
@@ -38,13 +44,20 @@ interface HoverableImageProps {
   index: number;
 }
 
+const selectAlwaysShouldImageSizeBadge = createSelector(
+  selectGallerySlice,
+  (gallery) => gallery.alwaysShowImageSizeBadge
+);
+
 const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const shift = useShiftModifier();
-  const { t } = useTranslation();
-  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
-  const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
-  const isSelectedForCompare = useAppSelector((s) => s.gallery.imageToCompare?.image_name === imageDTO.image_name);
+  const selectedBoardId = useAppSelector(selectSelectedBoardId);
+  const selectIsSelectedForCompare = useMemo(
+    () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name === imageDTO.image_name),
+    [imageDTO.image_name]
+  );
+  const alwaysShowImageSizeBadge = useAppSelector(selectAlwaysShouldImageSizeBadge);
+  const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
 
   const customStarUi = useStore($customStarUI);
@@ -190,16 +203,7 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
               insetInlineEnd={1}
             />
 
-            {isHovered && shift && (
-              <IAIDndImageIcon
-                onClick={handleDelete}
-                icon={<PiTrashSimpleFill size="16px" />}
-                tooltip={t('gallery.deleteImage_one')}
-                position="absolute"
-                bottom={1}
-                insetInlineEnd={1}
-              />
-            )}
+            {isHovered && <DeleteIcon onClick={handleDelete} />}
           </>
         </IAIDndImage>
       </Flex>
@@ -208,3 +212,23 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
 };
 
 export default memo(GalleryImage);
+
+const DeleteIcon = ({ onClick }: { onClick: MouseEventHandler }) => {
+  const shift = useShiftModifier();
+  const { t } = useTranslation();
+
+  if (!shift) {
+    return null;
+  }
+
+  return (
+    <IAIDndImageIcon
+      onClick={onClick}
+      icon={<PiTrashSimpleFill size="16px" />}
+      tooltip={t('gallery.deleteImage_one')}
+      position="absolute"
+      bottom={1}
+      insetInlineEnd={1}
+    />
+  );
+};

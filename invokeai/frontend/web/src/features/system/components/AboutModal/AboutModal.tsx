@@ -53,7 +53,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
       {cloneElement(children, {
         onClick: onOpen,
       })}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl">
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false}>
         <ModalOverlay />
         <ModalContent maxH="80vh" h="34rem">
           <ModalHeader>{t('accessibility.about')}</ModalHeader>

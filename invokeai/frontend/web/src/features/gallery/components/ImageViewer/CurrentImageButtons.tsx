@@ -1,27 +1,23 @@
 import { ButtonGroup, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { createSelector } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { $isConnected } from 'app/hooks/useSocketIO';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { iiLayerAdded } from 'features/controlLayers/store/controlLayersSlice';
+import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
-import { sentImageToImg2Img } from 'features/gallery/store/actions';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
-import { selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectSystemSlice } from 'features/system/store/systemSlice';
-import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { size } from 'lodash-es';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
@@ -34,28 +30,22 @@ import {
   PiRulerBold,
 } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-
-const selectShouldDisableToolbarButtons = createSelector(
-  selectSystemSlice,
-  selectGallerySlice,
-  selectLastSelectedImage,
-  (system, gallery, lastSelectedImage) => {
-    const hasProgressImage = Boolean(system.denoiseProgress?.progress_image);
-    return hasProgressImage || !lastSelectedImage;
-  }
-);
+import { $progressImage } from 'services/events/setEventListeners';
 
 const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
+  const progressImage = useStore($progressImage);
   const selection = useAppSelector((s) => s.gallery.selection);
-  const shouldDisableToolbarButtons = useAppSelector(selectShouldDisableToolbarButtons);
+  const shouldDisableToolbarButtons = useMemo(() => {
+    return Boolean(progressImage) || !lastSelectedImage;
+  }, [lastSelectedImage, progressImage]);
   const templates = useStore($templates);
   const isUpscalingEnabled = useFeatureStatus('upscaling');
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
-
+  const isImageViewerActive = useStore(INTERACTION_SCOPES.imageViewer.$isActive);
   const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
 
   const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =
@@ -70,29 +60,9 @@ const CurrentImageButtons = () => {
     getAndLoadEmbeddedWorkflow(lastSelectedImage.image_name);
   }, [getAndLoadEmbeddedWorkflow, lastSelectedImage]);
 
-  useHotkeys('w', handleLoadWorkflow, [lastSelectedImage]);
-  useHotkeys('a', recallAll, [recallAll]);
-  useHotkeys('s', recallSeed, [recallSeed]);
-  useHotkeys('p', recallPrompts, [recallPrompts]);
-  useHotkeys('r', remix, [remix]);
-
   const handleUseSize = useCallback(() => {
     parseAndRecallImageDimensions(lastSelectedImage);
   }, [lastSelectedImage]);
-
-  useHotkeys('d', handleUseSize, [handleUseSize]);
-
-  const handleSendToImageToImage = useCallback(() => {
-    if (!imageDTO) {
-      return;
-    }
-    dispatch(sentImageToImg2Img());
-    dispatch(iiLayerAdded(imageDTO));
-    dispatch(setActiveTab('generation'));
-  }, [dispatch, imageDTO]);
-
-  useHotkeys('shift+i', handleSendToImageToImage, [imageDTO]);
-
   const handleClickUpscale = useCallback(() => {
     if (!imageDTO) {
       return;
@@ -107,24 +77,20 @@ const CurrentImageButtons = () => {
     dispatch(imagesToDeleteSelected(selection));
   }, [dispatch, imageDTO, selection]);
 
+  useHotkeys('w', handleLoadWorkflow, { enabled: isImageViewerActive }, [lastSelectedImage, isImageViewerActive]);
+  useHotkeys('a', recallAll, { enabled: isImageViewerActive }, [recallAll, isImageViewerActive]);
+  useHotkeys('s', recallSeed, { enabled: isImageViewerActive }, [recallSeed, isImageViewerActive]);
+  useHotkeys('p', recallPrompts, { enabled: isImageViewerActive }, [recallPrompts, isImageViewerActive]);
+  useHotkeys('r', remix, { enabled: isImageViewerActive }, [remix, isImageViewerActive]);
+  useHotkeys('d', handleUseSize, { enabled: isImageViewerActive }, [handleUseSize, isImageViewerActive]);
   useHotkeys(
-    'Shift+U',
-    () => {
-      handleClickUpscale();
-    },
-    {
-      enabled: () => Boolean(isUpscalingEnabled && !shouldDisableToolbarButtons && isConnected),
-    },
-    [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected]
+    'shift+u',
+    handleClickUpscale,
+    { enabled: Boolean(isUpscalingEnabled && isImageViewerActive && isConnected) },
+    [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected, isImageViewerActive]
   );
 
-  useHotkeys(
-    'delete',
-    () => {
-      handleDelete();
-    },
-    [dispatch, imageDTO]
-  );
+  useHotkeys(['delete', 'backspace'], handleDelete, { enabled: isImageViewerActive }, [imageDTO, isImageViewerActive]);
 
   return (
     <>

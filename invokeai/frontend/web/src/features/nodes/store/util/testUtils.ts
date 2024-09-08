@@ -163,6 +163,7 @@ export const collect: InvocationTemplate = {
     },
   },
   useCache: true,
+  nodePack: 'invokeai',
   classification: 'stable',
 };
 
@@ -480,6 +481,7 @@ const iterate: InvocationTemplate = {
     },
   },
   useCache: true,
+  nodePack: 'invokeai',
   classification: 'stable',
 };
 
@@ -1152,6 +1154,7 @@ export const schema = {
         type: 'object',
         required: ['type', 'id'],
         title: 'CollectInvocation',
+        node_pack: 'invokeai',
         description: 'Collects values into a collection',
         classification: 'stable',
         version: '1.0.0',
@@ -1513,6 +1516,7 @@ export const schema = {
         title: 'IterateInvocation',
         description: 'Iterates over a list of items',
         classification: 'stable',
+        node_pack: 'invokeai',
         version: '1.1.0',
         output: {
           $ref: '#/components/schemas/IterateInvocationOutput',

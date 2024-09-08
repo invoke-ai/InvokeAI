@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/nanostores/store';
 import type { MapStore } from 'nanostores';
 import { atom, map } from 'nanostores';
 import { useEffect, useMemo } from 'react';
@@ -18,14 +18,19 @@ declare global {
   }
 }
 
+export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+
+export const $socket = atom<AppSocket | null>(null);
 export const $socketOptions = map<Partial<ManagerOptions & SocketOptions>>({});
+
 const $isSocketInitialized = atom<boolean>(false);
+export const $isConnected = atom<boolean>(false);
 
 /**
  * Initializes the socket.io connection and sets up event listeners.
  */
 export const useSocketIO = () => {
-  const dispatch = useAppDispatch();
+  const { dispatch, getState } = useAppStore();
   const baseUrl = useStore($baseUrl);
   const authToken = useStore($authToken);
   const addlSocketOptions = useStore($socketOptions);
@@ -61,8 +66,9 @@ export const useSocketIO = () => {
       return;
     }
 
-    const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(socketUrl, socketOptions);
-    setEventListeners({ dispatch, socket });
+    const socket: AppSocket = io(socketUrl, socketOptions);
+    $socket.set(socket);
+    setEventListeners({ socket, dispatch, getState, setIsConnected: $isConnected.set });
     socket.connect();
 
     if ($isDebugging.get() || import.meta.env.MODE === 'development') {
@@ -84,5 +90,5 @@ export const useSocketIO = () => {
       socket.disconnect();
       $isSocketInitialized.set(false);
     };
-  }, [dispatch, socketOptions, socketUrl]);
+  }, [dispatch, getState, socketOptions, socketUrl]);
 };

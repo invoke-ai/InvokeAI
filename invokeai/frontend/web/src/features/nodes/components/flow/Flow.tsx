@@ -1,16 +1,17 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { INTERACTION_SCOPES, useScopeImperativeApi } from 'common/hooks/interactionScopes';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
+  $addNodeCmdk,
   $cursorPos,
   $didUpdateEdge,
   $edgePendingUpdate,
-  $isAddNodePopoverOpen,
   $lastEdgeUpdateMouseEvent,
   $pendingConnection,
   $viewport,
@@ -20,7 +21,15 @@ import {
   undo,
 } from 'features/nodes/store/nodesSlice';
 import { $flow, $needsFit } from 'features/nodes/store/reactFlowInstance';
+import {
+  selectEdges,
+  selectMayRedo,
+  selectMayUndo,
+  selectNodes,
+  selectNodesSlice,
+} from 'features/nodes/store/selectors';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
+import { selectSelectionMode, selectShouldSnapToGrid } from 'features/nodes/store/workflowSettingsSlice';
 import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -65,30 +74,27 @@ const selectCancelConnection = (state: ReactFlowState) => state.cancelConnection
 
 export const Flow = memo(() => {
   const dispatch = useAppDispatch();
-  const nodes = useAppSelector((s) => s.nodes.present.nodes);
-  const edges = useAppSelector((s) => s.nodes.present.edges);
+  const nodes = useAppSelector(selectNodes);
+  const edges = useAppSelector(selectEdges);
   const viewport = useStore($viewport);
   const needsFit = useStore($needsFit);
-  const mayUndo = useAppSelector((s) => s.nodes.past.length > 0);
-  const mayRedo = useAppSelector((s) => s.nodes.future.length > 0);
-  const shouldSnapToGrid = useAppSelector((s) => s.workflowSettings.shouldSnapToGrid);
-  const selectionMode = useAppSelector((s) => s.workflowSettings.selectionMode);
+  const mayUndo = useAppSelector(selectMayUndo);
+  const mayRedo = useAppSelector(selectMayRedo);
+  const shouldSnapToGrid = useAppSelector(selectShouldSnapToGrid);
+  const selectionMode = useAppSelector(selectSelectionMode);
   const { onConnectStart, onConnect, onConnectEnd } = useConnection();
   const flowWrapper = useRef<HTMLDivElement>(null);
   const isValidConnection = useIsValidConnection();
   const cancelConnection = useReactFlowStore(selectCancelConnection);
   const updateNodeInternals = useUpdateNodeInternals();
   const store = useAppStore();
+  const isWorkflowsActive = useStore(INTERACTION_SCOPES.workflows.$isActive);
+  const workflowsScopeApi = useScopeImperativeApi('workflows');
+
   useWorkflowWatcher();
   useSyncExecutionState();
   const [borderRadius] = useToken('radii', ['base']);
-
-  const flowStyles = useMemo<CSSProperties>(
-    () => ({
-      borderRadius,
-    }),
-    [borderRadius]
-  );
+  const flowStyles = useMemo<CSSProperties>(() => ({ borderRadius }), [borderRadius]);
 
   const onNodesChange: OnNodesChange = useCallback(
     (nodeChanges) => {
@@ -121,7 +127,8 @@ export const Flow = memo(() => {
   const { onCloseGlobal } = useGlobalMenuClose();
   const handlePaneClick = useCallback(() => {
     onCloseGlobal();
-  }, [onCloseGlobal]);
+    workflowsScopeApi.add();
+  }, [onCloseGlobal, workflowsScopeApi]);
 
   const onInit: OnInit = useCallback((flow) => {
     $flow.set(flow);
@@ -215,7 +222,7 @@ export const Flow = memo(() => {
   const onSelectAllHotkey = useCallback(
     (e: KeyboardEvent) => {
       e.preventDefault();
-      const { nodes, edges } = store.getState().nodes.present;
+      const { nodes, edges } = selectNodesSlice(store.getState());
       const nodeChanges: NodeChange[] = [];
       const edgeChanges: EdgeChange[] = [];
       nodes.forEach(({ id, selected }) => {
@@ -237,7 +244,7 @@ export const Flow = memo(() => {
     },
     [dispatch, store]
   );
-  useHotkeys(['Ctrl+a', 'Meta+a'], onSelectAllHotkey);
+  useHotkeys(['Ctrl+a', 'Meta+a'], onSelectAllHotkey, { enabled: isWorkflowsActive }, [isWorkflowsActive]);
 
   const onPasteHotkey = useCallback(
     (e: KeyboardEvent) => {
@@ -274,14 +281,14 @@ export const Flow = memo(() => {
   const onEscapeHotkey = useCallback(() => {
     if (!$edgePendingUpdate.get()) {
       $pendingConnection.set(null);
-      $isAddNodePopoverOpen.set(false);
+      $addNodeCmdk.set(false);
       cancelConnection();
     }
   }, [cancelConnection]);
   useHotkeys('esc', onEscapeHotkey);
 
   const onDeleteHotkey = useCallback(() => {
-    const { nodes, edges } = store.getState().nodes.present;
+    const { nodes, edges } = selectNodesSlice(store.getState());
     const nodeChanges: NodeChange[] = [];
     const edgeChanges: EdgeChange[] = [];
     nodes

@@ -114,12 +114,6 @@ export const isSpandrelImageToImageModelConfig = (
   return config.type === 'spandrel_image_to_image';
 };
 
-export const isControlAdapterModelConfig = (
-  config: AnyModelConfig
-): config is ControlNetModelConfig | T2IAdapterModelConfig | IPAdapterModelConfig => {
-  return isControlNetModelConfig(config) || isT2IAdapterModelConfig(config) || isIPAdapterModelConfig(config);
-};
-
 export const isControlNetOrT2IAdapterModelConfig = (
   config: AnyModelConfig
 ): config is ControlNetModelConfig | T2IAdapterModelConfig => {
@@ -195,42 +189,21 @@ export type OutputFields<T extends AnyInvocation> = Extract<
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
 
-// Post-image upload actions, controls workflows when images are uploaded
-
-type ControlAdapterAction = {
-  type: 'SET_CONTROL_ADAPTER_IMAGE';
+export type IPALayerImagePostUploadAction = {
+  type: 'SET_IPA_IMAGE';
   id: string;
 };
 
-export type CALayerImagePostUploadAction = {
-  type: 'SET_CA_LAYER_IMAGE';
-  layerId: string;
-};
-
-export type IPALayerImagePostUploadAction = {
-  type: 'SET_IPA_LAYER_IMAGE';
-  layerId: string;
-};
-
-export type RGLayerIPAdapterImagePostUploadAction = {
-  type: 'SET_RG_LAYER_IP_ADAPTER_IMAGE';
-  layerId: string;
+export type RGIPAdapterImagePostUploadAction = {
+  type: 'SET_RG_IP_ADAPTER_IMAGE';
+  id: string;
   ipAdapterId: string;
-};
-
-export type IILayerImagePostUploadAction = {
-  type: 'SET_II_LAYER_IMAGE';
-  layerId: string;
 };
 
 type NodesAction = {
   type: 'SET_NODES_IMAGE';
   nodeId: string;
   fieldName: string;
-};
-
-type CanvasInitialImageAction = {
-  type: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
 type UpscaleInitialImageAction = {
@@ -247,13 +220,9 @@ type AddToBatchAction = {
 };
 
 export type PostUploadAction =
-  | ControlAdapterAction
   | NodesAction
-  | CanvasInitialImageAction
   | ToastAction
   | AddToBatchAction
-  | CALayerImagePostUploadAction
   | IPALayerImagePostUploadAction
-  | RGLayerIPAdapterImagePostUploadAction
-  | IILayerImagePostUploadAction
+  | RGIPAdapterImagePostUploadAction
   | UpscaleInitialImageAction;

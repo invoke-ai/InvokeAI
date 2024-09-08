@@ -6,16 +6,17 @@ import { imagesToDeleteSelected, isModalOpenChanged } from 'features/deleteImage
 export const addImageToDeleteSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: imagesToDeleteSelected,
-    effect: async (action, { dispatch, getState }) => {
+    effect: (action, { dispatch, getState }) => {
       const imageDTOs = action.payload;
       const state = getState();
       const { shouldConfirmOnDelete } = state.system;
       const imagesUsage = selectImageUsage(getState());
 
       const isImageInUse =
-        imagesUsage.some((i) => i.isCanvasImage) ||
-        imagesUsage.some((i) => i.isControlImage) ||
-        imagesUsage.some((i) => i.isNodesImage);
+        imagesUsage.some((i) => i.isLayerImage) ||
+        imagesUsage.some((i) => i.isControlAdapterImage) ||
+        imagesUsage.some((i) => i.isIPAdapterImage) ||
+        imagesUsage.some((i) => i.isLayerImage);
 
       if (shouldConfirmOnDelete || isImageInUse) {
         dispatch(isModalOpenChanged(true));

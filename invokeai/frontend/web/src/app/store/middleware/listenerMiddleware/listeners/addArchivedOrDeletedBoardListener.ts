@@ -23,7 +23,7 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
    */
   startAppListening({
     matcher: matchAnyBoardDeleted,
-    effect: async (action, { dispatch, getState }) => {
+    effect: (action, { dispatch, getState }) => {
       const state = getState();
       const deletedBoardId = action.meta.arg.originalArgs;
       const { autoAddBoardId, selectedBoardId } = state.gallery;
@@ -44,7 +44,7 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
   // If we archived a board, it may end up hidden. If it's selected or the auto-add board, we should reset those.
   startAppListening({
     matcher: boardsApi.endpoints.updateBoard.matchFulfilled,
-    effect: async (action, { dispatch, getState }) => {
+    effect: (action, { dispatch, getState }) => {
       const state = getState();
       const { shouldShowArchivedBoards } = state.gallery;
 
@@ -61,7 +61,7 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
   // When we hide archived boards, if the selected or the auto-add board is archived, we should reset those.
   startAppListening({
     actionCreator: shouldShowArchivedBoardsChanged,
-    effect: async (action, { dispatch, getState }) => {
+    effect: (action, { dispatch, getState }) => {
       const shouldShowArchivedBoards = action.payload;
 
       // We only need to take action if we have just hidden archived boards.
@@ -100,7 +100,7 @@ export const addArchivedOrDeletedBoardListener = (startAppListening: AppStartLis
    */
   startAppListening({
     matcher: boardsApi.endpoints.listAllBoards.matchFulfilled,
-    effect: async (action, { dispatch, getState }) => {
+    effect: (action, { dispatch, getState }) => {
       const boards = action.payload;
       const state = getState();
       const { selectedBoardId, autoAddBoardId } = state.gallery;

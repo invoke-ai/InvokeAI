@@ -111,28 +111,13 @@ const zParameterLoRAModel = zModelIdentifierField;
 export type ParameterLoRAModel = z.infer<typeof zParameterLoRAModel>;
 // #endregion
 
-// #region ControlNet Model
-const zParameterControlNetModel = zModelIdentifierField;
-export type ParameterControlNetModel = z.infer<typeof zParameterControlNetModel>;
-// #endregion
-
-// #region IP Adapter Model
-const zParameterIPAdapterModel = zModelIdentifierField;
-export type ParameterIPAdapterModel = z.infer<typeof zParameterIPAdapterModel>;
-// #endregion
-
-// #region T2I Adapter Model
-const zParameterT2IAdapterModel = zModelIdentifierField;
-export type ParameterT2IAdapterModel = z.infer<typeof zParameterT2IAdapterModel>;
-// #endregion
-
 // #region VAE Model
 const zParameterSpandrelImageToImageModel = zModelIdentifierField;
 export type ParameterSpandrelImageToImageModel = z.infer<typeof zParameterSpandrelImageToImageModel>;
 // #endregion
 
 // #region Strength (l2l strength)
-export const zParameterStrength = z.number().min(0).max(1);
+const zParameterStrength = z.number().min(0).max(1);
 export type ParameterStrength = z.infer<typeof zParameterStrength>;
 export const isParameterStrength = (val: unknown): val is ParameterStrength =>
   zParameterStrength.safeParse(val).success;
@@ -200,9 +185,4 @@ export const isParameterCanvasCoherenceMode = (val: unknown): val is ParameterCa
 const zLoRAWeight = z.number();
 type ParameterLoRAWeight = z.infer<typeof zLoRAWeight>;
 export const isParameterLoRAWeight = (val: unknown): val is ParameterLoRAWeight => zLoRAWeight.safeParse(val).success;
-// #endregion
-
-// #region Regional Prompts AutoNegative
-export const zAutoNegative = z.enum(['off', 'invert']);
-export type ParameterAutoNegative = z.infer<typeof zAutoNegative>;
 // #endregion

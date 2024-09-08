@@ -1,36 +1,42 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch, RootState } from 'app/store/store';
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import {
-  controlAdapterModelCleared,
-  selectControlAdapterAll,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
-import { loraRemoved } from 'features/lora/store/loraSlice';
-import { calculateNewSize } from 'features/parameters/components/ImageSize/calculateNewSize';
-import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
+  bboxHeightChanged,
+  bboxWidthChanged,
+  controlLayerModelChanged,
+  ipaModelChanged,
+  rgIPAdapterModelChanged,
+} from 'features/controlLayers/store/canvasSlice';
+import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
+import { modelChanged, refinerModelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
+import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
-import { refinerModelChanged } from 'features/sdxl/store/sdxlSlice';
-import { forEach } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isControlNetOrT2IAdapterModelConfig,
+  isIPAdapterModelConfig,
+  isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isVAEModelConfig,
 } from 'services/api/types';
 
+const log = logger('models');
+
 export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: modelsApi.endpoints.getModelConfigs.matchFulfilled,
-    effect: async (action, { getState, dispatch }) => {
+    effect: (action, { getState, dispatch }) => {
       // models loaded, we need to ensure the selected model is available and if not, select the first one
-      const log = logger('models');
       log.info({ models: action.payload.entities }, `Models loaded (${action.payload.ids.length})`);
 
       const state = getState();
@@ -43,6 +49,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleLoRAModels(models, state, dispatch, log);
       handleControlAdapterModels(models, state, dispatch, log);
       handleSpandrelImageToImageModels(models, state, dispatch, log);
+      handleIPAdapterModels(models, state, dispatch, log);
     },
   });
 };
@@ -51,15 +58,15 @@ type ModelHandler = (
   models: AnyModelConfig[],
   state: RootState,
   dispatch: AppDispatch,
-  log: Logger<JSONObject>
+  log: Logger<SerializableObject>
 ) => undefined;
 
 const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
-  const currentModel = state.generation.model;
+  const currentModel = state.params.model;
   const mainModels = models.filter(isNonRefinerMainModelConfig);
   if (mainModels.length === 0) {
     // No models loaded at all
-    dispatch(modelChanged(null));
+    dispatch(modelChanged({ model: null }));
     return;
   }
 
@@ -74,25 +81,16 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   if (defaultModelInList) {
     const result = zParameterModel.safeParse(defaultModelInList);
     if (result.success) {
-      dispatch(modelChanged(defaultModelInList, currentModel));
-
+      dispatch(modelChanged({ model: defaultModelInList, previousModel: currentModel }));
+      const { bbox } = selectCanvasSlice(state);
       const optimalDimension = getOptimalDimension(defaultModelInList);
-      if (
-        getIsSizeOptimal(
-          state.controlLayers.present.size.width,
-          state.controlLayers.present.size.height,
-          optimalDimension
-        )
-      ) {
+      if (getIsSizeOptimal(bbox.rect.width, bbox.rect.height, optimalDimension)) {
         return;
       }
-      const { width, height } = calculateNewSize(
-        state.controlLayers.present.size.aspectRatio.value,
-        optimalDimension * optimalDimension
-      );
+      const { width, height } = calculateNewSize(bbox.aspectRatio.value, optimalDimension * optimalDimension);
 
-      dispatch(widthChanged({ width }));
-      dispatch(heightChanged({ height }));
+      dispatch(bboxWidthChanged({ width }));
+      dispatch(bboxHeightChanged({ height }));
       return;
     }
   }
@@ -104,11 +102,11 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     return;
   }
 
-  dispatch(modelChanged(result.data, currentModel));
+  dispatch(modelChanged({ model: result.data, previousModel: currentModel }));
 };
 
 const handleRefinerModels: ModelHandler = (models, state, dispatch, _log) => {
-  const currentRefinerModel = state.sdxl.refinerModel;
+  const currentRefinerModel = state.params.refinerModel;
   const refinerModels = models.filter(isRefinerMainModelModelConfig);
   if (models.length === 0) {
     // No models loaded at all
@@ -127,7 +125,7 @@ const handleRefinerModels: ModelHandler = (models, state, dispatch, _log) => {
 };
 
 const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
-  const currentVae = state.generation.vae;
+  const currentVae = state.params.vae;
 
   if (currentVae === null) {
     // null is a valid VAE! it means "use the default with the main model"
@@ -160,28 +158,47 @@ const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
 };
 
 const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
-  const loras = state.lora.loras;
-
-  forEach(loras, (lora, id) => {
-    const isLoRAAvailable = models.some((m) => m.key === lora.model.key);
-
+  const loraModels = models.filter(isLoRAModelConfig);
+  state.loras.loras.forEach((lora) => {
+    const isLoRAAvailable = loraModels.some((m) => m.key === lora.model.key);
     if (isLoRAAvailable) {
       return;
     }
-
-    dispatch(loraRemoved(id));
+    dispatch(loraDeleted({ id: lora.id }));
   });
 };
 
 const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
-  selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
-    const isModelAvailable = models.some((m) => m.key === ca.model?.key);
-
+  const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
+  selectCanvasSlice(state).controlLayers.entities.forEach((entity) => {
+    const isModelAvailable = caModels.some((m) => m.key === entity.controlAdapter.model?.key);
     if (isModelAvailable) {
       return;
     }
+    dispatch(controlLayerModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
+  });
+};
 
-    dispatch(controlAdapterModelCleared({ id: ca.id }));
+const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
+  const ipaModels = models.filter(isIPAdapterModelConfig);
+  selectCanvasSlice(state).ipAdapters.entities.forEach((entity) => {
+    const isModelAvailable = ipaModels.some((m) => m.key === entity.ipAdapter.model?.key);
+    if (isModelAvailable) {
+      return;
+    }
+    dispatch(ipaModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
+  });
+
+  selectCanvasSlice(state).regions.entities.forEach((entity) => {
+    entity.ipAdapters.forEach(({ id: ipAdapterId, model }) => {
+      const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
+      if (isModelAvailable) {
+        return;
+      }
+      dispatch(
+        rgIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), ipAdapterId, modelConfig: null })
+      );
+    });
   });
 };
 

@@ -1,4 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
@@ -29,7 +30,7 @@ type UseImageUploadButtonArgs = {
  * <input {...getUploadInputProps()} /> // hidden, handles native upload functionality
  */
 export const useImageUploadButton = ({ postUploadAction, isDisabled }: UseImageUploadButtonArgs) => {
-  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [uploadImage] = useUploadImageMutation();
   const onDropAccepted = useCallback(
     (files: File[]) => {

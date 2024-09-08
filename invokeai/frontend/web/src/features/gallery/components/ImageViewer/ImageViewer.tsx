@@ -1,20 +1,27 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { useScopeOnFocus, useScopeOnMount } from 'common/hooks/interactionScopes';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
+import { ImageComparisonDroppable } from 'features/gallery/components/ImageViewer/ImageComparisonDroppable';
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
-import { memo } from 'react';
+import { selectHasImageToCompare } from 'features/gallery/store/gallerySelectors';
+import { memo, useRef } from 'react';
 import { useMeasure } from 'react-use';
 
-import { useImageViewer } from './useImageViewer';
-
 export const ImageViewer = memo(() => {
-  const imageViewer = useImageViewer();
+  const hasImageToCompare = useAppSelector(selectHasImageToCompare);
   const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
+  const ref = useRef<HTMLDivElement>(null);
+  useScopeOnFocus('imageViewer', ref);
+  useScopeOnMount('imageViewer');
 
   return (
     <Flex
-      layerStyle="first"
+      ref={ref}
+      tabIndex={-1}
+      layerStyle="body"
       borderRadius="base"
       position="absolute"
       flexDirection="column"
@@ -22,17 +29,17 @@ export const ImageViewer = memo(() => {
       right={0}
       bottom={0}
       left={0}
-      p={2}
       rowGap={4}
       alignItems="center"
       justifyContent="center"
     >
-      {imageViewer.isComparing && <CompareToolbar />}
-      {!imageViewer.isComparing && <ViewerToolbar />}
+      {hasImageToCompare && <CompareToolbar />}
+      {!hasImageToCompare && <ViewerToolbar />}
       <Box ref={containerRef} w="full" h="full">
-        {!imageViewer.isComparing && <CurrentImagePreview />}
-        {imageViewer.isComparing && <ImageComparison containerDims={containerDims} />}
+        {!hasImageToCompare && <CurrentImagePreview />}
+        {hasImageToCompare && <ImageComparison containerDims={containerDims} />}
       </Box>
+      <ImageComparisonDroppable />
     </Flex>
   );
 });

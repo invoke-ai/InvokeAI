@@ -4,11 +4,12 @@ import { $mouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import {
   $didUpdateEdge,
   $edgePendingUpdate,
-  $isAddNodePopoverOpen,
   $pendingConnection,
   $templates,
   edgesChanged,
+  useAddNodeCmdk,
 } from 'features/nodes/store/nodesSlice';
+import { selectNodes, selectNodesSlice } from 'features/nodes/store/selectors';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { useCallback, useMemo } from 'react';
@@ -20,11 +21,12 @@ export const useConnection = () => {
   const store = useAppStore();
   const templates = useStore($templates);
   const updateNodeInternals = useUpdateNodeInternals();
+  const addNodeCmdk = useAddNodeCmdk();
 
   const onConnectStart = useCallback<OnConnectStart>(
     (event, { nodeId, handleId, handleType }) => {
       assert(nodeId && handleId && handleType, 'Invalid connection start event');
-      const nodes = store.getState().nodes.present.nodes;
+      const nodes = selectNodes(store.getState());
 
       const node = nodes.find((n) => n.id === nodeId);
       if (!node) {
@@ -72,7 +74,7 @@ export const useConnection = () => {
     if (!pendingConnection) {
       return;
     }
-    const { nodes, edges } = store.getState().nodes.present;
+    const { nodes, edges } = selectNodesSlice(store.getState());
     if (mouseOverNodeId) {
       const { handleType } = pendingConnection;
       const source = handleType === 'source' ? pendingConnection.nodeId : mouseOverNodeId;
@@ -106,9 +108,9 @@ export const useConnection = () => {
       $pendingConnection.set(null);
     } else {
       // The mouse is not over a node - we should open the add node popover
-      $isAddNodePopoverOpen.set(true);
+      addNodeCmdk.setTrue();
     }
-  }, [store, templates, updateNodeInternals]);
+  }, [addNodeCmdk, store, templates, updateNodeInternals]);
 
   const api = useMemo(() => ({ onConnectStart, onConnect, onConnectEnd }), [onConnectStart, onConnect, onConnectEnd]);
   return api;

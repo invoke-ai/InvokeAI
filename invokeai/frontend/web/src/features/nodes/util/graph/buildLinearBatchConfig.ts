@@ -1,16 +1,20 @@
-import { NUMPY_RAND_MAX } from 'app/constants';
 import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { range } from 'lodash-es';
 import type { components } from 'services/api/schema';
-import type { Batch, BatchConfig, NonNullableGraph } from 'services/api/types';
+import type { Batch, BatchConfig, Invocation } from 'services/api/types';
 
-import { getHasMetadata, removeMetadata } from './canvas/metadata';
-import { CANVAS_COHERENCE_NOISE, METADATA, NOISE, POSITIVE_CONDITIONING } from './constants';
-
-export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, prepend: boolean): BatchConfig => {
-  const { iterations, model, shouldRandomizeSeed, seed } = state.generation;
-  const { shouldConcatPrompts } = state.controlLayers.present;
+export const prepareLinearUIBatch = (
+  state: RootState,
+  g: Graph,
+  prepend: boolean,
+  noise: Invocation<'noise'>,
+  posCond: Invocation<'compel' | 'sdxl_compel_prompt'>,
+  origin: 'generation' | 'workflows' | 'upscaling',
+  destination: 'canvas' | 'gallery'
+): BatchConfig => {
+  const { iterations, model, shouldRandomizeSeed, seed, shouldConcatPrompts } = state.params;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];
@@ -24,31 +28,19 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
       start: shouldRandomizeSeed ? undefined : seed,
     });
 
-    if (graph.nodes[NOISE]) {
-      firstBatchDatumList.push({
-        node_path: NOISE,
-        field_name: 'seed',
-        items: seeds,
-      });
-    }
+    firstBatchDatumList.push({
+      node_path: noise.id,
+      field_name: 'seed',
+      items: seeds,
+    });
 
     // add to metadata
-    if (getHasMetadata(graph)) {
-      removeMetadata(graph, 'seed');
-      firstBatchDatumList.push({
-        node_path: METADATA,
-        field_name: 'seed',
-        items: seeds,
-      });
-    }
-
-    if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
-      firstBatchDatumList.push({
-        node_path: CANVAS_COHERENCE_NOISE,
-        field_name: 'seed',
-        items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
-      });
-    }
+    g.removeMetadata(['seed']);
+    firstBatchDatumList.push({
+      node_path: g.getMetadataNode().id,
+      field_name: 'seed',
+      items: seeds,
+    });
   } else {
     // seedBehaviour = SeedBehaviour.PerRun
     const seeds = generateSeeds({
@@ -56,73 +48,53 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
       start: shouldRandomizeSeed ? undefined : seed,
     });
 
-    if (graph.nodes[NOISE]) {
-      secondBatchDatumList.push({
-        node_path: NOISE,
-        field_name: 'seed',
-        items: seeds,
-      });
-    }
+    secondBatchDatumList.push({
+      node_path: noise.id,
+      field_name: 'seed',
+      items: seeds,
+    });
 
     // add to metadata
-    if (getHasMetadata(graph)) {
-      removeMetadata(graph, 'seed');
-      secondBatchDatumList.push({
-        node_path: METADATA,
-        field_name: 'seed',
-        items: seeds,
-      });
-    }
-
-    if (graph.nodes[CANVAS_COHERENCE_NOISE]) {
-      secondBatchDatumList.push({
-        node_path: CANVAS_COHERENCE_NOISE,
-        field_name: 'seed',
-        items: seeds.map((seed) => (seed + 1) % NUMPY_RAND_MAX),
-      });
-    }
+    g.removeMetadata(['seed']);
+    secondBatchDatumList.push({
+      node_path: g.getMetadataNode().id,
+      field_name: 'seed',
+      items: seeds,
+    });
     data.push(secondBatchDatumList);
   }
 
   const extendedPrompts = seedBehaviour === 'PER_PROMPT' ? range(iterations).flatMap(() => prompts) : prompts;
 
   // zipped batch of prompts
-  if (graph.nodes[POSITIVE_CONDITIONING]) {
-    firstBatchDatumList.push({
-      node_path: POSITIVE_CONDITIONING,
-      field_name: 'prompt',
-      items: extendedPrompts,
-    });
-  }
+  firstBatchDatumList.push({
+    node_path: posCond.id,
+    field_name: 'prompt',
+    items: extendedPrompts,
+  });
 
   // add to metadata
-  if (getHasMetadata(graph)) {
-    removeMetadata(graph, 'positive_prompt');
-    firstBatchDatumList.push({
-      node_path: METADATA,
-      field_name: 'positive_prompt',
-      items: extendedPrompts,
-    });
-  }
+  g.removeMetadata(['positive_prompt']);
+  firstBatchDatumList.push({
+    node_path: g.getMetadataNode().id,
+    field_name: 'positive_prompt',
+    items: extendedPrompts,
+  });
 
   if (shouldConcatPrompts && model?.base === 'sdxl') {
-    if (graph.nodes[POSITIVE_CONDITIONING]) {
-      firstBatchDatumList.push({
-        node_path: POSITIVE_CONDITIONING,
-        field_name: 'style',
-        items: extendedPrompts,
-      });
-    }
+    firstBatchDatumList.push({
+      node_path: posCond.id,
+      field_name: 'style',
+      items: extendedPrompts,
+    });
 
     // add to metadata
-    if (getHasMetadata(graph)) {
-      removeMetadata(graph, 'positive_style_prompt');
-      firstBatchDatumList.push({
-        node_path: METADATA,
-        field_name: 'positive_style_prompt',
-        items: extendedPrompts,
-      });
-    }
+    g.removeMetadata(['positive_style_prompt']);
+    firstBatchDatumList.push({
+      node_path: g.getMetadataNode().id,
+      field_name: 'positive_style_prompt',
+      items: extendedPrompts,
+    });
   }
 
   data.push(firstBatchDatumList);
@@ -130,9 +102,11 @@ export const prepareLinearUIBatch = (state: RootState, graph: NonNullableGraph, 
   const enqueueBatchArg: BatchConfig = {
     prepend,
     batch: {
-      graph,
+      graph: g.getGraph(),
       runs: 1,
       data,
+      origin,
+      destination,
     },
   };
 

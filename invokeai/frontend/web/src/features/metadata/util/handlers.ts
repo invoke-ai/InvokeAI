@@ -1,11 +1,9 @@
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import { objectKeys } from 'common/util/objectKeys';
-import { shouldConcatPromptsChanged } from 'features/controlLayers/store/controlLayersSlice';
-import type { Layer } from 'features/controlLayers/store/types';
-import type { LoRA } from 'features/lora/store/loraSlice';
+import { shouldConcatPromptsChanged } from 'features/controlLayers/store/paramsSlice';
+import type { LoRA } from 'features/controlLayers/store/types';
 import type {
-  AnyControlAdapterConfigMetadata,
   BuildMetadataHandlers,
   MetadataGetLabelFunc,
   MetadataHandlers,
@@ -20,7 +18,6 @@ import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { size } from 'lodash-es';
-import { assert } from 'tsafe';
 
 import { parsers } from './parsers';
 import { recallers } from './recallers';
@@ -40,57 +37,6 @@ const renderLoRAValue: MetadataRenderValueFunc<LoRA> = async (value) => {
   } catch {
     return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
   }
-};
-const renderControlAdapterValue: MetadataRenderValueFunc<AnyControlAdapterConfigMetadata> = async (value) => {
-  try {
-    const modelConfig = await fetchModelConfig(value.model.key ?? 'none');
-    return `${modelConfig.name} (${modelConfig.base.toUpperCase()}) - ${value.weight}`;
-  } catch {
-    return `${value.model.key} (${value.model.base.toUpperCase()}) - ${value.weight}`;
-  }
-};
-const renderLayerValue: MetadataRenderValueFunc<Layer> = async (layer) => {
-  if (layer.type === 'initial_image_layer') {
-    let rendered = t('controlLayers.globalInitialImageLayer');
-    if (layer.image) {
-      rendered += ` (${layer.image})`;
-    }
-    return rendered;
-  }
-  if (layer.type === 'control_adapter_layer') {
-    let rendered = t('controlLayers.globalControlAdapterLayer');
-    const model = layer.controlAdapter.model;
-    if (model) {
-      rendered += ` (${model.name} - ${model.base.toUpperCase()})`;
-    }
-    return rendered;
-  }
-  if (layer.type === 'ip_adapter_layer') {
-    let rendered = t('controlLayers.globalIPAdapterLayer');
-    const model = layer.ipAdapter.model;
-    if (model) {
-      rendered += ` (${model.name} - ${model.base.toUpperCase()})`;
-    }
-    return rendered;
-  }
-  if (layer.type === 'regional_guidance_layer') {
-    const rendered = t('controlLayers.regionalGuidanceLayer');
-    const items: string[] = [];
-    if (layer.positivePrompt) {
-      items.push(`Positive: ${layer.positivePrompt}`);
-    }
-    if (layer.negativePrompt) {
-      items.push(`Negative: ${layer.negativePrompt}`);
-    }
-    if (layer.ipAdapters.length > 0) {
-      items.push(`${layer.ipAdapters.length} IP Adapters`);
-    }
-    return `${rendered} (${items.join(', ')})`;
-  }
-  assert(false, 'Unknown layer type');
-};
-const renderLayersValue: MetadataRenderValueFunc<Layer[]> = async (layers) => {
-  return `${layers.length} ${t('controlLayers.layers', { count: layers.length })}`;
 };
 
 const parameterSetToast = (parameter: string) => {
@@ -179,7 +125,10 @@ const buildRecallItem =
     }
   };
 
-const resolveToString = (value: unknown) => new Promise<string>((resolve) => resolve(String(value)));
+const resolveToString = (value: unknown) =>
+  new Promise<string>((resolve) => {
+    resolve(String(value));
+  });
 
 const buildHandlers: BuildMetadataHandlers = ({
   getLabel,
@@ -326,26 +275,6 @@ export const handlers = {
   }),
 
   // Arrays of models
-  controlNets: buildHandlers({
-    getLabel: () => t('common.controlNet'),
-    parser: parsers.controlNets,
-    itemParser: parsers.controlNet,
-    recaller: recallers.controlNets,
-    itemRecaller: recallers.controlNet,
-    validator: validators.controlNets,
-    itemValidator: validators.controlNet,
-    renderItemValue: renderControlAdapterValue,
-  }),
-  ipAdapters: buildHandlers({
-    getLabel: () => t('common.ipAdapter'),
-    parser: parsers.ipAdapters,
-    itemParser: parsers.ipAdapter,
-    recaller: recallers.ipAdapters,
-    itemRecaller: recallers.ipAdapter,
-    validator: validators.ipAdapters,
-    itemValidator: validators.ipAdapter,
-    renderItemValue: renderControlAdapterValue,
-  }),
   loras: buildHandlers({
     getLabel: () => t('models.lora'),
     parser: parsers.loras,
@@ -355,28 +284,6 @@ export const handlers = {
     validator: validators.loras,
     itemValidator: validators.lora,
     renderItemValue: renderLoRAValue,
-  }),
-  t2iAdapters: buildHandlers({
-    getLabel: () => t('common.t2iAdapter'),
-    parser: parsers.t2iAdapters,
-    itemParser: parsers.t2iAdapter,
-    recaller: recallers.t2iAdapters,
-    itemRecaller: recallers.t2iAdapter,
-    validator: validators.t2iAdapters,
-    itemValidator: validators.t2iAdapter,
-    renderItemValue: renderControlAdapterValue,
-  }),
-  layers: buildHandlers({
-    getLabel: () => t('controlLayers.layers_one'),
-    parser: parsers.layers,
-    itemParser: parsers.layer,
-    recaller: recallers.layers,
-    itemRecaller: recallers.layer,
-    validator: validators.layers,
-    itemValidator: validators.layer,
-    renderItemValue: renderLayerValue,
-    renderValue: renderLayersValue,
-    getIsVisible: (value) => value.length > 0,
   }),
 } as const;
 
@@ -396,7 +303,7 @@ export const parseAndRecallPrompts = async (metadata: unknown) => {
   }
 };
 
-export const parseAndRecallImageDimensions = async (metadata: unknown) => {
+export const parseAndRecallImageDimensions = (metadata: unknown) => {
   const recalled = recallKeys(['width', 'height'], metadata);
   if (size(recalled) > 0) {
     parameterSetToast(t('metadata.imageDimensions'));
@@ -404,9 +311,9 @@ export const parseAndRecallImageDimensions = async (metadata: unknown) => {
 };
 
 // These handlers should be omitted when recalling to control layers
-const TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['controlNets', 'ipAdapters', 't2iAdapters', 'strength'];
+const TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['strength'];
 // These handlers should be omitted when recalling to the rest of the app
-const NOT_TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = ['layers'];
+const NOT_TO_CONTROL_LAYERS_SKIP_KEYS: (keyof typeof handlers)[] = [];
 
 export const parseAndRecallAllMetadata = async (
   metadata: unknown,

@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
 import type { Templates } from 'features/nodes/store/types';
@@ -24,6 +25,8 @@ import { serializeError } from 'serialize-error';
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
 import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
 import { isCollectionFieldType, parseFieldType } from './parseFieldType';
+
+const log = logger('system');
 
 const RESERVED_INPUT_FIELD_NAMES = ['id', 'type', 'use_cache'];
 const RESERVED_OUTPUT_FIELD_NAMES = ['type'];
@@ -85,18 +88,15 @@ export const parseSchema = (
       schema.properties,
       (inputsAccumulator: Record<string, FieldInputTemplate>, property, propertyName) => {
         if (isReservedInputField(type, propertyName)) {
-          logger('nodes').trace(
-            { node: type, field: propertyName, schema: parseify(property) },
+          log.trace(
+            { node: type, field: propertyName, schema: property } as SerializableObject,
             'Skipped reserved input field'
           );
           return inputsAccumulator;
         }
 
         if (!isInvocationFieldSchema(property)) {
-          logger('nodes').warn(
-            { node: type, field: propertyName, schema: parseify(property) },
-            'Unhandled input property'
-          );
+          log.warn({ node: type, field: propertyName, schema: parseify(property) }, 'Unhandled input property');
           return inputsAccumulator;
         }
 
@@ -111,18 +111,12 @@ export const parseSchema = (
 
         const fieldType = fieldTypeOverride ?? originalFieldType;
         if (!fieldType) {
-          logger('nodes').trace(
-            { node: type, field: propertyName, schema: parseify(property) },
-            'Unable to parse field type'
-          );
+          log.trace({ node: type, field: propertyName, schema: parseify(property) }, 'Unable to parse field type');
           return inputsAccumulator;
         }
 
         if (isReservedFieldType(fieldType.name)) {
-          logger('nodes').trace(
-            { node: type, field: propertyName, schema: parseify(property) },
-            'Skipped reserved input field'
-          );
+          log.trace({ node: type, field: propertyName, schema: parseify(property) }, 'Skipped reserved input field');
           return inputsAccumulator;
         }
 
@@ -141,18 +135,18 @@ export const parseSchema = (
     const outputSchemaName = schema.output.$ref.split('/').pop();
 
     if (!outputSchemaName) {
-      logger('nodes').warn({ outputRefObject: parseify(schema.output) }, 'No output schema name found in ref object');
+      log.warn({ outputRefObject: parseify(schema.output) }, 'No output schema name found in ref object');
       return invocationsAccumulator;
     }
 
     const outputSchema = openAPI.components?.schemas?.[outputSchemaName];
     if (!outputSchema) {
-      logger('nodes').warn({ outputSchemaName }, 'Output schema not found');
+      log.warn({ outputSchemaName }, 'Output schema not found');
       return invocationsAccumulator;
     }
 
     if (!isInvocationOutputSchemaObject(outputSchema)) {
-      logger('nodes').error({ outputSchema: parseify(outputSchema) }, 'Invalid output schema');
+      log.error({ outputSchema: parseify(outputSchema) }, 'Invalid output schema');
       return invocationsAccumulator;
     }
 
@@ -162,18 +156,12 @@ export const parseSchema = (
       outputSchema.properties,
       (outputsAccumulator, property, propertyName) => {
         if (!isAllowedOutputField(type, propertyName)) {
-          logger('nodes').trace(
-            { node: type, field: propertyName, schema: parseify(property) },
-            'Skipped reserved output field'
-          );
+          log.trace({ node: type, field: propertyName, schema: parseify(property) }, 'Skipped reserved output field');
           return outputsAccumulator;
         }
 
         if (!isInvocationFieldSchema(property)) {
-          logger('nodes').warn(
-            { node: type, field: propertyName, schema: parseify(property) },
-            'Unhandled output property'
-          );
+          log.warn({ node: type, field: propertyName, schema: parseify(property) }, 'Unhandled output property');
           return outputsAccumulator;
         }
 
@@ -188,10 +176,7 @@ export const parseSchema = (
 
         const fieldType = fieldTypeOverride ?? originalFieldType;
         if (!fieldType) {
-          logger('nodes').trace(
-            { node: type, field: propertyName, schema: parseify(property) },
-            'Unable to parse field type'
-          );
+          log.trace({ node: type, field: propertyName, schema: parseify(property) }, 'Unable to parse field type');
           return outputsAccumulator;
         }
 
@@ -242,7 +227,7 @@ const getFieldType = (
   } catch (e) {
     const tKey = kind === 'input' ? 'nodes.inputFieldTypeParseError' : 'nodes.outputFieldTypeParseError';
     if (e instanceof FieldParseError) {
-      logger('nodes').warn(
+      log.warn(
         {
           node: type,
           field: propertyName,
@@ -255,7 +240,7 @@ const getFieldType = (
         })
       );
     } else {
-      logger('nodes').warn(
+      log.warn(
         {
           node: type,
           field: propertyName,
