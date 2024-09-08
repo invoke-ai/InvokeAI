@@ -1,12 +1,12 @@
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
+import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-type ColorPickerToolConfig = {
+type CanvasToolColorPickerConfig = {
   /**
    * The inner radius of the ring.
    */
@@ -23,7 +23,6 @@ type ColorPickerToolConfig = {
    * The outer border color of the outside edge of ring.
    */
   RING_BORDER_OUTER_COLOR: string;
-
   /**
    * The radius of the space between the center of the ring and start of the crosshair lines.
    */
@@ -50,7 +49,7 @@ type ColorPickerToolConfig = {
   CROSSHAIR_BORDER_COLOR: string;
 };
 
-const DEFAULT_CONFIG: ColorPickerToolConfig = {
+const DEFAULT_CONFIG: CanvasToolColorPickerConfig = {
   RING_INNER_RADIUS: 25,
   RING_OUTER_RADIUS: 35,
   RING_BORDER_INNER_COLOR: 'rgba(0,0,0,1)',
@@ -66,15 +65,15 @@ const DEFAULT_CONFIG: ColorPickerToolConfig = {
 /**
  * Renders a preview of the color picker tool on the canvas.
  */
-export class CanvasColorPickerToolPreview extends CanvasModuleBase {
-  readonly type = 'color_picker_tool_preview';
+export class CanvasToolColorPicker extends CanvasModuleBase {
+  readonly type = 'color_picker_tool';
   readonly id: string;
   readonly path: string[];
   readonly parent: CanvasToolModule;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
-  config: ColorPickerToolConfig = DEFAULT_CONFIG;
+  config: CanvasToolColorPickerConfig = DEFAULT_CONFIG;
 
   /**
    * The Konva objects that make up the color picker tool preview:

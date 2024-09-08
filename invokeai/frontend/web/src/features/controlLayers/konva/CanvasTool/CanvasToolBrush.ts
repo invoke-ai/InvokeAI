@@ -1,39 +1,50 @@
+import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
+import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { alignCoordForTool, getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
-type EraserToolPreviewConfig = {
+type CanvasToolBrushConfig = {
   /**
-   * The inner border color for the eraser tool preview.
+   * The inner border color for the brush tool preview.
    */
   BORDER_INNER_COLOR: string;
   /**
-   * The outer border color for the eraser tool preview.
+   * The outer border color for the brush tool preview.
    */
   BORDER_OUTER_COLOR: string;
 };
 
-const DEFAULT_CONFIG: EraserToolPreviewConfig = {
+const DEFAULT_CONFIG: CanvasToolBrushConfig = {
   BORDER_INNER_COLOR: 'rgba(0,0,0,1)',
   BORDER_OUTER_COLOR: 'rgba(255,255,255,0.8)',
 };
 
-export class CanvasEraserToolPreview extends CanvasModuleBase {
-  readonly type = 'eraser_tool_preview';
+/**
+ * Renders a preview of the brush tool on the canvas.
+ */
+export class CanvasToolBrush extends CanvasModuleBase {
+  readonly type = 'brush_tool';
   readonly id: string;
   readonly path: string[];
   readonly parent: CanvasToolModule;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
-  config: EraserToolPreviewConfig = DEFAULT_CONFIG;
+  config: CanvasToolBrushConfig = DEFAULT_CONFIG;
 
+  /**
+   * The Konva objects that make up the brush tool preview:
+   * - A group to hold the fill circle and borders
+   * - A circle to fill the brush area
+   * - An inner border ring
+   * - An outer border ring
+   */
   konva: {
     group: Konva.Group;
-    cutoutCircle: Konva.Circle;
+    fillCircle: Konva.Circle;
     innerBorder: Konva.Ring;
     outerBorder: Konva.Ring;
   };
@@ -49,17 +60,14 @@ export class CanvasEraserToolPreview extends CanvasModuleBase {
     this.log.debug('Creating module');
 
     this.konva = {
-      group: new Konva.Group({ name: `${this.type}:eraser_group`, listening: false }),
-      cutoutCircle: new Konva.Circle({
-        name: `${this.type}:eraser_cutout_circle`,
+      group: new Konva.Group({ name: `${this.type}:brush_group`, listening: false }),
+      fillCircle: new Konva.Circle({
+        name: `${this.type}:brush_fill_circle`,
         listening: false,
         strokeEnabled: false,
-        // The fill is used only to erase what is underneath it, so its color doesn't matter - just needs to be opaque
-        fill: 'white',
-        globalCompositeOperation: 'destination-out',
       }),
       innerBorder: new Konva.Ring({
-        name: `${this.type}:eraser_inner_border_ring`,
+        name: `${this.type}:brush_inner_border_ring`,
         listening: false,
         innerRadius: 0,
         outerRadius: 0,
@@ -67,32 +75,36 @@ export class CanvasEraserToolPreview extends CanvasModuleBase {
         strokeEnabled: false,
       }),
       outerBorder: new Konva.Ring({
-        name: `${this.type}:eraser_outer_border_ring`,
+        name: `${this.type}:brush_outer_border_ring`,
+        listening: false,
         innerRadius: 0,
         outerRadius: 0,
         fill: this.config.BORDER_OUTER_COLOR,
         strokeEnabled: false,
       }),
     };
-    this.konva.group.add(this.konva.cutoutCircle, this.konva.innerBorder, this.konva.outerBorder);
+    this.konva.group.add(this.konva.fillCircle, this.konva.innerBorder, this.konva.outerBorder);
   }
 
   render = () => {
     const cursorPos = this.manager.tool.$cursorPos.get();
 
+    // If the cursor position is not available, do not update the brush preview. The tool module will handle visiblity.
     if (!cursorPos) {
       return;
     }
 
     const settings = this.manager.stateApi.getSettings();
-    const alignedCursorPos = alignCoordForTool(cursorPos, settings.eraserWidth);
-    const radius = settings.eraserWidth / 2;
+    const brushPreviewFill = this.manager.stateApi.getBrushPreviewColor();
+    const alignedCursorPos = alignCoordForTool(cursorPos, settings.brushWidth);
+    const radius = settings.brushWidth / 2;
 
     // The circle is scaled
-    this.konva.cutoutCircle.setAttrs({
+    this.konva.fillCircle.setAttrs({
       x: alignedCursorPos.x,
       y: alignedCursorPos.y,
       radius,
+      fill: rgbaColorToString(brushPreviewFill),
     });
 
     // But the borders are in screen-pixels
@@ -127,7 +139,7 @@ export class CanvasEraserToolPreview extends CanvasModuleBase {
   };
 
   destroy = () => {
-    this.log.debug('Destroying eraser tool preview module');
+    this.log.debug('Destroying module');
     this.konva.group.destroy();
   };
 }
