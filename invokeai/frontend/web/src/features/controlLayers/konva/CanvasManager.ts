@@ -16,7 +16,7 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { CanvasProgressImageModule } from 'features/controlLayers/konva/CanvasProgressImageModule';
 import { CanvasStageModule } from 'features/controlLayers/konva/CanvasStageModule';
 import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
-import { CanvasToolModule } from 'features/controlLayers/konva/CanvasToolModule';
+import { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';

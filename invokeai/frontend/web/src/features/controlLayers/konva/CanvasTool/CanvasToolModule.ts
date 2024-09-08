@@ -1,8 +1,8 @@
-import { CanvasBrushToolPreview } from 'features/controlLayers/konva/CanvasBrushToolPreview';
-import { CanvasColorPickerToolPreview } from 'features/controlLayers/konva/CanvasColorPickerToolPreview';
-import { CanvasEraserToolPreview } from 'features/controlLayers/konva/CanvasEraserToolPreview';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasToolBrush } from 'features/controlLayers/konva/CanvasTool/CanvasToolBrush';
+import { CanvasToolColorPicker } from 'features/controlLayers/konva/CanvasTool/CanvasToolColorPicker';
+import { CanvasToolEraser } from 'features/controlLayers/konva/CanvasTool/CanvasToolEraser';
 import {
   alignCoordForTool,
   calculateNewBrushSizeFromWheelDelta,
@@ -51,9 +51,9 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   config: CanvasToolModuleConfig = DEFAULT_CONFIG;
 
-  brushToolPreview: CanvasBrushToolPreview;
-  eraserToolPreview: CanvasEraserToolPreview;
-  colorPickerToolPreview: CanvasColorPickerToolPreview;
+  brushToolPreview: CanvasToolBrush;
+  eraserToolPreview: CanvasToolEraser;
+  colorPickerToolPreview: CanvasToolColorPicker;
 
   /**
    * The currently selected tool.
@@ -92,9 +92,9 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     this.log.debug('Creating tool module');
 
-    this.brushToolPreview = new CanvasBrushToolPreview(this);
-    this.eraserToolPreview = new CanvasEraserToolPreview(this);
-    this.colorPickerToolPreview = new CanvasColorPickerToolPreview(this);
+    this.brushToolPreview = new CanvasToolBrush(this);
+    this.eraserToolPreview = new CanvasToolEraser(this);
+    this.colorPickerToolPreview = new CanvasToolColorPicker(this);
 
     this.konva = {
       stage: this.manager.stage.konva.stage,
@@ -483,10 +483,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       const tool = this.$tool.get();
 
       if (tool === 'brush') {
-        if (
-          selectedEntity.bufferRenderer.state?.type === 'brush_line' &&
-          selectedEntity.bufferRenderer.hasBuffer()
-        ) {
+        if (selectedEntity.bufferRenderer.state?.type === 'brush_line' && selectedEntity.bufferRenderer.hasBuffer()) {
           selectedEntity.bufferRenderer.commitBuffer();
         } else {
           selectedEntity.bufferRenderer.clearBuffer();
@@ -494,10 +491,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'eraser') {
-        if (
-          selectedEntity.bufferRenderer.state?.type === 'eraser_line' &&
-          selectedEntity.bufferRenderer.hasBuffer()
-        ) {
+        if (selectedEntity.bufferRenderer.state?.type === 'eraser_line' && selectedEntity.bufferRenderer.hasBuffer()) {
           selectedEntity.bufferRenderer.commitBuffer();
         } else {
           selectedEntity.bufferRenderer.clearBuffer();
