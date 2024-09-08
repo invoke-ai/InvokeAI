@@ -1,3 +1,4 @@
+import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -274,24 +275,26 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return newPos;
     }
 
-    // We need to snap the anchor to the nearest pixel, but the positions provided to this callback are absolute,
+    // If the user is not holding shift, the transform is retaining aspect ratio. It's not possible to snap to the grid
+    // in this case, because that would change the aspect ratio. So, we only snap to the grid when shift is held.
+    const snap = this.manager.stateApi.$shiftKey.get() ? this.manager.stateApi.getSnapToGridPixelValue() : 1;
+
+    // We need to snap the anchor to the selected grid size, but the positions provided to this callback are absolute,
     // scaled coordinates. They need to be converted to stage coordinates, snapped, then converted back to absolute
     // before returning them.
     const stageScale = this.manager.stage.getScale();
     const stagePos = this.manager.stage.getPosition();
 
-    // Unscale and round the target position to the nearest pixel.
-    const targetX = Math.round(newPos.x / stageScale);
-    const targetY = Math.round(newPos.y / stageScale);
+    // Unscale and snap the coordinate.
+    const targetX = roundToMultiple(newPos.x / stageScale, snap);
+    const targetY = roundToMultiple(newPos.y / stageScale, snap);
 
-    // The stage may be offset a fraction of a pixel. To ensure the anchor snaps to the nearest pixel, we need to
+    // The stage may be offset by fraction of the grid snap size. To ensure the anchor snaps to the grid, we need to
     // calculate that offset and add it back to the target position.
 
-    // Calculate the offset. It's the remainder of the stage position divided by the scale * desired grid size. In
-    // this case, the grid size is 1px. For example, if we wanted to snap to the nearest 8px, the calculation would
-    // be `stagePos.x % (stageScale * 8)`.
-    const scaledOffsetX = stagePos.x % stageScale;
-    const scaledOffsetY = stagePos.y % stageScale;
+    // Calculate the offset. It's the remainder of the stage position divided by the scale * grid snap value in pixels.
+    const scaledOffsetX = stagePos.x % (stageScale * snap);
+    const scaledOffsetY = stagePos.y % (stageScale * snap);
 
     // Unscale the target position and add the offset to get the absolute position for this anchor.
     const scaledTargetX = targetX * stageScale + scaledOffsetX;
@@ -376,9 +379,10 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   };
 
   onDragMove = () => {
-    // Snap the interaction rect to the nearest pixel
-    this.konva.proxyRect.x(Math.round(this.konva.proxyRect.x()));
-    this.konva.proxyRect.y(Math.round(this.konva.proxyRect.y()));
+    // Snap the interaction rect to the grid
+    const snap = this.manager.stateApi.getSnapToGridPixelValue();
+    this.konva.proxyRect.x(roundToMultiple(this.konva.proxyRect.x(), snap));
+    this.konva.proxyRect.y(roundToMultiple(this.konva.proxyRect.y(), snap));
 
     // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
     // and border

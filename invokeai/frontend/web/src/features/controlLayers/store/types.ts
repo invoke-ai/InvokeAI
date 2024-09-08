@@ -18,6 +18,10 @@ const zImageWithDims = z.object({
 });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
 
+const zSnap = z.enum(['off', '8', '64']);
+export type Snap = z.infer<typeof zSnap>;
+export const isSnap = (v: unknown): v is Snap => zSnap.safeParse(v).success;
+
 const zBeginEndStepPct = z
   .tuple([z.number().gte(0).lte(1), z.number().gte(0).lte(1)])
   .refine(([begin, end]) => begin < end, {
