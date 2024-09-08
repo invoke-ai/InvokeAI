@@ -1,5 +1,5 @@
 import { deepClone } from 'common/util/deepClone';
-import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLine';

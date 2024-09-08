@@ -1,7 +1,7 @@
 import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsCounterClockwiseBold, PiArrowsOutBold, PiCheckBold, PiXBold } from 'react-icons/pi';
