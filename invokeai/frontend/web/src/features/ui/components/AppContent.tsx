@@ -20,8 +20,13 @@ import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
-import { $isGalleryPanelOpen, $isParametersPanelOpen, selectUiSlice } from 'features/ui/store/uiSlice';
-import type { TabName } from 'features/ui/store/uiTypes';
+import {
+  $isGalleryPanelOpen,
+  $isParametersPanelOpen,
+  selectUiSlice,
+  TABS_WITH_GALLERY_PANEL,
+  TABS_WITH_OPTIONS_PANEL,
+} from 'features/ui/store/uiSlice';
 import type { CSSProperties } from 'react';
 import { memo, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -30,9 +35,6 @@ import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 import ResizeHandle from './tabs/ResizeHandle';
-
-const TABS_WITH_GALLERY_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
-const TABS_WITH_OPTIONS_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%' };
 const GALLERY_MIN_SIZE_PX = 310;

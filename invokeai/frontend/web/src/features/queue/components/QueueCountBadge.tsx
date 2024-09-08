@@ -1,6 +1,9 @@
 import { Badge, Portal } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { $isParametersPanelOpen } from 'features/ui/store/uiSlice';
+import { createSelector } from '@reduxjs/toolkit';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { $isParametersPanelOpen, TABS_WITH_OPTIONS_PANEL } from 'features/ui/store/uiSlice';
 import type { RefObject } from 'react';
 import { memo, useEffect, useState } from 'react';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
@@ -9,8 +12,13 @@ type Props = {
   targetRef: RefObject<HTMLDivElement>;
 };
 
+const selectActiveTabShouldShowBadge = createSelector(selectActiveTab, (activeTab) =>
+  TABS_WITH_OPTIONS_PANEL.includes(activeTab)
+);
+
 export const QueueCountBadge = memo(({ targetRef }: Props) => {
   const [badgePos, setBadgePos] = useState<{ x: string; y: string } | null>(null);
+  const activeTabShouldShowBadge = useAppSelector(selectActiveTabShouldShowBadge);
   const isParametersPanelOpen = useStore($isParametersPanelOpen);
   const { queueSize } = useGetQueueStatusQuery(undefined, {
     selectFromResult: (res) => ({
@@ -54,6 +62,9 @@ export const QueueCountBadge = memo(({ targetRef }: Props) => {
     return null;
   }
   if (!isParametersPanelOpen) {
+    return null;
+  }
+  if (!activeTabShouldShowBadge) {
     return null;
   }
 
