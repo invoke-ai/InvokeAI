@@ -2,29 +2,15 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObjectBrushLine';
-import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObjectEraserLine';
-import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObjectImage';
-import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObjectRect';
+import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLine';
+import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLine';
+import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
+import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
+import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type {
-  CanvasBrushLineState,
-  CanvasEraserLineState,
-  CanvasImageState,
-  CanvasRectState,
-} from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 import { assert } from 'tsafe';
-
-/**
- * Union of all object renderers.
- */
-type AnyObjectRenderer = CanvasObjectBrushLine | CanvasObjectEraserLine | CanvasObjectRect | CanvasObjectImage;
-/**
- * Union of all object states.
- */
-type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImageState | CanvasRectState;
 
 /**
  * Handles rendering of objects for a canvas entity.

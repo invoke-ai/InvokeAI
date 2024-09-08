@@ -4,7 +4,7 @@ import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityAdapterSafe } from 'features/controlLayers/hooks/useEntityAdapter';
-import type { AnyObjectRenderer } from 'features/controlLayers/konva/CanvasEntityObjectRenderer';
+import type { AnyObjectRenderer } from '../konva/CanvasObject/types';
 import { getEmptyRect } from 'features/controlLayers/konva/util';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { CanvasEntityIdentifier, Rect } from 'features/controlLayers/store/types';

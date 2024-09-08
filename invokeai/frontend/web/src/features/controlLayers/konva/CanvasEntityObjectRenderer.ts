@@ -3,10 +3,10 @@ import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntityAdapter/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObjectBrushLine';
-import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObjectEraserLine';
-import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObjectImage';
-import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObjectRect';
+import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLine';
+import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLine';
+import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
+import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
@@ -16,13 +16,7 @@ import {
   konvaNodeToImageData,
   previewBlob,
 } from 'features/controlLayers/konva/util';
-import type {
-  CanvasBrushLineState,
-  CanvasEraserLineState,
-  CanvasImageState,
-  CanvasRectState,
-  Rect,
-} from 'features/controlLayers/store/types';
+import type { Rect } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
@@ -34,6 +28,8 @@ import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
+import type { AnyObjectRenderer, AnyObjectState } from './CanvasObject/types';
+
 function setFillPatternImage(shape: Konva.Shape, ...args: Parameters<typeof getPatternSVG>): HTMLImageElement {
   const imageElement = new Image();
   imageElement.onload = () => {
@@ -42,15 +38,6 @@ function setFillPatternImage(shape: Konva.Shape, ...args: Parameters<typeof getP
   imageElement.src = getPatternSVG(...args);
   return imageElement;
 }
-
-/**
- * Union of all object renderers.
- */
-export type AnyObjectRenderer = CanvasObjectBrushLine | CanvasObjectEraserLine | CanvasObjectRect | CanvasObjectImage;
-/**
- * Union of all object states.
- */
-type AnyObjectState = CanvasBrushLineState | CanvasEraserLineState | CanvasImageState | CanvasRectState;
 
 /**
  * Handles rendering of objects for a canvas entity.
