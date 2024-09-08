@@ -212,6 +212,18 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     return this.runSelector(selectCanvasSettingsSlice);
   };
 
+  getGridSize = (): number => {
+    const snapToGrid = this.getSettings().snapToGrid;
+    if (!snapToGrid) {
+      return 1;
+    }
+    const useFine = this.$ctrlKey.get() || this.$metaKey.get();
+    if (useFine) {
+      return 8;
+    }
+    return 64;
+  };
+
   /**
    * Gets the regions state from redux.
    */
