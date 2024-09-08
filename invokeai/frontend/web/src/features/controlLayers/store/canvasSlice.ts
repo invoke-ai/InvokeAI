@@ -692,14 +692,14 @@ export const canvasSlice = createSlice({
       state.bbox.scaleMethod = action.payload;
       syncScaledSize(state);
     },
-    bboxChanged: (state, action: PayloadAction<IRect>) => {
+    bboxChangedFromCanvas: (state, action: PayloadAction<IRect>) => {
       state.bbox.rect = action.payload;
 
-      if (!state.bbox.aspectRatio.isLocked) {
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.id = 'Free';
-        state.bbox.aspectRatio.isLocked = false;
-      }
+      // TODO(psyche): Figure out a way to handle this without resetting the aspect ratio on every change.
+      // This action is dispatched when the user resizes or moves the bbox from the canvas. For now, when the user
+      // resizes the bbox from the canvas, we unlock the aspect ratio.
+      state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
+      state.bbox.aspectRatio.id = 'Free';
 
       syncScaledSize(state);
     },
@@ -1164,7 +1164,7 @@ export const {
   // allEntitiesDeleted, // currently unused
   allEntitiesOfTypeIsHiddenToggled,
   // bbox
-  bboxChanged,
+  bboxChangedFromCanvas,
   bboxScaledWidthChanged,
   bboxScaledHeightChanged,
   bboxScaleMethodChanged,
