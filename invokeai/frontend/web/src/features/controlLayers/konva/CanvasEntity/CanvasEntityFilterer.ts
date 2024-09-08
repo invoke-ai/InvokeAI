@@ -14,6 +14,14 @@ import { getImageDTO } from 'services/api/endpoints/images';
 import type { BatchConfig, ImageDTO, S } from 'services/api/types';
 import { assert } from 'tsafe';
 
+type CanvasEntityFiltererConfig = {
+  processDebounceMs: number;
+};
+
+const DEFAULT_CONFIG: CanvasEntityFiltererConfig = {
+  processDebounceMs: 1000,
+};
+
 export class CanvasEntityFilterer extends CanvasModuleBase {
   readonly type = 'canvas_filterer';
   readonly id: string;
@@ -24,6 +32,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
   imageState: CanvasImageState | null = null;
   subscriptions = new Set<() => void>();
+  config: CanvasEntityFiltererConfig = DEFAULT_CONFIG;
 
   $isFiltering = atom<boolean>(false);
   $hasProcessed = atom<boolean>(false);
@@ -113,7 +122,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       this.$isProcessing.set(true);
       this.manager.stateApi.enqueueBatch(batch);
     },
-    1000,
+    this.config.processDebounceMs,
     { leading: true, trailing: true }
   );
 
