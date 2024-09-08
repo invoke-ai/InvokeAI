@@ -133,7 +133,6 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       },
       replaceObjects: true,
     });
-    this.parent.renderer.showObjects();
     this.imageState = null;
     this.$isFiltering.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
