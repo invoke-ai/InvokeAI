@@ -15,7 +15,7 @@ import {
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   $lastCanvasProgressEvent,
-  bboxChanged,
+  bboxChangedFromCanvas,
   entityBrushLineAdded,
   entityEraserLineAdded,
   entityMoved,
@@ -161,7 +161,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Sets the generation bbox rect, pushing state to redux.
    */
   setGenerationBbox = (rect: Rect) => {
-    this.store.dispatch(bboxChanged(rect));
+    this.store.dispatch(bboxChangedFromCanvas(rect));
   };
 
   /**
