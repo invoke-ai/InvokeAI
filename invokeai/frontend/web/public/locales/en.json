@@ -93,6 +93,7 @@
         "copy": "Copy",
         "copyError": "$t(gallery.copy) Error",
         "on": "On",
+        "off": "Off",
         "or": "or",
         "checkpoint": "Checkpoint",
         "communityLabel": "Community",
@@ -1819,6 +1820,12 @@
                 "8": "8px",
                 "64": "64px"
             }
+        },
+        "HUD": {
+            "snapToGrid": "Snap",
+            "bbox": "Bbox",
+            "scaledBbox": "Scaled Bbox",
+            "autoSave": "Auto Save"
         }
     },
     "upscaling": {

@@ -156,6 +156,7 @@ export const selectCanvasSettingsSlice = (s: RootState) => s.canvasSettings;
 const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState, T>) =>
   createSelector(selectCanvasSettingsSlice, selector);
 
+export const selectAutoSave = createCanvasSettingsSelector((settings) => settings.autoSave);
 export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
 export const selectAutoPreviewFilter = createCanvasSettingsSelector((settings) => settings.autoPreviewFilter);
