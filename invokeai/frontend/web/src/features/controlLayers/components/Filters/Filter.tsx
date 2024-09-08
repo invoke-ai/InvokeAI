@@ -1,4 +1,13 @@
-import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Switch } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ButtonGroup,
+  Flex,
+  FormControl,
+  FormLabel,
+  Heading,
+  Spacer,
+  Switch,
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { FilterSettings } from 'features/controlLayers/components/Filters/FilterSettings';
@@ -11,7 +20,7 @@ import {
   settingsAutoPreviewFilterToggled,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import { type FilterConfig, IMAGE_FILTERS } from 'features/controlLayers/store/types';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold, PiShootingStarBold, PiXBold } from 'react-icons/pi';
 
@@ -39,6 +48,10 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
   const onChangeAutoPreviewFilter = useCallback(() => {
     dispatch(settingsAutoPreviewFilterToggled());
   }, [dispatch]);
+
+  const isValid = useMemo(() => {
+    return IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
+  }, [config]);
 
   return (
     <Flex
@@ -72,6 +85,7 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
           onClick={adapter.filterer.previewFilter}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.preview')}
+          isDisabled={!isValid}
         >
           {t('controlLayers.filter.preview')}
         </Button>
@@ -82,6 +96,7 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
           onClick={adapter.filterer.applyFilter}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.apply')}
+          isDisabled={!isValid}
         >
           {t('controlLayers.filter.apply')}
         </Button>
@@ -91,6 +106,7 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
           onClick={adapter.filterer.cancelFilter}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.cancel')}
+          isDisabled={!isValid}
         >
           {t('controlLayers.filter.cancel')}
         </Button>

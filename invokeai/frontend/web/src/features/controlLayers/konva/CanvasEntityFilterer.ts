@@ -68,6 +68,11 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   previewFilter = debounce(
     async () => {
       const config = this.$filterConfig.get();
+      const isValid = IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
+      if (!isValid) {
+        return;
+      }
+
       this.log.trace({ config }, 'Previewing filter');
       const rect = this.parent.transformer.getRelativeRect();
       const imageDTO = await this.parent.renderer.rasterize({ rect, attrs: { filters: [] } });

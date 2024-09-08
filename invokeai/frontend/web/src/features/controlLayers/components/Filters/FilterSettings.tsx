@@ -10,6 +10,7 @@ import { FilterMediapipeFace } from 'features/controlLayers/components/Filters/F
 import { FilterMidasDepth } from 'features/controlLayers/components/Filters/FilterMidasDepth';
 import { FilterMlsdImage } from 'features/controlLayers/components/Filters/FilterMlsdImage';
 import { FilterPidi } from 'features/controlLayers/components/Filters/FilterPidi';
+import { FilterSpandrel } from 'features/controlLayers/components/Filters/FilterSpandrel';
 import type { FilterConfig } from 'features/controlLayers/store/types';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
 import { memo } from 'react';
@@ -62,6 +63,10 @@ export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
 
   if (filterConfig.type === 'pidi_image_processor') {
     return <FilterPidi config={filterConfig} onChange={onChange} />;
+  }
+
+  if (filterConfig.type === 'spandrel_filter') {
+    return <FilterSpandrel config={filterConfig} onChange={onChange} />;
   }
 
   return (
