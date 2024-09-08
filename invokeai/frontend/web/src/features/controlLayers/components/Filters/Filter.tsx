@@ -20,6 +20,7 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
   const dispatch = useAppDispatch();
   const config = useStore(adapter.filterer.$filterConfig);
   const isProcessing = useStore(adapter.filterer.$isProcessing);
+  const hasProcessed = useStore(adapter.filterer.$hasProcessed);
   const autoProcessFilter = useAppSelector(selectAutoProcessFilter);
 
   const onChangeFilterConfig = useCallback(
@@ -96,7 +97,7 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
           onClick={adapter.filterer.apply}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.apply')}
-          isDisabled={!isValid}
+          isDisabled={!isValid || !hasProcessed}
         >
           {t('controlLayers.filter.apply')}
         </Button>
