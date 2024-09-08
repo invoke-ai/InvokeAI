@@ -1,7 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import type { GridSize, RgbaColor } from 'features/controlLayers/store/types';
+import type { RgbaColor } from 'features/controlLayers/store/types';
 
 type CanvasSettingsState = {
   /**
@@ -59,7 +59,7 @@ type CanvasSettingsState = {
   /**
    * The snap-to-grid setting for the canvas.
    */
-  gridSize: GridSize;
+  snapToGrid: boolean;
   // TODO(psyche): These are copied from old canvas state, need to be implemented
   // imageSmoothing: boolean;
   // preserveMaskedArea: boolean;
@@ -78,7 +78,7 @@ const initialState: CanvasSettingsState = {
   sendToCanvas: false,
   compositeMaskedRegions: false,
   autoProcessFilter: true,
-  gridSize: 64,
+  snapToGrid: true,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -118,8 +118,8 @@ export const canvasSettingsSlice = createSlice({
     settingsAutoProcessFilterToggled: (state) => {
       state.autoProcessFilter = !state.autoProcessFilter;
     },
-    settingsGridSizeChanged: (state, action: PayloadAction<GridSize>) => {
-      state.gridSize = action.payload;
+    settingsSnapToGridToggled: (state) => {
+      state.snapToGrid = !state.snapToGrid;
     },
   },
 });
@@ -136,7 +136,7 @@ export const {
   settingsSendToCanvasChanged,
   settingsCompositeMaskedRegionsChanged,
   settingsAutoProcessFilterToggled,
-  settingsGridSizeChanged,
+  settingsSnapToGridToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -159,4 +159,4 @@ export const selectAutoSave = createCanvasSettingsSelector((settings) => setting
 export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
 export const selectAutoProcessFilter = createCanvasSettingsSelector((settings) => settings.autoProcessFilter);
-export const selectGridSize = createCanvasSettingsSelector((settings) => settings.gridSize);
+export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
