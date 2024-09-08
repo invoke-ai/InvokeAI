@@ -47,7 +47,17 @@ export const EntityListSelectedEntityActionBarFill = memo(() => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <Flex role="button" aria-label={t('controlLayers.maskFill')} tabIndex={-1} w={8} h={8} _hover={{ bg: 'base.800' }} _active={{ bg: 'transparent' }} borderRadius="md" transitionDuration="faster">
+        <Flex
+          role="button"
+          aria-label={t('controlLayers.maskFill')}
+          tabIndex={-1}
+          w={8}
+          h={8}
+          _hover={{ bg: 'base.800' }}
+          _active={{ bg: 'transparent' }}
+          borderRadius="md"
+          transitionDuration="faster"
+        >
           <Tooltip label={t('controlLayers.maskFill')}>
             <Flex w="full" h="full" alignItems="center" justifyContent="center">
               <Box borderRadius="full" w={6} h={6} borderWidth={1} bg={rgbColorToString(fill.color)} />
