@@ -192,6 +192,9 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
     # Final layer.
     add_lora_layer_if_present("proj_out", "final_layer.linear")
 
+    # Assert that all keys were processed.
+    assert len(grouped_state_dict) == 0
+
     return LoRAModelRaw(layers=layers)
 
 
