@@ -80,11 +80,11 @@ export const uiPersistConfig: PersistConfig<UIState> = {
 
 export const LEFT_PANEL_MIN_SIZE_PX = 400;
 export const LEFT_PANEL_MIN_SIZE_PCT = 20;
-export const TABS_WITH_LEFT_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
+const TABS_WITH_LEFT_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
 export const $isLeftPanelOpen = atom(true);
 export const selectWithLeftPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_LEFT_PANEL.includes(ui.activeTab));
 
-export const TABS_WITH_RIGHT_PANEL: TabName[] = ['generation', 'upscaling', 'workflows', 'gallery'] as const;
+const TABS_WITH_RIGHT_PANEL: TabName[] = ['generation', 'upscaling', 'workflows', 'gallery'] as const;
 export const RIGHT_PANEL_MIN_SIZE_PX = 390;
 export const RIGHT_PANEL_MIN_SIZE_PCT = 20;
 export const $isRightPanelOpen = atom(true);
