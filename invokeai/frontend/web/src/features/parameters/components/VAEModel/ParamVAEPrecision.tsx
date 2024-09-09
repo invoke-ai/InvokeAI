@@ -31,7 +31,7 @@ const ParamVAEPrecision = () => {
   const value = useMemo(() => options.find((o) => o.value === vaePrecision), [vaePrecision]);
 
   return (
-    <FormControl w={24}>
+    <FormControl flexGrow={0}>
       <InformationalPopover feature="paramVAEPrecision">
         <FormLabel m={0}>{t('modelManager.vaePrecision')}</FormLabel>
       </InformationalPopover>
