@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { entityReset } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { isMaskEntityIdentifier } from 'features/controlLayers/store/types';
 import { useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
@@ -24,8 +25,8 @@ export function useCanvasResetLayerHotkey() {
   }, [dispatch, selectedEntityIdentifier]);
 
   const isResetEnabled = useMemo(
-    () => selectedEntityIdentifier?.type === 'inpaint_mask',
-    [selectedEntityIdentifier?.type]
+    () => selectedEntityIdentifier !== null && isMaskEntityIdentifier(selectedEntityIdentifier),
+    [selectedEntityIdentifier]
   );
 
   useHotkeys('shift+c', resetSelectedLayer, { enabled: isResetEnabled }, [isResetEnabled, resetSelectedLayer]);
