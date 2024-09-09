@@ -1824,7 +1824,16 @@
         "HUD": {
             "bbox": "Bbox",
             "scaledBbox": "Scaled Bbox",
-            "autoSave": "Auto Save"
+            "autoSave": "Auto Save",
+            "entityStatus": {
+                "selectedEntity": "Selected Entity",
+                "filtering": "Filtering",
+                "transforming": "Transforming",
+                "locked": "Locked",
+                "hidden": "Hidden",
+                "disabled": "Disabled",
+                "enabled": "Enabled"
+            }
         }
     },
     "upscaling": {
