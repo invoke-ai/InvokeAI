@@ -1,3 +1,6 @@
+# A sample state dict in the Diffusers FLUX LoRA format.
+# These keys are based on the LoRA model here:
+# https://civitai.com/models/200255/hands-xl-sd-15-flux1-dev?modelVersionId=781855
 state_dict_keys = [
     "transformer.single_transformer_blocks.0.attn.to_k.lora_A.weight",
     "transformer.single_transformer_blocks.0.attn.to_k.lora_B.weight",

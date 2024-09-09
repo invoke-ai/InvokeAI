@@ -202,6 +202,7 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
     """Groups the keys in the state dict by layer."""
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
     for key in state_dict:
+        # Split the 'lora_A.weight' or 'lora_B.weight' suffix from the layer name.
         parts = key.rsplit(".", maxsplit=2)
         layer_name = parts[0]
         key_name = ".".join(parts[1:])
