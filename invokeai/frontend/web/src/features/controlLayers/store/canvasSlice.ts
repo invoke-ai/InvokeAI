@@ -457,7 +457,7 @@ export const canvasSlice = createSlice({
           },
           opacity: 0.5,
           position: { x: 0, y: 0 },
-          autoNegative: true,
+          autoNegative: false,
           positivePrompt: '',
           negativePrompt: null,
           ipAdapters: [],
