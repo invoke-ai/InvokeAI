@@ -44,7 +44,7 @@ const PanelTabs = memo(({ setTab }: { setTab: (val: number) => void }) => {
   const onOnMouseOverLayersTab = useCallback(() => {
     tabTimeout.current = window.setTimeout(() => {
       if (dndCtx.active) {
-        setTab(1);
+        setTab(0);
       }
     }, 300);
   }, [dndCtx.active, setTab]);
@@ -52,7 +52,7 @@ const PanelTabs = memo(({ setTab }: { setTab: (val: number) => void }) => {
   const onOnMouseOverGalleryTab = useCallback(() => {
     tabTimeout.current = window.setTimeout(() => {
       if (dndCtx.active) {
-        setTab(0);
+        setTab(1);
       }
     }, 300);
   }, [dndCtx.active, setTab]);
