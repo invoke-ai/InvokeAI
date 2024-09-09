@@ -78,7 +78,7 @@ export const uiPersistConfig: PersistConfig<UIState> = {
   persistDenylist: ['shouldShowImageDetails'],
 };
 
-export const LEFT_PANEL_MIN_SIZE_PX = 390;
+export const LEFT_PANEL_MIN_SIZE_PX = 400;
 export const LEFT_PANEL_MIN_SIZE_PCT = 20;
 export const TABS_WITH_LEFT_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
 export const $isLeftPanelOpen = atom(true);
