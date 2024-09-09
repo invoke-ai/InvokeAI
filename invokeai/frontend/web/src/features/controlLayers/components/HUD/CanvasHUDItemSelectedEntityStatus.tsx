@@ -3,8 +3,9 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { Property } from 'csstype';
 import { CanvasHUDItem } from 'features/controlLayers/components/HUD/CanvasHUDItem';
-import { useEntityAdapter } from 'features/controlLayers/hooks/useEntityAdapter';
+import { useEntityAdapterSafe } from 'features/controlLayers/hooks/useEntityAdapter';
 import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import {
   selectCanvasSlice,
   selectEntityOrThrow,
@@ -17,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 
 type ContentProps = {
   entityIdentifier: CanvasEntityIdentifier;
+  adapter: CanvasEntityAdapter;
 };
 
 const $isFilteringFallback = atom(false);
@@ -26,9 +28,8 @@ type EntityStatus = {
   color?: Property.Color;
 };
 
-const CanvasHUDItemSelectedEntityStatusContent = memo(({ entityIdentifier }: ContentProps) => {
+const CanvasHUDItemSelectedEntityStatusContent = memo(({ entityIdentifier, adapter }: ContentProps) => {
   const { t } = useTranslation();
-  const adapter = useEntityAdapter(entityIdentifier);
   const selectIsEnabled = useMemo(
     () => createSelector(selectCanvasSlice, (canvas) => selectEntityOrThrow(canvas, entityIdentifier).isEnabled),
     [entityIdentifier]
@@ -99,12 +100,13 @@ CanvasHUDItemSelectedEntityStatusContent.displayName = 'CanvasHUDItemSelectedEnt
 
 export const CanvasHUDItemSelectedEntityStatus = memo(() => {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const adapter = useEntityAdapterSafe(selectedEntityIdentifier);
 
-  if (!selectedEntityIdentifier) {
+  if (!selectedEntityIdentifier || !adapter) {
     return null;
   }
 
-  return <CanvasHUDItemSelectedEntityStatusContent entityIdentifier={selectedEntityIdentifier} />;
+  return <CanvasHUDItemSelectedEntityStatusContent entityIdentifier={selectedEntityIdentifier} adapter={adapter} />;
 });
 
 CanvasHUDItemSelectedEntityStatus.displayName = 'CanvasHUDItemSelectedEntityStatus';
