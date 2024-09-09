@@ -1,3 +1,6 @@
+import pytest
+import torch
+
 from invokeai.backend.peft.conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
@@ -47,3 +50,17 @@ def test_lora_model_from_flux_diffusers_state_dict():
     concatenated_weights = ["to_k", "to_v", "proj_mlp", "add_k_proj", "add_v_proj"]
     expected_lora_layers = {k for k in expected_lora_layers if not any(w in k for w in concatenated_weights)}
     assert len(model.layers) == len(expected_lora_layers)
+
+
+def test_lora_model_from_flux_diffusers_state_dict_extra_keys_error():
+    """Test that lora_model_from_flux_diffusers_state_dict() raises an error if the input state_dict contains unexpected
+    keys that we don't handle.
+    """
+    # Construct a state dict that is in the Diffusers FLUX LoRA format.
+    state_dict = keys_to_mock_state_dict(flux_diffusers_state_dict_keys)
+    # Add an unexpected key.
+    state_dict["transformer.single_transformer_blocks.0.unexpected_key.lora_A.weight"] = torch.empty(1)
+
+    # Check that an error is raised.
+    with pytest.raises(AssertionError):
+        lora_model_from_flux_diffusers_state_dict(state_dict)
