@@ -1,3 +1,6 @@
+# A sample state dict in the Kohya FLUX LoRA format.
+# These keys are based on the LoRA model here:
+# https://civitai.com/models/159333/pokemon-trainer-sprite-pixelart?modelVersionId=779247
 state_dict_keys = [
     "lora_unet_double_blocks_0_img_attn_proj.alpha",
     "lora_unet_double_blocks_0_img_attn_proj.lora_down.weight",

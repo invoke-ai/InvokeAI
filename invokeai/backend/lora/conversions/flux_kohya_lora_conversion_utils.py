@@ -23,10 +23,7 @@ def is_state_dict_likely_in_flux_kohya_format(state_dict: Dict[str, Any]) -> boo
     This is intended to be a high-precision detector, but it is not guaranteed to have perfect precision. (A
     perfect-precision detector would require checking all keys against a whitelist and verifying tensor shapes.)
     """
-    for k in state_dict.keys():
-        if not re.match(FLUX_KOHYA_KEY_REGEX, k):
-            return False
-    return True
+    return all(re.match(FLUX_KOHYA_KEY_REGEX, k) for k in state_dict.keys())
 
 
 def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRAModelRaw:
