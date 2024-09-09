@@ -5,6 +5,7 @@ import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { CanvasPanelContent } from 'features/controlLayers/components/CanvasPanelContent';
 import { CanvasSendToToggle } from 'features/controlLayers/components/CanvasSendToToggle';
 import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectEntityCount } from 'features/controlLayers/store/selectors';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,6 +38,7 @@ CanvasRightPanelContent.displayName = 'CanvasRightPanelContent';
 
 const PanelTabs = memo(({ setTab }: { setTab: (val: number) => void }) => {
   const { t } = useTranslation();
+  const entityCount = useAppSelector(selectEntityCount);
   const sendToCanvas = useAppSelector(selectSendToCanvas);
   const tabTimeout = useRef<number | null>(null);
   const dndCtx = useDndContext();
@@ -64,8 +66,10 @@ const PanelTabs = memo(({ setTab }: { setTab: (val: number) => void }) => {
   }, []);
   return (
     <>
-      <Tab position="relative" onMouseOver={onOnMouseOverLayersTab} onMouseOut={onMouseOut}>
-        {t('controlLayers.layer_other')}
+      <Tab position="relative" onMouseOver={onOnMouseOverLayersTab} onMouseOut={onMouseOut} w={32}>
+        <Box as="span" w="full">
+          {t('controlLayers.layer_withCount', { count: entityCount })}
+        </Box>
         {sendToCanvas && (
           <Box position="absolute" top={2} right={2} h={2} w={2} bg="invokeYellow.300" borderRadius="full" />
         )}
