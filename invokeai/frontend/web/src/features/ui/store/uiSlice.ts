@@ -1,5 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { atom } from 'nanostores';
@@ -78,7 +78,14 @@ export const uiPersistConfig: PersistConfig<UIState> = {
   persistDenylist: ['shouldShowImageDetails'],
 };
 
-export const $isGalleryPanelOpen = atom(true);
-export const $isParametersPanelOpen = atom(true);
-export const TABS_WITH_GALLERY_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
-export const TABS_WITH_OPTIONS_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
+export const LEFT_PANEL_MIN_SIZE_PX = 390;
+export const LEFT_PANEL_MIN_SIZE_PCT = 20;
+export const TABS_WITH_LEFT_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
+export const $isLeftPanelOpen = atom(true);
+export const selectWithLeftPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_LEFT_PANEL.includes(ui.activeTab));
+
+export const TABS_WITH_RIGHT_PANEL: TabName[] = ['generation', 'upscaling', 'workflows', 'gallery'] as const;
+export const RIGHT_PANEL_MIN_SIZE_PX = 390;
+export const RIGHT_PANEL_MIN_SIZE_PCT = 20;
+export const $isRightPanelOpen = atom(true);
+export const selectWithRightPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_RIGHT_PANEL.includes(ui.activeTab));

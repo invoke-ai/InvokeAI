@@ -34,5 +34,5 @@ export const BboxSettings = memo(() => {
 BboxSettings.displayName = 'BboxSettings';
 
 const formLabelProps: FormLabelProps = {
-  minW: 14,
+  minW: 10,
 };

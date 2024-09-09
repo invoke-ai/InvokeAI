@@ -5,7 +5,6 @@ import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { toast } from 'features/toast/toast';
@@ -21,7 +20,6 @@ export const ImageMenuItemSendToCanvas = memo(() => {
   const dispatch = useAppDispatch();
   const imageDTO = useImageDTOContext();
   const bboxRect = useAppSelector(selectBboxRect);
-  const imageViewer = useImageViewer();
 
   const handleSendToCanvas = useCallback(() => {
     const imageObject = imageDTOToImageObject(imageDTO);
@@ -32,13 +30,12 @@ export const ImageMenuItemSendToCanvas = memo(() => {
     dispatch(sentImageToCanvas());
     dispatch(rasterLayerAdded({ overrides, isSelected: true }));
     dispatch(setActiveTab('generation'));
-    imageViewer.onClose();
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [bboxRect.x, bboxRect.y, dispatch, imageDTO, imageViewer, t]);
+  }, [bboxRect.x, bboxRect.y, dispatch, imageDTO, t]);
 
   return (
     <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToCanvas} id="send-to-canvas">

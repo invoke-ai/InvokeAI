@@ -1,4 +1,4 @@
-import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Box, Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
@@ -40,16 +40,18 @@ const ParamVAEModelSelect = () => {
   return (
     <FormControl isDisabled={!options.length} isInvalid={!options.length}>
       <InformationalPopover feature="paramVAE">
-        <FormLabel>{t('modelManager.vae')}</FormLabel>
+        <FormLabel m={0}>{t('modelManager.vae')}</FormLabel>
       </InformationalPopover>
-      <Combobox
-        isClearable
-        value={value}
-        placeholder={value ? value.value : t('models.defaultVAE')}
-        options={options}
-        onChange={onChange}
-        noOptionsMessage={noOptionsMessage}
-      />
+      <Box w="full" minW={0}>
+        <Combobox
+          isClearable
+          value={value}
+          placeholder={value ? value.value : t('models.defaultVAE')}
+          options={options}
+          onChange={onChange}
+          noOptionsMessage={noOptionsMessage}
+        />
+      </Box>
     </FormControl>
   );
 };

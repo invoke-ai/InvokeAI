@@ -13,8 +13,6 @@ import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/u
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
 import { useCanvasUndoRedoHotkeys } from 'features/controlLayers/hooks/useCanvasUndoRedoHotkeys';
 import { useNextPrevEntityHotkeys } from 'features/controlLayers/hooks/useNextPrevEntity';
-import { ToggleProgressButton } from 'features/gallery/components/ImageViewer/ToggleProgressButton';
-import { ViewerToggle } from 'features/gallery/components/ImageViewer/ViewerToggleMenu';
 import { memo } from 'react';
 
 export const CanvasToolbar = memo(() => {
@@ -27,7 +25,6 @@ export const CanvasToolbar = memo(() => {
   return (
     <CanvasManagerProviderGate>
       <Flex w="full" gap={2} alignItems="center">
-        <ToggleProgressButton />
         <ToolChooser />
         <Spacer />
         <ToolSettings />
@@ -38,7 +35,6 @@ export const CanvasToolbar = memo(() => {
         <ToolColorPicker />
         <CanvasToolbarSaveToGalleryButton />
         <CanvasSettingsPopover />
-        <ViewerToggle />
       </Flex>
     </CanvasManagerProviderGate>
   );

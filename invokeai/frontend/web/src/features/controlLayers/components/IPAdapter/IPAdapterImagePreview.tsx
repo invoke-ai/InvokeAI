@@ -85,7 +85,7 @@ export const IPAdapterImagePreview = memo(
         />
 
         {controlImage && (
-          <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
+          <Flex position="absolute" flexDir="column" top={2} insetInlineEnd={2} gap={1}>
             <IAIDndImageIcon
               onClick={handleResetControlImage}
               icon={<PiArrowCounterClockwiseBold size={16} />}

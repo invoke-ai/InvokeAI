@@ -1,11 +1,10 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
-import { CanvasEditor } from 'features/controlLayers/components/CanvasEditor';
+import { CanvasRightPanelContent } from 'features/controlLayers/components/CanvasRightPanel';
+import { CanvasTabContent } from 'features/controlLayers/components/CanvasTabContent';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
-import { useIsImageViewerOpen } from 'features/gallery/components/ImageViewer/useImageViewer';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
 import QueueControls from 'features/queue/components/QueueControls';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
@@ -13,19 +12,23 @@ import FloatingParametersPanelButtons from 'features/ui/components/FloatingParam
 import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
 import { TabMountGate } from 'features/ui/components/TabMountGate';
 import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
-import NodesTab from 'features/ui/components/tabs/NodesTab';
 import QueueTab from 'features/ui/components/tabs/QueueTab';
+import { WorkflowsTabContent } from 'features/ui/components/tabs/WorkflowsTabContent';
 import { TabVisibilityGate } from 'features/ui/components/TabVisibilityGate';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
 import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import {
-  $isGalleryPanelOpen,
-  $isParametersPanelOpen,
-  selectUiSlice,
-  TABS_WITH_GALLERY_PANEL,
-  TABS_WITH_OPTIONS_PANEL,
+  $isLeftPanelOpen,
+  $isRightPanelOpen,
+  LEFT_PANEL_MIN_SIZE_PCT,
+  LEFT_PANEL_MIN_SIZE_PX,
+  RIGHT_PANEL_MIN_SIZE_PCT,
+  RIGHT_PANEL_MIN_SIZE_PX,
+  selectWithLeftPanel,
+  selectWithRightPanel,
 } from 'features/ui/store/uiSlice';
 import type { CSSProperties } from 'react';
 import { memo, useMemo, useRef } from 'react';
@@ -37,95 +40,75 @@ import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 import ResizeHandle from './tabs/ResizeHandle';
 
 const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%' };
-const GALLERY_MIN_SIZE_PX = 310;
-const GALLERY_MIN_SIZE_PCT = 20;
-const OPTIONS_PANEL_MIN_SIZE_PX = 430;
-const OPTIONS_PANEL_MIN_SIZE_PCT = 20;
 
-const onGalleryPanelCollapse = (isCollapsed: boolean) => $isGalleryPanelOpen.set(!isCollapsed);
-const onParametersPanelCollapse = (isCollapsed: boolean) => $isParametersPanelOpen.set(!isCollapsed);
-
-const selectShouldShowGalleryPanel = createSelector(selectUiSlice, (ui) =>
-  TABS_WITH_GALLERY_PANEL.includes(ui.activeTab)
-);
-const selectShouldShowOptionsPanel = createSelector(selectUiSlice, (ui) =>
-  TABS_WITH_OPTIONS_PANEL.includes(ui.activeTab)
-);
+const onLeftPanelCollapse = (isCollapsed: boolean) => $isLeftPanelOpen.set(!isCollapsed);
+const onRightPanelCollapse = (isCollapsed: boolean) => $isRightPanelOpen.set(!isCollapsed);
 
 export const AppContent = memo(() => {
-  const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
-  const isImageViewerOpen = useIsImageViewerOpen();
-  const shouldShowGalleryPanel = useAppSelector(selectShouldShowGalleryPanel);
-  const shouldShowOptionsPanel = useAppSelector(selectShouldShowOptionsPanel);
   const ref = useRef<HTMLDivElement>(null);
   useScopeOnFocus('gallery', ref);
 
-  const optionsPanelUsePanelOptions = useMemo<UsePanelOptions>(
-    () => ({
-      id: 'options-panel',
-      unit: 'pixels',
-      minSize: OPTIONS_PANEL_MIN_SIZE_PX,
-      defaultSize: OPTIONS_PANEL_MIN_SIZE_PCT,
-      panelGroupRef,
-      panelGroupDirection: 'horizontal',
-      onCollapse: onParametersPanelCollapse,
-    }),
-    []
-  );
-
-  const galleryPanelUsePanelOptions = useMemo<UsePanelOptions>(
-    () => ({
-      id: 'gallery-panel',
-      unit: 'pixels',
-      minSize: GALLERY_MIN_SIZE_PX,
-      defaultSize: GALLERY_MIN_SIZE_PCT,
-      panelGroupRef,
-      panelGroupDirection: 'horizontal',
-      onCollapse: onGalleryPanelCollapse,
-    }),
-    []
-  );
-
+  const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const panelStorage = usePanelStorage();
 
-  const optionsPanel = usePanel(optionsPanelUsePanelOptions);
+  const withLeftPanel = useAppSelector(selectWithLeftPanel);
+  const leftPanelUsePanelOptions = useMemo<UsePanelOptions>(
+    () => ({
+      id: 'left-panel',
+      unit: 'pixels',
+      minSize: LEFT_PANEL_MIN_SIZE_PX,
+      defaultSize: LEFT_PANEL_MIN_SIZE_PCT,
+      panelGroupRef,
+      panelGroupDirection: 'horizontal',
+      onCollapse: onLeftPanelCollapse,
+    }),
+    []
+  );
+  const leftPanel = usePanel(leftPanelUsePanelOptions);
+  useHotkeys(['t', 'o'], leftPanel.toggle, { enabled: withLeftPanel }, [leftPanel.toggle, withLeftPanel]);
 
-  const galleryPanel = usePanel(galleryPanelUsePanelOptions);
+  const withRightPanel = useAppSelector(selectWithRightPanel);
+  const rightPanelUsePanelOptions = useMemo<UsePanelOptions>(
+    () => ({
+      id: 'right-panel',
+      unit: 'pixels',
+      minSize: RIGHT_PANEL_MIN_SIZE_PX,
+      defaultSize: RIGHT_PANEL_MIN_SIZE_PCT,
+      panelGroupRef,
+      panelGroupDirection: 'horizontal',
+      onCollapse: onRightPanelCollapse,
+    }),
+    []
+  );
+  const rightPanel = usePanel(rightPanelUsePanelOptions);
+  useHotkeys('g', rightPanel.toggle, { enabled: withRightPanel }, [rightPanel.toggle, withRightPanel]);
 
-  useHotkeys('g', galleryPanel.toggle, { enabled: shouldShowGalleryPanel }, [
-    galleryPanel.toggle,
-    shouldShowGalleryPanel,
-  ]);
-  useHotkeys(['t', 'o'], optionsPanel.toggle, { enabled: shouldShowOptionsPanel }, [
-    optionsPanel.toggle,
-    shouldShowOptionsPanel,
-  ]);
   useHotkeys(
     'shift+r',
     () => {
-      optionsPanel.reset();
-      galleryPanel.reset();
+      leftPanel.reset();
+      rightPanel.reset();
     },
-    [optionsPanel.reset, galleryPanel.reset]
+    [leftPanel.reset, rightPanel.reset]
   );
   useHotkeys(
     'f',
     () => {
-      if (optionsPanel.isCollapsed || galleryPanel.isCollapsed) {
-        optionsPanel.expand();
-        galleryPanel.expand();
+      if (leftPanel.isCollapsed || rightPanel.isCollapsed) {
+        leftPanel.expand();
+        rightPanel.expand();
       } else {
-        optionsPanel.collapse();
-        galleryPanel.collapse();
+        leftPanel.collapse();
+        rightPanel.collapse();
       }
     },
     [
-      optionsPanel.isCollapsed,
-      galleryPanel.isCollapsed,
-      optionsPanel.expand,
-      galleryPanel.expand,
-      optionsPanel.collapse,
-      galleryPanel.collapse,
+      leftPanel.isCollapsed,
+      rightPanel.isCollapsed,
+      leftPanel.expand,
+      rightPanel.expand,
+      leftPanel.collapse,
+      rightPanel.collapse,
     ]
   );
 
@@ -141,63 +124,100 @@ export const AppContent = memo(() => {
           style={panelStyles}
           storage={panelStorage}
         >
-          <Panel order={0} collapsible style={panelStyles} {...optionsPanel.panelProps}>
-            <Flex flexDir="column" w="full" h="full" gap={2}>
-              <QueueControls />
-              <Box position="relative" w="full" h="full">
+          {withLeftPanel && (
+            <>
+              <Panel order={0} collapsible style={panelStyles} {...leftPanel.panelProps}>
                 <TabMountGate tab="generation">
                   <TabVisibilityGate tab="generation">
-                    <ParametersPanelTextToImage />
+                    <Flex flexDir="column" w="full" h="full" gap={2}>
+                      <QueueControls />
+                      <Box position="relative" w="full" h="full">
+                        <ParametersPanelTextToImage />
+                      </Box>
+                    </Flex>
                   </TabVisibilityGate>
                 </TabMountGate>
                 <TabMountGate tab="upscaling">
                   <TabVisibilityGate tab="upscaling">
-                    <ParametersPanelUpscale />
+                    <Flex flexDir="column" w="full" h="full" gap={2}>
+                      <QueueControls />
+                      <Box position="relative" w="full" h="full">
+                        <ParametersPanelUpscale />
+                      </Box>
+                    </Flex>
                   </TabVisibilityGate>
                 </TabMountGate>
                 <TabMountGate tab="workflows">
                   <TabVisibilityGate tab="workflows">
-                    <NodeEditorPanelGroup />
+                    <Flex flexDir="column" w="full" h="full" gap={2}>
+                      <QueueControls />
+                      <Box position="relative" w="full" h="full">
+                        <NodeEditorPanelGroup />
+                      </Box>
+                    </Flex>
                   </TabVisibilityGate>
                 </TabMountGate>
-              </Box>
-            </Flex>
-          </Panel>
-          <ResizeHandle id="options-main-handle" orientation="vertical" {...optionsPanel.resizeHandleProps} />
+              </Panel>
+              <ResizeHandle id="left-main-handle" orientation="vertical" {...leftPanel.resizeHandleProps} />
+            </>
+          )}
           <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>
             <TabMountGate tab="generation">
               <TabVisibilityGate tab="generation">
-                <CanvasEditor />
+                <CanvasTabContent />
               </TabVisibilityGate>
             </TabMountGate>
-            {/* upscaling tab has no content of its own - uses image viewer only */}
+            <TabMountGate tab="upscaling">
+              <TabVisibilityGate tab="upscaling">
+                <ImageViewer />
+              </TabVisibilityGate>
+            </TabMountGate>
             <TabMountGate tab="workflows">
               <TabVisibilityGate tab="workflows">
-                <NodesTab />
+                <WorkflowsTabContent />
               </TabVisibilityGate>
             </TabMountGate>
-            {isImageViewerOpen && <ImageViewer />}
+            <TabMountGate tab="gallery">
+              <TabVisibilityGate tab="gallery">
+                <ImageViewer />
+              </TabVisibilityGate>
+            </TabMountGate>
+            <TabMountGate tab="models">
+              <TabVisibilityGate tab="models">
+                <ModelManagerTab />
+              </TabVisibilityGate>
+            </TabMountGate>
+            <TabMountGate tab="queue">
+              <TabVisibilityGate tab="queue">
+                <QueueTab />
+              </TabVisibilityGate>
+            </TabMountGate>
           </Panel>
-          <ResizeHandle id="main-gallery-handle" orientation="vertical" {...galleryPanel.resizeHandleProps} />
-          <Panel order={2} style={panelStyles} collapsible {...galleryPanel.panelProps}>
-            <GalleryPanelContent />
-          </Panel>
+          {withRightPanel && (
+            <>
+              <ResizeHandle id="main-right-handle" orientation="vertical" {...rightPanel.resizeHandleProps} />
+              <Panel order={2} style={panelStyles} collapsible {...rightPanel.panelProps}>
+                <RightPanelContent />
+              </Panel>
+            </>
+          )}
         </PanelGroup>
-        {shouldShowOptionsPanel && <FloatingParametersPanelButtons panelApi={optionsPanel} />}
-        {shouldShowGalleryPanel && <FloatingGalleryButton panelApi={galleryPanel} />}
-        <TabMountGate tab="models">
-          <TabVisibilityGate tab="models">
-            <ModelManagerTab />
-          </TabVisibilityGate>
-        </TabMountGate>
-        <TabMountGate tab="models">
-          <TabVisibilityGate tab="queue">
-            <QueueTab />
-          </TabVisibilityGate>
-        </TabMountGate>
+        {withLeftPanel && <FloatingParametersPanelButtons panelApi={leftPanel} />}
+        {withRightPanel && <FloatingGalleryButton panelApi={rightPanel} />}
       </Flex>
     </Flex>
   );
 });
 
 AppContent.displayName = 'AppContent';
+
+const RightPanelContent = memo(() => {
+  const tab = useAppSelector(selectActiveTab);
+
+  if (tab === 'generation') {
+    return <CanvasRightPanelContent />;
+  }
+
+  return <GalleryPanelContent />;
+});
+RightPanelContent.displayName = 'RightPanelContent';

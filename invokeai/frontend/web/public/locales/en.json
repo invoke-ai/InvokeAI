@@ -375,6 +375,7 @@
         "useCache": "Use Cache"
     },
     "gallery": {
+        "gallery": "Gallery",
         "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
         "assets": "Assets",
         "autoAssignBoardOnClick": "Auto-Assign Board on Click",
@@ -387,11 +388,11 @@
         "deleteImage_one": "Delete Image",
         "deleteImage_other": "Delete {{count}} Images",
         "deleteImagePermanent": "Deleted images cannot be restored.",
-        "displayBoardSearch": "Display Board Search",
-        "displaySearch": "Display Search",
+        "displayBoardSearch": "Board Search",
+        "displaySearch": "Image Search",
         "download": "Download",
         "exitBoardSearch": "Exit Board Search",
-        "exitSearch": "Exit Search",
+        "exitSearch": "Exit Image Search",
         "featuresWillReset": "If you delete this image, those features will immediately be reset.",
         "galleryImageSize": "Image Size",
         "gallerySettings": "Gallery Settings",
@@ -437,7 +438,8 @@
         "compareHelp1": "Hold <Kbd>Alt</Kbd> while clicking a gallery image or using the arrow keys to change the compare image.",
         "compareHelp2": "Press <Kbd>M</Kbd> to cycle through comparison modes.",
         "compareHelp3": "Press <Kbd>C</Kbd> to swap the compared images.",
-        "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit."
+        "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit.",
+        "toggleMiniViewer": "Toggle Mini Viewer"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",
@@ -1049,8 +1051,8 @@
         "scaledHeight": "Scaled H",
         "scaledWidth": "Scaled W",
         "scheduler": "Scheduler",
-        "seamlessXAxis": "Seamless Tiling X Axis",
-        "seamlessYAxis": "Seamless Tiling Y Axis",
+        "seamlessXAxis": "Seamless X Axis",
+        "seamlessYAxis": "Seamless Y Axis",
         "seed": "Seed",
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
@@ -1714,6 +1716,8 @@
         "inpaintMask": "Inpaint Mask",
         "regionalGuidance": "Regional Guidance",
         "ipAdapter": "IP Adapter",
+        "sendingToCanvas": "Sending to Canvas",
+        "sendingToGallery": "Sending to Gallery",
         "sendToGallery": "Send To Gallery",
         "sendToGalleryDesc": "Generations will be sent to the gallery.",
         "sendToCanvas": "Send To Canvas",

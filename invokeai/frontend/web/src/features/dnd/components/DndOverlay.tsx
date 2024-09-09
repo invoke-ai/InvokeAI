@@ -35,6 +35,7 @@ const dragOverlayStyles: CSSProperties = {
   width: 'min-content',
   height: 'min-content',
   cursor: 'grabbing',
+  pointerEvents: 'none',
   userSelect: 'none',
   // expand overlay to prevent cursor from going outside it and displaying
   padding: '10rem',

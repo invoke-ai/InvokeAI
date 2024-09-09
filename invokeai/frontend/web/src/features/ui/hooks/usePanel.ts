@@ -107,6 +107,12 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
       }
 
       const minSizePct = getSizeAsPercentage(arg.minSize, arg.panelGroupRef, arg.panelGroupDirection);
+
+      if (minSizePct > 100) {
+        // This can happen when the panel is hidden
+        return;
+      }
+
       _setMinSize(minSizePct);
 
       if (arg.defaultSize && arg.defaultSize > minSizePct) {
