@@ -143,7 +143,9 @@ export class CanvasStageModule extends CanvasModuleBase {
       if (type && adapter.state.type !== type) {
         continue;
       }
-      rects.push(adapter.transformer.getRelativeRect());
+      if (adapter.renderer.hasObjects()) {
+        rects.push(adapter.transformer.getRelativeRect());
+      }
     }
 
     return getRectUnion(...rects);

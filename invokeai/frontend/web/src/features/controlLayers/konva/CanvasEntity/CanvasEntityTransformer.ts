@@ -739,6 +739,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.calculateRect();
   };
 
+  // TODO(psyche): After resetting an entity, this can return stale data...
   getRelativeRect = (): Rect => {
     return this.konva.proxyRect.getClientRect({ relativeTo: this.parent.konva.layer });
   };
