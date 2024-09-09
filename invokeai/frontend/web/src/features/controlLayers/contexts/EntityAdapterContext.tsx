@@ -4,6 +4,7 @@ import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/kon
 import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRegionalGuidance';
+import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useMemo, useSyncExternalStore } from 'react';
 import { assert } from 'tsafe';
@@ -103,5 +104,53 @@ export const useEntityAdapter = ():
   | CanvasEntityAdapterRegionalGuidance => {
   const adapter = useContext(EntityAdapterContext);
   assert(adapter, 'useEntityAdapter must be used within a CanvasRasterLayerAdapterGate');
+  return adapter;
+};
+
+export const useEntityAdapterSafe = (
+  entityIdentifier: CanvasEntityIdentifier | null
+):
+  | CanvasEntityAdapterRasterLayer
+  | CanvasEntityAdapterControlLayer
+  | CanvasEntityAdapterInpaintMask
+  | CanvasEntityAdapterRegionalGuidance
+  | null => {
+  const canvasManager = useCanvasManager();
+  const regionalGuidanceAdapters = useSyncExternalStore(
+    canvasManager.adapters.regionMasks.subscribe,
+    canvasManager.adapters.regionMasks.getSnapshot
+  );
+  const rasterLayerAdapters = useSyncExternalStore(
+    canvasManager.adapters.rasterLayers.subscribe,
+    canvasManager.adapters.rasterLayers.getSnapshot
+  );
+  const controlLayerAdapters = useSyncExternalStore(
+    canvasManager.adapters.controlLayers.subscribe,
+    canvasManager.adapters.controlLayers.getSnapshot
+  );
+  const inpaintMaskAdapters = useSyncExternalStore(
+    canvasManager.adapters.inpaintMasks.subscribe,
+    canvasManager.adapters.inpaintMasks.getSnapshot
+  );
+
+  const adapter = useMemo(() => {
+    if (!entityIdentifier) {
+      return null;
+    }
+    if (entityIdentifier.type === 'raster_layer') {
+      return rasterLayerAdapters.get(entityIdentifier.id) ?? null;
+    }
+    if (entityIdentifier.type === 'control_layer') {
+      return controlLayerAdapters.get(entityIdentifier.id) ?? null;
+    }
+    if (entityIdentifier.type === 'inpaint_mask') {
+      return inpaintMaskAdapters.get(entityIdentifier.id) ?? null;
+    }
+    if (entityIdentifier.type === 'regional_guidance') {
+      return regionalGuidanceAdapters.get(entityIdentifier.id) ?? null;
+    }
+    return null;
+  }, [controlLayerAdapters, entityIdentifier, inpaintMaskAdapters, rasterLayerAdapters, regionalGuidanceAdapters]);
+
   return adapter;
 };

@@ -5,6 +5,8 @@ import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
+import { CanvasSelectedEntityStatusAlert } from 'features/controlLayers/components/HUD/CanvasSelectedEntityStatusAlert';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -97,11 +99,16 @@ export const StageComponent = memo(() => {
         overflow="hidden"
         data-testid="control-layers-canvas"
       />
-      {showHUD && (
-        <Flex position="absolute" top={1} insetInlineStart={1} pointerEvents="none">
-          <CanvasHUD />
+      <CanvasManagerProviderGate>
+        {showHUD && (
+          <Flex position="absolute" top={1} insetInlineStart={1} pointerEvents="none">
+            <CanvasHUD />
+          </Flex>
+        )}
+        <Flex position="absolute" top={1} insetInlineEnd={1} pointerEvents="none">
+          <CanvasSelectedEntityStatusAlert />
         </Flex>
-      )}
+      </CanvasManagerProviderGate>
     </Flex>
   );
 });
