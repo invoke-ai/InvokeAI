@@ -11,7 +11,7 @@ import { Transform } from 'features/controlLayers/components/Transform/Transform
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { memo, useRef } from 'react';
 
-export const CanvasEditor = memo(() => {
+export const CanvasTabContent = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   useScopeOnFocus('canvas', ref);
 
@@ -48,4 +48,4 @@ export const CanvasEditor = memo(() => {
   );
 });
 
-CanvasEditor.displayName = 'CanvasEditor';
+CanvasTabContent.displayName = 'CanvasTabContent';

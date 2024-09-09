@@ -6,7 +6,7 @@ import { memo } from 'react';
 
 export const EntityListGlobalActionBar = memo(() => {
   return (
-    <Flex w="full" py={1} px={1} gap={2} alignItems="center">
+    <Flex w="full" gap={2} alignItems="center">
       <EntityListGlobalActionBarDenoisingStrength />
       <Spacer />
       <Flex>

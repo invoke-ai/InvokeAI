@@ -114,4 +114,13 @@ export const useGlobalHotkeys = () => {
     },
     [dispatch, isModelManagerEnabled]
   );
+
+  useHotkeys(
+    isModelManagerEnabled ? '6' : '5',
+    () => {
+      dispatch(setActiveTab('gallery'));
+      setScopes([]);
+    },
+    [dispatch, isModelManagerEnabled]
+  );
 };

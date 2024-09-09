@@ -13,7 +13,7 @@ import type { CanvasControlLayerState, CanvasRasterLayerState } from 'features/c
 import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
-import { imageToCompareChanged, isImageViewerOpenChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -146,7 +146,6 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { imageDTO } = activeData.payload;
         dispatch(imageToCompareChanged(imageDTO));
-        dispatch(isImageViewerOpenChanged(true));
         return;
       }
 

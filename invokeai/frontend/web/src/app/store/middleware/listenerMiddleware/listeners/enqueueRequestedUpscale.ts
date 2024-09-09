@@ -1,6 +1,5 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -11,7 +10,6 @@ export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening)
       enqueueRequested.match(action) && action.payload.tabName === 'upscaling',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
-      const { shouldShowProgressInViewer } = state.ui;
       const { prepend } = action.payload;
 
       const { g, noise, posCond } = await buildMultidiffusionUpscaleGraph(state);
@@ -25,9 +23,6 @@ export const addEnqueueRequestedUpscale = (startAppListening: AppStartListening)
       );
       try {
         await req.unwrap();
-        if (shouldShowProgressInViewer) {
-          dispatch(isImageViewerOpenChanged(true));
-        }
       } finally {
         req.reset();
       }

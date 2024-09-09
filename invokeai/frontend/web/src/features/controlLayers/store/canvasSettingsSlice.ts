@@ -160,3 +160,4 @@ export const selectDynamicGrid = createCanvasSettingsSelector((settings) => sett
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
 export const selectAutoProcessFilter = createCanvasSettingsSelector((settings) => settings.autoProcessFilter);
 export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
+export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.sendToCanvas);

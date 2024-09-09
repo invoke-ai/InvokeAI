@@ -1,4 +1,4 @@
-import { Box, Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Combobox, Flex, FormControl, FormLabel, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
@@ -6,6 +6,7 @@ import { refinerModelChanged, selectRefinerModel } from 'features/controlLayers/
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 import { useRefinerModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
 
@@ -33,21 +34,32 @@ const ParamSDXLRefinerModelSelect = () => {
     isLoading,
     optionsFilter,
   });
+  const onReset = useCallback(() => {
+    _onChange(null);
+  }, [_onChange]);
+
   return (
     <FormControl isDisabled={!options.length} isInvalid={!options.length} w="full">
       <InformationalPopover feature="refinerModel">
         <FormLabel>{t('sdxl.refinermodel')}</FormLabel>
       </InformationalPopover>
-      <Box w="full" minW={0}>
+      <Flex w="full" minW={0} gap={2} alignItems="center">
         <Combobox
           value={value}
           placeholder={placeholder}
           options={options}
           onChange={onChange}
           noOptionsMessage={noOptionsMessage}
-          isClearable
         />
-      </Box>
+        <IconButton
+          size="sm"
+          variant="ghost"
+          icon={<PiXBold />}
+          aria-label={t('common.reset')}
+          onClick={onReset}
+          isDisabled={!value}
+        />
+      </Flex>
     </FormControl>
   );
 };

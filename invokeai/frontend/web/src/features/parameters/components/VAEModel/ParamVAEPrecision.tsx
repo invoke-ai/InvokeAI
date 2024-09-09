@@ -12,7 +12,7 @@ const options = [
   { label: 'FP32', value: 'fp32' },
 ];
 
-const ParamVAEModelSelect = () => {
+const ParamVAEPrecision = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const vaePrecision = useAppSelector(selectVAEPrecision);
@@ -31,13 +31,13 @@ const ParamVAEModelSelect = () => {
   const value = useMemo(() => options.find((o) => o.value === vaePrecision), [vaePrecision]);
 
   return (
-    <FormControl w="14rem" flexShrink={0}>
+    <FormControl w={24}>
       <InformationalPopover feature="paramVAEPrecision">
-        <FormLabel>{t('modelManager.vaePrecision')}</FormLabel>
+        <FormLabel m={0}>{t('modelManager.vaePrecision')}</FormLabel>
       </InformationalPopover>
       <Combobox value={value} options={options} onChange={onChange} />
     </FormControl>
   );
 };
 
-export default memo(ParamVAEModelSelect);
+export default memo(ParamVAEPrecision);

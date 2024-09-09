@@ -18,7 +18,7 @@ export const ParamSeedRandomize = memo(() => {
 
   return (
     <FormControl w="min-content">
-      <FormLabel>{t('common.random')}</FormLabel>
+      <FormLabel m={0}>{t('common.random')}</FormLabel>
       <Switch isChecked={shouldRandomizeSeed} onChange={handleChangeShouldRandomizeSeed} />
     </FormControl>
   );

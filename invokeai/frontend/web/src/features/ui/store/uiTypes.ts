@@ -1,4 +1,4 @@
-export type TabName = 'generation' | 'upscaling' | 'workflows' | 'models' | 'queue';
+export type TabName = 'generation' | 'upscaling' | 'workflows' | 'models' | 'queue' | 'gallery';
 
 export interface UIState {
   /**

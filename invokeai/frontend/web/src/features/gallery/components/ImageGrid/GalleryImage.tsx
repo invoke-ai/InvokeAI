@@ -13,11 +13,8 @@ import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
-import {
-  imageToCompareChanged,
-  isImageViewerOpenChanged,
-  selectGallerySlice,
-} from 'features/gallery/store/gallerySlice';
+import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -116,7 +113,7 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
   }, []);
 
   const onDoubleClick = useCallback(() => {
-    dispatch(isImageViewerOpenChanged(true));
+    dispatch(setActiveTab('gallery'));
     dispatch(imageToCompareChanged(null));
   }, [dispatch]);
 
@@ -150,7 +147,7 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
   }
 
   return (
-    <Box w="full" h="full" p={1.5} className={GALLERY_IMAGE_CLASS_NAME} data-testid={dataTestId} sx={boxSx}>
+    <Box w="full" h="full" className={GALLERY_IMAGE_CLASS_NAME} data-testid={dataTestId} sx={boxSx}>
       <Flex
         ref={imageContainerRef}
         userSelect="none"
@@ -183,13 +180,12 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
                 color="base.50"
                 fontSize="sm"
                 fontWeight="semibold"
-                bottom={0}
-                left={0}
+                bottom={1}
+                left={1}
                 opacity={0.7}
                 px={2}
                 lineHeight={1.25}
                 borderTopEndRadius="base"
-                borderBottomStartRadius="base"
                 sx={badgeSx}
                 pointerEvents="none"
               >{`${imageDTO.width}x${imageDTO.height}`}</Text>
@@ -199,8 +195,8 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
               icon={starIcon}
               tooltip={starTooltip}
               position="absolute"
-              top={1}
-              insetInlineEnd={1}
+              top={2}
+              insetInlineEnd={2}
             />
 
             {isHovered && <DeleteIcon onClick={handleDelete} />}
@@ -227,8 +223,8 @@ const DeleteIcon = ({ onClick }: { onClick: MouseEventHandler }) => {
       icon={<PiTrashSimpleFill size="16px" />}
       tooltip={t('gallery.deleteImage_one')}
       position="absolute"
-      bottom={1}
-      insetInlineEnd={1}
+      bottom={2}
+      insetInlineEnd={2}
     />
   );
 };

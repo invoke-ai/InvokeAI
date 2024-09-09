@@ -1,64 +1,76 @@
-import { Flex, Text } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { IconSwitch } from 'common/components/IconSwitch';
 import {
-  selectCanvasSettingsSlice,
-  settingsSendToCanvasChanged,
-} from 'features/controlLayers/store/canvasSettingsSlice';
+  Button,
+  Flex,
+  Icon,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+  Text,
+} from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectSendToCanvas, settingsSendToCanvasChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiImageBold, PiPaintBrushBold } from 'react-icons/pi';
-
-const TooltipSendToGallery = memo(() => {
-  const { t } = useTranslation();
-
-  return (
-    <Flex flexDir="column">
-      <Text fontWeight="semibold">{t('controlLayers.sendToGallery')}</Text>
-      <Text fontWeight="normal">{t('controlLayers.sendToGalleryDesc')}</Text>
-    </Flex>
-  );
-});
-
-TooltipSendToGallery.displayName = 'TooltipSendToGallery';
-
-const TooltipSendToCanvas = memo(() => {
-  const { t } = useTranslation();
-
-  return (
-    <Flex flexDir="column">
-      <Text fontWeight="semibold">{t('controlLayers.sendToCanvas')}</Text>
-      <Text fontWeight="normal">{t('controlLayers.sendToCanvasDesc')}</Text>
-    </Flex>
-  );
-});
-
-TooltipSendToCanvas.displayName = 'TooltipSendToCanvas';
-
-const selectSendToCanvas = createSelector(selectCanvasSettingsSlice, (canvasSettings) => canvasSettings.sendToCanvas);
+import { PiCaretDownBold, PiCheckBold } from 'react-icons/pi';
 
 export const CanvasSendToToggle = memo(() => {
-  const dispatch = useAppDispatch();
+  const { t } = useTranslation();
   const sendToCanvas = useAppSelector(selectSendToCanvas);
+  const dispatch = useAppDispatch();
 
-  const onChange = useCallback(
-    (isChecked: boolean) => {
-      dispatch(settingsSendToCanvasChanged(isChecked));
-    },
-    [dispatch]
-  );
+  const enableSendToCanvas = useCallback(() => {
+    dispatch(settingsSendToCanvasChanged(true));
+  }, [dispatch]);
+
+  const disableSendToCanvas = useCallback(() => {
+    dispatch(settingsSendToCanvasChanged(false));
+  }, [dispatch]);
 
   return (
-    <IconSwitch
-      isChecked={sendToCanvas}
-      onChange={onChange}
-      iconUnchecked={<PiImageBold />}
-      tooltipUnchecked={<TooltipSendToGallery />}
-      iconChecked={<PiPaintBrushBold />}
-      tooltipChecked={<TooltipSendToCanvas />}
-      ariaLabel="Toggle canvas mode"
-    />
+    <Popover isLazy>
+      <PopoverTrigger>
+        <Button
+          size="sm"
+          variant="link"
+          data-testid="toggle-viewer-menu-button"
+          pointerEvents="auto"
+          rightIcon={<PiCaretDownBold />}
+        >
+          {sendToCanvas ? t('controlLayers.sendingToCanvas') : t('controlLayers.sendingToGallery')}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent p={2} pointerEvents="auto">
+        <PopoverArrow />
+        <PopoverBody>
+          <Flex flexDir="column">
+            <Button onClick={disableSendToCanvas} variant="ghost" h="auto" w="auto" p={2}>
+              <Flex gap={2} w="full">
+                <Icon as={PiCheckBold} visibility={!sendToCanvas ? 'visible' : 'hidden'} />
+                <Flex flexDir="column" gap={2} alignItems="flex-start">
+                  <Text fontWeight="semibold">{t('controlLayers.sendToGallery')}</Text>
+                  <Text fontWeight="normal" variant="subtext">
+                    {t('controlLayers.sendToGalleryDesc')}
+                  </Text>
+                </Flex>
+              </Flex>
+            </Button>
+            <Button onClick={enableSendToCanvas} variant="ghost" h="auto" w="auto" p={2}>
+              <Flex gap={2} w="full">
+                <Icon as={PiCheckBold} visibility={sendToCanvas ? 'visible' : 'hidden'} />
+                <Flex flexDir="column" gap={2} alignItems="flex-start">
+                  <Text fontWeight="semibold">{t('controlLayers.sendToCanvas')}</Text>
+                  <Text fontWeight="normal" variant="subtext">
+                    {t('controlLayers.sendToCanvasDesc')}
+                  </Text>
+                </Flex>
+              </Flex>
+            </Button>
+          </Flex>
+        </PopoverBody>
+      </PopoverContent>
+    </Popover>
   );
 });
 
