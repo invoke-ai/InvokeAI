@@ -10,11 +10,9 @@ import QueueControls from 'features/queue/components/QueueControls';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
-import { TabMountGate } from 'features/ui/components/TabMountGate';
 import ModelManagerTab from 'features/ui/components/tabs/ModelManagerTab';
 import QueueTab from 'features/ui/components/tabs/QueueTab';
 import { WorkflowsTabContent } from 'features/ui/components/tabs/WorkflowsTabContent';
-import { TabVisibilityGate } from 'features/ui/components/TabVisibilityGate';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
@@ -127,71 +125,18 @@ export const AppContent = memo(() => {
           {withLeftPanel && (
             <>
               <Panel order={0} collapsible style={panelStyles} {...leftPanel.panelProps}>
-                <TabMountGate tab="generation">
-                  <TabVisibilityGate tab="generation">
-                    <Flex flexDir="column" w="full" h="full" gap={2}>
-                      <QueueControls />
-                      <Box position="relative" w="full" h="full">
-                        <ParametersPanelTextToImage />
-                      </Box>
-                    </Flex>
-                  </TabVisibilityGate>
-                </TabMountGate>
-                <TabMountGate tab="upscaling">
-                  <TabVisibilityGate tab="upscaling">
-                    <Flex flexDir="column" w="full" h="full" gap={2}>
-                      <QueueControls />
-                      <Box position="relative" w="full" h="full">
-                        <ParametersPanelUpscale />
-                      </Box>
-                    </Flex>
-                  </TabVisibilityGate>
-                </TabMountGate>
-                <TabMountGate tab="workflows">
-                  <TabVisibilityGate tab="workflows">
-                    <Flex flexDir="column" w="full" h="full" gap={2}>
-                      <QueueControls />
-                      <Box position="relative" w="full" h="full">
-                        <NodeEditorPanelGroup />
-                      </Box>
-                    </Flex>
-                  </TabVisibilityGate>
-                </TabMountGate>
+                <Flex flexDir="column" w="full" h="full" gap={2}>
+                  <QueueControls />
+                  <Box position="relative" w="full" h="full">
+                    <LeftPanelContent />
+                  </Box>
+                </Flex>
               </Panel>
               <ResizeHandle id="left-main-handle" orientation="vertical" {...leftPanel.resizeHandleProps} />
             </>
           )}
           <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>
-            <TabMountGate tab="generation">
-              <TabVisibilityGate tab="generation">
-                <CanvasTabContent />
-              </TabVisibilityGate>
-            </TabMountGate>
-            <TabMountGate tab="upscaling">
-              <TabVisibilityGate tab="upscaling">
-                <ImageViewer />
-              </TabVisibilityGate>
-            </TabMountGate>
-            <TabMountGate tab="workflows">
-              <TabVisibilityGate tab="workflows">
-                <WorkflowsTabContent />
-              </TabVisibilityGate>
-            </TabMountGate>
-            <TabMountGate tab="gallery">
-              <TabVisibilityGate tab="gallery">
-                <ImageViewer />
-              </TabVisibilityGate>
-            </TabMountGate>
-            <TabMountGate tab="models">
-              <TabVisibilityGate tab="models">
-                <ModelManagerTab />
-              </TabVisibilityGate>
-            </TabMountGate>
-            <TabMountGate tab="queue">
-              <TabVisibilityGate tab="queue">
-                <QueueTab />
-              </TabVisibilityGate>
-            </TabMountGate>
+            <MainPanelContent />
           </Panel>
           {withRightPanel && (
             <>
@@ -218,6 +163,53 @@ const RightPanelContent = memo(() => {
     return <CanvasRightPanelContent />;
   }
 
-  return <GalleryPanelContent />;
+  if (tab === 'upscaling' || tab === 'workflows' || tab === 'gallery') {
+    return <GalleryPanelContent />;
+  }
+
+  return null;
 });
 RightPanelContent.displayName = 'RightPanelContent';
+
+const LeftPanelContent = memo(() => {
+  const tab = useAppSelector(selectActiveTab);
+
+  if (tab === 'generation') {
+    return <ParametersPanelTextToImage />;
+  }
+  if (tab === 'upscaling') {
+    return <ParametersPanelUpscale />;
+  }
+
+  if (tab === 'workflows') {
+    return <NodeEditorPanelGroup />;
+  }
+
+  return null;
+});
+LeftPanelContent.displayName = 'LeftPanelContent';
+
+const MainPanelContent = memo(() => {
+  const tab = useAppSelector(selectActiveTab);
+  if (tab === 'generation') {
+    return <CanvasTabContent />;
+  }
+  if (tab === 'upscaling') {
+    return <ImageViewer />;
+  }
+  if (tab === 'workflows') {
+    return <WorkflowsTabContent />;
+  }
+  if (tab === 'gallery') {
+    return <ImageViewer />;
+  }
+  if (tab === 'models') {
+    return <ModelManagerTab />;
+  }
+  if (tab === 'queue') {
+    return <QueueTab />;
+  }
+
+  return null;
+});
+MainPanelContent.displayName = 'MainPanelContent';
