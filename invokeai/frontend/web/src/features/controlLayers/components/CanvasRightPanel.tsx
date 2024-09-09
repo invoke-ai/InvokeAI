@@ -22,11 +22,11 @@ export const CanvasRightPanelContent = memo(() => {
         <CanvasSendToToggle />
       </TabList>
       <TabPanels w="full" h="full">
-        <TabPanel w="full" h="full" p={0} pt={2}>
-          <GalleryPanelContent />
-        </TabPanel>
-        <TabPanel w="full" h="full" p={0} pt={2}>
+        <TabPanel w="full" h="full" p={0} pt={3}>
           <CanvasPanelContent />
+        </TabPanel>
+        <TabPanel w="full" h="full" p={0} pt={3}>
+          <GalleryPanelContent />
         </TabPanel>
       </TabPanels>
     </Tabs>
@@ -64,15 +64,15 @@ const PanelTabs = memo(({ setTab }: { setTab: (val: number) => void }) => {
   }, []);
   return (
     <>
-      <Tab position="relative" onMouseOver={onOnMouseOverGalleryTab} onMouseOut={onMouseOut}>
-        {t('gallery.gallery')}
-        {!sendToCanvas && (
-          <Box position="absolute" top={2} right={2} h={2} w={2} bg="invokeYellow.300" borderRadius="full" />
-        )}
-      </Tab>
       <Tab position="relative" onMouseOver={onOnMouseOverLayersTab} onMouseOut={onMouseOut}>
         {t('controlLayers.layer_other')}
         {sendToCanvas && (
+          <Box position="absolute" top={2} right={2} h={2} w={2} bg="invokeYellow.300" borderRadius="full" />
+        )}
+      </Tab>
+      <Tab position="relative" onMouseOver={onOnMouseOverGalleryTab} onMouseOut={onMouseOut}>
+        {t('gallery.gallery')}
+        {!sendToCanvas && (
           <Box position="absolute" top={2} right={2} h={2} w={2} bg="invokeYellow.300" borderRadius="full" />
         )}
       </Tab>
