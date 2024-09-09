@@ -1831,11 +1831,12 @@
             "autoSave": "Auto Save",
             "entityStatus": {
                 "selectedEntity": "Selected Entity",
-                "filtering": "Filtering",
-                "transforming": "Transforming",
-                "locked": "Locked",
-                "hidden": "Hidden",
-                "disabled": "Disabled",
+                "selectedEntityIs": "Selected Entity is",
+                "isFiltering": "is filtering",
+                "isTransforming": "is transforming",
+                "isLocked": "is locked",
+                "isHidden": "is hidden",
+                "isDisabled": "is disabled",
                 "enabled": "Enabled"
             }
         }
