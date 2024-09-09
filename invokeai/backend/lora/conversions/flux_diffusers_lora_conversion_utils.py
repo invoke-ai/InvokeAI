@@ -9,6 +9,27 @@ from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 
 
+def is_state_dict_likely_in_flux_diffusers_format(state_dict: Dict[str, torch.Tensor]) -> bool:
+    """Checks if the provided state dict is likely in the Diffusers FLUX LoRA format.
+
+    This is intended to be a reasonably high-precision detector, but it is not guaranteed to have perfect precision. (A
+    perfect-precision detector would require checking all keys against a whitelist and verifying tensor shapes.)
+    """
+    # First, check that all keys end in "lora_A.weight" or "lora_B.weight" (i.e. are in PEFT format).
+    all_keys_in_peft_format = all(k.endswith(("lora_A.weight", "lora_B.weight")) for k in state_dict.keys())
+
+    # Next, check that this is likely a FLUX model by spot-checking a few keys.
+    expected_keys = [
+        "transformer.single_transformer_blocks.0.attn.to_q.lora_A.weight",
+        "transformer.single_transformer_blocks.0.attn.to_q.lora_B.weight",
+        "transformer.transformer_blocks.0.attn.add_q_proj.lora_A.weight",
+        "transformer.transformer_blocks.0.attn.add_q_proj.lora_B.weight",
+    ]
+    all_expected_keys_present = all(k in state_dict for k in expected_keys)
+
+    return all_keys_in_peft_format and all_expected_keys_present
+
+
 # TODO(ryand): What alpha should we use? 1.0? Rank of the LoRA?
 def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor], alpha: float = 1.0) -> LoRAModelRaw:  # pyright: ignore[reportRedeclaration] (state_dict is intentionally re-declared)
     """Loads a state dict in the Diffusers FLUX LoRA format into a LoRAModelRaw object.
