@@ -20,6 +20,9 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache_base import ModelCacheBase
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.peft.conversions.flux_diffusers_lora_conversion_utils import (
+    lora_model_from_flux_diffusers_state_dict,
+)
 from invokeai.backend.peft.conversions.flux_kohya_lora_conversion_utils import (
     lora_model_from_flux_kohya_state_dict,
 )
@@ -64,7 +67,12 @@ class LoRALoader(ModelLoader):
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.Flux:
-            model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
+            if config.format == ModelFormat.Diffusers:
+                model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict)
+            elif config.format == ModelFormat.LyCORIS:
+                model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
+            else:
+                raise ValueError(f"LoRA model is in unsupported FLUX format: {config.format}")
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
             # Currently, we don't apply any conversions for SD1 and SD2 LoRA models.
             model = lora_model_from_sd_state_dict(state_dict=state_dict)

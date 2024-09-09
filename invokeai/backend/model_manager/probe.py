@@ -26,6 +26,9 @@ from invokeai.backend.model_manager.config import (
     SchedulerPredictionType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
+from invokeai.backend.peft.conversions.flux_diffusers_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_diffusers_format,
+)
 from invokeai.backend.peft.conversions.flux_kohya_lora_conversion_utils import is_state_dict_likely_in_flux_kohya_format
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -245,7 +248,9 @@ class ModelProbe(object):
                 return ModelType.VAE
             elif key.startswith(("lora_te_", "lora_unet_")):
                 return ModelType.LoRA
-            elif key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight")):
+            # "lora_A.weight" and "lora_B.weight" are associated with models in PEFT format. We don't support all PEFT
+            # LoRA models, but as of the time of writing, we support Diffusers FLUX PEFT LoRA models.
+            elif key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight", "lora_A.weight", "lora_B.weight")):
                 return ModelType.LoRA
             elif key.startswith(("controlnet", "control_model", "input_blocks")):
                 return ModelType.ControlNet
@@ -555,10 +560,17 @@ class LoRACheckpointProbe(CheckpointProbeBase):
     """Class for LoRA checkpoints."""
 
     def get_format(self) -> ModelFormat:
-        return ModelFormat("lycoris")
+        if is_state_dict_likely_in_flux_diffusers_format(self.checkpoint):
+            # TODO(ryand): This is an unusual case. In other places throughout the codebase, we treat
+            # ModelFormat.Diffusers as meaning that the model is in a directory. In this case, the model is a single
+            # file, but the weight keys are in the diffusers format.
+            return ModelFormat.Diffusers
+        return ModelFormat.LyCORIS
 
     def get_base_type(self) -> BaseModelType:
-        if is_state_dict_likely_in_flux_kohya_format(self.checkpoint):
+        if is_state_dict_likely_in_flux_kohya_format(self.checkpoint) or is_state_dict_likely_in_flux_diffusers_format(
+            self.checkpoint
+        ):
             return BaseModelType.Flux
 
         # If we've gotten here, we assume that the model is a Stable Diffusion model.
