@@ -89,10 +89,25 @@ const getRGMaskFill = (state: CanvasState): RgbColor => {
   return fill;
 };
 
+const initialInpaintMaskState: CanvasInpaintMaskState = {
+  id: getPrefixedId('inpaint_mask'),
+  name: null,
+  type: 'inpaint_mask',
+  isEnabled: true,
+  isLocked: false,
+  objects: [],
+  opacity: 1,
+  position: { x: 0, y: 0 },
+  fill: {
+    style: 'diagonal',
+    color: { r: 255, g: 122, b: 0 }, // some orange color
+  },
+};
+
 const initialState: CanvasState = {
   _version: 3,
-  selectedEntityIdentifier: null,
-  bookmarkedEntityIdentifier: null,
+  selectedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
+  bookmarkedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
   rasterLayers: {
     isHidden: false,
     entities: [],
@@ -103,7 +118,7 @@ const initialState: CanvasState = {
   },
   inpaintMasks: {
     isHidden: false,
-    entities: [],
+    entities: [initialInpaintMaskState],
   },
   regions: {
     isHidden: false,
