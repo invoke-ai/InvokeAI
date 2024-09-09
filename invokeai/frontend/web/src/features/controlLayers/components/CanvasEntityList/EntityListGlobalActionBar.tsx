@@ -1,7 +1,7 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { EntityListGlobalActionBarAddLayerMenu } from 'features/controlLayers/components/CanvasEntityList/EntityListGlobalActionBarAddLayerMenu';
 import { EntityListGlobalActionBarDenoisingStrength } from 'features/controlLayers/components/CanvasEntityList/EntityListGlobalActionBarDenoisingStrength';
-import { EntityListGlobalActionBarFitBboxToLayers } from 'features/controlLayers/components/CanvasEntityList/EntityListGlobalActionBarFitBboxToLayers';
+import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { memo } from 'react';
 
 export const EntityListGlobalActionBar = memo(() => {
@@ -10,7 +10,7 @@ export const EntityListGlobalActionBar = memo(() => {
       <EntityListGlobalActionBarDenoisingStrength />
       <Spacer />
       <Flex>
-        <EntityListGlobalActionBarFitBboxToLayers />
+        <CanvasToolbarFitBboxToLayersButton />
         <EntityListGlobalActionBarAddLayerMenu />
       </Flex>
     </Flex>
