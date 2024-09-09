@@ -4,7 +4,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOut } from 'react-icons/pi';
 
-export const EntityListGlobalActionBarFitBboxToLayers = memo(() => {
+export const CanvasToolbarFitBboxToLayersButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const onClick = useCallback(() => {
@@ -14,9 +14,7 @@ export const EntityListGlobalActionBarFitBboxToLayers = memo(() => {
   return (
     <IconButton
       onClick={onClick}
-      size="sm"
-      variant="link"
-      alignSelf="stretch"
+      variant="ghost"
       aria-label={t('controlLayers.fitBboxToLayers')}
       tooltip={t('controlLayers.fitBboxToLayers')}
       icon={<PiArrowsOut />}
@@ -24,4 +22,4 @@ export const EntityListGlobalActionBarFitBboxToLayers = memo(() => {
   );
 });
 
-EntityListGlobalActionBarFitBboxToLayers.displayName = 'EntityListGlobalActionBarFitBboxToLayers';
+CanvasToolbarFitBboxToLayersButton.displayName = 'CanvasToolbarFitBboxToLayersButton';

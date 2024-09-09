@@ -4,6 +4,7 @@ import { CanvasSettingsPopover } from 'features/controlLayers/components/Setting
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { ToolColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolSettings } from 'features/controlLayers/components/Tool/ToolSettings';
+import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { CanvasToolbarResetViewButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarResetViewButton';
 import { CanvasToolbarSaveToGalleryButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSaveToGalleryButton';
 import { CanvasToolbarScale } from 'features/controlLayers/components/Toolbar/CanvasToolbarScale';
@@ -33,6 +34,7 @@ export const CanvasToolbar = memo(() => {
         <CanvasToolbarResetViewButton />
         <Spacer />
         <ToolColorPicker />
+        <CanvasToolbarFitBboxToLayersButton />
         <CanvasToolbarSaveToGalleryButton />
         <CanvasSettingsPopover />
       </Flex>
