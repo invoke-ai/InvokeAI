@@ -662,7 +662,12 @@ export class CanvasToolModule extends CanvasModuleBase {
       // Cancel shape drawing on escape
       e.preventDefault();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-      if (selectedEntity) {
+      if (
+        selectedEntity &&
+        !selectedEntity.filterer?.$isFiltering.get() &&
+        !selectedEntity.transformer.$isTransforming.get() &&
+        selectedEntity.bufferRenderer.hasBuffer()
+      ) {
         selectedEntity.bufferRenderer.clearBuffer();
       }
       return;
