@@ -192,6 +192,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     if (this.renderers.size === 0) {
       this.log.trace('Clearing object group cache');
       this.konva.objectGroup.clearCache();
+      this.$canvasCache.set(null);
     } else if (force || !this.konva.objectGroup.isCached()) {
       this.log.trace('Caching object group');
       this.konva.objectGroup.clearCache();

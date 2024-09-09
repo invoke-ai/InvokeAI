@@ -37,13 +37,20 @@ export const CanvasEntityPreviewImage = memo(() => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cache = useStore(adapter.renderer.$canvasCache);
   useEffect(() => {
-    if (!cache || !canvasRef.current) {
+    if (!canvasRef.current) {
       return;
     }
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) {
       return;
     }
+
+    if (!cache) {
+      // Draw an empty canvas
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      return;
+    }
+
     const { rect, canvas } = cache;
 
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
