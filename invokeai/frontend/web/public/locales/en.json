@@ -1756,6 +1756,8 @@
         "noLayersAdded": "No Layers Added",
         "layer_one": "Layer",
         "layer_other": "Layers",
+        "layer_withCount_one": "Layer ({{count}})",
+        "layer_withCount_other": "Layers ({{count}})",
         "objects_zero": "empty",
         "objects_one": "{{count}} object",
         "objects_other": "{{count}} objects",
