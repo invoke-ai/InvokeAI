@@ -81,6 +81,7 @@ export const CanvasEntityPreviewImage = memo(() => {
       borderRadius="sm"
       borderWidth={1}
       bg="base.900"
+      flexShrink={0}
     >
       <Box
         position="absolute"
