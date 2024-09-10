@@ -1780,6 +1780,7 @@
         "deleteAll": "Delete All",
         "flipHorizontal": "Flip Horizontal",
         "flipVertical": "Flip Vertical",
+        "stagingOnCanvas": "Staging images on",
         "fill": {
             "fillColor": "Fill Color",
             "fillStyle": "Fill Style",
