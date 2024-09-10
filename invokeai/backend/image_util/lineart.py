@@ -1,6 +1,9 @@
 """Adapted from https://github.com/huggingface/controlnet_aux (Apache-2.0 license)."""
 
+import pathlib
+
 import cv2
+import huggingface_hub
 import numpy as np
 import torch
 import torch.nn as nn
@@ -153,6 +156,66 @@ class LineartProcessor:
         H, W, C = img.shape
 
         detected_map = cv2.resize(detected_map, (W, H), interpolation=cv2.INTER_LINEAR)
+        detected_map = 255 - detected_map
+
+        return np_to_pil(detected_map)
+
+
+class LineartEdgeDetector:
+    """Simple wrapper around the fine and coarse lineart models for detecting edges in an image."""
+
+    hf_repo_id = "lllyasviel/Annotators"
+    hf_filename_fine = "sk_model.pth"
+    hf_filename_coarse = "sk_model2.pth"
+
+    @classmethod
+    def get_model_url(cls, coarse: bool = False) -> str:
+        """Get the URL to download the model from the Hugging Face Hub."""
+        if coarse:
+            return huggingface_hub.hf_hub_url(cls.hf_repo_id, cls.hf_filename_coarse)
+        else:
+            return huggingface_hub.hf_hub_url(cls.hf_repo_id, cls.hf_filename_fine)
+
+    @classmethod
+    def load_model(cls, model_path: pathlib.Path) -> Generator:
+        """Load the model from a file."""
+        model = Generator(3, 1, 3)
+        model.load_state_dict(torch.load(model_path, map_location="cpu"))
+        model.float().eval()
+        return model
+
+    def __init__(self, model: Generator) -> None:
+        self.model = model
+
+    def to(self, device: torch.device):
+        self.model.to(device)
+        return self
+
+    def run(self, image: Image.Image) -> Image.Image:
+        """Detects edges in the input image with the selected lineart model.
+
+        Args:
+            input: The input image.
+            coarse: Whether to use the coarse model.
+
+        Returns:
+            The detected edges.
+        """
+        device = next(iter(self.model.parameters())).device
+
+        np_image = pil_to_np(image)
+
+        with torch.no_grad():
+            np_image = torch.from_numpy(np_image).float().to(device)
+            np_image = np_image / 255.0
+            np_image = rearrange(np_image, "h w c -> 1 c h w")
+            line = self.model(np_image)[0][0]
+
+            line = line.cpu().numpy()
+            line = (line * 255.0).clip(0, 255).astype(np.uint8)
+
+        detected_map = line
+
         detected_map = 255 - detected_map
 
         return np_to_pil(detected_map)
