@@ -5,13 +5,13 @@ from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils impo
     is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
 )
-from tests.backend.peft.conversions.lora_state_dicts.flux_lora_diffusers_format import (
+from tests.backend.lora.conversions.lora_state_dicts.flux_lora_diffusers_format import (
     state_dict_keys as flux_diffusers_state_dict_keys,
 )
-from tests.backend.peft.conversions.lora_state_dicts.flux_lora_kohya_format import (
+from tests.backend.lora.conversions.lora_state_dicts.flux_lora_kohya_format import (
     state_dict_keys as flux_kohya_state_dict_keys,
 )
-from tests.backend.peft.conversions.lora_state_dicts.utils import keys_to_mock_state_dict
+from tests.backend.lora.conversions.lora_state_dicts.utils import keys_to_mock_state_dict
 
 
 def test_is_state_dict_likely_in_flux_diffusers_format_true():

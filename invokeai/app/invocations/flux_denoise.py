@@ -30,7 +30,7 @@ from invokeai.backend.flux.sampling_utils import (
     unpack,
 )
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
-from invokeai.backend.lora.peft_patcher import PeftPatcher
+from invokeai.backend.lora.lora_patcher import LoraPatcher
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -192,7 +192,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         with (
             transformer_info.model_on_device() as (cached_weights, transformer),
             # Apply the LoRA after transformer has been moved to its target device for faster patching.
-            PeftPatcher.apply_peft_patches(
+            LoraPatcher.apply_lora_patches(
                 model=transformer,
                 patches=self._lora_iterator(context),
                 prefix="",
