@@ -20,8 +20,10 @@ export const useCanvasUndoRedoHotkeys = () => {
   const handleRedo = useCallback(() => {
     dispatch(canvasRedo());
   }, [dispatch]);
-  useHotkeys(['meta+shift+z', 'ctrl+shift+z'], handleRedo, { enabled: mayRedo, preventDefault: true }, [
-    mayRedo,
+  useHotkeys(
+    ['meta+shift+z', 'ctrl+shift+z', 'meta+y', 'ctrl+y'],
     handleRedo,
-  ]);
+    { enabled: mayRedo, preventDefault: true },
+    [mayRedo, handleRedo]
+  );
 };
