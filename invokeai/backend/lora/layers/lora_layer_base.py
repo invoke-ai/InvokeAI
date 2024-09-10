@@ -9,7 +9,6 @@ class LoRALayerBase:
     # rank: Optional[int]
     # alpha: Optional[float]
     # bias: Optional[torch.Tensor]
-    # layer_key: str
 
     # @property
     # def scale(self):
@@ -17,7 +16,6 @@ class LoRALayerBase:
 
     def __init__(
         self,
-        layer_key: str,
         values: Dict[str, torch.Tensor],
     ):
         if "alpha" in values:
@@ -36,7 +34,6 @@ class LoRALayerBase:
             self.bias = None
 
         self.rank = None  # set in layer implementation
-        self.layer_key = layer_key
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError()

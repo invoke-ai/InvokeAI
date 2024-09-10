@@ -55,8 +55,7 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
         if src_key in grouped_state_dict:
             src_layer_dict = grouped_state_dict.pop(src_key)
             layers[dst_key] = LoRALayer(
-                dst_key,
-                {
+                values={
                     "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
                     "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
                     "alpha": torch.tensor(alpha),
@@ -81,7 +80,6 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
         for src_layer_dict in src_layer_dicts:
             sub_layers.append(
                 LoRALayer(
-                    layer_key="",
                     values={
                         "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
                         "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
@@ -90,7 +88,7 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
                 )
             )
             assert len(src_layer_dict) == 0
-        layers[dst_qkv_key] = ConcatenatedLoRALayer(layer_key=dst_qkv_key, lora_layers=sub_layers, concat_axis=0)
+        layers[dst_qkv_key] = ConcatenatedLoRALayer(lora_layers=sub_layers, concat_axis=0)
 
     # time_text_embed.timestep_embedder -> time_in.
     add_lora_layer_if_present("time_text_embed.timestep_embedder.linear_1", "time_in.in_layer")
