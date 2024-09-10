@@ -204,6 +204,7 @@ exclude = [
   "invokeai/frontend/web/node_modules/",
   ".venv*",
   "*.ipynb",
+  "invokeai/backend/image_util/mediapipe_face/", # External code
 ]
 
 [tool.ruff.lint]
