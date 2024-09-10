@@ -1,5 +1,5 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
@@ -1277,6 +1277,8 @@ export const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> =
   // debug: import.meta.env.MODE === 'development',
 };
 
+const doNotGroupMatcher = isAnyOf(entityBrushLineAdded, entityEraserLineAdded, entityRectAdded);
+
 // Store rapid actions of the same type at most once every x time.
 // See: https://github.com/omnidan/redux-undo/blob/master/examples/throttled-drag/util/undoFilter.js
 const THROTTLE_MS = 1000;
@@ -1284,7 +1286,7 @@ let ignoreRapid = false;
 let prevActionType: string | null = null;
 function actionsThrottlingFilter(action: UnknownAction) {
   // If the actions are of a different type, reset the throttle and allow the action
-  if (action.type !== prevActionType) {
+  if (action.type !== prevActionType || doNotGroupMatcher(action)) {
     ignoreRapid = false;
     prevActionType = action.type;
     return true;
