@@ -6,7 +6,7 @@ from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.lora.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
 from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
-from invokeai.backend.lora.lora import LoRAModelRaw
+from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 
 
 def is_state_dict_likely_in_flux_diffusers_format(state_dict: Dict[str, torch.Tensor]) -> bool:

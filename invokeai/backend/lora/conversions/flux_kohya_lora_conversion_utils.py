@@ -5,7 +5,7 @@ import torch
 
 from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.lora.layers.utils import peft_layer_from_state_dict
-from invokeai.backend.lora.lora import LoRAModelRaw
+from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 
 # A regex pattern that matches all of the keys in the Kohya FLUX LoRA format.
 # Example keys:

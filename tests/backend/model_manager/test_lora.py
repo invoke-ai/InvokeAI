@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
-from invokeai.backend.lora.lora import LoRAModelRaw
+from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.model_patcher import ModelPatcher
 
 
