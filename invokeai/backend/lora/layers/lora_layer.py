@@ -6,31 +6,57 @@ from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
 from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
-# TODO: find and debug lora/locon with bias
 class LoRALayer(LoRALayerBase):
-    # up: torch.Tensor
-    # mid: Optional[torch.Tensor]
-    # down: torch.Tensor
-
     def __init__(
         self,
+        up: torch.Tensor,
+        down: torch.Tensor,
+        mid: Optional[torch.Tensor],
+        alpha: float | None,
+        bias: torch.Tensor | None,
+    ):
+        super().__init__(alpha=alpha, bias=bias)
+
+        self.up = up
+        self.down = down
+        self.mid = mid
+
+    @classmethod
+    def from_state_dict_values(
+        cls,
         values: Dict[str, torch.Tensor],
     ):
-        super().__init__(values)
+        alpha = cls._parse_alpha(values.get("alpha", None))
+        bias = cls._parse_bias(
+            values.get("bias_indices", None), values.get("bias_values", None), values.get("bias_size", None)
+        )
 
-        self.up = values["lora_up.weight"]
-        self.down = values["lora_down.weight"]
-        self.mid = values.get("lora_mid.weight", None)
+        cls(
+            up=values["lora_up.weight"],
+            down=values["lora_down.weight"],
+            mid=values.get("lora_mid.weight", None),
+            alpha=alpha,
+            bias=bias,
+        )
 
-        self.rank = self.down.shape[0]
-        self.check_keys(
+        cls.warn_on_unhandled_keys(
             values,
             {
+                # Default keys.
+                "alpha",
+                "bias_indices",
+                "bias_values",
+                "bias_size",
+                # Layer-specific keys.
                 "lora_up.weight",
                 "lora_down.weight",
                 "lora_mid.weight",
             },
         )
+
+    @property
+    def rank(self) -> int:
+        return self.down.shape[0]
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         if self.mid is not None:
