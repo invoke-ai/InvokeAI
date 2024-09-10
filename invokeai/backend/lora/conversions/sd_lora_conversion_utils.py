@@ -12,8 +12,7 @@ def lora_model_from_sd_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRAMo
 
     layers: dict[str, AnyLoRALayer] = {}
     for layer_key, values in grouped_state_dict.items():
-        layer = any_lora_layer_from_state_dict(layer_key, values)
-        layers[layer_key] = layer
+        layers[layer_key] = any_lora_layer_from_state_dict(values)
 
     return LoRAModelRaw(layers=layers)
 

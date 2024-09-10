@@ -12,10 +12,9 @@ class FullLayer(LoRALayerBase):
 
     def __init__(
         self,
-        layer_key: str,
         values: Dict[str, torch.Tensor],
     ):
-        super().__init__(layer_key, values)
+        super().__init__(values)
 
         self.weight = values["diff"]
         self.bias = values.get("diff_b", None)

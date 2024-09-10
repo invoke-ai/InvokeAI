@@ -13,8 +13,8 @@ class LoHALayer(LoRALayerBase):
     # t1: Optional[torch.Tensor] = None
     # t2: Optional[torch.Tensor] = None
 
-    def __init__(self, layer_key: str, values: Dict[str, torch.Tensor]):
-        super().__init__(layer_key, values)
+    def __init__(self, values: Dict[str, torch.Tensor]):
+        super().__init__(values)
 
         self.w1_a = values["hada_w1_a"]
         self.w1_b = values["hada_w1_b"]

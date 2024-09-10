@@ -13,10 +13,9 @@ class LoRALayer(LoRALayerBase):
 
     def __init__(
         self,
-        layer_key: str,
         values: Dict[str, torch.Tensor],
     ):
-        super().__init__(layer_key, values)
+        super().__init__(values)
 
         self.up = values["lora_up.weight"]
         self.down = values["lora_down.weight"]
