@@ -3,7 +3,7 @@ from typing import Dict
 import torch
 
 from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
-from invokeai.backend.lora.layers.utils import lora_layer_from_state_dict
+from invokeai.backend.lora.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 
 
@@ -12,7 +12,7 @@ def lora_model_from_sd_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRAMo
 
     layers: dict[str, AnyLoRALayer] = {}
     for layer_key, values in grouped_state_dict.items():
-        layer = lora_layer_from_state_dict(layer_key, values)
+        layer = any_lora_layer_from_state_dict(layer_key, values)
         layers[layer_key] = layer
 
     return LoRAModelRaw(layers=layers)

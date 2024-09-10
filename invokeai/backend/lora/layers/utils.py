@@ -11,7 +11,7 @@ from invokeai.backend.lora.layers.lora_layer import LoRALayer
 from invokeai.backend.lora.layers.norm_layer import NormLayer
 
 
-def lora_layer_from_state_dict(layer_key: str, state_dict: Dict[str, torch.Tensor]) -> AnyLoRALayer:
+def any_lora_layer_from_state_dict(layer_key: str, state_dict: Dict[str, torch.Tensor]) -> AnyLoRALayer:
     # Detect layers according to LyCORIS detection logic(`weight_list_det`)
     # https://github.com/KohakuBlueleaf/LyCORIS/tree/8ad8000efb79e2b879054da8c9356e6143591bad/lycoris/modules
 
