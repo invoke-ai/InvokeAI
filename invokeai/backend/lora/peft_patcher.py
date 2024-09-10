@@ -3,7 +3,7 @@ from typing import Dict, Iterator, Optional, Tuple
 
 import torch
 
-from invokeai.backend.peft.lora import LoRAModelRaw
+from invokeai.backend.lora.lora import LoRAModelRaw
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 

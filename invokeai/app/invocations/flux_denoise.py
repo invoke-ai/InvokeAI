@@ -29,8 +29,8 @@ from invokeai.backend.flux.sampling_utils import (
     pack,
     unpack,
 )
-from invokeai.backend.peft.lora import LoRAModelRaw
-from invokeai.backend.peft.peft_patcher import PeftPatcher
+from invokeai.backend.lora.lora import LoRAModelRaw
+from invokeai.backend.lora.peft_patcher import PeftPatcher
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice

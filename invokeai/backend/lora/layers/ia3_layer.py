@@ -2,7 +2,7 @@ from typing import Dict, Optional
 
 import torch
 
-from invokeai.backend.peft.layers.lora_layer_base import LoRALayerBase
+from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
 
 
 class IA3Layer(LoRALayerBase):
