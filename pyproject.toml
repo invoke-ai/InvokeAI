@@ -207,6 +207,7 @@ exclude = [
   "invokeai/backend/image_util/mediapipe_face/", # External code
   "invokeai/backend/image_util/mlsd/", # External code
   "invokeai/backend/image_util/normal_bae/", # External code
+  "invokeai/backend/image_util/pidi/", # External code
 ]
 
 [tool.ruff.lint]
