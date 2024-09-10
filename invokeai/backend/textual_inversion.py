@@ -10,6 +10,7 @@ from transformers import CLIPTokenizer
 from typing_extensions import Self
 
 from invokeai.backend.raw_model import RawModel
+from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
 class TextualInversionModelRaw(RawModel):
@@ -74,11 +75,7 @@ class TextualInversionModelRaw(RawModel):
 
     def calc_size(self) -> int:
         """Get the size of this model in bytes."""
-        embedding_size = self.embedding.element_size() * self.embedding.nelement()
-        embedding_2_size = 0
-        if self.embedding_2 is not None:
-            embedding_2_size = self.embedding_2.element_size() * self.embedding_2.nelement()
-        return embedding_size + embedding_2_size
+        return calc_tensors_size([self.embedding, self.embedding_2])
 
 
 class TextualInversionManager(BaseTextualInversionManager):
