@@ -11,7 +11,6 @@ const initialUIState: UIState = {
   activeTab: 'generation',
   shouldShowImageDetails: false,
   shouldShowProgressInViewer: true,
-  panels: {},
   accordions: {},
   expanders: {},
 };
@@ -28,9 +27,6 @@ export const uiSlice = createSlice({
     },
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
-    },
-    panelsChanged: (state, action: PayloadAction<{ name: string; value: string }>) => {
-      state.panels[action.payload.name] = action.payload.value;
     },
     accordionStateChanged: (state, action: PayloadAction<{ id: string; isOpen: boolean }>) => {
       const { id, isOpen } = action.payload;
@@ -52,7 +48,6 @@ export const {
   setActiveTab,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
-  panelsChanged,
   accordionStateChanged,
   expanderStateChanged,
 } = uiSlice.actions;

@@ -18,10 +18,6 @@ export interface UIState {
    */
   shouldShowProgressInViewer: boolean;
   /**
-   * The react-resizable-panels state. The shape is managed by react-resizable-panels.
-   */
-  panels: Record<string, string>;
-  /**
    * The state of accordions. The key is the id of the accordion, and the value is a boolean representing the open state.
    */
   accordions: Record<string, boolean>;

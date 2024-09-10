@@ -88,7 +88,7 @@ const GalleryPanelContent = () => {
         </Flex>
       </Flex>
 
-      <PanelGroup ref={panelGroupRef} direction="vertical">
+      <PanelGroup ref={panelGroupRef} direction="vertical" autoSaveId="boards-list-panel">
         <Panel collapsible {...boardsListPanel.panelProps}>
           <Flex flexDir="column" w="full" h="full">
             <Collapse in={boardSearchDisclosure.isOpen} style={COLLAPSE_STYLES}>
