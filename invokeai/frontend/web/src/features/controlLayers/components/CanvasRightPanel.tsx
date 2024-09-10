@@ -7,7 +7,7 @@ import { CanvasSendToToggle } from 'features/controlLayers/components/CanvasSend
 import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectEntityCount } from 'features/controlLayers/store/selectors';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const CanvasRightPanelContent = memo(() => {
@@ -64,11 +64,19 @@ const PanelTabs = memo(({ setTab }: { setTab: (val: number) => void }) => {
       clearTimeout(tabTimeout.current);
     }
   }, []);
+
+  const layersTabLabel = useMemo(() => {
+    if (entityCount === 0) {
+      return t('controlLayers.layer_other');
+    }
+    return `${t('controlLayers.layer_other')} (${entityCount})`;
+  }, [entityCount, t]);
+
   return (
     <>
       <Tab position="relative" onMouseOver={onOnMouseOverLayersTab} onMouseOut={onMouseOut} w={32}>
         <Box as="span" w="full">
-          {t('controlLayers.layer_withCount', { count: entityCount })}
+          {layersTabLabel}
         </Box>
         {sendToCanvas && (
           <Box position="absolute" top={2} right={2} h={2} w={2} bg="invokeYellow.300" borderRadius="full" />
