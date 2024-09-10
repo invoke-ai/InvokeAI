@@ -3,7 +3,7 @@ import torch
 
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
-from invokeai.backend.model_patcher import ModelPatcher
+from invokeai.backend.lora.lora_patcher import LoRAPatcher
 
 
 @pytest.mark.parametrize(
@@ -41,7 +41,7 @@ def test_apply_lora(device: str):
     orig_linear_weight = model["linear_layer_1"].weight.data.detach().clone()
     expected_patched_linear_weight = orig_linear_weight + (lora_dim * lora_weight)
 
-    with ModelPatcher.apply_lora(model, [(lora, lora_weight)], prefix=""):
+    with LoRAPatcher.apply_lora_patches(model=model, patches=[(lora, lora_weight)], prefix=""):
         # After patching, all LoRA layer weights should have been moved back to the cpu.
         assert lora_layers["linear_layer_1"].up.device.type == "cpu"
         assert lora_layers["linear_layer_1"].down.device.type == "cpu"
@@ -83,7 +83,7 @@ def test_apply_lora_change_device():
 
     orig_linear_weight = model["linear_layer_1"].weight.data.detach().clone()
 
-    with ModelPatcher.apply_lora(model, [(lora, 0.5)], prefix=""):
+    with LoRAPatcher.apply_lora_patches(model=model, patches=[(lora, 0.5)], prefix=""):
         # After patching, all LoRA layer weights should have been moved back to the cpu.
         assert lora_layers["linear_layer_1"].up.device.type == "cpu"
         assert lora_layers["linear_layer_1"].down.device.type == "cpu"
