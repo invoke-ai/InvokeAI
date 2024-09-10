@@ -1,6 +1,7 @@
-import { Flex } from '@invoke-ai/ui-library';
+import { ContextMenu, Flex, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
+import { CanvasContextMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuItems';
 import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea';
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
@@ -13,12 +14,22 @@ import { Transform } from 'features/controlLayers/components/Transform/Transform
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
-import { memo, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 
 export const CanvasTabContent = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
+
+  const renderMenu = useCallback(() => {
+    return (
+      <CanvasManagerProviderGate>
+        <MenuList>
+          <CanvasContextMenuItems />
+        </MenuList>
+      </CanvasManagerProviderGate>
+    );
+  }, []);
 
   useScopeOnFocus('canvas', ref);
 
@@ -36,31 +47,42 @@ export const CanvasTabContent = memo(() => {
       justifyContent="center"
     >
       <CanvasToolbar />
-      <Flex position="relative" w="full" h="full" bg={dynamicGrid ? 'base.850' : 'base.900'} borderRadius="base">
-        {!dynamicGrid && (
+      <ContextMenu<HTMLDivElement> renderMenu={renderMenu}>
+        {(ref) => (
           <Flex
-            position="absolute"
+            ref={ref}
+            position="relative"
+            w="full"
+            h="full"
+            bg={dynamicGrid ? 'base.850' : 'base.900'}
             borderRadius="base"
-            bgImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL}
-            top={0}
-            right={0}
-            bottom={0}
-            left={0}
-            opacity={0.1}
-          />
-        )}
-        <InvokeCanvasComponent />
-        <CanvasManagerProviderGate>
-          {showHUD && (
-            <Flex position="absolute" top={1} insetInlineStart={1} pointerEvents="none">
-              <CanvasHUD />
-            </Flex>
-          )}
-          <Flex position="absolute" top={1} insetInlineEnd={1} pointerEvents="none">
-            <CanvasSelectedEntityStatusAlert />
+          >
+            {!dynamicGrid && (
+              <Flex
+                position="absolute"
+                borderRadius="base"
+                bgImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL}
+                top={0}
+                right={0}
+                bottom={0}
+                left={0}
+                opacity={0.1}
+              />
+            )}
+            <InvokeCanvasComponent />
+            <CanvasManagerProviderGate>
+              {showHUD && (
+                <Flex position="absolute" top={1} insetInlineStart={1} pointerEvents="none">
+                  <CanvasHUD />
+                </Flex>
+              )}
+              <Flex position="absolute" top={1} insetInlineEnd={1} pointerEvents="none">
+                <CanvasSelectedEntityStatusAlert />
+              </Flex>
+            </CanvasManagerProviderGate>
           </Flex>
-        </CanvasManagerProviderGate>
-      </Flex>
+        )}
+      </ContextMenu>
       <Flex position="absolute" bottom={4} gap={2} align="center" justify="center">
         <CanvasManagerProviderGate>
           <StagingAreaIsStagingGate>
