@@ -36,7 +36,7 @@ from invokeai.app.invocations.t2i_adapter import T2IAdapterField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import prepare_control_image
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.lora.lora import LoRAModelRaw
+from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.model_manager import BaseModelType, ModelVariantType
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.stable_diffusion import PipelineIntermediateState
