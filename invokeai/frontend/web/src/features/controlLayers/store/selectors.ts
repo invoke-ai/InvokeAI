@@ -29,7 +29,7 @@ export const selectCanvasSlice = (state: RootState) => state.canvas.present;
  *
  * All entities are counted, regardless of their state.
  */
-export const selectEntityCountAll = createSelector(selectCanvasSlice, (canvas) => {
+const selectEntityCountAll = createSelector(selectCanvasSlice, (canvas) => {
   return (
     canvas.regions.entities.length +
     canvas.ipAdapters.entities.length +
