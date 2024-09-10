@@ -3,6 +3,7 @@ from typing import Dict, Optional
 import torch
 
 from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
+from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
 class NormLayer(LoRALayerBase):
@@ -27,7 +28,7 @@ class NormLayer(LoRALayerBase):
 
     def calc_size(self) -> int:
         model_size = super().calc_size()
-        model_size += self.weight.nelement() * self.weight.element_size()
+        model_size += calc_tensor_size(self.weight)
         return model_size
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
