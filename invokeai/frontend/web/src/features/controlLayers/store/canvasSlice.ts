@@ -118,7 +118,7 @@ const initialState: CanvasState = {
   },
   inpaintMasks: {
     isHidden: false,
-    entities: [initialInpaintMaskState],
+    entities: [deepClone(initialInpaintMaskState)],
   },
   regions: {
     isHidden: false,
