@@ -49,20 +49,24 @@ export const selectDefaultControlAdapter = createSelector(
   }
 );
 
-const selectDefaultIPAdapter = createSelector(selectModelConfigsQuery, selectBase, (query, base): IPAdapterConfig => {
-  const { data } = query;
-  let model: IPAdapterModelConfig | null = null;
-  if (data) {
-    const modelConfigs = modelConfigsAdapterSelectors.selectAll(data).filter(isIPAdapterModelConfig);
-    const compatibleModels = modelConfigs.filter((m) => (base ? m.base === base : true));
-    model = compatibleModels[0] ?? modelConfigs[0] ?? null;
+export const selectDefaultIPAdapter = createSelector(
+  selectModelConfigsQuery,
+  selectBase,
+  (query, base): IPAdapterConfig => {
+    const { data } = query;
+    let model: IPAdapterModelConfig | null = null;
+    if (data) {
+      const modelConfigs = modelConfigsAdapterSelectors.selectAll(data).filter(isIPAdapterModelConfig);
+      const compatibleModels = modelConfigs.filter((m) => (base ? m.base === base : true));
+      model = compatibleModels[0] ?? modelConfigs[0] ?? null;
+    }
+    const ipAdapter = deepClone(initialIPAdapter);
+    if (model) {
+      ipAdapter.model = zModelIdentifierField.parse(model);
+    }
+    return ipAdapter;
   }
-  const ipAdapter = deepClone(initialIPAdapter);
-  if (model) {
-    ipAdapter.model = zModelIdentifierField.parse(model);
-  }
-  return ipAdapter;
-});
+);
 
 export const useAddControlLayer = () => {
   const dispatch = useAppDispatch();
