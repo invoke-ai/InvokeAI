@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { RootState } from 'app/store/store';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, PendingConnection, Templates } from 'features/nodes/store/types';
 import { buildRejectResult, validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { Edge, HandleType } from 'reactflow';

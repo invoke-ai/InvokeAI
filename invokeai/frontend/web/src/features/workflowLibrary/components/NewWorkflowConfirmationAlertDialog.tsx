@@ -1,7 +1,7 @@
 import { ConfirmationAlertDialog, Flex, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
-import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowIsTouched, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +14,7 @@ export const NewWorkflowConfirmationAlertDialog = memo((props: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const isTouched = useAppSelector((s) => s.workflow.isTouched);
+  const isTouched = useAppSelector(selectWorkflowIsTouched);
 
   const handleNewWorkflow = useCallback(() => {
     dispatch(nodeEditorReset());
@@ -46,6 +46,7 @@ export const NewWorkflowConfirmationAlertDialog = memo((props: Props) => {
         onClose={onClose}
         title={t('nodes.newWorkflow')}
         acceptCallback={handleNewWorkflow}
+        useInert={false}
       >
         <Flex flexDir="column" gap={2}>
           <Text>{t('nodes.newWorkflowDesc')}</Text>

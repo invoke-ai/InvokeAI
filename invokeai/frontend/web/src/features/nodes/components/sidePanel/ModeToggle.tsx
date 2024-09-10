@@ -1,13 +1,13 @@
 import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowMode, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold, PiPencilBold } from 'react-icons/pi';
 
 export const ModeToggle = () => {
   const dispatch = useAppDispatch();
-  const mode = useAppSelector((s) => s.workflow.mode);
+  const mode = useAppSelector(selectWorkflowMode);
   const { t } = useTranslation();
 
   const onClickEdit = useCallback(() => {

@@ -13,6 +13,7 @@ import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddl
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
 import ParamPostProcessingModel from 'features/parameters/components/PostProcessing/ParamPostProcessingModel';
+import { selectPostProcessingModel } from 'features/parameters/store/upscaleSlice';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
@@ -25,7 +26,7 @@ type Props = { imageDTO?: ImageDTO };
 export const PostProcessingPopover = memo((props: Props) => {
   const { imageDTO } = props;
   const dispatch = useAppDispatch();
-  const { postProcessingModel } = useAppSelector((s) => s.upscale);
+  const postProcessingModel = useAppSelector(selectPostProcessingModel);
   const inProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();

@@ -27,6 +27,6 @@ export type GalleryState = {
   imageToCompare: ImageDTO | null;
   comparisonMode: ComparisonMode;
   comparisonFit: ComparisonFit;
-  isImageViewerOpen: boolean;
   shouldShowArchivedBoards: boolean;
+  isMiniViewerOpen: boolean;
 };

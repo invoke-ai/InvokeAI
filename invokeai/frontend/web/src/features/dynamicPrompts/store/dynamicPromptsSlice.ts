@@ -1,5 +1,5 @@
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction, Selector } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { z } from 'zod';
 
@@ -72,8 +72,6 @@ export const {
   seedBehaviourChanged,
 } = dynamicPromptsSlice.actions;
 
-export const selectDynamicPromptsSlice = (state: RootState) => state.dynamicPrompts;
-
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateDynamicPromptsState = (state: any): any => {
   if (!('_version' in state)) {
@@ -88,3 +86,23 @@ export const dynamicPromptsPersistConfig: PersistConfig<DynamicPromptsState> = {
   migrate: migrateDynamicPromptsState,
   persistDenylist: ['prompts'],
 };
+
+export const selectDynamicPromptsSlice = (state: RootState) => state.dynamicPrompts;
+const createDynamicPromptsSelector = <T>(selector: Selector<DynamicPromptsState, T>) =>
+  createSelector(selectDynamicPromptsSlice, selector);
+
+export const selectDynamicPromptsMaxPrompts = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.maxPrompts
+);
+export const selectDynamicPromptsCombinatorial = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.combinatorial
+);
+export const selectDynamicPromptsPrompts = createDynamicPromptsSelector((dynamicPrompts) => dynamicPrompts.prompts);
+export const selectDynamicPromptsParsingError = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.parsingError
+);
+export const selectDynamicPromptsIsError = createDynamicPromptsSelector((dynamicPrompts) => dynamicPrompts.isError);
+export const selectDynamicPromptsIsLoading = createDynamicPromptsSelector((dynamicPrompts) => dynamicPrompts.isLoading);
+export const selectDynamicPromptsSeedBehaviour = createDynamicPromptsSelector(
+  (dynamicPrompts) => dynamicPrompts.seedBehaviour
+);

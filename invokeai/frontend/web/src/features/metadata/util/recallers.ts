@@ -1,46 +1,30 @@
 import { getStore } from 'app/store/nanostores/store';
-import { deepClone } from 'common/util/deepClone';
+import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
+import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
-  controlAdapterRecalled,
-  controlNetsReset,
-  ipAdaptersReset,
-  t2iAdaptersReset,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import { getCALayerId, getIPALayerId, getRGLayerId } from 'features/controlLayers/konva/naming';
-import {
-  allLayersDeleted,
-  caLayerRecalled,
-  heightChanged,
-  iiLayerRecalled,
-  ipaLayerRecalled,
   negativePrompt2Changed,
   negativePromptChanged,
   positivePrompt2Changed,
   positivePromptChanged,
-  rgLayerRecalled,
-  widthChanged,
-} from 'features/controlLayers/store/controlLayersSlice';
-import type { Layer } from 'features/controlLayers/store/types';
-import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
-import type { LoRA } from 'features/lora/store/loraSlice';
-import { loraRecalled, lorasReset } from 'features/lora/store/loraSlice';
-import type {
-  ControlNetConfigMetadata,
-  IPAdapterConfigMetadata,
-  MetadataRecallFunc,
-  T2IAdapterConfigMetadata,
-} from 'features/metadata/types';
-import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
-import { modelSelected } from 'features/parameters/store/actions';
-import {
+  refinerModelChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
   setImg2imgStrength,
+  setRefinerCFGScale,
+  setRefinerNegativeAestheticScore,
+  setRefinerPositiveAestheticScore,
+  setRefinerScheduler,
+  setRefinerStart,
+  setRefinerSteps,
   setScheduler,
   setSeed,
   setSteps,
   vaeSelected,
-} from 'features/parameters/store/generationSlice';
+} from 'features/controlLayers/store/paramsSlice';
+import type { LoRA } from 'features/controlLayers/store/types';
+import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
+import type { MetadataRecallFunc } from 'features/metadata/types';
+import { modelSelected } from 'features/parameters/store/actions';
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
@@ -63,17 +47,6 @@ import type {
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
-import {
-  refinerModelChanged,
-  setRefinerCFGScale,
-  setRefinerNegativeAestheticScore,
-  setRefinerPositiveAestheticScore,
-  setRefinerScheduler,
-  setRefinerStart,
-  setRefinerSteps,
-} from 'features/sdxl/store/sdxlSlice';
-import { getImageDTO } from 'services/api/endpoints/images';
-import { v4 as uuidv4 } from 'uuid';
 
 const recallPositivePrompt: MetadataRecallFunc<ParameterPositivePrompt> = (positivePrompt) => {
   getStore().dispatch(positivePromptChanged(positivePrompt));
@@ -110,11 +83,11 @@ const recallScheduler: MetadataRecallFunc<ParameterScheduler> = (scheduler) => {
 const setSizeOptions = { updateAspectRatio: true, clamp: true };
 
 const recallWidth: MetadataRecallFunc<ParameterWidth> = (width) => {
-  getStore().dispatch(widthChanged({ width, ...setSizeOptions }));
+  getStore().dispatch(bboxWidthChanged({ width, ...setSizeOptions }));
 };
 
 const recallHeight: MetadataRecallFunc<ParameterHeight> = (height) => {
-  getStore().dispatch(heightChanged({ height, ...setSizeOptions }));
+  getStore().dispatch(bboxHeightChanged({ height, ...setSizeOptions }));
 };
 
 const recallSteps: MetadataRecallFunc<ParameterSteps> = (steps) => {
@@ -182,155 +155,18 @@ const recallVAE: MetadataRecallFunc<ParameterVAEModel | null | undefined> = (vae
 };
 
 const recallLoRA: MetadataRecallFunc<LoRA> = (lora) => {
-  getStore().dispatch(loraRecalled(lora));
+  getStore().dispatch(loraRecalled({ lora }));
 };
 
 const recallAllLoRAs: MetadataRecallFunc<LoRA[]> = (loras) => {
   const { dispatch } = getStore();
-  dispatch(lorasReset());
+  dispatch(loraAllDeleted());
   if (!loras.length) {
     return;
   }
   loras.forEach((lora) => {
-    dispatch(loraRecalled(lora));
+    dispatch(loraRecalled({ lora }));
   });
-};
-
-const recallControlNet: MetadataRecallFunc<ControlNetConfigMetadata> = (controlNet) => {
-  getStore().dispatch(controlAdapterRecalled(controlNet));
-};
-
-const recallControlNets: MetadataRecallFunc<ControlNetConfigMetadata[]> = (controlNets) => {
-  const { dispatch } = getStore();
-  dispatch(controlNetsReset());
-  if (!controlNets.length) {
-    return;
-  }
-  controlNets.forEach((controlNet) => {
-    dispatch(controlAdapterRecalled(controlNet));
-  });
-};
-
-const recallT2IAdapter: MetadataRecallFunc<T2IAdapterConfigMetadata> = (t2iAdapter) => {
-  getStore().dispatch(controlAdapterRecalled(t2iAdapter));
-};
-
-const recallT2IAdapters: MetadataRecallFunc<T2IAdapterConfigMetadata[]> = (t2iAdapters) => {
-  const { dispatch } = getStore();
-  dispatch(t2iAdaptersReset());
-  if (!t2iAdapters.length) {
-    return;
-  }
-  t2iAdapters.forEach((t2iAdapter) => {
-    dispatch(controlAdapterRecalled(t2iAdapter));
-  });
-};
-
-const recallIPAdapter: MetadataRecallFunc<IPAdapterConfigMetadata> = (ipAdapter) => {
-  getStore().dispatch(controlAdapterRecalled(ipAdapter));
-};
-
-const recallIPAdapters: MetadataRecallFunc<IPAdapterConfigMetadata[]> = (ipAdapters) => {
-  const { dispatch } = getStore();
-  dispatch(ipAdaptersReset());
-  if (!ipAdapters.length) {
-    return;
-  }
-  ipAdapters.forEach((ipAdapter) => {
-    dispatch(controlAdapterRecalled(ipAdapter));
-  });
-};
-
-//#region Control Layers
-const recallLayer: MetadataRecallFunc<Layer> = async (layer) => {
-  const { dispatch } = getStore();
-  // We need to check for the existence of all images and models when recalling. If they do not exist, SMITE THEM!
-  // Also, we need fresh IDs for all objects when recalling, to prevent multiple layers with the same ID.
-  if (layer.type === 'control_adapter_layer') {
-    const clone = deepClone(layer);
-    if (clone.controlAdapter.image) {
-      const imageDTO = await getImageDTO(clone.controlAdapter.image.name);
-      if (!imageDTO) {
-        clone.controlAdapter.image = null;
-      }
-    }
-    if (clone.controlAdapter.processedImage) {
-      const imageDTO = await getImageDTO(clone.controlAdapter.processedImage.name);
-      if (!imageDTO) {
-        clone.controlAdapter.processedImage = null;
-      }
-    }
-    if (clone.controlAdapter.model) {
-      try {
-        await fetchModelConfigByIdentifier(clone.controlAdapter.model);
-      } catch {
-        clone.controlAdapter.model = null;
-      }
-    }
-    clone.id = getCALayerId(uuidv4());
-    clone.controlAdapter.id = uuidv4();
-    dispatch(caLayerRecalled(clone));
-    return;
-  }
-  if (layer.type === 'ip_adapter_layer') {
-    const clone = deepClone(layer);
-    if (clone.ipAdapter.image) {
-      const imageDTO = await getImageDTO(clone.ipAdapter.image.name);
-      if (!imageDTO) {
-        clone.ipAdapter.image = null;
-      }
-    }
-    if (clone.ipAdapter.model) {
-      try {
-        await fetchModelConfigByIdentifier(clone.ipAdapter.model);
-      } catch {
-        clone.ipAdapter.model = null;
-      }
-    }
-    clone.id = getIPALayerId(uuidv4());
-    clone.ipAdapter.id = uuidv4();
-    dispatch(ipaLayerRecalled(clone));
-    return;
-  }
-
-  if (layer.type === 'regional_guidance_layer') {
-    const clone = deepClone(layer);
-    // Strip out the uploaded mask image property - this is an intermediate image
-    clone.uploadedMaskImage = null;
-
-    for (const ipAdapter of clone.ipAdapters) {
-      if (ipAdapter.image) {
-        const imageDTO = await getImageDTO(ipAdapter.image.name);
-        if (!imageDTO) {
-          ipAdapter.image = null;
-        }
-      }
-      if (ipAdapter.model) {
-        try {
-          await fetchModelConfigByIdentifier(ipAdapter.model);
-        } catch {
-          ipAdapter.model = null;
-        }
-      }
-      ipAdapter.id = uuidv4();
-    }
-    clone.id = getRGLayerId(uuidv4());
-    dispatch(rgLayerRecalled(clone));
-    return;
-  }
-
-  if (layer.type === 'initial_image_layer') {
-    dispatch(iiLayerRecalled(layer));
-    return;
-  }
-};
-
-const recallLayers: MetadataRecallFunc<Layer[]> = (layers) => {
-  const { dispatch } = getStore();
-  dispatch(allLayersDeleted());
-  for (const l of layers) {
-    recallLayer(l);
-  }
 };
 
 export const recallers = {
@@ -360,12 +196,4 @@ export const recallers = {
   vae: recallVAE,
   lora: recallLoRA,
   loras: recallAllLoRAs,
-  controlNets: recallControlNets,
-  controlNet: recallControlNet,
-  t2iAdapters: recallT2IAdapters,
-  t2iAdapter: recallT2IAdapter,
-  ipAdapters: recallIPAdapters,
-  ipAdapter: recallIPAdapter,
-  layer: recallLayer,
-  layers: recallLayers,
 } as const;

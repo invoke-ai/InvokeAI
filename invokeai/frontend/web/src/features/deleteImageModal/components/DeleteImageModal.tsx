@@ -1,9 +1,8 @@
 import { ConfirmationAlertDialog, Divider, Flex, FormControl, FormLabel, Switch, Text } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
-import { selectControlAdaptersSlice } from 'features/controlAdapters/store/controlAdaptersSlice';
-import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { getImageUsage, selectImageUsage } from 'features/deleteImageModal/store/selectors';
 import {
@@ -12,8 +11,8 @@ import {
   selectDeleteImageModalSlice,
 } from 'features/deleteImageModal/store/slice';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
-import { selectNodesSlice } from 'features/nodes/store/nodesSlice';
-import { setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectSystemSlice, setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 import { some } from 'lodash-es';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
@@ -22,26 +21,17 @@ import { useTranslation } from 'react-i18next';
 import ImageUsageMessage from './ImageUsageMessage';
 
 const selectImageUsages = createMemoizedSelector(
-  [
-    selectDeleteImageModalSlice,
-    selectCanvasSlice,
-    selectNodesSlice,
-    selectControlAdaptersSlice,
-    selectControlLayersSlice,
-    selectImageUsage,
-  ],
-  (deleteImageModal, canvas, nodes, controlAdapters, controlLayers, imagesUsage) => {
+  [selectDeleteImageModalSlice, selectNodesSlice, selectCanvasSlice, selectImageUsage],
+  (deleteImageModal, nodes, canvas, imagesUsage) => {
     const { imagesToDelete } = deleteImageModal;
 
-    const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) =>
-      getImageUsage(canvas, nodes, controlAdapters, controlLayers.present, image_name)
-    );
+    const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) => getImageUsage(nodes, canvas, image_name));
 
     const imageUsageSummary: ImageUsage = {
-      isCanvasImage: some(allImageUsage, (i) => i.isCanvasImage),
+      isLayerImage: some(allImageUsage, (i) => i.isLayerImage),
       isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
-      isControlImage: some(allImageUsage, (i) => i.isControlImage),
-      isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
+      isControlAdapterImage: some(allImageUsage, (i) => i.isControlAdapterImage),
+      isIPAdapterImage: some(allImageUsage, (i) => i.isIPAdapterImage),
     };
 
     return {
@@ -52,11 +42,17 @@ const selectImageUsages = createMemoizedSelector(
   }
 );
 
+const selectShouldConfirmOnDelete = createSelector(selectSystemSlice, (system) => system.shouldConfirmOnDelete);
+const selectIsModalOpen = createSelector(
+  selectDeleteImageModalSlice,
+  (deleteImageModal) => deleteImageModal.isModalOpen
+);
+
 const DeleteImageModal = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const shouldConfirmOnDelete = useAppSelector((s) => s.system.shouldConfirmOnDelete);
-  const isModalOpen = useAppSelector((s) => s.deleteImageModal.isModalOpen);
+  const shouldConfirmOnDelete = useAppSelector(selectShouldConfirmOnDelete);
+  const isModalOpen = useAppSelector(selectIsModalOpen);
   const { imagesToDelete, imagesUsage, imageUsageSummary } = useAppSelector(selectImageUsages);
 
   const handleChangeShouldConfirmOnDelete = useCallback(
@@ -85,6 +81,7 @@ const DeleteImageModal = () => {
       cancelButtonText={t('boards.cancel')}
       acceptButtonText={t('controlnet.delete')}
       acceptCallback={handleDelete}
+      useInert={false}
     >
       <Flex direction="column" gap={3}>
         <ImageUsageMessage imageUsage={imageUsageSummary} />

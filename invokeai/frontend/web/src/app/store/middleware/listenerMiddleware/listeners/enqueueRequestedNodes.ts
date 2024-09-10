@@ -1,5 +1,6 @@
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { buildNodesGraph } from 'features/nodes/util/graph/buildNodesGraph';
 import { buildWorkflowWithValidation } from 'features/nodes/util/workflow/buildWorkflow';
 import { queueApi } from 'services/api/endpoints/queue';
@@ -11,12 +12,12 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
       enqueueRequested.match(action) && action.payload.tabName === 'workflows',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
-      const { nodes, edges } = state.nodes.present;
+      const nodes = selectNodesSlice(state);
       const workflow = state.workflow;
-      const graph = buildNodesGraph(state.nodes.present);
+      const graph = buildNodesGraph(nodes);
       const builtWorkflow = buildWorkflowWithValidation({
-        nodes,
-        edges,
+        nodes: nodes.nodes,
+        edges: nodes.edges,
         workflow,
       });
 
@@ -29,7 +30,9 @@ export const addEnqueueRequestedNodes = (startAppListening: AppStartListening) =
         batch: {
           graph,
           workflow: builtWorkflow,
-          runs: state.generation.iterations,
+          runs: state.params.iterations,
+          origin: 'workflows',
+          destination: 'gallery',
         },
         prepend: action.payload.prepend,
       };

@@ -1,9 +1,10 @@
 import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { preventDefault } from 'common/util/stopPropagation';
-import type { Dimensions } from 'features/canvas/store/canvasTypes';
-import { TRANSPARENCY_CHECKER_PATTERN } from 'features/controlLayers/konva/constants';
+import { TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
+import type { Dimensions } from 'features/controlLayers/store/types';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
+import { selectComparisonFit } from 'features/gallery/store/gallerySelectors';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
@@ -19,7 +20,7 @@ const HANDLE_INNER_LEFT_PX = `${HANDLE_HITBOX / 2 - HANDLE_WIDTH / 2}px`;
 const HANDLE_LEFT_INITIAL_PX = `calc(${INITIAL_POS} - ${HANDLE_HITBOX / 2}px)`;
 
 export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerDims }: ComparisonProps) => {
-  const comparisonFit = useAppSelector((s) => s.gallery.comparisonFit);
+  const comparisonFit = useAppSelector(selectComparisonFit);
   // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
   const [left, setLeft] = useState(HANDLE_LEFT_INITIAL_PX);
   // How wide the first image is
@@ -120,7 +121,7 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerD
             left={0}
             right={0}
             bottom={0}
-            backgroundImage={TRANSPARENCY_CHECKER_PATTERN}
+            backgroundImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL}
             backgroundRepeat="repeat"
             opacity={0.2}
           />

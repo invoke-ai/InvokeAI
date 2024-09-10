@@ -1,6 +1,7 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectAutoAddBoardId, selectAutoAssignBoardOnClick } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,8 +10,8 @@ import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 const BoardAutoAddSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
-  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
+  const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const { options, hasBoards } = useListAllBoardsQuery(
     {},
     {

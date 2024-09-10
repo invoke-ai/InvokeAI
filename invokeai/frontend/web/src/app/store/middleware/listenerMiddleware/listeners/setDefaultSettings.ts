@@ -1,6 +1,5 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
-import { setDefaultSettings } from 'features/parameters/store/actions';
+import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
 import {
   setCfgRescaleMultiplier,
   setCfgScale,
@@ -8,7 +7,8 @@ import {
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
-} from 'features/parameters/store/generationSlice';
+} from 'features/controlLayers/store/paramsSlice';
+import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
@@ -30,7 +30,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
     effect: async (action, { dispatch, getState }) => {
       const state = getState();
 
-      const currentModel = state.generation.model;
+      const currentModel = state.params.model;
 
       if (!currentModel) {
         return;
@@ -98,13 +98,13 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
         if (width) {
           if (isParameterWidth(width)) {
-            dispatch(widthChanged({ width, ...setSizeOptions }));
+            dispatch(bboxWidthChanged({ width, ...setSizeOptions }));
           }
         }
 
         if (height) {
           if (isParameterHeight(height)) {
-            dispatch(heightChanged({ height, ...setSizeOptions }));
+            dispatch(bboxHeightChanged({ height, ...setSizeOptions }));
           }
         }
 

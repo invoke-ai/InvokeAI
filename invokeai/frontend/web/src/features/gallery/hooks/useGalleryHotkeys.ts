@@ -1,27 +1,35 @@
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { isStagingSelector } from 'features/canvas/store/canvasSelectors';
+import { $activeScopes } from 'common/hooks/interactionScopes';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
-import { useMemo } from 'react';
+import { $isRightPanelOpen } from 'features/ui/store/uiSlice';
+import { computed } from 'nanostores';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useListImagesQuery } from 'services/api/endpoints/images';
+
+const $leftRightHotkeysEnabled = computed($activeScopes, (activeScopes) => {
+  // The left and right hotkeys can be used when the gallery is focused and the canvas is not focused, OR when the image viewer is focused.
+  return !activeScopes.has('canvas') || activeScopes.has('imageViewer');
+});
+
+const $upDownHotkeysEnabled = computed([$activeScopes, $isRightPanelOpen], (activeScopes, isGalleryPanelOpen) => {
+  // The up and down hotkeys can be used when the gallery is focused and the canvas is not focused, and the gallery panel is open.
+  return !activeScopes.has('canvas') && isGalleryPanelOpen;
+});
 
 /**
  * Registers gallery hotkeys. This hook is a singleton.
  */
 export const useGalleryHotkeys = () => {
-  const activeTabName = useAppSelector(activeTabNameSelector);
-  const isStaging = useAppSelector(isStagingSelector);
-  // block navigation on Unified Canvas tab when staging new images
-  const canNavigateGallery = useMemo(() => {
-    return activeTabName !== 'canvas' || !isStaging;
-  }, [activeTabName, isStaging]);
-
+  useAssertSingleton('useGalleryHotkeys');
   const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const queryResult = useListImagesQuery(queryArgs);
+  const leftRightHotkeysEnabled = useStore($leftRightHotkeysEnabled);
+  const upDownHotkeysEnabled = useStore($upDownHotkeysEnabled);
 
   const {
     handleLeftImage,
@@ -41,17 +49,15 @@ export const useGalleryHotkeys = () => {
         goPrev(e.altKey ? 'alt+arrow' : 'arrow');
         return;
       }
-      canNavigateGallery && handleLeftImage(e.altKey);
+      handleLeftImage(e.altKey);
     },
-    [handleLeftImage, canNavigateGallery, isOnFirstImageOfView, goPrev, isPrevEnabled, queryResult.isFetching]
+    { preventDefault: true, enabled: leftRightHotkeysEnabled },
+    [handleLeftImage, isOnFirstImageOfView, goPrev, isPrevEnabled, queryResult.isFetching, leftRightHotkeysEnabled]
   );
 
   useHotkeys(
     ['right', 'alt+right'],
     (e) => {
-      if (!canNavigateGallery) {
-        return;
-      }
       if (isOnLastImageOfView && isNextEnabled && !queryResult.isFetching) {
         goNext(e.altKey ? 'alt+arrow' : 'arrow');
         return;
@@ -60,7 +66,8 @@ export const useGalleryHotkeys = () => {
         handleRightImage(e.altKey);
       }
     },
-    [isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage, canNavigateGallery]
+    { preventDefault: true, enabled: leftRightHotkeysEnabled },
+    [isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage, leftRightHotkeysEnabled]
   );
 
   useHotkeys(
@@ -72,8 +79,8 @@ export const useGalleryHotkeys = () => {
       }
       handleUpImage(e.altKey);
     },
-    { preventDefault: true },
-    [handleUpImage, canNavigateGallery, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching]
+    { preventDefault: true, enabled: upDownHotkeysEnabled },
+    [handleUpImage, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching, upDownHotkeysEnabled]
   );
 
   useHotkeys(
@@ -85,7 +92,7 @@ export const useGalleryHotkeys = () => {
       }
       handleDownImage(e.altKey);
     },
-    { preventDefault: true },
-    [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage]
+    { preventDefault: true, enabled: upDownHotkeysEnabled },
+    [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage, upDownHotkeysEnabled]
   );
 };

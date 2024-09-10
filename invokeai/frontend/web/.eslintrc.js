@@ -12,6 +12,18 @@ module.exports = {
     'i18next/no-literal-string': 'error',
     // https://eslint.org/docs/latest/rules/no-console
     'no-console': 'error',
+    // https://eslint.org/docs/latest/rules/no-promise-executor-return
+    'no-promise-executor-return': 'error',
+    // https://eslint.org/docs/latest/rules/require-await
+    'require-await': 'error',
+    'no-restricted-properties': [
+      'error',
+      {
+        object: 'crypto',
+        property: 'randomUUID',
+        message: 'Use of crypto.randomUUID is not allowed as it is not available in all browsers.',
+      },
+    ],
   },
   overrides: [
     /**

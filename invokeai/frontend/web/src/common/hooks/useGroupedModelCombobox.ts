@@ -1,6 +1,8 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { groupBy, reduce } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
@@ -28,11 +30,13 @@ const groupByBaseFunc = <T extends AnyModelConfig>(model: T) => model.base.toUpp
 const groupByBaseAndTypeFunc = <T extends AnyModelConfig>(model: T) =>
   `${model.base.toUpperCase()} / ${model.type.replaceAll('_', ' ').toUpperCase()}`;
 
+const selectBaseWithSDXLFallback = createSelector(selectParamsSlice, (params) => params.model?.base ?? 'sdxl');
+
 export const useGroupedModelCombobox = <T extends AnyModelConfig>(
   arg: UseGroupedModelComboboxArg<T>
 ): UseGroupedModelComboboxReturn => {
   const { t } = useTranslation();
-  const base_model = useAppSelector((s) => s.generation.model?.base ?? 'sdxl');
+  const base = useAppSelector(selectBaseWithSDXLFallback);
   const { modelConfigs, selectedModel, getIsDisabled, onChange, isLoading, groupByType = false } = arg;
   const options = useMemo<GroupBase<ComboboxOption>[]>(() => {
     if (!modelConfigs) {
@@ -54,9 +58,9 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
       },
       [] as GroupBase<ComboboxOption>[]
     );
-    _options.sort((a) => (a.label?.split('/')[0]?.toLowerCase().includes(base_model) ? -1 : 1));
+    _options.sort((a) => (a.label?.split('/')[0]?.toLowerCase().includes(base) ? -1 : 1));
     return _options;
-  }, [modelConfigs, groupByType, getIsDisabled, base_model]);
+  }, [modelConfigs, groupByType, getIsDisabled, base]);
 
   const value = useMemo(
     () =>

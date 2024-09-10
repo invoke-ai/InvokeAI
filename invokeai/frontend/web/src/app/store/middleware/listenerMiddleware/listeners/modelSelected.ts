@@ -1,23 +1,18 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import {
-  controlAdapterIsEnabledChanged,
-  selectControlAdapterAll,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import { loraRemoved } from 'features/lora/store/loraSlice';
+import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
+import { modelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { modelSelected } from 'features/parameters/store/actions';
-import { modelChanged, vaeSelected } from 'features/parameters/store/generationSlice';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { forEach } from 'lodash-es';
+
+const log = logger('models');
 
 export const addModelSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     actionCreator: modelSelected,
     effect: (action, { getState, dispatch }) => {
-      const log = logger('models');
-
       const state = getState();
       const result = zParameterModel.safeParse(action.payload);
 
@@ -29,34 +24,36 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       const newModel = result.data;
 
       const newBaseModel = newModel.base;
-      const didBaseModelChange = state.generation.model?.base !== newBaseModel;
+      const didBaseModelChange = state.params.model?.base !== newBaseModel;
 
       if (didBaseModelChange) {
         // we may need to reset some incompatible submodels
         let modelsCleared = 0;
 
         // handle incompatible loras
-        forEach(state.lora.loras, (lora, id) => {
+        state.loras.loras.forEach((lora) => {
           if (lora.model.base !== newBaseModel) {
-            dispatch(loraRemoved(id));
+            dispatch(loraDeleted({ id: lora.id }));
             modelsCleared += 1;
           }
         });
 
         // handle incompatible vae
-        const { vae } = state.generation;
+        const { vae } = state.params;
         if (vae && vae.base !== newBaseModel) {
           dispatch(vaeSelected(null));
           modelsCleared += 1;
         }
 
         // handle incompatible controlnets
-        selectControlAdapterAll(state.controlAdapters).forEach((ca) => {
-          if (ca.model?.base !== newBaseModel) {
-            dispatch(controlAdapterIsEnabledChanged({ id: ca.id, isEnabled: false }));
-            modelsCleared += 1;
-          }
-        });
+        // state.canvas.present.controlAdapters.entities.forEach((ca) => {
+        //   if (ca.model?.base !== newBaseModel) {
+        //     modelsCleared += 1;
+        //     if (ca.isEnabled) {
+        //       dispatch(entityIsEnabledToggled({ entityIdentifier: { id: ca.id, type: 'control_adapter' } }));
+        //     }
+        //   }
+        // });
 
         if (modelsCleared > 0) {
           toast({
@@ -70,7 +67,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
-      dispatch(modelChanged(newModel, state.generation.model));
+      dispatch(modelChanged({ model: newModel, previousModel: state.params.model }));
     },
   });
 };

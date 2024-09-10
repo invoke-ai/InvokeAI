@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { parseify } from 'common/util/serialize';
+import { $nodeExecutionStates } from 'features/nodes/hooks/useExecutionState';
 import { workflowLoaded, workflowLoadRequested } from 'features/nodes/store/actions';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { $needsFit } from 'features/nodes/store/reactFlowInstance';
@@ -10,10 +10,13 @@ import { graphToWorkflow } from 'features/nodes/util/workflow/graphToWorkflow';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
+import { serializeError } from 'serialize-error';
 import { checkBoardAccess, checkImageAccess, checkModelAccess } from 'services/api/hooks/accessChecks';
 import type { GraphAndWorkflowResponse, NonNullableGraph } from 'services/api/types';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
+
+const log = logger('workflows');
 
 const getWorkflow = async (data: GraphAndWorkflowResponse, templates: Templates) => {
   if (data.workflow) {
@@ -34,7 +37,6 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
   startAppListening({
     actionCreator: workflowLoadRequested,
     effect: async (action, { dispatch }) => {
-      const log = logger('nodes');
       const { data, asCopy } = action.payload;
       const nodeTemplates = $templates.get();
 
@@ -46,6 +48,7 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
           delete workflow.id;
         }
 
+        $nodeExecutionStates.set({});
         dispatch(workflowLoaded(workflow));
         if (!warnings.length) {
           toast({
@@ -69,7 +72,7 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
       } catch (e) {
         if (e instanceof WorkflowVersionError) {
           // The workflow version was not recognized in the valid list of versions
-          log.error({ error: parseify(e) }, e.message);
+          log.error({ error: serializeError(e) }, e.message);
           toast({
             id: 'UNABLE_TO_VALIDATE_WORKFLOW',
             title: t('nodes.unableToValidateWorkflow'),
@@ -78,7 +81,7 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
           });
         } else if (e instanceof WorkflowMigrationError) {
           // There was a problem migrating the workflow to the latest version
-          log.error({ error: parseify(e) }, e.message);
+          log.error({ error: serializeError(e) }, e.message);
           toast({
             id: 'UNABLE_TO_VALIDATE_WORKFLOW',
             title: t('nodes.unableToValidateWorkflow'),
@@ -90,7 +93,7 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
           const { message } = fromZodError(e, {
             prefix: t('nodes.workflowValidation'),
           });
-          log.error({ error: parseify(e) }, message);
+          log.error({ error: serializeError(e) }, message);
           toast({
             id: 'UNABLE_TO_VALIDATE_WORKFLOW',
             title: t('nodes.unableToValidateWorkflow'),
@@ -99,7 +102,7 @@ export const addWorkflowLoadRequestedListener = (startAppListening: AppStartList
           });
         } else {
           // Some other error occurred
-          log.error({ error: parseify(e) }, t('nodes.unknownErrorValidatingWorkflow'));
+          log.error({ error: serializeError(e) }, t('nodes.unknownErrorValidatingWorkflow'));
           toast({
             id: 'UNABLE_TO_VALIDATE_WORKFLOW',
             title: t('nodes.unableToValidateWorkflow'),

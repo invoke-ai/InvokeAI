@@ -1,5 +1,6 @@
 import { Button, Flex, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { QueueIterationsNumberInput } from 'features/queue/components/QueueIterationsNumberInput';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import { memo } from 'react';
@@ -11,10 +12,10 @@ const invoke = 'Invoke';
 
 export const InvokeQueueBackButton = memo(() => {
   const { queueBack, isLoading, isDisabled } = useQueueBack();
-  const isLoadingDynamicPrompts = useAppSelector((s) => s.dynamicPrompts.isLoading);
+  const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
 
   return (
-    <Flex pos="relative" flexGrow={1} minW="240px">
+    <Flex pos="relative" w="240px">
       <QueueIterationsNumberInput />
       <QueueButtonTooltip>
         <Button
@@ -24,7 +25,6 @@ export const InvokeQueueBackButton = memo(() => {
           isDisabled={isDisabled}
           rightIcon={<RiSparkling2Fill />}
           variant="solid"
-          zIndex={1}
           colorScheme="invokeYellow"
           size="lg"
           w="calc(100% - 60px)"

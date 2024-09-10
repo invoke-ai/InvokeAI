@@ -1,11 +1,10 @@
 import type { ChakraProps, ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
-import { selectLoraSlice } from 'features/lora/store/loraSlice';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
+import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
+import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import type { PromptTriggerSelectProps } from 'features/prompt/types';
 import { t } from 'i18next';
 import { flatten, map } from 'lodash-es';
@@ -17,14 +16,11 @@ import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 const noOptionsMessage = () => t('prompt.noMatchingTriggers');
 
-const selectLoRAs = createMemoizedSelector(selectLoraSlice, (loras) => loras.loras);
-const selectMainModel = createMemoizedSelector(selectGenerationSlice, (generation) => generation.model);
-
 export const PromptTriggerSelect = memo(({ onSelect, onClose }: PromptTriggerSelectProps) => {
   const { t } = useTranslation();
 
-  const mainModel = useAppSelector(selectMainModel);
-  const addedLoRAs = useAppSelector(selectLoRAs);
+  const mainModel = useAppSelector(selectModel);
+  const addedLoRAs = useAppSelector(selectAddedLoRAs);
   const { data: mainModelConfig, isLoading: isLoadingMainModelConfig } = useGetModelConfigQuery(
     mainModel?.key ?? skipToken
   );

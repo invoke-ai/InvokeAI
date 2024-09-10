@@ -6,17 +6,50 @@ import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import type { MouseEvent, ReactElement, ReactNode, SyntheticEvent } from 'react';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { PiImageBold, PiUploadSimpleBold } from 'react-icons/pi';
 import type { ImageDTO, PostUploadAction } from 'services/api/types';
 
 import IAIDraggable from './IAIDraggable';
 import IAIDroppable from './IAIDroppable';
-import SelectionOverlay from './SelectionOverlay';
 
 const defaultUploadElement = <Icon as={PiUploadSimpleBold} boxSize={16} />;
 
 const defaultNoContentFallback = <IAINoContentFallback icon={PiImageBold} />;
+
+const sx: SystemStyleObject = {
+  '.gallery-image-container::before': {
+    content: '""',
+    display: 'inline-block',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+    borderRadius: 'base',
+  },
+  '&[data-selected="selected"]>.gallery-image-container::before': {
+    boxShadow:
+      'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-500), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
+  },
+  '&[data-selected="selectedForCompare"]>.gallery-image-container::before': {
+    boxShadow:
+      'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-300), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
+  },
+  '&:hover>.gallery-image-container::before': {
+    boxShadow:
+      'inset 0px 0px 0px 2px var(--invoke-colors-invokeBlue-300), inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-800)',
+  },
+  '&:hover[data-selected="selected"]>.gallery-image-container::before': {
+    boxShadow:
+      'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-400), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
+  },
+  '&:hover[data-selected="selectedForCompare"]>.gallery-image-container::before': {
+    boxShadow:
+      'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-200), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
+  },
+};
 
 type IAIDndImageProps = FlexProps & {
   imageDTO: ImageDTO | undefined;
@@ -75,13 +108,11 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     ...rest
   } = props;
 
-  const [isHovered, setIsHovered] = useState(false);
   const handleMouseOver = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       if (onMouseOver) {
         onMouseOver(e);
       }
-      setIsHovered(true);
     },
     [onMouseOver]
   );
@@ -90,7 +121,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
       if (onMouseOut) {
         onMouseOut(e);
       }
-      setIsHovered(false);
     },
     [onMouseOut]
   );
@@ -141,10 +171,13 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           minH={minSize ? minSize : undefined}
           userSelect="none"
           cursor={isDragDisabled || !imageDTO ? 'default' : 'pointer'}
+          sx={withHoverOverlay ? sx : undefined}
+          data-selected={isSelectedForCompare ? 'selectedForCompare' : isSelected ? 'selected' : undefined}
           {...rest}
         >
           {imageDTO && (
             <Flex
+              className="gallery-image-container"
               w="full"
               h="full"
               position={fitContainer ? 'absolute' : 'relative'}
@@ -167,11 +200,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
                 data-testid={dataTestId}
               />
               {withMetadataOverlay && <ImageMetadataOverlay imageDTO={imageDTO} />}
-              <SelectionOverlay
-                isSelected={isSelected}
-                isSelectedForCompare={isSelectedForCompare}
-                isHovered={withHoverOverlay ? isHovered : false}
-              />
             </Flex>
           )}
           {!imageDTO && !isUploadDisabled && (

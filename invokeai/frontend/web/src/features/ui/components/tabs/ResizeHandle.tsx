@@ -17,7 +17,6 @@ const ResizeHandle = (props: ResizeHandleProps) => {
     <ChakraPanelResizeHandle {...rest}>
       <Flex sx={sx} data-orientation={orientation}>
         <Box className="resize-handle-inner" data-orientation={orientation} />
-        <Box className="resize-handle-drag-handle" data-orientation={orientation} />
       </Flex>
     </ChakraPanelResizeHandle>
   );
@@ -58,23 +57,5 @@ const sx: SystemStyleObject = {
     borderRadius: 'base',
     transitionProperty: 'inherit',
     transitionDuration: 'inherit',
-  },
-  '.resize-handle-drag-handle': {
-    pos: 'absolute',
-    borderRadius: '1px',
-    transitionProperty: 'inherit',
-    transitionDuration: 'inherit',
-    '&[data-orientation="horizontal"]': {
-      w: '30px',
-      h: '6px',
-      insetInlineStart: '50%',
-      transform: 'translate(-50%, 0)',
-    },
-    '&[data-orientation="vertical"]': {
-      w: '6px',
-      h: '30px',
-      insetBlockStart: '50%',
-      transform: 'translate(0, -50%)',
-    },
   },
 };

@@ -3,6 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { $pendingConnection } from 'features/nodes/store/nodesSlice';
+import { selectShouldAnimateEdges, selectShouldColorEdges } from 'features/nodes/store/workflowSettingsSlice';
 import type { CSSProperties } from 'react';
 import { memo, useMemo } from 'react';
 import type { ConnectionLineComponentProps } from 'reactflow';
@@ -12,8 +13,8 @@ const pathStyles: CSSProperties = { opacity: 0.8 };
 
 const CustomConnectionLine = ({ fromX, fromY, fromPosition, toX, toY, toPosition }: ConnectionLineComponentProps) => {
   const pendingConnection = useStore($pendingConnection);
-  const shouldColorEdges = useAppSelector((state) => state.workflowSettings.shouldColorEdges);
-  const shouldAnimateEdges = useAppSelector((state) => state.workflowSettings.shouldAnimateEdges);
+  const shouldColorEdges = useAppSelector(selectShouldColorEdges);
+  const shouldAnimateEdges = useAppSelector(selectShouldAnimateEdges);
   const stroke = useMemo(() => {
     if (shouldColorEdges && pendingConnection) {
       return getFieldColor(pendingConnection.fieldTemplate.type);

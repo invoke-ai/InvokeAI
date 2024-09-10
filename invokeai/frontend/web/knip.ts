@@ -9,6 +9,10 @@ const config: KnipConfig = {
     'src/services/api/schema.ts',
     'src/features/nodes/types/v1/**',
     'src/features/nodes/types/v2/**',
+    // TODO(psyche): maybe we can clean up these utils after canvas v2 release
+    'src/features/controlLayers/konva/util.ts',
+    // TODO(psyche): restore HRF functionality?
+    'src/features/hrf/**',
   ],
   ignoreBinaries: ['only-allow'],
   paths: {

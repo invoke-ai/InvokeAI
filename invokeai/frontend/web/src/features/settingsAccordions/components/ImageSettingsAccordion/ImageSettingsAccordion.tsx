@@ -1,65 +1,47 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
 import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCanvasSlice } from 'features/canvas/store/canvasSlice';
-import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
-import { HrfSettings } from 'features/hrf/components/HrfSettings';
-import { selectHrfSlice } from 'features/hrf/store/hrfSlice';
-import ParamScaleBeforeProcessing from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaleBeforeProcessing';
-import ParamScaledHeight from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledHeight';
-import ParamScaledWidth from 'features/parameters/components/Canvas/InfillAndScaling/ParamScaledWidth';
-import ParamImageToImageStrength from 'features/parameters/components/Canvas/ParamImageToImageStrength';
+import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import BboxScaledHeight from 'features/parameters/components/Bbox/BboxScaledHeight';
+import BboxScaledWidth from 'features/parameters/components/Bbox/BboxScaledWidth';
+import BboxScaleMethod from 'features/parameters/components/Bbox/BboxScaleMethod';
+import { BboxSettings } from 'features/parameters/components/Bbox/BboxSettings';
+import { ParamDenoisingStrength } from 'features/parameters/components/Core/ParamDenoisingStrength';
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ImageSizeCanvas } from './ImageSizeCanvas';
-import { ImageSizeLinear } from './ImageSizeLinear';
+const selectBadges = createMemoizedSelector([selectCanvasSlice, selectParamsSlice], (canvas, params) => {
+  const { shouldRandomizeSeed } = params;
+  const badges: string[] = [];
 
-const selector = createMemoizedSelector(
-  [selectGenerationSlice, selectCanvasSlice, selectHrfSlice, selectControlLayersSlice, activeTabNameSelector],
-  (generation, canvas, hrf, controlLayers, activeTabName) => {
-    const { shouldRandomizeSeed, model } = generation;
-    const { hrfEnabled } = hrf;
-    const badges: string[] = [];
-    const isSDXL = model?.base === 'sdxl';
+  const { aspectRatio } = canvas.bbox;
+  const { width, height } = canvas.bbox.rect;
 
-    if (activeTabName === 'canvas') {
-      const {
-        aspectRatio,
-        boundingBoxDimensions: { width, height },
-      } = canvas;
-      badges.push(`${width}×${height}`);
-      badges.push(aspectRatio.id);
-      if (aspectRatio.isLocked) {
-        badges.push('locked');
-      }
-    } else {
-      const { aspectRatio, width, height } = controlLayers.present.size;
-      badges.push(`${width}×${height}`);
-      badges.push(aspectRatio.id);
-      if (aspectRatio.isLocked) {
-        badges.push('locked');
-      }
-    }
+  badges.push(`${width}×${height}`);
+  badges.push(aspectRatio.id);
 
-    if (!shouldRandomizeSeed) {
-      badges.push('Manual Seed');
-    }
-
-    if (hrfEnabled && !isSDXL) {
-      badges.push('HiRes Fix');
-    }
-    return { badges, activeTabName, isSDXL };
+  if (aspectRatio.isLocked) {
+    badges.push('locked');
   }
-);
+
+  if (!shouldRandomizeSeed) {
+    badges.push('Manual Seed');
+  }
+
+  if (badges.length === 0) {
+    return EMPTY_ARRAY;
+  }
+
+  badges;
+});
 
 const scalingLabelProps: FormLabelProps = {
   minW: '4.5rem',
@@ -67,7 +49,7 @@ const scalingLabelProps: FormLabelProps = {
 
 export const ImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
-  const { badges, activeTabName, isSDXL } = useAppSelector(selector);
+  const badges = useAppSelector(selectBadges);
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
     id: 'image-settings',
     defaultIsOpen: true,
@@ -85,27 +67,20 @@ export const ImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        <Flex flexDir="column" gap={4}>
-          {activeTabName === 'canvas' ? <ImageSizeCanvas /> : <ImageSizeLinear />}
-          {activeTabName === 'canvas' && <ParamImageToImageStrength />}
+        <BboxSettings />
+        <Flex py={3} gap={4} alignItems="center">
+          <ParamSeedNumberInput />
+          <ParamSeedShuffle />
+          <ParamSeedRandomize />
         </Flex>
+        <ParamDenoisingStrength />
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
-            <Flex gap={4} alignItems="center">
-              <ParamSeedNumberInput />
-              <ParamSeedShuffle />
-              <ParamSeedRandomize />
-            </Flex>
-            {activeTabName === 'generation' && !isSDXL && <HrfSettings />}
-            {activeTabName === 'canvas' && (
-              <>
-                <ParamScaleBeforeProcessing />
-                <FormControlGroup formLabelProps={scalingLabelProps}>
-                  <ParamScaledWidth />
-                  <ParamScaledHeight />
-                </FormControlGroup>
-              </>
-            )}
+            <BboxScaleMethod />
+            <FormControlGroup formLabelProps={scalingLabelProps}>
+              <BboxScaledWidth />
+              <BboxScaledHeight />
+            </FormControlGroup>
           </Flex>
         </Expander>
       </Flex>

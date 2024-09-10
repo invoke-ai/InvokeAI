@@ -2,6 +2,10 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { IconButton, spinAnimation, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useDynamicPromptsModal } from 'features/dynamicPrompts/hooks/useDynamicPromptsModal';
+import {
+  selectDynamicPromptsIsError,
+  selectDynamicPromptsIsLoading,
+} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BsBracesAsterisk } from 'react-icons/bs';
@@ -12,8 +16,8 @@ const loadingStyles: SystemStyleObject = {
 
 export const ShowDynamicPromptsPreviewButton = memo(() => {
   const { t } = useTranslation();
-  const isLoading = useAppSelector((s) => s.dynamicPrompts.isLoading);
-  const isError = useAppSelector((s) => Boolean(s.dynamicPrompts.isError || s.dynamicPrompts.parsingError));
+  const isLoading = useAppSelector(selectDynamicPromptsIsLoading);
+  const isError = useAppSelector(selectDynamicPromptsIsError);
   const { isOpen, onOpen } = useDynamicPromptsModal();
 
   return (

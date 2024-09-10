@@ -10,6 +10,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     BatchStatus,
     CancelByBatchIDsResult,
+    CancelByDestinationResult,
     CancelByQueueIDResult,
     ClearResult,
     EnqueueBatchResult,
@@ -127,8 +128,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
             self.__cursor.executemany(
                 """--sql
-                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values_to_insert,
             )
@@ -417,17 +418,53 @@ class SqliteSessionQueue(SessionQueueBase):
             )
             self.__conn.commit()
             if current_queue_item is not None and current_queue_item.batch_id in batch_ids:
-                batch_status = self.get_batch_status(queue_id=queue_id, batch_id=current_queue_item.batch_id)
-                queue_status = self.get_queue_status(queue_id=queue_id)
-                self.__invoker.services.events.emit_queue_item_status_changed(
-                    current_queue_item, batch_status, queue_status
-                )
+                self._set_queue_item_status(current_queue_item.item_id, "canceled")
         except Exception:
             self.__conn.rollback()
             raise
         finally:
             self.__lock.release()
         return CancelByBatchIDsResult(canceled=count)
+
+    def cancel_by_destination(self, queue_id: str, destination: str) -> CancelByDestinationResult:
+        try:
+            current_queue_item = self.get_current(queue_id)
+            self.__lock.acquire()
+            where = """--sql
+                WHERE
+                  queue_id == ?
+                  AND destination == ?
+                  AND status != 'canceled'
+                  AND status != 'completed'
+                  AND status != 'failed'
+                """
+            params = (queue_id, destination)
+            self.__cursor.execute(
+                f"""--sql
+                SELECT COUNT(*)
+                FROM session_queue
+                {where};
+                """,
+                params,
+            )
+            count = self.__cursor.fetchone()[0]
+            self.__cursor.execute(
+                f"""--sql
+                UPDATE session_queue
+                SET status = 'canceled'
+                {where};
+                """,
+                params,
+            )
+            self.__conn.commit()
+            if current_queue_item is not None and current_queue_item.destination == destination:
+                self._set_queue_item_status(current_queue_item.item_id, "canceled")
+        except Exception:
+            self.__conn.rollback()
+            raise
+        finally:
+            self.__lock.release()
+        return CancelByDestinationResult(canceled=count)
 
     def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
         try:
@@ -541,7 +578,9 @@ class SqliteSessionQueue(SessionQueueBase):
                     started_at,
                     session_id,
                     batch_id,
-                    queue_id
+                    queue_id,
+                    origin,
+                    destination
                 FROM session_queue
                 WHERE queue_id = ?
             """
@@ -621,7 +660,7 @@ class SqliteSessionQueue(SessionQueueBase):
             self.__lock.acquire()
             self.__cursor.execute(
                 """--sql
-                SELECT status, count(*)
+                SELECT status, count(*), origin, destination
                 FROM session_queue
                 WHERE
                   queue_id = ?
@@ -633,6 +672,8 @@ class SqliteSessionQueue(SessionQueueBase):
             result = cast(list[sqlite3.Row], self.__cursor.fetchall())
             total = sum(row[1] for row in result)
             counts: dict[str, int] = {row[0]: row[1] for row in result}
+            origin = result[0]["origin"] if result else None
+            destination = result[0]["destination"] if result else None
         except Exception:
             self.__conn.rollback()
             raise
@@ -641,6 +682,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
         return BatchStatus(
             batch_id=batch_id,
+            origin=origin,
+            destination=destination,
             queue_id=queue_id,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),

@@ -1,4 +1,4 @@
-import { WATERMARKER } from 'features/nodes/util/graph/constants';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation } from 'services/api/types';
 
@@ -10,20 +10,12 @@ import type { Invocation } from 'services/api/types';
  */
 export const addWatermarker = (
   g: Graph,
-  imageOutput: Invocation<'l2i'> | Invocation<'img_nsfw'> | Invocation<'img_watermark'>
+  imageOutput: Invocation<'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop'>
 ): Invocation<'img_watermark'> => {
   const watermark = g.addNode({
-    id: WATERMARKER,
     type: 'img_watermark',
-    is_intermediate: imageOutput.is_intermediate,
-    board: imageOutput.board,
-    use_cache: false,
+    id: getPrefixedId('watermarker'),
   });
-
-  // The watermarker node is the new image output - make the previous one intermediate
-  imageOutput.is_intermediate = true;
-  imageOutput.use_cache = true;
-  imageOutput.board = undefined;
 
   g.addEdge(imageOutput, 'image', watermark, 'image');
 

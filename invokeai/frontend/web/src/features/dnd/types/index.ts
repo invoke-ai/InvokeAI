@@ -18,48 +18,27 @@ type BaseDropData = {
   id: string;
 };
 
-export type CurrentImageDropData = BaseDropData & {
-  actionType: 'SET_CURRENT_IMAGE';
-};
-
-type ControlAdapterDropData = BaseDropData & {
-  actionType: 'SET_CONTROL_ADAPTER_IMAGE';
+export type IPAImageDropData = BaseDropData & {
+  actionType: 'SET_IPA_IMAGE';
   context: {
     id: string;
   };
 };
 
-export type CALayerImageDropData = BaseDropData & {
-  actionType: 'SET_CA_LAYER_IMAGE';
+export type RGIPAdapterImageDropData = BaseDropData & {
+  actionType: 'SET_RG_IP_ADAPTER_IMAGE';
   context: {
-    layerId: string;
-  };
-};
-
-export type IPALayerImageDropData = BaseDropData & {
-  actionType: 'SET_IPA_LAYER_IMAGE';
-  context: {
-    layerId: string;
-  };
-};
-
-export type RGLayerIPAdapterImageDropData = BaseDropData & {
-  actionType: 'SET_RG_LAYER_IP_ADAPTER_IMAGE';
-  context: {
-    layerId: string;
+    id: string;
     ipAdapterId: string;
   };
 };
 
-export type IILayerImageDropData = BaseDropData & {
-  actionType: 'SET_II_LAYER_IMAGE';
-  context: {
-    layerId: string;
-  };
+export type AddRasterLayerFromImageDropData = BaseDropData & {
+  actionType: 'ADD_RASTER_LAYER_FROM_IMAGE';
 };
 
-export type CanvasInitialImageDropData = BaseDropData & {
-  actionType: 'SET_CANVAS_INITIAL_IMAGE';
+export type AddControlLayerFromImageDropData = BaseDropData & {
+  actionType: 'ADD_CONTROL_LAYER_FROM_IMAGE';
 };
 
 type UpscaleInitialImageDropData = BaseDropData & {
@@ -92,18 +71,15 @@ export type SelectForCompareDropData = BaseDropData & {
 };
 
 export type TypesafeDroppableData =
-  | CurrentImageDropData
-  | ControlAdapterDropData
-  | CanvasInitialImageDropData
   | NodesImageDropData
   | AddToBoardDropData
   | RemoveFromBoardDropData
-  | CALayerImageDropData
-  | IPALayerImageDropData
-  | RGLayerIPAdapterImageDropData
-  | IILayerImageDropData
+  | IPAImageDropData
+  | RGIPAdapterImageDropData
   | SelectForCompareDropData
-  | UpscaleInitialImageDropData;
+  | UpscaleInitialImageDropData
+  | AddRasterLayerFromImageDropData
+  | AddControlLayerFromImageDropData;
 
 type BaseDragData = {
   id: string;

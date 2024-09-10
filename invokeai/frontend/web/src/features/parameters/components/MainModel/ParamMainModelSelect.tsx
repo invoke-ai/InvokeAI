@@ -1,17 +1,14 @@
 import { Box, Combobox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
+import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSDMainModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
-
-const selectModel = createMemoizedSelector(selectGenerationSlice, (generation) => generation.model);
 
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();

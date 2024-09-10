@@ -3,6 +3,7 @@ import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-libra
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectParamsSlice, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
@@ -12,9 +13,8 @@ import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSee
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
-import { selectGenerationSlice } from 'features/parameters/store/generationSlice';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
@@ -28,33 +28,33 @@ const formLabelProps2: FormLabelProps = {
 };
 
 export const AdvancedSettingsAccordion = memo(() => {
-  const vaeKey = useAppSelector((state) => state.generation.vae?.key);
+  const vaeKey = useAppSelector(selectVAEKey);
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
-  const activeTabName = useAppSelector(activeTabNameSelector);
+  const activeTabName = useAppSelector(selectActiveTab);
 
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector(selectGenerationSlice, (generation) => {
+      createMemoizedSelector(selectParamsSlice, (params) => {
         const badges: (string | number)[] = [];
         if (vaeConfig) {
           let vaeBadge = vaeConfig.name;
-          if (generation.vaePrecision === 'fp16') {
-            vaeBadge += ` ${generation.vaePrecision}`;
+          if (params.vaePrecision === 'fp16') {
+            vaeBadge += ` ${params.vaePrecision}`;
           }
           badges.push(vaeBadge);
-        } else if (generation.vaePrecision === 'fp16') {
-          badges.push(`VAE ${generation.vaePrecision}`);
+        } else if (params.vaePrecision === 'fp16') {
+          badges.push(`VAE ${params.vaePrecision}`);
         }
-        if (generation.clipSkip) {
-          badges.push(`Skip ${generation.clipSkip}`);
+        if (params.clipSkip) {
+          badges.push(`Skip ${params.clipSkip}`);
         }
-        if (generation.cfgRescaleMultiplier) {
-          badges.push(`Rescale ${generation.cfgRescaleMultiplier}`);
+        if (params.cfgRescaleMultiplier) {
+          badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
         }
-        if (generation.seamlessXAxis || generation.seamlessYAxis) {
+        if (params.seamlessXAxis || params.seamlessYAxis) {
           badges.push('seamless');
         }
-        if (activeTabName === 'upscaling' && !generation.shouldRandomizeSeed) {
+        if (activeTabName === 'upscaling' && !params.shouldRandomizeSeed) {
           badges.push('Manual Seed');
         }
         return badges;

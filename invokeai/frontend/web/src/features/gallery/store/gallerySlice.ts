@@ -21,11 +21,11 @@ const initialGalleryState: GalleryState = {
   starredFirst: true,
   orderDir: 'DESC',
   searchTerm: '',
-  isImageViewerOpen: true,
   imageToCompare: null,
   comparisonMode: 'slider',
   comparisonFit: 'fill',
   shouldShowArchivedBoards: false,
+  isMiniViewerOpen: false,
 };
 
 export const gallerySlice = createSlice({
@@ -40,9 +40,6 @@ export const gallerySlice = createSlice({
     },
     imageToCompareChanged: (state, action: PayloadAction<ImageDTO | null>) => {
       state.imageToCompare = action.payload;
-      if (action.payload) {
-        state.isImageViewerOpen = true;
-      }
     },
     comparisonModeChanged: (state, action: PayloadAction<ComparisonMode>) => {
       state.comparisonMode = action.payload;
@@ -91,8 +88,8 @@ export const gallerySlice = createSlice({
     alwaysShowImageSizeBadgeChanged: (state, action: PayloadAction<boolean>) => {
       state.alwaysShowImageSizeBadge = action.payload;
     },
-    isImageViewerOpenChanged: (state, action: PayloadAction<boolean>) => {
-      state.isImageViewerOpen = action.payload;
+    isMiniViewerOpenToggled: (state) => {
+      state.isMiniViewerOpen = !state.isMiniViewerOpen;
     },
     comparedImagesSwapped: (state) => {
       if (state.imageToCompare) {
@@ -138,7 +135,6 @@ export const {
   selectionChanged,
   boardSearchTextChanged,
   alwaysShowImageSizeBadgeChanged,
-  isImageViewerOpenChanged,
   imageToCompareChanged,
   comparisonModeChanged,
   comparedImagesSwapped,
@@ -150,6 +146,7 @@ export const {
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
   searchTermChanged,
+  isMiniViewerOpenToggled,
 } = gallerySlice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;
@@ -166,13 +163,5 @@ export const galleryPersistConfig: PersistConfig<GalleryState> = {
   name: gallerySlice.name,
   initialState: initialGalleryState,
   migrate: migrateGalleryState,
-  persistDenylist: [
-    'selection',
-    'selectedBoardId',
-    'galleryView',
-    'offset',
-    'limit',
-    'isImageViewerOpen',
-    'imageToCompare',
-  ],
+  persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'offset', 'limit', 'imageToCompare'],
 };
