@@ -3,6 +3,7 @@ from typing import Dict, Optional
 import torch
 
 from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
+from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
 # TODO: find and debug lora/locon with bias
@@ -43,9 +44,7 @@ class LoRALayer(LoRALayerBase):
 
     def calc_size(self) -> int:
         model_size = super().calc_size()
-        for val in [self.up, self.mid, self.down]:
-            if val is not None:
-                model_size += val.nelement() * val.element_size()
+        model_size += calc_tensors_size([self.up, self.mid, self.down])
         return model_size
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:

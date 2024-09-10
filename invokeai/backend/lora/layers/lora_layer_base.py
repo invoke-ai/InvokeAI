@@ -3,6 +3,7 @@ from typing import Dict, Optional, Set
 import torch
 
 import invokeai.backend.util.logging as logger
+from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
 class LoRALayerBase:
@@ -49,11 +50,7 @@ class LoRALayerBase:
         return params
 
     def calc_size(self) -> int:
-        model_size = 0
-        for val in [self.bias]:
-            if val is not None:
-                model_size += val.nelement() * val.element_size()
-        return model_size
+        return calc_tensors_size([self.bias])
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         if self.bias is not None:
