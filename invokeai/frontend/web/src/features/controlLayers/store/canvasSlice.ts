@@ -191,8 +191,13 @@ export const canvasSlice = createSlice({
       state.selectedEntityIdentifier = getEntityIdentifier(data);
     },
     rasterLayerConvertedToControlLayer: {
-      reducer: (state, action: PayloadAction<EntityIdentifierPayload<{ newId: string }, 'raster_layer'>>) => {
-        const { entityIdentifier, newId } = action.payload;
+      reducer: (
+        state,
+        action: PayloadAction<
+          EntityIdentifierPayload<{ newId: string; overrides?: Partial<CanvasControlLayerState> }, 'raster_layer'>
+        >
+      ) => {
+        const { entityIdentifier, newId, overrides } = action.payload;
         const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
@@ -207,6 +212,8 @@ export const canvasSlice = createSlice({
           withTransparencyEffect: true,
         };
 
+        merge(controlLayerState, overrides);
+
         // Remove the raster layer
         state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
 
@@ -215,7 +222,9 @@ export const canvasSlice = createSlice({
 
         state.selectedEntityIdentifier = { type: controlLayerState.type, id: controlLayerState.id };
       },
-      prepare: (payload: EntityIdentifierPayload<void, 'raster_layer'>) => ({
+      prepare: (
+        payload: EntityIdentifierPayload<{ overrides?: Partial<CanvasControlLayerState> } | undefined, 'raster_layer'>
+      ) => ({
         payload: { ...payload, newId: getPrefixedId('control_layer') },
       }),
     },
