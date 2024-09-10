@@ -1302,4 +1302,7 @@ function actionsThrottlingFilter(action: UnknownAction) {
 }
 
 export const $lastCanvasProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
+/**
+ * The global canvas manager instance.
+ */
 export const $canvasManager = atom<CanvasManager | null>(null);
