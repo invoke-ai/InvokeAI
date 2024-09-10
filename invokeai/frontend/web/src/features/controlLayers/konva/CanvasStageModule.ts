@@ -78,6 +78,11 @@ export class CanvasStageModule extends CanvasModuleBase {
     };
   }
 
+  setContainer = (container: HTMLDivElement) => {
+    this.container = container;
+    this.konva.stage.container(container);
+  };
+
   setEventListeners = () => {
     this.konva.stage.on('wheel', this.onStageMouseWheel);
     this.konva.stage.on('dragmove', this.onStageDragMove);

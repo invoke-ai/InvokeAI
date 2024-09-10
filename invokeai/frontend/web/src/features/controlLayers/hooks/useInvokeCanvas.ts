@@ -4,6 +4,7 @@ import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
 import Konva from 'konva';
 import { useLayoutEffect, useState } from 'react';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
@@ -24,6 +25,7 @@ const useKonvaPixelRatioWatcher = () => {
 };
 
 export const useInvokeCanvas = (): ((el: HTMLDivElement | null) => void) => {
+  useAssertSingleton('useInvokeCanvas');
   useKonvaPixelRatioWatcher();
   const store = useAppStore();
   const socket = useStore($socket);
@@ -42,9 +44,14 @@ export const useInvokeCanvas = (): ((el: HTMLDivElement | null) => void) => {
       return () => {};
     }
 
+    const currentManager = $canvasManager.get();
+    if (currentManager) {
+      currentManager.stage.setContainer(container);
+      return;
+    }
+
     const manager = new CanvasManager(container, store, socket);
     manager.initialize();
-    return manager.destroy;
   }, [container, socket, store]);
 
   return containerRef;
