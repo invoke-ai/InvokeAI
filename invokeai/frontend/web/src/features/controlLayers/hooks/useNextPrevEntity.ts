@@ -61,16 +61,19 @@ export const useNextPrevEntityHotkeys = () => {
 
   useHotkeys(
     // “ === alt+[
-    ['alt+[', '“'],
+    ['“'],
     selectPrevEntity,
     { preventDefault: true, ignoreModifiers: true },
     [selectPrevEntity]
   );
+
+  useHotkeys(['alt+['], selectPrevEntity, { preventDefault: true }, [selectPrevEntity]);
   useHotkeys(
     // ‘ === alt+]
-    ['alt+]', '‘'],
+    ['‘'],
     selectNextEntity,
     { preventDefault: true, ignoreModifiers: true },
     [selectNextEntity]
   );
+  useHotkeys(['alt+]'], selectNextEntity, { preventDefault: true }, [selectNextEntity]);
 };
