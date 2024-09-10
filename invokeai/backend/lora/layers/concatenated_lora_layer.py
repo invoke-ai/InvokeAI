@@ -13,9 +13,9 @@ class ConcatenatedLoRALayer(LoRALayerBase):
     stored as separate tensors. This class enables diffusers LoRA layers to be used in BFL FLUX models.
     """
 
-    def __init__(self, layer_key: str, lora_layers: List[LoRALayerBase], concat_axis: int = 0):
+    def __init__(self, lora_layers: List[LoRALayerBase], concat_axis: int = 0):
         # Note: We pass values={} to the base class, because the values are handled by the individual LoRA layers.
-        super().__init__(layer_key, values={})
+        super().__init__(values={})
 
         self._lora_layers = lora_layers
         self._concat_axis = concat_axis

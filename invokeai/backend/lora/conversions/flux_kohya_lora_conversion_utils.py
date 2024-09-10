@@ -41,8 +41,7 @@ def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -
     # Create LoRA layers.
     layers: dict[str, AnyLoRALayer] = {}
     for layer_key, layer_state_dict in grouped_state_dict.items():
-        layer = any_lora_layer_from_state_dict(layer_key, layer_state_dict)
-        layers[layer_key] = layer
+        layers[layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
 
     # Create and return the LoRAModelRaw.
     return LoRAModelRaw(layers=layers)

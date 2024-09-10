@@ -11,10 +11,9 @@ class IA3Layer(LoRALayerBase):
 
     def __init__(
         self,
-        layer_key: str,
         values: Dict[str, torch.Tensor],
     ):
-        super().__init__(layer_key, values)
+        super().__init__(values)
 
         self.weight = values["weight"]
         self.on_input = values["on_input"]

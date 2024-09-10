@@ -16,10 +16,9 @@ class LoKRLayer(LoRALayerBase):
 
     def __init__(
         self,
-        layer_key: str,
         values: Dict[str, torch.Tensor],
     ):
-        super().__init__(layer_key, values)
+        super().__init__(values)
 
         self.w1 = values.get("lokr_w1", None)
         if self.w1 is None:
