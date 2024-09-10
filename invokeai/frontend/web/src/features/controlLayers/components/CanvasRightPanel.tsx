@@ -5,7 +5,7 @@ import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { CanvasPanelContent } from 'features/controlLayers/components/CanvasPanelContent';
 import { CanvasSendToToggle } from 'features/controlLayers/components/CanvasSendToToggle';
 import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectEntityCount } from 'features/controlLayers/store/selectors';
+import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +38,7 @@ CanvasRightPanelContent.displayName = 'CanvasRightPanelContent';
 
 const PanelTabs = memo(({ setTab }: { setTab: (val: number) => void }) => {
   const { t } = useTranslation();
-  const entityCount = useAppSelector(selectEntityCount);
+  const activeEntityCount = useAppSelector(selectEntityCountActive);
   const sendToCanvas = useAppSelector(selectSendToCanvas);
   const tabTimeout = useRef<number | null>(null);
   const dndCtx = useDndContext();
@@ -66,11 +66,11 @@ const PanelTabs = memo(({ setTab }: { setTab: (val: number) => void }) => {
   }, []);
 
   const layersTabLabel = useMemo(() => {
-    if (entityCount === 0) {
+    if (activeEntityCount === 0) {
       return t('controlLayers.layer_other');
     }
-    return `${t('controlLayers.layer_other')} (${entityCount})`;
-  }, [entityCount, t]);
+    return `${t('controlLayers.layer_other')} (${activeEntityCount})`;
+  }, [activeEntityCount, t]);
 
   return (
     <>
