@@ -4,7 +4,6 @@ import { Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowMode } from 'features/nodes/store/workflowSlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
-import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import WorkflowLibraryButton from 'features/workflowLibrary/components/WorkflowLibraryButton';
 import type { CSSProperties } from 'react';
 import { memo, useCallback, useRef } from 'react';
@@ -22,7 +21,6 @@ const panelGroupStyles: CSSProperties = { height: '100%', width: '100%' };
 const NodeEditorPanelGroup = () => {
   const mode = useAppSelector(selectWorkflowMode);
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
-  const panelStorage = usePanelStorage();
 
   const handleDoubleClickHandle = useCallback(() => {
     if (!panelGroupRef.current) {
@@ -49,7 +47,6 @@ const NodeEditorPanelGroup = () => {
           autoSaveId="workflow-panel-group"
           direction="vertical"
           style={panelGroupStyles}
-          storage={panelStorage}
         >
           <Panel id="workflow" collapsible minSize={25}>
             <WorkflowPanel />

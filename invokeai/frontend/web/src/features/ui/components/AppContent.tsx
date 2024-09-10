@@ -16,7 +16,6 @@ import { WorkflowsTabContent } from 'features/ui/components/tabs/WorkflowsTabCon
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import type { UsePanelOptions } from 'features/ui/hooks/usePanel';
 import { usePanel } from 'features/ui/hooks/usePanel';
-import { usePanelStorage } from 'features/ui/hooks/usePanelStorage';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import {
   $isLeftPanelOpen,
@@ -47,7 +46,6 @@ export const AppContent = memo(() => {
   useScopeOnFocus('gallery', ref);
 
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
-  const panelStorage = usePanelStorage();
 
   const withLeftPanel = useAppSelector(selectWithLeftPanel);
   const leftPanelUsePanelOptions = useMemo<UsePanelOptions>(
@@ -117,10 +115,9 @@ export const AppContent = memo(() => {
         <PanelGroup
           ref={panelGroupRef}
           id="app-panel-group"
-          autoSaveId="app"
+          autoSaveId="app-panel-group"
           direction="horizontal"
           style={panelStyles}
-          storage={panelStorage}
         >
           {withLeftPanel && (
             <>

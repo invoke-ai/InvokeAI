@@ -18,7 +18,12 @@ export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: Comp
   return (
     <Flex w="full" h="full" maxW="full" maxH="full" position="relative" alignItems="center" justifyContent="center">
       <Flex w="full" h="full" maxW="full" maxH="full" position="absolute" alignItems="center" justifyContent="center">
-        <PanelGroup ref={panelGroupRef} direction="horizontal" id="image-comparison-side-by-side">
+        <PanelGroup
+          ref={panelGroupRef}
+          direction="horizontal"
+          id="image-comparison-side-by-side"
+          autoSaveId="image-comparison-side-by-side"
+        >
           <Panel minSize={20}>
             <Flex position="relative" w="full" h="full" alignItems="center" justifyContent="center">
               <Flex position="absolute" maxW="full" maxH="full" aspectRatio={firstImage.width / firstImage.height}>
