@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Dict, Iterator, Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 import torch
 
@@ -9,17 +9,16 @@ from invokeai.backend.util.original_weights_storage import OriginalWeightsStorag
 
 
 class LoraPatcher:
-    @classmethod
+    @staticmethod
     @torch.no_grad()
     @contextmanager
     def apply_lora_patches(
-        cls,
         model: torch.nn.Module,
-        patches: Iterator[Tuple[LoRAModelRaw, float]],
+        patches: Iterable[Tuple[LoRAModelRaw, float]],
         prefix: str,
         cached_weights: Optional[Dict[str, torch.Tensor]] = None,
     ):
-        """Apply one or more LoRA patches to a model.
+        """Apply one or more LoRA patches to a model within a context manager.
 
         :param model: The model to patch.
         :param loras: An iterator that returns tuples of LoRA patches and associated weights. An iterator is used so
@@ -30,23 +29,23 @@ class LoraPatcher:
         original_weights = OriginalWeightsStorage(cached_weights)
         try:
             for patch, patch_weight in patches:
-                cls._apply_lora_patch(
+                LoraPatcher.apply_lora_patch(
                     model=model,
                     prefix=prefix,
                     patch=patch,
                     patch_weight=patch_weight,
                     original_weights=original_weights,
                 )
+                del patch
 
             yield
         finally:
             for param_key, weight in original_weights.get_changed_weights():
                 model.get_parameter(param_key).copy_(weight)
 
-    @classmethod
+    @staticmethod
     @torch.no_grad()
-    def _apply_lora_patch(
-        cls,
+    def apply_lora_patch(
         model: torch.nn.Module,
         prefix: str,
         patch: LoRAModelRaw,
@@ -54,7 +53,7 @@ class LoraPatcher:
         original_weights: OriginalWeightsStorage,
     ):
         """
-        Apply one a LoRA to a model.
+        Apply a single LoRA patch to a model.
         :param model: The model to patch.
         :param patch: LoRA model to patch in.
         :param patch_weight: LoRA patch weight.
@@ -65,11 +64,21 @@ class LoraPatcher:
         if patch_weight == 0:
             return
 
+        # If the layer keys contain a dot, then they are not flattened, and can be directly used to access model
+        # submodules. If the layer keys do not contain a dot, then they are flattened, meaning that all '.' have been
+        # replaced with '_'. Non-flattened keys are preferred, because they allow submodules to be accessed directly
+        # without searching, but some legacy code still uses flattened keys.
+        layer_keys_are_flattened = "." not in next(iter(patch.layers.keys()))
+
+        prefix_len = len(prefix)
+
         for layer_key, layer in patch.layers.items():
             if not layer_key.startswith(prefix):
                 continue
 
-            module = model.get_submodule(layer_key)
+            module_key, module = LoraPatcher._get_submodule(
+                model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
+            )
 
             # All of the LoRA weight calculations will be done on the same device as the module weight.
             # (Performance will be best if this is a CUDA device.)
@@ -87,7 +96,7 @@ class LoraPatcher:
             # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
             # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
             for param_name, lora_param_weight in layer.get_parameters(module).items():
-                param_key = layer_key + "." + param_name
+                param_key = module_key + "." + param_name
                 module_param = module.get_parameter(param_name)
 
                 # Save original weight
@@ -100,3 +109,40 @@ class LoraPatcher:
                 module_param += lora_param_weight.to(dtype=dtype)
 
             layer.to(device=TorchDevice.CPU_DEVICE)
+
+    @staticmethod
+    def _get_submodule(
+        model: torch.nn.Module, layer_key: str, layer_key_is_flattened: bool
+    ) -> tuple[str, torch.nn.Module]:
+        """Get the submodule corresponding to the given layer key.
+        :param model: The model to search.
+        :param layer_key: The layer key to search for.
+        :param layer_key_is_flattened: Whether the layer key is flattened. If flattened, then all '.' have been replaced
+            with '_'. Non-flattened keys are preferred, because they allow submodules to be accessed directly without
+            searching, but some legacy code still uses flattened keys.
+        :return: A tuple containing the module key and the submodule.
+        """
+        if not layer_key_is_flattened:
+            return layer_key, model.get_submodule(layer_key)
+
+        # Handle flattened keys.
+        assert "." not in layer_key
+
+        module = model
+        module_key = ""
+        key_parts = layer_key.split("_")
+
+        submodule_name = key_parts.pop(0)
+
+        while len(key_parts) > 0:
+            try:
+                module = module.get_submodule(submodule_name)
+                module_key += "." + submodule_name
+                submodule_name = key_parts.pop(0)
+            except Exception:
+                submodule_name += "_" + key_parts.pop(0)
+
+        module = module.get_submodule(submodule_name)
+        module_key = (module_key + "." + submodule_name).lstrip(".")
+
+        return module_key, module
