@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from invokeai.backend.peft.conversions.flux_diffusers_lora_conversion_utils import (
+from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
 )

@@ -3,7 +3,7 @@ from typing import Dict, Optional
 
 import torch
 
-from invokeai.backend.peft.layers.any_lora_layer import AnyLoRALayer
+from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.raw_model import RawModel
 
 

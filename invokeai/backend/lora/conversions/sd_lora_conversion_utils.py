@@ -2,9 +2,9 @@ from typing import Dict
 
 import torch
 
-from invokeai.backend.peft.layers.any_lora_layer import AnyLoRALayer
-from invokeai.backend.peft.layers.utils import peft_layer_from_state_dict
-from invokeai.backend.peft.lora import LoRAModelRaw
+from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
+from invokeai.backend.lora.layers.utils import peft_layer_from_state_dict
+from invokeai.backend.lora.lora import LoRAModelRaw
 
 
 def lora_model_from_sd_state_dict(state_dict: Dict[str, torch.Tensor]) -> LoRAModelRaw:

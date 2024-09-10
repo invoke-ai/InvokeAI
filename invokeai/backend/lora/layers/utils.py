@@ -2,13 +2,13 @@ from typing import Dict
 
 import torch
 
-from invokeai.backend.peft.layers.any_lora_layer import AnyLoRALayer
-from invokeai.backend.peft.layers.full_layer import FullLayer
-from invokeai.backend.peft.layers.ia3_layer import IA3Layer
-from invokeai.backend.peft.layers.loha_layer import LoHALayer
-from invokeai.backend.peft.layers.lokr_layer import LoKRLayer
-from invokeai.backend.peft.layers.lora_layer import LoRALayer
-from invokeai.backend.peft.layers.norm_layer import NormLayer
+from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
+from invokeai.backend.lora.layers.full_layer import FullLayer
+from invokeai.backend.lora.layers.ia3_layer import IA3Layer
+from invokeai.backend.lora.layers.loha_layer import LoHALayer
+from invokeai.backend.lora.layers.lokr_layer import LoKRLayer
+from invokeai.backend.lora.layers.lora_layer import LoRALayer
+from invokeai.backend.lora.layers.norm_layer import NormLayer
 
 
 def peft_layer_from_state_dict(layer_key: str, state_dict: Dict[str, torch.Tensor]) -> AnyLoRALayer:

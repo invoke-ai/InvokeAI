@@ -1,9 +1,9 @@
 import pytest
 import torch
 
+from invokeai.backend.lora.layers.lora_layer import LoRALayer
+from invokeai.backend.lora.lora import LoRAModelRaw
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.peft.layers.lora_layer import LoRALayer
-from invokeai.backend.peft.lora import LoRAModelRaw
 
 
 @pytest.mark.parametrize(
