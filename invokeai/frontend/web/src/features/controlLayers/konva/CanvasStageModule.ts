@@ -9,7 +9,7 @@ import type {
   Rect,
   StageAttrs,
 } from 'features/controlLayers/store/types';
-import type Konva from 'konva';
+import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -59,7 +59,7 @@ export class CanvasStageModule extends CanvasModuleBase {
 
   subscriptions = new Set<() => void>();
 
-  constructor(stage: Konva.Stage, container: HTMLDivElement, manager: CanvasManager) {
+  constructor(container: HTMLDivElement, manager: CanvasManager) {
     super();
     this.id = getPrefixedId('stage');
     this.parent = manager;
@@ -70,7 +70,12 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.log.debug('Creating module');
 
     this.container = container;
-    this.konva = { stage };
+    this.konva = {
+      stage: new Konva.Stage({
+        id: getPrefixedId('konva_stage'),
+        container,
+      }),
+    };
   }
 
   setEventListeners = () => {

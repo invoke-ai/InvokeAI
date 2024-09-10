@@ -77,7 +77,7 @@ export class CanvasManager extends CanvasModuleBase {
    */
   $isBusy: Atom<boolean>;
 
-  constructor(stage: Konva.Stage, container: HTMLDivElement, store: AppStore, socket: AppSocket) {
+  constructor(container: HTMLDivElement, store: AppStore, socket: AppSocket) {
     super();
     this.id = getPrefixedId(this.type);
     this.path = [this.id];
@@ -98,7 +98,7 @@ export class CanvasManager extends CanvasModuleBase {
     this.socket = socket;
 
     this.stateApi = new CanvasStateApiModule(this.store, this);
-    this.stage = new CanvasStageModule(stage, container, this);
+    this.stage = new CanvasStageModule(container, this);
     this.worker = new CanvasWorkerModule(this);
     this.cache = new CanvasCacheModule(this);
     this.entityRenderer = new CanvasEntityRendererModule(this);
