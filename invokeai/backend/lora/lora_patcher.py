@@ -8,29 +8,29 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
 
-class PeftPatcher:
+class LoraPatcher:
     @classmethod
     @torch.no_grad()
     @contextmanager
-    def apply_peft_patches(
+    def apply_lora_patches(
         cls,
         model: torch.nn.Module,
         patches: Iterator[Tuple[LoRAModelRaw, float]],
         prefix: str,
         cached_weights: Optional[Dict[str, torch.Tensor]] = None,
     ):
-        """Apply one or more PEFT patches to a model.
+        """Apply one or more LoRA patches to a model.
 
         :param model: The model to patch.
-        :param loras: An iterator that returns tuples of PEFT patches and associated weights. An iterator is used so
-            that the PEFT patches do not need to be loaded into memory all at once.
+        :param loras: An iterator that returns tuples of LoRA patches and associated weights. An iterator is used so
+            that the LoRA patches do not need to be loaded into memory all at once.
         :param prefix: The keys in the patches will be filtered to only include weights with this prefix.
         :cached_weights: Read-only copy of the model's state dict in CPU, for efficient unpatching purposes.
         """
         original_weights = OriginalWeightsStorage(cached_weights)
         try:
             for patch, patch_weight in patches:
-                cls._apply_peft_patch(
+                cls._apply_lora_patch(
                     model=model,
                     prefix=prefix,
                     patch=patch,
@@ -45,7 +45,7 @@ class PeftPatcher:
 
     @classmethod
     @torch.no_grad()
-    def _apply_peft_patch(
+    def _apply_lora_patch(
         cls,
         model: torch.nn.Module,
         prefix: str,

@@ -4,7 +4,7 @@ from typing import Any, Dict, TypeVar
 import torch
 
 from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
-from invokeai.backend.lora.layers.utils import peft_layer_from_state_dict
+from invokeai.backend.lora.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 
 # A regex pattern that matches all of the keys in the Kohya FLUX LoRA format.
@@ -41,7 +41,7 @@ def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -
     # Create LoRA layers.
     layers: dict[str, AnyLoRALayer] = {}
     for layer_key, layer_state_dict in grouped_state_dict.items():
-        layer = peft_layer_from_state_dict(layer_key, layer_state_dict)
+        layer = any_lora_layer_from_state_dict(layer_key, layer_state_dict)
         layers[layer_key] = layer
 
     # Create and return the LoRAModelRaw.
