@@ -13,7 +13,7 @@ from invokeai.backend.image_util.mlsd.utils import pred_lines
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np, resize_to_multiple
 
 
-class MLSDEdgeDetector:
+class MLSDDetector:
     """Simple wrapper around a MLSD model for detecting edges as line segments in an image."""
 
     hf_repo_id = "lllyasviel/ControlNet"
