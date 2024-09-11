@@ -19,6 +19,7 @@ import {
   setScheduler,
   setSeed,
   setSteps,
+  t5EncoderModelSelected,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
 import type { LoRA } from 'features/controlLayers/store/types';
@@ -44,6 +45,7 @@ import type {
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
+  ParameterT5EncoderModel,
   ParameterVAEModel,
   ParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
@@ -154,6 +156,10 @@ const recallVAE: MetadataRecallFunc<ParameterVAEModel | null | undefined> = (vae
   getStore().dispatch(vaeSelected(vaeModel));
 };
 
+const recallT5Encoder: MetadataRecallFunc<ParameterT5EncoderModel> = (t5EncoderModel) => {
+  getStore().dispatch(t5EncoderModelSelected(t5EncoderModel));
+};
+
 const recallLoRA: MetadataRecallFunc<LoRA> = (lora) => {
   getStore().dispatch(loraRecalled({ lora }));
 };
@@ -196,4 +202,5 @@ export const recallers = {
   vae: recallVAE,
   lora: recallLoRA,
   loras: recallAllLoRAs,
+  t5EncoderModel: recallT5Encoder
 } as const;

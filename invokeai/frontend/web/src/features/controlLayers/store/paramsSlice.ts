@@ -20,6 +20,9 @@ import type {
   ParameterSteps,
   ParameterStrength,
   ParameterVAEModel,
+  ParameterGuidance,
+  ParameterT5EncoderModel,
+  ParameterCLIPEmbedModel
 } from 'features/parameters/types/parameterSchemas';
 import { clamp } from 'lodash-es';
 
@@ -35,6 +38,7 @@ export type ParamsState = {
   infillColorValue: RgbaColor;
   cfgScale: ParameterCFGScale;
   cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
+  guidance: ParameterGuidance;
   img2imgStrength: ParameterStrength;
   iterations: number;
   scheduler: ParameterScheduler;
@@ -60,6 +64,8 @@ export type ParamsState = {
   refinerPositiveAestheticScore: number;
   refinerNegativeAestheticScore: number;
   refinerStart: number;
+  t5EncoderModel: ParameterT5EncoderModel | null,
+  clipEmbedModel: ParameterCLIPEmbedModel | null
 };
 
 const initialState: ParamsState = {
@@ -74,6 +80,7 @@ const initialState: ParamsState = {
   infillColorValue: { r: 0, g: 0, b: 0, a: 1 },
   cfgScale: 7.5,
   cfgRescaleMultiplier: 0,
+  guidance: 4,
   img2imgStrength: 0.75,
   iterations: 1,
   scheduler: 'euler',
@@ -99,6 +106,8 @@ const initialState: ParamsState = {
   refinerPositiveAestheticScore: 6,
   refinerNegativeAestheticScore: 2.5,
   refinerStart: 0.8,
+  t5EncoderModel: null,
+  clipEmbedModel: null
 };
 
 export const paramsSlice = createSlice({
@@ -113,6 +122,9 @@ export const paramsSlice = createSlice({
     },
     setCfgScale: (state, action: PayloadAction<ParameterCFGScale>) => {
       state.cfgScale = action.payload;
+    },
+    setGuidance: (state, action: PayloadAction<ParameterGuidance>) => {
+      state.guidance = action.payload;
     },
     setCfgRescaleMultiplier: (state, action: PayloadAction<ParameterCFGRescaleMultiplier>) => {
       state.cfgRescaleMultiplier = action.payload;
@@ -160,6 +172,12 @@ export const paramsSlice = createSlice({
     vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!
       state.vae = action.payload;
+    },
+    t5EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
+      state.t5EncoderModel = action.payload;
+    },
+    clipEmbedModelSelected: (state, action: PayloadAction<ParameterCLIPEmbedModel | null>) => {
+      state.clipEmbedModel = action.payload;
     },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
@@ -246,6 +264,7 @@ export const {
   setSteps,
   setCfgScale,
   setCfgRescaleMultiplier,
+  setGuidance,
   setScheduler,
   setSeed,
   setImg2imgStrength,
@@ -254,6 +273,8 @@ export const {
   setShouldRandomizeSeed,
   vaeSelected,
   vaePrecisionChanged,
+  t5EncoderModelSelected,
+  clipEmbedModelSelected,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   positivePromptChanged,
@@ -289,11 +310,16 @@ export const createParamsSelector = <T>(selector: Selector<ParamsState, T>) =>
 
 export const selectBase = createParamsSelector((params) => params.model?.base);
 export const selectIsSDXL = createParamsSelector((params) => params.model?.base === 'sdxl');
+export const selectIsFLUX = createParamsSelector((params) => params.model?.base === 'flux');
+
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);
 export const selectVAE = createParamsSelector((params) => params.vae);
 export const selectVAEKey = createParamsSelector((params) => params.vae?.key);
+export const selectT5EncoderModel = createParamsSelector((params) => params.t5EncoderModel);
+export const selectCLIPEmbedModel = createParamsSelector((params) => params.clipEmbedModel);
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
+export const selectGuidance = createParamsSelector((params) => params.guidance);
 export const selectSteps = createParamsSelector((params) => params.steps);
 export const selectCFGRescaleMultiplier = createParamsSelector((params) => params.cfgRescaleMultiplier);
 export const selectCLIPSKip = createParamsSelector((params) => params.clipSkip);

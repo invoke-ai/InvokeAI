@@ -3,7 +3,7 @@ import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-libra
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectParamsSlice, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
+import { selectIsFLUX, selectParamsSlice, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
@@ -18,6 +18,8 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetModelConfigQuery } from 'services/api/endpoints/models';
+import ParamT5EncoderModelSelect from '../../../parameters/components/Advanced/ParamT5EncoderModelSelect';
+import ParamCLIPEmbedModelSelect from '../../../parameters/components/Advanced/ParamCLIPEmbedModelSelect';
 
 const formLabelProps: FormLabelProps = {
   minW: '9.2rem',
@@ -31,32 +33,44 @@ export const AdvancedSettingsAccordion = memo(() => {
   const vaeKey = useAppSelector(selectVAEKey);
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const activeTabName = useAppSelector(selectActiveTab);
+  const isFLUX = useAppSelector(selectIsFLUX);
 
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector(selectParamsSlice, (params) => {
+      createMemoizedSelector([selectParamsSlice, selectIsFLUX], (params, isFLUX) => {
         const badges: (string | number)[] = [];
-        if (vaeConfig) {
-          let vaeBadge = vaeConfig.name;
-          if (params.vaePrecision === 'fp16') {
-            vaeBadge += ` ${params.vaePrecision}`;
+        if (isFLUX) {
+          if (vaeConfig) {
+            let vaeBadge = vaeConfig.name;
+            if (params.vaePrecision === 'fp16') {
+              vaeBadge += ` ${params.vaePrecision}`;
+            }
+            badges.push(vaeBadge);
           }
-          badges.push(vaeBadge);
-        } else if (params.vaePrecision === 'fp16') {
-          badges.push(`VAE ${params.vaePrecision}`);
+        } else {
+          if (vaeConfig) {
+            let vaeBadge = vaeConfig.name;
+            if (params.vaePrecision === 'fp16') {
+              vaeBadge += ` ${params.vaePrecision}`;
+            }
+            badges.push(vaeBadge);
+          } else if (params.vaePrecision === 'fp16') {
+            badges.push(`VAE ${params.vaePrecision}`);
+          }
+          if (params.clipSkip) {
+            badges.push(`Skip ${params.clipSkip}`);
+          }
+          if (params.cfgRescaleMultiplier) {
+            badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
+          }
+          if (params.seamlessXAxis || params.seamlessYAxis) {
+            badges.push('seamless');
+          }
+          if (activeTabName === 'upscaling' && !params.shouldRandomizeSeed) {
+            badges.push('Manual Seed');
+          }
         }
-        if (params.clipSkip) {
-          badges.push(`Skip ${params.clipSkip}`);
-        }
-        if (params.cfgRescaleMultiplier) {
-          badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
-        }
-        if (params.seamlessXAxis || params.seamlessYAxis) {
-          badges.push('seamless');
-        }
-        if (activeTabName === 'upscaling' && !params.shouldRandomizeSeed) {
-          badges.push('Manual Seed');
-        }
+
         return badges;
       }),
     [vaeConfig, activeTabName]
@@ -73,27 +87,36 @@ export const AdvancedSettingsAccordion = memo(() => {
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
         <Flex gap={4} w="full">
           <ParamVAEModelSelect />
-          <ParamVAEPrecision />
+          {!isFLUX && <ParamVAEPrecision />}
         </Flex>
-        {activeTabName === 'upscaling' && (
+        {activeTabName === 'upscaling' ? (
           <Flex gap={4} alignItems="center">
             <ParamSeedNumberInput />
             <ParamSeedShuffle />
             <ParamSeedRandomize />
           </Flex>
-        )}
-        {activeTabName !== 'upscaling' && (
+        ) : (
           <>
-            <FormControlGroup formLabelProps={formLabelProps}>
-              <ParamClipSkip />
-              <ParamCFGRescaleMultiplier />
-            </FormControlGroup>
-            <Flex gap={4} w="full">
-              <FormControlGroup formLabelProps={formLabelProps2}>
-                <ParamSeamlessXAxis />
-                <ParamSeamlessYAxis />
+            {!isFLUX && (
+              <>
+                <FormControlGroup formLabelProps={formLabelProps}>
+                  <ParamClipSkip />
+                  <ParamCFGRescaleMultiplier />
+                </FormControlGroup>
+                <Flex gap={4} w="full">
+                  <FormControlGroup formLabelProps={formLabelProps2}>
+                    <ParamSeamlessXAxis />
+                    <ParamSeamlessYAxis />
+                  </FormControlGroup>
+                </Flex>
+              </>
+            )}
+            {isFLUX && (
+              <FormControlGroup formLabelProps={formLabelProps}>
+                <ParamT5EncoderModelSelect />
+                <ParamCLIPEmbedModelSelect />
               </FormControlGroup>
-            </Flex>
+            )}
           </>
         )}
       </Flex>

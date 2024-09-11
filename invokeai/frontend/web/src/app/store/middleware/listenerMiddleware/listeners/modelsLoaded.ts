@@ -10,7 +10,7 @@ import {
   rgIPAdapterModelChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
-import { modelChanged, refinerModelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import { clipEmbedModelSelected, modelChanged, refinerModelChanged, t5EncoderModelSelected, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
@@ -21,12 +21,14 @@ import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isCLIPEmbedModelConfig,
   isControlNetOrT2IAdapterModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
+  isT5EncoderModelConfig,
   isVAEModelConfig,
 } from 'services/api/types';
 
@@ -50,6 +52,8 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleControlAdapterModels(models, state, dispatch, log);
       handleSpandrelImageToImageModels(models, state, dispatch, log);
       handleIPAdapterModels(models, state, dispatch, log);
+      handleT5EncoderModels(models, state, dispatch, log)
+      handleCLIPEmbedModels(models, state, dispatch, log)
     },
   });
 };
@@ -221,5 +225,33 @@ const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch,
 
   if (!isCurrentPostProcessingModelAvailable) {
     dispatch(postProcessingModelChanged(firstModel));
+  }
+};
+
+const handleT5EncoderModels: ModelHandler = (models, state, dispatch, _log) => {
+  const { t5EncoderModel: currentT5EncoderModel } = state.params;
+  const t5EncoderModels = models.filter(isT5EncoderModelConfig);
+  const firstModel = t5EncoderModels[0] || null;
+
+  const isCurrentT5EncoderModelAvailable = currentT5EncoderModel
+    ? t5EncoderModels.some((m) => m.key === currentT5EncoderModel.key)
+    : false;
+
+  if (!isCurrentT5EncoderModelAvailable) {
+    dispatch(t5EncoderModelSelected(firstModel));
+  }
+};
+
+const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, _log) => {
+  const { clipEmbedModel: currentCLIPEmbedModel } = state.params;
+  const CLIPEmbedModels = models.filter(isCLIPEmbedModelConfig);
+  const firstModel = CLIPEmbedModels[0] || null;
+
+  const isCurrentCLIPEmbedModelAvailable = currentCLIPEmbedModel
+    ? CLIPEmbedModels.some((m) => m.key === currentCLIPEmbedModel.key)
+    : false;
+
+  if (!isCurrentCLIPEmbedModelAvailable) {
+    dispatch(clipEmbedModelSelected(firstModel));
   }
 };

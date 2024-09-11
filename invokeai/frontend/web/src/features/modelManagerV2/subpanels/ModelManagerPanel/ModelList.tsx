@@ -9,7 +9,7 @@ import {
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  useClipEmbedModels,
+  useCLIPEmbedModels,
   useControlNetModels,
   useEmbeddingModels,
   useIPAdapterModels,
@@ -85,7 +85,7 @@ const ModelList = () => {
     [t5EncoderModels, searchTerm, filteredModelType]
   );
 
-  const [clipEmbedModels, { isLoading: isLoadingClipEmbedModels }] = useClipEmbedModels();
+  const [clipEmbedModels, { isLoading: isLoadingClipEmbedModels }] = useCLIPEmbedModels();
   const filteredClipEmbedModels = useMemo(
     () => modelsFilter(clipEmbedModels, searchTerm, filteredModelType),
     [clipEmbedModels, searchTerm, filteredModelType]

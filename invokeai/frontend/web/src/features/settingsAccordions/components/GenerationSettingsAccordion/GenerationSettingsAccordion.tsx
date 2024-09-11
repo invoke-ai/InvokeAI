@@ -18,6 +18,8 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
+import ParamGuidance from '../../../parameters/components/Core/ParamGuidance';
+import { selectIsFLUX } from '../../../controlLayers/store/paramsSlice';
 
 const formLabelProps: FormLabelProps = {
   minW: '4rem',
@@ -27,6 +29,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const modelConfig = useSelectedModelConfig();
   const activeTabName = useAppSelector(selectActiveTab);
+  const isFLUX = useAppSelector(selectIsFLUX);
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(selectLoRAsSlice, (loras) => {
@@ -71,9 +74,9 @@ export const GenerationSettingsAccordion = memo(() => {
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              <ParamScheduler />
+              {!isFLUX && <ParamScheduler />}
               <ParamSteps />
-              <ParamCFGScale />
+              {isFLUX ? <ParamGuidance /> : <ParamCFGScale />}
             </FormControlGroup>
           </Flex>
         </Expander>
