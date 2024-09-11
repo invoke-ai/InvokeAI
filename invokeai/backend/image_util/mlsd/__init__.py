@@ -41,7 +41,7 @@ class MLSDEdgeDetector:
         self.model.to(device)
         return self
 
-    def run(self, image: Image.Image, thr_v: float = 0.1, thr_d: float = 0.1) -> Image.Image:
+    def run(self, image: Image.Image, score_threshold: float = 0.1, distance_threshold: float = 20.0) -> Image.Image:
         """Processes an image and returns the detected edges."""
 
         np_img = pil_to_np(image)
@@ -53,7 +53,7 @@ class MLSDEdgeDetector:
         img_output = np.zeros_like(np_img)
 
         with torch.no_grad():
-            lines = pred_lines(np_img, self.model, [np_img.shape[0], np_img.shape[1]], thr_v, thr_d)
+            lines = pred_lines(np_img, self.model, [np_img.shape[0], np_img.shape[1]], score_threshold, distance_threshold)
             for line in lines:
                 x_start, y_start, x_end, y_end = [int(val) for val in line]
                 cv2.line(img_output, (x_start, y_start), (x_end, y_end), [255, 255, 255], 1)
