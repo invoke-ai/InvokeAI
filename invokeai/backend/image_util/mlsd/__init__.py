@@ -48,8 +48,8 @@ class MLSDDetector:
 
         height, width, _channels = np_img.shape
 
-        # This model requires the input image to have a resolution that is a multiple of 8
-        np_img = resize_to_multiple(np_img, 8)
+        # This model requires the input image to have a resolution that is a multiple of 64
+        np_img = resize_to_multiple(np_img, 64)
         img_output = np.zeros_like(np_img)
 
         with torch.no_grad():
