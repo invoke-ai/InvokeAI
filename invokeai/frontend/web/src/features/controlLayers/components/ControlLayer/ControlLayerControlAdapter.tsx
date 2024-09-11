@@ -6,6 +6,7 @@ import { Weight } from 'features/controlLayers/components/common/Weight';
 import { ControlLayerControlAdapterControlMode } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterControlMode';
 import { ControlLayerControlAdapterModel } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useIsSavingCanvas, usePullBboxIntoLayer } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useEntityFilter } from 'features/controlLayers/hooks/useEntityFilter';
 import {
   controlLayerBeginEndStepPctChanged,
@@ -17,7 +18,7 @@ import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/s
 import type { CanvasEntityIdentifier, ControlModeV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiShootingStarBold } from 'react-icons/pi';
+import { PiBoundingBoxBold, PiShootingStarBold } from 'react-icons/pi';
 import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 
 const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) => {
@@ -68,6 +69,9 @@ export const ControlLayerControlAdapter = memo(() => {
     [dispatch, entityIdentifier]
   );
 
+  const pullBboxIntoLayer = usePullBboxIntoLayer(entityIdentifier);
+  const isSaving = useIsSavingCanvas();
+
   return (
     <Flex flexDir="column" gap={3} position="relative" w="full">
       <Flex w="full" gap={2}>
@@ -79,6 +83,14 @@ export const ControlLayerControlAdapter = memo(() => {
           aria-label={t('controlLayers.filter.filter')}
           tooltip={t('controlLayers.filter.filter')}
           icon={<PiShootingStarBold />}
+        />
+        <IconButton
+          onClick={pullBboxIntoLayer}
+          isLoading={isSaving.isTrue}
+          variant="ghost"
+          aria-label={t('controlLayers.pullBboxIntoLayer')}
+          tooltip={t('controlLayers.pullBboxIntoLayer')}
+          icon={<PiBoundingBoxBold />}
         />
       </Flex>
       <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />

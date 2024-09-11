@@ -8,6 +8,10 @@ import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPA
 import { IPAdapterModel } from 'features/controlLayers/components/IPAdapter/IPAdapterModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import {
+  useIsSavingCanvas,
+  usePullBboxIntoRegionalGuidanceIPAdapter,
+} from 'features/controlLayers/hooks/saveCanvasHooks';
+import {
   rgIPAdapterBeginEndStepPctChanged,
   rgIPAdapterCLIPVisionModelChanged,
   rgIPAdapterDeleted,
@@ -20,7 +24,8 @@ import { selectCanvasSlice, selectRegionalGuidanceIPAdapter } from 'features/con
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { RGIPAdapterImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
-import { PiTrashSimpleBold } from 'react-icons/pi';
+import { useTranslation } from 'react-i18next';
+import { PiBoundingBoxBold, PiTrashSimpleBold } from 'react-icons/pi';
 import type { ImageDTO, IPAdapterModelConfig, RGIPAdapterImagePostUploadAction } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -31,6 +36,7 @@ type Props = {
 
 export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterNumber }: Props) => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const onDeleteIPAdapter = useCallback(() => {
     dispatch(rgIPAdapterDeleted({ entityIdentifier, ipAdapterId }));
@@ -100,6 +106,8 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterN
     () => ({ type: 'SET_RG_IP_ADAPTER_IMAGE', id: entityIdentifier.id, ipAdapterId }),
     [entityIdentifier.id, ipAdapterId]
   );
+  const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceIPAdapter(entityIdentifier, ipAdapterId);
+  const isSaving = useIsSavingCanvas();
 
   return (
     <Flex flexDir="column" gap={3}>
@@ -125,6 +133,14 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterN
               onChangeCLIPVisionModel={onChangeCLIPVisionModel}
             />
           </Box>
+          <IconButton
+            onClick={pullBboxIntoIPAdapter}
+            isLoading={isSaving.isTrue}
+            variant="ghost"
+            aria-label={t('controlLayers.pullBboxIntoIPAdapter')}
+            tooltip={t('controlLayers.pullBboxIntoIPAdapter')}
+            icon={<PiBoundingBoxBold />}
+          />
         </Flex>
         <Flex gap={4} w="full" alignItems="center">
           <Flex flexDir="column" gap={3} w="full">
