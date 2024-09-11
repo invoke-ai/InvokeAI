@@ -48,6 +48,7 @@ export type ParamsState = {
   model: ParameterModel | null;
   vae: ParameterVAEModel | null;
   vaePrecision: ParameterPrecision;
+  fluxVAE: ParameterVAEModel | null;
   seamlessXAxis: boolean;
   seamlessYAxis: boolean;
   clipSkip: number;
@@ -89,6 +90,7 @@ const initialState: ParamsState = {
   steps: 50,
   model: null,
   vae: null,
+  fluxVAE: null,
   vaePrecision: 'fp32',
   seamlessXAxis: false,
   seamlessYAxis: false,
@@ -172,6 +174,9 @@ export const paramsSlice = createSlice({
     vaeSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       // null is a valid VAE!
       state.vae = action.payload;
+    },
+    fluxVAESelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      state.fluxVAE = action.payload;
     },
     t5EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
       state.t5EncoderModel = action.payload;
@@ -272,6 +277,7 @@ export const {
   setSeamlessYAxis,
   setShouldRandomizeSeed,
   vaeSelected,
+  fluxVAESelected,
   vaePrecisionChanged,
   t5EncoderModelSelected,
   clipEmbedModelSelected,
@@ -315,6 +321,7 @@ export const selectIsFLUX = createParamsSelector((params) => params.model?.base 
 export const selectModel = createParamsSelector((params) => params.model);
 export const selectModelKey = createParamsSelector((params) => params.model?.key);
 export const selectVAE = createParamsSelector((params) => params.vae);
+export const selectFLUXVAE = createParamsSelector((params) => params.fluxVAE);
 export const selectVAEKey = createParamsSelector((params) => params.vae?.key);
 export const selectT5EncoderModel = createParamsSelector((params) => params.t5EncoderModel);
 export const selectCLIPEmbedModel = createParamsSelector((params) => params.clipEmbedModel);

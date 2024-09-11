@@ -83,6 +83,10 @@ export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConf
   return config.type === 'vae';
 };
 
+export const isNonFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return config.type === 'vae' && config.base !== 'flux';
+};
+
 export const isFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
   return config.type === 'vae' && config.base === 'flux';
 };

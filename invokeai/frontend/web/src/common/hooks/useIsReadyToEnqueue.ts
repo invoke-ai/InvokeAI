@@ -155,6 +155,9 @@ const createSelector = (
           if (!params.clipEmbedModel) {
             reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
           }
+          if (!params.fluxVAE) {
+            reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+          }
         }
 
         canvas.controlLayers.entities

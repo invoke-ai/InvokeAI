@@ -12,6 +12,7 @@ import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamS
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
 import ParamVAEModelSelect from 'features/parameters/components/VAEModel/ParamVAEModelSelect';
+import ParamFLUXVAEModelSelect from 'features/parameters/components/VAEModel/ParamFLUXVAEModelSelect';
 import ParamVAEPrecision from 'features/parameters/components/VAEModel/ParamVAEPrecision';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -86,7 +87,7 @@ export const AdvancedSettingsAccordion = memo(() => {
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
         <Flex gap={4} w="full">
-          <ParamVAEModelSelect />
+          {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
           {!isFLUX && <ParamVAEPrecision />}
         </Flex>
         {activeTabName === 'upscaling' ? (
@@ -112,7 +113,7 @@ export const AdvancedSettingsAccordion = memo(() => {
               </>
             )}
             {isFLUX && (
-              <FormControlGroup formLabelProps={formLabelProps}>
+              <FormControlGroup>
                 <ParamT5EncoderModelSelect />
                 <ParamCLIPEmbedModelSelect />
               </FormControlGroup>
