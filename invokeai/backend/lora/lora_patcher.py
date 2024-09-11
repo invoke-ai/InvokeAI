@@ -179,7 +179,9 @@ class LoraPatcher:
 
             # Move the LoRA sidecar layer to the same device/dtype as the orig module.
             # TODO(ryand): Experiment with moving to the device first, then casting. This could be faster.
-            lora_sidecar_layer.to(device=module.weight.device, dtype=module.weight.dtype)
+            # HACK(ryand): Set the dtype properly here. We want to set it to the *compute* dtype of the original module.
+            # In the case of quantized layers, this may be different than the weight dtype.
+            lora_sidecar_layer.to(device=module.weight.device, dtype=torch.bfloat16)
 
             if module_key in original_modules:
                 # The module has already been patched with a LoRASidecarModule. Append to it.
@@ -197,7 +199,7 @@ class LoraPatcher:
     def _initialize_lora_sidecar_layer(orig_layer: torch.nn.Module, lora_layer: AnyLoRALayer, patch_weight: float):
         if isinstance(orig_layer, torch.nn.Linear):
             if isinstance(lora_layer, LoRALayer):
-                return LoRALinearSidecarLayer.from_layers(orig_layer, lora_layer, patch_weight)
+                return LoRALinearSidecarLayer(lora_layer=lora_layer, weight=patch_weight)
             else:
                 raise ValueError(f"Unsupported Linear LoRA layer type: {type(lora_layer)}")
         elif isinstance(orig_layer, torch.nn.Conv1d):
