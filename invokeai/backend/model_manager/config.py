@@ -25,6 +25,7 @@ from enum import Enum
 from typing import Literal, Optional, Type, TypeAlias, Union
 
 import diffusers
+import onnxruntime as ort
 import torch
 from diffusers.models.modeling_utils import ModelMixin
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
@@ -37,7 +38,9 @@ from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NA
 
 # ModelMixin is the base class for all diffusers and transformers models
 # RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
-AnyModel = Union[ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor], diffusers.DiffusionPipeline]
+AnyModel = Union[
+    ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor], diffusers.DiffusionPipeline, ort.InferenceSession
+]
 
 
 class InvalidModelConfigException(Exception):
