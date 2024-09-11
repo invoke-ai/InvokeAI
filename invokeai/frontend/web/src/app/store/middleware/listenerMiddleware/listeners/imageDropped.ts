@@ -4,6 +4,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import { selectDefaultControlAdapter } from 'features/controlLayers/hooks/addLayerHooks';
 import {
   controlLayerAdded,
+  entityRasterized,
   ipaImageChanged,
   rasterLayerAdded,
   rgIPAdapterImageChanged,
@@ -114,6 +115,18 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
           controlAdapter: defaultControlAdapter,
         };
         dispatch(controlLayerAdded({ overrides, isSelected: true }));
+        return;
+      }
+
+      /**
+       * Image dropped on Raster layer
+       */
+      if (overData.actionType === 'REPLACE_LAYER_WITH_IMAGE' && activeData.payloadType === 'IMAGE_DTO') {
+        const state = getState();
+        const { entityIdentifier } = overData.context;
+        const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
+        const { x, y } = selectCanvasSlice(state).bbox.rect;
+        dispatch(entityRasterized({ entityIdentifier, imageObject, position: { x, y }, replaceObjects: true }));
         return;
       }
 

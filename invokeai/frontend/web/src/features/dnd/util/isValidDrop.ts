@@ -20,6 +20,7 @@ export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?
     case 'SET_UPSCALE_INITIAL_IMAGE':
     case 'SET_NODES_IMAGE':
     case 'SELECT_FOR_COMPARE':
+    case 'REPLACE_LAYER_WITH_IMAGE':
       return payloadType === 'IMAGE_DTO';
     case 'ADD_TO_BOARD': {
       // If the board is the same, don't allow the drop
