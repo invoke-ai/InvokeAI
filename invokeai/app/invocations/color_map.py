@@ -8,17 +8,17 @@ from invokeai.backend.image_util.util import np_to_pil, pil_to_np
 
 
 @invocation(
-    "color_map_generator",
-    title="Color Map Generator",
+    "color_map",
+    title="Color Map",
     tags=["controlnet"],
     category="controlnet",
     version="1.0.0",
 )
-class ColorMapGeneratorInvocation(BaseInvocation, WithMetadata, WithBoard):
+class ColorMapInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates a color map from the provided image."""
 
     image: ImageField = InputField(description="The image to process")
-    color_map_tile_size: int = InputField(default=64, ge=1, description=FieldDescriptions.tile_size)
+    tile_size: int = InputField(default=64, ge=1, description=FieldDescriptions.tile_size)
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name, "RGB")
@@ -26,8 +26,8 @@ class ColorMapGeneratorInvocation(BaseInvocation, WithMetadata, WithBoard):
         np_image = pil_to_np(image)
         height, width = np_image.shape[:2]
 
-        width_tile_size = min(self.color_map_tile_size, width)
-        height_tile_size = min(self.color_map_tile_size, height)
+        width_tile_size = min(self.tile_size, width)
+        height_tile_size = min(self.tile_size, height)
 
         color_map = cv2.resize(
             np_image,
