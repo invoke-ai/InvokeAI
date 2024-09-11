@@ -70,6 +70,8 @@ class LoRAConvSidecarLayer(torch.nn.Module):
                 weight=weight,
             )
 
+        # TODO(ryand): Are there cases where we need to reshape the weight matrices to match the conv layers?
+
         # Inject weight into the LoRA layer.
         assert model._up.weight.shape == lora_layer.up.shape
         assert model._down.weight.shape == lora_layer.down.shape
