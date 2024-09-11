@@ -18,18 +18,18 @@ def make_noise_disk(H, W, C, F):
     return noise
 
 
-def content_shuffle(input_image: Image.Image, f: int | None = None) -> Image.Image:
+def content_shuffle(input_image: Image.Image, scale_factor: int | None = None) -> Image.Image:
     """Shuffles the content of an image using a disk noise pattern, similar to a 'liquify' effect."""
 
     np_img = pil_to_np(input_image)
 
     height, width, _channels = np_img.shape
 
-    if f is None:
-        f = 256
+    if scale_factor is None:
+        scale_factor = 256
 
-    x = make_noise_disk(height, width, 1, f) * float(width - 1)
-    y = make_noise_disk(height, width, 1, f) * float(height - 1)
+    x = make_noise_disk(height, width, 1, scale_factor) * float(width - 1)
+    y = make_noise_disk(height, width, 1, scale_factor) * float(height - 1)
 
     flow = np.concatenate([x, y], axis=2).astype(np.float32)
 
