@@ -41,7 +41,7 @@ class PIDINetDetector:
         return self
 
     def run(
-        self, image: Image.Image, safe: bool = False, scribble: bool = False, apply_filter: bool = False
+        self, image: Image.Image, quantize_edges: bool = False, scribble: bool = False, apply_filter: bool = False
     ) -> Image.Image:
         """Processes an image and returns the detected edges."""
 
@@ -62,7 +62,7 @@ class PIDINetDetector:
             edge = edge.cpu().numpy()
             if apply_filter:
                 edge = edge > 0.5
-            if safe:
+            if quantize_edges:
                 edge = safe_step(edge)
             edge = (edge * 255.0).clip(0, 255).astype(np.uint8)
 
