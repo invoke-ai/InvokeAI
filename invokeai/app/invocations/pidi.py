@@ -17,7 +17,7 @@ class PiDiNetEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an edge map using PiDiNet."""
 
     image: ImageField = InputField(description="The image to process")
-    safe: bool = InputField(default=False, description=FieldDescriptions.safe_mode)
+    quantize_edges: bool = InputField(default=False, description=FieldDescriptions.safe_mode)
     scribble: bool = InputField(default=False, description=FieldDescriptions.scribble_mode)
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -27,7 +27,7 @@ class PiDiNetEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
         with loaded_model as model:
             assert isinstance(model, PiDiNet)
             detector = PIDINetDetector(model)
-            edge_map = detector.run(image=image, safe=self.safe, scribble=self.scribble)
+            edge_map = detector.run(image=image, quantize_edges=self.quantize_edges, scribble=self.scribble)
 
         image_dto = context.images.save(image=edge_map)
         return ImageOutput.build(image_dto)
