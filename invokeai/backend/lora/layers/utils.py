@@ -17,7 +17,7 @@ def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> AnyLo
 
     if "lora_up.weight" in state_dict:
         # LoRA a.k.a LoCon
-        return LoRALayer(state_dict)
+        return LoRALayer.from_state_dict_values(state_dict)
     elif "hada_w1_a" in state_dict:
         return LoHALayer(state_dict)
     elif "lokr_w1" in state_dict or "lokr_w1_a" in state_dict:

@@ -3,34 +3,60 @@ from typing import Dict, Optional
 import torch
 
 from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
-from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
-# TODO: find and debug lora/locon with bias
 class LoRALayer(LoRALayerBase):
-    # up: torch.Tensor
-    # mid: Optional[torch.Tensor]
-    # down: torch.Tensor
-
     def __init__(
         self,
+        up: torch.Tensor,
+        mid: Optional[torch.Tensor],
+        down: torch.Tensor,
+        alpha: float | None,
+        bias: Optional[torch.Tensor],
+    ):
+        super().__init__(alpha, bias)
+        self.up = torch.nn.Parameter(up)
+        self.mid = torch.nn.Parameter(mid) if mid is not None else None
+        self.down = torch.nn.Parameter(down)
+        self.bias = torch.nn.Parameter(bias) if bias is not None else None
+
+    @classmethod
+    def from_state_dict_values(
+        cls,
         values: Dict[str, torch.Tensor],
     ):
-        super().__init__(values)
+        alpha = cls._parse_alpha(values.get("alpha", None))
+        bias = cls._parse_bias(
+            values.get("bias_indices", None), values.get("bias_values", None), values.get("bias_size", None)
+        )
 
-        self.up = values["lora_up.weight"]
-        self.down = values["lora_down.weight"]
-        self.mid = values.get("lora_mid.weight", None)
+        layer = cls(
+            up=values["lora_up.weight"],
+            down=values["lora_down.weight"],
+            mid=values.get("lora_mid.weight", None),
+            alpha=alpha,
+            bias=bias,
+        )
 
-        self.rank = self.down.shape[0]
-        self.check_keys(
-            values,
-            {
+        cls.warn_on_unhandled_keys(
+            values=values,
+            handled_keys={
+                # Default keys.
+                "alpha",
+                "bias_indices",
+                "bias_values",
+                "bias_size",
+                # Layer-specific keys.
                 "lora_up.weight",
                 "lora_down.weight",
                 "lora_mid.weight",
             },
         )
+
+        return layer
+
+    def rank(self) -> int:
+        return self.down.shape[0]
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         if self.mid is not None:
@@ -43,15 +69,7 @@ class LoRALayer(LoRALayerBase):
         return weight
 
     def calc_size(self) -> int:
-        model_size = super().calc_size()
-        model_size += calc_tensors_size([self.up, self.mid, self.down])
-        return model_size
+        # HACK(ryand): Fix this issue with circular imports.
+        from invokeai.backend.model_manager.load.model_util import calc_module_size
 
-    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
-        super().to(device=device, dtype=dtype)
-
-        self.up = self.up.to(device=device, dtype=dtype)
-        self.down = self.down.to(device=device, dtype=dtype)
-
-        if self.mid is not None:
-            self.mid = self.mid.to(device=device, dtype=dtype)
+        return calc_module_size(self)

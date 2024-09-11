@@ -14,33 +14,33 @@ class ConcatenatedLoRALayer(LoRALayerBase):
     """
 
     def __init__(self, lora_layers: List[LoRALayerBase], concat_axis: int = 0):
-        # Note: We pass values={} to the base class, because the values are handled by the individual LoRA layers.
-        super().__init__(values={})
+        super().__init__(alpha=None, bias=None)
 
-        self._lora_layers = lora_layers
-        self._concat_axis = concat_axis
+        self.lora_layers = torch.nn.ModuleList(lora_layers)
+        self.concat_axis = concat_axis
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         # TODO(ryand): Currently, we pass orig_weight=None to the sub-layers. If we want to support sub-layers that
         # require this value, we will need to implement chunking of the original weight tensor here.
-        layer_weights = [lora_layer.get_weight(None) for lora_layer in self._lora_layers]  # pyright: ignore[reportArgumentType]
-        return torch.cat(layer_weights, dim=self._concat_axis)
+        # Note that we must apply the sub-layer scales here.
+        layer_weights = [lora_layer.get_weight(None) * lora_layer.scale() for lora_layer in self.lora_layers]  # pyright: ignore[reportArgumentType]
+        return torch.cat(layer_weights, dim=self.concat_axis)
 
     def get_bias(self, orig_bias: torch.Tensor) -> Optional[torch.Tensor]:
         # TODO(ryand): Currently, we pass orig_bias=None to the sub-layers. If we want to support sub-layers that
         # require this value, we will need to implement chunking of the original bias tensor here.
-        layer_biases = [lora_layer.get_bias(None) for lora_layer in self._lora_layers]  # pyright: ignore[reportArgumentType]
-        layer_bias_is_none = [layer_bias is None for layer_bias in layer_biases]
-        if any(layer_bias_is_none):
-            assert all(layer_bias_is_none)
+        # Note that we must apply the sub-layer scales here.
+        layer_biases: list[torch.Tensor] = []
+        for lora_layer in self.lora_layers:
+            layer_bias = lora_layer.get_bias(None)
+            if layer_bias is not None:
+                layer_biases.append(layer_bias * lora_layer.scale())
+
+        if len(layer_biases) == 0:
             return None
 
-        # Ignore the type error, because we have just verified that all layer biases are non-None.
-        return torch.cat(layer_biases, dim=self._concat_axis)
+        assert len(layer_biases) == len(self.lora_layers)
+        return torch.cat(layer_biases, dim=self.concat_axis)
 
     def calc_size(self) -> int:
-        return sum(lora_layer.calc_size() for lora_layer in self._lora_layers)
-
-    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
-        for lora_layer in self._lora_layers:
-            lora_layer.to(device=device, dtype=dtype)
+        return sum(lora_layer.calc_size() for lora_layer in self.lora_layers)
