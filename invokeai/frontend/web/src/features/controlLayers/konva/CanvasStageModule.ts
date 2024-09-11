@@ -58,6 +58,7 @@ export class CanvasStageModule extends CanvasModuleBase {
   });
 
   subscriptions = new Set<() => void>();
+  resizeObserver: ResizeObserver | null = null;
 
   constructor(container: HTMLDivElement, manager: CanvasManager) {
     super();
@@ -81,33 +82,31 @@ export class CanvasStageModule extends CanvasModuleBase {
   setContainer = (container: HTMLDivElement) => {
     this.container = container;
     this.konva.stage.container(container);
+    this.setResizeObserver();
   };
 
-  setEventListeners = () => {
-    this.konva.stage.on('wheel', this.onStageMouseWheel);
-    this.konva.stage.on('dragmove', this.onStageDragMove);
-    this.konva.stage.on('dragend', this.onStageDragEnd);
-
-    return () => {
-      this.konva.stage.off('wheel', this.onStageMouseWheel);
-      this.konva.stage.off('dragmove', this.onStageDragMove);
-      this.konva.stage.off('dragend', this.onStageDragEnd);
-    };
+  setResizeObserver = () => {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+    this.resizeObserver = new ResizeObserver(this.fitStageToContainer);
+    this.resizeObserver.observe(this.container);
   };
 
   initialize = () => {
     this.log.debug('Initializing module');
     this.konva.stage.container(this.container);
-    const resizeObserver = new ResizeObserver(this.fitStageToContainer);
-    resizeObserver.observe(this.container);
+    this.setResizeObserver();
     this.fitStageToContainer();
     this.fitLayersToStage();
-    const cleanupListeners = this.setEventListeners();
 
-    this.subscriptions.add(cleanupListeners);
-    this.subscriptions.add(() => {
-      resizeObserver.disconnect();
-    });
+    this.konva.stage.on('wheel', this.onStageMouseWheel);
+    this.konva.stage.on('dragmove', this.onStageDragMove);
+    this.konva.stage.on('dragend', this.onStageDragEnd);
+
+    this.subscriptions.add(() => this.konva.stage.off('wheel', this.onStageMouseWheel));
+    this.subscriptions.add(() => this.konva.stage.off('dragmove', this.onStageDragMove));
+    this.subscriptions.add(() => this.konva.stage.off('dragend', this.onStageDragEnd));
   };
 
   /**
@@ -382,6 +381,9 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.subscriptions.clear();
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
     this.konva.stage.destroy();
   };
 }
