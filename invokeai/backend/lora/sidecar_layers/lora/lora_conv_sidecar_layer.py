@@ -31,22 +31,6 @@ class LoRAConvSidecarLayer(torch.nn.Module):
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ):
-        """Initialize a LoRAConvLayer.
-        Args:
-            in_channels (int): The number of channels expected on inputs to this layer.
-            out_channels (int): The number of channels on outputs from this layer.
-            kernel_size: The kernel_size of the conv layer that this LoRA layer is mirroring. See torch.nn.Conv* docs.
-            stride: The stride of the conv layer that this LoRA layer is mirroring. See torch.nn.Conv* docs.
-            padding: The padding of the conv layer that this LoRA layer is mirroring. See torch.nn.Conv* docs.
-            rank (int, optional): The internal rank of the layer. See the paper for details.
-            alpha (float, optional): A scaling factor that enables tuning the rank without having to adjust the learning
-                rate. The recommendation from the paper is to set alpha equal to the first rank that you try and then do
-                not tune it further. See the paper for more details.
-            device (torch.device, optional): Device where weights will be initialized.
-            dtype (torch.dtype, optional): Weight dtype.
-        Raises:
-            ValueError: If the rank is greater than either in_channels or out_channels.
-        """
         super().__init__()
 
         if rank > min(in_channels, out_channels):
