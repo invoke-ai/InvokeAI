@@ -2,19 +2,19 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import ImageField, InputField, WithBoard, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.image_util.mlsd import MLSDEdgeDetector
+from invokeai.backend.image_util.mlsd import MLSDDetector
 from invokeai.backend.image_util.mlsd.models.mbv2_mlsd_large import MobileV2_MLSD_Large
 
 
 @invocation(
-    "mlsd_edge_detection",
-    title="MLSD Edge Detection",
+    "mlsd_detection",
+    title="MLSD Detection",
     tags=["controlnet", "mlsd", "edge"],
     category="controlnet",
     version="1.0.0",
 )
-class MLSDEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
-    """Generates an line segment edge map using MLSD."""
+class MLSDDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Generates an line segment map using MLSD."""
 
     image: ImageField = InputField(description="The image to process")
     score_threshold: float = InputField(
@@ -28,11 +28,11 @@ class MLSDEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name, "RGB")
-        loaded_model = context.models.load_remote_model(MLSDEdgeDetector.get_model_url(), MLSDEdgeDetector.load_model)
+        loaded_model = context.models.load_remote_model(MLSDDetector.get_model_url(), MLSDDetector.load_model)
 
         with loaded_model as model:
             assert isinstance(model, MobileV2_MLSD_Large)
-            detector = MLSDEdgeDetector(model)
+            detector = MLSDDetector(model)
             edge_map = detector.run(image, self.score_threshold, self.distance_threshold)
 
         image_dto = context.images.save(image=edge_map)
