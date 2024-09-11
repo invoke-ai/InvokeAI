@@ -950,7 +950,7 @@ export const canvasSlice = createSlice({
       }
     },
     entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
-      const { entityIdentifier, imageObject, rect, replaceObjects } = action.payload;
+      const { entityIdentifier, imageObject, position, replaceObjects } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
@@ -959,7 +959,7 @@ export const canvasSlice = createSlice({
       if (isRenderableEntity(entity)) {
         if (replaceObjects) {
           entity.objects = [imageObject];
-          entity.position = { x: rect.x, y: rect.y };
+          entity.position = position;
         }
       }
     },
