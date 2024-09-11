@@ -1,15 +1,15 @@
 import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { DepthAnythingModelSize, DepthAnythingProcessorConfig } from 'features/controlLayers/store/types';
-import { isDepthAnythingModelSize } from 'features/controlLayers/store/types';
+import type { DepthAnythingFilterConfig, DepthAnythingModelSize } from 'features/controlLayers/store/filters';
+import { isDepthAnythingModelSize } from 'features/controlLayers/store/filters';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { FilterComponentProps } from './types';
 
-type Props = FilterComponentProps<DepthAnythingProcessorConfig>;
+type Props = FilterComponentProps<DepthAnythingFilterConfig>;
 
-export const FilterDepthAnything = memo(({ onChange, config }: Props) => {
+export const FilterDepthAnythingDepthEstimation = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();
   const handleModelSizeChange = useCallback<ComboboxOnChange>(
     (v) => {
@@ -23,10 +23,10 @@ export const FilterDepthAnything = memo(({ onChange, config }: Props) => {
 
   const options: { label: string; value: DepthAnythingModelSize }[] = useMemo(
     () => [
-      { label: t('controlnet.depthAnythingSmallV2'), value: 'small_v2' },
-      { label: t('controlnet.small'), value: 'small' },
-      { label: t('controlnet.base'), value: 'base' },
-      { label: t('controlnet.large'), value: 'large' },
+      { label: t('controlLayers.filter.depth_anything_depth_estimation.model_size_small_v2'), value: 'small_v2' },
+      { label: t('controlLayers.filter.depth_anything_depth_estimation.model_size_small'), value: 'small' },
+      { label: t('controlLayers.filter.depth_anything_depth_estimation.model_size_base'), value: 'base' },
+      { label: t('controlLayers.filter.depth_anything_depth_estimation.model_size_large'), value: 'large' },
     ],
     [t]
   );
@@ -36,11 +36,11 @@ export const FilterDepthAnything = memo(({ onChange, config }: Props) => {
   return (
     <>
       <FormControl>
-        <FormLabel m={0}>{t('controlnet.modelSize')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.depth_anything_depth_estimation.model_size')}</FormLabel>
         <Combobox value={value} options={options} onChange={handleModelSizeChange} isSearchable={false} />
       </FormControl>
     </>
   );
 });
 
-FilterDepthAnything.displayName = 'FilterDepthAnything';
+FilterDepthAnythingDepthEstimation.displayName = 'FilterDepthAnythingDepthEstimation';

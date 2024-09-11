@@ -1,14 +1,14 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
-import type { HedProcessorConfig } from 'features/controlLayers/store/types';
+import type { HEDEdgeDetectionFilterConfig } from 'features/controlLayers/store/filters';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { FilterComponentProps } from './types';
 
-type Props = FilterComponentProps<HedProcessorConfig>;
+type Props = FilterComponentProps<HEDEdgeDetectionFilterConfig>;
 
-export const FilterHed = memo(({ onChange, config }: Props) => {
+export const FilterHEDEdgeDetection = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();
 
   const handleScribbleChanged = useCallback(
@@ -21,11 +21,11 @@ export const FilterHed = memo(({ onChange, config }: Props) => {
   return (
     <>
       <FormControl>
-        <FormLabel m={0}>{t('controlnet.scribble')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.hed_edge_detection.scribble')}</FormLabel>
         <Switch isChecked={config.scribble} onChange={handleScribbleChanged} />
       </FormControl>
     </>
   );
 });
 
-FilterHed.displayName = 'FilterHed';
+FilterHEDEdgeDetection.displayName = 'FilterHEDEdgeDetection';

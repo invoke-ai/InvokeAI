@@ -1809,13 +1809,81 @@
             "process": "Process",
             "apply": "Apply",
             "cancel": "Cancel",
-            "spandrel": {
+            "spandrel_filter": {
                 "label": "Image-to-Image Model",
                 "description": "Run an image-to-image model on the selected layer.",
-                "paramModel": "Model",
-                "paramAutoScale": "Auto Scale",
-                "paramAutoScaleDesc": "The selected model will be run until the target scale is reached.",
-                "paramScale": "Target Scale"
+                "model": "Model",
+                "autoScale": "Auto Scale",
+                "autoScaleDesc": "The selected model will be run until the target scale is reached.",
+                "scale": "Target Scale"
+            },
+            "canny_edge_detection": {
+                "label": "Canny Edge Detection",
+                "description": "Generates an edge map from the selected layer using the Canny edge detection algorithm.",
+                "low_threshold": "Low Threshold",
+                "high_threshold": "Hight Threshold"
+            },
+            "color_map": {
+                "label": "Color Map",
+                "description": "Create a color map from the selected layer.",
+                "tile_size": "Tile Size"
+            },
+            "content_shuffle": {
+                "label": "Content Shuffle",
+                "description": "Shuffles the content of the selected layer, similar to a 'liquify' effect.",
+                "scale_factor": "Scale Factor"
+            },
+            "depth_anything_depth_estimation": {
+                "label": "Depth Anything",
+                "description": "Generates a depth map from the selected layer using a Depth Anything model.",
+                "model_size": "Model Size",
+                "model_size_small": "Small",
+                "model_size_small_v2": "Small v2",
+                "model_size_base": "Base",
+                "model_size_large": "Large"
+            },
+            "dw_openpose_detection": {
+                "label": "DW Openpose Detection",
+                "description": "Detects human poses in the selected layer using the DW Openpose model.",
+                "draw_hands": "Draw Hands",
+                "draw_face": "Draw Face",
+                "draw_body": "Draw Body"
+            },
+            "hed_edge_detection": {
+                "label": "HED Edge Detection",
+                "description": "Generates an edge map from the selected layer using the HED edge detection model.",
+                "scribble": "Scribble"
+            },
+            "lineart_anime_edge_detection": {
+                "label": "Lineart Anime Edge Detection",
+                "description": "Generates an edge map from the selected layer using the Lineart Anime edge detection model."
+            },
+            "lineart_edge_detection": {
+                "label": "Lineart Edge Detection",
+                "description": "Generates an edge map from the selected layer using the Lineart edge detection model.",
+                "coarse": "Coarse"
+            },
+            "mediapipe_face_detection": {
+                "label": "MediaPipe Face Detection",
+                "description": "Detects faces in the selected layer using the MediaPipe face detection model.",
+                "max_faces": "Max Faces",
+                "min_confidence": "Min Confidence"
+            },
+            "mlsd_detection": {
+                "label": "Line Segment Detection",
+                "description": "Generates a line segment map from the selected layer using the MLSD line segment detection model.",
+                "score_threshold": "Score Threshold",
+                "distance_threshold": "Distance Threshold"
+            },
+            "normal_map": {
+                "label": "Normal Map",
+                "description": "Generates a normal map from the selected layer."
+            },
+            "pidi_edge_detection": {
+                "label": "PiDiNet Edge Detection",
+                "description": "Generates an edge map from the selected layer using the PiDiNet edge detection model.",
+                "scribble": "Scribble",
+                "quantize_edges": "Quantize Edges"
             }
         },
         "transform": {

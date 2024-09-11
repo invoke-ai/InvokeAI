@@ -1,30 +1,26 @@
+import type {
+  CannyEdgeDetectionFilterConfig,
+  ColorMapFilterConfig,
+  ContentShuffleFilterConfig,
+  DepthAnythingFilterConfig,
+  DepthAnythingModelSize,
+  DWOpenposeDetectionFilterConfig,
+  FilterConfig,
+  FilterType,
+  HEDEdgeDetectionFilterConfig,
+  LineartAnimeEdgeDetectionFilterConfig,
+  LineartEdgeDetectionFilterConfig,
+  MediaPipeFaceDetectionFilterConfig,
+  MLSDDetectionFilterConfig,
+  NormalMapFilterConfig,
+  PiDiNetEdgeDetectionFilterConfig,
+} from 'features/controlLayers/store/filters';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 import { describe, test } from 'vitest';
 
-import type {
-  CannyProcessorConfig,
-  CLIPVisionModelV2,
-  ColorMapProcessorConfig,
-  ContentShuffleProcessorConfig,
-  ControlModeV2,
-  DepthAnythingModelSize,
-  DepthAnythingProcessorConfig,
-  DWOpenposeProcessorConfig,
-  FilterConfig,
-  FilterType,
-  HedProcessorConfig,
-  IPMethodV2,
-  LineartAnimeProcessorConfig,
-  LineartProcessorConfig,
-  MediapipeFaceProcessorConfig,
-  MidasDepthProcessorConfig,
-  MlsdProcessorConfig,
-  NormalbaeProcessorConfig,
-  PidiProcessorConfig,
-  ZoeDepthProcessorConfig,
-} from './types';
+import type { CLIPVisionModelV2, ControlModeV2, IPMethodV2 } from './types';
 
 describe('Control Adapter Types', () => {
   test('ProcessorType', () => {
@@ -40,54 +36,46 @@ describe('Control Adapter Types', () => {
     assert<Equals<NonNullable<Invocation<'controlnet'>['control_mode']>, ControlModeV2>>();
   });
   test('DepthAnything Model Size', () => {
-    assert<Equals<NonNullable<Invocation<'depth_anything_image_processor'>['model_size']>, DepthAnythingModelSize>>();
+    assert<Equals<NonNullable<Invocation<'depth_anything_depth_estimation'>['model_size']>, DepthAnythingModelSize>>();
   });
   test('Processor Configs', () => {
     // The processor configs are manually modeled zod schemas. This test ensures that the inferred types are correct.
     // The types prefixed with `_` are types generated from OpenAPI, while the types without the prefix are manually modeled.
-    assert<Equals<_CannyProcessorConfig, CannyProcessorConfig>>();
-    assert<Equals<_ColorMapProcessorConfig, ColorMapProcessorConfig>>();
-    assert<Equals<_ContentShuffleProcessorConfig, ContentShuffleProcessorConfig>>();
-    assert<Equals<_DepthAnythingProcessorConfig, DepthAnythingProcessorConfig>>();
-    assert<Equals<_HedProcessorConfig, HedProcessorConfig>>();
-    assert<Equals<_LineartAnimeProcessorConfig, LineartAnimeProcessorConfig>>();
-    assert<Equals<_LineartProcessorConfig, LineartProcessorConfig>>();
-    assert<Equals<_MediapipeFaceProcessorConfig, MediapipeFaceProcessorConfig>>();
-    assert<Equals<_MidasDepthProcessorConfig, MidasDepthProcessorConfig>>();
-    assert<Equals<_MlsdProcessorConfig, MlsdProcessorConfig>>();
-    assert<Equals<_NormalbaeProcessorConfig, NormalbaeProcessorConfig>>();
-    assert<Equals<_DWOpenposeProcessorConfig, DWOpenposeProcessorConfig>>();
-    assert<Equals<_PidiProcessorConfig, PidiProcessorConfig>>();
-    assert<Equals<_ZoeDepthProcessorConfig, ZoeDepthProcessorConfig>>();
+    assert<Equals<_CannyEdgeDetectionFilterConfig, CannyEdgeDetectionFilterConfig>>();
+    assert<Equals<_ColorMapFilterConfig, ColorMapFilterConfig>>();
+    assert<Equals<_ContentShuffleFilterConfig, ContentShuffleFilterConfig>>();
+    assert<Equals<_DepthAnythingFilterConfig, DepthAnythingFilterConfig>>();
+    assert<Equals<_HEDEdgeDetectionFilterConfig, HEDEdgeDetectionFilterConfig>>();
+    assert<Equals<_LineartAnimeEdgeDetectionFilterConfig, LineartAnimeEdgeDetectionFilterConfig>>();
+    assert<Equals<_LineartEdgeDetectionFilterConfig, LineartEdgeDetectionFilterConfig>>();
+    assert<Equals<_MediaPipeFaceDetectionFilterConfig, MediaPipeFaceDetectionFilterConfig>>();
+    assert<Equals<_MLSDDetectionFilterConfig, MLSDDetectionFilterConfig>>();
+    assert<Equals<_NormalMapFilterConfig, NormalMapFilterConfig>>();
+    assert<Equals<_DWOpenposeDetectionFilterConfig, DWOpenposeDetectionFilterConfig>>();
+    assert<Equals<_PiDiNetEdgeDetectionFilterConfig, PiDiNetEdgeDetectionFilterConfig>>();
   });
 });
 
 // Types derived from OpenAPI
-type _CannyProcessorConfig = Required<
-  Pick<Invocation<'canny_image_processor'>, 'id' | 'type' | 'low_threshold' | 'high_threshold'>
+type _CannyEdgeDetectionFilterConfig = Required<
+  Pick<Invocation<'canny_edge_detection'>, 'type' | 'low_threshold' | 'high_threshold'>
 >;
-type _ColorMapProcessorConfig = Required<
-  Pick<Invocation<'color_map_image_processor'>, 'id' | 'type' | 'color_map_tile_size'>
+type _ColorMapFilterConfig = Required<Pick<Invocation<'color_map'>, 'type' | 'tile_size'>>;
+type _ContentShuffleFilterConfig = Required<Pick<Invocation<'content_shuffle'>, 'type' | 'scale_factor'>>;
+type _DepthAnythingFilterConfig = Required<Pick<Invocation<'depth_anything_depth_estimation'>, 'type' | 'model_size'>>;
+type _HEDEdgeDetectionFilterConfig = Required<Pick<Invocation<'hed_edge_detection'>, 'type' | 'scribble'>>;
+type _LineartAnimeEdgeDetectionFilterConfig = Required<Pick<Invocation<'lineart_anime_edge_detection'>, 'type'>>;
+type _LineartEdgeDetectionFilterConfig = Required<Pick<Invocation<'lineart_edge_detection'>, 'type' | 'coarse'>>;
+type _MediaPipeFaceDetectionFilterConfig = Required<
+  Pick<Invocation<'mediapipe_face_detection'>, 'type' | 'max_faces' | 'min_confidence'>
 >;
-type _ContentShuffleProcessorConfig = Required<
-  Pick<Invocation<'content_shuffle_image_processor'>, 'id' | 'type' | 'w' | 'h' | 'f'>
+type _MLSDDetectionFilterConfig = Required<
+  Pick<Invocation<'mlsd_detection'>, 'type' | 'score_threshold' | 'distance_threshold'>
 >;
-type _DepthAnythingProcessorConfig = Required<
-  Pick<Invocation<'depth_anything_image_processor'>, 'id' | 'type' | 'model_size'>
+type _NormalMapFilterConfig = Required<Pick<Invocation<'normal_map'>, 'type'>>;
+type _DWOpenposeDetectionFilterConfig = Required<
+  Pick<Invocation<'dw_openpose_detection'>, 'type' | 'draw_body' | 'draw_face' | 'draw_hands'>
 >;
-type _HedProcessorConfig = Required<Pick<Invocation<'hed_image_processor'>, 'id' | 'type' | 'scribble'>>;
-type _LineartAnimeProcessorConfig = Required<Pick<Invocation<'lineart_anime_image_processor'>, 'id' | 'type'>>;
-type _LineartProcessorConfig = Required<Pick<Invocation<'lineart_image_processor'>, 'id' | 'type' | 'coarse'>>;
-type _MediapipeFaceProcessorConfig = Required<
-  Pick<Invocation<'mediapipe_face_processor'>, 'id' | 'type' | 'max_faces' | 'min_confidence'>
+type _PiDiNetEdgeDetectionFilterConfig = Required<
+  Pick<Invocation<'pidi_edge_detection'>, 'type' | 'quantize_edges' | 'scribble'>
 >;
-type _MidasDepthProcessorConfig = Required<
-  Pick<Invocation<'midas_depth_image_processor'>, 'id' | 'type' | 'a_mult' | 'bg_th'>
->;
-type _MlsdProcessorConfig = Required<Pick<Invocation<'mlsd_image_processor'>, 'id' | 'type' | 'thr_v' | 'thr_d'>>;
-type _NormalbaeProcessorConfig = Required<Pick<Invocation<'normalbae_image_processor'>, 'id' | 'type'>>;
-type _DWOpenposeProcessorConfig = Required<
-  Pick<Invocation<'dw_openpose_image_processor'>, 'id' | 'type' | 'draw_body' | 'draw_face' | 'draw_hands'>
->;
-type _PidiProcessorConfig = Required<Pick<Invocation<'pidi_image_processor'>, 'id' | 'type' | 'safe' | 'scribble'>>;
-type _ZoeDepthProcessorConfig = Required<Pick<Invocation<'zoe_depth_image_processor'>, 'id' | 'type'>>;

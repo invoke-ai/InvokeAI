@@ -11,8 +11,8 @@ import {
   Tooltip,
 } from '@invoke-ai/ui-library';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import type { SpandrelFilterConfig } from 'features/controlLayers/store/types';
-import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
+import type { SpandrelFilterConfig } from 'features/controlLayers/store/filters';
+import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import type { ChangeEvent } from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +22,7 @@ import type { SpandrelImageToImageModelConfig } from 'services/api/types';
 import type { FilterComponentProps } from './types';
 
 type Props = FilterComponentProps<SpandrelFilterConfig>;
-const DEFAULTS = IMAGE_FILTERS['spandrel_filter'].buildDefaults();
+const DEFAULTS = IMAGE_FILTERS.spandrel_filter.buildDefaults();
 
 export const FilterSpandrel = ({ onChange, config }: Props) => {
   const { t } = useTranslation();

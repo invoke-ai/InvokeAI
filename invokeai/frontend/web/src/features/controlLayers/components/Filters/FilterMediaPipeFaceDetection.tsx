@@ -1,15 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { MediapipeFaceProcessorConfig } from 'features/controlLayers/store/types';
-import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
+import type { MediaPipeFaceDetectionFilterConfig } from 'features/controlLayers/store/filters';
+import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { FilterComponentProps } from './types';
 
-type Props = FilterComponentProps<MediapipeFaceProcessorConfig>;
-const DEFAULTS = IMAGE_FILTERS['mediapipe_face_processor'].buildDefaults();
+type Props = FilterComponentProps<MediaPipeFaceDetectionFilterConfig>;
+const DEFAULTS = IMAGE_FILTERS.mediapipe_face_detection.buildDefaults();
 
-export const FilterMediapipeFace = memo(({ onChange, config }: Props) => {
+export const FilterMediaPipeFaceDetection = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();
 
   const handleMaxFacesChanged = useCallback(
@@ -29,7 +29,7 @@ export const FilterMediapipeFace = memo(({ onChange, config }: Props) => {
   return (
     <>
       <FormControl>
-        <FormLabel m={0}>{t('controlnet.maxFaces')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.mediapipe_face_detection.max_faces')}</FormLabel>
         <CompositeSlider
           value={config.max_faces}
           onChange={handleMaxFacesChanged}
@@ -47,7 +47,7 @@ export const FilterMediapipeFace = memo(({ onChange, config }: Props) => {
         />
       </FormControl>
       <FormControl>
-        <FormLabel m={0}>{t('controlnet.minConfidence')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.mediapipe_face_detection.min_confidence')}</FormLabel>
         <CompositeSlider
           value={config.min_confidence}
           onChange={handleMinConfidenceChanged}
@@ -70,4 +70,4 @@ export const FilterMediapipeFace = memo(({ onChange, config }: Props) => {
   );
 });
 
-FilterMediapipeFace.displayName = 'FilterMediapipeFace';
+FilterMediaPipeFaceDetection.displayName = 'FilterMediaPipeFaceDetection';
