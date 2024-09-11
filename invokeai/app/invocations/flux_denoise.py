@@ -192,6 +192,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         with (
             transformer_info.model_on_device() as (cached_weights, transformer),
             # Apply the LoRA after transformer has been moved to its target device for faster patching.
+            # LoRAPatcher.apply_lora_sidecar_patches(
+            #     model=transformer,
+            #     patches=self._lora_iterator(context),
+            #     prefix="",
+            # ),
             LoRAPatcher.apply_lora_patches(
                 model=transformer,
                 patches=self._lora_iterator(context),

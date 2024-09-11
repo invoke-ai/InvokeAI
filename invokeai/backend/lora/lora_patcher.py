@@ -130,7 +130,7 @@ class LoRAPatcher:
         original_modules: dict[str, torch.nn.Module] = {}
         try:
             for patch, patch_weight in patches:
-                LoraPatcher._apply_lora_sidecar_patch(
+                LoRAPatcher._apply_lora_sidecar_patch(
                     model=model,
                     prefix=prefix,
                     patch=patch,
@@ -145,7 +145,7 @@ class LoRAPatcher:
             for module_key, orig_module in original_modules.items():
                 module_parent_key, module_name = module_key.rsplit(".", 1)
                 parent_module = model.get_submodule(module_parent_key)
-                LoraPatcher._set_submodule(parent_module, module_name, orig_module)
+                LoRAPatcher._set_submodule(parent_module, module_name, orig_module)
 
     @staticmethod
     def _apply_lora_sidecar_patch(
@@ -170,14 +170,16 @@ class LoRAPatcher:
             if not layer_key.startswith(prefix):
                 continue
 
-            module_key, module = LoraPatcher._get_submodule(
+            module_key, module = LoRAPatcher._get_submodule(
                 model, layer_key[prefix_len:], layer_key_is_flattened=layer_keys_are_flattened
             )
 
             # Initialize the LoRA sidecar layer.
-            lora_sidecar_layer = LoraPatcher._initialize_lora_sidecar_layer(module, layer, patch_weight)
+            lora_sidecar_layer = LoRAPatcher._initialize_lora_sidecar_layer(module, layer, patch_weight)
 
-            # TODO(ryand): Should we move the LoRA sidecar layer to the same device/dtype as the orig module?
+            # Move the LoRA sidecar layer to the same device/dtype as the orig module.
+            # TODO(ryand): Experiment with moving to the device first, then casting. This could be faster.
+            lora_sidecar_layer.to(device=module.weight.device, dtype=module.weight.dtype)
 
             if module_key in original_modules:
                 # The module has already been patched with a LoRASidecarModule. Append to it.
@@ -189,7 +191,7 @@ class LoRAPatcher:
                 original_modules[module_key] = module
                 module_parent_key, module_name = module_key.rsplit(".", 1)
                 module_parent = model.get_submodule(module_parent_key)
-                LoraPatcher._set_submodule(module_parent, module_name, lora_sidecar_module)
+                LoRAPatcher._set_submodule(module_parent, module_name, lora_sidecar_module)
 
     @staticmethod
     def _initialize_lora_sidecar_layer(orig_layer: torch.nn.Module, lora_layer: AnyLoRALayer, patch_weight: float):
