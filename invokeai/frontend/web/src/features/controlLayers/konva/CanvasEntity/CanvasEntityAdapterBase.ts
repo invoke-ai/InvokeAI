@@ -15,9 +15,10 @@ import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
 export abstract class CanvasEntityAdapterBase<
-  T extends CanvasRenderableEntityState = CanvasRenderableEntityState,
+  T extends CanvasRenderableEntityState,
+  U extends string,
 > extends CanvasModuleBase {
-  readonly type: string;
+  readonly type: U;
   readonly id: string;
   readonly path: string[];
   readonly manager: CanvasManager;
@@ -91,7 +92,7 @@ export abstract class CanvasEntityAdapterBase<
    */
   subscriptions = new Set<() => void>();
 
-  constructor(entityIdentifier: CanvasEntityIdentifier<T['type']>, manager: CanvasManager, adapterType: string) {
+  constructor(entityIdentifier: CanvasEntityIdentifier<T['type']>, manager: CanvasManager, adapterType: U) {
     super();
     this.type = adapterType;
     this.id = entityIdentifier.id;
