@@ -9,8 +9,8 @@ export const prepareLinearUIBatch = (
   state: RootState,
   g: Graph,
   prepend: boolean,
-  noise: Invocation<'noise'>,
-  posCond: Invocation<'compel' | 'sdxl_compel_prompt'>,
+  noise: Invocation<'noise' | 'flux_denoise'>,
+  posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>,
   origin: 'generation' | 'workflows' | 'upscaling',
   destination: 'canvas' | 'gallery'
 ): BatchConfig => {

@@ -18,6 +18,7 @@ import { serializeError } from 'serialize-error';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
+import { buildFLUXGraph } from '../../../../../features/nodes/util/graph/generation/buildFLUXGraph';
 
 const log = logger('generation');
 
@@ -47,7 +48,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       };
 
       let buildGraphResult: Result<
-        { g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'compel' | 'sdxl_compel_prompt'> },
+        { g: Graph; noise: Invocation<'noise' | 'flux_denoise'>; posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'> },
         Error
       >;
 
@@ -61,6 +62,9 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         case 'sd-1':
         case `sd-2`:
           buildGraphResult = await withResultAsync(() => buildSD1Graph(state, manager));
+          break;
+        case `flux`:
+          buildGraphResult = await withResultAsync(() => buildFLUXGraph(state, manager));
           break;
         default:
           assert(false, `No graph builders for base ${base}`);
