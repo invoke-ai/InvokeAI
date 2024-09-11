@@ -10,7 +10,7 @@ import {
   rgIPAdapterModelChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
-import { clipEmbedModelSelected, modelChanged, refinerModelChanged, t5EncoderModelSelected, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import { clipEmbedModelSelected, fluxVAESelected, modelChanged, refinerModelChanged, t5EncoderModelSelected, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
@@ -23,8 +23,10 @@ import type { AnyModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfig,
   isControlNetOrT2IAdapterModelConfig,
+  isFluxVAEModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
+  isNonFluxVAEModelConfig,
   isNonRefinerMainModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
@@ -54,6 +56,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleIPAdapterModels(models, state, dispatch, log);
       handleT5EncoderModels(models, state, dispatch, log)
       handleCLIPEmbedModels(models, state, dispatch, log)
+      handleFLUXVAEModels(models, state, dispatch, log)
     },
   });
 };
@@ -135,7 +138,7 @@ const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
     // null is a valid VAE! it means "use the default with the main model"
     return;
   }
-  const vaeModels = models.filter(isVAEModelConfig);
+  const vaeModels = models.filter(isNonFluxVAEModelConfig);
 
   const isCurrentVAEAvailable = vaeModels.some((m) => m.key === currentVae.key);
 
@@ -253,5 +256,19 @@ const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, _log) => {
 
   if (!isCurrentCLIPEmbedModelAvailable) {
     dispatch(clipEmbedModelSelected(firstModel));
+  }
+};
+
+const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, _log) => {
+  const { fluxVAE: currentFLUXVAEModel } = state.params;
+  const fluxVAEModels = models.filter(isFluxVAEModelConfig);
+  const firstModel = fluxVAEModels[0] || null;
+
+  const isCurrentFLUXVAEModelAvailable = currentFLUXVAEModel
+    ? fluxVAEModels.some((m) => m.key === currentFLUXVAEModel.key)
+    : false;
+
+  if (!isCurrentFLUXVAEModelAvailable) {
+    dispatch(fluxVAESelected(firstModel));
   }
 };
