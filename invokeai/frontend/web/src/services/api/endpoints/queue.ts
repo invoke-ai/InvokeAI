@@ -70,12 +70,41 @@ export const queueApi = api.injectEndpoints({
         body: arg,
         method: 'POST',
       }),
-      invalidatesTags: ['SessionQueueStatus', 'CurrentSessionQueueItem', 'NextSessionQueueItem'],
+      invalidatesTags: ['CurrentSessionQueueItem', 'NextSessionQueueItem'],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
         try {
-          await queryFulfilled;
+          const { data } = await queryFulfilled;
           resetListQueryData(dispatch);
+          /**
+           * When a batch is enqueued, we need to update the queue status. While it might be templting to invalidate the
+           * `SessionQueueStatus` tag here, this can introduce a race condition:
+           *
+           * - Enqueue batch via this query
+           * - On success, we invalidate `SessionQueueStatus` tag - network request sent to server
+           * - Network request received, response preparing/sending
+           * - A queue item status changes and we receive a socket event w/ updated status
+           * - Update status optimistically in socket handler
+           * - Tag invalidation response received, but by now its payload has stale data
+           * - Stale data is written to the cache
+           *
+           * Ok, what if we just never did optimistic updates and invalidated the tag in the queue event handlers instead?
+           * It's much simpler that way, but it causes a lot of network requests - 3 per queue item, as it moves from
+           * pending -> in_progress -> completed/failed/canceled.
+           *
+           * We can do a bit of extra work here, incrementing the pending and total counts in the queue status, and do
+           * similar optimistic updates in the socket handler. Because this optimistic update runs immediately after the
+           * enqueue network request, it should always occur _before_ the next queue event, so no race condition.
+           */
+          dispatch(
+            queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
+              if (!draft) {
+                return;
+              }
+              draft.queue.pending += data.enqueued;
+              draft.queue.total += data.enqueued;
+            })
+          );
         } catch {
           // no-op
         }
