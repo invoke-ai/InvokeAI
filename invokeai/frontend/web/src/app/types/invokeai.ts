@@ -1,4 +1,4 @@
-import type { FilterType } from 'features/controlLayers/store/types';
+import type { FilterType } from 'features/controlLayers/store/filters';
 import type { ParameterPrecision, ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import type { TabName } from 'features/ui/store/uiTypes';
 import type { O } from 'ts-toolbelt';

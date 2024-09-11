@@ -1,14 +1,14 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
-import type { LineartProcessorConfig } from 'features/controlLayers/store/types';
+import type { LineartEdgeDetectionFilterConfig } from 'features/controlLayers/store/filters';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { FilterComponentProps } from './types';
 
-type Props = FilterComponentProps<LineartProcessorConfig>;
+type Props = FilterComponentProps<LineartEdgeDetectionFilterConfig>;
 
-export const FilterLineart = memo(({ onChange, config }: Props) => {
+export const FilterLineartEdgeDetection = memo(({ onChange, config }: Props) => {
   const { t } = useTranslation();
 
   const handleCoarseChanged = useCallback(
@@ -21,11 +21,11 @@ export const FilterLineart = memo(({ onChange, config }: Props) => {
   return (
     <>
       <FormControl>
-        <FormLabel m={0}>{t('controlnet.coarse')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.lineart_edge_detection.coarse')}</FormLabel>
         <Switch isChecked={config.coarse} onChange={handleCoarseChanged} />
       </FormControl>
     </>
   );
 });
 
-FilterLineart.displayName = 'FilterLineart';
+FilterLineartEdgeDetection.displayName = 'FilterLineartEdgeDetection';

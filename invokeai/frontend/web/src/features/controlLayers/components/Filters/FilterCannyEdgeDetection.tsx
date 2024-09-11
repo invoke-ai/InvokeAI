@@ -1,15 +1,15 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
-import type { CannyProcessorConfig } from 'features/controlLayers/store/types';
-import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
+import type { CannyEdgeDetectionFilterConfig } from 'features/controlLayers/store/filters';
+import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { FilterComponentProps } from './types';
 
-type Props = FilterComponentProps<CannyProcessorConfig>;
-const DEFAULTS = IMAGE_FILTERS['canny_image_processor'].buildDefaults();
+type Props = FilterComponentProps<CannyEdgeDetectionFilterConfig>;
+const DEFAULTS = IMAGE_FILTERS.canny_edge_detection.buildDefaults();
 
-export const FilterCanny = ({ onChange, config }: Props) => {
+export const FilterCannyEdgeDetection = ({ onChange, config }: Props) => {
   const { t } = useTranslation();
   const handleLowThresholdChanged = useCallback(
     (v: number) => {
@@ -27,7 +27,7 @@ export const FilterCanny = ({ onChange, config }: Props) => {
   return (
     <>
       <FormControl>
-        <FormLabel m={0}>{t('controlnet.lowThreshold')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.canny_edge_detection.low_threshold')}</FormLabel>
         <CompositeSlider
           value={config.low_threshold}
           onChange={handleLowThresholdChanged}
@@ -44,7 +44,7 @@ export const FilterCanny = ({ onChange, config }: Props) => {
         />
       </FormControl>
       <FormControl>
-        <FormLabel m={0}>{t('controlnet.highThreshold')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.canny_edge_detection.high_threshold')}</FormLabel>
         <CompositeSlider
           value={config.high_threshold}
           onChange={handleHighThresholdChanged}
@@ -64,4 +64,4 @@ export const FilterCanny = ({ onChange, config }: Props) => {
   );
 };
 
-FilterCanny.displayName = 'FilterCanny';
+FilterCannyEdgeDetection.displayName = 'FilterCannyEdgeDetection';

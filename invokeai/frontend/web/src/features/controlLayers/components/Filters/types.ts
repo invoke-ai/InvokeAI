@@ -1,4 +1,4 @@
-import type { FilterConfig } from 'features/controlLayers/store/types';
+import type { FilterConfig } from 'features/controlLayers/store/filters';
 
 export type FilterComponentProps<T extends FilterConfig> = {
   onChange: (config: T) => void;

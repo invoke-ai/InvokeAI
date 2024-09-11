@@ -1,18 +1,16 @@
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { FilterCanny } from 'features/controlLayers/components/Filters/FilterCanny';
+import { FilterCannyEdgeDetection } from 'features/controlLayers/components/Filters/FilterCannyEdgeDetection';
 import { FilterColorMap } from 'features/controlLayers/components/Filters/FilterColorMap';
 import { FilterContentShuffle } from 'features/controlLayers/components/Filters/FilterContentShuffle';
-import { FilterDepthAnything } from 'features/controlLayers/components/Filters/FilterDepthAnything';
-import { FilterDWOpenpose } from 'features/controlLayers/components/Filters/FilterDWOpenpose';
-import { FilterHed } from 'features/controlLayers/components/Filters/FilterHed';
-import { FilterLineart } from 'features/controlLayers/components/Filters/FilterLineart';
-import { FilterMediapipeFace } from 'features/controlLayers/components/Filters/FilterMediapipeFace';
-import { FilterMidasDepth } from 'features/controlLayers/components/Filters/FilterMidasDepth';
-import { FilterMlsdImage } from 'features/controlLayers/components/Filters/FilterMlsdImage';
-import { FilterPidi } from 'features/controlLayers/components/Filters/FilterPidi';
+import { FilterDepthAnythingDepthEstimation } from 'features/controlLayers/components/Filters/FilterDepthAnythingDepthEstimation';
+import { FilterDWOpenposeDetection } from 'features/controlLayers/components/Filters/FilterDWOpenposeDetection';
+import { FilterHEDEdgeDetection } from 'features/controlLayers/components/Filters/FilterHEDEdgeDetection';
+import { FilterLineartEdgeDetection } from 'features/controlLayers/components/Filters/FilterLineartEdgeDetection';
+import { FilterMediaPipeFaceDetection } from 'features/controlLayers/components/Filters/FilterMediaPipeFaceDetection';
+import { FilterMLSDDetection } from 'features/controlLayers/components/Filters/FilterMLSDDetection';
+import { FilterPiDiNetEdgeDetection } from 'features/controlLayers/components/Filters/FilterPiDiNetEdgeDetection';
 import { FilterSpandrel } from 'features/controlLayers/components/Filters/FilterSpandrel';
-import type { FilterConfig } from 'features/controlLayers/store/types';
-import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
+import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,48 +19,44 @@ type Props = { filterConfig: FilterConfig; onChange: (filterConfig: FilterConfig
 export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
   const { t } = useTranslation();
 
-  if (filterConfig.type === 'canny_image_processor') {
-    return <FilterCanny config={filterConfig} onChange={onChange} />;
+  if (filterConfig.type === 'canny_edge_detection') {
+    return <FilterCannyEdgeDetection config={filterConfig} onChange={onChange} />;
   }
 
-  if (filterConfig.type === 'color_map_image_processor') {
+  if (filterConfig.type === 'color_map') {
     return <FilterColorMap config={filterConfig} onChange={onChange} />;
   }
 
-  if (filterConfig.type === 'content_shuffle_image_processor') {
+  if (filterConfig.type === 'content_shuffle') {
     return <FilterContentShuffle config={filterConfig} onChange={onChange} />;
   }
 
-  if (filterConfig.type === 'depth_anything_image_processor') {
-    return <FilterDepthAnything config={filterConfig} onChange={onChange} />;
+  if (filterConfig.type === 'depth_anything_depth_estimation') {
+    return <FilterDepthAnythingDepthEstimation config={filterConfig} onChange={onChange} />;
   }
 
-  if (filterConfig.type === 'dw_openpose_image_processor') {
-    return <FilterDWOpenpose config={filterConfig} onChange={onChange} />;
+  if (filterConfig.type === 'dw_openpose_detection') {
+    return <FilterDWOpenposeDetection config={filterConfig} onChange={onChange} />;
   }
 
-  if (filterConfig.type === 'hed_image_processor') {
-    return <FilterHed config={filterConfig} onChange={onChange} />;
+  if (filterConfig.type === 'hed_edge_detection') {
+    return <FilterHEDEdgeDetection config={filterConfig} onChange={onChange} />;
   }
 
-  if (filterConfig.type === 'lineart_image_processor') {
-    return <FilterLineart config={filterConfig} onChange={onChange} />;
+  if (filterConfig.type === 'lineart_edge_detection') {
+    return <FilterLineartEdgeDetection config={filterConfig} onChange={onChange} />;
   }
 
-  if (filterConfig.type === 'mediapipe_face_processor') {
-    return <FilterMediapipeFace config={filterConfig} onChange={onChange} />;
+  if (filterConfig.type === 'mediapipe_face_detection') {
+    return <FilterMediaPipeFaceDetection config={filterConfig} onChange={onChange} />;
   }
 
-  if (filterConfig.type === 'midas_depth_image_processor') {
-    return <FilterMidasDepth config={filterConfig} onChange={onChange} />;
+  if (filterConfig.type === 'mlsd_detection') {
+    return <FilterMLSDDetection config={filterConfig} onChange={onChange} />;
   }
 
-  if (filterConfig.type === 'mlsd_image_processor') {
-    return <FilterMlsdImage config={filterConfig} onChange={onChange} />;
-  }
-
-  if (filterConfig.type === 'pidi_image_processor') {
-    return <FilterPidi config={filterConfig} onChange={onChange} />;
+  if (filterConfig.type === 'pidi_edge_detection') {
+    return <FilterPiDiNetEdgeDetection config={filterConfig} onChange={onChange} />;
   }
 
   if (filterConfig.type === 'spandrel_filter') {
@@ -72,7 +66,7 @@ export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
   return (
     <IAINoContentFallback
       py={4}
-      label={`${t(IMAGE_FILTERS[filterConfig.type].labelTKey)} has no settings`}
+      label={`${t(`controlLayers.filter.${filterConfig.type}.label`)} has no settings`}
       icon={null}
     />
   );
