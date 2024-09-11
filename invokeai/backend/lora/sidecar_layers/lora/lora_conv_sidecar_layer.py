@@ -71,10 +71,13 @@ class LoRAConvSidecarLayer(torch.nn.Module):
             )
 
         # Inject weight into the LoRA layer.
+        assert model._up.weight.shape == lora_layer.up.shape
+        assert model._down.weight.shape == lora_layer.down.shape
         model._up.weight.data = lora_layer.up
         model._down.weight.data = lora_layer.down
         if lora_layer.mid is not None:
             assert model._mid is not None
+            assert model._mid.weight.shape == lora_layer.mid.shape
             model._mid.weight.data = lora_layer.mid
 
         return model

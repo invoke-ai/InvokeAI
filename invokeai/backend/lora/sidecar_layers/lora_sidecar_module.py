@@ -10,8 +10,8 @@ class LoRASidecarModule(torch.nn.Module):
     def add_lora_layer(self, lora_layer: torch.nn.Module):
         self._lora_layers.append(lora_layer)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self._orig_module(x)
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        x = self._orig_module(input)
         for lora_layer in self._lora_layers:
-            x += lora_layer(x)
+            x += lora_layer(input)
         return x
