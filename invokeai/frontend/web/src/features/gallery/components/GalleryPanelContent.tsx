@@ -50,14 +50,6 @@ const GalleryPanelContent = () => {
     boardsListPanel.expand();
   }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
-  const handleToggleBoardPanel = useCallback(() => {
-    if (boardSearchText.length) {
-      dispatch(boardSearchTextChanged(''));
-    }
-    boardSearchDisclosure.onClose();
-    boardsListPanel.toggle();
-  }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
-
   return (
     <Flex ref={ref} position="relative" flexDirection="column" h="full" w="full" tabIndex={-1}>
       <GalleryHeader />
@@ -65,7 +57,7 @@ const GalleryPanelContent = () => {
         <Button
           size="sm"
           variant="ghost"
-          onClick={handleToggleBoardPanel}
+          onClick={boardsListPanel.toggle}
           rightIcon={boardsListPanel.isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
         >
           {boardsListPanel.isCollapsed ? t('boards.viewBoards') : t('boards.hideBoards')}
