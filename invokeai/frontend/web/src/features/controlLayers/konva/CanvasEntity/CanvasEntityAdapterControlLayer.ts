@@ -9,16 +9,17 @@ import type { CanvasControlLayerState, CanvasEntityIdentifier, Rect } from 'feat
 import type { GroupConfig } from 'konva/lib/Group';
 import { omit } from 'lodash-es';
 
-export class CanvasEntityAdapterControlLayer extends CanvasEntityAdapterBase<CanvasControlLayerState> {
-  static TYPE = 'control_layer_adapter';
-
+export class CanvasEntityAdapterControlLayer extends CanvasEntityAdapterBase<
+  CanvasControlLayerState,
+  'control_layer_adapter'
+> {
   renderer: CanvasEntityObjectRenderer;
   bufferRenderer: CanvasEntityBufferObjectRenderer;
   transformer: CanvasEntityTransformer;
   filterer: CanvasEntityFilterer;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'control_layer'>, manager: CanvasManager) {
-    super(entityIdentifier, manager, CanvasEntityAdapterControlLayer.TYPE);
+    super(entityIdentifier, manager, 'control_layer_adapter');
 
     this.renderer = new CanvasEntityObjectRenderer(this);
     this.bufferRenderer = new CanvasEntityBufferObjectRenderer(this);

@@ -8,16 +8,17 @@ import type { CanvasEntityIdentifier, CanvasRegionalGuidanceState, Rect } from '
 import type { GroupConfig } from 'konva/lib/Group';
 import { omit } from 'lodash-es';
 
-export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase<CanvasRegionalGuidanceState> {
-  static TYPE = 'regional_guidance_adapter';
-
+export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase<
+  CanvasRegionalGuidanceState,
+  'regional_guidance_adapter'
+> {
   renderer: CanvasEntityObjectRenderer;
   bufferRenderer: CanvasEntityBufferObjectRenderer;
   transformer: CanvasEntityTransformer;
   filterer = undefined;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>, manager: CanvasManager) {
-    super(entityIdentifier, manager, CanvasEntityAdapterRegionalGuidance.TYPE);
+    super(entityIdentifier, manager, 'regional_guidance_adapter');
 
     this.renderer = new CanvasEntityObjectRenderer(this);
     this.bufferRenderer = new CanvasEntityBufferObjectRenderer(this);
