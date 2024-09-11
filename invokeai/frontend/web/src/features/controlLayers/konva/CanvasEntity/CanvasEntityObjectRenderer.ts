@@ -419,7 +419,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.entityIdentifier,
       imageObject,
-      rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: imageDTO.width, height: imageDTO.height },
+      position: { x: Math.round(rect.x), y: Math.round(rect.y) },
       replaceObjects,
     });
     this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);

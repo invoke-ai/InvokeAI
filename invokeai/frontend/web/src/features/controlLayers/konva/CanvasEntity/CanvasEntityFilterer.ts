@@ -171,11 +171,9 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.entityIdentifier,
       imageObject: imageState,
-      rect: {
+      position: {
         x: Math.round(rect.x),
         y: Math.round(rect.y),
-        width: imageState.image.height,
-        height: imageState.image.width,
       },
       replaceObjects: true,
     });

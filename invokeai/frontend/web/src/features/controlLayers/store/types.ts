@@ -353,7 +353,7 @@ export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{ eraserLine:
 export type EntityRectAddedPayload = EntityIdentifierPayload<{ rect: CanvasRectState }>;
 export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;
-  rect: Rect;
+  position: Coordinate;
   replaceObjects: boolean;
 }>;
 
