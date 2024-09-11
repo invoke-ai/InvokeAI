@@ -10,6 +10,7 @@ import type {
   useDroppable as useOriginalDroppable,
   UseDroppableArguments,
 } from '@dnd-kit/core';
+import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { BoardId } from 'features/gallery/store/types';
 import type { FieldInputInstance, FieldInputTemplate } from 'features/nodes/types/field';
 import type { ImageDTO } from 'services/api/types';
@@ -39,6 +40,13 @@ export type AddRasterLayerFromImageDropData = BaseDropData & {
 
 export type AddControlLayerFromImageDropData = BaseDropData & {
   actionType: 'ADD_CONTROL_LAYER_FROM_IMAGE';
+};
+
+export type ReplaceLayerImageDropData = BaseDropData & {
+  actionType: 'REPLACE_LAYER_WITH_IMAGE';
+  context: {
+    entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer'>;
+  };
 };
 
 type UpscaleInitialImageDropData = BaseDropData & {
@@ -79,7 +87,8 @@ export type TypesafeDroppableData =
   | SelectForCompareDropData
   | UpscaleInitialImageDropData
   | AddRasterLayerFromImageDropData
-  | AddControlLayerFromImageDropData;
+  | AddControlLayerFromImageDropData
+  | ReplaceLayerImageDropData;
 
 type BaseDragData = {
   id: string;

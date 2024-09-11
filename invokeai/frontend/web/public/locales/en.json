@@ -1781,6 +1781,7 @@
         "flipHorizontal": "Flip Horizontal",
         "flipVertical": "Flip Vertical",
         "stagingOnCanvas": "Staging images on",
+        "replaceLayer": "Replace Layer",
         "fill": {
             "fillColor": "Fill Color",
             "fillStyle": "Fill Style",
