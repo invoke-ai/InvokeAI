@@ -129,7 +129,18 @@ class MergeMetadataInvocation(BaseInvocation):
 
 
 GENERATION_MODES = Literal[
-    "txt2img", "img2img", "inpaint", "outpaint", "sdxl_txt2img", "sdxl_img2img", "sdxl_inpaint", "sdxl_outpaint"
+    "txt2img",
+    "img2img",
+    "inpaint",
+    "outpaint",
+    "sdxl_txt2img",
+    "sdxl_img2img",
+    "sdxl_inpaint",
+    "sdxl_outpaint",
+    "flux_txt2img",
+    "flux_img2img",
+    "flux_inpaint",
+    "flux_outpaint",
 ]
 
 
