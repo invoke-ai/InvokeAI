@@ -17,8 +17,14 @@ class MLSDEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an line segment edge map using MLSD."""
 
     image: ImageField = InputField(description="The image to process")
-    thr_v: float = InputField(default=0.1, ge=0, description="MLSD parameter `thr_v`")
-    thr_d: float = InputField(default=0.1, ge=0, description="MLSD parameter `thr_d`")
+    score_threshold: float = InputField(
+        default=0.1, ge=0, description="The threshold used to score points when determining line segments"
+    )
+    distance_threshold: float = InputField(
+        default=20.0,
+        ge=0,
+        description="Threshold for including a line segment - lines shorter than this distance will be discarded",
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name, "RGB")
@@ -27,7 +33,7 @@ class MLSDEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
         with loaded_model as model:
             assert isinstance(model, MobileV2_MLSD_Large)
             detector = MLSDEdgeDetector(model)
-            edge_map = detector.run(image, self.thr_v, self.thr_d)
+            edge_map = detector.run(image, self.score_threshold, self.distance_threshold)
 
         image_dto = context.images.save(image=edge_map)
         return ImageOutput.build(image_dto)
