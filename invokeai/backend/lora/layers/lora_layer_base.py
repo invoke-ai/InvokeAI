@@ -3,38 +3,39 @@ from typing import Dict, Optional, Set
 import torch
 
 import invokeai.backend.util.logging as logger
-from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
-class LoRALayerBase:
-    # rank: Optional[int]
-    # alpha: Optional[float]
-    # bias: Optional[torch.Tensor]
+class LoRALayerBase(torch.nn.Module):
+    """Base class for all LoRA-like patching layers."""
 
-    # @property
-    # def scale(self):
-    #    return self.alpha / self.rank if (self.alpha and self.rank) else 1.0
+    def __init__(self, alpha: float | None, bias: torch.Tensor | None):
+        super().__init__()
+        self._alpha = alpha
+        self.bias = torch.nn.Parameter(bias) if bias is not None else None
 
-    def __init__(
-        self,
-        values: Dict[str, torch.Tensor],
-    ):
-        if "alpha" in values:
-            self.alpha = values["alpha"].item()
-        else:
-            self.alpha = None
+    @classmethod
+    def _parse_bias(
+        cls, bias_indices: torch.Tensor | None, bias_values: torch.Tensor | None, bias_size: torch.Tensor | None
+    ) -> torch.Tensor | None:
+        assert (bias_indices is None) == (bias_values is None) == (bias_size is None)
 
-        if "bias_indices" in values and "bias_values" in values and "bias_size" in values:
-            self.bias: Optional[torch.Tensor] = torch.sparse_coo_tensor(
-                values["bias_indices"],
-                values["bias_values"],
-                tuple(values["bias_size"]),
-            )
+        bias = None
+        if bias_indices is not None:
+            bias = torch.sparse_coo_tensor(bias_indices, bias_values, tuple(bias_size))
+        return bias
 
-        else:
-            self.bias = None
+    @classmethod
+    def _parse_alpha(
+        cls,
+        alpha: torch.Tensor | None,
+    ) -> float | None:
+        return alpha.item() if alpha is not None else None
 
-        self.rank = None  # set in layer implementation
+    def rank(self) -> int:
+        raise NotImplementedError()
+
+    def scale(self) -> float:
+        return self._alpha / self.rank() if self._alpha is not None else 1.0
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError()
@@ -49,20 +50,11 @@ class LoRALayerBase:
             params["bias"] = bias
         return params
 
-    def calc_size(self) -> int:
-        return calc_tensors_size([self.bias])
-
-    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
-        if self.bias is not None:
-            self.bias = self.bias.to(device=device, dtype=dtype)
-
-    def check_keys(self, values: Dict[str, torch.Tensor], known_keys: Set[str]):
+    @classmethod
+    def warn_on_unhandled_keys(cls, values: Dict[str, torch.Tensor], handled_keys: Set[str]):
         """Log a warning if values contains unhandled keys."""
-        # {"alpha", "bias_indices", "bias_values", "bias_size"} are hard-coded, because they are handled by
-        # `LoRALayerBase`. Sub-classes should provide the known_keys that they handled.
-        all_known_keys = known_keys | {"alpha", "bias_indices", "bias_values", "bias_size"}
-        unknown_keys = set(values.keys()) - all_known_keys
+        unknown_keys = set(values.keys()) - handled_keys
         if unknown_keys:
             logger.warning(
-                f"Unexpected keys found in LoRA/LyCORIS layer, model might work incorrectly! Keys: {unknown_keys}"
+                f"Unexpected keys found in LoRA/LyCORIS layer, model might work incorrectly! Unexpected keys: {unknown_keys}"
             )

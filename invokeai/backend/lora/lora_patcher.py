@@ -4,8 +4,12 @@ from typing import Dict, Iterable, Optional, Tuple
 import torch
 
 from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
+from invokeai.backend.lora.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
+from invokeai.backend.lora.sidecar_layers.concatenated_lora.concatenated_lora_linear_sidecar_layer import (
+    ConcatenatedLoRALinearSidecarLayer,
+)
 from invokeai.backend.lora.sidecar_layers.lora.lora_conv_sidecar_layer import (
     LoRAConv1dSidecarLayer,
     LoRAConv2dSidecarLayer,
@@ -94,7 +98,7 @@ class LoRAPatcher:
             device = module.weight.device
             dtype = module.weight.dtype
 
-            layer_scale = layer.alpha / layer.rank if (layer.alpha and layer.rank) else 1.0
+            layer_scale = layer.scale()
 
             # We intentionally move to the target device first, then cast. Experimentally, this was found to
             # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
@@ -200,6 +204,8 @@ class LoRAPatcher:
         if isinstance(orig_layer, torch.nn.Linear):
             if isinstance(lora_layer, LoRALayer):
                 return LoRALinearSidecarLayer(lora_layer=lora_layer, weight=patch_weight)
+            elif isinstance(lora_layer, ConcatenatedLoRALayer):
+                return ConcatenatedLoRALinearSidecarLayer(concatenated_lora_layer=lora_layer, weight=patch_weight)
             else:
                 raise ValueError(f"Unsupported Linear LoRA layer type: {type(lora_layer)}")
         elif isinstance(orig_layer, torch.nn.Conv1d):

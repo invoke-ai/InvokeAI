@@ -54,7 +54,7 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
     def add_lora_layer_if_present(src_key: str, dst_key: str) -> None:
         if src_key in grouped_state_dict:
             src_layer_dict = grouped_state_dict.pop(src_key)
-            layers[dst_key] = LoRALayer(
+            layers[dst_key] = LoRALayer.from_state_dict_values(
                 values={
                     "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
                     "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
@@ -79,7 +79,7 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
         sub_layers: list[LoRALayerBase] = []
         for src_layer_dict in src_layer_dicts:
             sub_layers.append(
-                LoRALayer(
+                LoRALayer.from_state_dict_values(
                     values={
                         "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
                         "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
