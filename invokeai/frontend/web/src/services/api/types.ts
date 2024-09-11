@@ -52,7 +52,7 @@ export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
 export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
 export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
-export type ClipEmbedModelConfig = S['CLIPEmbedDiffusersConfig'];
+export type CLIPEmbedModelConfig = S['CLIPEmbedDiffusersConfig'];
 export type T5EncoderModelConfig = S['T5EncoderConfig'];
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = S['T5EncoderBnbQuantizedLlmInt8bConfig'];
 export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
@@ -68,7 +68,7 @@ export type AnyModelConfig =
   | IPAdapterModelConfig
   | T5EncoderModelConfig
   | T5EncoderBnbQuantizedLlmInt8bModelConfig
-  | ClipEmbedModelConfig
+  | CLIPEmbedModelConfig
   | T2IAdapterModelConfig
   | SpandrelImageToImageModelConfig
   | TextualInversionModelConfig
@@ -105,7 +105,7 @@ export const isT5EncoderModelConfig = (
   return config.type === 't5_encoder';
 };
 
-export const isClipEmbedModelConfig = (config: AnyModelConfig): config is ClipEmbedModelConfig => {
+export const isCLIPEmbedModelConfig = (config: AnyModelConfig): config is CLIPEmbedModelConfig => {
   return config.type === 'clip_embed';
 };
 

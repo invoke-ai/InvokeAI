@@ -167,6 +167,17 @@ const initialConfigState: AppConfig = {
       },
     },
   },
+  flux: {
+    guidance: {
+      initial: 4,
+      sliderMin: 2,
+      sliderMax: 6,
+      numberInputMin: 2,
+      numberInputMax: 6,
+      fineStep: 0.1,
+      coarseStep: 1,
+    }
+  }
 };
 
 export const configSlice = createSlice({
@@ -188,6 +199,7 @@ export const selectWidthConfig = createConfigSelector((config) => config.sd.widt
 export const selectHeightConfig = createConfigSelector((config) => config.sd.height);
 export const selectStepsConfig = createConfigSelector((config) => config.sd.steps);
 export const selectCFGScaleConfig = createConfigSelector((config) => config.sd.guidance);
+export const selectGuidanceConfig = createConfigSelector((config) => config.flux.guidance);
 export const selectCLIPSkipConfig = createConfigSelector((config) => config.sd.clipSkip);
 export const selectCFGRescaleMultiplierConfig = createConfigSelector((config) => config.sd.cfgRescaleMultiplier);
 export const selectCanvasCoherenceEdgeSizeConfig = createConfigSelector((config) => config.sd.canvasCoherenceEdgeSize);

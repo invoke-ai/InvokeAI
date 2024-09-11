@@ -56,6 +56,13 @@ export const isParameterCFGScale = (val: unknown): val is ParameterCFGScale =>
   zParameterCFGScale.safeParse(val).success;
 // #endregion
 
+// #region Guidance parameter
+const zParameterGuidance = z.number().min(1);
+export type ParameterGuidance = z.infer<typeof zParameterGuidance>;
+export const isParameterGuidance = (val: unknown): val is ParameterGuidance =>
+  zParameterGuidance.safeParse(val).success;
+// #endregion
+
 // #region CFG Rescale Multiplier
 const zParameterCFGRescaleMultiplier = z.number().gte(0).lt(1);
 export type ParameterCFGRescaleMultiplier = z.infer<typeof zParameterCFGRescaleMultiplier>;
@@ -104,6 +111,16 @@ export type ParameterSDXLRefinerModel = z.infer<typeof zParameterSDXLRefinerMode
 // #region VAE Model
 export const zParameterVAEModel = zModelIdentifierField;
 export type ParameterVAEModel = z.infer<typeof zParameterVAEModel>;
+// #endregion
+
+// #region T5Encoder Model
+export const zParameterT5EncoderModel = zModelIdentifierField;
+export type ParameterT5EncoderModel = z.infer<typeof zParameterT5EncoderModel>;
+// #endregion
+
+// #region CLIP embed Model
+export const zParameterCLIPEmbedModel = zModelIdentifierField;
+export type ParameterCLIPEmbedModel = z.infer<typeof zParameterCLIPEmbedModel>;
 // #endregion
 
 // #region LoRA Model

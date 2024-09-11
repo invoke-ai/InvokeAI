@@ -7,7 +7,7 @@ import type {
   T2IAdapterConfigMetadata,
 } from 'features/metadata/types';
 import { InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
-import type { ParameterSDXLRefinerModel, ParameterVAEModel } from 'features/parameters/types/parameterSchemas';
+import type { ParameterSDXLRefinerModel, ParameterT5EncoderModel, ParameterVAEModel } from 'features/parameters/types/parameterSchemas';
 import type { BaseModelType } from 'services/api/types';
 
 /**
@@ -37,6 +37,13 @@ const validateVAEModel: MetadataValidateFunc<ParameterVAEModel> = (vaeModel) => 
   validateBaseCompatibility(vaeModel.base, 'VAE incompatible with currently-selected model');
   return new Promise((resolve) => {
     resolve(vaeModel);
+  });
+};
+
+const validateT5EncoderModel: MetadataValidateFunc<ParameterT5EncoderModel> = (t5EncoderModel) => {
+  validateBaseCompatibility('flux', 'T5 Encoder incompatible with currently-selected model');
+  return new Promise((resolve) => {
+    resolve(t5EncoderModel);
   });
 };
 
@@ -131,6 +138,7 @@ const validateIPAdapters: MetadataValidateFunc<IPAdapterConfigMetadata[]> = (ipA
 export const validators = {
   refinerModel: validateRefinerModel,
   vaeModel: validateVAEModel,
+  t5EncoderModel: validateT5EncoderModel,
   lora: validateLoRA,
   loras: validateLoRAs,
   controlNet: validateControlNet,

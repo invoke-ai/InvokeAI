@@ -7,14 +7,14 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSDMainModels } from 'services/api/hooks/modelsByType';
+import { useMainModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig } from 'services/api/types';
 
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const selectedModel = useAppSelector(selectModel);
-  const [modelConfigs, { isLoading }] = useSDMainModels();
+  const [modelConfigs, { isLoading }] = useMainModels();
   const tooltipLabel = useMemo(() => {
     if (!modelConfigs.length || !selectedModel) {
       return;

@@ -114,6 +114,9 @@ export type AppConfig = {
       weight: NumericalParameterConfig;
     };
   };
+  flux: {
+    guidance: NumericalParameterConfig
+  }
 };
 
 export type PartialAppConfig = O.Partial<AppConfig, 'deep'>;
