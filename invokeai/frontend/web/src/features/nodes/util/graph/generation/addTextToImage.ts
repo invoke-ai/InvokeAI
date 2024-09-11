@@ -6,10 +6,10 @@ import type { Invocation } from 'services/api/types';
 
 export const addTextToImage = (
   g: Graph,
-  l2i: Invocation<'l2i'>,
+  l2i: Invocation<'l2i' | 'flux_vae_decode'>,
   originalSize: Dimensions,
   scaledSize: Dimensions
-): Invocation<'img_resize' | 'l2i'> => {
+): Invocation<'img_resize' | 'l2i' | 'flux_vae_decode'> => {
   if (!isEqual(scaledSize, originalSize)) {
     // We need to resize the output image back to the original size
     const resizeImageToOriginalSize = g.addNode({

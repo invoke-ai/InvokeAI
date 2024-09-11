@@ -8,15 +8,15 @@ import type { Invocation } from 'services/api/types';
 export const addImageToImage = async (
   g: Graph,
   manager: CanvasManager,
-  l2i: Invocation<'l2i'>,
-  denoise: Invocation<'denoise_latents'>,
-  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'seamless' | 'vae_loader'>,
+  l2i: Invocation<'l2i' | 'flux_vae_decode'>,
+  denoise: Invocation<'denoise_latents' | 'flux_denoise'>,
+  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader' | 'seamless' | 'vae_loader'>,
   originalSize: Dimensions,
   scaledSize: Dimensions,
   bbox: CanvasState['bbox'],
   denoising_start: number,
   fp32: boolean
-): Promise<Invocation<'img_resize' | 'l2i'>> => {
+): Promise<Invocation<'img_resize' | 'l2i' | 'flux_vae_decode'>> => {
   denoise.denoising_start = denoising_start;
 
   const { image_name } = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
@@ -29,7 +29,11 @@ export const addImageToImage = async (
       image: { image_name },
       ...scaledSize,
     });
-    const i2l = g.addNode({ id: 'i2l', type: 'i2l', fp32 });
+
+    const i2l = vaeSource.type === "flux_model_loader" ?
+      g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' }) :
+      g.addNode({ id: 'i2l', type: 'i2l', fp32 });
+
     const resizeImageToOriginalSize = g.addNode({
       type: 'img_resize',
       id: getPrefixedId('initial_image_resize_out'),
@@ -45,7 +49,7 @@ export const addImageToImage = async (
     return resizeImageToOriginalSize;
   } else {
     // No need to resize, just decode
-    const i2l = g.addNode({ id: 'i2l', type: 'i2l', image: { image_name }, fp32 });
+    const i2l = vaeSource.type === "flux_model_loader" ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' }) : g.addNode({ id: 'i2l', type: 'i2l', fp32 });
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
     return l2i;
