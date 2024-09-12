@@ -6,6 +6,11 @@ from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
 
 
 class LoKRLayer(LoRALayerBase):
+    """LoKR LyCoris layer.
+
+    Example model for testing this layer type: https://civitai.com/models/346747/lokrnekopara-allgirl-for-jru2
+    """
+
     def __init__(
         self,
         w1: torch.Tensor | None,

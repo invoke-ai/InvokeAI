@@ -6,6 +6,11 @@ from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
 
 
 class IA3Layer(LoRALayerBase):
+    """IA3 Layer
+
+    Example model for testing this layer type: https://civitai.com/models/123930/gwendolyn-tennyson-ben-10-ia3
+    """
+
     def __init__(self, weight: torch.Tensor, on_input: torch.Tensor, bias: Optional[torch.Tensor]):
         super().__init__(alpha=None, bias=bias)
         self.weight = torch.nn.Parameter(weight)
