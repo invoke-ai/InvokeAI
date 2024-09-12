@@ -10,7 +10,14 @@ import {
   rgIPAdapterModelChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
-import { clipEmbedModelSelected, fluxVAESelected, modelChanged, refinerModelChanged, t5EncoderModelSelected, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import {
+  clipEmbedModelSelected,
+  fluxVAESelected,
+  modelChanged,
+  refinerModelChanged,
+  t5EncoderModelSelected,
+  vaeSelected,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
@@ -31,7 +38,6 @@ import {
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfig,
-  isVAEModelConfig,
 } from 'services/api/types';
 
 const log = logger('models');
@@ -54,9 +60,9 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleControlAdapterModels(models, state, dispatch, log);
       handleSpandrelImageToImageModels(models, state, dispatch, log);
       handleIPAdapterModels(models, state, dispatch, log);
-      handleT5EncoderModels(models, state, dispatch, log)
-      handleCLIPEmbedModels(models, state, dispatch, log)
-      handleFLUXVAEModels(models, state, dispatch, log)
+      handleT5EncoderModels(models, state, dispatch, log);
+      handleCLIPEmbedModels(models, state, dispatch, log);
+      handleFLUXVAEModels(models, state, dispatch, log);
     },
   });
 };

@@ -176,8 +176,8 @@ const initialConfigState: AppConfig = {
       numberInputMax: 6,
       fineStep: 0.1,
       coarseStep: 1,
-    }
-  }
+    },
+  },
 };
 
 export const configSlice = createSlice({

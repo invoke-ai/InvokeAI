@@ -202,5 +202,5 @@ export const recallers = {
   vae: recallVAE,
   lora: recallLoRA,
   loras: recallAllLoRAs,
-  t5EncoderModel: recallT5Encoder
+  t5EncoderModel: recallT5Encoder,
 } as const;

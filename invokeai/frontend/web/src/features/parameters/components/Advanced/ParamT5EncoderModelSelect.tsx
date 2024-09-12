@@ -1,12 +1,12 @@
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import { selectT5EncoderModel, t5EncoderModelSelected } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useT5EncoderModels } from 'services/api/hooks/modelsByType';
 import type { T5EncoderBnbQuantizedLlmInt8bModelConfig, T5EncoderModelConfig } from 'services/api/types';
-import { useModelCombobox } from '../../../../common/hooks/useModelCombobox';
 
 const ParamT5EncoderModelSelect = () => {
   const dispatch = useAppDispatch();

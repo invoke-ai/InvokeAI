@@ -4,9 +4,11 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
+import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
+import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
@@ -18,8 +20,6 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
-import ParamGuidance from '../../../parameters/components/Core/ParamGuidance';
-import { selectIsFLUX } from '../../../controlLayers/store/paramsSlice';
 
 const formLabelProps: FormLabelProps = {
   minW: '4rem',

@@ -11,6 +11,7 @@ import {
   stagingAreaStartedStaging,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -18,7 +19,6 @@ import { serializeError } from 'serialize-error';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
-import { buildFLUXGraph } from '../../../../../features/nodes/util/graph/generation/buildFLUXGraph';
 
 const log = logger('generation');
 
@@ -48,7 +48,11 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       };
 
       let buildGraphResult: Result<
-        { g: Graph; noise: Invocation<'noise' | 'flux_denoise'>; posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'> },
+        {
+          g: Graph;
+          noise: Invocation<'noise' | 'flux_denoise'>;
+          posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+        },
         Error
       >;
 

@@ -148,7 +148,6 @@ const createSelector = (
         }
 
         if (model?.base === 'flux') {
-          console.log({ params })
           if (!params.t5EncoderModel) {
             reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
           }

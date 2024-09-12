@@ -7,6 +7,8 @@ import type {
   ParameterCanvasCoherenceMode,
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
+  ParameterCLIPEmbedModel,
+  ParameterGuidance,
   ParameterMaskBlurMethod,
   ParameterModel,
   ParameterNegativePrompt,
@@ -19,10 +21,8 @@ import type {
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
-  ParameterVAEModel,
-  ParameterGuidance,
   ParameterT5EncoderModel,
-  ParameterCLIPEmbedModel
+  ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { clamp } from 'lodash-es';
 
@@ -65,8 +65,8 @@ export type ParamsState = {
   refinerPositiveAestheticScore: number;
   refinerNegativeAestheticScore: number;
   refinerStart: number;
-  t5EncoderModel: ParameterT5EncoderModel | null,
-  clipEmbedModel: ParameterCLIPEmbedModel | null
+  t5EncoderModel: ParameterT5EncoderModel | null;
+  clipEmbedModel: ParameterCLIPEmbedModel | null;
 };
 
 const initialState: ParamsState = {
@@ -109,7 +109,7 @@ const initialState: ParamsState = {
   refinerNegativeAestheticScore: 2.5,
   refinerStart: 0.8,
   t5EncoderModel: null,
-  clipEmbedModel: null
+  clipEmbedModel: null,
 };
 
 export const paramsSlice = createSlice({
