@@ -1,10 +1,7 @@
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { useMemo } from 'react';
 
-const hook = buildUseBoolean(true);
-const useImageViewerState = hook[0];
-
-export const $imageViewerState = hook[1];
+const [useImageViewerState, $imageViewerState] = buildUseBoolean(true);
 
 export const useImageViewer = () => {
   const imageViewerState = useImageViewerState();
