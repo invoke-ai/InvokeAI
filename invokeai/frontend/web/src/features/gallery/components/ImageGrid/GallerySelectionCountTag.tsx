@@ -22,8 +22,11 @@ export const GallerySelectionCountTag = () => {
   const isSelectAllEnabled = useStore($isSelectAllEnabled);
 
   const onClearSelection = useCallback(() => {
-    dispatch(selectionChanged([]));
-  }, [dispatch]);
+    const firstImage = selection[0];
+    if (firstImage) {
+      dispatch(selectionChanged([firstImage]));
+    }
+  }, [dispatch, selection]);
 
   const onSelectPage = useCallback(() => {
     dispatch(selectionChanged([...selection, ...imageDTOs]));
