@@ -6,6 +6,7 @@ import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { addImageToLatents } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
@@ -35,10 +36,7 @@ export const addInpaint = async (
 
   if (!isEqual(scaledSize, originalSize)) {
     // Scale before processing requires some resizing
-    const i2l =
-      vaeSource.type === 'flux_model_loader'
-        ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' })
-        : g.addNode({ id: 'i2l', type: 'i2l', fp32 });
+    const i2l = addImageToLatents(g, modelLoader.type === 'flux_model_loader', fp32, initialImage.image_name);
 
     const resizeImageToScaledSize = g.addNode({
       type: 'img_resize',
@@ -113,10 +111,7 @@ export const addInpaint = async (
     return canvasPasteBack;
   } else {
     // No scale before processing, much simpler
-    const i2l =
-      vaeSource.type === 'flux_model_loader'
-        ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode', image: { image_name: initialImage.image_name } })
-        : g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', image: { image_name: initialImage.image_name }, fp32 });
+    const i2l = addImageToLatents(g, modelLoader.type === 'flux_model_loader', fp32, initialImage.image_name);
 
     const alphaToMask = g.addNode({
       id: getPrefixedId('alpha_to_mask'),
