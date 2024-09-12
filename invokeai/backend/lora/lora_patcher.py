@@ -10,11 +10,6 @@ from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.lora.sidecar_layers.concatenated_lora.concatenated_lora_linear_sidecar_layer import (
     ConcatenatedLoRALinearSidecarLayer,
 )
-from invokeai.backend.lora.sidecar_layers.lora.lora_conv_sidecar_layer import (
-    LoRAConv1dSidecarLayer,
-    LoRAConv2dSidecarLayer,
-    LoRAConv3dSidecarLayer,
-)
 from invokeai.backend.lora.sidecar_layers.lora.lora_linear_sidecar_layer import LoRALinearSidecarLayer
 from invokeai.backend.lora.sidecar_layers.lora_sidecar_module import LoRASidecarModule
 from invokeai.backend.util.devices import TorchDevice
@@ -208,21 +203,6 @@ class LoRAPatcher:
                 return ConcatenatedLoRALinearSidecarLayer(concatenated_lora_layer=lora_layer, weight=patch_weight)
             else:
                 raise ValueError(f"Unsupported Linear LoRA layer type: {type(lora_layer)}")
-        elif isinstance(orig_layer, torch.nn.Conv1d):
-            if isinstance(lora_layer, LoRALayer):
-                return LoRAConv1dSidecarLayer.from_layers(orig_layer, lora_layer, patch_weight)
-            else:
-                raise ValueError(f"Unsupported Conv1D LoRA layer type: {type(lora_layer)}")
-        elif isinstance(orig_layer, torch.nn.Conv2d):
-            if isinstance(lora_layer, LoRALayer):
-                return LoRAConv2dSidecarLayer.from_layers(orig_layer, lora_layer, patch_weight)
-            else:
-                raise ValueError(f"Unsupported Conv2D LoRA layer type: {type(lora_layer)}")
-        elif isinstance(orig_layer, torch.nn.Conv3d):
-            if isinstance(lora_layer, LoRALayer):
-                return LoRAConv3dSidecarLayer.from_layers(orig_layer, lora_layer, patch_weight)
-            else:
-                raise ValueError(f"Unsupported Conv3D LoRA layer type: {type(lora_layer)}")
         else:
             raise ValueError(f"Unsupported layer type: {type(orig_layer)}")
 
