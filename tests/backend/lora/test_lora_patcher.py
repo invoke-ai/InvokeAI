@@ -27,7 +27,7 @@ def test_apply_lora(device: str):
     )
 
     lora_layers = {
-        "linear_layer_1": LoRALayer(
+        "linear_layer_1": LoRALayer.from_state_dict_values(
             values={
                 "lora_down.weight": torch.ones((lora_dim, linear_in_features), device="cpu", dtype=torch.float16),
                 "lora_up.weight": torch.ones((linear_out_features, lora_dim), device="cpu", dtype=torch.float16),
@@ -70,7 +70,7 @@ def test_apply_lora_change_device():
     )
 
     lora_layers = {
-        "linear_layer_1": LoRALayer(
+        "linear_layer_1": LoRALayer.from_state_dict_values(
             values={
                 "lora_down.weight": torch.ones((lora_dim, linear_in_features), device="cpu", dtype=torch.float16),
                 "lora_up.weight": torch.ones((linear_out_features, lora_dim), device="cpu", dtype=torch.float16),

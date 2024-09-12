@@ -37,7 +37,7 @@ def test_lora_model_from_flux_diffusers_state_dict():
     # Construct a state dict that is in the Diffusers FLUX LoRA format.
     state_dict = keys_to_mock_state_dict(flux_diffusers_state_dict_keys)
     # Load the state dict into a LoRAModelRaw object.
-    model = lora_model_from_flux_diffusers_state_dict(state_dict)
+    model = lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
 
     # Check that the model has the correct number of LoRA layers.
     expected_lora_layers: set[str] = set()
@@ -63,4 +63,4 @@ def test_lora_model_from_flux_diffusers_state_dict_extra_keys_error():
 
     # Check that an error is raised.
     with pytest.raises(AssertionError):
-        lora_model_from_flux_diffusers_state_dict(state_dict)
+        lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
