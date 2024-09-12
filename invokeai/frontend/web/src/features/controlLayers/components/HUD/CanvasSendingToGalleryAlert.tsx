@@ -17,7 +17,7 @@ import {
 } from 'features/controlLayers/components/CanvasRightPanel';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useCurrentDestination } from 'features/queue/hooks/useCurrentDestination';
-import { selectShowSendToAlerts, showSendToAlertsChanged } from 'features/system/store/systemSlice';
+import { selectShowSendingToAlerts, showSendingToAlertsChanged } from 'features/system/store/systemSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { PropsWithChildren, ReactNode } from 'react';
@@ -116,10 +116,10 @@ const AlertWrapper = ({
 }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const showSendToAlerts = useAppSelector(selectShowSendToAlerts);
+  const showSendToAlerts = useAppSelector(selectShowSendingToAlerts);
   const isHovered = useBoolean(false);
   const onClickDontShowMeThese = useCallback(() => {
-    dispatch(showSendToAlertsChanged(false));
+    dispatch(showSendingToAlertsChanged(false));
     isHovered.setFalse();
   }, [dispatch, isHovered]);
 

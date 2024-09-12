@@ -39,6 +39,5 @@ export interface SystemState {
   logIsEnabled: boolean;
   logLevel: LogLevel;
   logNamespaces: LogNamespace[];
-  showSendToAlerts: boolean;
-  showSendToToasts: boolean;
+  showSendingToDifferentViewAlerts: boolean;
 }

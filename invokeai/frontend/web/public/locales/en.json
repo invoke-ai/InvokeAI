@@ -2035,6 +2035,7 @@
             "events": "Events",
             "queue": "Queue",
             "metadata": "Metadata"
-        }
+        },
+        "showSendingToAlerts": "Alert When Sending to Different View"
     }
 }
