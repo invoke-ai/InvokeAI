@@ -121,7 +121,7 @@ export const buildFLUXGraph = async (
       originalSize,
       scaledSize,
       bbox,
-      1 - params.img2imgStrength,
+      1 - img2imgStrength,
       false
     );
   } else if (generationMode === 'inpaint') {
@@ -135,7 +135,7 @@ export const buildFLUXGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      1 - params.img2imgStrength,
+      1 - img2imgStrength,
       false
     );
   } else if (generationMode === 'outpaint') {
@@ -149,7 +149,7 @@ export const buildFLUXGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      1 - params.img2imgStrength,
+      1 - img2imgStrength,
       false
     );
   }

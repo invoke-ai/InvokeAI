@@ -112,13 +112,15 @@ export const buildSDXLGraph = async (
   const vaeLoader =
     vae?.base === model.base
       ? g.addNode({
-        type: 'vae_loader',
-        id: getPrefixedId('vae'),
-        vae_model: vae,
-      })
+          type: 'vae_loader',
+          id: getPrefixedId('vae'),
+          vae_model: vae,
+        })
       : null;
 
-  let canvasOutput: Invocation<'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'> = l2i;
+  let canvasOutput: Invocation<
+    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
+  > = l2i;
 
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
