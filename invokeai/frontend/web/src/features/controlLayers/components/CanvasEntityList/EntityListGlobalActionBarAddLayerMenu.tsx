@@ -1,4 +1,5 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import {
   useAddControlLayer,
   useAddGlobalReferenceImage,
@@ -7,6 +8,7 @@ import {
   useAddRegionalGuidance,
   useAddRegionalReferenceImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
+import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -19,6 +21,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
+  const isFLUX = useAppSelector(selectIsFLUX);
 
   return (
     <Menu>
@@ -34,7 +37,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
       />
       <MenuList>
         <MenuGroup title={t('controlLayers.global')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addGlobalReferenceImage}>
+          <MenuItem icon={<PiPlusBold />} onClick={addGlobalReferenceImage} isDisabled={isFLUX}>
             {t('controlLayers.globalReferenceImage')}
           </MenuItem>
         </MenuGroup>
@@ -42,15 +45,15 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
           <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask}>
             {t('controlLayers.inpaintMask')}
           </MenuItem>
-          <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance}>
+          <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance} isDisabled={isFLUX}>
             {t('controlLayers.regionalGuidance')}
           </MenuItem>
-          <MenuItem icon={<PiPlusBold />} onClick={addRegionalReferenceImage}>
+          <MenuItem icon={<PiPlusBold />} onClick={addRegionalReferenceImage} isDisabled={isFLUX}>
             {t('controlLayers.regionalReferenceImage')}
           </MenuItem>
         </MenuGroup>
         <MenuGroup title={t('controlLayers.layer_other')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addControlLayer}>
+          <MenuItem icon={<PiPlusBold />} onClick={addControlLayer} isDisabled={isFLUX}>
             {t('controlLayers.controlLayer')}
           </MenuItem>
           <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>
