@@ -81,14 +81,14 @@ export const FilterSpandrel = ({ onChange, config }: Props) => {
       <FormControl w="full" orientation="vertical">
         <Flex w="full" alignItems="center">
           <FormLabel m={0} flexGrow={1}>
-            {t('controlLayers.filter.spandrel.paramAutoScale')}
+            {t('controlLayers.filter.spandrel_filter.autoScale')}
           </FormLabel>
           <Switch size="sm" isChecked={config.autoScale} onChange={onAutoscaleChanged} />
         </Flex>
-        <FormHelperText>{t('controlLayers.filter.spandrel.paramAutoScaleDesc')}</FormHelperText>
+        <FormHelperText>{t('controlLayers.filter.spandrel_filter.autoScaleDesc')}</FormHelperText>
       </FormControl>
       <FormControl isDisabled={!config.autoScale}>
-        <FormLabel m={0}>{t('controlLayers.filter.spandrel.paramScale')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.spandrel_filter.scale')}</FormLabel>
         <CompositeSlider
           value={config.scale}
           onChange={onScaleChanged}
@@ -105,7 +105,7 @@ export const FilterSpandrel = ({ onChange, config }: Props) => {
         />
       </FormControl>
       <FormControl>
-        <FormLabel m={0}>{t('controlLayers.filter.spandrel.paramModel')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.spandrel_filter.model')}</FormLabel>
         <Tooltip label={tooltipLabel}>
           <Box w="full">
             <Combobox
