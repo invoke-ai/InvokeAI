@@ -7,7 +7,7 @@ import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/Canva
 import { selectHasEntities } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 
-export const CanvasPanelContent = memo(() => {
+export const CanvasLayersPanelContent = memo(() => {
   const hasEntities = useAppSelector(selectHasEntities);
 
   return (
@@ -22,4 +22,4 @@ export const CanvasPanelContent = memo(() => {
   );
 });
 
-CanvasPanelContent.displayName = 'CanvasPanelContent';
+CanvasLayersPanelContent.displayName = 'CanvasLayersPanelContent';

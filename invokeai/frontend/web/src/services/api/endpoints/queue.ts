@@ -368,6 +368,7 @@ export const {
   useListQueueItemsQuery,
   useCancelQueueItemMutation,
   useGetBatchStatusQuery,
+  useGetCurrentQueueItemQuery,
 } = queueApi;
 
 export const selectQueueStatus = queueApi.endpoints.getQueueStatus.select();

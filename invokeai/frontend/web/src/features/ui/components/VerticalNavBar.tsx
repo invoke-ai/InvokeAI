@@ -8,7 +8,7 @@ import { TabMountGate } from 'features/ui/components/TabMountGate';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdZoomOutMap } from 'react-icons/md';
-import { PiFlowArrowBold, PiImageBold } from 'react-icons/pi';
+import { PiFlowArrowBold } from 'react-icons/pi';
 import { RiBox2Line, RiInputMethodLine, RiPlayList2Fill } from 'react-icons/ri';
 
 import { TabButton } from './TabButton';
@@ -35,9 +35,6 @@ export const VerticalNavBar = memo(() => {
         </TabMountGate>
         <TabMountGate tab="queue">
           <TabButton tab="queue" icon={<RiPlayList2Fill />} label={t('ui.tabs.queue')} />
-        </TabMountGate>
-        <TabMountGate tab="gallery">
-          <TabButton tab="gallery" icon={<PiImageBold />} label={t('ui.tabs.gallery')} />
         </TabMountGate>
       </Flex>
       <Spacer />
