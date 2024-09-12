@@ -93,7 +93,10 @@ export const addOutpaint = async (
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
 
     // Decode infilled image and connect to denoise
-    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', fp32 });
+    const i2l =
+      vaeSource.type === 'flux_model_loader'
+        ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' })
+        : g.addNode({ id: 'i2l', type: 'i2l', fp32 });
     g.addEdge(infill, 'image', i2l, 'image');
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
@@ -135,7 +138,10 @@ export const addOutpaint = async (
   } else {
     infill.image = { image_name: initialImage.image_name };
     // No scale before processing, much simpler
-    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', fp32 });
+    const i2l =
+      vaeSource.type === 'flux_model_loader'
+        ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' })
+        : g.addNode({ id: 'i2l', type: 'i2l', fp32 });
     const maskAlphaToMask = g.addNode({
       id: getPrefixedId('mask_alpha_to_mask'),
       type: 'tomask',
