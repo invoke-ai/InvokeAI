@@ -1,4 +1,5 @@
 import { Button, Flex, Heading } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import {
   useAddControlLayer,
   useAddGlobalReferenceImage,
@@ -7,6 +8,7 @@ import {
   useAddRegionalGuidance,
   useAddRegionalReferenceImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
+import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
@@ -19,6 +21,7 @@ export const CanvasAddEntityButtons = memo(() => {
   const addControlLayer = useAddControlLayer();
   const addGlobalReferenceImage = useAddGlobalReferenceImage();
   const addRegionalReferenceImage = useAddRegionalReferenceImage();
+  const isFLUX = useAppSelector(selectIsFLUX);
 
   return (
     <Flex w="full" h="full" justifyContent="center" gap={4}>
@@ -31,6 +34,7 @@ export const CanvasAddEntityButtons = memo(() => {
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
             onClick={addGlobalReferenceImage}
+            isDisabled={isFLUX}
           >
             {t('controlLayers.globalReferenceImage')}
           </Button>
@@ -52,6 +56,7 @@ export const CanvasAddEntityButtons = memo(() => {
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
             onClick={addRegionalGuidance}
+            isDisabled={isFLUX}
           >
             {t('controlLayers.regionalGuidance')}
           </Button>
@@ -61,6 +66,7 @@ export const CanvasAddEntityButtons = memo(() => {
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
             onClick={addRegionalReferenceImage}
+            isDisabled={isFLUX}
           >
             {t('controlLayers.regionalReferenceImage')}
           </Button>
@@ -74,6 +80,7 @@ export const CanvasAddEntityButtons = memo(() => {
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
             onClick={addControlLayer}
+            isDisabled={isFLUX}
           >
             {t('controlLayers.controlLayer')}
           </Button>
