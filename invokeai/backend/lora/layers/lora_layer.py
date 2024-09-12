@@ -67,9 +67,3 @@ class LoRALayer(LoRALayerBase):
             weight = self.up.reshape(self.up.shape[0], -1) @ self.down.reshape(self.down.shape[0], -1)
 
         return weight
-
-    def calc_size(self) -> int:
-        # HACK(ryand): Fix this issue with circular imports.
-        from invokeai.backend.model_manager.load.model_util import calc_module_size
-
-        return calc_module_size(self)

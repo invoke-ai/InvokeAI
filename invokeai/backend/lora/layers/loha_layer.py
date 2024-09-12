@@ -6,6 +6,11 @@ from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
 
 
 class LoHALayer(LoRALayerBase):
+    """LoHA LyCoris layer.
+
+    Example model for testing this layer type: https://civitai.com/models/27397/loha-renoir-the-dappled-light-style
+    """
+
     def __init__(
         self,
         w1_a: torch.Tensor,
