@@ -40,6 +40,7 @@ const nodeTypeDenylist = ['load_image', 'image'];
 export const $lastProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
 export const $hasProgress = computed($lastProgressEvent, (val) => Boolean(val));
 export const $progressImage = computed($lastProgressEvent, (val) => val?.progress_image ?? null);
+export const $isProgressFromCanvas = computed($lastProgressEvent, (val) => val?.destination === 'canvas');
 
 export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }: SetEventListenersArg) => {
   socket.on('connect', () => {
