@@ -25,7 +25,6 @@ const initialGalleryState: GalleryState = {
   comparisonMode: 'slider',
   comparisonFit: 'fill',
   shouldShowArchivedBoards: false,
-  isMiniViewerOpen: false,
 };
 
 export const gallerySlice = createSlice({
@@ -88,9 +87,6 @@ export const gallerySlice = createSlice({
     alwaysShowImageSizeBadgeChanged: (state, action: PayloadAction<boolean>) => {
       state.alwaysShowImageSizeBadge = action.payload;
     },
-    isMiniViewerOpenToggled: (state) => {
-      state.isMiniViewerOpen = !state.isMiniViewerOpen;
-    },
     comparedImagesSwapped: (state) => {
       if (state.imageToCompare) {
         const oldSelection = state.selection;
@@ -146,7 +142,6 @@ export const {
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
   searchTermChanged,
-  isMiniViewerOpenToggled,
 } = gallerySlice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;

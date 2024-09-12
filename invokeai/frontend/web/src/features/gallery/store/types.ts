@@ -28,5 +28,4 @@ export type GalleryState = {
   comparisonMode: ComparisonMode;
   comparisonFit: ComparisonFit;
   shouldShowArchivedBoards: boolean;
-  isMiniViewerOpen: boolean;
 };
