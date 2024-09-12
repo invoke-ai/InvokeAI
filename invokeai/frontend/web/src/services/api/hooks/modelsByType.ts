@@ -29,18 +29,18 @@ import {
 
 const buildModelsHook =
   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T) =>
-    () => {
-      const result = useGetModelConfigsQuery(undefined);
-      const modelConfigs = useMemo(() => {
-        if (!result.data) {
-          return EMPTY_ARRAY;
-        }
+  () => {
+    const result = useGetModelConfigsQuery(undefined);
+    const modelConfigs = useMemo(() => {
+      if (!result.data) {
+        return EMPTY_ARRAY;
+      }
 
-        return modelConfigsAdapterSelectors.selectAll(result.data).filter(typeGuard);
-      }, [result]);
+      return modelConfigsAdapterSelectors.selectAll(result.data).filter(typeGuard);
+    }, [result]);
 
-      return [modelConfigs, result] as const;
-    };
+    return [modelConfigs, result] as const;
+  };
 
 export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
