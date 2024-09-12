@@ -70,8 +70,9 @@ export const FilterSpandrel = ({ onChange, config }: Props) => {
   );
 
   useEffect(() => {
-    if (!config.model) {
-      onChangeModel(options[0] ?? null);
+    const firstModel = options[0];
+    if (!config.model && firstModel) {
+      onChangeModel(firstModel);
     }
   }, [config.model, onChangeModel, options]);
 
