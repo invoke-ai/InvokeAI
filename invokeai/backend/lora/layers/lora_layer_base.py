@@ -31,11 +31,13 @@ class LoRALayerBase(torch.nn.Module):
     ) -> float | None:
         return alpha.item() if alpha is not None else None
 
-    def rank(self) -> int:
+    def rank(self) -> int | None:
         raise NotImplementedError()
 
     def scale(self) -> float:
-        return self._alpha / self.rank() if self._alpha is not None else 1.0
+        if self._alpha is None or self.rank() is None:
+            return 1.0
+        return self._alpha / self.rank()
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError()
@@ -58,3 +60,9 @@ class LoRALayerBase(torch.nn.Module):
             logger.warning(
                 f"Unexpected keys found in LoRA/LyCORIS layer, model might work incorrectly! Unexpected keys: {unknown_keys}"
             )
+
+    def calc_size(self) -> int:
+        # HACK(ryand): Fix this issue with circular imports.
+        from invokeai.backend.model_manager.load.model_util import calc_module_size
+
+        return calc_module_size(self)

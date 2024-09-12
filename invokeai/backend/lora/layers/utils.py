@@ -19,15 +19,15 @@ def any_lora_layer_from_state_dict(state_dict: Dict[str, torch.Tensor]) -> AnyLo
         # LoRA a.k.a LoCon
         return LoRALayer.from_state_dict_values(state_dict)
     elif "hada_w1_a" in state_dict:
-        return LoHALayer(state_dict)
+        return LoHALayer.from_state_dict_values(state_dict)
     elif "lokr_w1" in state_dict or "lokr_w1_a" in state_dict:
-        return LoKRLayer(state_dict)
+        return LoKRLayer.from_state_dict_values(state_dict)
     elif "diff" in state_dict:
         # Full a.k.a Diff
-        return FullLayer(state_dict)
+        return FullLayer.from_state_dict_values(state_dict)
     elif "on_input" in state_dict:
-        return IA3Layer(state_dict)
+        return IA3Layer.from_state_dict_values(state_dict)
     elif "w_norm" in state_dict:
-        return NormLayer(state_dict)
+        return NormLayer.from_state_dict_values(state_dict)
     else:
         raise ValueError(f"Unsupported lora format: {state_dict.keys()}")
