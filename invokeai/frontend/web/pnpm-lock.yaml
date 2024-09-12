@@ -24,8 +24,8 @@ dependencies:
     specifier: ^5.0.20
     version: 5.0.20
   '@invoke-ai/ui-library':
-    specifier: ^0.0.34
-    version: 0.0.34(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.20)(@types/react@18.3.3)(i18next@23.12.2)(react-dom@18.3.1)(react@18.3.1)
+    specifier: ^0.0.36
+    version: 0.0.36(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.20)(@types/react@18.3.3)(i18next@23.12.2)(react-dom@18.3.1)(react@18.3.1)
   '@nanostores/react':
     specifier: ^0.7.3
     version: 0.7.3(nanostores@0.11.2)(react@18.3.1)
@@ -3574,8 +3574,8 @@ packages:
       prettier: 3.3.3
     dev: true
 
-  /@invoke-ai/ui-library@0.0.34(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.20)(@types/react@18.3.3)(i18next@23.12.2)(react-dom@18.3.1)(react@18.3.1):
-    resolution: {integrity: sha512-iDSjFQV2U4LfQ8+UdZ9Uy6J1iKKTSsXM0uhkWrwcIghbgN5QwY3ABVLhqJrSWVTwp7puEDhe/lRQ9QhTZBkVzw==}
+  /@invoke-ai/ui-library@0.0.36(@chakra-ui/form-control@2.2.0)(@chakra-ui/icon@3.2.0)(@chakra-ui/media-query@3.3.0)(@chakra-ui/menu@2.2.1)(@chakra-ui/spinner@2.1.0)(@chakra-ui/system@2.6.2)(@fontsource-variable/inter@5.0.20)(@types/react@18.3.3)(i18next@23.12.2)(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-gF/LSzUYFxDmKiUADvl7lsVEbyOQurWVxeCRD4279lBo/RjVcGDwkflLtP8FN//Wv1CqZqn9UnOrJHpUZWl1Rg==}
     peerDependencies:
       '@fontsource-variable/inter': ^5.0.16
       react: ^18.2.0
