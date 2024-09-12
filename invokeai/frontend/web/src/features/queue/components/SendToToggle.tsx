@@ -6,7 +6,6 @@ import {
   selectCanvasSettingsSlice,
   settingsSendToCanvasChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
-import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold, PiPaintBrushBold } from 'react-icons/pi';
@@ -63,29 +62,15 @@ export const SendToToggle = memo(() => {
     if (!sendToCanvas) {
       return;
     }
-    toast({
-      id: 'sendToCanvas',
-      title: t('controlLayers.sendingToGallery'),
-      description: t('controlLayers.sendToGalleryDesc'),
-      status: 'info',
-      withCount: false,
-    });
     dispatch(settingsSendToCanvasChanged(false));
-  }, [dispatch, sendToCanvas, t]);
+  }, [dispatch, sendToCanvas]);
 
   const onClickSendToCanvas = useCallback(() => {
     if (sendToCanvas) {
       return;
     }
-    toast({
-      id: 'sendToCanvas',
-      title: t('controlLayers.sendingToCanvas'),
-      description: t('controlLayers.sendToCanvasDesc'),
-      status: 'info',
-      withCount: false,
-    });
     dispatch(settingsSendToCanvasChanged(true));
-  }, [dispatch, sendToCanvas, t]);
+  }, [dispatch, sendToCanvas]);
 
   return (
     <Flex
