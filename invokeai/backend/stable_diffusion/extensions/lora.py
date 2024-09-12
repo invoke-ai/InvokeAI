@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Tuple
 import torch
 from diffusers import UNet2DConditionModel
 
+from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
 from invokeai.backend.util.devices import TorchDevice
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.model import ModelIdentifierField
     from invokeai.app.services.shared.invocation_context import InvocationContext
-    from invokeai.backend.lora import LoRAModelRaw
     from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
 
