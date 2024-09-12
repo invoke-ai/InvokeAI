@@ -14,8 +14,8 @@ import {
   setRightPanelTabToGallery,
   setRightPanelTabToLayers,
 } from 'features/controlLayers/components/CanvasRightPanel';
-import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { useCurrentDestination } from 'features/queue/hooks/useCurrentDestination';
 import { selectShowSendToAlerts, showSendToAlertsChanged } from 'features/system/store/systemSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { PropsWithChildren } from 'react';
@@ -24,6 +24,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
 const DontShowMeTheseAgainButton = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
     dispatch(showSendToAlertsChanged(false));
@@ -32,8 +33,8 @@ const DontShowMeTheseAgainButton = () => {
     <IconButton
       variant="link"
       icon={<Icon as={PiXBold} fill="base.50 !important" />}
-      tooltip="Don't show me these again"
-      aria-label="Don't show me these again"
+      tooltip={t('common.dontShowMeThese')}
+      aria-label={t('common.dontShowMeThese')}
       right={-1}
       top={-2}
       onClick={onClick}
@@ -57,14 +58,18 @@ const ActivateImageViewerButton = (props: PropsWithChildren) => {
 
 export const SendingToGalleryAlert = () => {
   const { t } = useTranslation();
-  const sendToCanvas = useAppSelector(selectSendToCanvas);
+  const destination = useCurrentDestination();
   const showSendToAlerts = useAppSelector(selectShowSendToAlerts);
 
   if (!showSendToAlerts) {
     return null;
   }
 
-  if (sendToCanvas) {
+  if (!destination) {
+    return null;
+  }
+
+  if (destination === 'canvas') {
     return null;
   }
 
@@ -77,10 +82,7 @@ export const SendingToGalleryAlert = () => {
         <DontShowMeTheseAgainButton />
       </Flex>
       <AlertDescription>
-        <Trans
-          i18nKey="controlLayers.viewGenerationsInImageViewer"
-          components={{ Btn: <ActivateImageViewerButton /> }}
-        />
+        <Trans i18nKey="controlLayers.viewProgressInViewer" components={{ Btn: <ActivateImageViewerButton /> }} />
       </AlertDescription>
     </Alert>
   );
@@ -103,14 +105,18 @@ const ActivateCanvasButton = (props: PropsWithChildren) => {
 
 export const SendingToCanvasAlert = () => {
   const { t } = useTranslation();
-  const sendToCanvas = useAppSelector(selectSendToCanvas);
+  const destination = useCurrentDestination();
   const showSendToAlerts = useAppSelector(selectShowSendToAlerts);
 
   if (!showSendToAlerts) {
     return null;
   }
 
-  if (!sendToCanvas) {
+  if (!destination) {
+    return null;
+  }
+
+  if (destination !== 'canvas') {
     return null;
   }
 
@@ -123,7 +129,7 @@ export const SendingToCanvasAlert = () => {
         <DontShowMeTheseAgainButton />
       </Flex>
       <AlertDescription>
-        <Trans i18nKey="controlLayers.viewAndStageOnTheCanvas" components={{ Btn: <ActivateCanvasButton /> }} />
+        <Trans i18nKey="controlLayers.viewProgressOnCanvas" components={{ Btn: <ActivateCanvasButton /> }} />
       </AlertDescription>
     </Alert>
   );
