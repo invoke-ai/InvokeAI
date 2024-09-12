@@ -84,7 +84,7 @@ export const addInpaint = async (
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
 
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
-    if (modelLoader.type !== "flux_model_loader") {
+    if (modelLoader.type !== 'flux_model_loader') {
       g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
     }
     g.addEdge(resizeImageToScaledSize, 'image', createGradientMask, 'image');
@@ -140,7 +140,7 @@ export const addInpaint = async (
     g.addEdge(i2l, 'latents', denoise, 'latents');
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
-    if (modelLoader.type !== "flux_model_loader") {
+    if (modelLoader.type !== 'flux_model_loader') {
       g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
     }
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');

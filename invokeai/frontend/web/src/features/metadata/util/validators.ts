@@ -7,7 +7,11 @@ import type {
   T2IAdapterConfigMetadata,
 } from 'features/metadata/types';
 import { InvalidModelConfigError } from 'features/metadata/util/modelFetchingHelpers';
-import type { ParameterSDXLRefinerModel, ParameterT5EncoderModel, ParameterVAEModel } from 'features/parameters/types/parameterSchemas';
+import type {
+  ParameterSDXLRefinerModel,
+  ParameterT5EncoderModel,
+  ParameterVAEModel,
+} from 'features/parameters/types/parameterSchemas';
 import type { BaseModelType } from 'services/api/types';
 
 /**

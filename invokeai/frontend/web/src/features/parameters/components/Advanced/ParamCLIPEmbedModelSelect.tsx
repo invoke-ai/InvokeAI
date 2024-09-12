@@ -1,12 +1,12 @@
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import { clipEmbedModelSelected, selectCLIPEmbedModel } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCLIPEmbedModels } from 'services/api/hooks/modelsByType';
 import type { CLIPEmbedModelConfig } from 'services/api/types';
-import { useModelCombobox } from '../../../../common/hooks/useModelCombobox';
 
 const ParamCLIPEmbedModelSelect = () => {
   const dispatch = useAppDispatch();

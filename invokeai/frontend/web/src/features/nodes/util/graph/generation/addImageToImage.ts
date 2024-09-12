@@ -30,9 +30,10 @@ export const addImageToImage = async (
       ...scaledSize,
     });
 
-    const i2l = vaeSource.type === "flux_model_loader" ?
-      g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' }) :
-      g.addNode({ id: 'i2l', type: 'i2l', fp32 });
+    const i2l =
+      vaeSource.type === 'flux_model_loader'
+        ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' })
+        : g.addNode({ id: 'i2l', type: 'i2l', fp32 });
 
     const resizeImageToOriginalSize = g.addNode({
       type: 'img_resize',
@@ -49,7 +50,10 @@ export const addImageToImage = async (
     return resizeImageToOriginalSize;
   } else {
     // No need to resize, just decode
-    const i2l = vaeSource.type === "flux_model_loader" ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' }) : g.addNode({ id: 'i2l', type: 'i2l', fp32 });
+    const i2l =
+      vaeSource.type === 'flux_model_loader'
+        ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' })
+        : g.addNode({ id: 'i2l', type: 'i2l', fp32 });
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
     return l2i;

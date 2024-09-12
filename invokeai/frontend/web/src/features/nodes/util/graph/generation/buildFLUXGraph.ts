@@ -35,23 +35,14 @@ export const buildFLUXGraph = async (
 
   const { originalSize, scaledSize } = getSizes(bbox);
 
-  const {
-    model,
-    guidance,
-    seed,
-    steps,
-    fluxVAE,
-    t5EncoderModel,
-    clipEmbedModel,
-    img2imgStrength,
-  } = params;
+  const { model, guidance, seed, steps, fluxVAE, t5EncoderModel, clipEmbedModel, img2imgStrength } = params;
 
   assert(model, 'No model found in state');
   assert(t5EncoderModel, 'No T5 Encoder model found in state');
   assert(clipEmbedModel, 'No CLIP Embed model found in state');
   assert(fluxVAE, 'No FLUX VAE model found in state');
 
-  const { positivePrompt, } = getPresetModifiedPrompts(state);
+  const { positivePrompt } = getPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('flux_graph'));
   const modelLoader = g.addNode({
@@ -60,7 +51,7 @@ export const buildFLUXGraph = async (
     model,
     t5_encoder_model: t5EncoderModel,
     clip_embed_model: clipEmbedModel,
-    vae_model: fluxVAE
+    vae_model: fluxVAE,
   });
 
   const posCond = g.addNode({
@@ -78,7 +69,7 @@ export const buildFLUXGraph = async (
     denoising_start: 1 - img2imgStrength,
     denoising_end: 1,
     width: scaledSize.width,
-    height: scaledSize.height
+    height: scaledSize.height,
   });
 
   const l2i = g.addNode({
@@ -86,8 +77,9 @@ export const buildFLUXGraph = async (
     id: getPrefixedId('flux_vae_decode'),
   });
 
-
-  let canvasOutput: Invocation<'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'> = l2i;
+  let canvasOutput: Invocation<
+    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
+  > = l2i;
 
   g.addEdge(modelLoader, 'transformer', noise, 'transformer');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
@@ -99,7 +91,6 @@ export const buildFLUXGraph = async (
   g.addEdge(posCond, 'conditioning', noise, 'positive_text_conditioning');
 
   g.addEdge(noise, 'latents', l2i, 'latents');
-
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
   assert(modelConfig.base === 'flux');
@@ -115,9 +106,8 @@ export const buildFLUXGraph = async (
     steps,
     vae: fluxVAE,
     t5_encoder: t5EncoderModel,
-    clip_embed_model: clipEmbedModel
+    clip_embed_model: clipEmbedModel,
   });
-
 
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
@@ -163,7 +153,6 @@ export const buildFLUXGraph = async (
       false
     );
   }
-
 
   if (state.system.shouldUseNSFWChecker) {
     canvasOutput = addNSFWChecker(g, canvasOutput);

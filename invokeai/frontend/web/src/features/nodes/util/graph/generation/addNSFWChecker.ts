@@ -10,7 +10,9 @@ import type { Invocation } from 'services/api/types';
  */
 export const addNSFWChecker = (
   g: Graph,
-  imageOutput: Invocation<'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'>
+  imageOutput: Invocation<
+    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
+  >
 ): Invocation<'img_nsfw'> => {
   const nsfw = g.addNode({
     type: 'img_nsfw',
