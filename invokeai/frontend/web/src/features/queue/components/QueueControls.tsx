@@ -1,6 +1,7 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { ClearQueueIconButton } from 'features/queue/components/ClearQueueIconButton';
 import QueueFrontButton from 'features/queue/components/QueueFrontButton';
+import { SendToToggle } from 'features/queue/components/SendToToggle';
 import ProgressBar from 'features/system/components/ProgressBar';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo } from 'react';
@@ -16,6 +17,7 @@ const QueueControls = () => {
         {isPrependEnabled && <QueueFrontButton />}
         <InvokeQueueBackButton />
         <Spacer />
+        <SendToToggle />
         <ClearQueueIconButton />
       </Flex>
       <ProgressBar />

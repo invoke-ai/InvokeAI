@@ -10,11 +10,11 @@ import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import type { GallerySelectionDraggableData, ImageDraggableData, TypesafeDraggableData } from 'features/dnd/types';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
-import { setActiveTab } from 'features/ui/store/uiSlice';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -112,10 +112,11 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
     setIsHovered(true);
   }, []);
 
+  const imageViewer = useImageViewer();
   const onDoubleClick = useCallback(() => {
-    dispatch(setActiveTab('gallery'));
+    imageViewer.open();
     dispatch(imageToCompareChanged(null));
-  }, [dispatch]);
+  }, [dispatch, imageViewer]);
 
   const handleMouseOut = useCallback(() => {
     setIsHovered(false);

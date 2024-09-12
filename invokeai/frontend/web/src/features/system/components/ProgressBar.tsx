@@ -3,12 +3,13 @@ import { useStore } from '@nanostores/react';
 import { $isConnected } from 'app/hooks/useSocketIO';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import { useGetCurrentQueueItemQuery, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 import { $lastProgressEvent } from 'services/events/setEventListeners';
 
 const ProgressBar = () => {
   const { t } = useTranslation();
   const { data: queueStatus } = useGetQueueStatusQuery();
+  const currentQueueItem = useGetCurrentQueueItemQuery().data;
   const isConnected = useStore($isConnected);
   const lastProgressEvent = useStore($lastProgressEvent);
   const value = useMemo(() => {
@@ -25,7 +26,7 @@ const ProgressBar = () => {
       isIndeterminate={isConnected && Boolean(queueStatus?.queue.in_progress) && !lastProgressEvent}
       h={2}
       w="full"
-      colorScheme="invokeBlue"
+      colorScheme={currentQueueItem && currentQueueItem.destination === 'canvas' ? 'invokeGreen' : 'invokeBlue'}
     />
   );
 };

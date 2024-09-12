@@ -1,11 +1,19 @@
+import { Button } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
+import { useAppDispatch } from 'app/store/storeHooks';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { $imageViewerState } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
+import { selectShowSendToToasts, showSendToToastsChanged } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
@@ -17,6 +25,22 @@ const isCanvasOutputNode = (data: S['InvocationCompleteEvent']) => {
   return data.invocation_source_id.split(':')[0] === 'canvas_output';
 };
 
+const SEND_TO_TOAST_ID = 'send-to-toast';
+
+const DontShowMeTheseToastDescription = () => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const onClick = useCallback(() => {
+    dispatch(showSendToToastsChanged(false));
+  }, [dispatch]);
+
+  return (
+    <Button onClick={onClick} size="sm" variant="link" color="base.50">
+      {t('common.dontShowMeThese')}
+    </Button>
+  );
+};
+
 export const buildOnInvocationComplete = (
   getState: () => RootState,
   dispatch: AppDispatch,
@@ -24,6 +48,32 @@ export const buildOnInvocationComplete = (
   setLastProgressEvent: (event: S['InvocationDenoiseProgressEvent'] | null) => void,
   setLastCanvasProgressEvent: (event: S['InvocationDenoiseProgressEvent'] | null) => void
 ) => {
+  const toastIfUserIsLost = (destination: string | null) => {
+    const state = getState();
+    const showToasts = selectShowSendToToasts(state);
+    if (!showToasts) {
+      return;
+    }
+    const tab = selectActiveTab(state);
+    if (destination === 'canvas' && ($imageViewerState.get() || tab !== 'generation')) {
+      toast({
+        id: SEND_TO_TOAST_ID,
+        title: 'Image sent to Canvas',
+        updateDescription: true,
+        withCount: false,
+        description: <DontShowMeTheseToastDescription />,
+      });
+    } else if (destination !== 'canvas' && !$imageViewerState.get() && tab === 'generation') {
+      toast({
+        id: SEND_TO_TOAST_ID,
+        title: 'Image sent to Gallery',
+        updateDescription: true,
+        withCount: false,
+        description: <DontShowMeTheseToastDescription />,
+      });
+    }
+  };
+
   const addImageToGallery = (imageDTO: ImageDTO) => {
     if (imageDTO.is_intermediate) {
       return;
@@ -108,12 +158,13 @@ export const buildOnInvocationComplete = (
 
     const imageDTO = await getResultImageDTO(data);
 
-    if (imageDTO) {
+    if (imageDTO && !imageDTO.is_intermediate) {
       addImageToGallery(imageDTO);
+      toastIfUserIsLost(data.destination);
     }
   };
 
-  const handleOriginCanvas = async (data: S['InvocationCompleteEvent']) => {
+  const handleOriginGeneration = async (data: S['InvocationCompleteEvent']) => {
     const imageDTO = await getResultImageDTO(data);
 
     if (!imageDTO) {
@@ -128,20 +179,23 @@ export const buildOnInvocationComplete = (
         } else if (data.result.type === 'image_output') {
           dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
         }
+        addImageToGallery(imageDTO);
+        toastIfUserIsLost(data.destination);
       }
-    } else {
+    } else if (!imageDTO.is_intermediate) {
       // session.mode === 'generate'
       setLastCanvasProgressEvent(null);
+      addImageToGallery(imageDTO);
+      toastIfUserIsLost(data.destination);
     }
-
-    addImageToGallery(imageDTO);
   };
 
   const handleOriginOther = async (data: S['InvocationCompleteEvent']) => {
     const imageDTO = await getResultImageDTO(data);
 
-    if (imageDTO) {
+    if (imageDTO && !imageDTO.is_intermediate) {
       addImageToGallery(imageDTO);
+      toastIfUserIsLost(data.destination);
     }
   };
 
@@ -155,7 +209,7 @@ export const buildOnInvocationComplete = (
     if (data.origin === 'workflows') {
       await handleOriginWorkflows(data);
     } else if (data.origin === 'generation') {
-      await handleOriginCanvas(data);
+      await handleOriginGeneration(data);
     } else {
       await handleOriginOther(data);
     }

@@ -439,7 +439,9 @@
         "compareHelp2": "Press <Kbd>M</Kbd> to cycle through comparison modes.",
         "compareHelp3": "Press <Kbd>C</Kbd> to swap the compared images.",
         "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit.",
-        "toggleMiniViewer": "Toggle Mini Viewer"
+        "toggleMiniViewer": "Toggle Mini Viewer",
+        "openViewer": "Open Viewer",
+        "closeViewer": "Close Viewer"
     },
     "hotkeys": {
         "searchHotkeys": "Search Hotkeys",
@@ -1723,9 +1725,11 @@
         "sendingToCanvas": "Sending to Canvas",
         "sendingToGallery": "Sending to Gallery",
         "sendToGallery": "Send To Gallery",
-        "sendToGalleryDesc": "Generations will be sent to the gallery.",
+        "sendToGalleryDesc": "Pressing Invoke generates and saves a unique image to your gallery.",
         "sendToCanvas": "Send To Canvas",
-        "sendToCanvasDesc": "Generations will be staged onto the canvas.",
+        "sendToCanvasDesc": "Pressing Invoke stages your work in progress on the canvas.",
+        "viewGenerationsInImageViewer": "View Generations in the <Btn>Image Viewer</Btn>.",
+        "viewAndStageOnTheCanvas": "View and stage generations on the <Btn>Canvas</Btn>.",
         "rasterLayer_withCount_one": "$t(controlLayers.rasterLayer)",
         "controlLayer_withCount_one": "$t(controlLayers.controlLayer)",
         "inpaintMask_withCount_one": "$t(controlLayers.inpaintMask)",

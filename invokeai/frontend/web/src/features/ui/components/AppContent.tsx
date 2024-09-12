@@ -1,8 +1,8 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
-import { CanvasRightPanelContent } from 'features/controlLayers/components/CanvasRightPanel';
-import { CanvasTabContent } from 'features/controlLayers/components/CanvasTabContent';
+import { CanvasMainPanelContent } from 'features/controlLayers/components/CanvasMainPanelContent';
+import { CanvasRightPanel } from 'features/controlLayers/components/CanvasRightPanel';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
@@ -157,10 +157,10 @@ const RightPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
 
   if (tab === 'generation') {
-    return <CanvasRightPanelContent />;
+    return <CanvasRightPanel />;
   }
 
-  if (tab === 'upscaling' || tab === 'workflows' || tab === 'gallery') {
+  if (tab === 'upscaling' || tab === 'workflows') {
     return <GalleryPanelContent />;
   }
 
@@ -189,16 +189,13 @@ LeftPanelContent.displayName = 'LeftPanelContent';
 const MainPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
   if (tab === 'generation') {
-    return <CanvasTabContent />;
+    return <CanvasMainPanelContent />;
   }
   if (tab === 'upscaling') {
     return <ImageViewer />;
   }
   if (tab === 'workflows') {
     return <WorkflowsTabContent />;
-  }
-  if (tab === 'gallery') {
-    return <ImageViewer />;
   }
   if (tab === 'models') {
     return <ModelManagerTab />;

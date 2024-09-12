@@ -6,6 +6,7 @@ import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { CanvasSelectedEntityStatusAlert } from 'features/controlLayers/components/HUD/CanvasSelectedEntityStatusAlert';
+import { SendingToGalleryAlert } from 'features/controlLayers/components/HUD/CanvasSendingToGalleryAlert';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { StagingAreaIsStagingGate } from 'features/controlLayers/components/StagingArea/StagingAreaIsStagingGate';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
@@ -14,9 +15,10 @@ import { Transform } from 'features/controlLayers/components/Transform/Transform
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
+import { GatedImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import { memo, useCallback, useRef } from 'react';
 
-export const CanvasTabContent = memo(() => {
+export const CanvasMainPanelContent = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
@@ -76,8 +78,9 @@ export const CanvasTabContent = memo(() => {
                   <CanvasHUD />
                 </Flex>
               )}
-              <Flex position="absolute" top={1} insetInlineEnd={1} pointerEvents="none">
+              <Flex flexDir="column" position="absolute" top={1} insetInlineEnd={1} pointerEvents="none" gap={2}>
                 <CanvasSelectedEntityStatusAlert />
+                <SendingToGalleryAlert />
               </Flex>
             </CanvasManagerProviderGate>
           </Flex>
@@ -97,8 +100,9 @@ export const CanvasTabContent = memo(() => {
         </CanvasManagerProviderGate>
       </Flex>
       <CanvasDropArea />
+      <GatedImageViewer />
     </Flex>
   );
 });
 
-CanvasTabContent.displayName = 'CanvasTabContent';
+CanvasMainPanelContent.displayName = 'CanvasMainPanelContent';
