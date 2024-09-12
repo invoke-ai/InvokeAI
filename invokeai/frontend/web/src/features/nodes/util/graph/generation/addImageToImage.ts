@@ -52,8 +52,8 @@ export const addImageToImage = async (
     // No need to resize, just decode
     const i2l =
       vaeSource.type === 'flux_model_loader'
-        ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' })
-        : g.addNode({ id: 'i2l', type: 'i2l', fp32 });
+        ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode', image: { image_name } })
+        : g.addNode({ id: 'i2l', type: 'i2l', image: { image_name }, fp32 });
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
     return l2i;

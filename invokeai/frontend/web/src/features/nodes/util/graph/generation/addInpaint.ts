@@ -35,7 +35,11 @@ export const addInpaint = async (
 
   if (!isEqual(scaledSize, originalSize)) {
     // Scale before processing requires some resizing
-    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', fp32 });
+    const i2l =
+      vaeSource.type === 'flux_model_loader'
+        ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode' })
+        : g.addNode({ id: 'i2l', type: 'i2l', fp32 });
+
     const resizeImageToScaledSize = g.addNode({
       type: 'img_resize',
       id: getPrefixedId('resize_image_to_scaled_size'),
@@ -109,12 +113,11 @@ export const addInpaint = async (
     return canvasPasteBack;
   } else {
     // No scale before processing, much simpler
-    const i2l = g.addNode({
-      id: getPrefixedId('i2l'),
-      type: 'i2l',
-      image: { image_name: initialImage.image_name },
-      fp32,
-    });
+    const i2l =
+      vaeSource.type === 'flux_model_loader'
+        ? g.addNode({ id: 'flux_vae_encode', type: 'flux_vae_encode', image: { image_name: initialImage.image_name } })
+        : g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', image: { image_name: initialImage.image_name }, fp32 });
+
     const alphaToMask = g.addNode({
       id: getPrefixedId('alpha_to_mask'),
       type: 'tomask',

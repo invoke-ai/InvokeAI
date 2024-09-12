@@ -66,7 +66,7 @@ export const buildFLUXGraph = async (
     guidance,
     num_steps: steps,
     seed,
-    denoising_start: 1 - img2imgStrength,
+    denoising_start: 0, // denoising_start should be 0 when latents are not provided
     denoising_end: 1,
     width: scaledSize.width,
     height: scaledSize.height,
