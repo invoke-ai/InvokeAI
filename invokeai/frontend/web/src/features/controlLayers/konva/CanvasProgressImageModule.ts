@@ -2,6 +2,7 @@ import { Mutex } from 'async-mutex';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId, loadImage } from 'features/controlLayers/konva/util';
+import { selectShowProgressOnCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
 
@@ -43,6 +44,7 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
 
     this.subscriptions.add(this.manager.stateApi.$lastCanvasProgressEvent.listen(this.render));
     this.subscriptions.add(this.manager.stagingArea.$shouldShowStagedImage.listen(this.render));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectShowProgressOnCanvas, this.render));
   }
 
   getNodes = () => {
@@ -53,8 +55,9 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
     const release = await this.mutex.acquire();
 
     const event = this.manager.stateApi.$lastCanvasProgressEvent.get();
+    const showProgressOnCanvas = this.manager.stateApi.runSelector(selectShowProgressOnCanvas);
 
-    if (!event) {
+    if (!event || !showProgressOnCanvas) {
       this.konva.group.visible(false);
       this.imageElement = null;
       this.isLoading = false;

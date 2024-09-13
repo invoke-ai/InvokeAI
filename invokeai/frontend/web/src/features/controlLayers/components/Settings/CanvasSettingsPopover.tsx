@@ -21,6 +21,7 @@ import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/compone
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsResetButton } from 'features/controlLayers/components/Settings/CanvasSettingsResetButton';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
+import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RiSettings4Fill } from 'react-icons/ri';
@@ -41,6 +42,7 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsClipToBboxCheckbox />
             <CanvasSettingsCompositeMaskedRegionsCheckbox />
             <CanvasSettingsSnapToGridCheckbox />
+            <CanvasSettingsShowProgressOnCanvas />
             <CanvasSettingsDynamicGridSwitch />
             <CanvasSettingsShowHUDSwitch />
             <CanvasSettingsResetButton />
