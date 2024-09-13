@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { isOk, withResultAsync } from 'common/util/result';
+import { withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityTypeCount } from 'features/controlLayers/hooks/useEntityTypeCount';
@@ -33,7 +33,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
         canvasManager.compositor.rasterizeAndUploadCompositeRasterLayer(rect, false)
       );
 
-      if (isOk(result)) {
+      if (result.isOk()) {
         dispatch(
           rasterLayerAdded({
             isSelected: true,
@@ -55,7 +55,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
         canvasManager.compositor.rasterizeAndUploadCompositeInpaintMask(rect, false)
       );
 
-      if (isOk(result)) {
+      if (result.isOk()) {
         dispatch(
           inpaintMaskAdded({
             isSelected: true,

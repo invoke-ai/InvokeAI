@@ -1,5 +1,5 @@
 import type { SerializableObject } from 'common/types';
-import { isErr, withResultAsync } from 'common/util/result';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -153,7 +153,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.$isProcessing.set(true);
     const req = this.manager.stateApi.enqueueBatch(batch);
     const result = await withResultAsync(req.unwrap);
-    if (isErr(result)) {
+    if (result.isErr()) {
       this.$isProcessing.set(false);
     }
     req.reset();

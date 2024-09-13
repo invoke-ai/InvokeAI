@@ -2,8 +2,7 @@ import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 import { describe, expect, it } from 'vitest';
 
-import type { ErrResult, OkResult } from './result';
-import { Err, isErr, isOk, Ok, withResult, withResultAsync } from './result'; // Adjust import as needed
+import { Err, ErrResult, Ok, OkResult, withResult, withResultAsync } from './result';
 
 const promiseify = <T>(fn: () => T): (() => Promise<T>) => {
   return () =>
@@ -13,28 +12,30 @@ const promiseify = <T>(fn: () => T): (() => Promise<T>) => {
 };
 
 describe('Result Utility Functions', () => {
-  it('Ok() should create an OkResult', () => {
-    const result = Ok(42);
-    expect(result).toEqual({ type: 'Ok', value: 42 });
-    expect(isOk(result)).toBe(true);
-    expect(isErr(result)).toBe(false);
-    assert<Equals<OkResult<number>, typeof result>>(result);
+  it('OkResult() should create an Ok result', () => {
+    const result = OkResult(42);
+    expect(result).toBeInstanceOf(Ok);
+    expect(result.isOk()).toBe(true);
+    expect(result.isErr()).toBe(false);
+    expect(result.value).toBe(42);
+    assert<Equals<Ok<number>, typeof result>>(result);
   });
 
-  it('Err() should create an ErrResult', () => {
+  it('ErrResult() should create an Err result', () => {
     const error = new Error('Something went wrong');
-    const result = Err(error);
-    expect(result).toEqual({ type: 'Err', error });
-    expect(isOk(result)).toBe(false);
-    expect(isErr(result)).toBe(true);
-    assert<Equals<ErrResult<Error>, typeof result>>(result);
+    const result = ErrResult(error);
+    expect(result).toBeInstanceOf(Err);
+    expect(result.isOk()).toBe(false);
+    expect(result.isErr()).toBe(true);
+    expect(result.error).toBe(error);
+    assert<Equals<Err<Error>, typeof result>>(result);
   });
 
   it('withResult() should return Ok on success', () => {
     const fn = () => 42;
     const result = withResult(fn);
-    expect(isOk(result)).toBe(true);
-    if (isOk(result)) {
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
       expect(result.value).toBe(42);
     }
   });
@@ -44,8 +45,8 @@ describe('Result Utility Functions', () => {
       throw new Error('Failure');
     };
     const result = withResult(fn);
-    expect(isErr(result)).toBe(true);
-    if (isErr(result)) {
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
       expect(result.error.message).toBe('Failure');
     }
   });
@@ -53,8 +54,8 @@ describe('Result Utility Functions', () => {
   it('withResultAsync() should return Ok on success', async () => {
     const fn = promiseify(() => 42);
     const result = await withResultAsync(fn);
-    expect(isOk(result)).toBe(true);
-    if (isOk(result)) {
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
       expect(result.value).toBe(42);
     }
   });
@@ -64,8 +65,8 @@ describe('Result Utility Functions', () => {
       throw new Error('Async failure');
     });
     const result = await withResultAsync(fn);
-    expect(isErr(result)).toBe(true);
-    if (isErr(result)) {
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
       expect(result.error.message).toBe('Async failure');
     }
   });
