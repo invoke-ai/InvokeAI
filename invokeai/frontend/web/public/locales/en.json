@@ -1664,6 +1664,7 @@
         "storeNotInitialized": "Store is not initialized"
     },
     "controlLayers": {
+        "canvas": "Canvas",
         "bookmark": "Bookmark for Quick Switch",
         "fitBboxToLayers": "Fit Bbox To Layers",
         "removeBookmark": "Remove Bookmark",

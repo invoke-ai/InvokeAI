@@ -1,7 +1,8 @@
 import { ContextMenu, Flex, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
-import { CanvasContextMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuItems';
+import { CanvasContextMenuGlobalMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuGlobalMenuItems';
+import { CanvasContextMenuSelectedEntityMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuSelectedEntityMenuItems';
 import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea';
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
@@ -27,7 +28,8 @@ export const CanvasMainPanelContent = memo(() => {
     return (
       <CanvasManagerProviderGate>
         <MenuList>
-          <CanvasContextMenuItems />
+          <CanvasContextMenuGlobalMenuItems />
+          <CanvasContextMenuSelectedEntityMenuItems />
         </MenuList>
       </CanvasManagerProviderGate>
     );
