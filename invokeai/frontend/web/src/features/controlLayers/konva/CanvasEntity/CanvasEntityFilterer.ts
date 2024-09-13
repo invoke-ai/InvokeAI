@@ -107,7 +107,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
     this.log.trace({ config }, 'Previewing filter');
     const rect = this.parent.transformer.getRelativeRect();
-    const imageDTO = await this.parent.renderer.rasterize({ rect, attrs: { filters: [] } });
+    const imageDTO = await this.parent.renderer.rasterize({ rect, attrs: { filters: [], opacity: 1 } });
     const nodeId = getPrefixedId('filter_node');
     const batch = this.buildBatchConfig(imageDTO, config, nodeId);
 
