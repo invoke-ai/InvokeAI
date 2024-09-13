@@ -2,6 +2,7 @@ from typing import Optional, Sequence
 
 import torch
 
+from invokeai.backend.lora.layers.lora_layer import LoRALayer
 from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
 
 
@@ -13,11 +14,14 @@ class ConcatenatedLoRALayer(LoRALayerBase):
     stored as separate tensors. This class enables diffusers LoRA layers to be used in BFL FLUX models.
     """
 
-    def __init__(self, lora_layers: Sequence[LoRALayerBase], concat_axis: int = 0):
+    def __init__(self, lora_layers: Sequence[LoRALayer], concat_axis: int = 0):
         super().__init__(alpha=None, bias=None)
 
-        self.lora_layers = torch.nn.ModuleList(lora_layers)
+        self.lora_layers = lora_layers
         self.concat_axis = concat_axis
+
+    def rank(self) -> int | None:
+        return None
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         # TODO(ryand): Currently, we pass orig_weight=None to the sub-layers. If we want to support sub-layers that
@@ -41,3 +45,11 @@ class ConcatenatedLoRALayer(LoRALayerBase):
 
         assert len(layer_biases) == len(self.lora_layers)
         return torch.cat(layer_biases, dim=self.concat_axis)
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        super().to(device=device, dtype=dtype)
+        for lora_layer in self.lora_layers:
+            lora_layer.to(device=device, dtype=dtype)
+
+    def calc_size(self) -> int:
+        return super().calc_size() + sum(lora_layer.calc_size() for lora_layer in self.lora_layers)

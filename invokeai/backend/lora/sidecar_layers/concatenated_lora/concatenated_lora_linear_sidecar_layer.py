@@ -28,3 +28,7 @@ class ConcatenatedLoRALinearSidecarLayer(torch.nn.Module):
         assert self._concatenated_lora_layer.concat_axis == 0
         x = torch.cat(x_chunks, dim=-1)
         return x
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self._concatenated_lora_layer.to(device=device, dtype=dtype)
+        return self

@@ -3,6 +3,7 @@ from typing import Dict
 import torch
 
 from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
+from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
 class LoKRLayer(LoRALayerBase):
@@ -24,18 +25,19 @@ class LoKRLayer(LoRALayerBase):
         bias: torch.Tensor | None,
     ):
         super().__init__(alpha=alpha, bias=bias)
-        self.w1 = torch.nn.Parameter(w1) if w1 is not None else None
-        self.w1_a = torch.nn.Parameter(w1_a) if w1_a is not None else None
-        self.w1_b = torch.nn.Parameter(w1_b) if w1_b is not None else None
-        self.w2 = torch.nn.Parameter(w2) if w2 is not None else None
-        self.w2_a = torch.nn.Parameter(w2_a) if w2_a is not None else None
-        self.w2_b = torch.nn.Parameter(w2_b) if w2_b is not None else None
-        self.t2 = torch.nn.Parameter(t2) if t2 is not None else None
+        self.w1 = w1
+        self.w1_a = w1_a
+        self.w1_b = w1_b
+        self.w2 = w2
+        self.w2_a = w2_a
+        self.w2_b = w2_b
+        self.t2 = t2
 
         # Validate parameters.
         assert (self.w1 is None) != (self.w1_a is None)
         assert (self.w1_a is None) == (self.w1_b is None)
         assert (self.w2 is None) != (self.w2_a is None)
+        assert (self.w2_a is None) == (self.w2_b is None)
 
     def rank(self) -> int | None:
         if self.w1_b is not None:
@@ -108,3 +110,18 @@ class LoKRLayer(LoRALayerBase):
         w2 = w2.contiguous()
         weight = torch.kron(w1, w2)
         return weight
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        super().to(device=device, dtype=dtype)
+        self.w1 = self.w1.to(device=device, dtype=dtype) if self.w1 is not None else self.w1
+        self.w1_a = self.w1_a.to(device=device, dtype=dtype) if self.w1_a is not None else self.w1_a
+        self.w1_b = self.w1_b.to(device=device, dtype=dtype) if self.w1_b is not None else self.w1_b
+        self.w2 = self.w2.to(device=device, dtype=dtype) if self.w2 is not None else self.w2
+        self.w2_a = self.w2_a.to(device=device, dtype=dtype) if self.w2_a is not None else self.w2_a
+        self.w2_b = self.w2_b.to(device=device, dtype=dtype) if self.w2_b is not None else self.w2_b
+        self.t2 = self.t2.to(device=device, dtype=dtype) if self.t2 is not None else self.t2
+
+    def calc_size(self) -> int:
+        return super().calc_size() + calc_tensors_size(
+            [self.w1, self.w1_a, self.w1_b, self.w2, self.w2_a, self.w2_b, self.t2]
+        )

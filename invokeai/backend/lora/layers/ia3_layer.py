@@ -13,8 +13,8 @@ class IA3Layer(LoRALayerBase):
 
     def __init__(self, weight: torch.Tensor, on_input: torch.Tensor, bias: Optional[torch.Tensor]):
         super().__init__(alpha=None, bias=bias)
-        self.weight = torch.nn.Parameter(weight)
-        self.on_input = torch.nn.Parameter(on_input)
+        self.weight = weight
+        self.on_input = on_input
 
     def rank(self) -> int | None:
         return None
@@ -51,3 +51,8 @@ class IA3Layer(LoRALayerBase):
         if not self.on_input:
             weight = weight.reshape(-1, 1)
         return orig_weight * weight
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        super().to(device, dtype)
+        self.weight = self.weight.to(device, dtype)
+        self.on_input = self.on_input.to(device, dtype)

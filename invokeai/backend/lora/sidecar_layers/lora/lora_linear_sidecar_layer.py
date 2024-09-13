@@ -21,3 +21,7 @@ class LoRALinearSidecarLayer(torch.nn.Module):
         x = torch.nn.functional.linear(x, self._lora_layer.up, bias=self._lora_layer.bias)
         x *= self._weight * self._lora_layer.scale()
         return x
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self._lora_layer.to(device=device, dtype=dtype)
+        return self

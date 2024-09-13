@@ -17,3 +17,8 @@ class LoRASidecarModule(torch.nn.Module):
         for lora_layer in self._lora_layers:
             x += lora_layer(input)
         return x
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self._orig_module.to(device=device, dtype=dtype)
+        for lora_layer in self._lora_layers:
+            lora_layer.to(device=device, dtype=dtype)

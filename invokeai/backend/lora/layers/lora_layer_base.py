@@ -3,15 +3,21 @@ from typing import Dict, Optional, Set
 import torch
 
 import invokeai.backend.util.logging as logger
+from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
-class LoRALayerBase(torch.nn.Module):
+class LoRALayerBase:
     """Base class for all LoRA-like patching layers."""
 
+    # Note: It is tempting to make this a torch.nn.Module sub-class and make all tensors 'torch.nn.Parameter's. Then we
+    # could inherit automatic .to(...) behavior for this class, its subclasses, and all sidecar layers that wrap a
+    # LoRALayerBase. We would also be able to implement a single calc_size() method that could be inherited by all
+    # subclasses. But, it turns out that the speed overhead of the default .to(...) implementation in torch.nn.Module is
+    # noticeable, so for now we have opted not to use torch.nn.Module.
+
     def __init__(self, alpha: float | None, bias: torch.Tensor | None):
-        super().__init__()
         self._alpha = alpha
-        self.bias = torch.nn.Parameter(bias) if bias is not None else None
+        self.bias = bias
 
     @classmethod
     def _parse_bias(
@@ -35,9 +41,10 @@ class LoRALayerBase(torch.nn.Module):
         raise NotImplementedError()
 
     def scale(self) -> float:
-        if self._alpha is None or self.rank() is None:
+        rank = self.rank()
+        if self._alpha is None or rank is None:
             return 1.0
-        return self._alpha / self.rank()
+        return self._alpha / rank
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError()
@@ -62,7 +69,8 @@ class LoRALayerBase(torch.nn.Module):
             )
 
     def calc_size(self) -> int:
-        # HACK(ryand): Fix this issue with circular imports.
-        from invokeai.backend.model_manager.load.model_util import calc_module_size
+        return calc_tensors_size([self.bias])
 
-        return calc_module_size(self)
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        if self.bias is not None:
+            self.bias = self.bias.to(device=device, dtype=dtype)

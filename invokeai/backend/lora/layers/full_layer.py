@@ -3,6 +3,7 @@ from typing import Dict, Optional
 import torch
 
 from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
+from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
 class FullLayer(LoRALayerBase):
@@ -24,3 +25,10 @@ class FullLayer(LoRALayerBase):
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         return self.weight
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        super().to(device=device, dtype=dtype)
+        self.weight = self.weight.to(device=device, dtype=dtype)
+
+    def calc_size(self) -> int:
+        return super().calc_size() + calc_tensor_size(self.weight)

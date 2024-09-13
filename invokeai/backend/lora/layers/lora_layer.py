@@ -3,6 +3,7 @@ from typing import Dict, Optional
 import torch
 
 from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
+from invokeai.backend.util.calc_tensor_size import calc_tensors_size
 
 
 class LoRALayer(LoRALayerBase):
@@ -15,10 +16,10 @@ class LoRALayer(LoRALayerBase):
         bias: Optional[torch.Tensor],
     ):
         super().__init__(alpha, bias)
-        self.up = torch.nn.Parameter(up)
-        self.mid = torch.nn.Parameter(mid) if mid is not None else None
-        self.down = torch.nn.Parameter(down)
-        self.bias = torch.nn.Parameter(bias) if bias is not None else None
+        self.up = up
+        self.mid = mid
+        self.down = down
+        self.bias = bias
 
     @classmethod
     def from_state_dict_values(
@@ -67,3 +68,13 @@ class LoRALayer(LoRALayerBase):
             weight = self.up.reshape(self.up.shape[0], -1) @ self.down.reshape(self.down.shape[0], -1)
 
         return weight
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        super().to(device=device, dtype=dtype)
+        self.up = self.up.to(device=device, dtype=dtype)
+        if self.mid is not None:
+            self.mid = self.mid.to(device=device, dtype=dtype)
+        self.down = self.down.to(device=device, dtype=dtype)
+
+    def calc_size(self) -> int:
+        return super().calc_size() + calc_tensors_size([self.up, self.mid, self.down])
