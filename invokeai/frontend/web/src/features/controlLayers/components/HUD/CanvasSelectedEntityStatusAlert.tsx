@@ -46,6 +46,7 @@ const CanvasSelectedEntityStatusAlertContent = memo(({ entityIdentifier, adapter
   const isHidden = useEntityTypeIsHidden(entityIdentifier.type);
   const isFiltering = useStore(adapter.filterer?.$isFiltering ?? $isFilteringFallback);
   const isTransforming = useStore(adapter.transformer.$isTransforming);
+  const isEmpty = useStore(adapter.$isEmpty);
 
   const alert = useMemo<AlertData | null>(() => {
     if (isFiltering) {
@@ -61,6 +62,14 @@ const CanvasSelectedEntityStatusAlertContent = memo(({ entityIdentifier, adapter
         status: 'info',
         title,
         description: t('controlLayers.HUD.entityStatus.isTransforming'),
+      };
+    }
+
+    if (isEmpty) {
+      return {
+        status: 'info',
+        title,
+        description: t('controlLayers.HUD.entityStatus.isEmpty'),
       };
     }
 
@@ -89,7 +98,7 @@ const CanvasSelectedEntityStatusAlertContent = memo(({ entityIdentifier, adapter
     }
 
     return null;
-  }, [isFiltering, isTransforming, isHidden, isLocked, isEnabled, title, t]);
+  }, [isFiltering, isTransforming, isEmpty, isHidden, isLocked, isEnabled, title, t]);
 
   if (!alert) {
     return null;
@@ -99,7 +108,7 @@ const CanvasSelectedEntityStatusAlertContent = memo(({ entityIdentifier, adapter
     <Alert status={alert.status} borderRadius="base" fontSize="sm" shadow="md">
       <AlertIcon />
       <AlertTitle>{alert.title}</AlertTitle>
-      <AlertDescription>{alert.description}.</AlertDescription>
+      <AlertDescription>{alert.description}</AlertDescription>
     </Alert>
   );
 });
