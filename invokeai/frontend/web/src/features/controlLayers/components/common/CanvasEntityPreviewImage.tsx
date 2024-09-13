@@ -4,7 +4,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { useEntityAdapter } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
+import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
@@ -96,11 +96,10 @@ export const CanvasEntityPreviewImage = memo(() => {
         right={0}
         bottom={0}
         left={0}
-        bgImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL}
+        bgImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL}
         bgSize="5px"
-        opacity={0.1}
       />
-      <ChakraCanvas ref={canvasRef} objectFit="contain" maxW="full" maxH="full" />
+      <ChakraCanvas position="relative" ref={canvasRef} objectFit="contain" maxW="full" maxH="full" />
     </Flex>
   );
 });
