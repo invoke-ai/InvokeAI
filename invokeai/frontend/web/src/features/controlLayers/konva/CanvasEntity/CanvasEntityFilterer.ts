@@ -70,6 +70,11 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   }
 
   start = (config?: FilterConfig) => {
+    const filteringAdapter = this.manager.stateApi.$filteringAdapter.get();
+    if (filteringAdapter) {
+      assert(false, `Already filtering an entity: ${filteringAdapter.id}`);
+    }
+
     this.log.trace('Initializing filter');
     if (config) {
       this.$filterConfig.set(config);
@@ -89,75 +94,73 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.$isFiltering.set(true);
     this.manager.stateApi.$filteringAdapter.set(this.parent);
     if (this.manager.stateApi.getSettings().autoProcessFilter) {
-      this.process();
+      this.processImmediate();
     }
   };
 
-  process = debounce(
-    async () => {
-      const config = this.$filterConfig.get();
-      const isValid = IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
-      if (!isValid) {
+  processImmediate = async () => {
+    const config = this.$filterConfig.get();
+    const isValid = IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
+    if (!isValid) {
+      return;
+    }
+
+    this.log.trace({ config }, 'Previewing filter');
+    const rect = this.parent.transformer.getRelativeRect();
+    const imageDTO = await this.parent.renderer.rasterize({ rect, attrs: { filters: [] } });
+    const nodeId = getPrefixedId('filter_node');
+    const batch = this.buildBatchConfig(imageDTO, config, nodeId);
+
+    // Listen for the filter processing completion event
+    const completedListener = async (event: S['InvocationCompleteEvent']) => {
+      if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
         return;
       }
+      this.manager.socket.off('invocation_complete', completedListener);
+      this.manager.socket.off('invocation_error', errorListener);
 
-      this.log.trace({ config }, 'Previewing filter');
-      const rect = this.parent.transformer.getRelativeRect();
-      const imageDTO = await this.parent.renderer.rasterize({ rect, attrs: { filters: [] } });
-      const nodeId = getPrefixedId('filter_node');
-      const batch = this.buildBatchConfig(imageDTO, config, nodeId);
+      this.log.trace({ event } as SerializableObject, 'Handling filter processing completion');
 
-      // Listen for the filter processing completion event
-      const completedListener = async (event: S['InvocationCompleteEvent']) => {
-        if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
-          return;
-        }
-        this.manager.socket.off('invocation_complete', completedListener);
-        this.manager.socket.off('invocation_error', errorListener);
+      const { result } = event;
+      assert(result.type === 'image_output', `Processor did not return an image output, got: ${result}`);
 
-        this.log.trace({ event } as SerializableObject, 'Handling filter processing completion');
+      const imageDTO = await getImageDTO(result.image.image_name);
+      assert(imageDTO, "Failed to fetch processor output's image DTO");
 
-        const { result } = event;
-        assert(result.type === 'image_output', `Processor did not return an image output, got: ${result}`);
+      this.imageState = imageDTOToImageObject(imageDTO);
 
-        const imageDTO = await getImageDTO(result.image.image_name);
-        assert(imageDTO, "Failed to fetch processor output's image DTO");
+      await this.parent.bufferRenderer.setBuffer(this.imageState, true);
 
-        this.imageState = imageDTOToImageObject(imageDTO);
-
-        await this.parent.bufferRenderer.setBuffer(this.imageState, true);
-
-        this.parent.renderer.hideObjects();
-        this.$isProcessing.set(false);
-        this.$hasProcessed.set(true);
-      };
-      const errorListener = (event: S['InvocationErrorEvent']) => {
-        if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
-          return;
-        }
-        this.manager.socket.off('invocation_complete', completedListener);
-        this.manager.socket.off('invocation_error', errorListener);
-
-        this.log.error({ event } as SerializableObject, 'Error processing filter');
-        this.$isProcessing.set(false);
-      };
-
-      this.manager.socket.on('invocation_complete', completedListener);
-      this.manager.socket.on('invocation_error', errorListener);
-
-      this.log.trace({ batch } as SerializableObject, 'Enqueuing filter batch');
-
-      this.$isProcessing.set(true);
-      const req = this.manager.stateApi.enqueueBatch(batch);
-      const result = await withResultAsync(req.unwrap);
-      if (isErr(result)) {
-        this.$isProcessing.set(false);
+      this.parent.renderer.hideObjects();
+      this.$isProcessing.set(false);
+      this.$hasProcessed.set(true);
+    };
+    const errorListener = (event: S['InvocationErrorEvent']) => {
+      if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
+        return;
       }
-      req.reset();
-    },
-    this.config.processDebounceMs,
-    { leading: true, trailing: true }
-  );
+      this.manager.socket.off('invocation_complete', completedListener);
+      this.manager.socket.off('invocation_error', errorListener);
+
+      this.log.error({ event } as SerializableObject, 'Error processing filter');
+      this.$isProcessing.set(false);
+    };
+
+    this.manager.socket.on('invocation_complete', completedListener);
+    this.manager.socket.on('invocation_error', errorListener);
+
+    this.log.trace({ batch } as SerializableObject, 'Enqueuing filter batch');
+
+    this.$isProcessing.set(true);
+    const req = this.manager.stateApi.enqueueBatch(batch);
+    const result = await withResultAsync(req.unwrap);
+    if (isErr(result)) {
+      this.$isProcessing.set(false);
+    }
+    req.reset();
+  };
+
+  process = debounce(this.processImmediate, this.config.processDebounceMs);
 
   apply = () => {
     const imageState = this.imageState;

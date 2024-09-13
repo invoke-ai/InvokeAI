@@ -18,7 +18,7 @@ const CONTAINER_WIDTH_PX = `${CONTAINER_WIDTH}px`;
 
 export const CanvasEntityPreviewImage = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
-  const adapter = useEntityAdapter();
+  const adapter = useEntityAdapter(entityIdentifier);
   const selectMaskColor = useMemo(
     () =>
       createSelector(selectCanvasSlice, (state) => {

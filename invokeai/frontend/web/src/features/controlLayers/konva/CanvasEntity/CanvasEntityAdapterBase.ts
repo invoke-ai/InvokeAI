@@ -10,6 +10,7 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { getIsHiddenSelector, selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, CanvasRenderableEntityState, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
@@ -92,6 +93,32 @@ export abstract class CanvasEntityAdapterBase<
    */
   subscriptions = new Set<() => void>();
 
+  /**
+   * Whether this entity is locked. This is synced with the entity's state.
+   */
+  $isLocked = atom(false);
+  /**
+   * Whether this entity is disabled. This is synced with the entity's state.
+   */
+  $isDisabled = atom(false);
+  /**
+   * Whether this entity is hidden. This is synced with the entity's group type visibility.
+   */
+  $isHidden = atom(false);
+  /**
+   * Whether this entity has objects. This is computed based on the entity's objects.
+   */
+  $hasObjects = atom(false);
+  /**
+   * Whether this entity is interactable. This is computed based on the entity's locked, disabled, and hidden states.
+   */
+  $isInteractable = computed(
+    [this.$isLocked, this.$isDisabled, this.$isHidden, this.$hasObjects],
+    (isLocked, isDisabled, isHidden, hasObjects) => {
+      return !isLocked && !isDisabled && !isHidden && hasObjects;
+    }
+  );
+
   constructor(entityIdentifier: CanvasEntityIdentifier<T['type']>, manager: CanvasManager, adapterType: U) {
     super();
     this.type = adapterType;
@@ -119,10 +146,15 @@ export abstract class CanvasEntityAdapterBase<
     assert(state !== undefined, 'Missing entity state on creation');
     this.state = state;
 
-    // When the hidden flag is updated, we need to update the entity's visibility and transformer interaction state,
-    // which will show/hide the entity's selection outline
+    /**
+     * When a group is hidden or shown, we need to update a few things:
+     * - The entity's individual isHidden flag
+     * - The entity's opacity/visibility
+     * - The entity's transformer interaction state, which will show/hide the entity's selection outline
+     */
     this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(getIsHiddenSelector(this.entityIdentifier.type), () => {
+      this.manager.stateApi.createStoreSubscription(getIsHiddenSelector(this.entityIdentifier.type), (isHidden) => {
+        this.$isHidden.set(isHidden);
         this.syncOpacity();
         this.transformer.syncInteractionState();
       })
@@ -166,12 +198,14 @@ export abstract class CanvasEntityAdapterBase<
     this.konva.layer.visible(this.state.isEnabled);
     this.renderer.syncCache(this.state.isEnabled);
     this.transformer.syncInteractionState();
+    this.$isDisabled.set(!this.state.isEnabled);
   };
 
   /**
    * Synchronizes the entity's objects with the canvas.
    */
   syncObjects = async () => {
+    this.$hasObjects.set(this.state.objects.length > 0);
     const didRender = await this.renderer.render();
     if (didRender) {
       // If the objects have changed, we need to recalculate the transformer's bounding box.
@@ -200,14 +234,7 @@ export abstract class CanvasEntityAdapterBase<
     // The only thing we need to do is update the transformer's interaction state. For tool interactions, like drawing
     // shapes, we defer to the CanvasToolModule to handle the locked state.
     this.transformer.syncInteractionState();
-  };
-
-  /**
-   * Checks if the entity is interactable. An entity is interactable if it is enabled, not locked, and its type is not
-   * hidden.
-   */
-  getIsInteractable = (): boolean => {
-    return this.state.isEnabled && !this.state.isLocked && !this.manager.stateApi.getIsTypeHidden(this.state.type);
+    this.$isLocked.set(this.state.isLocked);
   };
 
   /**

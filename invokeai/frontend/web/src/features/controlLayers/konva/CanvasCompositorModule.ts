@@ -10,6 +10,7 @@ import {
 } from 'features/controlLayers/konva/util';
 import type { GenerationMode, Rect } from 'features/controlLayers/store/types';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -29,6 +30,16 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   readonly log: Logger;
   readonly parent: CanvasManager;
   readonly manager: CanvasManager;
+
+  $isCompositing = atom(false);
+  $isProcessing = atom(false);
+  $isUploading = atom(false);
+  $isBusy = computed(
+    [this.$isCompositing, this.$isProcessing, this.$isUploading],
+    (isCompositing, isProcessing, isUploading) => {
+      return isCompositing || isProcessing || isUploading;
+    }
+  );
 
   constructor(manager: CanvasManager) {
     super();
@@ -105,6 +116,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     }
 
     this.log.trace({ rect }, 'Building composite raster layer canvas');
+    this.$isCompositing.set(true);
 
     const canvas = document.createElement('canvas');
     canvas.width = rect.width;
@@ -124,6 +136,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       ctx.drawImage(adapterCanvas, 0, 0);
     }
     this.manager.cache.canvasElementCache.set(hash, canvas);
+    this.$isCompositing.set(false);
     return canvas;
   };
 
@@ -140,19 +153,25 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     this.log.trace({ rect }, 'Rasterizing composite raster layer');
 
     const canvas = this.getCompositeRasterLayerCanvas(rect);
+
+    this.$isProcessing.set(true);
     const blob = await canvasToBlob(canvas);
 
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Composite raster layer canvas');
     }
+    this.$isProcessing.set(false);
 
-    return uploadImage({
+    this.$isUploading.set(true);
+    const imageDTO = await uploadImage({
       blob,
       fileName: 'composite-raster-layer.png',
       image_category: 'general',
       is_intermediate: !saveToGallery,
       board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
     });
+    this.$isUploading.set(false);
+    return imageDTO;
   };
 
   /**
@@ -247,7 +266,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     }
 
     this.log.trace({ rect }, 'Building composite inpaint mask canvas');
-
+    this.$isCompositing.set(true);
     const canvas = document.createElement('canvas');
     canvas.width = rect.width;
     canvas.height = rect.height;
@@ -266,6 +285,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       ctx.drawImage(adapterCanvas, 0, 0);
     }
     this.manager.cache.canvasElementCache.set(hash, canvas);
+    this.$isCompositing.set(false);
     return canvas;
   };
 
@@ -282,18 +302,24 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     this.log.trace({ rect }, 'Rasterizing composite inpaint mask');
 
     const canvas = this.getCompositeInpaintMaskCanvas(rect);
+
+    this.$isProcessing.set(true);
     const blob = await canvasToBlob(canvas);
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Composite inpaint mask canvas');
     }
+    this.$isProcessing.set(false);
 
-    return uploadImage({
+    this.$isUploading.set(true);
+    const imageDTO = await uploadImage({
       blob,
       fileName: 'composite-inpaint-mask.png',
       image_category: 'general',
       is_intermediate: !saveToGallery,
       board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
     });
+    this.$isUploading.set(false);
+    return imageDTO;
   };
 
   /**
@@ -355,12 +381,16 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     }
 
     const compositeInpaintMaskCanvas = this.getCompositeInpaintMaskCanvas(rect);
+    this.$isProcessing.set(true);
     const compositeInpaintMaskImageData = canvasToImageData(compositeInpaintMaskCanvas);
     const compositeInpaintMaskTransparency = getImageDataTransparency(compositeInpaintMaskImageData);
+    this.$isProcessing.set(false);
 
     const compositeRasterLayerCanvas = this.getCompositeRasterLayerCanvas(rect);
+    this.$isProcessing.set(true);
     const compositeRasterLayerImageData = canvasToImageData(compositeRasterLayerCanvas);
     const compositeRasterLayerTransparency = getImageDataTransparency(compositeRasterLayerImageData);
+    this.$isProcessing.set(false);
 
     let generationMode: GenerationMode;
     if (compositeRasterLayerTransparency === 'FULLY_TRANSPARENT') {

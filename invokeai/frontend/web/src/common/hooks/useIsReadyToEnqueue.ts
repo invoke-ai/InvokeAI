@@ -18,6 +18,7 @@ import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
+import type { ReadableAtom } from 'nanostores';
 import { atom } from 'nanostores';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
@@ -30,7 +31,14 @@ const LAYER_TYPE_TO_TKEY = {
   control_layer: 'controlLayers.globalControlAdapter',
 } as const;
 
-const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy: boolean) =>
+const createSelector = (
+  templates: Templates,
+  isConnected: boolean,
+  canvasIsFiltering: boolean,
+  canvasIsTransforming: boolean,
+  canvasIsRasterizing: boolean,
+  canvasIsCompositing: boolean
+) =>
   createMemoizedSelector(
     [
       selectSystemSlice,
@@ -119,8 +127,17 @@ const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy
           reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
         }
       } else {
-        if (canvasIsBusy) {
-          reasons.push({ content: i18n.t('parameters.invoke.canvasBusy') });
+        if (canvasIsFiltering) {
+          reasons.push({ content: i18n.t('parameters.invoke.canvasIsFiltering') });
+        }
+        if (canvasIsTransforming) {
+          reasons.push({ content: i18n.t('parameters.invoke.canvasIsTransforming') });
+        }
+        if (canvasIsRasterizing) {
+          reasons.push({ content: i18n.t('parameters.invoke.canvasIsRasterizing') });
+        }
+        if (canvasIsCompositing) {
+          reasons.push({ content: i18n.t('parameters.invoke.canvasIsCompositing') });
         }
 
         if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
@@ -246,16 +263,27 @@ const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy
     }
   );
 
-const dummyAtom = atom(true);
+const $fallbackTrue: ReadableAtom<true> = atom(true);
 
 export const useIsReadyToEnqueue = () => {
   const templates = useStore($templates);
   const isConnected = useStore($isConnected);
   const canvasManager = useCanvasManagerSafe();
-  const canvasIsBusy = useStore(canvasManager?.$isBusy ?? dummyAtom);
+  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $fallbackTrue);
+  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $fallbackTrue);
+  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $fallbackTrue);
+  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $fallbackTrue);
   const selector = useMemo(
-    () => createSelector(templates, isConnected, canvasIsBusy),
-    [templates, isConnected, canvasIsBusy]
+    () =>
+      createSelector(
+        templates,
+        isConnected,
+        canvasIsFiltering,
+        canvasIsTransforming,
+        canvasIsRasterizing,
+        canvasIsCompositing
+      ),
+    [templates, isConnected, canvasIsFiltering, canvasIsTransforming, canvasIsRasterizing, canvasIsCompositing]
   );
   const value = useAppSelector(selector);
   return value;

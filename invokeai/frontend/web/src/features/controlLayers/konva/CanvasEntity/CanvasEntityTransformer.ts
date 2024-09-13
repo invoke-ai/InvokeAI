@@ -10,6 +10,7 @@ import type { GroupConfig } from 'konva/lib/Group';
 import { debounce, get } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
+import { assert } from 'tsafe';
 
 type CanvasEntityTransformerConfig = {
   /**
@@ -466,7 +467,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
 
-    if (this.manager.stateApi.$isTranforming.get() && !this.$isTransforming.get()) {
+    if (this.manager.stateApi.$isTransforming.get() && !this.$isTransforming.get()) {
       // If another entity is being transformed, we can't interact with this transformer
       this.parent.konva.layer.listening(false);
       this._setInteractionMode('off');
@@ -486,7 +487,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const tool = this.manager.tool.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
 
-    if (!this.parent.renderer.hasObjects() || !this.parent.getIsInteractable()) {
+    if (!this.parent.$isInteractable.get()) {
       // The layer is totally empty, we can just disable the layer
       this.parent.konva.layer.listening(false);
       this._setInteractionMode('off');
@@ -538,6 +539,10 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * Starts the transformation of the entity.
    */
   startTransform = () => {
+    const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
+    if (transformingAdapter) {
+      assert(false, `Already transforming an entity: ${transformingAdapter.id}`);
+    }
     this.log.debug('Starting transform');
     this.$isTransforming.set(true);
     this.manager.stateApi.$transformingAdapter.set(this.parent);

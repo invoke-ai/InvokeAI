@@ -106,7 +106,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.group.add(this.colorPickerToolPreview.konva.group);
 
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
-    this.subscriptions.add(this.manager.stateApi.$isTranforming.listen(this.render));
+    this.subscriptions.add(this.manager.stateApi.$isTransforming.listen(this.render));
     this.subscriptions.add(this.manager.stateApi.$isFiltering.listen(this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSettingsSlice, this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.syncCursorStyle));
@@ -144,11 +144,13 @@ export class CanvasToolModule extends CanvasModuleBase {
       stage.setCursor(isMouseDown ? 'grabbing' : 'grab');
     } else if (this.manager.stateApi.getRenderedEntityCount() === 0) {
       stage.setCursor('not-allowed');
-    } else if (this.manager.stateApi.$isTranforming.get()) {
+    } else if (this.manager.stateApi.$isTransforming.get()) {
       stage.setCursor('default');
     } else if (this.manager.stateApi.$isFiltering.get()) {
       stage.setCursor('not-allowed');
-    } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.getIsInteractable()) {
+    } else if (this.manager.stagingArea.$isStaging.get()) {
+      stage.setCursor('not-allowed');
+    } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.$isInteractable.get()) {
       stage.setCursor('not-allowed');
     } else if (tool === 'colorPicker' || tool === 'brush' || tool === 'eraser') {
       stage.setCursor('none');
@@ -280,11 +282,9 @@ export class CanvasToolModule extends CanvasModuleBase {
   getCanDraw = (): boolean => {
     if (this.manager.stateApi.getRenderedEntityCount() === 0) {
       return false;
-    } else if (this.manager.stateApi.$isTranforming.get()) {
+    } else if (this.manager.$isBusy.get()) {
       return false;
-    } else if (this.manager.stateApi.$isFiltering.get()) {
-      return false;
-    } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.getIsInteractable()) {
+    } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.$isInteractable.get()) {
       return false;
     } else {
       return true;
@@ -640,6 +640,13 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.render();
   };
 
+  /**
+   * Commit the buffer on window pointer up.
+   *
+   * The user may start drawing inside the stage and then release the mouse button outside of the stage. To prevent
+   * whatever the user was drawing from being lost, or ending up with stale state, we need to commit the buffer
+   * on window pointer up.
+   */
   onWindowPointerUp = () => {
     this.$isMouseDown.set(false);
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();

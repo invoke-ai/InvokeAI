@@ -170,4 +170,6 @@ export const selectShowHUD = createCanvasSettingsSelector((settings) => settings
 export const selectAutoProcessFilter = createCanvasSettingsSelector((settings) => settings.autoProcessFilter);
 export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
 export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.sendToCanvas);
-export const selectShowProgressOnCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.showProgressOnCanvas);
+export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
+  (canvasSettings) => canvasSettings.showProgressOnCanvas
+);

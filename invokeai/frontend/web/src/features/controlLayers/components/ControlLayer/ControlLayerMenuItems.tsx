@@ -4,7 +4,7 @@ import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/c
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
 import { CanvasEntityMenuItemsFilter } from 'features/controlLayers/components/common/CanvasEntityMenuItemsFilter';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
-import { ControlLayerMenuItemsControlToRaster } from 'features/controlLayers/components/ControlLayer/ControlLayerMenuItemsControlToRaster';
+import { ControlLayerMenuItemsConvertControlToRaster } from 'features/controlLayers/components/ControlLayer/ControlLayerMenuItemsConvertControlToRaster';
 import { ControlLayerMenuItemsTransparencyEffect } from 'features/controlLayers/components/ControlLayer/ControlLayerMenuItemsTransparencyEffect';
 import { memo } from 'react';
 
@@ -13,7 +13,7 @@ export const ControlLayerMenuItems = memo(() => {
     <>
       <CanvasEntityMenuItemsTransform />
       <CanvasEntityMenuItemsFilter />
-      <ControlLayerMenuItemsControlToRaster />
+      <ControlLayerMenuItemsConvertControlToRaster />
       <ControlLayerMenuItemsTransparencyEffect />
       <MenuDivider />
       <CanvasEntityMenuItemsArrange />
