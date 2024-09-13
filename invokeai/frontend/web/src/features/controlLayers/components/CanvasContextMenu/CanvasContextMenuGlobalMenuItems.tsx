@@ -1,4 +1,4 @@
-import { MenuItem } from '@invoke-ai/ui-library';
+import { MenuGroup, MenuItem } from '@invoke-ai/ui-library';
 import {
   useSaveBboxAsControlLayer,
   useSaveBboxAsGlobalIPAdapter,
@@ -12,7 +12,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFloppyDiskBold, PiShareFatBold } from 'react-icons/pi';
 
-export const CanvasContextMenuItems = memo(() => {
+export const CanvasContextMenuGlobalMenuItems = memo(() => {
   const { t } = useTranslation();
   const isBusy = useCanvasIsBusy();
   const saveCanvasToGallery = useSaveCanvasToGallery();
@@ -23,7 +23,7 @@ export const CanvasContextMenuItems = memo(() => {
   const saveBboxAsControlLayer = useSaveBboxAsControlLayer();
 
   return (
-    <>
+    <MenuGroup title={t('controlLayers.canvas')}>
       <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveCanvasToGallery}>
         {t('controlLayers.saveCanvasToGallery')}
       </MenuItem>
@@ -42,8 +42,8 @@ export const CanvasContextMenuItems = memo(() => {
       <MenuItem icon={<PiShareFatBold />} isDisabled={isBusy} onClick={saveBboxAsRasterLayer}>
         {t('controlLayers.sendBboxToRasterLayer')}
       </MenuItem>
-    </>
+    </MenuGroup>
   );
 });
 
-CanvasContextMenuItems.displayName = 'CanvasContextMenuItems';
+CanvasContextMenuGlobalMenuItems.displayName = 'CanvasContextMenuGlobalMenuItems';
