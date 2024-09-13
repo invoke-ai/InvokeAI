@@ -39,7 +39,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="1.0.0",
+    version="2.0.0",
     classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -220,12 +220,18 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 device, and dtype for the inpaint mask.
 
         Returns:
-            torch.Tensor | None: Inpaint mask.
+            torch.Tensor | None: Inpaint mask. Values of 0.0 represent the regions to be fully denoised, and 1.0
+                represent the regions to be preserved.
         """
         if self.denoise_mask is None:
             return None
 
         mask = context.tensors.load(self.denoise_mask.mask_name)
+
+        # The input denoise_mask contains values in [0, 1], where 0.0 represents the regions to be fully denoised, and
+        # 1.0 represents the regions to be preserved.
+        # We invert the mask so that the regions to be preserved are 0.0 and the regions to be denoised are 1.0.
+        mask = 1.0 - mask
 
         _, _, latent_height, latent_width = latents.shape
         mask = tv_resize(

@@ -181,7 +181,7 @@ class FieldDescriptions:
     )
     num_1 = "The first number"
     num_2 = "The second number"
-    denoise_mask = "A mask of the region to apply the denoising process to."
+    denoise_mask = "A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved."
     board = "The board to save the image to"
     image = "The image to process"
     tile_size = "Tile size"
