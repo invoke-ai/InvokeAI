@@ -1,3 +1,4 @@
+import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
 
@@ -219,10 +220,16 @@ type AddToBatchAction = {
   type: 'ADD_TO_BATCH';
 };
 
+type ReplaceLayerWithImagePostUploadAction = {
+  type: 'REPLACE_LAYER_WITH_IMAGE';
+  entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer'>;
+};
+
 export type PostUploadAction =
   | NodesAction
   | ToastAction
   | AddToBatchAction
   | IPALayerImagePostUploadAction
   | RGIPAdapterImagePostUploadAction
-  | UpscaleInitialImageAction;
+  | UpscaleInitialImageAction
+  | ReplaceLayerWithImagePostUploadAction;

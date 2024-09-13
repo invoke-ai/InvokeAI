@@ -1,6 +1,7 @@
 import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { createMemoizedAppSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { ControlLayerControlAdapterControlMode } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterControlMode';
@@ -18,8 +19,8 @@ import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/s
 import type { CanvasEntityIdentifier, ControlModeV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBoundingBoxBold, PiShootingStarBold } from 'react-icons/pi';
-import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import { PiBoundingBoxBold, PiShootingStarBold, PiUploadBold } from 'react-icons/pi';
+import type { ControlNetModelConfig, PostUploadAction, T2IAdapterModelConfig } from 'services/api/types';
 
 const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) => {
   const selectControlAdapter = useMemo(
@@ -71,6 +72,11 @@ export const ControlLayerControlAdapter = memo(() => {
 
   const pullBboxIntoLayer = usePullBboxIntoLayer(entityIdentifier);
   const isSaving = useIsSavingCanvas();
+  const postUploadAction = useMemo<PostUploadAction>(
+    () => ({ type: 'REPLACE_LAYER_WITH_IMAGE', entityIdentifier }),
+    [entityIdentifier]
+  );
+  const uploadApi = useImageUploadButton({ postUploadAction });
 
   return (
     <Flex flexDir="column" gap={3} position="relative" w="full">
@@ -79,7 +85,9 @@ export const ControlLayerControlAdapter = memo(() => {
         <IconButton
           onClick={filter.start}
           isDisabled={filter.isDisabled}
-          variant="ghost"
+          size="sm"
+          alignSelf="stretch"
+          variant="link"
           aria-label={t('controlLayers.filter.filter')}
           tooltip={t('controlLayers.filter.filter')}
           icon={<PiShootingStarBold />}
@@ -87,11 +95,24 @@ export const ControlLayerControlAdapter = memo(() => {
         <IconButton
           onClick={pullBboxIntoLayer}
           isLoading={isSaving.isTrue}
-          variant="ghost"
+          size="sm"
+          alignSelf="stretch"
+          variant="link"
           aria-label={t('controlLayers.pullBboxIntoLayer')}
           tooltip={t('controlLayers.pullBboxIntoLayer')}
           icon={<PiBoundingBoxBold />}
         />
+        <IconButton
+          isLoading={isSaving.isTrue}
+          size="sm"
+          alignSelf="stretch"
+          variant="link"
+          aria-label={t('accessibility.uploadImage')}
+          tooltip={t('accessibility.uploadImage')}
+          icon={<PiUploadBold />}
+          {...uploadApi.getUploadButtonProps()}
+        />
+        <input {...uploadApi.getUploadInputProps()} />
       </Flex>
       <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
       <BeginEndStepPct beginEndStepPct={controlAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
