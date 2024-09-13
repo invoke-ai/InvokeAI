@@ -6,7 +6,8 @@ import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/c
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useIsSavingCanvas, usePullBboxIntoIPAdapter } from 'features/controlLayers/hooks/saveCanvasHooks';
+import { usePullBboxIntoIPAdapter } from 'features/controlLayers/hooks/saveCanvasHooks';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   ipaBeginEndStepPctChanged,
   ipaCLIPVisionModelChanged,
@@ -87,7 +88,7 @@ export const IPAdapterSettings = memo(() => {
     [entityIdentifier.id]
   );
   const pullBboxIntoIPAdapter = usePullBboxIntoIPAdapter(entityIdentifier);
-  const isSaving = useIsSavingCanvas();
+  const isBusy = useCanvasIsBusy();
 
   return (
     <CanvasEntitySettingsWrapper>
@@ -103,7 +104,7 @@ export const IPAdapterSettings = memo(() => {
           </Box>
           <IconButton
             onClick={pullBboxIntoIPAdapter}
-            isLoading={isSaving.isTrue}
+            isDisabled={isBusy}
             variant="ghost"
             aria-label={t('controlLayers.pullBboxIntoIPAdapter')}
             tooltip={t('controlLayers.pullBboxIntoIPAdapter')}

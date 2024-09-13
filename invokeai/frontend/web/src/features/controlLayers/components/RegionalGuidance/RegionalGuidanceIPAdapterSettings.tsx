@@ -7,10 +7,8 @@ import { IPAdapterImagePreview } from 'features/controlLayers/components/IPAdapt
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterModel } from 'features/controlLayers/components/IPAdapter/IPAdapterModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import {
-  useIsSavingCanvas,
-  usePullBboxIntoRegionalGuidanceIPAdapter,
-} from 'features/controlLayers/hooks/saveCanvasHooks';
+import { usePullBboxIntoRegionalGuidanceIPAdapter } from 'features/controlLayers/hooks/saveCanvasHooks';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   rgIPAdapterBeginEndStepPctChanged,
   rgIPAdapterCLIPVisionModelChanged,
@@ -107,7 +105,7 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterN
     [entityIdentifier.id, ipAdapterId]
   );
   const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceIPAdapter(entityIdentifier, ipAdapterId);
-  const isSaving = useIsSavingCanvas();
+  const isBusy = useCanvasIsBusy();
 
   return (
     <Flex flexDir="column" gap={3}>
@@ -135,7 +133,7 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterN
           </Box>
           <IconButton
             onClick={pullBboxIntoIPAdapter}
-            isLoading={isSaving.isTrue}
+            isDisabled={isBusy}
             variant="ghost"
             aria-label={t('controlLayers.pullBboxIntoIPAdapter')}
             tooltip={t('controlLayers.pullBboxIntoIPAdapter')}

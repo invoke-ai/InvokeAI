@@ -15,6 +15,7 @@ export const useEntityFilter = (entityIdentifier: CanvasEntityIdentifier | null)
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const isBusy = useCanvasIsBusy();
   const isInteractable = useStore(adapter?.$isInteractable ?? $fallbackFalse);
+  const isEmpty = useStore(adapter?.$isEmpty ?? $fallbackFalse);
 
   const isDisabled = useMemo(() => {
     if (!entityIdentifier) {
@@ -32,8 +33,11 @@ export const useEntityFilter = (entityIdentifier: CanvasEntityIdentifier | null)
     if (!isInteractable) {
       return true;
     }
+    if (isEmpty) {
+      return true;
+    }
     return false;
-  }, [entityIdentifier, adapter, isBusy, isInteractable]);
+  }, [entityIdentifier, adapter, isBusy, isInteractable, isEmpty]);
 
   const start = useCallback(() => {
     if (isDisabled) {

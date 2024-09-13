@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityDuplicated } from 'features/controlLayers/store/canvasSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { memo, useCallback } from 'react';
@@ -9,6 +10,7 @@ import { PiCopyFill } from 'react-icons/pi';
 export const EntityListSelectedEntityActionBarDuplicateButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const isBusy = useCanvasIsBusy();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const onClick = useCallback(() => {
     if (!selectedEntityIdentifier) {
@@ -20,7 +22,7 @@ export const EntityListSelectedEntityActionBarDuplicateButton = memo(() => {
   return (
     <IconButton
       onClick={onClick}
-      isDisabled={!selectedEntityIdentifier}
+      isDisabled={!selectedEntityIdentifier || isBusy}
       size="sm"
       variant="link"
       alignSelf="stretch"

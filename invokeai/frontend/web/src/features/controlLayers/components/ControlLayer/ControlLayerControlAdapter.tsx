@@ -7,7 +7,8 @@ import { Weight } from 'features/controlLayers/components/common/Weight';
 import { ControlLayerControlAdapterControlMode } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterControlMode';
 import { ControlLayerControlAdapterModel } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useIsSavingCanvas, usePullBboxIntoLayer } from 'features/controlLayers/hooks/saveCanvasHooks';
+import { usePullBboxIntoLayer } from 'features/controlLayers/hooks/saveCanvasHooks';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityFilter } from 'features/controlLayers/hooks/useEntityFilter';
 import {
   controlLayerBeginEndStepPctChanged,
@@ -71,7 +72,7 @@ export const ControlLayerControlAdapter = memo(() => {
   );
 
   const pullBboxIntoLayer = usePullBboxIntoLayer(entityIdentifier);
-  const isSaving = useIsSavingCanvas();
+  const isBusy = useCanvasIsBusy();
   const postUploadAction = useMemo<PostUploadAction>(
     () => ({ type: 'REPLACE_LAYER_WITH_IMAGE', entityIdentifier }),
     [entityIdentifier]
@@ -94,7 +95,7 @@ export const ControlLayerControlAdapter = memo(() => {
         />
         <IconButton
           onClick={pullBboxIntoLayer}
-          isLoading={isSaving.isTrue}
+          isDisabled={isBusy}
           size="sm"
           alignSelf="stretch"
           variant="link"
@@ -103,7 +104,7 @@ export const ControlLayerControlAdapter = memo(() => {
           icon={<PiBoundingBoxBold />}
         />
         <IconButton
-          isLoading={isSaving.isTrue}
+          isDisabled={isBusy}
           size="sm"
           alignSelf="stretch"
           variant="link"
