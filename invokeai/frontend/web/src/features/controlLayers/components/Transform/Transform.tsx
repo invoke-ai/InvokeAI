@@ -31,7 +31,7 @@ const TransformBox = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
           leftIcon={<PiArrowsOutBold />}
           onClick={adapter.transformer.fitProxyRectToBbox}
           isLoading={isProcessing}
-          loadingText={t('controlLayers.transform.reset')}
+          loadingText={t('controlLayers.transform.fitToBbox')}
           variant="ghost"
         >
           {t('controlLayers.transform.fitToBbox')}
