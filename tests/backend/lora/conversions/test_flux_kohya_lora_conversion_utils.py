@@ -1,3 +1,4 @@
+import accelerate
 import pytest
 import torch
 
@@ -49,7 +50,7 @@ def test_convert_flux_kohya_state_dict_to_invoke_format():
         converted_key_prefixes.append(k)
 
     # Initialize a FLUX model on the meta device.
-    with torch.device("meta"):
+    with accelerate.init_empty_weights():
         model = Flux(params["flux-dev"])
     model_keys = set(model.state_dict().keys())
 
