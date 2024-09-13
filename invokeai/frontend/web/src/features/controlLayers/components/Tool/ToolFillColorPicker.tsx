@@ -26,7 +26,14 @@ export const ToolColorPicker = memo(() => {
         <Flex role="button" aria-label={t('controlLayers.fill.fillColor')} tabIndex={-1} w={8} h={8}>
           <Tooltip label={t('controlLayers.fill.fillColor')}>
             <Flex w="full" h="full" alignItems="center" justifyContent="center">
-              <Box borderRadius="full" w={6} h={6} borderWidth={1} bg={rgbaColorToString(fill)} />
+              <Box
+                borderRadius="full"
+                borderColor="base.300"
+                w={6}
+                h={6}
+                borderWidth={1}
+                bg={rgbaColorToString(fill)}
+              />
             </Flex>
           </Tooltip>
         </Flex>
