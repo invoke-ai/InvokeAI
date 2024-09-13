@@ -131,7 +131,6 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
       await this.parent.bufferRenderer.setBuffer(this.imageState, true);
 
-      this.parent.renderer.hideObjects();
       this.$isProcessing.set(false);
       this.$hasProcessed.set(true);
     };
@@ -190,7 +189,6 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.log.trace('Resetting filter');
 
     this.parent.bufferRenderer.clearBuffer();
-    this.parent.renderer.showObjects();
     this.parent.transformer.updatePosition();
     this.parent.renderer.syncCache(true);
     this.imageState = null;
