@@ -30,7 +30,7 @@ def is_state_dict_likely_in_flux_diffusers_format(state_dict: Dict[str, torch.Te
     return all_keys_in_peft_format and all_expected_keys_present
 
 
-def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor], alpha: float) -> LoRAModelRaw:  # pyright: ignore[reportRedeclaration] (state_dict is intentionally re-declared)
+def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor], alpha: float) -> LoRAModelRaw:
     """Loads a state dict in the Diffusers FLUX LoRA format into a LoRAModelRaw object.
 
     This function is based on:

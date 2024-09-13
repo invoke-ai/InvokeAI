@@ -40,7 +40,7 @@ class FluxLoRALoaderInvocation(BaseInvocation):
             raise ValueError(f"Unknown lora: {lora_key}!")
 
         if any(lora.lora.key == lora_key for lora in self.transformer.loras):
-            raise Exception(f'LoRA "{lora_key}" already applied to transformer.')
+            raise ValueError(f'LoRA "{lora_key}" already applied to transformer.')
 
         transformer = self.transformer.model_copy(deep=True)
         transformer.loras.append(

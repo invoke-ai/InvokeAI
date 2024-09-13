@@ -2,6 +2,8 @@ import torch
 
 
 class LoRASidecarModule(torch.nn.Module):
+    """A LoRA sidecar module that wraps an original module and adds LoRA layers to it."""
+
     def __init__(self, orig_module: torch.nn.Module, lora_layers: list[torch.nn.Module]):
         super().__init__()
         self._orig_module = orig_module

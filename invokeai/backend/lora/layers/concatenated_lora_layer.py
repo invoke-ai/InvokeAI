@@ -41,6 +41,3 @@ class ConcatenatedLoRALayer(LoRALayerBase):
 
         assert len(layer_biases) == len(self.lora_layers)
         return torch.cat(layer_biases, dim=self.concat_axis)
-
-    def calc_size(self) -> int:
-        return sum(lora_layer.calc_size() for lora_layer in self.lora_layers)
