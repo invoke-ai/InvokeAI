@@ -1675,6 +1675,7 @@
         "sendBboxToRasterLayer": "Send Bbox to Raster Layer",
         "savedToGalleryOk": "Saved to Gallery",
         "savedToGalleryError": "Error saving to gallery",
+        "regionIsEmpty": "Selected region is empty",
         "mergeVisible": "Merge Visible",
         "mergeVisibleOk": "Merged visible layers",
         "mergeVisibleError": "Error merging visible layers",

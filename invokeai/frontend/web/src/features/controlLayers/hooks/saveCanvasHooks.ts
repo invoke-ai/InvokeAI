@@ -46,6 +46,15 @@ const useSaveCanvas = ({ region, saveToGallery, onSave }: UseSaveCanvasArg) => {
     const rect =
       region === 'bbox' ? canvasManager.stateApi.getBbox().rect : canvasManager.stage.getVisibleRect('raster_layer');
 
+    if (rect.width === 0 || rect.height === 0) {
+      toast({
+        title: t('controlLayers.savedToGalleryError'),
+        description: t('controlLayers.regionIsEmpty'),
+        status: 'warning',
+      });
+      return;
+    }
+
     const result = await withResultAsync(() =>
       canvasManager.compositor.rasterizeAndUploadCompositeRasterLayer(rect, saveToGallery)
     );
