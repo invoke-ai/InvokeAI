@@ -75,7 +75,7 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
         <Button
           variant="ghost"
           leftIcon={<PiShootingStarBold />}
-          onClick={adapter.filterer.process}
+          onClick={adapter.filterer.processImmediate}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.process')}
           isDisabled={!isValid || autoProcessFilter}
