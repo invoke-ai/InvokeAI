@@ -385,6 +385,11 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     attrs?: GroupConfig;
     bg?: string;
   }): Promise<ImageDTO> => {
+    const rasterizingAdapter = this.manager.stateApi.$rasterizingAdapter.get();
+    if (rasterizingAdapter) {
+      assert(false, `Already rasterizing an entity: ${rasterizingAdapter.id}`);
+    }
+
     const { rect, replaceObjects, attrs, bg } = { replaceObjects: false, attrs: {}, ...options };
     let imageDTO: ImageDTO | null = null;
     const rasterizeArgs = { rect, attrs, bg };
@@ -400,6 +405,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     }
 
     this.log.trace({ rasterizeArgs }, 'Rasterizing entity');
+    this.manager.stateApi.$rasterizingAdapter.set(this.parent);
 
     const blob = await this.getBlob(rasterizeArgs);
     if (this.manager._isDebugging) {
@@ -423,7 +429,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       replaceObjects,
     });
     this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
-
+    this.manager.stateApi.$rasterizingAdapter.set(null);
     return imageDTO;
   };
 

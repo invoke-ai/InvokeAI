@@ -26,6 +26,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   selectedImage: StagingAreaImage | null;
 
   $shouldShowStagedImage = atom<boolean>(true);
+  $isStaging = atom<boolean>(false);
 
   constructor(manager: CanvasManager) {
     super();
@@ -49,7 +50,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
           actionCreator: stagingAreaStartedStaging,
           effect: () => {
             this.$shouldShowStagedImage.set(true);
-            this.render();
           },
         })
       )
@@ -64,6 +64,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   render = async () => {
     this.log.trace('Rendering staging area');
     const stagingArea = this.manager.stateApi.runSelector(selectCanvasStagingAreaSlice);
+    this.$isStaging.set(stagingArea.isStaging);
+
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
     const shouldShowStagedImage = this.$shouldShowStagedImage.get();
 

@@ -370,7 +370,17 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   /**
    * Whether an entity is currently being transformed. Derived from `$transformingAdapter`.
    */
-  $isTranforming = computed(this.$transformingAdapter, (transformingAdapter) => Boolean(transformingAdapter));
+  $isTransforming = computed(this.$transformingAdapter, (transformingAdapter) => Boolean(transformingAdapter));
+
+  /**
+   * The entity adapter being rasterized, if any.
+   */
+  $rasterizingAdapter = atom<CanvasEntityAdapter | null>(null);
+
+  /**
+   * Whether an entity is currently being transformed. Derived from `$transformingAdapter`.
+   */
+  $isRasterizing = computed(this.$rasterizingAdapter, (rasterizingAdapter) => Boolean(rasterizingAdapter));
 
   /**
    * The last canvas progress event. This is set in a global event listener. The staging area may set it to null when it

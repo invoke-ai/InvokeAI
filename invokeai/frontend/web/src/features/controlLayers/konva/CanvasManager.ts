@@ -125,9 +125,15 @@ export class CanvasManager extends CanvasModuleBase {
     this.konva.previewLayer.add(this.tool.konva.group);
 
     this.$isBusy = computed(
-      [this.stateApi.$isFiltering, this.stateApi.$isTranforming],
-      (isFiltering, isTransforming) => {
-        return isFiltering || isTransforming;
+      [
+        this.stateApi.$isFiltering,
+        this.stateApi.$isTransforming,
+        this.stateApi.$isRasterizing,
+        this.stagingArea.$isStaging,
+        this.compositor.$isBusy,
+      ],
+      (isFiltering, isTransforming, isRasterizing, isStaging, isCompositing) => {
+        return isFiltering || isTransforming || isRasterizing || isStaging || isCompositing;
       }
     );
   }

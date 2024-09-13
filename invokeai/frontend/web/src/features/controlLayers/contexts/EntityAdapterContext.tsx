@@ -6,7 +6,7 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRegionalGuidance';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { PropsWithChildren } from 'react';
-import { createContext, memo, useContext, useMemo, useSyncExternalStore } from 'react';
+import { createContext, memo, useMemo, useSyncExternalStore } from 'react';
 import { assert } from 'tsafe';
 
 const EntityAdapterContext = createContext<
@@ -97,16 +97,6 @@ export const RegionalGuidanceAdapterGate = memo(({ children }: PropsWithChildren
 
 RegionalGuidanceAdapterGate.displayName = 'RegionalGuidanceAdapterGate';
 
-export const useEntityAdapter = ():
-  | CanvasEntityAdapterRasterLayer
-  | CanvasEntityAdapterControlLayer
-  | CanvasEntityAdapterInpaintMask
-  | CanvasEntityAdapterRegionalGuidance => {
-  const adapter = useContext(EntityAdapterContext);
-  assert(adapter, 'useEntityAdapter must be used within a CanvasRasterLayerAdapterGate');
-  return adapter;
-};
-
 export const useEntityAdapterSafe = (
   entityIdentifier: CanvasEntityIdentifier | null
 ):
@@ -152,5 +142,17 @@ export const useEntityAdapterSafe = (
     return null;
   }, [controlLayerAdapters, entityIdentifier, inpaintMaskAdapters, rasterLayerAdapters, regionalGuidanceAdapters]);
 
+  return adapter;
+};
+
+export const useEntityAdapter = (
+  entityIdentifier: CanvasEntityIdentifier
+):
+  | CanvasEntityAdapterRasterLayer
+  | CanvasEntityAdapterControlLayer
+  | CanvasEntityAdapterInpaintMask
+  | CanvasEntityAdapterRegionalGuidance => {
+  const adapter = useEntityAdapterSafe(entityIdentifier);
+  assert(adapter, 'useEntityAdapter must be used within a CanvasRasterLayerAdapterGate');
   return adapter;
 };

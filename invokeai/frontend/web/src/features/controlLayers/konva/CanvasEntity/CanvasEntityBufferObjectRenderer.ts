@@ -67,9 +67,15 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
 
     this.parent.konva.layer.add(this.konva.group);
 
-    // When switching tool, commit the buffer. This is necessary to prevent the buffer from being lost when the
-    // user switches tool mid-drawing, for example by pressing space to pan the stage. It's easy to press space
-    // to pan _before_ releasing the mouse button, which would cause the buffer to be lost if we didn't commit it.
+    /**
+     * When switching tool, commit the buffer. This is necessary to prevent the buffer from being lost when the
+     * user switches tool mid-drawing, for example by pressing space to pan the stage. It's easy to press space
+     * to pan _before_ releasing the mouse button, which would cause the buffer to be lost if we didn't commit it.
+     *
+     * But! We should only do this if we are not "busy". "Busy" means the canvas may be filtering or transforming
+     * a layer, and may be using the buffer object! So, we should not commit the buffer in that case, and let the
+     * filter or transformer handle it.
+     */
     this.subscriptions.add(
       this.manager.tool.$tool.listen(() => {
         if (this.hasBuffer() && !this.manager.$isBusy.get()) {
