@@ -1,4 +1,5 @@
 import type { SerializableObject } from 'common/types';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import {
@@ -111,7 +112,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     const cachedCanvas = this.manager.cache.canvasElementCache.get(hash);
 
     if (cachedCanvas) {
-      this.log.trace({ rect }, 'Using cached composite inpaint mask canvas');
+      this.log.trace({ rect }, 'Using cached composite raster layer canvas');
       return cachedCanvas;
     }
 
@@ -152,25 +153,38 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   rasterizeAndUploadCompositeRasterLayer = async (rect: Rect, saveToGallery: boolean): Promise<ImageDTO> => {
     this.log.trace({ rect }, 'Rasterizing composite raster layer');
 
+    assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
+
     const canvas = this.getCompositeRasterLayerCanvas(rect);
 
     this.$isProcessing.set(true);
-    const blob = await canvasToBlob(canvas);
+    const blobResult = await withResultAsync(() => canvasToBlob(canvas));
+    this.$isProcessing.set(false);
+
+    if (blobResult.isErr()) {
+      throw blobResult.error;
+    }
+    const blob = blobResult.value;
 
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Composite raster layer canvas');
     }
-    this.$isProcessing.set(false);
 
     this.$isUploading.set(true);
-    const imageDTO = await uploadImage({
-      blob,
-      fileName: 'composite-raster-layer.png',
-      image_category: 'general',
-      is_intermediate: !saveToGallery,
-      board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
-    });
+    const uploadResult = await withResultAsync(() =>
+      uploadImage({
+        blob,
+        fileName: 'composite-raster-layer.png',
+        image_category: 'general',
+        is_intermediate: !saveToGallery,
+        board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
+      })
+    );
     this.$isUploading.set(false);
+    if (uploadResult.isErr()) {
+      throw uploadResult.error;
+    }
+    const imageDTO = uploadResult.value;
     return imageDTO;
   };
 
@@ -301,24 +315,38 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   rasterizeAndUploadCompositeInpaintMask = async (rect: Rect, saveToGallery: boolean) => {
     this.log.trace({ rect }, 'Rasterizing composite inpaint mask');
 
+    assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
+
     const canvas = this.getCompositeInpaintMaskCanvas(rect);
 
     this.$isProcessing.set(true);
-    const blob = await canvasToBlob(canvas);
+    const blobResult = await withResultAsync(() => canvasToBlob(canvas));
+    this.$isProcessing.set(false);
+
+    if (blobResult.isErr()) {
+      throw blobResult.error;
+    }
+    const blob = blobResult.value;
+
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Composite inpaint mask canvas');
     }
-    this.$isProcessing.set(false);
 
     this.$isUploading.set(true);
-    const imageDTO = await uploadImage({
-      blob,
-      fileName: 'composite-inpaint-mask.png',
-      image_category: 'general',
-      is_intermediate: !saveToGallery,
-      board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
-    });
+    const uploadResult = await withResultAsync(() =>
+      uploadImage({
+        blob,
+        fileName: 'composite-inpaint-mask.png',
+        image_category: 'general',
+        is_intermediate: !saveToGallery,
+        board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
+      })
+    );
     this.$isUploading.set(false);
+    if (uploadResult.isErr()) {
+      throw uploadResult.error;
+    }
+    const imageDTO = uploadResult.value;
     return imageDTO;
   };
 
