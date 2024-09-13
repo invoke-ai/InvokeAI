@@ -24,7 +24,7 @@ export const CanvasSettingsCompositeMaskedRegionsCheckbox = memo(() => {
   );
   return (
     <FormControl w="full">
-      <FormLabel flexGrow={1}>{t('controlLayers.compositeMaskedRegions')}</FormLabel>
+      <FormLabel flexGrow={1}>{t('controlLayers.outputOnlyMaskedRegions')}</FormLabel>
       <Checkbox isChecked={compositeMaskedRegions} onChange={onChange} />
     </FormControl>
   );
