@@ -1,6 +1,13 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { ipaImageChanged, rgIPAdapterImageChanged } from 'features/controlLayers/store/canvasSlice';
+import {
+  entityRasterized,
+  entitySelected,
+  ipaImageChanged,
+  rgIPAdapterImageChanged,
+} from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { imageDTOToImageObject } from 'features/controlLayers/store/types';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
@@ -112,6 +119,17 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         const { nodeId, fieldName } = postUploadAction;
         dispatch(fieldImageValueChanged({ nodeId, fieldName, value: imageDTO }));
         toast({ ...DEFAULT_UPLOADED_TOAST, description: `${t('toast.setNodeField')} ${fieldName}` });
+        return;
+      }
+
+      if (postUploadAction?.type === 'REPLACE_LAYER_WITH_IMAGE') {
+        const { entityIdentifier } = postUploadAction;
+
+        const state = getState();
+        const imageObject = imageDTOToImageObject(imageDTO);
+        const { x, y } = selectCanvasSlice(state).bbox.rect;
+        dispatch(entityRasterized({ entityIdentifier, imageObject, position: { x, y }, replaceObjects: true }));
+        dispatch(entitySelected({ entityIdentifier }));
         return;
       }
     },
