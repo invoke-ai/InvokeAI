@@ -50,7 +50,14 @@ export const EntityListSelectedEntityActionBarFill = memo(() => {
         <Flex role="button" aria-label={t('controlLayers.maskFill')} tabIndex={-1} w={8} h={8}>
           <Tooltip label={t('controlLayers.maskFill')}>
             <Flex w="full" h="full" alignItems="center" justifyContent="center">
-              <Box borderRadius="full" w={6} h={6} borderWidth={1} bg={rgbColorToString(fill.color)} />
+              <Box
+                borderRadius="full"
+                borderColor="base.300"
+                w={6}
+                h={6}
+                borderWidth={1}
+                bg={rgbColorToString(fill.color)}
+              />
             </Flex>
           </Tooltip>
         </Flex>
