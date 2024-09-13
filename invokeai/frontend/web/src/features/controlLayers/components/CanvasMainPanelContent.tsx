@@ -48,7 +48,9 @@ export const CanvasMainPanelContent = memo(() => {
       alignItems="center"
       justifyContent="center"
     >
-      <CanvasToolbar />
+      <CanvasManagerProviderGate>
+        <CanvasToolbar />
+      </CanvasManagerProviderGate>
       <ContextMenu<HTMLDivElement> renderMenu={renderMenu}>
         {(ref) => (
           <Flex

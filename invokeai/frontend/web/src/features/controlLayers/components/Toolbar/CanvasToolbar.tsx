@@ -8,7 +8,6 @@ import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/compo
 import { CanvasToolbarResetViewButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarResetViewButton';
 import { CanvasToolbarSaveToGalleryButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSaveToGalleryButton';
 import { CanvasToolbarScale } from 'features/controlLayers/components/Toolbar/CanvasToolbarScale';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanvasDeleteLayerHotkey';
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
@@ -24,21 +23,19 @@ export const CanvasToolbar = memo(() => {
   useNextPrevEntityHotkeys();
 
   return (
-    <CanvasManagerProviderGate>
-      <Flex w="full" gap={2} alignItems="center">
-        <ToolChooser />
-        <Spacer />
-        <ToolSettings />
-        <Spacer />
-        <CanvasToolbarScale />
-        <CanvasToolbarResetViewButton />
-        <Spacer />
-        <ToolColorPicker />
-        <CanvasToolbarFitBboxToLayersButton />
-        <CanvasToolbarSaveToGalleryButton />
-        <CanvasSettingsPopover />
-      </Flex>
-    </CanvasManagerProviderGate>
+    <Flex w="full" gap={2} alignItems="center">
+      <ToolChooser />
+      <Spacer />
+      <ToolSettings />
+      <Spacer />
+      <CanvasToolbarScale />
+      <CanvasToolbarResetViewButton />
+      <Spacer />
+      <ToolColorPicker />
+      <CanvasToolbarFitBboxToLayersButton />
+      <CanvasToolbarSaveToGalleryButton />
+      <CanvasSettingsPopover />
+    </Flex>
   );
 });
 
