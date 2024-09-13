@@ -191,7 +191,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Enqueues a batch, pushing state to redux.
    */
   enqueueBatch = (batch: BatchConfig) => {
-    this.store.dispatch(
+    return this.store.dispatch(
       queueApi.endpoints.enqueueBatch.initiate(batch, {
         fixedCacheKey: 'enqueueBatch',
       })

@@ -1,4 +1,4 @@
-import { Box, Flex } from '@invoke-ai/ui-library';
+import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
@@ -6,6 +6,7 @@ import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/c
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useIsSavingCanvas, usePullBboxIntoIPAdapter } from 'features/controlLayers/hooks/saveCanvasHooks';
 import {
   ipaBeginEndStepPctChanged,
   ipaCLIPVisionModelChanged,
@@ -18,12 +19,15 @@ import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/s
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { IPAImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PiBoundingBoxBold } from 'react-icons/pi';
 import type { ImageDTO, IPAdapterModelConfig, IPALayerImagePostUploadAction } from 'services/api/types';
 
 import { IPAdapterImagePreview } from './IPAdapterImagePreview';
 import { IPAdapterModel } from './IPAdapterModel';
 
 export const IPAdapterSettings = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('ip_adapter');
   const selectIPAdapter = useMemo(
@@ -82,6 +86,8 @@ export const IPAdapterSettings = memo(() => {
     () => ({ type: 'SET_IPA_IMAGE', id: entityIdentifier.id }),
     [entityIdentifier.id]
   );
+  const pullBboxIntoIPAdapter = usePullBboxIntoIPAdapter(entityIdentifier);
+  const isSaving = useIsSavingCanvas();
 
   return (
     <CanvasEntitySettingsWrapper>
@@ -95,6 +101,14 @@ export const IPAdapterSettings = memo(() => {
               onChangeCLIPVisionModel={onChangeCLIPVisionModel}
             />
           </Box>
+          <IconButton
+            onClick={pullBboxIntoIPAdapter}
+            isLoading={isSaving.isTrue}
+            variant="ghost"
+            aria-label={t('controlLayers.pullBboxIntoIPAdapter')}
+            tooltip={t('controlLayers.pullBboxIntoIPAdapter')}
+            icon={<PiBoundingBoxBold />}
+          />
         </Flex>
         <Flex gap={4} w="full" alignItems="center">
           <Flex flexDir="column" gap={3} w="full">

@@ -14,14 +14,12 @@ import {
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
-import CurrentImageButtons from 'features/gallery/components/ImageViewer/CurrentImageButtons';
-import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
-import { selectIsMiniViewerOpen, selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
-import { galleryViewChanged, isMiniViewerOpenToggled, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
+import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { CSSProperties } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiEyeBold, PiEyeClosedBold, PiMagnifyingGlassBold } from 'react-icons/pi';
+import { PiMagnifyingGlassBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
@@ -52,11 +50,6 @@ export const Gallery = () => {
   const initialSearchTerm = useAppSelector(selectSearchTerm);
   const searchDisclosure = useDisclosure({ defaultIsOpen: initialSearchTerm.length > 0 });
   const [searchTerm, onChangeSearchTerm, onResetSearchTerm] = useGallerySearchTerm();
-  const isMiniViewerOpen = useAppSelector(selectIsMiniViewerOpen);
-
-  const toggleMiniViewer = useCallback(() => {
-    dispatch(isMiniViewerOpenToggled());
-  }, [dispatch]);
   const handleClickImages = useCallback(() => {
     dispatch(galleryViewChanged('images'));
   }, [dispatch]);
@@ -87,27 +80,15 @@ export const Gallery = () => {
           <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickAssets} data-testid="assets-tab">
             {t('gallery.assets')}
           </Tab>
-          <Flex h="full">
-            <IconButton
-              size="sm"
-              variant="link"
-              alignSelf="stretch"
-              onClick={toggleMiniViewer}
-              tooltip={t('gallery.toggleMiniViewer')}
-              aria-label={t('gallery.toggleMiniViewer')}
-              icon={isMiniViewerOpen ? <PiEyeBold /> : <PiEyeClosedBold />}
-              colorScheme={isMiniViewerOpen ? 'invokeBlue' : 'base'}
-            />
-            <IconButton
-              size="sm"
-              variant="link"
-              alignSelf="stretch"
-              onClick={handleClickSearch}
-              tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
-              aria-label={t('gallery.displaySearch')}
-              icon={<PiMagnifyingGlassBold />}
-            />
-          </Flex>
+          <IconButton
+            size="sm"
+            variant="link"
+            alignSelf="stretch"
+            onClick={handleClickSearch}
+            tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
+            aria-label={t('gallery.displaySearch')}
+            icon={<PiMagnifyingGlassBold />}
+          />
         </TabList>
       </Tabs>
 
@@ -118,21 +99,6 @@ export const Gallery = () => {
             onChangeSearchTerm={onChangeSearchTerm}
             onResetSearchTerm={onResetSearchTerm}
           />
-        </Box>
-      </Collapse>
-      <Collapse in={isMiniViewerOpen} style={COLLAPSE_STYLES}>
-        <Box position="relative" w="full" mt={2} aspectRatio="1/1">
-          <CurrentImagePreview />
-          <Flex
-            position="absolute"
-            top={2}
-            gap={2}
-            justifyContent="space-between"
-            left="50%"
-            transform="translateX(-50%)"
-          >
-            <CurrentImageButtons />
-          </Flex>
         </Box>
       </Collapse>
       <GalleryImageGrid />

@@ -27,9 +27,9 @@ export const selectCanvasSlice = (state: RootState) => state.canvas.present;
  * - Control layers
  * - Inpaint masks
  *
- * It does not check for validity of the entities.
+ * All entities are counted, regardless of their state.
  */
-const selectEntityCount = createSelector(selectCanvasSlice, (canvas) => {
+const selectEntityCountAll = createSelector(selectCanvasSlice, (canvas) => {
   return (
     canvas.regions.entities.length +
     canvas.ipAdapters.entities.length +
@@ -39,10 +39,63 @@ const selectEntityCount = createSelector(selectCanvasSlice, (canvas) => {
   );
 });
 
+const selectActiveRasterLayerEntities = createSelector(selectCanvasSlice, (canvas) =>
+  canvas.rasterLayers.entities.filter((e) => e.isEnabled && e.objects.length > 0)
+);
+
+const selectActiveControlLayerEntities = createSelector(selectCanvasSlice, (canvas) =>
+  canvas.controlLayers.entities.filter((e) => e.isEnabled && e.objects.length > 0)
+);
+
+const selectActiveInpaintMaskEntities = createSelector(selectCanvasSlice, (canvas) =>
+  canvas.inpaintMasks.entities.filter((e) => e.isEnabled && e.objects.length > 0)
+);
+
+const selectActiveRegionalGuidanceEntities = createSelector(selectCanvasSlice, (canvas) =>
+  canvas.regions.entities.filter((e) => e.isEnabled && e.objects.length > 0)
+);
+
+const selectActiveIPAdapterEntities = createSelector(selectCanvasSlice, (canvas) =>
+  canvas.ipAdapters.entities.filter((e) => e.isEnabled)
+);
+
+/**
+ * Selects the total _active_ canvas entity count:
+ * - Regions
+ * - IP adapters
+ * - Raster layers
+ * - Control layers
+ * - Inpaint masks
+ *
+ * Active entities are those that are enabled and have at least one object.
+ */
+export const selectEntityCountActive = createSelector(
+  selectActiveRasterLayerEntities,
+  selectActiveControlLayerEntities,
+  selectActiveInpaintMaskEntities,
+  selectActiveRegionalGuidanceEntities,
+  selectActiveIPAdapterEntities,
+  (
+    activeRasterLayerEntities,
+    activeControlLayerEntities,
+    activeInpaintMaskEntities,
+    activeRegionalGuidanceEntities,
+    activeIPAdapterEntities
+  ) => {
+    return (
+      activeRasterLayerEntities.length +
+      activeControlLayerEntities.length +
+      activeInpaintMaskEntities.length +
+      activeRegionalGuidanceEntities.length +
+      activeIPAdapterEntities.length
+    );
+  }
+);
+
 /**
  * Selects if the canvas has any entities.
  */
-export const selectHasEntities = createSelector(selectEntityCount, (count) => count > 0);
+export const selectHasEntities = createSelector(selectEntityCountAll, (count) => count > 0);
 
 /**
  * Selects the optimal dimension for the canvas based on the currently-model

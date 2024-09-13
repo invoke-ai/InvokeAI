@@ -10,7 +10,8 @@ import {
   selectAutoProcessFilter,
   settingsAutoProcessFilterToggled,
 } from 'features/controlLayers/store/canvasSettingsSlice';
-import { type FilterConfig, IMAGE_FILTERS } from 'features/controlLayers/store/types';
+import type { FilterConfig } from 'features/controlLayers/store/filters';
+import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsCounterClockwiseBold, PiCheckBold, PiShootingStarBold, PiXBold } from 'react-icons/pi';
@@ -77,7 +78,7 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
           onClick={adapter.filterer.process}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.process')}
-          isDisabled={!isValid}
+          isDisabled={!isValid || autoProcessFilter}
         >
           {t('controlLayers.filter.process')}
         </Button>
@@ -107,7 +108,6 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
           onClick={adapter.filterer.cancel}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.cancel')}
-          isDisabled={!isValid}
         >
           {t('controlLayers.filter.cancel')}
         </Button>

@@ -11,7 +11,6 @@ const initialUIState: UIState = {
   activeTab: 'generation',
   shouldShowImageDetails: false,
   shouldShowProgressInViewer: true,
-  panels: {},
   accordions: {},
   expanders: {},
 };
@@ -28,9 +27,6 @@ export const uiSlice = createSlice({
     },
     setShouldShowProgressInViewer: (state, action: PayloadAction<boolean>) => {
       state.shouldShowProgressInViewer = action.payload;
-    },
-    panelsChanged: (state, action: PayloadAction<{ name: string; value: string }>) => {
-      state.panels[action.payload.name] = action.payload.value;
     },
     accordionStateChanged: (state, action: PayloadAction<{ id: string; isOpen: boolean }>) => {
       const { id, isOpen } = action.payload;
@@ -52,7 +48,6 @@ export const {
   setActiveTab,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
-  panelsChanged,
   accordionStateChanged,
   expanderStateChanged,
 } = uiSlice.actions;
@@ -84,7 +79,7 @@ const TABS_WITH_LEFT_PANEL: TabName[] = ['generation', 'upscaling', 'workflows']
 export const $isLeftPanelOpen = atom(true);
 export const selectWithLeftPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_LEFT_PANEL.includes(ui.activeTab));
 
-const TABS_WITH_RIGHT_PANEL: TabName[] = ['generation', 'upscaling', 'workflows', 'gallery'] as const;
+const TABS_WITH_RIGHT_PANEL: TabName[] = ['generation', 'upscaling', 'workflows'] as const;
 export const RIGHT_PANEL_MIN_SIZE_PX = 390;
 export const RIGHT_PANEL_MIN_SIZE_PCT = 20;
 export const $isRightPanelOpen = atom(true);

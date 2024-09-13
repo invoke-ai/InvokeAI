@@ -1,29 +1,47 @@
 import { useDndContext } from '@dnd-kit/core';
-import { Box, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Button, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
-import { CanvasPanelContent } from 'features/controlLayers/components/CanvasPanelContent';
-import { CanvasSendToToggle } from 'features/controlLayers/components/CanvasSendToToggle';
-import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
+import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
+import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
-import { memo, useCallback, useRef, useState } from 'react';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { atom } from 'nanostores';
+import { memo, useCallback, useMemo, useRef } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
-export const CanvasRightPanelContent = memo(() => {
+const $tabIndex = atom(0);
+export const setRightPanelTabToLayers = () => $tabIndex.set(0);
+export const setRightPanelTabToGallery = () => $tabIndex.set(1);
+
+export const CanvasRightPanel = memo(() => {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState(0);
+  const tabIndex = useStore($tabIndex);
   useScopeOnFocus('gallery', ref);
+  const imageViewer = useImageViewer();
+  const onClickViewerToggleButton = useCallback(() => {
+    if ($tabIndex.get() !== 1) {
+      $tabIndex.set(1);
+    }
+    imageViewer.toggle();
+  }, [imageViewer]);
+  useHotkeys('z', imageViewer.toggle);
 
   return (
-    <Tabs index={tab} onChange={setTab} w="full" h="full" display="flex" flexDir="column">
+    <Tabs index={tabIndex} onChange={$tabIndex.set} w="full" h="full" display="flex" flexDir="column">
       <TabList alignItems="center">
-        <PanelTabs setTab={setTab} />
+        <PanelTabs />
         <Spacer />
-        <CanvasSendToToggle />
+        <Button size="sm" variant="ghost" onClick={onClickViewerToggleButton}>
+          {imageViewer.isOpen ? t('gallery.closeViewer') : t('gallery.openViewer')}
+        </Button>
       </TabList>
       <TabPanels w="full" h="full">
         <TabPanel w="full" h="full" p={0} pt={3}>
-          <CanvasPanelContent />
+          <CanvasLayersPanelContent />
         </TabPanel>
         <TabPanel w="full" h="full" p={0} pt={3}>
           <GalleryPanelContent />
@@ -33,48 +51,52 @@ export const CanvasRightPanelContent = memo(() => {
   );
 });
 
-CanvasRightPanelContent.displayName = 'CanvasRightPanelContent';
+CanvasRightPanel.displayName = 'CanvasRightPanel';
 
-const PanelTabs = memo(({ setTab }: { setTab: (val: number) => void }) => {
+const PanelTabs = memo(() => {
   const { t } = useTranslation();
-  const sendToCanvas = useAppSelector(selectSendToCanvas);
+  const activeEntityCount = useAppSelector(selectEntityCountActive);
   const tabTimeout = useRef<number | null>(null);
   const dndCtx = useDndContext();
 
   const onOnMouseOverLayersTab = useCallback(() => {
     tabTimeout.current = window.setTimeout(() => {
       if (dndCtx.active) {
-        setTab(1);
+        setRightPanelTabToLayers();
       }
     }, 300);
-  }, [dndCtx.active, setTab]);
+  }, [dndCtx.active]);
 
   const onOnMouseOverGalleryTab = useCallback(() => {
     tabTimeout.current = window.setTimeout(() => {
       if (dndCtx.active) {
-        setTab(0);
+        setRightPanelTabToGallery();
       }
     }, 300);
-  }, [dndCtx.active, setTab]);
+  }, [dndCtx.active]);
 
   const onMouseOut = useCallback(() => {
     if (tabTimeout.current) {
       clearTimeout(tabTimeout.current);
     }
   }, []);
+
+  const layersTabLabel = useMemo(() => {
+    if (activeEntityCount === 0) {
+      return t('controlLayers.layer_other');
+    }
+    return `${t('controlLayers.layer_other')} (${activeEntityCount})`;
+  }, [activeEntityCount, t]);
+
   return (
     <>
-      <Tab position="relative" onMouseOver={onOnMouseOverLayersTab} onMouseOut={onMouseOut}>
-        {t('controlLayers.layer_other')}
-        {sendToCanvas && (
-          <Box position="absolute" top={2} right={2} h={2} w={2} bg="invokeYellow.300" borderRadius="full" />
-        )}
+      <Tab position="relative" onMouseOver={onOnMouseOverLayersTab} onMouseOut={onMouseOut} w={32}>
+        <Box as="span" w="full">
+          {layersTabLabel}
+        </Box>
       </Tab>
       <Tab position="relative" onMouseOver={onOnMouseOverGalleryTab} onMouseOut={onMouseOut}>
         {t('gallery.gallery')}
-        {!sendToCanvas && (
-          <Box position="absolute" top={2} right={2} h={2} w={2} bg="invokeYellow.300" borderRadius="full" />
-        )}
       </Tab>
     </>
   );

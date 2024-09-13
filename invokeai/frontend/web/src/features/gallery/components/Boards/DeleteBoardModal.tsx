@@ -10,6 +10,7 @@ import {
   Skeleton,
   Text,
 } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -19,19 +20,17 @@ import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { some } from 'lodash-es';
+import { atom } from 'nanostores';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllImageNamesForBoardQuery } from 'services/api/endpoints/boards';
 import { useDeleteBoardAndImagesMutation, useDeleteBoardMutation } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
 
-type Props = {
-  boardToDelete?: BoardDTO;
-  setBoardToDelete: (board?: BoardDTO) => void;
-};
+export const $boardToDelete = atom<BoardDTO | null>(null);
 
-const DeleteBoardModal = (props: Props) => {
-  const { boardToDelete, setBoardToDelete } = props;
+const DeleteBoardModal = () => {
+  const boardToDelete = useStore($boardToDelete);
   const { t } = useTranslation();
   const { currentData: boardImageNames, isFetching: isFetchingBoardNames } = useListAllImageNamesForBoardQuery(
     boardToDelete?.board_id ?? skipToken
@@ -65,20 +64,20 @@ const DeleteBoardModal = (props: Props) => {
       return;
     }
     deleteBoardOnly(boardToDelete.board_id);
-    setBoardToDelete(undefined);
-  }, [boardToDelete, deleteBoardOnly, setBoardToDelete]);
+    $boardToDelete.set(null);
+  }, [boardToDelete, deleteBoardOnly]);
 
   const handleDeleteBoardAndImages = useCallback(() => {
     if (!boardToDelete) {
       return;
     }
     deleteBoardAndImages(boardToDelete.board_id);
-    setBoardToDelete(undefined);
-  }, [boardToDelete, deleteBoardAndImages, setBoardToDelete]);
+    $boardToDelete.set(null);
+  }, [boardToDelete, deleteBoardAndImages]);
 
   const handleClose = useCallback(() => {
-    setBoardToDelete(undefined);
-  }, [setBoardToDelete]);
+    $boardToDelete.set(null);
+  }, []);
 
   const cancelRef = useRef<HTMLButtonElement>(null);
 

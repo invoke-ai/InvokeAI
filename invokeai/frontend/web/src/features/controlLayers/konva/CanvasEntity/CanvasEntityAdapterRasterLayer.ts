@@ -9,16 +9,17 @@ import type { CanvasEntityIdentifier, CanvasRasterLayerState, Rect } from 'featu
 import type { GroupConfig } from 'konva/lib/Group';
 import { omit } from 'lodash-es';
 
-export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<CanvasRasterLayerState> {
-  static TYPE = 'raster_layer_adapter';
-
+export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
+  CanvasRasterLayerState,
+  'raster_layer_adapter'
+> {
   renderer: CanvasEntityObjectRenderer;
   bufferRenderer: CanvasEntityBufferObjectRenderer;
   transformer: CanvasEntityTransformer;
   filterer: CanvasEntityFilterer;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'raster_layer'>, manager: CanvasManager) {
-    super(entityIdentifier, manager, CanvasEntityAdapterRasterLayer.TYPE);
+    super(entityIdentifier, manager, 'raster_layer_adapter');
 
     this.renderer = new CanvasEntityObjectRenderer(this);
     this.bufferRenderer = new CanvasEntityBufferObjectRenderer(this);

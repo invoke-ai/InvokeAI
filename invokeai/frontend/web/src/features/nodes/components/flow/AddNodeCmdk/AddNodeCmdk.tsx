@@ -246,7 +246,12 @@ type NodeCommandItemData = {
   nodePack: string;
 };
 
-const $templatesArray = computed($templates, (templates) => Object.values(templates));
+/**
+ * An array of all templates, excluding deprecated ones.
+ */
+const $templatesArray = computed($templates, (templates) =>
+  Object.values(templates).filter((template) => template.classification !== 'deprecated')
+);
 
 const createRegex = memoize(
   (inputValue: string) =>

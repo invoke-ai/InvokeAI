@@ -24,6 +24,7 @@ import { useRefreshAfterResetModal } from 'features/system/components/SettingsMo
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
+import { SettingsShowSendingToDifferentViewAlerts } from 'features/system/components/SettingsModal/SettingsShowSendingToDifferentViewAlerts';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
@@ -175,6 +176,7 @@ const SettingsModal = ({ config = defaultConfig }: SettingsModalProps) => {
                     <FormLabel>{t('settings.confirmOnDelete')}</FormLabel>
                     <Switch isChecked={shouldConfirmOnDelete} onChange={handleChangeShouldConfirmOnDelete} />
                   </FormControl>
+                  <SettingsShowSendingToDifferentViewAlerts />
                 </StickyScrollable>
 
                 <StickyScrollable title={t('settings.generation')}>

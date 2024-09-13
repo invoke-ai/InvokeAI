@@ -1,6 +1,7 @@
 import { Flex } from '@invoke-ai/ui-library';
 import IAIDroppable from 'common/components/IAIDroppable';
 import type { AddControlLayerFromImageDropData, AddRasterLayerFromImageDropData } from 'features/dnd/types';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo } from 'react';
 
 const addRasterLayerFromImageDropData: AddRasterLayerFromImageDropData = {
@@ -14,6 +15,12 @@ const addControlLayerFromImageDropData: AddControlLayerFromImageDropData = {
 };
 
 export const CanvasDropArea = memo(() => {
+  const imageViewer = useImageViewer();
+
+  if (imageViewer.isOpen) {
+    return null;
+  }
+
   return (
     <>
       <Flex position="absolute" top={0} right={0} bottom="50%" left={0} gap={2} pointerEvents="none">

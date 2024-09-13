@@ -1,5 +1,5 @@
 import type { PayloadAction, UnknownAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import type { PersistConfig } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
@@ -118,7 +118,7 @@ const initialState: CanvasState = {
   },
   inpaintMasks: {
     isHidden: false,
-    entities: [initialInpaintMaskState],
+    entities: [deepClone(initialInpaintMaskState)],
   },
   regions: {
     isHidden: false,
@@ -191,8 +191,13 @@ export const canvasSlice = createSlice({
       state.selectedEntityIdentifier = getEntityIdentifier(data);
     },
     rasterLayerConvertedToControlLayer: {
-      reducer: (state, action: PayloadAction<EntityIdentifierPayload<{ newId: string }, 'raster_layer'>>) => {
-        const { entityIdentifier, newId } = action.payload;
+      reducer: (
+        state,
+        action: PayloadAction<
+          EntityIdentifierPayload<{ newId: string; overrides?: Partial<CanvasControlLayerState> }, 'raster_layer'>
+        >
+      ) => {
+        const { entityIdentifier, newId, overrides } = action.payload;
         const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
@@ -207,6 +212,8 @@ export const canvasSlice = createSlice({
           withTransparencyEffect: true,
         };
 
+        merge(controlLayerState, overrides);
+
         // Remove the raster layer
         state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
 
@@ -215,7 +222,9 @@ export const canvasSlice = createSlice({
 
         state.selectedEntityIdentifier = { type: controlLayerState.type, id: controlLayerState.id };
       },
-      prepare: (payload: EntityIdentifierPayload<void, 'raster_layer'>) => ({
+      prepare: (
+        payload: EntityIdentifierPayload<{ overrides?: Partial<CanvasControlLayerState> } | undefined, 'raster_layer'>
+      ) => ({
         payload: { ...payload, newId: getPrefixedId('control_layer') },
       }),
     },
@@ -941,7 +950,7 @@ export const canvasSlice = createSlice({
       }
     },
     entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
-      const { entityIdentifier, imageObject, rect, replaceObjects } = action.payload;
+      const { entityIdentifier, imageObject, position, replaceObjects } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
@@ -950,7 +959,7 @@ export const canvasSlice = createSlice({
       if (isRenderableEntity(entity)) {
         if (replaceObjects) {
           entity.objects = [imageObject];
-          entity.position = { x: rect.x, y: rect.y };
+          entity.position = position;
         }
       }
     },
@@ -1277,6 +1286,8 @@ export const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> =
   // debug: import.meta.env.MODE === 'development',
 };
 
+const doNotGroupMatcher = isAnyOf(entityBrushLineAdded, entityEraserLineAdded, entityRectAdded);
+
 // Store rapid actions of the same type at most once every x time.
 // See: https://github.com/omnidan/redux-undo/blob/master/examples/throttled-drag/util/undoFilter.js
 const THROTTLE_MS = 1000;
@@ -1284,7 +1295,7 @@ let ignoreRapid = false;
 let prevActionType: string | null = null;
 function actionsThrottlingFilter(action: UnknownAction) {
   // If the actions are of a different type, reset the throttle and allow the action
-  if (action.type !== prevActionType) {
+  if (action.type !== prevActionType || doNotGroupMatcher(action)) {
     ignoreRapid = false;
     prevActionType = action.type;
     return true;
@@ -1302,4 +1313,7 @@ function actionsThrottlingFilter(action: UnknownAction) {
 }
 
 export const $lastCanvasProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
+/**
+ * The global canvas manager instance.
+ */
 export const $canvasManager = atom<CanvasManager | null>(null);

@@ -15,7 +15,7 @@ import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { $hasProgress } from 'services/events/setEventListeners';
+import { $hasProgress, $isProgressFromCanvas } from 'services/events/setEventListeners';
 
 import ProgressImage from './ProgressImage';
 
@@ -24,6 +24,7 @@ const CurrentImagePreview = () => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
   const hasDenoiseProgress = useStore($hasProgress);
+  const isProgressFromCanvas = useStore($isProgressFromCanvas);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
 
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
@@ -61,7 +62,7 @@ const CurrentImagePreview = () => {
       justifyContent="center"
       position="relative"
     >
-      {hasDenoiseProgress && shouldShowProgressInViewer ? (
+      {hasDenoiseProgress && !isProgressFromCanvas && shouldShowProgressInViewer ? (
         <ProgressImage />
       ) : (
         <IAIDndImage

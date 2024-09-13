@@ -57,4 +57,3 @@ export const selectImageToCompare = createSelector(selectGallerySlice, (gallery)
 export const selectHasImageToCompare = createSelector(selectImageToCompare, (imageToCompare) =>
   Boolean(imageToCompare)
 );
-export const selectIsMiniViewerOpen = createSelector(selectGallerySlice, (gallery) => gallery.isMiniViewerOpen);

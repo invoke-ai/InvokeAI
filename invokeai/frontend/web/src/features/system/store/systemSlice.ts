@@ -19,6 +19,7 @@ const initialSystemState: SystemState = {
   logIsEnabled: true,
   logLevel: 'debug',
   logNamespaces: [...zLogNamespace.options],
+  showSendingToDifferentViewAlerts: true,
 };
 
 export const systemSlice = createSlice({
@@ -56,6 +57,9 @@ export const systemSlice = createSlice({
     setShouldEnableInformationalPopovers(state, action: PayloadAction<boolean>) {
       state.shouldEnableInformationalPopovers = action.payload;
     },
+    showSendingToAlertsChanged: (state, action: PayloadAction<boolean>) => {
+      state.showSendingToDifferentViewAlerts = action.payload;
+    },
   },
 });
 
@@ -69,6 +73,7 @@ export const {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
+  showSendingToAlertsChanged,
 } = systemSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -103,3 +108,4 @@ export const selectSystemShouldAntialiasProgressImage = createSystemSelector(
 export const selectSystemShouldEnableInformationalPopovers = createSystemSelector(
   (system) => system.shouldEnableInformationalPopovers
 );
+export const selectShowSendingToAlerts = createSystemSelector((s) => s.showSendingToDifferentViewAlerts);

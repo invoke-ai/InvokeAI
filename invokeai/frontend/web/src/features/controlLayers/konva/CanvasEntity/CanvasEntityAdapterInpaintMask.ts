@@ -8,16 +8,17 @@ import type { CanvasEntityIdentifier, CanvasInpaintMaskState, Rect } from 'featu
 import type { GroupConfig } from 'konva/lib/Group';
 import { omit } from 'lodash-es';
 
-export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<CanvasInpaintMaskState> {
-  static TYPE = 'inpaint_mask_adapter';
-
+export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<
+  CanvasInpaintMaskState,
+  'inpaint_mask_adapter'
+> {
   renderer: CanvasEntityObjectRenderer;
   bufferRenderer: CanvasEntityBufferObjectRenderer;
   transformer: CanvasEntityTransformer;
   filterer = undefined;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>, manager: CanvasManager) {
-    super(entityIdentifier, manager, CanvasEntityAdapterInpaintMask.TYPE);
+    super(entityIdentifier, manager, 'inpaint_mask_adapter');
 
     this.renderer = new CanvasEntityObjectRenderer(this);
     this.bufferRenderer = new CanvasEntityBufferObjectRenderer(this);

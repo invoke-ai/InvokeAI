@@ -2,6 +2,7 @@ import { Divider, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-a
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
+import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectIterations, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import {
   selectDynamicPromptsIsLoading,
@@ -34,6 +35,7 @@ export const QueueButtonTooltip = (props: PropsWithChildren<Props>) => {
 const TooltipContent = memo(({ prepend = false }: Props) => {
   const { t } = useTranslation();
   const { isReady, reasons } = useIsReadyToEnqueue();
+  const sendToCanvas = useAppSelector(selectSendToCanvas);
   const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
   const promptsCount = useAppSelector(selectPromptsCount);
   const iterationsCount = useAppSelector(selectIterations);
@@ -66,6 +68,23 @@ const TooltipContent = memo(({ prepend = false }: Props) => {
     return t('queue.notReady');
   }, [isLoading, isLoadingDynamicPrompts, isReady, prepend, t]);
 
+  const addingTo = useMemo(() => {
+    if (sendToCanvas) {
+      return t('controlLayers.stagingOnCanvas');
+    }
+    return t('parameters.invoke.addingImagesTo');
+  }, [sendToCanvas, t]);
+
+  const destination = useMemo(() => {
+    if (sendToCanvas) {
+      return t('queue.canvas');
+    }
+    if (autoAddBoardName) {
+      return autoAddBoardName;
+    }
+    return t('boards.uncategorized');
+  }, [autoAddBoardName, sendToCanvas, t]);
+
   return (
     <Flex flexDir="column" gap={1}>
       <Text fontWeight="semibold">{label}</Text>
@@ -91,9 +110,9 @@ const TooltipContent = memo(({ prepend = false }: Props) => {
       )}
       <Divider opacity={0.2} borderColor="base.900" />
       <Text fontStyle="oblique 10deg">
-        {t('parameters.invoke.addingImagesTo')}{' '}
+        {addingTo}{' '}
         <Text as="span" fontWeight="semibold">
-          {autoAddBoardName || t('boards.uncategorized')}
+          {destination}
         </Text>
       </Text>
     </Flex>
