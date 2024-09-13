@@ -220,6 +220,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         model=transformer,
                         patches=self._lora_iterator(context),
                         prefix="",
+                        dtype=inference_dtype,
                     )
                 )
             else:

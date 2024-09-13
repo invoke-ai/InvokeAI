@@ -128,6 +128,7 @@ class LoRAPatcher:
         model: torch.nn.Module,
         patches: Iterable[Tuple[LoRAModelRaw, float]],
         prefix: str,
+        dtype: torch.dtype,
     ):
         """Apply one or more LoRA sidecar patches to a model within a context manager. Sidecar patches incur some
         overhead compared to normal LoRA patching, but they allow for LoRA layers to applied to base layers in any
@@ -139,6 +140,9 @@ class LoRAPatcher:
                 associated weights. An iterator is used so that the LoRA patches do not need to be loaded into memory
                 all at once.
             prefix (str): The keys in the patches will be filtered to only include weights with this prefix.
+            dtype (torch.dtype): The compute dtype of the sidecar layers. This cannot easily be inferred from the model,
+                since the sidecar layers are typically applied on top of quantized layers whose weight dtype is
+                different from their compute dtype.
         """
         original_modules: dict[str, torch.nn.Module] = {}
         try:
@@ -149,13 +153,14 @@ class LoRAPatcher:
                     patch=patch,
                     patch_weight=patch_weight,
                     original_modules=original_modules,
+                    dtype=dtype,
                 )
             yield
         finally:
             # Restore original modules.
             # Note: This logic assumes no nested modules in original_modules.
             for module_key, orig_module in original_modules.items():
-                module_parent_key, module_name = module_key.rsplit(".", 1)
+                module_parent_key, module_name = LoRAPatcher._split_parent_key(module_key)
                 parent_module = model.get_submodule(module_parent_key)
                 LoRAPatcher._set_submodule(parent_module, module_name, orig_module)
 
@@ -166,6 +171,7 @@ class LoRAPatcher:
         patch_weight: float,
         prefix: str,
         original_modules: dict[str, torch.nn.Module],
+        dtype: torch.dtype,
     ):
         """Apply a single LoRA sidecar patch to a model."""
 
@@ -193,9 +199,7 @@ class LoRAPatcher:
 
             # Move the LoRA sidecar layer to the same device/dtype as the orig module.
             # TODO(ryand): Experiment with moving to the device first, then casting. This could be faster.
-            # HACK(ryand): Figure out how to set the dtype properly here. We want to set it to the *compute* dtype of
-            # the original module. In the case of quantized layers, this may be different than the weight dtype.
-            lora_sidecar_layer.to(device=module.weight.device, dtype=torch.bfloat16)
+            lora_sidecar_layer.to(device=module.weight.device, dtype=dtype)
 
             if module_key in original_modules:
                 # The module has already been patched with a LoRASidecarModule. Append to it.
@@ -205,9 +209,27 @@ class LoRAPatcher:
                 # The module has not yet been patched with a LoRASidecarModule. Create one.
                 lora_sidecar_module = LoRASidecarModule(module, [lora_sidecar_layer])
                 original_modules[module_key] = module
-                module_parent_key, module_name = module_key.rsplit(".", 1)
+                module_parent_key, module_name = LoRAPatcher._split_parent_key(module_key)
                 module_parent = model.get_submodule(module_parent_key)
                 LoRAPatcher._set_submodule(module_parent, module_name, lora_sidecar_module)
+
+    @staticmethod
+    def _split_parent_key(module_key: str) -> tuple[str, str]:
+        """Split a module key into its parent key and module name.
+
+        Args:
+            module_key (str): The module key to split.
+
+        Returns:
+            tuple[str, str]: A tuple containing the parent key and module name.
+        """
+        split_key = module_key.rsplit(".", 1)
+        if len(split_key) == 2:
+            return tuple(split_key)
+        elif len(split_key) == 1:
+            return "", split_key[0]
+        else:
+            raise ValueError(f"Invalid module key: {module_key}")
 
     @staticmethod
     def _initialize_lora_sidecar_layer(orig_layer: torch.nn.Module, lora_layer: AnyLoRALayer, patch_weight: float):

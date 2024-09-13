@@ -1,5 +1,5 @@
 # Copyright (c) 2024 The InvokeAI Development team
-from typing import Dict, Optional
+from typing import Mapping, Optional
 
 import torch
 
@@ -8,7 +8,7 @@ from invokeai.backend.raw_model import RawModel
 
 
 class LoRAModelRaw(RawModel):  # (torch.nn.Module):
-    def __init__(self, layers: Dict[str, AnyLoRALayer]):
+    def __init__(self, layers: Mapping[str, AnyLoRALayer]):
         self.layers = layers
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
