@@ -106,25 +106,25 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
       // 5. Inpaint masks
       // 6. Preview layer (bbox, staging area, progress image, tool)
 
-      this.manager.background.konva.layer.zIndex(++zIndex);
+      this.manager.background.konva.layer.zIndex(zIndex++);
 
       for (const { id } of this.manager.stateApi.getRasterLayersState().entities) {
-        this.manager.adapters.rasterLayers.get(id)?.konva.layer.zIndex(++zIndex);
+        this.manager.adapters.rasterLayers.get(id)?.konva.layer.zIndex(zIndex++);
       }
 
       for (const { id } of this.manager.stateApi.getControlLayersState().entities) {
-        this.manager.adapters.controlLayers.get(id)?.konva.layer.zIndex(++zIndex);
+        this.manager.adapters.controlLayers.get(id)?.konva.layer.zIndex(zIndex++);
       }
 
       for (const { id } of this.manager.stateApi.getRegionsState().entities) {
-        this.manager.adapters.regionMasks.get(id)?.konva.layer.zIndex(++zIndex);
+        this.manager.adapters.regionMasks.get(id)?.konva.layer.zIndex(zIndex++);
       }
 
       for (const { id } of this.manager.stateApi.getInpaintMasksState().entities) {
-        this.manager.adapters.inpaintMasks.get(id)?.konva.layer.zIndex(++zIndex);
+        this.manager.adapters.inpaintMasks.get(id)?.konva.layer.zIndex(zIndex++);
       }
 
-      this.manager.konva.previewLayer.zIndex(++zIndex);
+      this.manager.konva.previewLayer.zIndex(zIndex++);
     }
   };
 
