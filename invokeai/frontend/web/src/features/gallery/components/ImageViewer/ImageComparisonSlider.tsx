@@ -1,7 +1,7 @@
 import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { preventDefault } from 'common/util/stopPropagation';
-import { TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
+import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
 import { selectComparisonFit } from 'features/gallery/store/gallerySelectors';
@@ -121,9 +121,8 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, containerD
             left={0}
             right={0}
             bottom={0}
-            backgroundImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL}
+            backgroundImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL}
             backgroundRepeat="repeat"
-            opacity={0.2}
           />
           <Image
             position="relative"
