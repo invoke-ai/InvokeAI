@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isOk, withResultAsync } from 'common/util/result';
+import { withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDefaultControlAdapter, selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -50,7 +50,7 @@ const useSaveCanvas = ({ region, saveToGallery, onSave }: UseSaveCanvasArg) => {
       canvasManager.compositor.rasterizeAndUploadCompositeRasterLayer(rect, saveToGallery)
     );
 
-    if (isOk(result)) {
+    if (result.isOk()) {
       if (onSave) {
         onSave(result.value, rect);
       }

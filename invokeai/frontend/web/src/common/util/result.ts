@@ -2,39 +2,81 @@
  * Represents a successful result.
  * @template T The type of the value.
  */
-export type OkResult<T> = { type: 'Ok'; value: T };
+export class Ok<T> {
+  readonly value: T;
+  constructor(value: T) {
+    this.value = value;
+  }
+
+  /**
+   * Type guard to check if this result is an `Ok` result.
+   * @returns {this is Ok<T>} `true` if the result is an `Ok` result, otherwise `false`.
+   */
+  isOk(): this is Ok<T> {
+    return true;
+  }
+
+  /**
+   * Type guard to check if this result is an `Err` result.
+   * @returns {this is Err<never>} `true` if the result is an `Err` result, otherwise `false`.
+   */
+  isErr(): this is Err<never> {
+    return false;
+  }
+}
 
 /**
  * Represents a failed result.
  * @template E The type of the error.
  */
-export type ErrResult<E> = { type: 'Err'; error: E };
+export class Err<E> {
+  readonly error: E;
+  constructor(error: E) {
+    this.error = error;
+  }
+
+  /**
+   * Type guard to check if this result is an `Ok` result.
+   * @returns {this is Ok<never>} `true` if the result is an `Ok` result, otherwise `false`.
+   */
+  isOk(): this is Ok<never> {
+    return false;
+  }
+
+  /**
+   * Type guard to check if this result is an `Err` result.
+   * @returns {this is Err<E>} `true` if the result is an `Err` result, otherwise `false`.
+   */
+  isErr(): this is Err<E> {
+    return true;
+  }
+}
 
 /**
  * A union type that represents either a successful result (`Ok`) or a failed result (`Err`).
  * @template T The type of the value in the `Ok` case.
  * @template E The type of the error in the `Err` case.
  */
-export type Result<T, E = Error> = OkResult<T> | ErrResult<E>;
+export type Result<T, E = Error> = Ok<T> | Err<E>;
 
 /**
  * Creates a successful result.
  * @template T The type of the value.
  * @param {T} value The value to wrap in an `Ok` result.
- * @returns {OkResult<T>} The `Ok` result containing the value.
+ * @returns {Ok<T>} The `Ok` result containing the value.
  */
-export function Ok<T>(value: T): OkResult<T> {
-  return { type: 'Ok', value };
+export function OkResult<T>(value: T): Ok<T> {
+  return new Ok(value);
 }
 
 /**
  * Creates a failed result.
  * @template E The type of the error.
  * @param {E} error The error to wrap in an `Err` result.
- * @returns {ErrResult<E>} The `Err` result containing the error.
+ * @returns {Err<E>} The `Err` result containing the error.
  */
-export function Err<E>(error: E): ErrResult<E> {
-  return { type: 'Err', error };
+export function ErrResult<E>(error: E): Err<E> {
+  return new Err(error);
 }
 
 /**
@@ -45,9 +87,9 @@ export function Err<E>(error: E): ErrResult<E> {
  */
 export function withResult<T>(fn: () => T): Result<T> {
   try {
-    return Ok(fn());
+    return new Ok(fn());
   } catch (error) {
-    return Err(error instanceof Error ? error : new Error(String(error)));
+    return new Err(error instanceof Error ? error : new Error(String(error)));
   }
 }
 
@@ -60,30 +102,8 @@ export function withResult<T>(fn: () => T): Result<T> {
 export async function withResultAsync<T>(fn: () => Promise<T>): Promise<Result<T>> {
   try {
     const result = await fn();
-    return Ok(result);
+    return new Ok(result);
   } catch (error) {
-    return Err(error instanceof Error ? error : new Error(String(error)));
+    return new Err(error instanceof Error ? error : new Error(String(error)));
   }
-}
-
-/**
- * Type guard to check if a `Result` is an `Ok` result.
- * @template T The type of the value in the `Ok` result.
- * @template E The type of the error in the `Err` result.
- * @param {Result<T, E>} result The result to check.
- * @returns {result is OkResult<T>} `true` if the result is an `Ok` result, otherwise `false`.
- */
-export function isOk<T, E>(result: Result<T, E>): result is OkResult<T> {
-  return result.type === 'Ok';
-}
-
-/**
- * Type guard to check if a `Result` is an `Err` result.
- * @template T The type of the value in the `Ok` result.
- * @template E The type of the error in the `Err` result.
- * @param {Result<T, E>} result The result to check.
- * @returns {result is ErrResult<E>} `true` if the result is an `Err` result, otherwise `false`.
- */
-export function isErr<T, E>(result: Result<T, E>): result is ErrResult<E> {
-  return result.type === 'Err';
 }
