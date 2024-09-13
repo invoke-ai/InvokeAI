@@ -15,8 +15,6 @@ class ConcatenatedLoRALinearSidecarLayer(torch.nn.Module):
         self._weight = weight
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        assert input.ndim == 3
-
         x_chunks: list[torch.Tensor] = []
         for lora_layer in self._concatenated_lora_layer.lora_layers:
             x_chunk = torch.nn.functional.linear(input, lora_layer.down)
