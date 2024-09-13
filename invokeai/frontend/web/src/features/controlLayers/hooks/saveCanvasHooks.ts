@@ -1,6 +1,5 @@
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { isOk, withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDefaultControlAdapter, selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
@@ -32,8 +31,6 @@ import type { ImageDTO } from 'services/api/types';
 
 const log = logger('canvas');
 
-export const [useIsSavingCanvas] = buildUseBoolean(false);
-
 type UseSaveCanvasArg = {
   region: 'canvas' | 'bbox';
   saveToGallery: boolean;
@@ -44,11 +41,8 @@ const useSaveCanvas = ({ region, saveToGallery, onSave }: UseSaveCanvasArg) => {
   const { t } = useTranslation();
 
   const canvasManager = useCanvasManager();
-  const isSaving = useIsSavingCanvas();
 
   const saveCanvas = useCallback(async () => {
-    isSaving.setTrue();
-
     const rect =
       region === 'bbox' ? canvasManager.stateApi.getBbox().rect : canvasManager.stage.getVisibleRect('raster_layer');
 
@@ -65,18 +59,7 @@ const useSaveCanvas = ({ region, saveToGallery, onSave }: UseSaveCanvasArg) => {
       log.error({ error: serializeError(result.error) }, 'Failed to save canvas to gallery');
       toast({ title: t('controlLayers.savedToGalleryError'), status: 'error' });
     }
-
-    isSaving.setFalse();
-  }, [
-    canvasManager.compositor,
-    canvasManager.stage,
-    canvasManager.stateApi,
-    isSaving,
-    onSave,
-    region,
-    saveToGallery,
-    t,
-  ]);
+  }, [canvasManager.compositor, canvasManager.stage, canvasManager.stateApi, onSave, region, saveToGallery, t]);
 
   return saveCanvas;
 };

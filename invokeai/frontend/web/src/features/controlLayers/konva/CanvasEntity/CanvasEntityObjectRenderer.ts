@@ -325,18 +325,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     return didRender;
   };
 
-  hideObjects = (except: string[] = []) => {
-    for (const renderer of this.renderers.values()) {
-      renderer.setVisibility(except.includes(renderer.id));
-    }
-  };
-
-  showObjects = (except: string[] = []) => {
-    for (const renderer of this.renderers.values()) {
-      renderer.setVisibility(!except.includes(renderer.id));
-    }
-  };
-
   /**
    * Determines if the objects in the renderer require a pixel bbox calculation.
    *

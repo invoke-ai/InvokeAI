@@ -15,20 +15,7 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const isBusy = useCanvasIsBusy();
   const isInteractable = useStore(adapter?.$isInteractable ?? $fallbackFalse);
-
-  const start = useCallback(() => {
-    if (!entityIdentifier) {
-      return;
-    }
-    if (!isTransformableEntityIdentifier(entityIdentifier)) {
-      return;
-    }
-    const adapter = canvasManager.getAdapter(entityIdentifier);
-    if (!adapter) {
-      return;
-    }
-    adapter.transformer.startTransform();
-  }, [entityIdentifier, canvasManager]);
+  const isEmpty = useStore(adapter?.$isEmpty ?? $fallbackFalse);
 
   const isDisabled = useMemo(() => {
     if (!entityIdentifier) {
@@ -46,8 +33,28 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
     if (!isInteractable) {
       return true;
     }
+    if (isEmpty) {
+      return true;
+    }
     return false;
-  }, [entityIdentifier, adapter, isBusy, isInteractable]);
+  }, [entityIdentifier, adapter, isBusy, isInteractable, isEmpty]);
+
+  const start = useCallback(() => {
+    if (isDisabled) {
+      return;
+    }
+    if (!entityIdentifier) {
+      return;
+    }
+    if (!isTransformableEntityIdentifier(entityIdentifier)) {
+      return;
+    }
+    const adapter = canvasManager.getAdapter(entityIdentifier);
+    if (!adapter) {
+      return;
+    }
+    adapter.transformer.startTransform();
+  }, [isDisabled, entityIdentifier, canvasManager]);
 
   return { isDisabled, start } as const;
 };

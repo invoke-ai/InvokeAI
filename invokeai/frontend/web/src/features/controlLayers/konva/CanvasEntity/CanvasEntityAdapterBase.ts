@@ -106,18 +106,15 @@ export abstract class CanvasEntityAdapterBase<
    */
   $isHidden = atom(false);
   /**
-   * Whether this entity has objects. This is computed based on the entity's objects.
+   * Whether this entity is empty. This is computed based on the entity's objects.
    */
-  $hasObjects = atom(false);
+  $isEmpty = atom(true);
   /**
    * Whether this entity is interactable. This is computed based on the entity's locked, disabled, and hidden states.
    */
-  $isInteractable = computed(
-    [this.$isLocked, this.$isDisabled, this.$isHidden, this.$hasObjects],
-    (isLocked, isDisabled, isHidden, hasObjects) => {
-      return !isLocked && !isDisabled && !isHidden && hasObjects;
-    }
-  );
+  $isInteractable = computed([this.$isLocked, this.$isDisabled, this.$isHidden], (isLocked, isDisabled, isHidden) => {
+    return !isLocked && !isDisabled && !isHidden;
+  });
 
   constructor(entityIdentifier: CanvasEntityIdentifier<T['type']>, manager: CanvasManager, adapterType: U) {
     super();
@@ -205,7 +202,7 @@ export abstract class CanvasEntityAdapterBase<
    * Synchronizes the entity's objects with the canvas.
    */
   syncObjects = async () => {
-    this.$hasObjects.set(this.state.objects.length > 0);
+    this.$isEmpty.set(this.state.objects.length === 0);
     const didRender = await this.renderer.render();
     if (didRender) {
       // If the objects have changed, we need to recalculate the transformer's bounding box.

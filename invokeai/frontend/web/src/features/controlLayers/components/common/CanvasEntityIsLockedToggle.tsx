@@ -1,6 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
 import { entityIsLockedToggled } from 'features/controlLayers/store/canvasSlice';
 import { memo, useCallback } from 'react';
@@ -11,6 +12,7 @@ export const CanvasEntityIsLockedToggle = memo(() => {
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
   const isLocked = useEntityIsLocked(entityIdentifier);
+  const isBusy = useCanvasIsBusy();
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
     dispatch(entityIsLockedToggled({ entityIdentifier }));
@@ -25,6 +27,7 @@ export const CanvasEntityIsLockedToggle = memo(() => {
       alignSelf="stretch"
       icon={isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}
       onClick={onClick}
+      isDisabled={isBusy}
     />
   );
 });

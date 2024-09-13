@@ -1,9 +1,6 @@
 import { IconButton, useShiftModifier } from '@invoke-ai/ui-library';
-import {
-  useIsSavingCanvas,
-  useSaveBboxToGallery,
-  useSaveCanvasToGallery,
-} from 'features/controlLayers/hooks/saveCanvasHooks';
+import { useSaveBboxToGallery, useSaveCanvasToGallery } from 'features/controlLayers/hooks/saveCanvasHooks';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFloppyDiskBold } from 'react-icons/pi';
@@ -11,7 +8,7 @@ import { PiFloppyDiskBold } from 'react-icons/pi';
 export const CanvasToolbarSaveToGalleryButton = memo(() => {
   const { t } = useTranslation();
   const shift = useShiftModifier();
-  const isSaving = useIsSavingCanvas();
+  const isBusy = useCanvasIsBusy();
   const saveCanvasToGallery = useSaveCanvasToGallery();
   const saveBboxToGallery = useSaveBboxToGallery();
 
@@ -20,9 +17,9 @@ export const CanvasToolbarSaveToGalleryButton = memo(() => {
       variant="ghost"
       onClick={shift ? saveBboxToGallery : saveCanvasToGallery}
       icon={<PiFloppyDiskBold />}
-      isLoading={isSaving.isTrue}
       aria-label={shift ? t('controlLayers.saveBboxToGallery') : t('controlLayers.saveCanvasToGallery')}
       tooltip={shift ? t('controlLayers.saveBboxToGallery') : t('controlLayers.saveCanvasToGallery')}
+      isDisabled={isBusy}
     />
   );
 });

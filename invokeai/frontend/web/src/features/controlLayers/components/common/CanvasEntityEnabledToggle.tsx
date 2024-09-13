@@ -1,6 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
 import { entityIsEnabledToggled } from 'features/controlLayers/store/canvasSlice';
 import { memo, useCallback } from 'react';
@@ -11,6 +12,7 @@ export const CanvasEntityEnabledToggle = memo(() => {
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
   const isEnabled = useEntityIsEnabled(entityIdentifier);
+  const isBusy = useCanvasIsBusy();
   const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
     dispatch(entityIsEnabledToggled({ entityIdentifier }));
@@ -25,6 +27,7 @@ export const CanvasEntityEnabledToggle = memo(() => {
       alignSelf="stretch"
       icon={isEnabled ? <PiCircleFill /> : <PiCircleBold />}
       onClick={onClick}
+      isDisabled={isBusy}
     />
   );
 });
