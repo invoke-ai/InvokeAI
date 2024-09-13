@@ -26,7 +26,8 @@ def test_concatenated_lora_linear_sidecar_layer():
     for out_features in sub_layer_out_features:
         down = torch.randn(rank, in_features)
         up = torch.randn(out_features, rank)
-        sub_layers.append(LoRALayer(up=up, mid=None, down=down, alpha=1.0, bias=None))
+        bias = torch.randn(out_features)
+        sub_layers.append(LoRALayer(up=up, mid=None, down=down, alpha=1.0, bias=bias))
     concatenated_lora_layer = ConcatenatedLoRALayer(sub_layers, concat_axis=0)
 
     # Patch the ConcatenatedLoRA layer into the linear layer.
@@ -34,6 +35,7 @@ def test_concatenated_lora_linear_sidecar_layer():
     linear_patched.weight.data += (
         concatenated_lora_layer.get_weight(linear_patched.weight) * concatenated_lora_layer.scale()
     )
+    linear_patched.bias.data += concatenated_lora_layer.get_bias(linear_patched.bias) * concatenated_lora_layer.scale()
 
     # Create a ConcatenatedLoRALinearSidecarLayer.
     concatenated_lora_linear_sidecar_layer = ConcatenatedLoRALinearSidecarLayer(concatenated_lora_layer, weight=1.0)

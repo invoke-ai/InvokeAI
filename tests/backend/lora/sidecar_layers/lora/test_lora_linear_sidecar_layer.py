@@ -20,12 +20,13 @@ def test_lora_linear_sidecar_layer():
     rank = 4
     down = torch.randn(rank, in_features)
     up = torch.randn(out_features, rank)
-    lora_layer = LoRALayer(up=up, mid=None, down=down, alpha=1.0, bias=None)
+    bias = torch.randn(out_features)
+    lora_layer = LoRALayer(up=up, mid=None, down=down, alpha=1.0, bias=bias)
 
     # Patch the LoRA layer into the linear layer.
     linear_patched = copy.deepcopy(linear)
     linear_patched.weight.data += lora_layer.get_weight(linear_patched.weight) * lora_layer.scale()
-
+    linear_patched.bias.data += lora_layer.get_bias(linear_patched.bias) * lora_layer.scale()
     # Create a LoRALinearSidecarLayer.
     lora_linear_sidecar_layer = LoRALinearSidecarLayer(lora_layer, weight=1.0)
     linear_with_sidecar = LoRASidecarModule(linear, [lora_linear_sidecar_layer])

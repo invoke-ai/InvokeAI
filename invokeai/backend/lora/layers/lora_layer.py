@@ -19,7 +19,6 @@ class LoRALayer(LoRALayerBase):
         self.up = up
         self.mid = mid
         self.down = down
-        self.bias = bias
 
     @classmethod
     def from_state_dict_values(
