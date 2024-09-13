@@ -325,10 +325,9 @@ export const konvaNodeToCanvas = (arg: { node: Konva.Node; rect?: Rect; bg?: str
 };
 
 /**
- * Converts a Konva node to a Blob
- * @param node - The Konva node to convert to a Blob
- * @param bbox - The bounding box to crop to
- * @returns A Promise that resolves with Blob of the node cropped to the bounding box
+ * Converts a HTMLCanvasElement to a Blob
+ * @param canvas - The canvas to convert to a Blob
+ * @returns A Promise that resolves to the Blob, or rejects if the conversion fails
  */
 export const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob> => {
   return new Promise((resolve, reject) => {
