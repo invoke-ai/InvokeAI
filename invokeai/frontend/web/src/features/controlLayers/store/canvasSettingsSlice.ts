@@ -60,6 +60,10 @@ type CanvasSettingsState = {
    * The snap-to-grid setting for the canvas.
    */
   snapToGrid: boolean;
+  /**
+   * Whether to show progress on the canvas when generating images.
+   */
+  showProgressOnCanvas: boolean;
   // TODO(psyche): These are copied from old canvas state, need to be implemented
   // imageSmoothing: boolean;
   // preserveMaskedArea: boolean;
@@ -79,6 +83,7 @@ const initialState: CanvasSettingsState = {
   compositeMaskedRegions: false,
   autoProcessFilter: true,
   snapToGrid: true,
+  showProgressOnCanvas: true,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -121,6 +126,9 @@ export const canvasSettingsSlice = createSlice({
     settingsSnapToGridToggled: (state) => {
       state.snapToGrid = !state.snapToGrid;
     },
+    settingsShowProgressOnCanvasToggled: (state) => {
+      state.showProgressOnCanvas = !state.showProgressOnCanvas;
+    },
   },
 });
 
@@ -137,6 +145,7 @@ export const {
   settingsCompositeMaskedRegionsChanged,
   settingsAutoProcessFilterToggled,
   settingsSnapToGridToggled,
+  settingsShowProgressOnCanvasToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -161,3 +170,4 @@ export const selectShowHUD = createCanvasSettingsSelector((settings) => settings
 export const selectAutoProcessFilter = createCanvasSettingsSelector((settings) => settings.autoProcessFilter);
 export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
 export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.sendToCanvas);
+export const selectShowProgressOnCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.showProgressOnCanvas);

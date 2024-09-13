@@ -1788,6 +1788,7 @@
         "replaceLayer": "Replace Layer",
         "pullBboxIntoLayer": "Pull Bbox into Layer",
         "pullBboxIntoIPAdapter": "Pull Bbox into IP Adapter",
+        "showProgressOnCanvas": "Show Progress on Canvas",
         "fill": {
             "fillColor": "Fill Color",
             "fillStyle": "Fill Style",
