@@ -5,6 +5,7 @@ import { selectDefaultControlAdapter } from 'features/controlLayers/hooks/addLay
 import {
   controlLayerAdded,
   entityRasterized,
+  entitySelected,
   ipaImageChanged,
   rasterLayerAdded,
   rgIPAdapterImageChanged,
@@ -127,6 +128,7 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
         const { x, y } = selectCanvasSlice(state).bbox.rect;
         dispatch(entityRasterized({ entityIdentifier, imageObject, position: { x, y }, replaceObjects: true }));
+        dispatch(entitySelected({ entityIdentifier }));
         return;
       }
 
