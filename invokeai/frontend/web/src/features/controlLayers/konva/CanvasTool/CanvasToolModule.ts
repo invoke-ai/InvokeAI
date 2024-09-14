@@ -106,10 +106,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.group.add(this.colorPickerToolPreview.konva.group);
 
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
-    this.subscriptions.add(this.manager.stateApi.$isTransforming.listen(this.render));
-    this.subscriptions.add(this.manager.stateApi.$isFiltering.listen(this.render));
+    this.subscriptions.add(this.manager.$isBusy.listen(this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSettingsSlice, this.render));
-    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.syncCursorStyle));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.render));
     this.subscriptions.add(
       this.$tool.listen(() => {
         // On tool switch, reset mouse state
