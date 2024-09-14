@@ -51,7 +51,7 @@ type CanvasSettingsState = {
    *
    * When `sendToCanvas` is disabled, this setting is ignored, masked regions will always be composited.
    */
-  compositeMaskedRegions: boolean;
+  outputOnlyMaskedRegions: boolean;
   /**
    * Whether to automatically process the filter when the filter configuration changes.
    */
@@ -88,7 +88,7 @@ const initialState: CanvasSettingsState = {
   invertScrollForToolWidth: false,
   color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
   sendToCanvas: false,
-  compositeMaskedRegions: false,
+  outputOnlyMaskedRegions: false,
   autoProcessFilter: true,
   snapToGrid: true,
   showProgressOnCanvas: true,
@@ -127,8 +127,8 @@ export const canvasSettingsSlice = createSlice({
     settingsSendToCanvasChanged: (state, action: PayloadAction<boolean>) => {
       state.sendToCanvas = action.payload;
     },
-    settingsCompositeMaskedRegionsChanged: (state, action: PayloadAction<boolean>) => {
-      state.compositeMaskedRegions = action.payload;
+    settingsOutputOnlyMaskedRegionsToggled: (state) => {
+      state.outputOnlyMaskedRegions = !state.outputOnlyMaskedRegions;
     },
     settingsAutoProcessFilterToggled: (state) => {
       state.autoProcessFilter = !state.autoProcessFilter;
@@ -158,7 +158,7 @@ export const {
   settingsColorChanged,
   settingsInvertScrollForToolWidthChanged,
   settingsSendToCanvasChanged,
-  settingsCompositeMaskedRegionsChanged,
+  settingsOutputOnlyMaskedRegionsToggled,
   settingsAutoProcessFilterToggled,
   settingsSnapToGridToggled,
   settingsShowProgressOnCanvasToggled,
@@ -184,6 +184,9 @@ const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState,
 
 export const selectAutoSave = createCanvasSettingsSelector((settings) => settings.autoSave);
 export const selectPreserveMask = createCanvasSettingsSelector((settings) => settings.preserveMask);
+export const selectOutputOnlyMaskedRegions = createCanvasSettingsSelector(
+  (settings) => settings.outputOnlyMaskedRegions
+);
 export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
 export const selectBboxOverlay = createCanvasSettingsSelector((settings) => settings.bboxOverlay);
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
