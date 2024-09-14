@@ -155,6 +155,13 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     return styles;
   }, [isUploadDisabled, minSize]);
 
+  const openInNewTab = useCallback(() => {
+    if (!imageDTO) {
+      return;
+    }
+    window.open(imageDTO.image_url, '_blank');
+  }, [imageDTO]);
+
   return (
     <ImageContextMenu imageDTO={imageDTO}>
       {(ref) => (
@@ -212,7 +219,12 @@ const IAIDndImage = (props: IAIDndImageProps) => {
           )}
           {!imageDTO && isUploadDisabled && noContentFallback}
           {imageDTO && !isDragDisabled && (
-            <IAIDraggable data={draggableData} disabled={isDragDisabled || !imageDTO} onClick={onClick} />
+            <IAIDraggable
+              data={draggableData}
+              disabled={isDragDisabled || !imageDTO}
+              onClick={onClick}
+              onAuxClick={openInNewTab}
+            />
           )}
           {children}
           {!isDropDisabled && <IAIDroppable data={droppableData} disabled={isDropDisabled} dropLabel={dropLabel} />}
