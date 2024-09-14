@@ -1,5 +1,5 @@
 import type { AlertStatus } from '@invoke-ai/ui-library';
-import { Alert, AlertDescription, AlertIcon, AlertTitle } from '@invoke-ai/ui-library';
+import { Alert, AlertIcon, AlertTitle } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -27,7 +27,6 @@ const $isFilteringFallback = atom(false);
 type AlertData = {
   status: AlertStatus;
   title: string;
-  description: string;
 };
 
 const CanvasAlertsSelectedEntityStatusContent = memo(({ entityIdentifier, adapter }: ContentProps) => {
@@ -52,48 +51,42 @@ const CanvasAlertsSelectedEntityStatusContent = memo(({ entityIdentifier, adapte
     if (isFiltering) {
       return {
         status: 'info',
-        title,
-        description: t('controlLayers.HUD.entityStatus.isFiltering'),
+        title: t('controlLayers.HUD.entityStatus.isFiltering', { title }),
       };
     }
 
     if (isTransforming) {
       return {
         status: 'info',
-        title,
-        description: t('controlLayers.HUD.entityStatus.isTransforming'),
+        title: t('controlLayers.HUD.entityStatus.isTransforming', { title }),
       };
     }
 
     if (isEmpty) {
       return {
         status: 'info',
-        title,
-        description: t('controlLayers.HUD.entityStatus.isEmpty'),
+        title: t('controlLayers.HUD.entityStatus.isEmpty', { title }),
       };
     }
 
     if (isHidden) {
       return {
         status: 'warning',
-        title,
-        description: t('controlLayers.HUD.entityStatus.isHidden'),
+        title: t('controlLayers.HUD.entityStatus.isHidden', { title }),
       };
     }
 
     if (isLocked) {
       return {
         status: 'warning',
-        title,
-        description: t('controlLayers.HUD.entityStatus.isLocked'),
+        title: t('controlLayers.HUD.entityStatus.isLocked', { title }),
       };
     }
 
     if (!isEnabled) {
       return {
         status: 'warning',
-        title,
-        description: t('controlLayers.HUD.entityStatus.isDisabled'),
+        title: t('controlLayers.HUD.entityStatus.isDisabled', { title }),
       };
     }
 
@@ -105,10 +98,9 @@ const CanvasAlertsSelectedEntityStatusContent = memo(({ entityIdentifier, adapte
   }
 
   return (
-    <Alert status={alert.status} borderRadius="base" fontSize="sm" shadow="md">
+    <Alert status={alert.status} borderRadius="base" fontSize="sm" shadow="md" w="fit-content" alignSelf="flex-end">
       <AlertIcon />
       <AlertTitle>{alert.title}</AlertTitle>
-      <AlertDescription>{alert.description}</AlertDescription>
     </Alert>
   );
 });
