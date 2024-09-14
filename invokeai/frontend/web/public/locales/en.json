@@ -1923,15 +1923,12 @@
             "scaledBbox": "Scaled Bbox",
             "autoSave": "Auto Save",
             "entityStatus": {
-                "selectedEntity": "Selected Entity",
-                "selectedEntityIs": "Selected Entity is",
-                "isFiltering": "is filtering",
-                "isTransforming": "is transforming",
-                "isLocked": "is locked",
-                "isHidden": "is hidden",
-                "isDisabled": "is disabled",
-                "isEmpty": "is empty",
-                "enabled": "Enabled"
+                "isFiltering": "{{title}} is filtering",
+                "isTransforming": "{{title}} is transforming",
+                "isLocked": "{{title}} is locked",
+                "isHidden": "{{title}} is hidden",
+                "isDisabled": "{{title}} is disabled",
+                "isEmpty": "{{title}} is empty"
             }
         }
     },

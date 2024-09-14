@@ -136,7 +136,16 @@ const AlertWrapper = ({
           onMouseEnter={isHovered.setTrue}
           onMouseLeave={isHovered.setFalse}
         >
-          <Alert status="warning" flexDir="column" pointerEvents="auto" borderRadius="base" fontSize="sm" shadow="md">
+          <Alert
+            status="warning"
+            flexDir="column"
+            pointerEvents="auto"
+            borderRadius="base"
+            fontSize="sm"
+            shadow="md"
+            w="fit-content"
+            alignSelf="flex-end"
+          >
             <Flex w="full" alignItems="center">
               <AlertIcon />
               <AlertTitle>{title}</AlertTitle>
