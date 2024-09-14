@@ -1,11 +1,12 @@
-import { Button } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { canvasReset } from 'features/controlLayers/store/canvasSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiTrashBold } from 'react-icons/pi';
 
-export const CanvasSettingsResetButton = memo(() => {
+export const CanvasToolbarResetCanvasButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const canvasManager = useCanvasManager();
@@ -14,10 +15,15 @@ export const CanvasSettingsResetButton = memo(() => {
     canvasManager.stage.fitLayersToStage();
   }, [canvasManager.stage, dispatch]);
   return (
-    <Button onClick={onClick} colorScheme="error" size="sm">
-      {t('controlLayers.resetCanvas')}
-    </Button>
+    <IconButton
+      aria-label={t('controlLayers.resetCanvas')}
+      tooltip={t('controlLayers.resetCanvas')}
+      onClick={onClick}
+      colorScheme="error"
+      icon={<PiTrashBold />}
+      variant="ghost"
+    />
   );
 });
 
-CanvasSettingsResetButton.displayName = 'CanvasSettingsResetButton';
+CanvasToolbarResetCanvasButton.displayName = 'CanvasToolbarResetCanvasButton';

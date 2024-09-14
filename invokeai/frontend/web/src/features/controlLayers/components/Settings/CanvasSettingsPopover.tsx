@@ -19,7 +19,6 @@ import { CanvasSettingsSnapToGridCheckbox } from 'features/controlLayers/compone
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
 import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
-import { CanvasSettingsResetButton } from 'features/controlLayers/components/Settings/CanvasSettingsResetButton';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
@@ -45,7 +44,6 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsShowProgressOnCanvas />
             <CanvasSettingsDynamicGridSwitch />
             <CanvasSettingsShowHUDSwitch />
-            <CanvasSettingsResetButton />
             <DebugSettings />
           </Flex>
         </PopoverBody>
