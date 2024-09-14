@@ -73,7 +73,7 @@ export class CanvasManager extends CanvasModuleBase {
   _isDebugging: boolean = false;
 
   /**
-   * Whether the canvas is currently busy with a transformation or filtering operation.
+   * Whether the canvas is currently busy with a transformation, filter, rasterization, staging or compositing operation.
    */
   $isBusy: Atom<boolean>;
 
@@ -104,25 +104,7 @@ export class CanvasManager extends CanvasModuleBase {
     this.entityRenderer = new CanvasEntityRendererModule(this);
 
     this.compositor = new CanvasCompositorModule(this);
-
-    this.background = new CanvasBackgroundModule(this);
-    this.stage.addLayer(this.background.konva.layer);
-
-    this.konva = {
-      previewLayer: new Konva.Layer({ listening: false, imageSmoothingEnabled: false }),
-    };
-    this.stage.addLayer(this.konva.previewLayer);
-
-    this.tool = new CanvasToolModule(this);
     this.stagingArea = new CanvasStagingAreaModule(this);
-    this.progressImage = new CanvasProgressImageModule(this);
-    this.bbox = new CanvasBboxModule(this);
-
-    // Must add in this order for correct z-index
-    this.konva.previewLayer.add(this.stagingArea.konva.group);
-    this.konva.previewLayer.add(this.progressImage.konva.group);
-    this.konva.previewLayer.add(this.bbox.konva.group);
-    this.konva.previewLayer.add(this.tool.konva.group);
 
     this.$isBusy = computed(
       [
@@ -136,6 +118,24 @@ export class CanvasManager extends CanvasModuleBase {
         return isFiltering || isTransforming || isRasterizing || isStaging || isCompositing;
       }
     );
+
+    this.background = new CanvasBackgroundModule(this);
+    this.stage.addLayer(this.background.konva.layer);
+
+    this.konva = {
+      previewLayer: new Konva.Layer({ listening: false, imageSmoothingEnabled: false }),
+    };
+    this.stage.addLayer(this.konva.previewLayer);
+
+    this.tool = new CanvasToolModule(this);
+    this.progressImage = new CanvasProgressImageModule(this);
+    this.bbox = new CanvasBboxModule(this);
+
+    // Must add in this order for correct z-index
+    this.konva.previewLayer.add(this.stagingArea.konva.group);
+    this.konva.previewLayer.add(this.progressImage.konva.group);
+    this.konva.previewLayer.add(this.bbox.konva.group);
+    this.konva.previewLayer.add(this.tool.konva.group);
   }
 
   getAdapter = <T extends CanvasEntityType = CanvasEntityType>(

@@ -366,6 +366,9 @@ export class CanvasStageModule extends CanvasModuleBase {
   };
 
   setCursor = (cursor: Property.Cursor) => {
+    if (this.container.style.cursor === cursor) {
+      return;
+    }
     this.container.style.cursor = cursor;
   };
 
