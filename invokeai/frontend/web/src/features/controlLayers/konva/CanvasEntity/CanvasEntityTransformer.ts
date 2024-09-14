@@ -229,6 +229,12 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       this.manager.stateApi.createStoreSubscription(selectSelectedEntityIdentifier, this.syncInteractionState)
     );
 
+    /**
+     * When the canvas global state changes, we need to update the transformer's interaction state. This implies
+     * a change to staging or some other global state that affects the transformer.
+     */
+    this.subscriptions.add(this.manager.$isBusy.listen(this.syncInteractionState));
+
     this.parent.konva.layer.add(this.konva.outlineRect);
     this.parent.konva.layer.add(this.konva.proxyRect);
     this.parent.konva.layer.add(this.konva.transformer);
@@ -458,6 +464,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
+
+    if (this.manager.$isBusy.get() && !this.$isTransforming.get()) {
+      // The canvas is busy, we can't interact with the transformer
+      this.parent.konva.layer.listening(false);
+      this._setInteractionMode('off');
+      return;
+    }
 
     // Not all entities have a filterer - only raster layer and control layer adapters
     if (this.parent.filterer?.$isFiltering.get()) {
