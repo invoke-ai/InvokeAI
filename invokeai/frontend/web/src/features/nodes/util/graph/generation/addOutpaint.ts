@@ -122,7 +122,9 @@ export const addOutpaint = async (
     g.addEdge(resizeOutputImageToOriginalSize, 'image', canvasPasteBack, 'generated_image');
     g.addEdge(resizeOutputMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
 
-    if (!canvasSettings.sendToCanvas || canvasSettings.compositeMaskedRegions) {
+    // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
+    // to canvas but not outputting only masked regions
+    if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
       canvasPasteBack.source_image = { image_name: initialImage.image_name };
     }
 
@@ -172,7 +174,9 @@ export const addOutpaint = async (
     g.addEdge(createGradientMask, 'expanded_mask_area', canvasPasteBack, 'mask');
     g.addEdge(l2i, 'image', canvasPasteBack, 'generated_image');
 
-    if (!canvasSettings.sendToCanvas || canvasSettings.compositeMaskedRegions) {
+    // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
+    // to canvas but not outputting only masked regions
+    if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
       canvasPasteBack.source_image = { image_name: initialImage.image_name };
     }
 
