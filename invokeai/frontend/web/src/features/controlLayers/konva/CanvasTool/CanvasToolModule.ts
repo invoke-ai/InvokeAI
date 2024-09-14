@@ -728,6 +728,23 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      config: this.config,
+      $tool: this.$tool.get(),
+      $toolBuffer: this.$toolBuffer.get(),
+      $isMouseDown: this.$isMouseDown.get(),
+      $cursorPos: this.$cursorPos.get(),
+      $colorUnderCursor: this.$colorUnderCursor.get(),
+      brushToolPreview: this.brushToolPreview.repr(),
+      eraserToolPreview: this.eraserToolPreview.repr(),
+      colorPickerToolPreview: this.colorPickerToolPreview.repr(),
+    };
+  };
+
   destroy = () => {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());

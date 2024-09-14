@@ -517,3 +517,17 @@ export const createReduxSubscription = <T, U>(
 
   return unsubscribe;
 };
+
+export const getKonvaNodeDebugAttrs = (node: Konva.Node) => {
+  return {
+    x: node.x(),
+    y: node.y(),
+    width: node.width(),
+    height: node.height(),
+    scaleX: node.scaleX(),
+    scaleY: node.scaleY(),
+    offsetX: node.offsetX(),
+    offsetY: node.offsetY(),
+    rotation: node.rotation(),
+  };
+};

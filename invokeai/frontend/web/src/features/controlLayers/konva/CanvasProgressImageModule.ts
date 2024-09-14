@@ -14,7 +14,6 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
   readonly manager: CanvasManager;
   readonly log: Logger;
 
-  progressImageId: string | null = null;
   konva: {
     group: Konva.Group;
     image: Konva.Image | null; // The image is loaded asynchronously, so it may not be available immediately

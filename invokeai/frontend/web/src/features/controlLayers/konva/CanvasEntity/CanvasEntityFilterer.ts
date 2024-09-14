@@ -229,4 +229,17 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
     return batch;
   };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      config: this.config,
+      $isFiltering: this.$isFiltering.get(),
+      $hasProcessed: this.$hasProcessed.get(),
+      $isProcessing: this.$isProcessing.get(),
+      $filterConfig: this.$filterConfig.get(),
+    };
+  };
 }
