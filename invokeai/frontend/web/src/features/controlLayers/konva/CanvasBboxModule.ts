@@ -88,14 +88,6 @@ export class CanvasBboxModule extends CanvasModuleBase {
         name: `${this.type}:overlayGroup`,
         listening: false,
         clipFunc: (ctx) => {
-          const stageAttrs = this.manager.stage.$stageAttrs.get();
-          const stageX = -stageAttrs.x / stageAttrs.scale;
-          const stageY = -stageAttrs.y / stageAttrs.scale;
-          const stageWidth = stageAttrs.width / stageAttrs.scale;
-          const stageHeight = stageAttrs.height / stageAttrs.scale;
-
-          const bboxRect = this.manager.stateApi.runSelector(selectBbox).rect;
-
           /**
            * We want to clip the overlay so that the bbox region shows through, but konva's clip clips everything
            * _outside_ the clip bounds. For example, if we used `overlayGroup.clip(bboxRect)`, we would be rendering
@@ -108,11 +100,15 @@ export class CanvasBboxModule extends CanvasModuleBase {
            *
            * Here's a good overview of winding rules: https://www.bit-101.com/2003/?p=3702
            */
+
+          const stageRect = this.manager.stage.getScaledStageRect();
+          const bboxRect = this.manager.stateApi.runSelector(selectBbox).rect;
+
           ctx.beginPath();
-          ctx.moveTo(stageX, stageY);
-          ctx.lineTo(stageX + stageWidth, stageY);
-          ctx.lineTo(stageX + stageWidth, stageY + stageHeight);
-          ctx.lineTo(stageX, stageY + stageHeight);
+          ctx.moveTo(stageRect.x, stageRect.y);
+          ctx.lineTo(stageRect.x + stageRect.width, stageRect.y);
+          ctx.lineTo(stageRect.x + stageRect.width, stageRect.y + stageRect.height);
+          ctx.lineTo(stageRect.x, stageRect.y + stageRect.height);
           ctx.closePath();
           ctx.moveTo(bboxRect.x, bboxRect.y);
           ctx.lineTo(bboxRect.x, bboxRect.y + bboxRect.height);

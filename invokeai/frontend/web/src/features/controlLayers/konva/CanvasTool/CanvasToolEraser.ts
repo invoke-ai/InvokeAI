@@ -96,8 +96,8 @@ export class CanvasToolEraser extends CanvasModuleBase {
     });
 
     // But the borders are in screen-pixels
-    const onePixel = this.manager.stage.getScaledPixels(1);
-    const twoPixels = this.manager.stage.getScaledPixels(2);
+    const onePixel = this.manager.stage.unscale(1);
+    const twoPixels = this.manager.stage.unscale(2);
 
     this.konva.innerBorder.setAttrs({
       x: cursorPos.x,

@@ -235,15 +235,12 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
 
     assert(this.konva.compositing, 'Missing compositing rect');
 
-    const { x, y, width, height, scale } = this.manager.stage.$stageAttrs.get();
+    const scale = this.manager.stage.unscale(1);
 
     this.konva.compositing.rect.setAttrs({
-      x: -x / scale,
-      y: -y / scale,
-      width: width / scale,
-      height: height / scale,
-      fillPatternScaleX: 1 / scale,
-      fillPatternScaleY: 1 / scale,
+      ...this.manager.stage.getScaledStageRect(),
+      fillPatternScaleX: scale,
+      fillPatternScaleY: scale,
     });
   };
 

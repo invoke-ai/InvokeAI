@@ -398,9 +398,10 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
     // and border
+    const padding = this.manager.stage.unscale(this.config.OUTLINE_PADDING);
     this.konva.outlineRect.setAttrs({
-      x: this.konva.proxyRect.x() - this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING),
-      y: this.konva.proxyRect.y() - this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING),
+      x: this.konva.proxyRect.x() - padding,
+      y: this.konva.proxyRect.y() - padding,
     });
 
     // The object group is translated by the difference between the interaction rect's new and old positions (which is
@@ -445,8 +446,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * @param bbox The bounding box of the parent entity
    */
   update = (position: Coordinate, bbox: Rect) => {
-    const onePixel = this.manager.stage.getScaledPixels(1);
-    const bboxPadding = this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING);
+    const onePixel = this.manager.stage.unscale(1);
+    const bboxPadding = this.manager.stage.unscale(this.config.OUTLINE_PADDING);
 
     this.konva.outlineRect.setAttrs({
       x: position.x + bbox.x - bboxPadding,
@@ -540,8 +541,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * Updates the transformer's scale. This is called when the stage is scaled.
    */
   syncScale = () => {
-    const onePixel = this.manager.stage.getScaledPixels(1);
-    const bboxPadding = this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING);
+    const onePixel = this.manager.stage.unscale(1);
+    const bboxPadding = this.manager.stage.unscale(this.config.OUTLINE_PADDING);
 
     this.konva.outlineRect.setAttrs({
       x: this.konva.proxyRect.x() - bboxPadding,

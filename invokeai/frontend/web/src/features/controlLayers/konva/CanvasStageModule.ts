@@ -356,13 +356,11 @@ export class CanvasStageModule extends CanvasModuleBase {
   }
 
   /**
-   * Scales a number of pixels by the current stage scale. For example, if the stage is scaled by 5, then 10 pixels
-   * would be scaled to 10px / 5 = 2 pixels.
-   * @param pixels The number of pixels to scale
-   * @returns The number of pixels scaled by the current stage scale
+   * Unscales a value by the current stage scale. For example, if the stage scale is 5, and you want to unscale 10
+   * pixels, would be scaled to 10px / 5 = 2 pixels.
    */
-  getScaledPixels = (pixels: number): number => {
-    return pixels / this.getScale();
+  unscale = (value: number): number => {
+    return value / this.getScale();
   };
 
   setCursor = (cursor: Property.Cursor) => {
@@ -378,6 +376,22 @@ export class CanvasStageModule extends CanvasModuleBase {
 
   addLayer = (layer: Konva.Layer) => {
     this.konva.stage.add(layer);
+  };
+
+  /**
+   * Gets the rectangle of the stage in the absolute coordinates. This can be used to draw a rect that covers the
+   * entire stage.
+   */
+  getScaledStageRect = (): Rect => {
+    const { x, y } = this.getPosition();
+    const { width, height } = this.getSize();
+    const scale = this.getScale();
+    return {
+      x: -x / scale,
+      y: -y / scale,
+      width: width / scale,
+      height: height / scale,
+    };
   };
 
   repr = () => {
