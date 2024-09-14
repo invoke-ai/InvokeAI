@@ -184,6 +184,15 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
     return 256;
   };
 
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      config: this.config,
+    };
+  };
+
   destroy = () => {
     this.log.trace('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());

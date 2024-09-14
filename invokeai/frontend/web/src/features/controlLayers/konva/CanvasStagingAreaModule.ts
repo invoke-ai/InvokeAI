@@ -124,6 +124,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       type: this.type,
       path: this.path,
       selectedImage: this.selectedImage,
+      $shouldShowStagedImage: this.$shouldShowStagedImage.get(),
+      $isStaging: this.$isStaging.get(),
     };
   };
 }

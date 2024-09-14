@@ -439,4 +439,16 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     this.manager.cache.generationModeCache.set(hash, generationMode);
     return generationMode;
   }
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      $isCompositing: this.$isCompositing.get(),
+      $isProcessing: this.$isProcessing.get(),
+      $isUploading: this.$isUploading.get(),
+      $isBusy: this.$isBusy.get(),
+    };
+  };
 }

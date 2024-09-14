@@ -267,9 +267,12 @@ export abstract class CanvasEntityAdapterBase<
       id: this.id,
       type: this.type,
       path: this.path,
+      entityIdentifier: this.entityIdentifier,
       state: deepClone(this.state),
       transformer: this.transformer.repr(),
       renderer: this.renderer.repr(),
+      bufferRenderer: this.bufferRenderer.repr(),
+      filterer: this.filterer?.repr(),
     };
   };
 }

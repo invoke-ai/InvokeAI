@@ -274,6 +274,7 @@ export class CanvasManager extends CanvasModuleBase {
       id: this.id,
       type: this.type,
       path: this.path,
+      $isBusy: this.$isBusy.get(),
       rasterLayers: Array.from(this.adapters.rasterLayers.values()).map((adapter) => adapter.repr()),
       controlLayers: Array.from(this.adapters.controlLayers.values()).map((adapter) => adapter.repr()),
       inpaintMasks: Array.from(this.adapters.inpaintMasks.values()).map((adapter) => adapter.repr()),
@@ -310,8 +311,11 @@ export class CanvasManager extends CanvasModuleBase {
   };
 
   logDebugInfo() {
+    /**
+     * We are logging the live manager instance here, so we cannot use the logger, which only accepts serializable
+     * objects.
+     */
     // eslint-disable-next-line no-console
-    console.log('Canvas manager', this);
-    this.log.debug({ manager: this.repr() }, 'Canvas manager');
+    console.log('Canvas manager', { managerInstance: this, managerInfo: this.repr() });
   }
 }

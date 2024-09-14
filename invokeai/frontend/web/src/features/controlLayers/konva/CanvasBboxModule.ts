@@ -6,7 +6,7 @@ import {
 } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect } from 'features/controlLayers/store/types';
@@ -239,13 +239,6 @@ export class CanvasBboxModule extends CanvasModuleBase {
     });
   };
 
-  destroy = () => {
-    this.log.trace('Destroying module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-    this.subscriptions.clear();
-    this.konva.group.destroy();
-  };
-
   /**
    * Handles the dragmove event on the bbox rect:
    * - Snaps the bbox position to the grid (determined by ctrl/meta key)
@@ -432,5 +425,26 @@ export class CanvasBboxModule extends CanvasModuleBase {
       x: roundToMultiple(newAbsPos.x, scaledGridSize) + offsetX,
       y: roundToMultiple(newAbsPos.y, scaledGridSize) + offsetY,
     };
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      aspectRatioBuffer: this.$aspectRatioBuffer.get(),
+      konva: {
+        group: getKonvaNodeDebugAttrs(this.konva.group),
+        proxyRect: getKonvaNodeDebugAttrs(this.konva.proxyRect),
+        transformer: getKonvaNodeDebugAttrs(this.konva.transformer),
+      },
+    };
+  };
+
+  destroy = () => {
+    this.log.trace('Destroying module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
+    this.konva.group.destroy();
   };
 }

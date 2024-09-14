@@ -11,6 +11,7 @@ import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/k
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
+  getKonvaNodeDebugAttrs,
   getPrefixedId,
   konvaNodeToBlob,
   konvaNodeToCanvas,
@@ -498,6 +499,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       path: this.path,
       parent: this.parent.id,
       renderers: Array.from(this.renderers.values()).map((renderer) => renderer.repr()),
+      konva: {
+        objectGroup: getKonvaNodeDebugAttrs(this.konva.objectGroup),
+      },
+      hasCache: this.$canvasCache.get() !== null,
     };
   };
 }

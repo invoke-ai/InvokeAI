@@ -1,7 +1,7 @@
 import type { Property } from 'csstype';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
+import { getKonvaNodeDebugAttrs, getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
 import type {
   CanvasEntityIdentifier,
   Coordinate,
@@ -378,6 +378,18 @@ export class CanvasStageModule extends CanvasModuleBase {
 
   addLayer = (layer: Konva.Layer) => {
     this.konva.stage.add(layer);
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      config: this.config,
+      konva: {
+        stage: getKonvaNodeDebugAttrs(this.konva.stage),
+      },
+    };
   };
 
   destroy = () => {

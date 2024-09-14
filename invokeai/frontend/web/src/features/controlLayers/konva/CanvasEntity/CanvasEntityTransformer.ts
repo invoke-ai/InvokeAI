@@ -2,7 +2,12 @@ import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
+import {
+  canvasToImageData,
+  getEmptyRect,
+  getKonvaNodeDebugAttrs,
+  getPrefixedId,
+} from 'features/controlLayers/konva/util';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -801,14 +806,20 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       id: this.id,
       type: this.type,
       path: this.path,
-      nodeRect: this.$nodeRect.get(),
-      pixelRect: this.$pixelRect.get(),
-      isPendingRectCalculation: this.$isPendingRectCalculation.get(),
-      isTransforming: this.$isTransforming.get(),
-      interactionMode: this.$interactionMode.get(),
-      isDragEnabled: this.$isDragEnabled.get(),
-      isTransformEnabled: this.$isTransformEnabled.get(),
-      isProcessing: this.$isProcessing.get(),
+      config: this.config,
+      $nodeRect: this.$nodeRect.get(),
+      $pixelRect: this.$pixelRect.get(),
+      $isPendingRectCalculation: this.$isPendingRectCalculation.get(),
+      $isTransforming: this.$isTransforming.get(),
+      $interactionMode: this.$interactionMode.get(),
+      $isDragEnabled: this.$isDragEnabled.get(),
+      $isTransformEnabled: this.$isTransformEnabled.get(),
+      $isProcessing: this.$isProcessing.get(),
+      konva: {
+        transformer: getKonvaNodeDebugAttrs(this.konva.transformer),
+        proxyRect: getKonvaNodeDebugAttrs(this.konva.proxyRect),
+        outlineRect: getKonvaNodeDebugAttrs(this.konva.outlineRect),
+      },
     };
   };
 
