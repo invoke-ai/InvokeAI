@@ -129,13 +129,7 @@ export class CanvasStageModule extends CanvasModuleBase {
 
     this.konva.stage.width(containerWidth);
     this.konva.stage.height(containerHeight);
-    this.$stageAttrs.set({
-      x: this.konva.stage.x(),
-      y: this.konva.stage.y(),
-      width: this.konva.stage.width(),
-      height: this.konva.stage.height(),
-      scale: this.konva.stage.scaleX(),
-    });
+    this.syncStageAttrs();
 
     if (shouldFitLayersAfterFittingStage) {
       this.fitLayersToStage();
@@ -215,12 +209,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       scaleY: scale,
     });
 
-    this.$stageAttrs.set({
-      ...this.$stageAttrs.get(),
-      x,
-      y,
-      scale,
-    });
+    this.syncStageAttrs({ x, y, scale });
   };
 
   /**
@@ -276,13 +265,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       scaleY: newScale,
     });
 
-    this.$stageAttrs.set({
-      x: Math.floor(this.konva.stage.x()),
-      y: Math.floor(this.konva.stage.y()),
-      width: this.konva.stage.width(),
-      height: this.konva.stage.height(),
-      scale: this.konva.stage.scaleX(),
-    });
+    this.syncStageAttrs();
   };
 
   onStageMouseWheel = (e: KonvaEventObject<WheelEvent>) => {
@@ -308,14 +291,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       return;
     }
 
-    this.$stageAttrs.set({
-      // Stage position should always be an integer, else we get fractional pixels which are blurry
-      x: Math.floor(this.konva.stage.x()),
-      y: Math.floor(this.konva.stage.y()),
-      width: this.konva.stage.width(),
-      height: this.konva.stage.height(),
-      scale: this.konva.stage.scaleX(),
-    });
+    this.syncStageAttrs();
   };
 
   onStageDragEnd = (e: KonvaEventObject<DragEvent>) => {
@@ -323,14 +299,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       return;
     }
 
-    this.$stageAttrs.set({
-      // Stage position should always be an integer, else we get fractional pixels which are blurry
-      x: Math.floor(this.konva.stage.x()),
-      y: Math.floor(this.konva.stage.y()),
-      width: this.konva.stage.width(),
-      height: this.konva.stage.height(),
-      scale: this.konva.stage.scaleX(),
-    });
+    this.syncStageAttrs();
   };
 
   /**
@@ -368,6 +337,17 @@ export class CanvasStageModule extends CanvasModuleBase {
       return;
     }
     this.container.style.cursor = cursor;
+  };
+
+  syncStageAttrs = (overrides?: Partial<StageAttrs>) => {
+    this.$stageAttrs.set({
+      x: this.konva.stage.x(),
+      y: this.konva.stage.y(),
+      width: this.konva.stage.width(),
+      height: this.konva.stage.height(),
+      scale: this.konva.stage.scaleX(),
+      ...overrides,
+    });
   };
 
   setIsDraggable = (isDraggable: boolean) => {
