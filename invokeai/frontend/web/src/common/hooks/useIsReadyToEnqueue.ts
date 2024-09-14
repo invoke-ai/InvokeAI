@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { $isConnected } from 'app/hooks/useSocketIO';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { $true } from 'app/store/nanostores/util';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
@@ -18,8 +19,6 @@ import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
-import type { ReadableAtom } from 'nanostores';
-import { atom } from 'nanostores';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
 
@@ -263,16 +262,14 @@ const createSelector = (
     }
   );
 
-const $fallbackTrue: ReadableAtom<true> = atom(true);
-
 export const useIsReadyToEnqueue = () => {
   const templates = useStore($templates);
   const isConnected = useStore($isConnected);
   const canvasManager = useCanvasManagerSafe();
-  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $fallbackTrue);
-  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $fallbackTrue);
-  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $fallbackTrue);
-  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $fallbackTrue);
+  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $true);
+  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $true);
+  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $true);
+  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
   const selector = useMemo(
     () =>
       createSelector(

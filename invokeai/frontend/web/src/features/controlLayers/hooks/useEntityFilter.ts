@@ -1,21 +1,18 @@
 import { useStore } from '@nanostores/react';
+import { $false } from 'app/store/nanostores/util';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { isFilterableEntityIdentifier } from 'features/controlLayers/store/types';
-import type { ReadableAtom } from 'nanostores';
-import { atom } from 'nanostores';
 import { useCallback, useMemo } from 'react';
-
-const $fallbackFalse: ReadableAtom<boolean> = atom(false);
 
 export const useEntityFilter = (entityIdentifier: CanvasEntityIdentifier | null) => {
   const canvasManager = useCanvasManager();
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const isBusy = useCanvasIsBusy();
-  const isInteractable = useStore(adapter?.$isInteractable ?? $fallbackFalse);
-  const isEmpty = useStore(adapter?.$isEmpty ?? $fallbackFalse);
+  const isInteractable = useStore(adapter?.$isInteractable ?? $false);
+  const isEmpty = useStore(adapter?.$isEmpty ?? $false);
 
   const isDisabled = useMemo(() => {
     if (!entityIdentifier) {

@@ -153,6 +153,6 @@ export const useEntityAdapter = (
   | CanvasEntityAdapterInpaintMask
   | CanvasEntityAdapterRegionalGuidance => {
   const adapter = useEntityAdapterSafe(entityIdentifier);
-  assert(adapter, 'useEntityAdapter must be used within a CanvasRasterLayerAdapterGate');
+  assert(adapter, 'useEntityAdapter must be used within a EntityAdapterContext');
   return adapter;
 };
