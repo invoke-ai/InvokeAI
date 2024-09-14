@@ -66,13 +66,13 @@ export const useImageActions = (image_name?: string) => {
   }, [dispatch, activeStylePresetId, t]);
 
   const recallAll = useCallback(() => {
-    parseAndRecallAllMetadata(metadata, activeTabName === 'generation');
+    parseAndRecallAllMetadata(metadata, activeTabName === 'canvas');
     clearStylePreset();
   }, [activeTabName, metadata, clearStylePreset]);
 
   const remix = useCallback(() => {
     // Recalls all metadata parameters except seed
-    parseAndRecallAllMetadata(metadata, activeTabName === 'generation', ['seed']);
+    parseAndRecallAllMetadata(metadata, activeTabName === 'canvas', ['seed']);
     clearStylePreset();
   }, [activeTabName, metadata, clearStylePreset]);
 

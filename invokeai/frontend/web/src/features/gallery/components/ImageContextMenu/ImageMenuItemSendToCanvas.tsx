@@ -31,7 +31,7 @@ export const ImageMenuItemSendToCanvas = memo(() => {
     };
     dispatch(sentImageToCanvas());
     dispatch(rasterLayerAdded({ overrides, isSelected: true }));
-    dispatch(setActiveTab('generation'));
+    dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
       id: 'SENT_TO_CANVAS',

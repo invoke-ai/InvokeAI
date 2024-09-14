@@ -156,7 +156,7 @@ AppContent.displayName = 'AppContent';
 const RightPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
 
-  if (tab === 'generation') {
+  if (tab === 'canvas') {
     return <CanvasRightPanel />;
   }
 
@@ -171,7 +171,7 @@ RightPanelContent.displayName = 'RightPanelContent';
 const LeftPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
 
-  if (tab === 'generation') {
+  if (tab === 'canvas') {
     return <ParametersPanelTextToImage />;
   }
   if (tab === 'upscaling') {
@@ -188,7 +188,7 @@ LeftPanelContent.displayName = 'LeftPanelContent';
 
 const MainPanelContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
-  if (tab === 'generation') {
+  if (tab === 'canvas') {
     return <CanvasMainPanelContent />;
   }
   if (tab === 'upscaling') {

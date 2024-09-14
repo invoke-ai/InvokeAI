@@ -68,7 +68,7 @@ export const useGlobalHotkeys = () => {
   useHotkeys(
     '1',
     () => {
-      dispatch(setActiveTab('generation'));
+      dispatch(setActiveTab('canvas'));
       addScope('canvas');
       removeScope('workflows');
     },
