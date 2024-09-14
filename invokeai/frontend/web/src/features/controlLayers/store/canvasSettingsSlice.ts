@@ -68,6 +68,10 @@ type CanvasSettingsState = {
    * Whether to show the bounding box overlay on the canvas.
    */
   bboxOverlay: boolean;
+  /**
+   * Whether to preserve the masked region instead of inpainting it.
+   */
+  preserveMask: boolean;
   // TODO(psyche): These are copied from old canvas state, need to be implemented
   // imageSmoothing: boolean;
   // preserveMaskedArea: boolean;
@@ -89,6 +93,7 @@ const initialState: CanvasSettingsState = {
   snapToGrid: true,
   showProgressOnCanvas: true,
   bboxOverlay: false,
+  preserveMask: false,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -137,6 +142,9 @@ export const canvasSettingsSlice = createSlice({
     settingsBboxOverlayToggled: (state) => {
       state.bboxOverlay = !state.bboxOverlay;
     },
+    settingsPreserveMaskToggled: (state) => {
+      state.preserveMask = !state.preserveMask;
+    },
   },
 });
 
@@ -155,6 +163,7 @@ export const {
   settingsSnapToGridToggled,
   settingsShowProgressOnCanvasToggled,
   settingsBboxOverlayToggled,
+  settingsPreserveMaskToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -174,6 +183,7 @@ const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState,
   createSelector(selectCanvasSettingsSlice, selector);
 
 export const selectAutoSave = createCanvasSettingsSelector((settings) => settings.autoSave);
+export const selectPreserveMask = createCanvasSettingsSelector((settings) => settings.preserveMask);
 export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
 export const selectBboxOverlay = createCanvasSettingsSelector((settings) => settings.bboxOverlay);
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);

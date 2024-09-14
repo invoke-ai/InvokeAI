@@ -1,13 +1,14 @@
 import { ContextMenu, Flex, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
+import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
+import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
+import { CanvasAlertsSendingToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import { CanvasContextMenuGlobalMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuGlobalMenuItems';
 import { CanvasContextMenuSelectedEntityMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuSelectedEntityMenuItems';
 import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea';
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
-import { CanvasSelectedEntityStatusAlert } from 'features/controlLayers/components/HUD/CanvasSelectedEntityStatusAlert';
-import { SendingToGalleryAlert } from 'features/controlLayers/components/HUD/CanvasSendingToGalleryAlert';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
 import { StagingAreaIsStagingGate } from 'features/controlLayers/components/StagingArea/StagingAreaIsStagingGate';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
@@ -82,8 +83,9 @@ export const CanvasMainPanelContent = memo(() => {
                 </Flex>
               )}
               <Flex flexDir="column" position="absolute" top={1} insetInlineEnd={1} pointerEvents="none" gap={2}>
-                <CanvasSelectedEntityStatusAlert />
-                <SendingToGalleryAlert />
+                <CanvasAlertsSelectedEntityStatus />
+                <CanvasAlertsPreserveMask />
+                <CanvasAlertsSendingToGallery />
               </Flex>
             </CanvasManagerProviderGate>
           </Flex>

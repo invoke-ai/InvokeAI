@@ -38,7 +38,7 @@ const ActivateImageViewerButton = (props: PropsWithChildren) => {
   );
 };
 
-export const SendingToGalleryAlert = () => {
+export const CanvasAlertsSendingToGallery = () => {
   const { t } = useTranslation();
   const destination = useCurrentDestination();
   const isVisible = useMemo(() => {
@@ -79,7 +79,7 @@ const ActivateCanvasButton = (props: PropsWithChildren) => {
   );
 };
 
-export const SendingToCanvasAlert = () => {
+export const CanvasAlertsSendingToCanvas = () => {
   const { t } = useTranslation();
   const destination = useCurrentDestination();
   const isVisible = useMemo(() => {

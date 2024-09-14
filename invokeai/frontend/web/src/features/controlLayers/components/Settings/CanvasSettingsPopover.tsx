@@ -19,6 +19,7 @@ import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/componen
 import { CanvasSettingsSnapToGridCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsGridSize';
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
 import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
+import { CanvasSettingsPreserveMaskCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPreserveMaskCheckbox';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
@@ -39,6 +40,7 @@ export const CanvasSettingsPopover = memo(() => {
           <Flex direction="column" gap={2}>
             <CanvasSettingsAutoSaveCheckbox />
             <CanvasSettingsInvertScrollCheckbox />
+            <CanvasSettingsPreserveMaskCheckbox />
             <CanvasSettingsClipToBboxCheckbox />
             <CanvasSettingsCompositeMaskedRegionsCheckbox />
             <CanvasSettingsSnapToGridCheckbox />
