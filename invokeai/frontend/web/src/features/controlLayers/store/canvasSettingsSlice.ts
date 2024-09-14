@@ -72,10 +72,6 @@ type CanvasSettingsState = {
    * Whether to preserve the masked region instead of inpainting it.
    */
   preserveMask: boolean;
-  // TODO(psyche): These are copied from old canvas state, need to be implemented
-  // imageSmoothing: boolean;
-  // preserveMaskedArea: boolean;
-  // cropToBboxOnSave: boolean;
 };
 
 const initialState: CanvasSettingsState = {
