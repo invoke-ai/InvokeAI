@@ -2,7 +2,7 @@ import { IconButton } from '@invoke-ai/ui-library';
 import { useQueueFront } from 'features/queue/hooks/useQueueFront';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AiFillThunderbolt } from 'react-icons/ai';
+import { PiLightningFill } from 'react-icons/pi';
 
 import { QueueButtonTooltip } from './QueueButtonTooltip';
 
@@ -16,7 +16,7 @@ const QueueFrontButton = () => {
         isDisabled={isDisabled}
         isLoading={isLoading}
         onClick={queueFront}
-        icon={<AiFillThunderbolt />}
+        icon={<PiLightningFill />}
         size="lg"
       />
     </QueueButtonTooltip>

@@ -9,7 +9,7 @@ import ShowStarredFirstCheckbox from 'features/gallery/components/GallerySetting
 import SortDirectionCombobox from 'features/gallery/components/GallerySettingsPopover/SortDirectionCombobox';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RiSettings4Fill } from 'react-icons/ri';
+import { PiGearSixFill } from 'react-icons/pi';
 
 const GallerySettingsPopover = () => {
   const { t } = useTranslation();
@@ -22,7 +22,7 @@ const GallerySettingsPopover = () => {
           variant="link"
           alignSelf="stretch"
           aria-label={t('gallery.gallerySettings')}
-          icon={<RiSettings4Fill />}
+          icon={<PiGearSixFill />}
         />
       </PopoverTrigger>
       <PopoverContent>

@@ -25,14 +25,14 @@ import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/S
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RiSettings4Fill } from 'react-icons/ri';
+import { PiGearSixFill } from 'react-icons/pi';
 
 export const CanvasSettingsPopover = memo(() => {
   const { t } = useTranslation();
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <IconButton aria-label={t('common.settingsLabel')} icon={<RiSettings4Fill />} variant="ghost" />
+        <IconButton aria-label={t('common.settingsLabel')} icon={<PiGearSixFill />} variant="ghost" />
       </PopoverTrigger>
       <PopoverContent>
         <PopoverArrow />

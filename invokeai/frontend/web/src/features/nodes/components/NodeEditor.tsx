@@ -10,7 +10,7 @@ import { LoadWorkflowFromGraphModal } from 'features/workflowLibrary/components/
 import { SaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/SaveWorkflowAsDialog';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MdDeviceHub } from 'react-icons/md';
+import { PiFlowArrowBold } from 'react-icons/pi';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 
 import { Flow } from './flow/Flow';
@@ -47,7 +47,7 @@ const NodeEditor = () => {
         </>
       )}
       <WorkflowEditorSettings />
-      {isLoading && <IAINoContentFallback label={t('nodes.loadingNodes')} icon={MdDeviceHub} />}
+      {isLoading && <IAINoContentFallback label={t('nodes.loadingNodes')} icon={PiFlowArrowBold} />}
     </Flex>
   );
 };
