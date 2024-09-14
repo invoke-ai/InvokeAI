@@ -199,10 +199,10 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
 
     const settings = this.manager.stateApi.getSettings();
     const colorUnderCursor = this.parent.$colorUnderCursor.get();
-    const colorPickerInnerRadius = this.manager.stage.getScaledPixels(this.config.RING_INNER_RADIUS);
-    const colorPickerOuterRadius = this.manager.stage.getScaledPixels(this.config.RING_OUTER_RADIUS);
-    const onePixel = this.manager.stage.getScaledPixels(1);
-    const twoPixels = this.manager.stage.getScaledPixels(2);
+    const colorPickerInnerRadius = this.manager.stage.unscale(this.config.RING_INNER_RADIUS);
+    const colorPickerOuterRadius = this.manager.stage.unscale(this.config.RING_OUTER_RADIUS);
+    const onePixel = this.manager.stage.unscale(1);
+    const twoPixels = this.manager.stage.unscale(2);
 
     this.konva.ringCandidateColor.setAttrs({
       x: cursorPos.x,
@@ -231,10 +231,10 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
       outerRadius: colorPickerOuterRadius + twoPixels,
     });
 
-    const size = this.manager.stage.getScaledPixels(this.config.CROSSHAIR_LINE_LENGTH);
-    const space = this.manager.stage.getScaledPixels(this.config.CROSSHAIR_INNER_RADIUS);
-    const innerThickness = this.manager.stage.getScaledPixels(this.config.CROSSHAIR_LINE_THICKNESS);
-    const outerThickness = this.manager.stage.getScaledPixels(
+    const size = this.manager.stage.unscale(this.config.CROSSHAIR_LINE_LENGTH);
+    const space = this.manager.stage.unscale(this.config.CROSSHAIR_INNER_RADIUS);
+    const innerThickness = this.manager.stage.unscale(this.config.CROSSHAIR_LINE_THICKNESS);
+    const outerThickness = this.manager.stage.unscale(
       this.config.CROSSHAIR_LINE_THICKNESS + this.config.CROSSHAIR_LINE_BORDER_THICKNESS * 2
     );
     this.konva.crosshairNorthOuter.setAttrs({

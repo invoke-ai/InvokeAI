@@ -15,7 +15,6 @@ import { StagingAreaToolbar } from 'features/controlLayers/components/StagingAre
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import { GatedImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import { memo, useCallback, useRef } from 'react';
@@ -64,17 +63,6 @@ export const CanvasMainPanelContent = memo(() => {
             bg={dynamicGrid ? 'base.850' : 'base.900'}
             borderRadius="base"
           >
-            {!dynamicGrid && (
-              <Flex
-                position="absolute"
-                borderRadius="base"
-                bgImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL}
-                top={0}
-                right={0}
-                bottom={0}
-                left={0}
-              />
-            )}
             <InvokeCanvasComponent />
             <CanvasManagerProviderGate>
               {showHUD && (

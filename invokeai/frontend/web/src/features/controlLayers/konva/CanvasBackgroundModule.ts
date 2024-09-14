@@ -1,6 +1,7 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectDynamicGrid } from 'features/controlLayers/store/canvasSettingsSlice';
 import Konva from 'konva';
@@ -9,17 +10,19 @@ import type { Logger } from 'roarr';
 type CanvasBackgroundModuleConfig = {
   GRID_LINE_COLOR_COARSE: string;
   GRID_LINE_COLOR_FINE: string;
+  CHECKERBOARD_PATTERN_DATAURL: string;
 };
 
 const DEFAULT_CONFIG: CanvasBackgroundModuleConfig = {
   GRID_LINE_COLOR_COARSE: getArbitraryBaseColor(27),
   GRID_LINE_COLOR_FINE: getArbitraryBaseColor(18),
+  CHECKERBOARD_PATTERN_DATAURL: TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL,
 };
 
 /**
- * Renders a background grid on the canvas, where the grid spacing changes based on the stage scale.
+ * Renders a background for the canvas - either a checkboard pattern or a grid.
  *
- * The grid is only visible when the dynamic grid setting is enabled.
+ * The grid is dynamic and changes based on the scale of the stage, while the checkboard pattern is static.
  */
 export class CanvasBackgroundModule extends CanvasModuleBase {
   readonly type = 'background';
@@ -33,12 +36,21 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
   config: CanvasBackgroundModuleConfig = DEFAULT_CONFIG;
 
   /**
+   * The checkboard pattern image used when the grid is disabled.
+   */
+  checkboardPattern = new Image();
+
+  /**
    * The Konva objects that make up the background grid:
    * - A layer to hold the grid lines
    * - An array of grid lines
+   * - A group to hold the grid lines
+   * - A rectangle to hold the checkboard pattern
    */
   konva: {
     layer: Konva.Layer;
+    patternRect: Konva.Rect;
+    linesGroup: Konva.Group;
     lines: Konva.Line[];
   };
 
@@ -52,10 +64,18 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
 
     this.log.debug('Creating module');
 
-    this.konva = { layer: new Konva.Layer({ name: `${this.type}:layer`, listening: false }), lines: [] };
+    this.konva = {
+      layer: new Konva.Layer({ name: `${this.type}:layer`, listening: false, imageSmoothingEnabled: false }),
+      linesGroup: new Konva.Group({ name: `${this.type}:linesGroup` }),
+      lines: [],
+      patternRect: new Konva.Rect({ name: `${this.type}:patternRect` }),
+    };
+
+    this.konva.layer.add(this.konva.patternRect);
+    this.konva.layer.add(this.konva.linesGroup);
 
     /**
-     * The background grid should be rendered when the stage attributes change:
+     * The background should be rendered when the stage attributes change:
      * - scale
      * - position
      * - size
@@ -63,28 +83,41 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
 
     /**
-     * The background grid should be rendered when the dynamic grid setting changes.
+     * The background should be rendered when the dynamic grid setting changes.
      */
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectDynamicGrid, this.render));
   }
 
   initialize = () => {
     this.log.debug('Initializing module');
+    this.checkboardPattern.onload = () => {
+      this.konva.patternRect.fillPatternImage(this.checkboardPattern);
+      this.render();
+    };
+    this.checkboardPattern.src = this.config.CHECKERBOARD_PATTERN_DATAURL;
     this.render();
   };
 
   /**
-   * Renders the background grid.
+   * Renders the background.
    */
   render = () => {
     const dynamicGrid = this.manager.stateApi.runSelector(selectDynamicGrid);
 
     if (!dynamicGrid) {
-      this.konva.layer.visible(false);
+      this.konva.linesGroup.visible(false);
+      const patternScale = this.manager.stage.unscale(1);
+      this.konva.patternRect.setAttrs({
+        visible: true,
+        ...this.manager.stage.getScaledStageRect(),
+        fillPatternScaleX: patternScale,
+        fillPatternScaleY: patternScale,
+      });
       return;
     }
 
-    this.konva.layer.visible(true);
+    this.konva.linesGroup.visible(true);
+    this.konva.patternRect.visible(false);
 
     const scale = this.manager.stage.getScale();
     const { x, y } = this.manager.stage.getPosition();
@@ -127,7 +160,7 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
     let _x = 0;
     let _y = 0;
 
-    this.konva.layer.destroyChildren();
+    this.konva.linesGroup.destroyChildren();
     this.konva.lines = [];
 
     for (let i = 0; i < xSteps; i++) {
@@ -141,7 +174,7 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
         listening: false,
       });
       this.konva.lines.push(line);
-      this.konva.layer.add(line);
+      this.konva.linesGroup.add(line);
     }
     for (let i = 0; i < ySteps; i++) {
       _y = gridFullRect.y1 + i * gridSpacing;
@@ -154,7 +187,7 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
         listening: false,
       });
       this.konva.lines.push(line);
-      this.konva.layer.add(line);
+      this.konva.linesGroup.add(line);
     }
   };
 
