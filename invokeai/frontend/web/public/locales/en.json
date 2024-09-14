@@ -1681,6 +1681,7 @@
         "mergeVisibleOk": "Merged visible layers",
         "mergeVisibleError": "Error merging visible layers",
         "clearHistory": "Clear History",
+        "bboxOverlay": "Show Bbox Overlay",
         "generateMode": "Generate",
         "generateModeDesc": "Create individual images. Generated images are added directly to the gallery.",
         "composeMode": "Compose",

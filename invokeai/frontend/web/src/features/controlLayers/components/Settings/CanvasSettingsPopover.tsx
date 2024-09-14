@@ -10,6 +10,7 @@ import {
   useShiftModifier,
 } from '@invoke-ai/ui-library';
 import { CanvasSettingsAutoSaveCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsAutoSaveCheckbox';
+import { CanvasSettingsBboxOverlaySwitch } from 'features/controlLayers/components/Settings/CanvasSettingsBboxOverlaySwitch';
 import { CanvasSettingsClearCachesButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearCachesButton';
 import { CanvasSettingsClearHistoryButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearHistoryButton';
 import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsClipToBboxCheckbox';
@@ -43,6 +44,7 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsSnapToGridCheckbox />
             <CanvasSettingsShowProgressOnCanvas />
             <CanvasSettingsDynamicGridSwitch />
+            <CanvasSettingsBboxOverlaySwitch />
             <CanvasSettingsShowHUDSwitch />
             <DebugSettings />
           </Flex>
