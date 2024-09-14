@@ -141,19 +141,21 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     if (tool === 'view') {
       stage.setCursor(isMouseDown ? 'grabbing' : 'grab');
-    } else if (this.manager.stateApi.getRenderedEntityCount() === 0) {
-      stage.setCursor('not-allowed');
     } else if (this.manager.stateApi.$isTransforming.get()) {
       stage.setCursor('default');
     } else if (this.manager.stateApi.$isFiltering.get()) {
       stage.setCursor('not-allowed');
     } else if (this.manager.stagingArea.$isStaging.get()) {
       stage.setCursor('not-allowed');
+    } else if (tool === 'bbox') {
+      stage.setCursor('default');
+    } else if (this.manager.stateApi.getRenderedEntityCount() === 0) {
+      stage.setCursor('not-allowed');
     } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.$isInteractable.get()) {
       stage.setCursor('not-allowed');
     } else if (tool === 'colorPicker' || tool === 'brush' || tool === 'eraser') {
       stage.setCursor('none');
-    } else if (tool === 'move' || tool === 'bbox') {
+    } else if (tool === 'move') {
       stage.setCursor('default');
     } else if (tool === 'rect') {
       stage.setCursor('crosshair');

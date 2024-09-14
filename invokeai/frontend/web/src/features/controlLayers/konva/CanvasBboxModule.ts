@@ -173,6 +173,9 @@ export class CanvasBboxModule extends CanvasModuleBase {
 
     // Listen for the bbox overlay setting to update the overlay's visibility
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectBboxOverlay, this.render));
+
+    // Update on busy state changes
+    this.subscriptions.add(this.manager.$isBusy.listen(this.render));
   }
 
   initialize = () => {
