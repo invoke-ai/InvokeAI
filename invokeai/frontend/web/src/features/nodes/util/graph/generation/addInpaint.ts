@@ -46,7 +46,7 @@ export const addInpaint = async (
       id: getPrefixedId('alpha_to_mask'),
       type: 'tomask',
       image: { image_name: maskImage.image_name },
-      invert: true,
+      invert: !canvasSettings.preserveMask,
     });
     const resizeMaskToScaledSize = g.addNode({
       id: getPrefixedId('resize_mask_to_scaled_size'),
@@ -115,7 +115,7 @@ export const addInpaint = async (
       id: getPrefixedId('alpha_to_mask'),
       type: 'tomask',
       image: { image_name: maskImage.image_name },
-      invert: true,
+      invert: !canvasSettings.preserveMask,
     });
     const createGradientMask = g.addNode({
       id: getPrefixedId('create_gradient_mask'),

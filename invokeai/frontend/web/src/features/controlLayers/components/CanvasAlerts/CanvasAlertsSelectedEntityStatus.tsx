@@ -30,7 +30,7 @@ type AlertData = {
   description: string;
 };
 
-const CanvasSelectedEntityStatusAlertContent = memo(({ entityIdentifier, adapter }: ContentProps) => {
+const CanvasAlertsSelectedEntityStatusContent = memo(({ entityIdentifier, adapter }: ContentProps) => {
   const { t } = useTranslation();
   const title = useEntityTitle(entityIdentifier);
   const selectIsEnabled = useMemo(
@@ -113,9 +113,9 @@ const CanvasSelectedEntityStatusAlertContent = memo(({ entityIdentifier, adapter
   );
 });
 
-CanvasSelectedEntityStatusAlertContent.displayName = 'CanvasSelectedEntityStatusAlertContent';
+CanvasAlertsSelectedEntityStatusContent.displayName = 'CanvasAlertsSelectedEntityStatusContent';
 
-export const CanvasSelectedEntityStatusAlert = memo(() => {
+export const CanvasAlertsSelectedEntityStatus = memo(() => {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const adapter = useEntityAdapterSafe(selectedEntityIdentifier);
 
@@ -123,7 +123,7 @@ export const CanvasSelectedEntityStatusAlert = memo(() => {
     return null;
   }
 
-  return <CanvasSelectedEntityStatusAlertContent entityIdentifier={selectedEntityIdentifier} adapter={adapter} />;
+  return <CanvasAlertsSelectedEntityStatusContent entityIdentifier={selectedEntityIdentifier} adapter={adapter} />;
 });
 
-CanvasSelectedEntityStatusAlert.displayName = 'CanvasSelectedEntityStatusAlert';
+CanvasAlertsSelectedEntityStatus.displayName = 'CanvasAlertsSelectedEntityStatus';

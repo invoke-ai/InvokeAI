@@ -43,7 +43,7 @@ export const addOutpaint = async (
       id: getPrefixedId('alpha_to_mask'),
       type: 'tomask',
       image: { image_name: maskImage.image_name },
-      invert: true,
+      invert: !canvasSettings.preserveMask,
     });
     const initialImageAlphaToMask = g.addNode({
       id: getPrefixedId('image_alpha_to_mask'),
@@ -135,7 +135,7 @@ export const addOutpaint = async (
       id: getPrefixedId('mask_alpha_to_mask'),
       type: 'tomask',
       image: { image_name: maskImage.image_name },
-      invert: true,
+      invert: !canvasSettings.preserveMask,
     });
     const initialImageAlphaToMask = g.addNode({
       id: getPrefixedId('image_alpha_to_mask'),

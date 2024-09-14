@@ -2,7 +2,7 @@ import { Box, Button, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus, useScopeOnMount } from 'common/hooks/interactionScopes';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { SendingToCanvasAlert } from 'features/controlLayers/components/HUD/CanvasSendingToGalleryAlert';
+import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
@@ -58,7 +58,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
       </Box>
       <ImageComparisonDroppable />
       <Box position="absolute" top={14} insetInlineEnd={2}>
-        <SendingToCanvasAlert />
+        <CanvasAlertsSendingToCanvas />
       </Box>
     </Flex>
   );
