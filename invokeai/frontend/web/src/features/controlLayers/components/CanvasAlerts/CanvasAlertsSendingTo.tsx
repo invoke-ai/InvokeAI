@@ -68,7 +68,7 @@ const ActivateCanvasButton = (props: PropsWithChildren) => {
   const dispatch = useAppDispatch();
   const imageViewer = useImageViewer();
   const onClick = useCallback(() => {
-    dispatch(setActiveTab('generation'));
+    dispatch(setActiveTab('canvas'));
     setRightPanelTabToLayers();
     imageViewer.close();
   }, [dispatch, imageViewer]);

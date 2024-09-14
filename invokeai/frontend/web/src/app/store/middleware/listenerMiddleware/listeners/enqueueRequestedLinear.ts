@@ -24,7 +24,7 @@ const log = logger('generation');
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) && action.payload.tabName === 'generation',
+      enqueueRequested.match(action) && action.payload.tabName === 'canvas',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
       const model = state.params.model;

@@ -20,7 +20,7 @@ const QueueControls = () => {
         {isPrependEnabled && <QueueFrontButton />}
         <InvokeQueueBackButton />
         <Spacer />
-        {tab === 'generation' && <SendToToggle />}
+        {tab === 'canvas' && <SendToToggle />}
         <ClearQueueIconButton />
       </Flex>
       <ProgressBar />

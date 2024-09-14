@@ -1,10 +1,10 @@
-export type TabName = 'generation' | 'upscaling' | 'workflows' | 'models' | 'queue';
+export type TabName = 'canvas' | 'upscaling' | 'workflows' | 'models' | 'queue';
 
 export interface UIState {
   /**
    * Slice schema version.
    */
-  _version: 2;
+  _version: 3;
   /**
    * The currently active tab.
    */
