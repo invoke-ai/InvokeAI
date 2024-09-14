@@ -64,6 +64,10 @@ type CanvasSettingsState = {
    * Whether to show progress on the canvas when generating images.
    */
   showProgressOnCanvas: boolean;
+  /**
+   * Whether to show the bounding box overlay on the canvas.
+   */
+  bboxOverlay: boolean;
   // TODO(psyche): These are copied from old canvas state, need to be implemented
   // imageSmoothing: boolean;
   // preserveMaskedArea: boolean;
@@ -84,6 +88,7 @@ const initialState: CanvasSettingsState = {
   autoProcessFilter: true,
   snapToGrid: true,
   showProgressOnCanvas: true,
+  bboxOverlay: false,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -129,6 +134,9 @@ export const canvasSettingsSlice = createSlice({
     settingsShowProgressOnCanvasToggled: (state) => {
       state.showProgressOnCanvas = !state.showProgressOnCanvas;
     },
+    settingsBboxOverlayToggled: (state) => {
+      state.bboxOverlay = !state.bboxOverlay;
+    },
   },
 });
 
@@ -146,6 +154,7 @@ export const {
   settingsAutoProcessFilterToggled,
   settingsSnapToGridToggled,
   settingsShowProgressOnCanvasToggled,
+  settingsBboxOverlayToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -166,6 +175,7 @@ const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState,
 
 export const selectAutoSave = createCanvasSettingsSelector((settings) => settings.autoSave);
 export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
+export const selectBboxOverlay = createCanvasSettingsSelector((settings) => settings.bboxOverlay);
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
 export const selectAutoProcessFilter = createCanvasSettingsSelector((settings) => settings.autoProcessFilter);
 export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
