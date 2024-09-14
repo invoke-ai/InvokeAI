@@ -5,7 +5,7 @@ import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiGearSixBold } from 'react-icons/pi';
+import { PiGearSixFill } from 'react-icons/pi';
 
 export const NavigateToModelManagerButton = memo((props: Omit<IconButtonProps, 'aria-label'>) => {
   const { t } = useTranslation();
@@ -22,7 +22,7 @@ export const NavigateToModelManagerButton = memo((props: Omit<IconButtonProps, '
 
   return (
     <IconButton
-      icon={<PiGearSixBold />}
+      icon={<PiGearSixFill />}
       tooltip={`${t('common.goTo')} ${t('ui.tabs.modelsTab')}`}
       aria-label={`${t('common.goTo')} ${t('ui.tabs.modelsTab')}`}
       onClick={handleClick}

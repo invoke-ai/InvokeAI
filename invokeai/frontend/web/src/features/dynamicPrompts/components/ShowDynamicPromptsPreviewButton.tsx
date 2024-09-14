@@ -8,7 +8,7 @@ import {
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BsBracesAsterisk } from 'react-icons/bs';
+import { PiBracketsCurlyBold } from 'react-icons/pi';
 
 const loadingStyles: SystemStyleObject = {
   svg: { animation: spinAnimation },
@@ -27,7 +27,7 @@ export const ShowDynamicPromptsPreviewButton = memo(() => {
         variant="promptOverlay"
         isDisabled={isOpen}
         aria-label={t('dynamicPrompts.showDynamicPrompts')}
-        icon={<BsBracesAsterisk />}
+        icon={<PiBracketsCurlyBold />}
         onClick={onOpen}
         sx={isLoading ? loadingStyles : undefined}
         colorScheme={isError && !isLoading ? 'error' : 'base'}

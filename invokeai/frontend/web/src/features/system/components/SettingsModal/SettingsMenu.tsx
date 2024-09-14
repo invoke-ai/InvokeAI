@@ -17,13 +17,14 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiBugBeetleBold,
+  PiGearSixFill,
   PiInfoBold,
   PiKeyboardBold,
   PiShareNetworkFill,
   PiToggleRightFill,
   PiUsersBold,
 } from 'react-icons/pi';
-import { RiDiscordFill, RiGithubFill, RiSettings4Line } from 'react-icons/ri';
+import { RiDiscordFill, RiGithubFill } from 'react-icons/ri';
 
 import { useSettingsModal } from './SettingsModal';
 import { SettingsUpsellMenuItem } from './SettingsUpsellMenuItem';
@@ -43,7 +44,7 @@ const SettingsMenu = () => {
         as={IconButton}
         variant="link"
         aria-label={t('accessibility.menu')}
-        icon={<RiSettings4Line fontSize={20} />}
+        icon={<PiGearSixFill fontSize={20} />}
         boxSize={8}
       />
       <Portal>

@@ -6,7 +6,7 @@ import { selectCanvasSlice, selectOptimalDimension } from 'features/controlLayer
 import { getIsSizeTooLarge, getIsSizeTooSmall } from 'features/parameters/util/optimalDimension';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RiSparklingFill } from 'react-icons/ri';
+import { PiSparkleFill } from 'react-icons/pi';
 
 const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);
 const selectHeight = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.height);
@@ -45,7 +45,7 @@ export const BboxSetOptimalSizeButton = memo(() => {
       onClick={onClick}
       variant="ghost"
       size="sm"
-      icon={<RiSparklingFill />}
+      icon={<PiSparkleFill />}
       colorScheme={isSizeTooSmall || isSizeTooLarge ? 'warning' : 'base'}
     />
   );
