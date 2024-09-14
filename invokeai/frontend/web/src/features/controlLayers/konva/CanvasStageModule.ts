@@ -380,6 +380,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       type: this.type,
       path: this.path,
       config: this.config,
+      $stageAttrs: this.$stageAttrs.get(),
       konva: {
         stage: getKonvaNodeDebugAttrs(this.konva.stage),
       },
