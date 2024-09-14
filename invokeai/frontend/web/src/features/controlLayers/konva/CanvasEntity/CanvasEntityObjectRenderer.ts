@@ -452,7 +452,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     if (attrs) {
       clone.setAttrs(attrs);
     }
-    clone.cache();
+    clone.cache({ pixelRatio: 1, imageSmoothingEnabled: false });
     return clone;
   };
 

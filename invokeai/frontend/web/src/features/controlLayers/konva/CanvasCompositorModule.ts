@@ -126,6 +126,8 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     const ctx = canvas.getContext('2d');
     assert(ctx !== null, 'Canvas 2D context is null');
 
+    ctx.imageSmoothingEnabled = false;
+
     for (const id of this.getCompositeRasterLayerEntityIds()) {
       const adapter = this.manager.adapters.rasterLayers.get(id);
       if (!adapter) {
@@ -287,6 +289,8 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     const ctx = canvas.getContext('2d');
     assert(ctx !== null);
+
+    ctx.imageSmoothingEnabled = false;
 
     for (const id of this.getCompositeInpaintMaskEntityIds()) {
       const adapter = this.manager.adapters.inpaintMasks.get(id);
