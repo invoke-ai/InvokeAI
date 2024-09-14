@@ -1,26 +1,26 @@
 import { MenuGroup, MenuItem } from '@invoke-ai/ui-library';
 import {
-  useSaveBboxAsControlLayer,
-  useSaveBboxAsGlobalIPAdapter,
-  useSaveBboxAsRasterLayer,
-  useSaveBboxAsRegionalGuidanceIPAdapter,
+  useNewControlLayerFromBbox,
+  useNewGlobalIPAdapterFromBbox,
+  useNewRasterLayerFromBbox,
+  useNewRegionalIPAdapterFromBbox,
   useSaveBboxToGallery,
   useSaveCanvasToGallery,
 } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFloppyDiskBold, PiShareFatBold } from 'react-icons/pi';
+import { PiFloppyDiskBold, PiStackPlusFill } from 'react-icons/pi';
 
 export const CanvasContextMenuGlobalMenuItems = memo(() => {
   const { t } = useTranslation();
   const isBusy = useCanvasIsBusy();
   const saveCanvasToGallery = useSaveCanvasToGallery();
   const saveBboxToGallery = useSaveBboxToGallery();
-  const saveBboxAsRegionalGuidanceIPAdapter = useSaveBboxAsRegionalGuidanceIPAdapter();
-  const saveBboxAsIPAdapter = useSaveBboxAsGlobalIPAdapter();
-  const saveBboxAsRasterLayer = useSaveBboxAsRasterLayer();
-  const saveBboxAsControlLayer = useSaveBboxAsControlLayer();
+  const saveBboxAsRegionalGuidanceIPAdapter = useNewRegionalIPAdapterFromBbox();
+  const saveBboxAsIPAdapter = useNewGlobalIPAdapterFromBbox();
+  const saveBboxAsRasterLayer = useNewRasterLayerFromBbox();
+  const saveBboxAsControlLayer = useNewControlLayerFromBbox();
 
   return (
     <MenuGroup title={t('controlLayers.canvas')}>
@@ -30,17 +30,17 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
       <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveBboxToGallery}>
         {t('controlLayers.saveBboxToGallery')}
       </MenuItem>
-      <MenuItem icon={<PiShareFatBold />} isDisabled={isBusy} onClick={saveBboxAsIPAdapter}>
-        {t('controlLayers.sendBboxToGlobalIPAdapter')}
+      <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={saveBboxAsIPAdapter}>
+        {t('controlLayers.newGlobalIPAdapterFromBbox')}
       </MenuItem>
-      <MenuItem icon={<PiShareFatBold />} isDisabled={isBusy} onClick={saveBboxAsRegionalGuidanceIPAdapter}>
-        {t('controlLayers.sendBboxToRegionalIPAdapter')}
+      <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={saveBboxAsRegionalGuidanceIPAdapter}>
+        {t('controlLayers.newRegionalIPAdapterFromBbox')}
       </MenuItem>
-      <MenuItem icon={<PiShareFatBold />} isDisabled={isBusy} onClick={saveBboxAsControlLayer}>
-        {t('controlLayers.sendBboxToControlLayer')}
+      <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={saveBboxAsControlLayer}>
+        {t('controlLayers.newControlLayerFromBbox')}
       </MenuItem>
-      <MenuItem icon={<PiShareFatBold />} isDisabled={isBusy} onClick={saveBboxAsRasterLayer}>
-        {t('controlLayers.sendBboxToRasterLayer')}
+      <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={saveBboxAsRasterLayer}>
+        {t('controlLayers.newRasterLayerFromBbox')}
       </MenuItem>
     </MenuGroup>
   );

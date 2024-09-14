@@ -73,23 +73,23 @@ const useSaveCanvas = ({ region, saveToGallery, onSave }: UseSaveCanvasArg) => {
   return saveCanvas;
 };
 
+const saveCanvasToGalleryArg: UseSaveCanvasArg = { region: 'canvas', saveToGallery: true };
 export const useSaveCanvasToGallery = () => {
-  const saveCanvasToGalleryArg = useMemo<UseSaveCanvasArg>(() => ({ region: 'canvas', saveToGallery: true }), []);
   const saveCanvasToGallery = useSaveCanvas(saveCanvasToGalleryArg);
   return saveCanvasToGallery;
 };
 
+const saveBboxToGalleryArg: UseSaveCanvasArg = { region: 'bbox', saveToGallery: true };
 export const useSaveBboxToGallery = () => {
-  const saveBboxToGalleryArg = useMemo<UseSaveCanvasArg>(() => ({ region: 'bbox', saveToGallery: true }), []);
   const saveBboxToGallery = useSaveCanvas(saveBboxToGalleryArg);
   return saveBboxToGallery;
 };
 
-export const useSaveBboxAsRegionalGuidanceIPAdapter = () => {
+export const useNewRegionalIPAdapterFromBbox = () => {
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
 
-  const saveBboxAsRegionalGuidanceIPAdapterArg = useMemo<UseSaveCanvasArg>(() => {
+  const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
       const ipAdapter: RegionalGuidanceIPAdapterConfig = {
         ...defaultIPAdapter,
@@ -105,15 +105,15 @@ export const useSaveBboxAsRegionalGuidanceIPAdapter = () => {
 
     return { region: 'bbox', saveToGallery: false, onSave };
   }, [defaultIPAdapter, dispatch]);
-  const saveBboxAsRegionalGuidanceIPAdapter = useSaveCanvas(saveBboxAsRegionalGuidanceIPAdapterArg);
-  return saveBboxAsRegionalGuidanceIPAdapter;
+  const newRegionalIPAdapterFromBbox = useSaveCanvas(arg);
+  return newRegionalIPAdapterFromBbox;
 };
 
-export const useSaveBboxAsGlobalIPAdapter = () => {
+export const useNewGlobalIPAdapterFromBbox = () => {
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
 
-  const saveBboxAsIPAdapterArg = useMemo<UseSaveCanvasArg>(() => {
+  const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
       const overrides: Partial<CanvasIPAdapterState> = {
         ipAdapter: {
@@ -126,13 +126,13 @@ export const useSaveBboxAsGlobalIPAdapter = () => {
 
     return { region: 'bbox', saveToGallery: false, onSave };
   }, [defaultIPAdapter, dispatch]);
-  const saveBboxAsIPAdapter = useSaveCanvas(saveBboxAsIPAdapterArg);
-  return saveBboxAsIPAdapter;
+  const newGlobalIPAdapterFromBbox = useSaveCanvas(arg);
+  return newGlobalIPAdapterFromBbox;
 };
 
-export const useSaveBboxAsRasterLayer = () => {
+export const useNewRasterLayerFromBbox = () => {
   const dispatch = useAppDispatch();
-  const saveBboxAsRasterLayerArg = useMemo<UseSaveCanvasArg>(() => {
+  const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, rect: Rect) => {
       const overrides: Partial<CanvasRasterLayerState> = {
         objects: [imageDTOToImageObject(imageDTO)],
@@ -143,15 +143,15 @@ export const useSaveBboxAsRasterLayer = () => {
 
     return { region: 'bbox', saveToGallery: false, onSave };
   }, [dispatch]);
-  const saveBboxAsRasterLayer = useSaveCanvas(saveBboxAsRasterLayerArg);
-  return saveBboxAsRasterLayer;
+  const newRasterLayerFromBbox = useSaveCanvas(arg);
+  return newRasterLayerFromBbox;
 };
 
-export const useSaveBboxAsControlLayer = () => {
+export const useNewControlLayerFromBbox = () => {
   const dispatch = useAppDispatch();
   const defaultControlAdapter = useAppSelector(selectDefaultControlAdapter);
 
-  const saveBboxAsControlLayerArg = useMemo<UseSaveCanvasArg>(() => {
+  const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, rect: Rect) => {
       const overrides: Partial<CanvasControlLayerState> = {
         objects: [imageDTOToImageObject(imageDTO)],
@@ -163,14 +163,14 @@ export const useSaveBboxAsControlLayer = () => {
 
     return { region: 'bbox', saveToGallery: false, onSave };
   }, [defaultControlAdapter, dispatch]);
-  const saveBboxAsControlLayer = useSaveCanvas(saveBboxAsControlLayerArg);
-  return saveBboxAsControlLayer;
+  const newControlLayerFromBbox = useSaveCanvas(arg);
+  return newControlLayerFromBbox;
 };
 
 export const usePullBboxIntoLayer = (entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer'>) => {
   const dispatch = useAppDispatch();
 
-  const pullBboxIntoLayerArg = useMemo<UseSaveCanvasArg>(() => {
+  const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, rect: Rect) => {
       dispatch(
         entityRasterized({
@@ -185,14 +185,14 @@ export const usePullBboxIntoLayer = (entityIdentifier: CanvasEntityIdentifier<'c
     return { region: 'bbox', saveToGallery: false, onSave };
   }, [dispatch, entityIdentifier]);
 
-  const pullBboxIntoLayer = useSaveCanvas(pullBboxIntoLayerArg);
+  const pullBboxIntoLayer = useSaveCanvas(arg);
   return pullBboxIntoLayer;
 };
 
 export const usePullBboxIntoIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'ip_adapter'>) => {
   const dispatch = useAppDispatch();
 
-  const pullBboxIntoIPAdapterArg = useMemo<UseSaveCanvasArg>(() => {
+  const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
       dispatch(ipaImageChanged({ entityIdentifier, imageDTO }));
     };
@@ -200,7 +200,7 @@ export const usePullBboxIntoIPAdapter = (entityIdentifier: CanvasEntityIdentifie
     return { region: 'bbox', saveToGallery: false, onSave };
   }, [dispatch, entityIdentifier]);
 
-  const pullBboxIntoIPAdapter = useSaveCanvas(pullBboxIntoIPAdapterArg);
+  const pullBboxIntoIPAdapter = useSaveCanvas(arg);
   return pullBboxIntoIPAdapter;
 };
 
@@ -210,7 +210,7 @@ export const usePullBboxIntoRegionalGuidanceIPAdapter = (
 ) => {
   const dispatch = useAppDispatch();
 
-  const pullBboxIntoRegionalGuidanceIPAdapterArg = useMemo<UseSaveCanvasArg>(() => {
+  const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
       dispatch(rgIPAdapterImageChanged({ entityIdentifier, ipAdapterId, imageDTO }));
     };
@@ -218,6 +218,6 @@ export const usePullBboxIntoRegionalGuidanceIPAdapter = (
     return { region: 'bbox', saveToGallery: false, onSave };
   }, [dispatch, entityIdentifier, ipAdapterId]);
 
-  const pullBboxIntoRegionalGuidanceIPAdapter = useSaveCanvas(pullBboxIntoRegionalGuidanceIPAdapterArg);
+  const pullBboxIntoRegionalGuidanceIPAdapter = useSaveCanvas(arg);
   return pullBboxIntoRegionalGuidanceIPAdapter;
 };
