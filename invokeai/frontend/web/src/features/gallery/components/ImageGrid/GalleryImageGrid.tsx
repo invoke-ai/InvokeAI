@@ -14,7 +14,7 @@ import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
 import { GALLERY_GRID_CLASS_NAME } from './constants';
-import GalleryImage, { GALLERY_IMAGE_CLASS_NAME } from './GalleryImage';
+import { GALLERY_IMAGE_CLASS_NAME, GalleryImage } from './GalleryImage';
 
 const GalleryImageGrid = () => {
   useGalleryHotkeys();
