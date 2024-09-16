@@ -1,4 +1,4 @@
-import { Box, Button, Flex } from '@invoke-ai/ui-library';
+import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus, useScopeOnMount } from 'common/hooks/interactionScopes';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
@@ -13,6 +13,7 @@ import type { ReactNode } from 'react';
 import { memo, useEffect, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
+import { PiXBold } from 'react-icons/pi';
 import { useMeasure } from 'react-use';
 
 import { useImageViewer } from './useImageViewer';
@@ -84,9 +85,13 @@ const ImageViewerCloseButton = memo(() => {
   useAssertSingleton('ImageViewerCloseButton');
   useHotkeys('esc', imageViewer.close);
   return (
-    <Button variant="ghost" onClick={imageViewer.close}>
-      {t('gallery.closeViewer')}
-    </Button>
+    <IconButton
+      tooltip={t('gallery.closeViewer')}
+      aria-label={t('gallery.closeViewer')}
+      icon={<PiXBold />}
+      variant="ghost"
+      onClick={imageViewer.close}
+    />
   );
 });
 
