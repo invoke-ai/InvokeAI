@@ -30,7 +30,9 @@ const IAIDroppable = (props: IAIDroppableProps) => {
       ref={setNodeRef}
       position="absolute"
       top={0}
-      insetInlineStart={0}
+      right={0}
+      bottom={0}
+      left={0}
       w="full"
       h="full"
       pointerEvents={active ? 'auto' : 'none'}
