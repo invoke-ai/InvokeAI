@@ -42,6 +42,14 @@ export type AddControlLayerFromImageDropData = BaseDropData & {
   actionType: 'ADD_CONTROL_LAYER_FROM_IMAGE';
 };
 
+export type AddRegionalReferenceImageFromImageDropData = BaseDropData & {
+  actionType: 'ADD_REGIONAL_REFERENCE_IMAGE_FROM_IMAGE';
+};
+
+export type AddGlobalReferenceImageFromImageDropData = BaseDropData & {
+  actionType: 'ADD_GLOBAL_REFERENCE_IMAGE_FROM_IMAGE';
+};
+
 export type ReplaceLayerImageDropData = BaseDropData & {
   actionType: 'REPLACE_LAYER_WITH_IMAGE';
   context: {
@@ -88,7 +96,9 @@ export type TypesafeDroppableData =
   | UpscaleInitialImageDropData
   | AddRasterLayerFromImageDropData
   | AddControlLayerFromImageDropData
-  | ReplaceLayerImageDropData;
+  | ReplaceLayerImageDropData
+  | AddRegionalReferenceImageFromImageDropData
+  | AddGlobalReferenceImageFromImageDropData;
 
 type BaseDragData = {
   id: string;
