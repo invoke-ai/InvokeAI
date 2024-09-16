@@ -1,4 +1,4 @@
-import { IconButton, Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import {
   useAddControlLayer,
   useAddInpaintMask,
@@ -31,21 +31,27 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
         data-testid="control-layers-add-layer-menu-button"
       />
       <MenuList>
-        <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask}>
-          {t('controlLayers.inpaintMask')}
-        </MenuItem>
-        <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance}>
-          {t('controlLayers.regionalGuidance')}
-        </MenuItem>
-        <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>
-          {t('controlLayers.rasterLayer')}
-        </MenuItem>
-        <MenuItem icon={<PiPlusBold />} onClick={addControlLayer}>
-          {t('controlLayers.controlLayer')}
-        </MenuItem>
-        <MenuItem icon={<PiPlusBold />} onClick={addIPAdapter}>
-          {t('controlLayers.globalIPAdapter')}
-        </MenuItem>
+        <MenuGroup title={t('controlLayers.global')}>
+          <MenuItem icon={<PiPlusBold />} onClick={addIPAdapter}>
+            {t('controlLayers.ipAdapter')}
+          </MenuItem>
+        </MenuGroup>
+        <MenuGroup title={t('controlLayers.regional')}>
+          <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask}>
+            {t('controlLayers.inpaintMask')}
+          </MenuItem>
+          <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance}>
+            {t('controlLayers.regionalGuidance')}
+          </MenuItem>
+        </MenuGroup>
+        <MenuGroup title={t('controlLayers.layer_other')}>
+          <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>
+            {t('controlLayers.rasterLayer')}
+          </MenuItem>
+          <MenuItem icon={<PiPlusBold />} onClick={addControlLayer}>
+            {t('controlLayers.controlLayer')}
+          </MenuItem>
+        </MenuGroup>
       </MenuList>
     </Menu>
   );
