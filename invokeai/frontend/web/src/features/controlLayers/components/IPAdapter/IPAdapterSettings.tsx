@@ -92,8 +92,8 @@ export const IPAdapterSettings = memo(() => {
 
   return (
     <CanvasEntitySettingsWrapper>
-      <Flex flexDir="column" gap={4} position="relative" w="full">
-        <Flex gap={3} alignItems="center" w="full">
+      <Flex flexDir="column" gap={2} position="relative" w="full">
+        <Flex gap={2} alignItems="center" w="full">
           <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
             <IPAdapterModel
               modelKey={ipAdapter.model?.key ?? null}
@@ -111,13 +111,13 @@ export const IPAdapterSettings = memo(() => {
             icon={<PiBoundingBoxBold />}
           />
         </Flex>
-        <Flex gap={4} w="full" alignItems="center">
-          <Flex flexDir="column" gap={3} w="full">
+        <Flex gap={2} w="full" alignItems="center">
+          <Flex flexDir="column" gap={2} w="full">
             <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
             <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
             <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
-          <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
+          <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
             <IPAdapterImagePreview
               image={ipAdapter.image ?? null}
               onChangeImage={onChangeImage}

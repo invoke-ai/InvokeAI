@@ -70,7 +70,7 @@ export const IPAdapterModel = memo(({ modelKey, onChangeModel, clipVisionModel, 
   );
 
   return (
-    <Flex gap={4}>
+    <Flex gap={2}>
       <Tooltip label={selectedModel?.description}>
         <FormControl isInvalid={!value || currentBaseModel !== selectedModel?.base} w="full">
           <Combobox
