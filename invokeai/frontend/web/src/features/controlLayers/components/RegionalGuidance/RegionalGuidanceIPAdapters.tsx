@@ -33,7 +33,7 @@ export const RegionalGuidanceIPAdapters = memo(() => {
       {ipAdapterIds.map((ipAdapterId, index) => (
         <Fragment key={ipAdapterId}>
           {index > 0 && <Divider />}
-          <RegionalGuidanceIPAdapterSettings referenceImageId={ipAdapterId} ipAdapterNumber={index + 1} />
+          <RegionalGuidanceIPAdapterSettings referenceImageId={ipAdapterId} />
         </Fragment>
       ))}
     </>

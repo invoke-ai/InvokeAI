@@ -56,7 +56,7 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
       case 'control_layer':
         return t('controlLayers.addControlLayer');
       case 'reference_image':
-        return t('controlLayers.addIPAdapter');
+        return t('controlLayers.addGlobalReferenceImage');
     }
   }, [type, t]);
 

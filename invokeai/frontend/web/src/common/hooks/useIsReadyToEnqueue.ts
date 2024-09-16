@@ -23,7 +23,7 @@ import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
 
 const LAYER_TYPE_TO_TKEY = {
-  reference_image: 'controlLayers.ipAdapter',
+  reference_image: 'controlLayers.referenceImage',
   inpaint_mask: 'controlLayers.inpaintMask',
   regional_guidance: 'controlLayers.regionalGuidance',
   raster_layer: 'controlLayers.raster',

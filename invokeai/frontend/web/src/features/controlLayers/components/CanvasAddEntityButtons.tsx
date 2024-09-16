@@ -34,7 +34,7 @@ export const CanvasAddEntityButtons = memo(() => {
           {t('controlLayers.controlLayer')}
         </Button>
         <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addIPAdapter}>
-          {t('controlLayers.ipAdapter')}
+          {t('controlLayers.globalReferenceImage')}
         </Button>
       </ButtonGroup>
     </Flex>
