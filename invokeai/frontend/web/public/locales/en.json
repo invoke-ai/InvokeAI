@@ -1630,6 +1630,7 @@
         "enableAutoNegative": "Enable Auto Negative",
         "disableAutoNegative": "Disable Auto Negative",
         "deletePrompt": "Delete Prompt",
+        "deleteReferenceImage": "Delete Reference Image",
         "resetRegion": "Reset Region",
         "debugLayers": "Debug Layers",
         "showHUD": "Show HUD",

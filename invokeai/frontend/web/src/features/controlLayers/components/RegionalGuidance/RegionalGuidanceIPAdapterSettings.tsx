@@ -23,7 +23,7 @@ import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store
 import type { RGIPAdapterImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBoundingBoxBold, PiTrashSimpleBold } from 'react-icons/pi';
+import { PiBoundingBoxBold, PiTrashSimpleFill } from 'react-icons/pi';
 import type { ImageDTO, IPAdapterModelConfig, RGIPAdapterImagePostUploadAction } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -115,10 +115,12 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
         <Spacer />
         <IconButton
           size="sm"
-          icon={<PiTrashSimpleBold />}
-          aria-label="Delete IP Adapter"
+          variant="link"
+          alignSelf="stretch"
+          icon={<PiTrashSimpleFill />}
+          tooltip={t('controlLayers.deleteReferenceImage')}
+          aria-label={t('controlLayers.deleteReferenceImage')}
           onClick={onDeleteIPAdapter}
-          variant="ghost"
           colorScheme="error"
         />
       </Flex>
