@@ -1852,7 +1852,7 @@
                 "off": "Off"
             },
             "preserveMask": {
-                "label": "Preserve Mask Region",
+                "label": "Preserve Masked Region",
                 "alert": "Preserving Masked Region"
             }
         },
