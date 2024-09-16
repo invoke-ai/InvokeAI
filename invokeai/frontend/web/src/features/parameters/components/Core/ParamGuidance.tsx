@@ -1,5 +1,6 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { selectGuidance, setGuidance } from 'features/controlLayers/store/paramsSlice';
 import { selectGuidanceConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -22,7 +23,9 @@ const ParamGuidance = () => {
 
   return (
     <FormControl>
-      <FormLabel>{t('parameters.guidance')}</FormLabel>
+      <InformationalPopover feature="paramGuidance">
+        <FormLabel>{t('parameters.guidance')}</FormLabel>
+      </InformationalPopover>
       <CompositeSlider
         value={guidance}
         defaultValue={config.initial}
