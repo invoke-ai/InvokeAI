@@ -14,8 +14,8 @@ export const CanvasEntityList = memo(() => {
         <IPAdapterList />
         <InpaintMaskList />
         <RegionalGuidanceEntityList />
-        <RasterLayerEntityList />
         <ControlLayerEntityList />
+        <RasterLayerEntityList />
       </Flex>
     </ScrollableContent>
   );
