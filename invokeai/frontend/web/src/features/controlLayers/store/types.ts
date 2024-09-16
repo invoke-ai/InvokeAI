@@ -1,5 +1,4 @@
 import type { SerializableObject } from 'common/types';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/Bbox/types';
 import type { ParameterHeight, ParameterLoRAModel, ParameterWidth } from 'features/parameters/types/parameterSchemas';
@@ -211,51 +210,6 @@ const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
   controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig]),
 });
 export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
-
-export const initialControlNet: ControlNetConfig = {
-  type: 'controlnet',
-  model: null,
-  weight: 1,
-  beginEndStepPct: [0, 1],
-  controlMode: 'balanced',
-};
-
-export const initialT2IAdapter: T2IAdapterConfig = {
-  type: 't2i_adapter',
-  model: null,
-  weight: 1,
-  beginEndStepPct: [0, 1],
-};
-
-export const initialIPAdapter: IPAdapterConfig = {
-  type: 'ip_adapter',
-  image: null,
-  model: null,
-  beginEndStepPct: [0, 1],
-  method: 'full',
-  clipVisionModel: 'ViT-H',
-  weight: 1,
-};
-
-export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO): ImageWithDims => ({
-  image_name,
-  width,
-  height,
-});
-
-export const imageDTOToImageObject = (imageDTO: ImageDTO, overrides?: Partial<CanvasImageState>): CanvasImageState => {
-  const { width, height, image_name } = imageDTO;
-  return {
-    id: getPrefixedId('image'),
-    type: 'image',
-    image: {
-      image_name,
-      width,
-      height,
-    },
-    ...overrides,
-  };
-};
 
 const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
 export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;

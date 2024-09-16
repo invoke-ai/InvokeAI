@@ -12,7 +12,7 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasControlLayerState, CanvasRasterLayerState } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';

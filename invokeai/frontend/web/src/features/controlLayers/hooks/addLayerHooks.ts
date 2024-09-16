@@ -20,7 +20,7 @@ import type {
   IPAdapterConfig,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
-import { initialControlNet, initialIPAdapter, initialT2IAdapter } from 'features/controlLayers/store/types';
+import { initialControlNet, initialIPAdapter, initialT2IAdapter } from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback } from 'react';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';

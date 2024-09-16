@@ -7,7 +7,7 @@ import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityTypeCount } from 'features/controlLayers/hooks/useEntityTypeCount';
 import { inpaintMaskAdded, rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

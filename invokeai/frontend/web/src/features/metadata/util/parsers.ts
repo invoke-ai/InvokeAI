@@ -8,13 +8,13 @@ import type {
   CanvasRegionalGuidanceState,
   LoRA,
 } from 'features/controlLayers/store/types';
+import { zCanvasRasterLayerState } from 'features/controlLayers/store/types';
 import {
   imageDTOToImageWithDims,
   initialControlNet,
   initialIPAdapter,
   initialT2IAdapter,
-  zCanvasRasterLayerState,
-} from 'features/controlLayers/store/types';
+} from 'features/controlLayers/store/util';
 import type {
   ControlNetConfigMetadata,
   IPAdapterConfigMetadata,

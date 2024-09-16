@@ -19,7 +19,7 @@ import {
   previewBlob,
 } from 'features/controlLayers/konva/util';
 import type { Rect } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import { debounce } from 'lodash-es';

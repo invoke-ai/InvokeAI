@@ -23,7 +23,7 @@ import type {
   Rect,
   RegionalGuidanceReferenceImageState,
 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

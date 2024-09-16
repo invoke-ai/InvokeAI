@@ -9,7 +9,7 @@ import { selectAutoProcessFilter } from 'features/controlLayers/store/canvasSett
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { getFilterForModel, IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import type { CanvasImageState } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { debounce } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
