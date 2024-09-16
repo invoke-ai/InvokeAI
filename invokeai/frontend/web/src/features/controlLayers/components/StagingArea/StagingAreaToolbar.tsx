@@ -22,7 +22,6 @@ import {
   PiEyeBold,
   PiEyeSlashBold,
   PiFloppyDiskBold,
-  PiStackPlusBold,
   PiTrashSimpleBold,
   PiXBold,
 } from 'react-icons/pi';
@@ -179,14 +178,6 @@ export const StagingAreaToolbar = memo(() => {
           onClick={onSaveStagingImage}
           colorScheme="invokeBlue"
           isDisabled={!selectedImage || !selectedImage.imageDTO.is_intermediate}
-        />
-        <IconButton
-          tooltip={`${t('unifiedCanvas.saveToGallery')} (Shift+S)`}
-          aria-label={t('unifiedCanvas.saveToGallery')}
-          icon={<PiStackPlusBold />}
-          onClick={onSaveStagingImage}
-          colorScheme="invokeBlue"
-          isDisabled={!selectedImage}
         />
         <IconButton
           tooltip={`${t('unifiedCanvas.discardCurrent')}`}
