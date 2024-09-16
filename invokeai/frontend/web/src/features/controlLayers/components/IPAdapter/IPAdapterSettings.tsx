@@ -106,8 +106,8 @@ export const IPAdapterSettings = memo(() => {
             onClick={pullBboxIntoIPAdapter}
             isDisabled={isBusy}
             variant="ghost"
-            aria-label={t('controlLayers.pullBboxIntoIPAdapter')}
-            tooltip={t('controlLayers.pullBboxIntoIPAdapter')}
+            aria-label={t('controlLayers.pullBboxIntoReferenceImage')}
+            tooltip={t('controlLayers.pullBboxIntoReferenceImage')}
             icon={<PiBoundingBoxBold />}
           />
         </Flex>
