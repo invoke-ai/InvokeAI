@@ -89,7 +89,7 @@ const getInitialState = (): CanvasState => {
       isHidden: false,
       entities: [initialInpaintMaskState],
     },
-    regions: {
+    regionalGuidance: {
       isHidden: false,
       entities: [],
     },
@@ -425,7 +425,7 @@ export const canvasSlice = createSlice({
 
         const entityState = getRegionalGuidanceState(id, overrides);
 
-        state.regions.entities.push(entityState);
+        state.regionalGuidance.entities.push(entityState);
 
         if (isSelected) {
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
@@ -437,7 +437,7 @@ export const canvasSlice = createSlice({
     },
     rgRecalled: (state, action: PayloadAction<{ data: CanvasRegionalGuidanceState }>) => {
       const { data } = action.payload;
-      state.regions.entities.push(data);
+      state.regionalGuidance.entities.push(data);
       state.selectedEntityIdentifier = { type: 'regional_guidance', id: data.id };
     },
     rgPositivePromptChanged: (
@@ -817,7 +817,7 @@ export const canvasSlice = createSlice({
           break;
         case 'regional_guidance':
           newEntity.id = getPrefixedId('regional_guidance');
-          state.regions.entities.push(newEntity);
+          state.regionalGuidance.entities.push(newEntity);
           break;
         case 'reference_image':
           newEntity.id = getPrefixedId('reference_image');
@@ -961,7 +961,9 @@ export const canvasSlice = createSlice({
           state.controlLayers.entities = state.controlLayers.entities.filter((rg) => rg.id !== entityIdentifier.id);
           break;
         case 'regional_guidance':
-          state.regions.entities = state.regions.entities.filter((rg) => rg.id !== entityIdentifier.id);
+          state.regionalGuidance.entities = state.regionalGuidance.entities.filter(
+            (rg) => rg.id !== entityIdentifier.id
+          );
           break;
         case 'reference_image':
           state.referenceImages.entities = state.referenceImages.entities.filter((rg) => rg.id !== entityIdentifier.id);
@@ -1030,7 +1032,7 @@ export const canvasSlice = createSlice({
           state.inpaintMasks.isHidden = !state.inpaintMasks.isHidden;
           break;
         case 'regional_guidance':
-          state.regions.isHidden = !state.regions.isHidden;
+          state.regionalGuidance.isHidden = !state.regionalGuidance.isHidden;
           break;
         case 'reference_image':
           // no-op

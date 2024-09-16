@@ -261,7 +261,7 @@ export type CanvasState = {
     isHidden: boolean;
     entities: CanvasControlLayerState[];
   };
-  regions: {
+  regionalGuidance: {
     isHidden: boolean;
     entities: CanvasRegionalGuidanceState[];
   };

@@ -16,7 +16,7 @@ export const useEntityTypeIsHidden = (type: CanvasEntityIdentifier['type']): boo
           case 'inpaint_mask':
             return canvas.inpaintMasks.isHidden;
           case 'regional_guidance':
-            return canvas.regions.isHidden;
+            return canvas.regionalGuidance.isHidden;
           case 'reference_image':
           default:
             return false;

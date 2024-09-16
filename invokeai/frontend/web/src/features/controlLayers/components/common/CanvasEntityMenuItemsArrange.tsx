@@ -31,8 +31,8 @@ const getIndexAndCount = (
     };
   } else if (type === 'regional_guidance') {
     return {
-      index: canvas.regions.entities.findIndex((entity) => entity.id === id),
-      count: canvas.regions.entities.length,
+      index: canvas.regionalGuidance.entities.findIndex((entity) => entity.id === id),
+      count: canvas.regionalGuidance.entities.length,
     };
   } else if (type === 'inpaint_mask') {
     return {
