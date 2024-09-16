@@ -19,6 +19,7 @@ set INSTRUCTIONS=https://invoke-ai.github.io/InvokeAI/installation/INSTALL_AUTOM
 set TROUBLESHOOTING=https://invoke-ai.github.io/InvokeAI/help/FAQ/
 set PYTHON_URL=https://www.python.org/downloads/windows/
 set MINIMUM_PYTHON_VERSION=3.10.0
+set MAXIMUM_PYTHON_VERSION=3.11.100
 set PYTHON_URL=https://www.python.org/downloads/release/python-3109/
 
 set err_msg=An error has occurred and the script could not continue.
@@ -57,6 +58,12 @@ if "%python_version%" == "" (
 call :compareVersions %MINIMUM_PYTHON_VERSION% %python_version%
 if %errorlevel% == 1 (
    set err_msg=Your version of Python is too low. You need at least %MINIMUM_PYTHON_VERSION% but you have %python_version%. We recommend Python 3.10.12 from %PYTHON_URL%
+   goto err_exit
+)
+
+call :compareVersions %python_version% %MAXIMUM_PYTHON_VERSION%
+if %errorlevel% == 1 (
+   set err_msg=Your version of Python is too high. You need %MAXIMUM_PYTHON_VERSION% but you have %python_version%. We recommend Python 3.10.12 from %PYTHON_URL%
    goto err_exit
 )
 
