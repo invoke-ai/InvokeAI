@@ -7,7 +7,8 @@ import {
   selectCanvasStagingAreaSlice,
   stagingAreaStartedStaging,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { imageDTOToImageWithDims, type StagingAreaImage } from 'features/controlLayers/store/types';
+import type { StagingAreaImage } from 'features/controlLayers/store/types';
+import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';

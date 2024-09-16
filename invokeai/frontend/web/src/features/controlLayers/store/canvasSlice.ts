@@ -27,7 +27,7 @@ import { ASPECT_RATIO_MAP, initialAspectRatioState } from 'features/parameters/c
 import type { AspectRatioID } from 'features/parameters/components/Bbox/types';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
-import { isEqual, merge, omit } from 'lodash-es';
+import { merge, omit } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { UndoableOptions } from 'redux-undo';
 import type {
@@ -59,83 +59,56 @@ import type {
   IPMethodV2,
   T2IAdapterConfig,
 } from './types';
+import { getEntityIdentifier, isRenderableEntity } from './types';
 import {
-  getEntityIdentifier,
+  getControlLayerState,
+  getInpaintMaskState,
+  getRasterLayerState,
+  getReferenceImageState,
+  getRegionalGuidanceState,
   imageDTOToImageWithDims,
   initialControlNet,
   initialIPAdapter,
-  isRenderableEntity,
-} from './types';
+} from './util';
 
-const DEFAULT_MASK_COLORS: RgbColor[] = [
-  { r: 121, g: 157, b: 219 }, // rgb(121, 157, 219)
-  { r: 131, g: 214, b: 131 }, // rgb(131, 214, 131)
-  { r: 250, g: 225, b: 80 }, // rgb(250, 225, 80)
-  { r: 220, g: 144, b: 101 }, // rgb(220, 144, 101)
-  { r: 224, g: 117, b: 117 }, // rgb(224, 117, 117)
-  { r: 213, g: 139, b: 202 }, // rgb(213, 139, 202)
-  { r: 161, g: 120, b: 214 }, // rgb(161, 120, 214)
-];
-
-const getRGMaskFill = (state: CanvasState): RgbColor => {
-  const lastFill = state.regions.entities.slice(-1)[0]?.fill.color;
-  let i = DEFAULT_MASK_COLORS.findIndex((c) => isEqual(c, lastFill));
-  if (i === -1) {
-    i = 0;
-  }
-  i = (i + 1) % DEFAULT_MASK_COLORS.length;
-  const fill = DEFAULT_MASK_COLORS[i];
-  assert(fill, 'This should never happen');
-  return fill;
-};
-
-const initialInpaintMaskState: CanvasInpaintMaskState = {
-  id: getPrefixedId('inpaint_mask'),
-  name: null,
-  type: 'inpaint_mask',
-  isEnabled: true,
-  isLocked: false,
-  objects: [],
-  opacity: 1,
-  position: { x: 0, y: 0 },
-  fill: {
-    style: 'diagonal',
-    color: { r: 255, g: 122, b: 0 }, // some orange color
-  },
-};
-
-const initialState: CanvasState = {
-  _version: 3,
-  selectedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
-  bookmarkedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
-  rasterLayers: {
-    isHidden: false,
-    entities: [],
-  },
-  controlLayers: {
-    isHidden: false,
-    entities: [],
-  },
-  inpaintMasks: {
-    isHidden: false,
-    entities: [deepClone(initialInpaintMaskState)],
-  },
-  regions: {
-    isHidden: false,
-    entities: [],
-  },
-  referenceImages: { entities: [] },
-  bbox: {
-    rect: { x: 0, y: 0, width: 512, height: 512 },
-    optimalDimension: 512,
-    aspectRatio: deepClone(initialAspectRatioState),
-    scaleMethod: 'auto',
-    scaledSize: {
-      width: 512,
-      height: 512,
+const getInitialState = (): CanvasState => {
+  const initialInpaintMaskState = getInpaintMaskState(getPrefixedId('inpaint_mask'));
+  const initialState: CanvasState = {
+    _version: 3,
+    selectedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
+    bookmarkedEntityIdentifier: getEntityIdentifier(initialInpaintMaskState),
+    rasterLayers: {
+      isHidden: false,
+      entities: [],
     },
-  },
+    controlLayers: {
+      isHidden: false,
+      entities: [],
+    },
+    inpaintMasks: {
+      isHidden: false,
+      entities: [initialInpaintMaskState],
+    },
+    regions: {
+      isHidden: false,
+      entities: [],
+    },
+    referenceImages: { entities: [] },
+    bbox: {
+      rect: { x: 0, y: 0, width: 512, height: 512 },
+      optimalDimension: 512,
+      aspectRatio: deepClone(initialAspectRatioState),
+      scaleMethod: 'auto',
+      scaledSize: {
+        width: 512,
+        height: 512,
+      },
+    },
+  };
+  return initialState;
 };
+
+const initialState = getInitialState();
 
 export const canvasSlice = createSlice({
   name: 'canvas',
@@ -154,27 +127,17 @@ export const canvasSlice = createSlice({
         }>
       ) => {
         const { id, overrides, isSelected, isMergingVisible } = action.payload;
-        const entity: CanvasRasterLayerState = {
-          id,
-          name: null,
-          type: 'raster_layer',
-          isEnabled: true,
-          isLocked: false,
-          objects: [],
-          opacity: 1,
-          position: { x: 0, y: 0 },
-        };
-        merge(entity, overrides);
+        const entityState = getRasterLayerState(id, overrides);
 
         if (isMergingVisible) {
           // When merging visible, we delete all disabled layers
           state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => !layer.isEnabled);
         }
 
-        state.rasterLayers.entities.push(entity);
+        state.rasterLayers.entities.push(entityState);
 
         if (isSelected) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entity);
+          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
       prepare: (payload: {
@@ -235,22 +198,13 @@ export const canvasSlice = createSlice({
         action: PayloadAction<{ id: string; overrides?: Partial<CanvasControlLayerState>; isSelected?: boolean }>
       ) => {
         const { id, overrides, isSelected } = action.payload;
-        const entity: CanvasControlLayerState = {
-          id,
-          name: null,
-          type: 'control_layer',
-          isEnabled: true,
-          isLocked: false,
-          withTransparencyEffect: true,
-          objects: [],
-          opacity: 1,
-          position: { x: 0, y: 0 },
-          controlAdapter: deepClone(initialControlNet),
-        };
-        merge(entity, overrides);
-        state.controlLayers.entities.push(entity);
+
+        const entityState = getControlLayerState(id, overrides);
+
+        state.controlLayers.entities.push(entityState);
+
         if (isSelected) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entity);
+          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
       prepare: (payload: { overrides?: Partial<CanvasControlLayerState>; isSelected?: boolean }) => ({
@@ -378,18 +332,12 @@ export const canvasSlice = createSlice({
         action: PayloadAction<{ id: string; overrides?: Partial<CanvasReferenceImageState>; isSelected?: boolean }>
       ) => {
         const { id, overrides, isSelected } = action.payload;
-        const entity: CanvasReferenceImageState = {
-          id,
-          type: 'reference_image',
-          name: null,
-          isLocked: false,
-          isEnabled: true,
-          ipAdapter: deepClone(initialIPAdapter),
-        };
-        merge(entity, overrides);
-        state.referenceImages.entities.push(entity);
+        const entityState = getReferenceImageState(id, overrides);
+
+        state.referenceImages.entities.push(entityState);
+
         if (isSelected) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entity);
+          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
       prepare: (payload?: { overrides?: Partial<CanvasReferenceImageState>; isSelected?: boolean }) => ({
@@ -474,28 +422,13 @@ export const canvasSlice = createSlice({
         action: PayloadAction<{ id: string; overrides?: Partial<CanvasRegionalGuidanceState>; isSelected?: boolean }>
       ) => {
         const { id, overrides, isSelected } = action.payload;
-        const entity: CanvasRegionalGuidanceState = {
-          id,
-          name: null,
-          isLocked: false,
-          type: 'regional_guidance',
-          isEnabled: true,
-          objects: [],
-          fill: {
-            style: 'solid',
-            color: getRGMaskFill(state),
-          },
-          opacity: 0.5,
-          position: { x: 0, y: 0 },
-          autoNegative: false,
-          positivePrompt: null,
-          negativePrompt: null,
-          referenceImages: [],
-        };
-        merge(entity, overrides);
-        state.regions.entities.push(entity);
+
+        const entityState = getRegionalGuidanceState(id, overrides);
+
+        state.regions.entities.push(entityState);
+
         if (isSelected) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entity);
+          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
       prepare: (payload?: { overrides?: Partial<CanvasRegionalGuidanceState>; isSelected?: boolean }) => ({
@@ -670,31 +603,18 @@ export const canvasSlice = createSlice({
         }>
       ) => {
         const { id, overrides, isSelected, isMergingVisible } = action.payload;
-        const entity: CanvasInpaintMaskState = {
-          id,
-          name: null,
-          type: 'inpaint_mask',
-          isEnabled: true,
-          isLocked: false,
-          objects: [],
-          opacity: 1,
-          position: { x: 0, y: 0 },
-          fill: {
-            style: 'diagonal',
-            color: { r: 255, g: 122, b: 0 }, // some orange color
-          },
-        };
-        merge(entity, overrides);
+
+        const entityState = getInpaintMaskState(id, overrides);
 
         if (isMergingVisible) {
           // When merging visible, we delete all disabled layers
           state.inpaintMasks.entities = state.inpaintMasks.entities.filter((layer) => !layer.isEnabled);
         }
 
-        state.inpaintMasks.entities.push(entity);
+        state.inpaintMasks.entities.push(entityState);
 
         if (isSelected) {
-          state.selectedEntityIdentifier = getEntityIdentifier(entity);
+          state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
       prepare: (payload?: {
@@ -1117,17 +1037,8 @@ export const canvasSlice = createSlice({
           break;
       }
     },
-    allEntitiesDeleted: (state) => {
-      state.referenceImages = deepClone(initialState.referenceImages);
-      state.rasterLayers = deepClone(initialState.rasterLayers);
-      state.controlLayers = deepClone(initialState.controlLayers);
-      state.regions = deepClone(initialState.regions);
-      state.inpaintMasks = deepClone(initialState.inpaintMasks);
-
-      state.selectedEntityIdentifier = deepClone(initialState.selectedEntityIdentifier);
-    },
     canvasReset: (state) => {
-      const newState = deepClone(initialState);
+      const newState = getInitialState();
 
       // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
       // from the old state, then recalculate the bbox size & scaled size.

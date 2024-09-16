@@ -7,7 +7,7 @@ import {
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
