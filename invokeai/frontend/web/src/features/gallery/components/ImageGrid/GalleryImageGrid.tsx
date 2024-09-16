@@ -1,4 +1,5 @@
 import { Box, Flex, Grid } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
@@ -105,7 +106,9 @@ const Content = () => {
       let imagesPerColumn = 0;
       let spaceUsed = 0;
 
-      while (spaceUsed + imageRect.height <= containerRect.height) {
+      // Floating point precision can cause imagesPerColumn to be 1 too small. Adding 1px to the container size fixes
+      // this. Because the minimum image size is  without the possibility of overshooting.
+      while (spaceUsed + imageRect.height <= containerRect.height + 1) {
         imagesPerColumn++; // Increment the number of images
         spaceUsed += imageRect.height; // Add image size to the used space
         if (spaceUsed + gap <= containerRect.height) {
@@ -116,7 +119,9 @@ const Content = () => {
       let imagesPerRow = 0;
       spaceUsed = 0;
 
-      while (spaceUsed + imageRect.width <= containerRect.width) {
+      // Floating point precision can cause imagesPerRow to be 1 too small. Adding 1px to the container size fixes
+      // this, without the possibility of accidentally adding an extra column.
+      while (spaceUsed + imageRect.width <= containerRect.width + 1) {
         imagesPerRow++; // Increment the number of images
         spaceUsed += imageRect.width; // Add image size to the used space
         if (spaceUsed + gap <= containerRect.width) {
@@ -126,14 +131,18 @@ const Content = () => {
 
       // Always load at least 1 row of images
       const limit = Math.max(imagesPerRow, imagesPerRow * imagesPerColumn);
+
+      if (queryArgs === skipToken || queryArgs.limit === limit) {
+        return;
+      }
       dispatch(limitChanged(limit));
     }, 300);
-  }, [container, dispatch]);
+  }, [container, dispatch, queryArgs]);
 
   useEffect(() => {
     // We want to recalculate the limit when image size changes
     calculateNewLimit();
-  }, [calculateNewLimit, galleryImageMinimumWidth]);
+  }, [calculateNewLimit, galleryImageMinimumWidth, imageDTOs]);
 
   useEffect(() => {
     if (!container) {
