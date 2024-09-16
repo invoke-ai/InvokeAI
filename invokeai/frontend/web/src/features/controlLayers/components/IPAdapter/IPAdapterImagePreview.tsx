@@ -76,7 +76,7 @@ export const IPAdapterImagePreview = memo(({ image, onChangeImage, droppableData
   }, [handleResetControlImage, isConnected, isErrorControlImage]);
 
   return (
-    <Flex position="relative" w={36} h={36} alignItems="center">
+    <Flex position="relative" w="full" h="full" alignItems="center">
       <IAIDndImage
         draggableData={draggableData}
         droppableData={droppableData}
