@@ -5,7 +5,6 @@ import torch
 from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.lora.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
-from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 
 
@@ -30,7 +29,7 @@ def is_state_dict_likely_in_flux_diffusers_format(state_dict: Dict[str, torch.Te
     return all_keys_in_peft_format and all_expected_keys_present
 
 
-def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor], alpha: float) -> LoRAModelRaw:
+def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor], alpha: float | None) -> LoRAModelRaw:
     """Loads a state dict in the Diffusers FLUX LoRA format into a LoRAModelRaw object.
 
     This function is based on:
@@ -53,13 +52,13 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
     def add_lora_layer_if_present(src_key: str, dst_key: str) -> None:
         if src_key in grouped_state_dict:
             src_layer_dict = grouped_state_dict.pop(src_key)
-            layers[dst_key] = LoRALayer.from_state_dict_values(
-                values={
-                    "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
-                    "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
-                    "alpha": torch.tensor(alpha),
-                },
-            )
+            value = {
+                "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
+                "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
+            }
+            if alpha is not None:
+                value["alpha"] = torch.tensor(alpha)
+            layers[dst_key] = LoRALayer.from_state_dict_values(values=value)
             assert len(src_layer_dict) == 0
 
     def add_qkv_lora_layer_if_present(src_keys: list[str], dst_qkv_key: str) -> None:
@@ -75,17 +74,15 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
             return
 
         src_layer_dicts = [grouped_state_dict.pop(key) for key in src_keys]
-        sub_layers: list[LoRALayerBase] = []
+        sub_layers: list[LoRALayer] = []
         for src_layer_dict in src_layer_dicts:
-            sub_layers.append(
-                LoRALayer.from_state_dict_values(
-                    values={
-                        "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
-                        "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
-                        "alpha": torch.tensor(alpha),
-                    },
-                )
-            )
+            values = {
+                "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
+                "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
+            }
+            if alpha is not None:
+                values["alpha"] = torch.tensor(alpha)
+            sub_layers.append(LoRALayer.from_state_dict_values(values=values))
             assert len(src_layer_dict) == 0
         layers[dst_qkv_key] = ConcatenatedLoRALayer(lora_layers=sub_layers, concat_axis=0)
 

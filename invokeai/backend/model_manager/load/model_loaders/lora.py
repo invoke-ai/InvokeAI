@@ -68,13 +68,12 @@ class LoRALoader(ModelLoader):
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.Flux:
             if config.format == ModelFormat.Diffusers:
-                # HACK(ryand): We assume alpha=8 for diffusers PEFT format models. These models are typically
+                # HACK(ryand): We set alpha=None for diffusers PEFT format models. These models are typically
                 # distributed as a single file without the associated metadata containing the alpha value. We chose
-                # alpha=8, because this is the default value in the PEFT library:
-                # https://github.com/huggingface/peft/blob/7868d0372b86a6b9ac5f365b8f0eef2f2f5dedce/src/peft/tuners/lora/config.py#L169
-                # Other reasonable defaults for alpha could be 1.0 or the rank of the LoRA. If our assumption is wrong,
-                # the user will need to adjust the weight accordingly to account for the difference.
-                model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=8)
+                # alpha=None, because this is treated as alpha=rank internally in `LoRALayerBase.scale()`. alpha=rank
+                # is a popular choice. For example, in the diffusers training scripts:
+                # https://github.com/huggingface/diffusers/blob/main/examples/dreambooth/train_dreambooth_lora_flux.py#L1194
+                model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
             elif config.format == ModelFormat.LyCORIS:
                 model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
             else:
