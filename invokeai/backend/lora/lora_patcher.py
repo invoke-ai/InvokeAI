@@ -197,21 +197,25 @@ class LoRAPatcher:
             # Initialize the LoRA sidecar layer.
             lora_sidecar_layer = LoRAPatcher._initialize_lora_sidecar_layer(module, layer, patch_weight)
 
-            # Move the LoRA sidecar layer to the same device/dtype as the orig module.
-            # TODO(ryand): Experiment with moving to the device first, then casting. This could be faster.
-            lora_sidecar_layer.to(device=module.weight.device, dtype=dtype)
-
+            # Replace the original module with a LoRASidecarModule if it has not already been done.
             if module_key in original_modules:
                 # The module has already been patched with a LoRASidecarModule. Append to it.
                 assert isinstance(module, LoRASidecarModule)
-                module.add_lora_layer(lora_sidecar_layer)
+                lora_sidecar_module = module
             else:
                 # The module has not yet been patched with a LoRASidecarModule. Create one.
-                lora_sidecar_module = LoRASidecarModule(module, [lora_sidecar_layer])
+                lora_sidecar_module = LoRASidecarModule(module, [])
                 original_modules[module_key] = module
                 module_parent_key, module_name = LoRAPatcher._split_parent_key(module_key)
                 module_parent = model.get_submodule(module_parent_key)
                 LoRAPatcher._set_submodule(module_parent, module_name, lora_sidecar_module)
+
+            # Move the LoRA sidecar layer to the same device/dtype as the orig module.
+            # TODO(ryand): Experiment with moving to the device first, then casting. This could be faster.
+            lora_sidecar_layer.to(device=lora_sidecar_module.orig_module.weight.device, dtype=dtype)
+
+            # Add the LoRA sidecar layer to the LoRASidecarModule.
+            lora_sidecar_module.add_lora_layer(lora_sidecar_layer)
 
     @staticmethod
     def _split_parent_key(module_key: str) -> tuple[str, str]:
@@ -234,7 +238,9 @@ class LoRAPatcher:
     @staticmethod
     def _initialize_lora_sidecar_layer(orig_layer: torch.nn.Module, lora_layer: AnyLoRALayer, patch_weight: float):
         # TODO(ryand): Add support for more original layer types and LoRA layer types.
-        if isinstance(orig_layer, torch.nn.Linear):
+        if isinstance(orig_layer, torch.nn.Linear) or (
+            isinstance(orig_layer, LoRASidecarModule) and isinstance(orig_layer.orig_module, torch.nn.Linear)
+        ):
             if isinstance(lora_layer, LoRALayer):
                 return LoRALinearSidecarLayer(lora_layer=lora_layer, weight=patch_weight)
             elif isinstance(lora_layer, ConcatenatedLoRALayer):

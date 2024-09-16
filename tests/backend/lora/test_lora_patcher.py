@@ -16,41 +16,48 @@ class DummyModule(torch.nn.Module):
 
 
 @pytest.mark.parametrize(
-    "device",
+    ["device", "num_layers"],
     [
-        "cpu",
-        pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
+        ("cpu", 1),
+        pytest.param("cuda", 1, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
+        ("cpu", 2),
+        pytest.param("cuda", 2, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
     ],
 )
 @torch.no_grad()
-def test_apply_lora_patches(device: str):
+def test_apply_lora_patches(device: str, num_layers: int):
     """Test the basic behavior of ModelPatcher.apply_lora_patches(...). Check that patching and unpatching produce the
     correct result, and that model/LoRA tensors are moved between devices as expected.
     """
 
     linear_in_features = 4
     linear_out_features = 8
-    lora_dim = 2
+    lora_rank = 2
     model = DummyModule(linear_in_features, linear_out_features, device=device, dtype=torch.float16)
 
-    lora_layers = {
-        "linear_layer_1": LoRALayer.from_state_dict_values(
-            values={
-                "lora_down.weight": torch.ones((lora_dim, linear_in_features), device="cpu", dtype=torch.float16),
-                "lora_up.weight": torch.ones((linear_out_features, lora_dim), device="cpu", dtype=torch.float16),
-            },
-        )
-    }
-    lora = LoRAModelRaw(lora_layers)
-
+    # Initialize num_layers LoRA models with weights of 0.5.
     lora_weight = 0.5
-    orig_linear_weight = model.linear_layer_1.weight.data.detach().clone()
-    expected_patched_linear_weight = orig_linear_weight + (lora_dim * lora_weight)
+    lora_models: list[tuple[LoRAModelRaw, float]] = []
+    for _ in range(num_layers):
+        lora_layers = {
+            "linear_layer_1": LoRALayer.from_state_dict_values(
+                values={
+                    "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.float16),
+                    "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
+                },
+            )
+        }
+        lora = LoRAModelRaw(lora_layers)
+        lora_models.append((lora, lora_weight))
 
-    with LoRAPatcher.apply_lora_patches(model=model, patches=[(lora, lora_weight)], prefix=""):
+    orig_linear_weight = model.linear_layer_1.weight.data.detach().clone()
+    expected_patched_linear_weight = orig_linear_weight + (lora_rank * lora_weight * num_layers)
+
+    with LoRAPatcher.apply_lora_patches(model=model, patches=lora_models, prefix=""):
         # After patching, all LoRA layer weights should have been moved back to the cpu.
-        assert lora_layers["linear_layer_1"].up.device.type == "cpu"
-        assert lora_layers["linear_layer_1"].down.device.type == "cpu"
+        for lora, _ in lora_models:
+            assert lora.layers["linear_layer_1"].up.device.type == "cpu"
+            assert lora.layers["linear_layer_1"].down.device.type == "cpu"
 
         # After patching, the patched model should still be on its original device.
         assert model.linear_layer_1.weight.data.device.type == device
@@ -103,37 +110,43 @@ def test_apply_lora_patches_change_device():
 
 
 @pytest.mark.parametrize(
-    "device",
+    ["device", "num_layers"],
     [
-        "cpu",
-        pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
+        ("cpu", 1),
+        pytest.param("cuda", 1, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
+        ("cpu", 2),
+        pytest.param("cuda", 2, marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
     ],
 )
-def test_apply_lora_sidecar_patches(device: str):
+def test_apply_lora_sidecar_patches(device: str, num_layers: int):
     """Test the basic behavior of ModelPatcher.apply_lora_sidecar_patches(...). Check that unpatching works correctly."""
     dtype = torch.float16
     linear_in_features = 4
     linear_out_features = 8
-    lora_dim = 2
+    lora_rank = 2
     model = DummyModule(linear_in_features, linear_out_features, device=device, dtype=dtype)
 
-    lora_layers = {
-        "linear_layer_1": LoRALayer.from_state_dict_values(
-            values={
-                "lora_down.weight": torch.ones((lora_dim, linear_in_features), device="cpu", dtype=dtype),
-                "lora_up.weight": torch.ones((linear_out_features, lora_dim), device="cpu", dtype=dtype),
-            },
-        )
-    }
-    lora = LoRAModelRaw(lora_layers)
+    # Initialize num_layers LoRA models with weights of 0.5.
+    lora_weight = 0.5
+    lora_models: list[tuple[LoRAModelRaw, float]] = []
+    for _ in range(num_layers):
+        lora_layers = {
+            "linear_layer_1": LoRALayer.from_state_dict_values(
+                values={
+                    "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.float16),
+                    "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
+                },
+            )
+        }
+        lora = LoRAModelRaw(lora_layers)
+        lora_models.append((lora, lora_weight))
 
     # Run inference before patching the model.
     input = torch.randn(1, linear_in_features, device=device, dtype=dtype)
     output_before_patch = model(input)
 
     # Patch the model and run inference during the patch.
-    lora_weight = 0.5
-    with LoRAPatcher.apply_lora_sidecar_patches(model=model, patches=[(lora, lora_weight)], prefix="", dtype=dtype):
+    with LoRAPatcher.apply_lora_sidecar_patches(model=model, patches=lora_models, prefix="", dtype=dtype):
         output_during_patch = model(input)
 
     # Run inference after unpatching.
@@ -147,31 +160,36 @@ def test_apply_lora_sidecar_patches(device: str):
 
 
 @torch.no_grad()
-def test_apply_lora_sidecar_patches_matches_apply_lora_patches():
+@pytest.mark.parametrize(["num_layers"], [(1,), (2,)])
+def test_apply_lora_sidecar_patches_matches_apply_lora_patches(num_layers: int):
     """Test that apply_lora_sidecar_patches(...) produces the same model outputs as apply_lora_patches(...)."""
     dtype = torch.float32
     linear_in_features = 4
     linear_out_features = 8
-    lora_dim = 2
+    lora_rank = 2
     model = DummyModule(linear_in_features, linear_out_features, device="cpu", dtype=dtype)
 
-    lora_layers = {
-        "linear_layer_1": LoRALayer.from_state_dict_values(
-            values={
-                "lora_down.weight": torch.ones((lora_dim, linear_in_features), device="cpu", dtype=dtype),
-                "lora_up.weight": torch.ones((linear_out_features, lora_dim), device="cpu", dtype=dtype),
-            },
-        )
-    }
-    lora = LoRAModelRaw(lora_layers)
+    # Initialize num_layers LoRA models with weights of 0.5.
+    lora_weight = 0.5
+    lora_models: list[tuple[LoRAModelRaw, float]] = []
+    for _ in range(num_layers):
+        lora_layers = {
+            "linear_layer_1": LoRALayer.from_state_dict_values(
+                values={
+                    "lora_down.weight": torch.ones((lora_rank, linear_in_features), device="cpu", dtype=torch.float16),
+                    "lora_up.weight": torch.ones((linear_out_features, lora_rank), device="cpu", dtype=torch.float16),
+                },
+            )
+        }
+        lora = LoRAModelRaw(lora_layers)
+        lora_models.append((lora, lora_weight))
 
     input = torch.randn(1, linear_in_features, device="cpu", dtype=dtype)
 
-    lora_weight = 0.5
-    with LoRAPatcher.apply_lora_patches(model=model, patches=[(lora, lora_weight)], prefix=""):
+    with LoRAPatcher.apply_lora_patches(model=model, patches=lora_models, prefix=""):
         output_lora_patches = model(input)
 
-    with LoRAPatcher.apply_lora_sidecar_patches(model=model, patches=[(lora, lora_weight)], prefix="", dtype=dtype):
+    with LoRAPatcher.apply_lora_sidecar_patches(model=model, patches=lora_models, prefix="", dtype=dtype):
         output_lora_sidecar_patches = model(input)
 
     assert torch.allclose(output_lora_patches, output_lora_sidecar_patches)
