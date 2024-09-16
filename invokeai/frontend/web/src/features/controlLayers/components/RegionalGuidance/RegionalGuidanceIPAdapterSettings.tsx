@@ -29,10 +29,9 @@ import { assert } from 'tsafe';
 
 type Props = {
   referenceImageId: string;
-  ipAdapterNumber: number;
 };
 
-export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId, ipAdapterNumber }: Props) => {
+export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Props) => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -110,7 +109,9 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId, ipAda
   return (
     <Flex flexDir="column" gap={3}>
       <Flex alignItems="center" gap={3}>
-        <Text fontWeight="semibold" color="base.400">{`IP Adapter ${ipAdapterNumber}`}</Text>
+        <Text fontWeight="semibold" color="base.400">
+          {t('controlLayers.referenceImage')}
+        </Text>
         <Spacer />
         <IconButton
           size="sm"

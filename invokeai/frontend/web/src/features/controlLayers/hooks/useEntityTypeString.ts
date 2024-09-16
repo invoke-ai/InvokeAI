@@ -16,7 +16,9 @@ export const useEntityTypeString = (type: CanvasEntityIdentifier['type'], plural
       case 'regional_guidance':
         return plural ? t('controlLayers.regionalGuidance_withCount_other') : t('controlLayers.regionalGuidance');
       case 'reference_image':
-        return plural ? t('controlLayers.ipAdapter_withCount_other') : t('controlLayers.ipAdapter');
+        return plural
+          ? t('controlLayers.globalReferenceImage_withCount_other')
+          : t('controlLayers.globalReferenceImage');
       default:
         return '';
     }
