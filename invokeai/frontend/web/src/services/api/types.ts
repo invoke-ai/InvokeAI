@@ -198,7 +198,7 @@ export type IPALayerImagePostUploadAction = {
 export type RGIPAdapterImagePostUploadAction = {
   type: 'SET_RG_IP_ADAPTER_IMAGE';
   id: string;
-  ipAdapterId: string;
+  referenceImageId: string;
 };
 
 type NodesAction = {

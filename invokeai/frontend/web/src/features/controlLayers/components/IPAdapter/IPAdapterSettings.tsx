@@ -9,12 +9,12 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { usePullBboxIntoIPAdapter } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
-  ipaBeginEndStepPctChanged,
-  ipaCLIPVisionModelChanged,
-  ipaImageChanged,
-  ipaMethodChanged,
-  ipaModelChanged,
-  ipaWeightChanged,
+  referenceImageIPAdapterBeginEndStepPctChanged,
+  referenceImageIPAdapterCLIPVisionModelChanged,
+  referenceImageIPAdapterImageChanged,
+  referenceImageIPAdapterMethodChanged,
+  referenceImageIPAdapterModelChanged,
+  referenceImageIPAdapterWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
@@ -30,7 +30,7 @@ import { IPAdapterModel } from './IPAdapterModel';
 export const IPAdapterSettings = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const entityIdentifier = useEntityIdentifierContext('ip_adapter');
+  const entityIdentifier = useEntityIdentifierContext('reference_image');
   const selectIPAdapter = useMemo(
     () => createSelector(selectCanvasSlice, (s) => selectEntityOrThrow(s, entityIdentifier).ipAdapter),
     [entityIdentifier]
@@ -39,42 +39,42 @@ export const IPAdapterSettings = memo(() => {
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
-      dispatch(ipaBeginEndStepPctChanged({ entityIdentifier, beginEndStepPct }));
+      dispatch(referenceImageIPAdapterBeginEndStepPctChanged({ entityIdentifier, beginEndStepPct }));
     },
     [dispatch, entityIdentifier]
   );
 
   const onChangeWeight = useCallback(
     (weight: number) => {
-      dispatch(ipaWeightChanged({ entityIdentifier, weight }));
+      dispatch(referenceImageIPAdapterWeightChanged({ entityIdentifier, weight }));
     },
     [dispatch, entityIdentifier]
   );
 
   const onChangeIPMethod = useCallback(
     (method: IPMethodV2) => {
-      dispatch(ipaMethodChanged({ entityIdentifier, method }));
+      dispatch(referenceImageIPAdapterMethodChanged({ entityIdentifier, method }));
     },
     [dispatch, entityIdentifier]
   );
 
   const onChangeModel = useCallback(
     (modelConfig: IPAdapterModelConfig) => {
-      dispatch(ipaModelChanged({ entityIdentifier, modelConfig }));
+      dispatch(referenceImageIPAdapterModelChanged({ entityIdentifier, modelConfig }));
     },
     [dispatch, entityIdentifier]
   );
 
   const onChangeCLIPVisionModel = useCallback(
     (clipVisionModel: CLIPVisionModelV2) => {
-      dispatch(ipaCLIPVisionModelChanged({ entityIdentifier, clipVisionModel }));
+      dispatch(referenceImageIPAdapterCLIPVisionModelChanged({ entityIdentifier, clipVisionModel }));
     },
     [dispatch, entityIdentifier]
   );
 
   const onChangeImage = useCallback(
     (imageDTO: ImageDTO | null) => {
-      dispatch(ipaImageChanged({ entityIdentifier, imageDTO }));
+      dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier, imageDTO }));
     },
     [dispatch, entityIdentifier]
   );
@@ -121,7 +121,6 @@ export const IPAdapterSettings = memo(() => {
             <IPAdapterImagePreview
               image={ipAdapter.image ?? null}
               onChangeImage={onChangeImage}
-              ipAdapterId={entityIdentifier.id}
               droppableData={droppableData}
               postUploadAction={postUploadAction}
             />

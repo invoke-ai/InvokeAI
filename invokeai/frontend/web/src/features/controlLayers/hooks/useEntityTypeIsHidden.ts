@@ -17,7 +17,7 @@ export const useEntityTypeIsHidden = (type: CanvasEntityIdentifier['type']): boo
             return canvas.inpaintMasks.isHidden;
           case 'regional_guidance':
             return canvas.regions.isHidden;
-          case 'ip_adapter':
+          case 'reference_image':
           default:
             return false;
         }

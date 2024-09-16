@@ -30,7 +30,7 @@ export type RGIPAdapterImageDropData = BaseDropData & {
   actionType: 'SET_RG_IP_ADAPTER_IMAGE';
   context: {
     id: string;
-    ipAdapterId: string;
+    referenceImageId: string;
   };
 };
 

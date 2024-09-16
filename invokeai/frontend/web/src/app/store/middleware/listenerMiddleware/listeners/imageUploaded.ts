@@ -3,7 +3,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import {
   entityRasterized,
   entitySelected,
-  ipaImageChanged,
+  referenceImageIPAdapterImageChanged,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
@@ -101,15 +101,15 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
 
       if (postUploadAction?.type === 'SET_IPA_IMAGE') {
         const { id } = postUploadAction;
-        dispatch(ipaImageChanged({ entityIdentifier: { id, type: 'ip_adapter' }, imageDTO }));
+        dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier: { id, type: 'reference_image' }, imageDTO }));
         toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
         return;
       }
 
       if (postUploadAction?.type === 'SET_RG_IP_ADAPTER_IMAGE') {
-        const { id, ipAdapterId } = postUploadAction;
+        const { id, referenceImageId } = postUploadAction;
         dispatch(
-          rgIPAdapterImageChanged({ entityIdentifier: { id, type: 'regional_guidance' }, ipAdapterId, imageDTO })
+          rgIPAdapterImageChanged({ entityIdentifier: { id, type: 'regional_guidance' }, referenceImageId, imageDTO })
         );
         toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
         return;

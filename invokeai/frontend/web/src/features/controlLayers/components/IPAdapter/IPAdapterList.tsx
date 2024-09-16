@@ -9,10 +9,10 @@ import { selectCanvasSlice, selectSelectedEntityIdentifier } from 'features/cont
 import { memo } from 'react';
 
 const selectEntityIds = createMemoizedSelector(selectCanvasSlice, (canvas) => {
-  return canvas.ipAdapters.entities.map(mapId).reverse();
+  return canvas.referenceImages.entities.map(mapId).reverse();
 });
 const selectIsSelected = createSelector(selectSelectedEntityIdentifier, (selectedEntityIdentifier) => {
-  return selectedEntityIdentifier?.type === 'ip_adapter';
+  return selectedEntityIdentifier?.type === 'reference_image';
 });
 
 export const IPAdapterList = memo(() => {
@@ -25,7 +25,7 @@ export const IPAdapterList = memo(() => {
 
   if (ipaIds.length > 0) {
     return (
-      <CanvasEntityGroupList type="ip_adapter" isSelected={isSelected}>
+      <CanvasEntityGroupList type="reference_image" isSelected={isSelected}>
         {ipaIds.map((id) => (
           <IPAdapter key={id} id={id} />
         ))}

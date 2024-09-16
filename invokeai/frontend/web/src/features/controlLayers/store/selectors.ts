@@ -32,7 +32,7 @@ export const selectCanvasSlice = (state: RootState) => state.canvas.present;
 const selectEntityCountAll = createSelector(selectCanvasSlice, (canvas) => {
   return (
     canvas.regions.entities.length +
-    canvas.ipAdapters.entities.length +
+    canvas.referenceImages.entities.length +
     canvas.rasterLayers.entities.length +
     canvas.controlLayers.entities.length +
     canvas.inpaintMasks.entities.length
@@ -56,7 +56,7 @@ const selectActiveRegionalGuidanceEntities = createSelector(selectCanvasSlice, (
 );
 
 const selectActiveIPAdapterEntities = createSelector(selectCanvasSlice, (canvas) =>
-  canvas.ipAdapters.entities.filter((e) => e.isEnabled)
+  canvas.referenceImages.entities.filter((e) => e.isEnabled)
 );
 
 /**
@@ -129,8 +129,8 @@ export function selectEntity<T extends CanvasEntityIdentifier>(
     case 'regional_guidance':
       entity = state.regions.entities.find((entity) => entity.id === id);
       break;
-    case 'ip_adapter':
-      entity = state.ipAdapters.entities.find((entity) => entity.id === id);
+    case 'reference_image':
+      entity = state.referenceImages.entities.find((entity) => entity.id === id);
       break;
   }
 
@@ -173,8 +173,8 @@ export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
     case 'regional_guidance':
       entities = state.regions.entities;
       break;
-    case 'ip_adapter':
-      entities = state.ipAdapters.entities;
+    case 'reference_image':
+      entities = state.referenceImages.entities;
       break;
   }
 
@@ -190,7 +190,7 @@ export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
   return [
     ...state.inpaintMasks.entities.toReversed(),
     ...state.regions.entities.toReversed(),
-    ...state.ipAdapters.entities.toReversed(),
+    ...state.referenceImages.entities.toReversed(),
     ...state.controlLayers.entities.toReversed(),
     ...state.rasterLayers.entities.toReversed(),
   ];
@@ -217,16 +217,16 @@ export function selectAllRenderableEntities(
 /**
  * Selects the IP adapter for the specific Regional Guidance layer.
  */
-export function selectRegionalGuidanceIPAdapter(
+export function selectRegionalGuidanceReferenceImage(
   state: CanvasState,
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>,
-  ipAdapterId: string
+  referenceImageId: string
 ) {
   const entity = selectEntity(state, entityIdentifier);
   if (!entity) {
     return undefined;
   }
-  return entity.ipAdapters.find((ipAdapter) => ipAdapter.id === ipAdapterId);
+  return entity.referenceImages.find(({ id }) => id === referenceImageId);
 }
 
 export const selectBbox = createSelector(selectCanvasSlice, (canvas) => canvas.bbox);

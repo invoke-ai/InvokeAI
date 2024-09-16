@@ -23,7 +23,7 @@ import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
 
 const LAYER_TYPE_TO_TKEY = {
-  ip_adapter: 'controlLayers.ipAdapter',
+  reference_image: 'controlLayers.ipAdapter',
   inpaint_mask: 'controlLayers.inpaintMask',
   regional_guidance: 'controlLayers.regionalGuidance',
   raster_layer: 'controlLayers.raster',
@@ -177,7 +177,7 @@ const createSelector = (
             }
           });
 
-        canvas.ipAdapters.entities
+        canvas.referenceImages.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layer_one');
@@ -218,10 +218,14 @@ const createSelector = (
               problems.push(i18n.t('parameters.invoke.layer.rgNoRegion'));
             }
             // Must have at least 1 prompt or IP Adapter
-            if (entity.positivePrompt === null && entity.negativePrompt === null && entity.ipAdapters.length === 0) {
+            if (
+              entity.positivePrompt === null &&
+              entity.negativePrompt === null &&
+              entity.referenceImages.length === 0
+            ) {
               problems.push(i18n.t('parameters.invoke.layer.rgNoPromptsOrIPAdapters'));
             }
-            entity.ipAdapters.forEach((ipAdapter) => {
+            entity.referenceImages.forEach(({ ipAdapter }) => {
               // Must have model
               if (!ipAdapter.model) {
                 problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoModelSelected'));

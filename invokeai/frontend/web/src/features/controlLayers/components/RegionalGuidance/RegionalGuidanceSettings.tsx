@@ -20,7 +20,7 @@ export const RegionalGuidanceSettings = memo(() => {
         return {
           hasPositivePrompt: entity.positivePrompt !== null,
           hasNegativePrompt: entity.negativePrompt !== null,
-          hasIPAdapters: entity.ipAdapters.length > 0,
+          hasIPAdapters: entity.referenceImages.length > 0,
         };
       }),
     [entityIdentifier]

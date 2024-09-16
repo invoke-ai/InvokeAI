@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDefaultControlAdapter, selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
@@ -7,20 +8,20 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
   entityRasterized,
-  ipaAdded,
-  ipaImageChanged,
   rasterLayerAdded,
+  referenceImageAdded,
+  referenceImageIPAdapterImageChanged,
   rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
-  CanvasIPAdapterState,
   CanvasRasterLayerState,
+  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   Rect,
-  RegionalGuidanceIPAdapterConfig,
+  RegionalGuidanceReferenceImageState,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/types';
 import { toast } from 'features/toast/toast';
@@ -91,13 +92,15 @@ export const useNewRegionalIPAdapterFromBbox = () => {
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
-      const ipAdapter: RegionalGuidanceIPAdapterConfig = {
-        ...defaultIPAdapter,
+      const ipAdapter: RegionalGuidanceReferenceImageState = {
         id: getPrefixedId('regional_guidance_ip_adapter'),
-        image: imageDTOToImageWithDims(imageDTO),
+        ipAdapter: {
+          ...deepClone(defaultIPAdapter),
+          image: imageDTOToImageWithDims(imageDTO),
+        },
       };
       const overrides: Partial<CanvasRegionalGuidanceState> = {
-        ipAdapters: [ipAdapter],
+        referenceImages: [ipAdapter],
       };
 
       dispatch(rgAdded({ overrides, isSelected: true }));
@@ -115,13 +118,13 @@ export const useNewGlobalIPAdapterFromBbox = () => {
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
-      const overrides: Partial<CanvasIPAdapterState> = {
+      const overrides: Partial<CanvasReferenceImageState> = {
         ipAdapter: {
-          ...defaultIPAdapter,
+          ...deepClone(defaultIPAdapter),
           image: imageDTOToImageWithDims(imageDTO),
         },
       };
-      dispatch(ipaAdded({ overrides, isSelected: true }));
+      dispatch(referenceImageAdded({ overrides, isSelected: true }));
     };
 
     return { region: 'bbox', saveToGallery: false, onSave };
@@ -155,7 +158,7 @@ export const useNewControlLayerFromBbox = () => {
     const onSave = (imageDTO: ImageDTO, rect: Rect) => {
       const overrides: Partial<CanvasControlLayerState> = {
         objects: [imageDTOToImageObject(imageDTO)],
-        controlAdapter: defaultControlAdapter,
+        controlAdapter: deepClone(defaultControlAdapter),
         position: { x: rect.x, y: rect.y },
       };
       dispatch(controlLayerAdded({ overrides, isSelected: true }));
@@ -189,12 +192,12 @@ export const usePullBboxIntoLayer = (entityIdentifier: CanvasEntityIdentifier<'c
   return pullBboxIntoLayer;
 };
 
-export const usePullBboxIntoIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'ip_adapter'>) => {
+export const usePullBboxIntoIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'reference_image'>) => {
   const dispatch = useAppDispatch();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
-      dispatch(ipaImageChanged({ entityIdentifier, imageDTO }));
+      dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier, imageDTO }));
     };
 
     return { region: 'bbox', saveToGallery: false, onSave };
@@ -206,17 +209,17 @@ export const usePullBboxIntoIPAdapter = (entityIdentifier: CanvasEntityIdentifie
 
 export const usePullBboxIntoRegionalGuidanceIPAdapter = (
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>,
-  ipAdapterId: string
+  referenceImageId: string
 ) => {
   const dispatch = useAppDispatch();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, _: Rect) => {
-      dispatch(rgIPAdapterImageChanged({ entityIdentifier, ipAdapterId, imageDTO }));
+      dispatch(rgIPAdapterImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
     };
 
     return { region: 'bbox', saveToGallery: false, onSave };
-  }, [dispatch, entityIdentifier, ipAdapterId]);
+  }, [dispatch, entityIdentifier, referenceImageId]);
 
   const pullBboxIntoRegionalGuidanceIPAdapter = useSaveCanvas(arg);
   return pullBboxIntoRegionalGuidanceIPAdapter;

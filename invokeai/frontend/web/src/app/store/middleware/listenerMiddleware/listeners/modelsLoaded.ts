@@ -6,7 +6,7 @@ import {
   bboxHeightChanged,
   bboxWidthChanged,
   controlLayerModelChanged,
-  ipaModelChanged,
+  referenceImageIPAdapterModelChanged,
   rgIPAdapterModelChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
@@ -181,22 +181,22 @@ const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log)
 
 const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
   const ipaModels = models.filter(isIPAdapterModelConfig);
-  selectCanvasSlice(state).ipAdapters.entities.forEach((entity) => {
+  selectCanvasSlice(state).referenceImages.entities.forEach((entity) => {
     const isModelAvailable = ipaModels.some((m) => m.key === entity.ipAdapter.model?.key);
     if (isModelAvailable) {
       return;
     }
-    dispatch(ipaModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
+    dispatch(referenceImageIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
   });
 
   selectCanvasSlice(state).regions.entities.forEach((entity) => {
-    entity.ipAdapters.forEach(({ id: ipAdapterId, model }) => {
-      const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
+    entity.referenceImages.forEach(({ id: referenceImageId, ipAdapter }) => {
+      const isModelAvailable = ipaModels.some((m) => m.key === ipAdapter.model?.key);
       if (isModelAvailable) {
         return;
       }
       dispatch(
-        rgIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), ipAdapterId, modelConfig: null })
+        rgIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), referenceImageId, modelConfig: null })
       );
     });
   });
