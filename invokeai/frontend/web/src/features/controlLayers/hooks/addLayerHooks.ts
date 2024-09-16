@@ -5,8 +5,8 @@ import { deepClone } from 'common/util/deepClone';
 import {
   controlLayerAdded,
   inpaintMaskAdded,
-  ipaAdded,
   rasterLayerAdded,
+  referenceImageAdded,
   rgAdded,
   rgIPAdapterAdded,
   rgNegativePromptChanged,
@@ -111,7 +111,7 @@ export const useAddIPAdapter = () => {
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
   const addControlLayer = useCallback(() => {
     const overrides = { ipAdapter: defaultIPAdapter };
-    dispatch(ipaAdded({ isSelected: true, overrides }));
+    dispatch(referenceImageAdded({ isSelected: true, overrides }));
   }, [defaultIPAdapter, dispatch]);
 
   return addControlLayer;
@@ -121,7 +121,7 @@ export const useAddRegionalGuidanceIPAdapter = (entityIdentifier: CanvasEntityId
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
   const addRegionalGuidanceIPAdapter = useCallback(() => {
-    dispatch(rgIPAdapterAdded({ entityIdentifier, overrides: defaultIPAdapter }));
+    dispatch(rgIPAdapterAdded({ entityIdentifier, overrides: { ipAdapter: defaultIPAdapter } }));
   }, [defaultIPAdapter, dispatch, entityIdentifier]);
 
   return addRegionalGuidanceIPAdapter;

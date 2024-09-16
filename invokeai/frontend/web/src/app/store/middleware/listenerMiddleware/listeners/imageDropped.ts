@@ -6,8 +6,8 @@ import {
   controlLayerAdded,
   entityRasterized,
   entitySelected,
-  ipaImageChanged,
   rasterLayerAdded,
+  referenceImageIPAdapterImageChanged,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
@@ -56,7 +56,10 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { id } = overData.context;
         dispatch(
-          ipaImageChanged({ entityIdentifier: { id, type: 'ip_adapter' }, imageDTO: activeData.payload.imageDTO })
+          referenceImageIPAdapterImageChanged({
+            entityIdentifier: { id, type: 'reference_image' },
+            imageDTO: activeData.payload.imageDTO,
+          })
         );
         return;
       }
@@ -69,11 +72,11 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        const { id, ipAdapterId } = overData.context;
+        const { id, referenceImageId } = overData.context;
         dispatch(
           rgIPAdapterImageChanged({
             entityIdentifier: { id, type: 'regional_guidance' },
-            ipAdapterId,
+            referenceImageId,
             imageDTO: activeData.payload.imageDTO,
           })
         );

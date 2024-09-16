@@ -39,7 +39,7 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
       case 'control_layer':
         addControlLayer();
         break;
-      case 'ip_adapter':
+      case 'reference_image':
         addIPAdapter();
         break;
     }
@@ -55,7 +55,7 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
         return t('controlLayers.addRasterLayer');
       case 'control_layer':
         return t('controlLayers.addControlLayer');
-      case 'ip_adapter':
+      case 'reference_image':
         return t('controlLayers.addIPAdapter');
     }
   }, [type, t]);

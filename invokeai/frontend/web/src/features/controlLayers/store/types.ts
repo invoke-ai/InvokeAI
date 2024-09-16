@@ -124,6 +124,7 @@ const zCanvasObjectState = z.discriminatedUnion('type', [
 export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
 
 const zIPAdapterConfig = z.object({
+  type: z.literal('ip_adapter'),
   image: zImageWithDims.nullable(),
   model: zModelIdentifierField.nullable(),
   weight: z.number().gte(-1).lte(2),
@@ -140,21 +141,22 @@ const zCanvasEntityBase = z.object({
   isLocked: z.boolean(),
 });
 
-const zCanvasIPAdapterState = zCanvasEntityBase.extend({
-  type: z.literal('ip_adapter'),
+const zCanvasReferenceImageState = zCanvasEntityBase.extend({
+  type: z.literal('reference_image'),
   ipAdapter: zIPAdapterConfig,
 });
-export type CanvasIPAdapterState = z.infer<typeof zCanvasIPAdapterState>;
+export type CanvasReferenceImageState = z.infer<typeof zCanvasReferenceImageState>;
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
 export const isFillStyle = (v: unknown): v is FillStyle => zFillStyle.safeParse(v).success;
 const zFill = z.object({ style: zFillStyle, color: zRgbColor });
 
-const zRegionalGuidanceIPAdapterConfig = zIPAdapterConfig.extend({
+const zRegionalGuidanceReferenceImageState = z.object({
   id: zId,
+  ipAdapter: zIPAdapterConfig,
 });
-export type RegionalGuidanceIPAdapterConfig = z.infer<typeof zRegionalGuidanceIPAdapterConfig>;
+export type RegionalGuidanceReferenceImageState = z.infer<typeof zRegionalGuidanceReferenceImageState>;
 
 const zCanvasRegionalGuidanceState = zCanvasEntityBase.extend({
   type: z.literal('regional_guidance'),
@@ -164,7 +166,7 @@ const zCanvasRegionalGuidanceState = zCanvasEntityBase.extend({
   fill: zFill,
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
-  ipAdapters: z.array(zRegionalGuidanceIPAdapterConfig),
+  referenceImages: z.array(zRegionalGuidanceReferenceImageState),
   autoNegative: z.boolean(),
 });
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
@@ -226,6 +228,7 @@ export const initialT2IAdapter: T2IAdapterConfig = {
 };
 
 export const initialIPAdapter: IPAdapterConfig = {
+  type: 'ip_adapter',
   image: null,
   model: null,
   beginEndStepPct: [0, 1],
@@ -264,7 +267,7 @@ export type CanvasEntityState =
   | CanvasControlLayerState
   | CanvasRegionalGuidanceState
   | CanvasInpaintMaskState
-  | CanvasIPAdapterState;
+  | CanvasReferenceImageState;
 
 export type CanvasRenderableEntityState =
   | CanvasRasterLayerState
@@ -308,8 +311,8 @@ export type CanvasState = {
     isHidden: boolean;
     entities: CanvasRegionalGuidanceState[];
   };
-  ipAdapters: {
-    entities: CanvasIPAdapterState[];
+  referenceImages: {
+    entities: CanvasReferenceImageState[];
   };
   bbox: {
     rect: {

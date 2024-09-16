@@ -248,7 +248,7 @@ export const buildSD1Graph = async (
     type: 'collect',
     id: getPrefixedId('ip_adapter_collector'),
   });
-  const ipAdapterResult = addIPAdapters(canvas.ipAdapters.entities, g, ipAdapterCollector, modelConfig.base);
+  const ipAdapterResult = addIPAdapters(canvas.referenceImages.entities, g, ipAdapterCollector, modelConfig.base);
 
   const regionsResult = await addRegions(
     manager,

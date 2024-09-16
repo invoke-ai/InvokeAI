@@ -17,7 +17,7 @@ export const getImageUsage = (nodes: NodesState, canvas: CanvasState, image_name
       some(node.data.inputs, (input) => isImageFieldInputInstance(input) && input.value?.image_name === image_name)
     );
 
-  const isIPAdapterImage = canvas.ipAdapters.entities.some(
+  const isIPAdapterImage = canvas.referenceImages.entities.some(
     ({ ipAdapter }) => ipAdapter.image?.image_name === image_name
   );
 

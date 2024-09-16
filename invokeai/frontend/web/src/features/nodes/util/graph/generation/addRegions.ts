@@ -5,7 +5,7 @@ import type {
   CanvasRegionalGuidanceState,
   IPAdapterConfig,
   Rect,
-  RegionalGuidanceIPAdapterConfig,
+  RegionalGuidanceReferenceImageState,
 } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { BaseModelType, Invocation } from 'services/api/types';
@@ -21,7 +21,7 @@ type AddedRegionResult = {
 const isValidRegion = (rg: CanvasRegionalGuidanceState, base: BaseModelType) => {
   const isEnabled = rg.isEnabled;
   const hasTextPrompt = Boolean(rg.positivePrompt || rg.negativePrompt);
-  const hasIPAdapter = rg.ipAdapters.filter((ipa) => isValidIPAdapter(ipa, base)).length > 0;
+  const hasIPAdapter = rg.referenceImages.filter(({ ipAdapter }) => isValidIPAdapter(ipAdapter, base)).length > 0;
   return isEnabled && (hasTextPrompt || hasIPAdapter);
 };
 
@@ -198,17 +198,17 @@ export const addRegions = async (
       }
     }
 
-    const validRGIPAdapters: RegionalGuidanceIPAdapterConfig[] = region.ipAdapters.filter((ipAdapter) =>
+    const validRGIPAdapters: RegionalGuidanceReferenceImageState[] = region.referenceImages.filter(({ ipAdapter }) =>
       isValidIPAdapter(ipAdapter, base)
     );
 
-    for (const ipa of validRGIPAdapters) {
+    for (const { id, ipAdapter } of validRGIPAdapters) {
       result.addedIPAdapters++;
-      const { id, weight, model, clipVisionModel, method, beginEndStepPct, image } = ipa;
+      const { weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
       assert(model, 'IP Adapter model is required');
       assert(image, 'IP Adapter image is required');
 
-      const ipAdapter = g.addNode({
+      const ipAdapterNode = g.addNode({
         id: `ip_adapter_${id}`,
         type: 'ip_adapter',
         weight,
@@ -223,8 +223,8 @@ export const addRegions = async (
       });
 
       // Connect the mask to the conditioning
-      g.addEdge(maskToTensor, 'mask', ipAdapter, 'mask');
-      g.addEdge(ipAdapter, 'ip_adapter', ipAdapterCollect, 'item');
+      g.addEdge(maskToTensor, 'mask', ipAdapterNode, 'mask');
+      g.addEdge(ipAdapterNode, 'ip_adapter', ipAdapterCollect, 'item');
     }
 
     results.push(result);

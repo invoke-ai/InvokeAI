@@ -11,12 +11,12 @@ import {
   selectAllEntities,
   selectAllEntitiesOfType,
   selectEntity,
-  selectRegionalGuidanceIPAdapter,
+  selectRegionalGuidanceReferenceImage,
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasInpaintMaskState,
   FillStyle,
-  RegionalGuidanceIPAdapterConfig,
+  RegionalGuidanceReferenceImageState,
   RgbColor,
 } from 'features/controlLayers/store/types';
 import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
@@ -43,8 +43,8 @@ import type {
   BoundingBoxScaleMethod,
   CanvasControlLayerState,
   CanvasEntityIdentifier,
-  CanvasIPAdapterState,
   CanvasRasterLayerState,
+  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   CanvasState,
   CLIPVisionModelV2,
@@ -124,7 +124,7 @@ const initialState: CanvasState = {
     isHidden: false,
     entities: [],
   },
-  ipAdapters: { entities: [] },
+  referenceImages: { entities: [] },
   bbox: {
     rect: { x: 0, y: 0, width: 512, height: 512 },
     optimalDimension: 512,
@@ -371,39 +371,39 @@ export const canvasSlice = createSlice({
       }
       layer.withTransparencyEffect = !layer.withTransparencyEffect;
     },
-    //#region IP Adapters
-    ipaAdded: {
+    //#region Global Reference Images
+    referenceImageAdded: {
       reducer: (
         state,
-        action: PayloadAction<{ id: string; overrides?: Partial<CanvasIPAdapterState>; isSelected?: boolean }>
+        action: PayloadAction<{ id: string; overrides?: Partial<CanvasReferenceImageState>; isSelected?: boolean }>
       ) => {
         const { id, overrides, isSelected } = action.payload;
-        const entity: CanvasIPAdapterState = {
+        const entity: CanvasReferenceImageState = {
           id,
-          type: 'ip_adapter',
+          type: 'reference_image',
           name: null,
           isLocked: false,
           isEnabled: true,
           ipAdapter: deepClone(initialIPAdapter),
         };
         merge(entity, overrides);
-        state.ipAdapters.entities.push(entity);
+        state.referenceImages.entities.push(entity);
         if (isSelected) {
           state.selectedEntityIdentifier = getEntityIdentifier(entity);
         }
       },
-      prepare: (payload?: { overrides?: Partial<CanvasIPAdapterState>; isSelected?: boolean }) => ({
-        payload: { ...payload, id: getPrefixedId('ip_adapter') },
+      prepare: (payload?: { overrides?: Partial<CanvasReferenceImageState>; isSelected?: boolean }) => ({
+        payload: { ...payload, id: getPrefixedId('reference_image') },
       }),
     },
-    ipaRecalled: (state, action: PayloadAction<{ data: CanvasIPAdapterState }>) => {
+    referenceImageRecalled: (state, action: PayloadAction<{ data: CanvasReferenceImageState }>) => {
       const { data } = action.payload;
-      state.ipAdapters.entities.push(data);
-      state.selectedEntityIdentifier = { type: 'ip_adapter', id: data.id };
+      state.referenceImages.entities.push(data);
+      state.selectedEntityIdentifier = { type: 'reference_image', id: data.id };
     },
-    ipaImageChanged: (
+    referenceImageIPAdapterImageChanged: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ imageDTO: ImageDTO | null }, 'ip_adapter'>>
+      action: PayloadAction<EntityIdentifierPayload<{ imageDTO: ImageDTO | null }, 'reference_image'>>
     ) => {
       const { entityIdentifier, imageDTO } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -412,7 +412,10 @@ export const canvasSlice = createSlice({
       }
       entity.ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
     },
-    ipaMethodChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ method: IPMethodV2 }, 'ip_adapter'>>) => {
+    referenceImageIPAdapterMethodChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ method: IPMethodV2 }, 'reference_image'>>
+    ) => {
       const { entityIdentifier, method } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
@@ -420,9 +423,9 @@ export const canvasSlice = createSlice({
       }
       entity.ipAdapter.method = method;
     },
-    ipaModelChanged: (
+    referenceImageIPAdapterModelChanged: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ modelConfig: IPAdapterModelConfig | null }, 'ip_adapter'>>
+      action: PayloadAction<EntityIdentifierPayload<{ modelConfig: IPAdapterModelConfig | null }, 'reference_image'>>
     ) => {
       const { entityIdentifier, modelConfig } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -431,9 +434,9 @@ export const canvasSlice = createSlice({
       }
       entity.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
     },
-    ipaCLIPVisionModelChanged: (
+    referenceImageIPAdapterCLIPVisionModelChanged: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ clipVisionModel: CLIPVisionModelV2 }, 'ip_adapter'>>
+      action: PayloadAction<EntityIdentifierPayload<{ clipVisionModel: CLIPVisionModelV2 }, 'reference_image'>>
     ) => {
       const { entityIdentifier, clipVisionModel } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -442,7 +445,10 @@ export const canvasSlice = createSlice({
       }
       entity.ipAdapter.clipVisionModel = clipVisionModel;
     },
-    ipaWeightChanged: (state, action: PayloadAction<EntityIdentifierPayload<{ weight: number }, 'ip_adapter'>>) => {
+    referenceImageIPAdapterWeightChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ weight: number }, 'reference_image'>>
+    ) => {
       const { entityIdentifier, weight } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
@@ -450,9 +456,9 @@ export const canvasSlice = createSlice({
       }
       entity.ipAdapter.weight = weight;
     },
-    ipaBeginEndStepPctChanged: (
+    referenceImageIPAdapterBeginEndStepPctChanged: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ beginEndStepPct: [number, number] }, 'ip_adapter'>>
+      action: PayloadAction<EntityIdentifierPayload<{ beginEndStepPct: [number, number] }, 'reference_image'>>
     ) => {
       const { entityIdentifier, beginEndStepPct } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -484,7 +490,7 @@ export const canvasSlice = createSlice({
           autoNegative: false,
           positivePrompt: null,
           negativePrompt: null,
-          ipAdapters: [],
+          referenceImages: [],
         };
         merge(entity, overrides);
         state.regions.entities.push(entity);
@@ -536,116 +542,121 @@ export const canvasSlice = createSlice({
         state,
         action: PayloadAction<
           EntityIdentifierPayload<
-            { ipAdapterId: string; overrides?: Partial<RegionalGuidanceIPAdapterConfig> },
+            { referenceImageId: string; overrides?: Partial<RegionalGuidanceReferenceImageState> },
             'regional_guidance'
           >
         >
       ) => {
-        const { entityIdentifier, overrides, ipAdapterId } = action.payload;
+        const { entityIdentifier, overrides, referenceImageId } = action.payload;
         const entity = selectEntity(state, entityIdentifier);
         if (!entity) {
           return;
         }
-        const ipAdapter = { ...deepClone(initialIPAdapter), id: ipAdapterId };
+        const ipAdapter = { id: referenceImageId, ipAdapter: deepClone(initialIPAdapter) };
         merge(ipAdapter, overrides);
-        entity.ipAdapters.push(ipAdapter);
+        entity.referenceImages.push(ipAdapter);
       },
       prepare: (
-        payload: EntityIdentifierPayload<{ overrides?: Partial<RegionalGuidanceIPAdapterConfig> }, 'regional_guidance'>
+        payload: EntityIdentifierPayload<
+          { overrides?: Partial<RegionalGuidanceReferenceImageState> },
+          'regional_guidance'
+        >
       ) => ({
-        payload: { ...payload, ipAdapterId: getPrefixedId('regional_guidance_ip_adapter') },
+        payload: { ...payload, referenceImageId: getPrefixedId('regional_guidance_ip_adapter') },
       }),
     },
     rgIPAdapterDeleted: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ ipAdapterId: string }, 'regional_guidance'>>
+      action: PayloadAction<EntityIdentifierPayload<{ referenceImageId: string }, 'regional_guidance'>>
     ) => {
-      const { entityIdentifier, ipAdapterId } = action.payload;
+      const { entityIdentifier, referenceImageId } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
       }
-      entity.ipAdapters = entity.ipAdapters.filter((ipAdapter) => ipAdapter.id !== ipAdapterId);
+      entity.referenceImages = entity.referenceImages.filter((ipAdapter) => ipAdapter.id !== referenceImageId);
     },
     rgIPAdapterImageChanged: (
       state,
       action: PayloadAction<
-        EntityIdentifierPayload<{ ipAdapterId: string; imageDTO: ImageDTO | null }, 'regional_guidance'>
+        EntityIdentifierPayload<{ referenceImageId: string; imageDTO: ImageDTO | null }, 'regional_guidance'>
       >
     ) => {
-      const { entityIdentifier, ipAdapterId, imageDTO } = action.payload;
-      const ipAdapter = selectRegionalGuidanceIPAdapter(state, entityIdentifier, ipAdapterId);
-      if (!ipAdapter) {
+      const { entityIdentifier, referenceImageId, imageDTO } = action.payload;
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
+      if (!referenceImage) {
         return;
       }
-      ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
+      referenceImage.ipAdapter.image = imageDTO ? imageDTOToImageWithDims(imageDTO) : null;
     },
     rgIPAdapterWeightChanged: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ ipAdapterId: string; weight: number }, 'regional_guidance'>>
+      action: PayloadAction<EntityIdentifierPayload<{ referenceImageId: string; weight: number }, 'regional_guidance'>>
     ) => {
-      const { entityIdentifier, ipAdapterId, weight } = action.payload;
-      const ipAdapter = selectRegionalGuidanceIPAdapter(state, entityIdentifier, ipAdapterId);
-      if (!ipAdapter) {
+      const { entityIdentifier, referenceImageId, weight } = action.payload;
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
+      if (!referenceImage) {
         return;
       }
-      ipAdapter.weight = weight;
+      referenceImage.ipAdapter.weight = weight;
     },
     rgIPAdapterBeginEndStepPctChanged: (
       state,
       action: PayloadAction<
-        EntityIdentifierPayload<{ ipAdapterId: string; beginEndStepPct: [number, number] }, 'regional_guidance'>
+        EntityIdentifierPayload<{ referenceImageId: string; beginEndStepPct: [number, number] }, 'regional_guidance'>
       >
     ) => {
-      const { entityIdentifier, ipAdapterId, beginEndStepPct } = action.payload;
-      const ipAdapter = selectRegionalGuidanceIPAdapter(state, entityIdentifier, ipAdapterId);
-      if (!ipAdapter) {
+      const { entityIdentifier, referenceImageId, beginEndStepPct } = action.payload;
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
+      if (!referenceImage) {
         return;
       }
-      ipAdapter.beginEndStepPct = beginEndStepPct;
+      referenceImage.ipAdapter.beginEndStepPct = beginEndStepPct;
     },
     rgIPAdapterMethodChanged: (
       state,
-      action: PayloadAction<EntityIdentifierPayload<{ ipAdapterId: string; method: IPMethodV2 }, 'regional_guidance'>>
+      action: PayloadAction<
+        EntityIdentifierPayload<{ referenceImageId: string; method: IPMethodV2 }, 'regional_guidance'>
+      >
     ) => {
-      const { entityIdentifier, ipAdapterId, method } = action.payload;
-      const ipAdapter = selectRegionalGuidanceIPAdapter(state, entityIdentifier, ipAdapterId);
-      if (!ipAdapter) {
+      const { entityIdentifier, referenceImageId, method } = action.payload;
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
+      if (!referenceImage) {
         return;
       }
-      ipAdapter.method = method;
+      referenceImage.ipAdapter.method = method;
     },
     rgIPAdapterModelChanged: (
       state,
       action: PayloadAction<
         EntityIdentifierPayload<
           {
-            ipAdapterId: string;
+            referenceImageId: string;
             modelConfig: IPAdapterModelConfig | null;
           },
           'regional_guidance'
         >
       >
     ) => {
-      const { entityIdentifier, ipAdapterId, modelConfig } = action.payload;
-      const ipAdapter = selectRegionalGuidanceIPAdapter(state, entityIdentifier, ipAdapterId);
-      if (!ipAdapter) {
+      const { entityIdentifier, referenceImageId, modelConfig } = action.payload;
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
+      if (!referenceImage) {
         return;
       }
-      ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
+      referenceImage.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
     },
     rgIPAdapterCLIPVisionModelChanged: (
       state,
       action: PayloadAction<
-        EntityIdentifierPayload<{ ipAdapterId: string; clipVisionModel: CLIPVisionModelV2 }, 'regional_guidance'>
+        EntityIdentifierPayload<{ referenceImageId: string; clipVisionModel: CLIPVisionModelV2 }, 'regional_guidance'>
       >
     ) => {
-      const { entityIdentifier, ipAdapterId, clipVisionModel } = action.payload;
-      const ipAdapter = selectRegionalGuidanceIPAdapter(state, entityIdentifier, ipAdapterId);
-      if (!ipAdapter) {
+      const { entityIdentifier, referenceImageId, clipVisionModel } = action.payload;
+      const referenceImage = selectRegionalGuidanceReferenceImage(state, entityIdentifier, referenceImageId);
+      if (!referenceImage) {
         return;
       }
-      ipAdapter.clipVisionModel = clipVisionModel;
+      referenceImage.ipAdapter.clipVisionModel = clipVisionModel;
     },
     //#region Inpaint mask
     inpaintMaskAdded: {
@@ -888,9 +899,9 @@ export const canvasSlice = createSlice({
           newEntity.id = getPrefixedId('regional_guidance');
           state.regions.entities.push(newEntity);
           break;
-        case 'ip_adapter':
-          newEntity.id = getPrefixedId('ip_adapter');
-          state.ipAdapters.entities.push(newEntity);
+        case 'reference_image':
+          newEntity.id = getPrefixedId('reference_image');
+          state.referenceImages.entities.push(newEntity);
           break;
         case 'inpaint_mask':
           newEntity.id = getPrefixedId('inpaint_mask');
@@ -1032,8 +1043,8 @@ export const canvasSlice = createSlice({
         case 'regional_guidance':
           state.regions.entities = state.regions.entities.filter((rg) => rg.id !== entityIdentifier.id);
           break;
-        case 'ip_adapter':
-          state.ipAdapters.entities = state.ipAdapters.entities.filter((rg) => rg.id !== entityIdentifier.id);
+        case 'reference_image':
+          state.referenceImages.entities = state.referenceImages.entities.filter((rg) => rg.id !== entityIdentifier.id);
           break;
         case 'inpaint_mask':
           state.inpaintMasks.entities = state.inpaintMasks.entities.filter((rg) => rg.id !== entityIdentifier.id);
@@ -1080,7 +1091,7 @@ export const canvasSlice = createSlice({
       if (!entity) {
         return;
       }
-      if (entity.type === 'ip_adapter') {
+      if (entity.type === 'reference_image') {
         return;
       }
       entity.opacity = opacity;
@@ -1101,13 +1112,13 @@ export const canvasSlice = createSlice({
         case 'regional_guidance':
           state.regions.isHidden = !state.regions.isHidden;
           break;
-        case 'ip_adapter':
+        case 'reference_image':
           // no-op
           break;
       }
     },
     allEntitiesDeleted: (state) => {
-      state.ipAdapters = deepClone(initialState.ipAdapters);
+      state.referenceImages = deepClone(initialState.referenceImages);
       state.rasterLayers = deepClone(initialState.rasterLayers);
       state.controlLayers = deepClone(initialState.controlLayers);
       state.regions = deepClone(initialState.regions);
@@ -1212,14 +1223,14 @@ export const {
   controlLayerBeginEndStepPctChanged,
   controlLayerWithTransparencyEffectToggled,
   // IP Adapters
-  ipaAdded,
-  // ipaRecalled,
-  ipaImageChanged,
-  ipaMethodChanged,
-  ipaModelChanged,
-  ipaCLIPVisionModelChanged,
-  ipaWeightChanged,
-  ipaBeginEndStepPctChanged,
+  referenceImageAdded,
+  // referenceImageRecalled,
+  referenceImageIPAdapterImageChanged,
+  referenceImageIPAdapterMethodChanged,
+  referenceImageIPAdapterModelChanged,
+  referenceImageIPAdapterCLIPVisionModelChanged,
+  referenceImageIPAdapterWeightChanged,
+  referenceImageIPAdapterBeginEndStepPctChanged,
   // Regions
   rgAdded,
   // rgRecalled,

@@ -12,7 +12,7 @@ export const CanvasEntityHeaderCommonActions = memo(() => {
   return (
     <Flex alignSelf="stretch">
       <CanvasEntityIsBookmarkedForQuickSwitchToggle />
-      {entityIdentifier.type !== 'ip_adapter' && <CanvasEntityIsLockedToggle />}
+      {entityIdentifier.type !== 'reference_image' && <CanvasEntityIsLockedToggle />}
       <CanvasEntityEnabledToggle />
       <CanvasEntityDeleteButton />
     </Flex>

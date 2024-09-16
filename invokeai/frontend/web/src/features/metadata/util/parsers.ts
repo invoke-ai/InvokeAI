@@ -3,8 +3,8 @@ import { defaultLoRAConfig } from 'features/controlLayers/store/lorasSlice';
 import type {
   CanvasControlLayerState,
   CanvasInpaintMaskState,
-  CanvasIPAdapterState,
   CanvasRasterLayerState,
+  CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   LoRA,
 } from 'features/controlLayers/store/types';
@@ -359,6 +359,7 @@ const parseIPAdapter: MetadataParseFunc<IPAdapterConfigMetadata> = async (metada
     .parse(await getProperty(metadataItem, 'end_step_percent'));
 
   const ipAdapter: IPAdapterConfigMetadata = {
+    type: 'ip_adapter',
     model: zModelIdentifierField.parse(ipAdapterModel),
     clipVisionModel: 'ViT-H',
     image: null, //TODO(psyche): need an ImageWithDims
@@ -390,7 +391,7 @@ const parseAllIPAdapters: MetadataParseFunc<IPAdapterConfigMetadata[]> = async (
 const parseLayer: MetadataParseFunc<
   | CanvasRasterLayerState
   | CanvasControlLayerState
-  | CanvasIPAdapterState
+  | CanvasReferenceImageState
   | CanvasRegionalGuidanceState
   | CanvasInpaintMaskState
 > = (metadataItem) => zCanvasRasterLayerState.parseAsync(metadataItem);
@@ -399,7 +400,7 @@ const parseLayers: MetadataParseFunc<
   (
     | CanvasRasterLayerState
     | CanvasControlLayerState
-    | CanvasIPAdapterState
+    | CanvasReferenceImageState
     | CanvasRegionalGuidanceState
     | CanvasInpaintMaskState
   )[]
@@ -412,7 +413,7 @@ const parseLayers: MetadataParseFunc<
     const layers: (
       | CanvasRasterLayerState
       | CanvasControlLayerState
-      | CanvasIPAdapterState
+      | CanvasReferenceImageState
       | CanvasRegionalGuidanceState
       | CanvasInpaintMaskState
     )[] = [];
@@ -461,7 +462,7 @@ const parseLayers: MetadataParseFunc<
         ipAdaptersRaw.map(async (cn) => await parseIPAdapterToIPAdapterLayer(cn))
       );
       const ipAdaptersAsLayers = ipAdaptersParseResults
-        .filter((result): result is PromiseFulfilledResult<CanvasIPAdapterState> => result.status === 'fulfilled')
+        .filter((result): result is PromiseFulfilledResult<CanvasReferenceImageState> => result.status === 'fulfilled')
         .map((result) => result.value);
       layers.push(...ipAdaptersAsLayers);
     } catch {
@@ -566,7 +567,7 @@ const parseT2IAdapterToControlAdapterLayer: MetadataParseFunc<CanvasControlLayer
   return layer;
 };
 
-const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasIPAdapterState> = async (metadataItem) => {
+const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasReferenceImageState> = async (metadataItem) => {
   const ip_adapter_model = await getProperty(metadataItem, 'ip_adapter_model');
   const key = await getModelKey(ip_adapter_model, 'ip_adapter');
   const ipAdapterModel = await fetchModelConfigWithTypeGuard(key, isIPAdapterModelConfig);
@@ -598,13 +599,14 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasIPAdapterState> = 
   ];
   const imageDTO = image ? await getImageDTO(image.image_name) : null;
 
-  const layer: CanvasIPAdapterState = {
+  const layer: CanvasReferenceImageState = {
     id: getPrefixedId('ip_adapter'),
-    type: 'ip_adapter',
+    type: 'reference_image',
     isEnabled: true,
     isLocked: false,
     name: null,
     ipAdapter: {
+      type: 'ip_adapter',
       model: zModelIdentifierField.parse(ipAdapterModel),
       weight: typeof weight === 'number' ? weight : initialIPAdapter.weight,
       beginEndStepPct,

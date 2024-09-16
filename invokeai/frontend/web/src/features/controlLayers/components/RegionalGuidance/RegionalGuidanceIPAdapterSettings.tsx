@@ -18,7 +18,7 @@ import {
   rgIPAdapterModelChanged,
   rgIPAdapterWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectRegionalGuidanceIPAdapter } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { RGIPAdapterImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -28,83 +28,83 @@ import type { ImageDTO, IPAdapterModelConfig, RGIPAdapterImagePostUploadAction }
 import { assert } from 'tsafe';
 
 type Props = {
-  ipAdapterId: string;
+  referenceImageId: string;
   ipAdapterNumber: number;
 };
 
-export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterNumber }: Props) => {
+export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId, ipAdapterNumber }: Props) => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const onDeleteIPAdapter = useCallback(() => {
-    dispatch(rgIPAdapterDeleted({ entityIdentifier, ipAdapterId }));
-  }, [dispatch, entityIdentifier, ipAdapterId]);
+    dispatch(rgIPAdapterDeleted({ entityIdentifier, referenceImageId }));
+  }, [dispatch, entityIdentifier, referenceImageId]);
   const selectIPAdapter = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
-        const ipAdapter = selectRegionalGuidanceIPAdapter(canvas, entityIdentifier, ipAdapterId);
-        assert(ipAdapter, `Regional GuidanceIP Adapter with id ${ipAdapterId} not found`);
-        return ipAdapter;
+        const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+        assert(referenceImage, `Regional Guidance IP Adapter with id ${referenceImageId} not found`);
+        return referenceImage.ipAdapter;
       }),
-    [entityIdentifier, ipAdapterId]
+    [entityIdentifier, referenceImageId]
   );
   const ipAdapter = useAppSelector(selectIPAdapter);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
-      dispatch(rgIPAdapterBeginEndStepPctChanged({ entityIdentifier, ipAdapterId, beginEndStepPct }));
+      dispatch(rgIPAdapterBeginEndStepPctChanged({ entityIdentifier, referenceImageId, beginEndStepPct }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeWeight = useCallback(
     (weight: number) => {
-      dispatch(rgIPAdapterWeightChanged({ entityIdentifier, ipAdapterId, weight }));
+      dispatch(rgIPAdapterWeightChanged({ entityIdentifier, referenceImageId, weight }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeIPMethod = useCallback(
     (method: IPMethodV2) => {
-      dispatch(rgIPAdapterMethodChanged({ entityIdentifier, ipAdapterId, method }));
+      dispatch(rgIPAdapterMethodChanged({ entityIdentifier, referenceImageId, method }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeModel = useCallback(
     (modelConfig: IPAdapterModelConfig) => {
-      dispatch(rgIPAdapterModelChanged({ entityIdentifier, ipAdapterId, modelConfig }));
+      dispatch(rgIPAdapterModelChanged({ entityIdentifier, referenceImageId, modelConfig }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeCLIPVisionModel = useCallback(
     (clipVisionModel: CLIPVisionModelV2) => {
-      dispatch(rgIPAdapterCLIPVisionModelChanged({ entityIdentifier, ipAdapterId, clipVisionModel }));
+      dispatch(rgIPAdapterCLIPVisionModelChanged({ entityIdentifier, referenceImageId, clipVisionModel }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeImage = useCallback(
     (imageDTO: ImageDTO | null) => {
-      dispatch(rgIPAdapterImageChanged({ entityIdentifier, ipAdapterId, imageDTO }));
+      dispatch(rgIPAdapterImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const droppableData = useMemo<RGIPAdapterImageDropData>(
     () => ({
       actionType: 'SET_RG_IP_ADAPTER_IMAGE',
-      context: { id: entityIdentifier.id, ipAdapterId },
+      context: { id: entityIdentifier.id, referenceImageId: referenceImageId },
       id: entityIdentifier.id,
     }),
-    [entityIdentifier.id, ipAdapterId]
+    [entityIdentifier.id, referenceImageId]
   );
   const postUploadAction = useMemo<RGIPAdapterImagePostUploadAction>(
-    () => ({ type: 'SET_RG_IP_ADAPTER_IMAGE', id: entityIdentifier.id, ipAdapterId }),
-    [entityIdentifier.id, ipAdapterId]
+    () => ({ type: 'SET_RG_IP_ADAPTER_IMAGE', id: entityIdentifier.id, referenceImageId: referenceImageId }),
+    [entityIdentifier.id, referenceImageId]
   );
-  const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceIPAdapter(entityIdentifier, ipAdapterId);
+  const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceIPAdapter(entityIdentifier, referenceImageId);
   const isBusy = useCanvasIsBusy();
 
   return (
@@ -150,7 +150,6 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterN
             <IPAdapterImagePreview
               image={ipAdapter.image ?? null}
               onChangeImage={onChangeImage}
-              ipAdapterId={ipAdapter.id}
               droppableData={droppableData}
               postUploadAction={postUploadAction}
             />
