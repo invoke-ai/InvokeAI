@@ -1,8 +1,8 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import {
   useAddControlLayer,
+  useAddGlobalReferenceImage,
   useAddInpaintMask,
-  useAddIPAdapter,
   useAddRasterLayer,
   useAddRegionalGuidance,
 } from 'features/controlLayers/hooks/addLayerHooks';
@@ -16,7 +16,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const addRegionalGuidance = useAddRegionalGuidance();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const addIPAdapter = useAddIPAdapter();
+  const addGlobalReferenceImage = useAddGlobalReferenceImage();
 
   return (
     <Menu>
@@ -32,7 +32,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
       />
       <MenuList>
         <MenuGroup title={t('controlLayers.global')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addIPAdapter}>
+          <MenuItem icon={<PiPlusBold />} onClick={addGlobalReferenceImage}>
             {t('controlLayers.globalReferenceImage')}
           </MenuItem>
         </MenuGroup>

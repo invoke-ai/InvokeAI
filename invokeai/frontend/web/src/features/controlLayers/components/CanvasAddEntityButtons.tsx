@@ -1,8 +1,8 @@
 import { Button, ButtonGroup, Flex } from '@invoke-ai/ui-library';
 import {
   useAddControlLayer,
+  useAddGlobalReferenceImage,
   useAddInpaintMask,
-  useAddIPAdapter,
   useAddRasterLayer,
   useAddRegionalGuidance,
 } from 'features/controlLayers/hooks/addLayerHooks';
@@ -16,7 +16,7 @@ export const CanvasAddEntityButtons = memo(() => {
   const addRegionalGuidance = useAddRegionalGuidance();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const addIPAdapter = useAddIPAdapter();
+  const addGlobalReferenceImage = useAddGlobalReferenceImage();
 
   return (
     <Flex flexDir="column" w="full" h="full" alignItems="center">
@@ -33,7 +33,7 @@ export const CanvasAddEntityButtons = memo(() => {
         <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addControlLayer}>
           {t('controlLayers.controlLayer')}
         </Button>
-        <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addIPAdapter}>
+        <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addGlobalReferenceImage}>
           {t('controlLayers.globalReferenceImage')}
         </Button>
       </ButtonGroup>

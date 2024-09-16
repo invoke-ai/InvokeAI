@@ -1,8 +1,8 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import {
   useAddControlLayer,
+  useAddGlobalReferenceImage,
   useAddInpaintMask,
-  useAddIPAdapter,
   useAddRasterLayer,
   useAddRegionalGuidance,
 } from 'features/controlLayers/hooks/addLayerHooks';
@@ -23,7 +23,7 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
   const addRegionalGuidance = useAddRegionalGuidance();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const addIPAdapter = useAddIPAdapter();
+  const addGlobalReferenceImage = useAddGlobalReferenceImage();
 
   const onClick = useCallback(() => {
     switch (type) {
@@ -40,10 +40,10 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
         addControlLayer();
         break;
       case 'reference_image':
-        addIPAdapter();
+        addGlobalReferenceImage();
         break;
     }
-  }, [addControlLayer, addIPAdapter, addInpaintMask, addRasterLayer, addRegionalGuidance, type]);
+  }, [addControlLayer, addGlobalReferenceImage, addInpaintMask, addRasterLayer, addRegionalGuidance, type]);
 
   const label = useMemo(() => {
     switch (type) {
