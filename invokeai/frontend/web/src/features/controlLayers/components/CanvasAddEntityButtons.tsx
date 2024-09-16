@@ -67,15 +67,7 @@ export const CanvasAddEntityButtons = memo(() => {
         </Flex>
         <Flex flexDir="column" justifyContent="flex-start" gap={2}>
           <Heading size="xs">{t('controlLayers.layer_other')}</Heading>
-          <Button
-            size="sm"
-            variant="ghost"
-            justifyContent="flex-start"
-            leftIcon={<PiPlusBold />}
-            onClick={addRasterLayer}
-          >
-            {t('controlLayers.rasterLayer')}
-          </Button>
+
           <Button
             size="sm"
             variant="ghost"
@@ -84,6 +76,15 @@ export const CanvasAddEntityButtons = memo(() => {
             onClick={addControlLayer}
           >
             {t('controlLayers.controlLayer')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            justifyContent="flex-start"
+            leftIcon={<PiPlusBold />}
+            onClick={addRasterLayer}
+          >
+            {t('controlLayers.rasterLayer')}
           </Button>
         </Flex>
       </Flex>
