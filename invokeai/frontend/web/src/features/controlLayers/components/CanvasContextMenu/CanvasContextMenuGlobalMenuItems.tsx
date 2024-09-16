@@ -1,9 +1,9 @@
 import { MenuGroup, MenuItem } from '@invoke-ai/ui-library';
 import {
   useNewControlLayerFromBbox,
-  useNewGlobalIPAdapterFromBbox,
+  useNewGlobalReferenceImageFromBbox,
   useNewRasterLayerFromBbox,
-  useNewRegionalIPAdapterFromBbox,
+  useNewRegionalReferenceImageFromBbox,
   useSaveBboxToGallery,
   useSaveCanvasToGallery,
 } from 'features/controlLayers/hooks/saveCanvasHooks';
@@ -17,32 +17,36 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
   const isBusy = useCanvasIsBusy();
   const saveCanvasToGallery = useSaveCanvasToGallery();
   const saveBboxToGallery = useSaveBboxToGallery();
-  const saveBboxAsRegionalGuidanceIPAdapter = useNewRegionalIPAdapterFromBbox();
-  const saveBboxAsIPAdapter = useNewGlobalIPAdapterFromBbox();
-  const saveBboxAsRasterLayer = useNewRasterLayerFromBbox();
-  const saveBboxAsControlLayer = useNewControlLayerFromBbox();
+  const newRegionalReferenceImageFromBbox = useNewRegionalReferenceImageFromBbox();
+  const newGlobalReferenceImageFromBbox = useNewGlobalReferenceImageFromBbox();
+  const newRasterLayerFromBbox = useNewRasterLayerFromBbox();
+  const newControlLayerFromBbox = useNewControlLayerFromBbox();
 
   return (
-    <MenuGroup title={t('controlLayers.canvas')}>
-      <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveCanvasToGallery}>
-        {t('controlLayers.saveCanvasToGallery')}
-      </MenuItem>
-      <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveBboxToGallery}>
-        {t('controlLayers.saveBboxToGallery')}
-      </MenuItem>
-      <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={saveBboxAsIPAdapter}>
-        {t('controlLayers.newGlobalIPAdapterFromBbox')}
-      </MenuItem>
-      <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={saveBboxAsRegionalGuidanceIPAdapter}>
-        {t('controlLayers.newRegionalIPAdapterFromBbox')}
-      </MenuItem>
-      <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={saveBboxAsControlLayer}>
-        {t('controlLayers.newControlLayerFromBbox')}
-      </MenuItem>
-      <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={saveBboxAsRasterLayer}>
-        {t('controlLayers.newRasterLayerFromBbox')}
-      </MenuItem>
-    </MenuGroup>
+    <>
+      <MenuGroup title={t('controlLayers.canvasContextMenu.saveToGalleryGroup')}>
+        <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveCanvasToGallery}>
+          {t('controlLayers.canvasContextMenu.saveCanvasToGallery')}
+        </MenuItem>
+        <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveBboxToGallery}>
+          {t('controlLayers.canvasContextMenu.saveBboxToGallery')}
+        </MenuItem>
+      </MenuGroup>
+      <MenuGroup title={t('controlLayers.canvasContextMenu.bboxGroup')}>
+        <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={newGlobalReferenceImageFromBbox}>
+          {t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
+        </MenuItem>
+        <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={newRegionalReferenceImageFromBbox}>
+          {t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
+        </MenuItem>
+        <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={newControlLayerFromBbox}>
+          {t('controlLayers.canvasContextMenu.newControlLayer')}
+        </MenuItem>
+        <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={newRasterLayerFromBbox}>
+          {t('controlLayers.canvasContextMenu.newRasterLayer')}
+        </MenuItem>
+      </MenuGroup>
+    </>
   );
 });
 
