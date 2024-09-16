@@ -7,7 +7,7 @@ import { IPAdapterImagePreview } from 'features/controlLayers/components/IPAdapt
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterModel } from 'features/controlLayers/components/IPAdapter/IPAdapterModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { usePullBboxIntoRegionalGuidanceIPAdapter } from 'features/controlLayers/hooks/saveCanvasHooks';
+import { usePullBboxIntoRegionalGuidanceReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   rgIPAdapterBeginEndStepPctChanged,
@@ -104,7 +104,7 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId, ipAda
     () => ({ type: 'SET_RG_IP_ADAPTER_IMAGE', id: entityIdentifier.id, referenceImageId: referenceImageId }),
     [entityIdentifier.id, referenceImageId]
   );
-  const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceIPAdapter(entityIdentifier, referenceImageId);
+  const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
   const isBusy = useCanvasIsBusy();
 
   return (

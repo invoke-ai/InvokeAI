@@ -1678,6 +1678,18 @@
         "newRasterLayerFromBbox": "New Raster Layer from Bbox",
         "savedToGalleryOk": "Saved to Gallery",
         "savedToGalleryError": "Error saving to gallery",
+        "newGlobalReferenceImageOk": "Created Global Reference Image",
+        "newGlobalReferenceImageError": "Problem Creating Global Reference Image",
+        "newRegionalReferenceImageOk": "Created Regional Reference Image",
+        "newRegionalReferenceImageError": "Problem Creating Regional Reference Image",
+        "newControlLayerOk": "Created Control Layer",
+        "newControlLayerError": "Problem Creating Control Layer",
+        "newRasterLayerOk": "Created Raster Layer",
+        "newRasterLayerError": "Problem Creating Raster Layer",
+        "pullBboxIntoLayerOk": "Bbox Pulled Into Layer",
+        "pullBboxIntoLayerError": "Problem Pulling BBox Into Layer",
+        "pullBboxIntoReferenceImageOk": "Bbox Pulled Into ReferenceImage",
+        "pullBboxIntoReferenceImageError": "Problem Pulling BBox Into ReferenceImage",
         "regionIsEmpty": "Selected region is empty",
         "mergeVisible": "Merge Visible",
         "mergeVisibleOk": "Merged visible layers",
@@ -1932,6 +1944,16 @@
                 "isDisabled": "{{title}} is disabled",
                 "isEmpty": "{{title}} is empty"
             }
+        },
+        "canvasContextMenu": {
+            "saveToGalleryGroup": "Save To Gallery",
+            "saveCanvasToGallery": "Save Canvas To Gallery",
+            "saveBboxToGallery": "Save Bbox To Gallery",
+            "bboxGroup": "Create From Bbox",
+            "newGlobalReferenceImage": "New Global Reference Image",
+            "newRegionalReferenceImage": "New Regional Reference Image",
+            "newControlLayer": "New Control Layer",
+            "newRasterLayer": "New Raster Layer"
         }
     },
     "upscaling": {

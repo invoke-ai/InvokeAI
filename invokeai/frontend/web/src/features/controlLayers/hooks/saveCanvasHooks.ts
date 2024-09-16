@@ -35,10 +35,12 @@ const log = logger('canvas');
 type UseSaveCanvasArg = {
   region: 'canvas' | 'bbox';
   saveToGallery: boolean;
+  toastOk: string;
+  toastError: string;
   onSave?: (imageDTO: ImageDTO, rect: Rect) => void;
 };
 
-const useSaveCanvas = ({ region, saveToGallery, onSave }: UseSaveCanvasArg) => {
+const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave }: UseSaveCanvasArg) => {
   const { t } = useTranslation();
 
   const canvasManager = useCanvasManager();
@@ -49,7 +51,7 @@ const useSaveCanvas = ({ region, saveToGallery, onSave }: UseSaveCanvasArg) => {
 
     if (rect.width === 0 || rect.height === 0) {
       toast({
-        title: t('controlLayers.savedToGalleryError'),
+        title: toastError,
         description: t('controlLayers.regionIsEmpty'),
         status: 'warning',
       });
@@ -64,36 +66,65 @@ const useSaveCanvas = ({ region, saveToGallery, onSave }: UseSaveCanvasArg) => {
       if (onSave) {
         onSave(result.value, rect);
       }
-      toast({ title: t('controlLayers.savedToGalleryOk') });
+      toast({ title: toastOk });
     } else {
       log.error({ error: serializeError(result.error) }, 'Failed to save canvas to gallery');
-      toast({ title: t('controlLayers.savedToGalleryError'), status: 'error' });
+      toast({ title: toastError, status: 'error' });
     }
-  }, [canvasManager.compositor, canvasManager.stage, canvasManager.stateApi, onSave, region, saveToGallery, t]);
+  }, [
+    canvasManager.compositor,
+    canvasManager.stage,
+    canvasManager.stateApi,
+    onSave,
+    region,
+    saveToGallery,
+    t,
+    toastError,
+    toastOk,
+  ]);
 
   return saveCanvas;
 };
 
-const saveCanvasToGalleryArg: UseSaveCanvasArg = { region: 'canvas', saveToGallery: true };
 export const useSaveCanvasToGallery = () => {
-  const saveCanvasToGallery = useSaveCanvas(saveCanvasToGalleryArg);
-  return saveCanvasToGallery;
+  const { t } = useTranslation();
+  const arg: UseSaveCanvasArg = useMemo(
+    () => ({
+      region: 'canvas',
+      saveToGallery: true,
+      toastOk: t('controlLayers.savedToGalleryOk'),
+      toastError: t('controlLayers.savedToGalleryError'),
+    }),
+    [t]
+  );
+  const func = useSaveCanvas(arg);
+  return func;
 };
 
-const saveBboxToGalleryArg: UseSaveCanvasArg = { region: 'bbox', saveToGallery: true };
 export const useSaveBboxToGallery = () => {
-  const saveBboxToGallery = useSaveCanvas(saveBboxToGalleryArg);
-  return saveBboxToGallery;
+  const { t } = useTranslation();
+  const arg: UseSaveCanvasArg = useMemo(
+    () => ({
+      region: 'bbox',
+      saveToGallery: true,
+      toastOk: t('controlLayers.savedToGalleryOk'),
+      toastError: t('controlLayers.savedToGalleryError'),
+    }),
+    [t]
+  );
+  const func = useSaveCanvas(arg);
+  return func;
 };
 
-export const useNewRegionalIPAdapterFromBbox = () => {
+export const useNewRegionalReferenceImageFromBbox = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO) => {
       const ipAdapter: RegionalGuidanceReferenceImageState = {
-        id: getPrefixedId('regional_guidance_ip_adapter'),
+        id: getPrefixedId('regional_guidance_reference_image'),
         ipAdapter: {
           ...deepClone(defaultIPAdapter),
           image: imageDTOToImageWithDims(imageDTO),
@@ -106,13 +137,20 @@ export const useNewRegionalIPAdapterFromBbox = () => {
       dispatch(rgAdded({ overrides, isSelected: true }));
     };
 
-    return { region: 'bbox', saveToGallery: false, onSave };
-  }, [defaultIPAdapter, dispatch]);
-  const newRegionalIPAdapterFromBbox = useSaveCanvas(arg);
-  return newRegionalIPAdapterFromBbox;
+    return {
+      region: 'bbox',
+      saveToGallery: false,
+      onSave,
+      toastOk: t('controlLayers.newRegionalReferenceImageOk'),
+      toastError: t('controlLayers.newRegionalReferenceImageError'),
+    };
+  }, [defaultIPAdapter, dispatch, t]);
+  const func = useSaveCanvas(arg);
+  return func;
 };
 
-export const useNewGlobalIPAdapterFromBbox = () => {
+export const useNewGlobalReferenceImageFromBbox = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
 
@@ -127,13 +165,20 @@ export const useNewGlobalIPAdapterFromBbox = () => {
       dispatch(referenceImageAdded({ overrides, isSelected: true }));
     };
 
-    return { region: 'bbox', saveToGallery: false, onSave };
-  }, [defaultIPAdapter, dispatch]);
-  const newGlobalIPAdapterFromBbox = useSaveCanvas(arg);
-  return newGlobalIPAdapterFromBbox;
+    return {
+      region: 'bbox',
+      saveToGallery: false,
+      onSave,
+      toastOk: t('controlLayers.newGlobalReferenceImageOk'),
+      toastError: t('controlLayers.newGlobalReferenceImageError'),
+    };
+  }, [defaultIPAdapter, dispatch, t]);
+  const func = useSaveCanvas(arg);
+  return func;
 };
 
 export const useNewRasterLayerFromBbox = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, rect: Rect) => {
@@ -144,13 +189,20 @@ export const useNewRasterLayerFromBbox = () => {
       dispatch(rasterLayerAdded({ overrides, isSelected: true }));
     };
 
-    return { region: 'bbox', saveToGallery: false, onSave };
-  }, [dispatch]);
+    return {
+      region: 'bbox',
+      saveToGallery: false,
+      onSave,
+      toastOk: t('controlLayers.newRasterLayerOk'),
+      toastError: t('controlLayers.newRasterLayerError'),
+    };
+  }, [dispatch, t]);
   const newRasterLayerFromBbox = useSaveCanvas(arg);
   return newRasterLayerFromBbox;
 };
 
 export const useNewControlLayerFromBbox = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const defaultControlAdapter = useAppSelector(selectDefaultControlAdapter);
 
@@ -164,13 +216,20 @@ export const useNewControlLayerFromBbox = () => {
       dispatch(controlLayerAdded({ overrides, isSelected: true }));
     };
 
-    return { region: 'bbox', saveToGallery: false, onSave };
-  }, [defaultControlAdapter, dispatch]);
-  const newControlLayerFromBbox = useSaveCanvas(arg);
-  return newControlLayerFromBbox;
+    return {
+      region: 'bbox',
+      saveToGallery: false,
+      onSave,
+      toastOk: t('controlLayers.newControlLayerOk'),
+      toastError: t('controlLayers.newControlLayerError'),
+    };
+  }, [defaultControlAdapter, dispatch, t]);
+  const func = useSaveCanvas(arg);
+  return func;
 };
 
 export const usePullBboxIntoLayer = (entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer'>) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
@@ -185,14 +244,21 @@ export const usePullBboxIntoLayer = (entityIdentifier: CanvasEntityIdentifier<'c
       );
     };
 
-    return { region: 'bbox', saveToGallery: false, onSave };
-  }, [dispatch, entityIdentifier]);
+    return {
+      region: 'bbox',
+      saveToGallery: false,
+      onSave,
+      toastOk: t('controlLayers.pullBboxIntoLayerOk'),
+      toastError: t('controlLayers.pullBboxIntoLayerError'),
+    };
+  }, [dispatch, entityIdentifier, t]);
 
-  const pullBboxIntoLayer = useSaveCanvas(arg);
-  return pullBboxIntoLayer;
+  const func = useSaveCanvas(arg);
+  return func;
 };
 
-export const usePullBboxIntoIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'reference_image'>) => {
+export const usePullBboxIntoGlobalReferenceImage = (entityIdentifier: CanvasEntityIdentifier<'reference_image'>) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
@@ -200,17 +266,24 @@ export const usePullBboxIntoIPAdapter = (entityIdentifier: CanvasEntityIdentifie
       dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier, imageDTO }));
     };
 
-    return { region: 'bbox', saveToGallery: false, onSave };
-  }, [dispatch, entityIdentifier]);
+    return {
+      region: 'bbox',
+      saveToGallery: false,
+      onSave,
+      toastOk: t('controlLayers.pullBboxIntoReferenceImageOk'),
+      toastError: t('controlLayers.pullBboxIntoReferenceImageError'),
+    };
+  }, [dispatch, entityIdentifier, t]);
 
-  const pullBboxIntoIPAdapter = useSaveCanvas(arg);
-  return pullBboxIntoIPAdapter;
+  const func = useSaveCanvas(arg);
+  return func;
 };
 
-export const usePullBboxIntoRegionalGuidanceIPAdapter = (
+export const usePullBboxIntoRegionalGuidanceReferenceImage = (
   entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>,
   referenceImageId: string
 ) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
@@ -218,9 +291,15 @@ export const usePullBboxIntoRegionalGuidanceIPAdapter = (
       dispatch(rgIPAdapterImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
     };
 
-    return { region: 'bbox', saveToGallery: false, onSave };
-  }, [dispatch, entityIdentifier, referenceImageId]);
+    return {
+      region: 'bbox',
+      saveToGallery: false,
+      onSave,
+      toastOk: t('controlLayers.pullBboxIntoReferenceImageOk'),
+      toastError: t('controlLayers.pullBboxIntoReferenceImageError'),
+    };
+  }, [dispatch, entityIdentifier, referenceImageId, t]);
 
-  const pullBboxIntoRegionalGuidanceIPAdapter = useSaveCanvas(arg);
-  return pullBboxIntoRegionalGuidanceIPAdapter;
+  const func = useSaveCanvas(arg);
+  return func;
 };

@@ -6,7 +6,7 @@ import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/c
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { usePullBboxIntoIPAdapter } from 'features/controlLayers/hooks/saveCanvasHooks';
+import { usePullBboxIntoGlobalReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   referenceImageIPAdapterBeginEndStepPctChanged,
@@ -87,7 +87,7 @@ export const IPAdapterSettings = memo(() => {
     () => ({ type: 'SET_IPA_IMAGE', id: entityIdentifier.id }),
     [entityIdentifier.id]
   );
-  const pullBboxIntoIPAdapter = usePullBboxIntoIPAdapter(entityIdentifier);
+  const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);
   const isBusy = useCanvasIsBusy();
 
   return (
