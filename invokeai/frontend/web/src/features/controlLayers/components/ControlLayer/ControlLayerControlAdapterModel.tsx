@@ -51,7 +51,7 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
       <FormControl isInvalid={!value || currentBaseModel !== selectedModel?.base} w="full">
         <Combobox
           options={options}
-          placeholder={t('controlnet.selectModel')}
+          placeholder={t('common.placeholderSelectAModel')}
           value={value}
           onChange={onChange}
           noOptionsMessage={noOptionsMessage}

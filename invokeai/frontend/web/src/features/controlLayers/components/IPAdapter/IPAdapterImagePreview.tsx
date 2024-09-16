@@ -89,12 +89,12 @@ export const IPAdapterImagePreview = memo(({ image, onChangeImage, droppableData
           <IAIDndImageIcon
             onClick={handleResetControlImage}
             icon={<PiArrowCounterClockwiseBold size={16} />}
-            tooltip={t('controlnet.resetControlImage')}
+            tooltip={t('common.reset')}
           />
           <IAIDndImageIcon
             onClick={handleSetControlImageToDimensions}
             icon={<PiRulerBold size={16} />}
-            tooltip={shift ? t('controlnet.setControlImageDimensionsForce') : t('controlnet.setControlImageDimensions')}
+            tooltip={shift ? t('controlLayers.useSizeIgnoreModel') : t('controlLayers.useSizeOptimizeForModel')}
           />
         </Flex>
       )}

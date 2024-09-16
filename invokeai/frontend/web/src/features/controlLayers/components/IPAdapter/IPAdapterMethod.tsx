@@ -16,9 +16,9 @@ export const IPAdapterMethod = memo(({ method, onChange }: Props) => {
   const { t } = useTranslation();
   const options: { label: string; value: IPMethodV2 }[] = useMemo(
     () => [
-      { label: t('controlnet.full'), value: 'full' },
-      { label: `${t('controlnet.style')} (${t('common.beta')})`, value: 'style' },
-      { label: `${t('controlnet.composition')} (${t('common.beta')})`, value: 'composition' },
+      { label: t('controlLayers.ipAdapterMethod.full'), value: 'full' },
+      { label: `${t('controlLayers.ipAdapterMethod.style')} (${t('common.beta')})`, value: 'style' },
+      { label: `${t('controlLayers.ipAdapterMethod.composition')} (${t('common.beta')})`, value: 'composition' },
     ],
     [t]
   );
@@ -34,7 +34,7 @@ export const IPAdapterMethod = memo(({ method, onChange }: Props) => {
   return (
     <FormControl>
       <InformationalPopover feature="ipAdapterMethod">
-        <FormLabel>{t('controlnet.ipAdapterMethod')}</FormLabel>
+        <FormLabel>{t('controlLayers.ipAdapterMethod.ipAdapterMethod')}</FormLabel>
       </InformationalPopover>
       <Combobox value={value} options={options} onChange={_onChange} />
     </FormControl>

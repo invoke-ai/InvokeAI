@@ -78,8 +78,8 @@ const DeleteImageModal = () => {
       title={t('gallery.deleteImage', { count: imagesToDelete.length })}
       isOpen={isModalOpen}
       onClose={handleClose}
-      cancelButtonText={t('boards.cancel')}
-      acceptButtonText={t('controlnet.delete')}
+      cancelButtonText={t('common.cancel')}
+      acceptButtonText={t('common.delete')}
       acceptCallback={handleDelete}
       useInert={false}
     >

@@ -23,7 +23,7 @@ export const Weight = memo(({ weight, onChange }: Props) => {
   return (
     <FormControl orientation="horizontal">
       <InformationalPopover feature="controlNetWeight">
-        <FormLabel m={0}>{t('controlnet.weight')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.weight')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
         value={weight}
