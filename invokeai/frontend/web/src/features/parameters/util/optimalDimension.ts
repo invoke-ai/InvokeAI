@@ -6,7 +6,7 @@ import type { ModelIdentifierField } from 'features/nodes/types/common';
  * @returns The optimal dimension for the model
  */
 export const getOptimalDimension = (model?: ModelIdentifierField | null): number =>
-  model?.base === 'sdxl' ? 1024 : 512;
+  model?.base === 'sdxl' || model?.base === 'flux' ? 1024 : 512;
 
 const MIN_AREA_FACTOR = 0.8;
 const MAX_AREA_FACTOR = 1.2;
