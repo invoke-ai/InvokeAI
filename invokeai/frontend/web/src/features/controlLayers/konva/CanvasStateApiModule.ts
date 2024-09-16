@@ -228,7 +228,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Gets the regions state from redux.
    */
   getRegionsState = () => {
-    return this.getCanvasState().regions;
+    return this.getCanvasState().regionalGuidance;
   };
 
   /**

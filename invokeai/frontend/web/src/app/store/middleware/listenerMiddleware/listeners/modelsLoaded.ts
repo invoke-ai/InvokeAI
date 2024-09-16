@@ -189,7 +189,7 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
     dispatch(referenceImageIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
   });
 
-  selectCanvasSlice(state).regions.entities.forEach((entity) => {
+  selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
     entity.referenceImages.forEach(({ id: referenceImageId, ipAdapter }) => {
       const isModelAvailable = ipaModels.some((m) => m.key === ipAdapter.model?.key);
       if (isModelAvailable) {

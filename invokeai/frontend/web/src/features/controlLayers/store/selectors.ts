@@ -31,7 +31,7 @@ export const selectCanvasSlice = (state: RootState) => state.canvas.present;
  */
 const selectEntityCountAll = createSelector(selectCanvasSlice, (canvas) => {
   return (
-    canvas.regions.entities.length +
+    canvas.regionalGuidance.entities.length +
     canvas.referenceImages.entities.length +
     canvas.rasterLayers.entities.length +
     canvas.controlLayers.entities.length +
@@ -52,7 +52,7 @@ const selectActiveInpaintMaskEntities = createSelector(selectCanvasSlice, (canva
 );
 
 const selectActiveRegionalGuidanceEntities = createSelector(selectCanvasSlice, (canvas) =>
-  canvas.regions.entities.filter((e) => e.isEnabled && e.objects.length > 0)
+  canvas.regionalGuidance.entities.filter((e) => e.isEnabled && e.objects.length > 0)
 );
 
 const selectActiveIPAdapterEntities = createSelector(selectCanvasSlice, (canvas) =>
@@ -127,7 +127,7 @@ export function selectEntity<T extends CanvasEntityIdentifier>(
       entity = state.inpaintMasks.entities.find((entity) => entity.id === id);
       break;
     case 'regional_guidance':
-      entity = state.regions.entities.find((entity) => entity.id === id);
+      entity = state.regionalGuidance.entities.find((entity) => entity.id === id);
       break;
     case 'reference_image':
       entity = state.referenceImages.entities.find((entity) => entity.id === id);
@@ -171,7 +171,7 @@ export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
       entities = state.inpaintMasks.entities;
       break;
     case 'regional_guidance':
-      entities = state.regions.entities;
+      entities = state.regionalGuidance.entities;
       break;
     case 'reference_image':
       entities = state.referenceImages.entities;
@@ -189,7 +189,7 @@ export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
   // These are in the same order as they are displayed in the list!
   return [
     ...state.inpaintMasks.entities.toReversed(),
-    ...state.regions.entities.toReversed(),
+    ...state.regionalGuidance.entities.toReversed(),
     ...state.referenceImages.entities.toReversed(),
     ...state.controlLayers.entities.toReversed(),
     ...state.rasterLayers.entities.toReversed(),
@@ -210,7 +210,7 @@ export function selectAllRenderableEntities(
     ...state.rasterLayers.entities,
     ...state.controlLayers.entities,
     ...state.inpaintMasks.entities,
-    ...state.regions.entities,
+    ...state.regionalGuidance.entities,
   ];
 }
 
@@ -264,7 +264,7 @@ export const selectSelectedEntityFill = createSelector(
 const selectRasterLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.rasterLayers.isHidden);
 const selectControlLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.controlLayers.isHidden);
 const selectInpaintMasksIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.inpaintMasks.isHidden);
-const selectRegionalGuidanceIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.regions.isHidden);
+const selectRegionalGuidanceIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.regionalGuidance.isHidden);
 
 /**
  * Returns the hidden selector for the given entity type.

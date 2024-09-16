@@ -255,7 +255,7 @@ export const buildSDXLGraph = async (
 
   const regionsResult = await addRegions(
     manager,
-    canvas.regions.entities,
+    canvas.regionalGuidance.entities,
     g,
     canvas.bbox.rect,
     modelConfig.base,

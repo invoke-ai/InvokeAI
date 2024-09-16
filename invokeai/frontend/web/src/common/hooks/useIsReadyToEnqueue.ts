@@ -205,7 +205,7 @@ const createSelector = (
             }
           });
 
-        canvas.regions.entities
+        canvas.regionalGuidance.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layer_one');
