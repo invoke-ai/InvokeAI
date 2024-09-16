@@ -26,8 +26,8 @@ const LAYER_TYPE_TO_TKEY = {
   reference_image: 'controlLayers.referenceImage',
   inpaint_mask: 'controlLayers.inpaintMask',
   regional_guidance: 'controlLayers.regionalGuidance',
-  raster_layer: 'controlLayers.raster',
-  control_layer: 'controlLayers.globalControlAdapter',
+  raster_layer: 'controlLayers.rasterLayer',
+  control_layer: 'controlLayers.controlLayer',
 } as const;
 
 const createSelector = (

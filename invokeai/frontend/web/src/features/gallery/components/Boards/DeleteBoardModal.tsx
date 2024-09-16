@@ -95,7 +95,7 @@ const DeleteBoardModal = () => {
       <AlertDialogOverlay>
         <AlertDialogContent>
           <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            {t('controlnet.delete')} {boardToDelete.board_name}
+            {t('common.delete')} {boardToDelete.board_name}
           </AlertDialogHeader>
 
           <AlertDialogBody>
