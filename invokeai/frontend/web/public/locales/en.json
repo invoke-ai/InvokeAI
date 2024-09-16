@@ -1300,6 +1300,13 @@
                 "High CFG Scale values can result in over-saturation and distorted generation results. "
             ]
         },
+        "paramGuidance": {
+            "heading": "Guidance",
+            "paragraphs": [
+                "Controls how much the prompt influences the generation process.",
+                "High guidance values can result in over-saturation and high or low guidance may result in distorted generation results. Guidance only applies to FLUX DEV models."
+            ]
+        },
         "paramCFGRescaleMultiplier": {
             "heading": "CFG Rescale Multiplier",
             "paragraphs": [
