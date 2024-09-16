@@ -2,6 +2,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
   inpaintMaskAdded,
@@ -16,6 +17,7 @@ import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
+  CanvasRegionalGuidanceState,
   ControlNetConfig,
   IPAdapterConfig,
   T2IAdapterConfig,
@@ -102,6 +104,20 @@ export const useAddRegionalGuidance = () => {
   const func = useCallback(() => {
     dispatch(rgAdded({ isSelected: true }));
   }, [dispatch]);
+
+  return func;
+};
+
+export const useAddRegionalReferenceImage = () => {
+  const dispatch = useAppDispatch();
+  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+
+  const func = useCallback(() => {
+    const overrides: Partial<CanvasRegionalGuidanceState> = {
+      referenceImages: [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter: defaultIPAdapter }],
+    };
+    dispatch(rgAdded({ isSelected: true, overrides }));
+  }, [defaultIPAdapter, dispatch]);
 
   return func;
 };
