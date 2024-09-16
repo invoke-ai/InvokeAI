@@ -1,10 +1,11 @@
-import { Button, ButtonGroup, Flex } from '@invoke-ai/ui-library';
+import { Button, Flex, Heading } from '@invoke-ai/ui-library';
 import {
   useAddControlLayer,
   useAddGlobalReferenceImage,
   useAddInpaintMask,
   useAddRasterLayer,
   useAddRegionalGuidance,
+  useAddRegionalReferenceImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,26 +18,75 @@ export const CanvasAddEntityButtons = memo(() => {
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
   const addGlobalReferenceImage = useAddGlobalReferenceImage();
+  const addRegionalReferenceImage = useAddRegionalReferenceImage();
 
   return (
-    <Flex flexDir="column" w="full" h="full" alignItems="center">
-      <ButtonGroup position="relative" orientation="vertical" isAttached={false} top="20%">
-        <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addInpaintMask}>
-          {t('controlLayers.inpaintMask')}
-        </Button>
-        <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addRegionalGuidance}>
-          {t('controlLayers.regionalGuidance')}
-        </Button>
-        <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addRasterLayer}>
-          {t('controlLayers.rasterLayer')}
-        </Button>
-        <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addControlLayer}>
-          {t('controlLayers.controlLayer')}
-        </Button>
-        <Button variant="ghost" justifyContent="flex-start" leftIcon={<PiPlusBold />} onClick={addGlobalReferenceImage}>
-          {t('controlLayers.globalReferenceImage')}
-        </Button>
-      </ButtonGroup>
+    <Flex w="full" h="full" justifyContent="center" gap={4}>
+      <Flex position="relative" flexDir="column" gap={4} top="20%">
+        <Flex flexDir="column" justifyContent="flex-start" gap={2}>
+          <Heading size="xs">{t('controlLayers.global')}</Heading>
+          <Button
+            size="sm"
+            variant="ghost"
+            justifyContent="flex-start"
+            leftIcon={<PiPlusBold />}
+            onClick={addGlobalReferenceImage}
+          >
+            {t('controlLayers.globalReferenceImage')}
+          </Button>
+        </Flex>
+        <Flex flexDir="column" gap={2}>
+          <Heading size="xs">{t('controlLayers.regional')}</Heading>
+          <Button
+            size="sm"
+            variant="ghost"
+            justifyContent="flex-start"
+            leftIcon={<PiPlusBold />}
+            onClick={addInpaintMask}
+          >
+            {t('controlLayers.inpaintMask')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            justifyContent="flex-start"
+            leftIcon={<PiPlusBold />}
+            onClick={addRegionalGuidance}
+          >
+            {t('controlLayers.regionalGuidance')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            justifyContent="flex-start"
+            leftIcon={<PiPlusBold />}
+            onClick={addRegionalReferenceImage}
+          >
+            {t('controlLayers.regionalReferenceImage')}
+          </Button>
+        </Flex>
+        <Flex flexDir="column" justifyContent="flex-start" gap={2}>
+          <Heading size="xs">{t('controlLayers.layer_other')}</Heading>
+          <Button
+            size="sm"
+            variant="ghost"
+            justifyContent="flex-start"
+            leftIcon={<PiPlusBold />}
+            onClick={addRasterLayer}
+          >
+            {t('controlLayers.rasterLayer')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            justifyContent="flex-start"
+            leftIcon={<PiPlusBold />}
+            onClick={addControlLayer}
+          >
+            {t('controlLayers.controlLayer')}
+          </Button>
+        </Flex>
+      </Flex>
     </Flex>
   );
 });

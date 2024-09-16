@@ -5,6 +5,7 @@ import {
   useAddInpaintMask,
   useAddRasterLayer,
   useAddRegionalGuidance,
+  useAddRegionalReferenceImage,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,11 +13,12 @@ import { PiPlusBold } from 'react-icons/pi';
 
 export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const { t } = useTranslation();
+  const addGlobalReferenceImage = useAddGlobalReferenceImage();
   const addInpaintMask = useAddInpaintMask();
   const addRegionalGuidance = useAddRegionalGuidance();
+  const addRegionalReferenceImage = useAddRegionalReferenceImage();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const addGlobalReferenceImage = useAddGlobalReferenceImage();
 
   return (
     <Menu>
@@ -42,6 +44,9 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
           </MenuItem>
           <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance}>
             {t('controlLayers.regionalGuidance')}
+          </MenuItem>
+          <MenuItem icon={<PiPlusBold />} onClick={addRegionalReferenceImage}>
+            {t('controlLayers.regionalReferenceImage')}
           </MenuItem>
         </MenuGroup>
         <MenuGroup title={t('controlLayers.layer_other')}>

@@ -176,7 +176,8 @@
         "disabled": "Disabled",
         "placeholderSelectAModel": "Select a model",
         "reset": "Reset",
-        "none": "None"
+        "none": "None",
+        "new": "New"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
@@ -1649,6 +1650,7 @@
         "inpaintMask": "Inpaint Mask",
         "regionalGuidance": "Regional Guidance",
         "referenceImage": "Reference Image",
+        "regionalReferenceImage": "Regional Reference Image",
         "globalReferenceImage": "Global Reference Image",
         "sendingToCanvas": "Sending to Canvas",
         "sendingToGallery": "Sending to Gallery",
