@@ -87,7 +87,7 @@ const initialState: ParamsState = {
   scheduler: 'euler',
   seed: 0,
   shouldRandomizeSeed: true,
-  steps: 50,
+  steps: 30,
   model: null,
   vae: null,
   fluxVAE: null,
