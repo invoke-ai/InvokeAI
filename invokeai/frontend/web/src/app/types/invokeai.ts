@@ -22,7 +22,6 @@ export type AppFeature =
   | 'multiselect'
   | 'pauseQueue'
   | 'resumeQueue'
-  | 'prependQueue'
   | 'invocationCache'
   | 'bulkDownload'
   | 'starterModels'

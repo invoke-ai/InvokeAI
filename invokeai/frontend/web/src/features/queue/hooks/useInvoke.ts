@@ -1,30 +1,29 @@
 import { enqueueRequested } from 'app/store/actions';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 
-export const useQueueFront = () => {
+export const useInvoke = () => {
   const dispatch = useAppDispatch();
   const tabName = useAppSelector(selectActiveTab);
   const { isReady } = useIsReadyToEnqueue();
   const [_, { isLoading }] = useEnqueueBatchMutation({
     fixedCacheKey: 'enqueueBatch',
   });
-  const prependEnabled = useFeatureStatus('prependQueue');
-
-  const isDisabled = useMemo(() => {
-    return !isReady || !prependEnabled;
-  }, [isReady, prependEnabled]);
-
+  const queueBack = useCallback(() => {
+    if (!isReady) {
+      return;
+    }
+    dispatch(enqueueRequested({ tabName, prepend: false }));
+  }, [dispatch, isReady, tabName]);
   const queueFront = useCallback(() => {
-    if (isDisabled) {
+    if (!isReady) {
       return;
     }
     dispatch(enqueueRequested({ tabName, prepend: true }));
-  }, [dispatch, isDisabled, tabName]);
+  }, [dispatch, isReady, tabName]);
 
-  return { queueFront, isLoading, isDisabled };
+  return { queueBack, queueFront, isLoading, isDisabled: !isReady };
 };
