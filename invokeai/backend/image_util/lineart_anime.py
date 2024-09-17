@@ -260,8 +260,14 @@ class LineartAnimeEdgeDetector:
             line = cv2.resize(line, (width, height), interpolation=cv2.INTER_CUBIC)
             line = line.clip(0, 255).astype(np.uint8)
 
-        detected_map = line
-        detected_map = 255 - detected_map
+        detected_map = 255 - line
+
+        # The lineart model often outputs a lot of almost-black noise. SD1.5 ControlNets seem to be OK with this, but
+        # SDXL ControlNets are not - they need a cleaner map. 12 was experimentally determined to be a good threshold,
+        # eliminating all the noise while keeping the actual edges. Other approaches to thresholding may be better,
+        # for example stretching the contrast or removing noise.
+        detected_map[detected_map < 12] = 0
+
         output = np_to_pil(detected_map)
 
         return output
