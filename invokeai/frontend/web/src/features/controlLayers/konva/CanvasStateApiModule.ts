@@ -191,7 +191,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Enqueues a batch, pushing state to redux.
    */
   enqueueBatch = (batch: BatchConfig) => {
-    this.store.dispatch(
+    return this.store.dispatch(
       queueApi.endpoints.enqueueBatch.initiate(batch, {
         fixedCacheKey: 'enqueueBatch',
       })
@@ -212,11 +212,23 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     return this.runSelector(selectCanvasSettingsSlice);
   };
 
+  getGridSize = (): number => {
+    const snapToGrid = this.getSettings().snapToGrid;
+    if (!snapToGrid) {
+      return 1;
+    }
+    const useFine = this.$ctrlKey.get() || this.$metaKey.get();
+    if (useFine) {
+      return 8;
+    }
+    return 64;
+  };
+
   /**
    * Gets the regions state from redux.
    */
   getRegionsState = () => {
-    return this.getCanvasState().regions;
+    return this.getCanvasState().regionalGuidance;
   };
 
   /**
@@ -358,7 +370,17 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   /**
    * Whether an entity is currently being transformed. Derived from `$transformingAdapter`.
    */
-  $isTranforming = computed(this.$transformingAdapter, (transformingAdapter) => Boolean(transformingAdapter));
+  $isTransforming = computed(this.$transformingAdapter, (transformingAdapter) => Boolean(transformingAdapter));
+
+  /**
+   * The entity adapter being rasterized, if any.
+   */
+  $rasterizingAdapter = atom<CanvasEntityAdapter | null>(null);
+
+  /**
+   * Whether an entity is currently being transformed. Derived from `$transformingAdapter`.
+   */
+  $isRasterizing = computed(this.$rasterizingAdapter, (rasterizingAdapter) => Boolean(rasterizingAdapter));
 
   /**
    * The last canvas progress event. This is set in a global event listener. The staging area may set it to null when it

@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
@@ -31,8 +31,8 @@ export const ImageMenuItemSendToCanvas = memo(() => {
     };
     dispatch(sentImageToCanvas());
     dispatch(rasterLayerAdded({ overrides, isSelected: true }));
-    dispatch(setActiveTab('generation'));
-    imageViewer.onClose();
+    dispatch(setActiveTab('canvas'));
+    imageViewer.close();
     toast({
       id: 'SENT_TO_CANVAS',
       title: t('toast.sentToCanvas'),

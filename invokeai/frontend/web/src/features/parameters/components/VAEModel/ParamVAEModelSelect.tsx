@@ -38,9 +38,9 @@ const ParamVAEModelSelect = () => {
   });
 
   return (
-    <FormControl isDisabled={!options.length} isInvalid={!options.length}>
+    <FormControl isDisabled={!options.length} isInvalid={!options.length} minW={0} flexGrow={1}>
       <InformationalPopover feature="paramVAE">
-        <FormLabel>{t('modelManager.vae')}</FormLabel>
+        <FormLabel m={0}>{t('modelManager.vae')}</FormLabel>
       </InformationalPopover>
       <Combobox
         isClearable

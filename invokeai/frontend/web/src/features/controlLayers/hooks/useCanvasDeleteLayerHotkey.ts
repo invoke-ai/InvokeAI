@@ -1,5 +1,6 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
@@ -11,6 +12,7 @@ export function useCanvasDeleteLayerHotkey() {
   const dispatch = useAppDispatch();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const isStaging = useAppSelector(selectIsStaging);
+  const isBusy = useCanvasIsBusy();
 
   const deleteSelectedLayer = useCallback(() => {
     if (selectedEntityIdentifier === null) {
@@ -24,8 +26,9 @@ export function useCanvasDeleteLayerHotkey() {
     [selectedEntityIdentifier, isStaging]
   );
 
-  useHotkeys(['delete', 'backspace'], deleteSelectedLayer, { enabled: isDeleteEnabled }, [
+  useHotkeys(['delete', 'backspace'], deleteSelectedLayer, { enabled: isDeleteEnabled && !isBusy }, [
     isDeleteEnabled,
+    isBusy,
     deleteSelectedLayer,
   ]);
 }

@@ -1,19 +1,30 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { selectDefaultControlAdapter } from 'features/controlLayers/hooks/addLayerHooks';
+import { deepClone } from 'common/util/deepClone';
+import { selectDefaultControlAdapter, selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
-  ipaImageChanged,
+  entityRasterized,
+  entitySelected,
   rasterLayerAdded,
+  referenceImageAdded,
+  referenceImageIPAdapterImageChanged,
+  rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { CanvasControlLayerState, CanvasRasterLayerState } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import type {
+  CanvasControlLayerState,
+  CanvasRasterLayerState,
+  CanvasReferenceImageState,
+  CanvasRegionalGuidanceState,
+} from 'features/controlLayers/store/types';
+import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
-import { imageToCompareChanged, isImageViewerOpenChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { imagesApi } from 'services/api/endpoints/images';
@@ -54,7 +65,10 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { id } = overData.context;
         dispatch(
-          ipaImageChanged({ entityIdentifier: { id, type: 'ip_adapter' }, imageDTO: activeData.payload.imageDTO })
+          referenceImageIPAdapterImageChanged({
+            entityIdentifier: { id, type: 'reference_image' },
+            imageDTO: activeData.payload.imageDTO,
+          })
         );
         return;
       }
@@ -67,11 +81,11 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        const { id, ipAdapterId } = overData.context;
+        const { id, referenceImageId } = overData.context;
         dispatch(
           rgIPAdapterImageChanged({
             entityIdentifier: { id, type: 'regional_guidance' },
-            ipAdapterId,
+            referenceImageId,
             imageDTO: activeData.payload.imageDTO,
           })
         );
@@ -117,6 +131,49 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         return;
       }
 
+      if (
+        overData.actionType === 'ADD_REGIONAL_REFERENCE_IMAGE_FROM_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const state = getState();
+        const ipAdapter = deepClone(selectDefaultIPAdapter(state));
+        ipAdapter.image = imageDTOToImageWithDims(activeData.payload.imageDTO);
+        const overrides: Partial<CanvasRegionalGuidanceState> = {
+          referenceImages: [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }],
+        };
+        dispatch(rgAdded({ overrides, isSelected: true }));
+        return;
+      }
+
+      if (
+        overData.actionType === 'ADD_GLOBAL_REFERENCE_IMAGE_FROM_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const state = getState();
+        const ipAdapter = deepClone(selectDefaultIPAdapter(state));
+        ipAdapter.image = imageDTOToImageWithDims(activeData.payload.imageDTO);
+        const overrides: Partial<CanvasReferenceImageState> = {
+          ipAdapter,
+        };
+        dispatch(referenceImageAdded({ overrides, isSelected: true }));
+        return;
+      }
+
+      /**
+       * Image dropped on Raster layer
+       */
+      if (overData.actionType === 'REPLACE_LAYER_WITH_IMAGE' && activeData.payloadType === 'IMAGE_DTO') {
+        const state = getState();
+        const { entityIdentifier } = overData.context;
+        const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
+        const { x, y } = selectCanvasSlice(state).bbox.rect;
+        dispatch(entityRasterized({ entityIdentifier, imageObject, position: { x, y }, replaceObjects: true }));
+        dispatch(entitySelected({ entityIdentifier }));
+        return;
+      }
+
       /**
        * Image dropped on node image field
        */
@@ -146,7 +203,6 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { imageDTO } = activeData.payload;
         dispatch(imageToCompareChanged(imageDTO));
-        dispatch(isImageViewerOpenChanged(true));
         return;
       }
 

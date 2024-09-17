@@ -23,11 +23,11 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
   const title = useEntityTypeTitle(type);
   const collapse = useBoolean(true);
   const canMergeVisible = useMemo(() => type === 'raster_layer' || type === 'inpaint_mask', [type]);
-  const canHideAll = useMemo(() => type !== 'ip_adapter', [type]);
+  const canHideAll = useMemo(() => type !== 'reference_image', [type]);
 
   return (
     <Flex flexDir="column" w="full">
-      <Flex w="full" px={1}>
+      <Flex w="full">
         <Flex
           flexGrow={1}
           as={Button}

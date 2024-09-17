@@ -10,7 +10,9 @@ const sx: SystemStyleObject = {
     transitionDuration: 'normal',
     fill: 'base.100',
     _hover: { fill: 'base.50' },
-    filter: 'drop-shadow(0px 0px 0.1rem var(--invoke-colors-base-800))',
+    filter: `drop-shadow(0px 0px 0.1rem var(--invoke-colors-base-900))
+      drop-shadow(0px 0px 0.3rem var(--invoke-colors-base-900))
+      drop-shadow(0px 0px 0.3rem var(--invoke-colors-base-900))`,
   },
 };
 
@@ -27,7 +29,6 @@ const IAIDndImageIcon = (props: Props) => {
       onClick={onClick}
       aria-label={tooltip}
       icon={icon}
-      size="sm"
       variant="link"
       sx={sx}
       data-testid={tooltip}

@@ -1,7 +1,7 @@
 import type { Property } from 'csstype';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
+import { getKonvaNodeDebugAttrs, getPrefixedId, getRectUnion } from 'features/controlLayers/konva/util';
 import type {
   CanvasEntityIdentifier,
   Coordinate,
@@ -9,7 +9,7 @@ import type {
   Rect,
   StageAttrs,
 } from 'features/controlLayers/store/types';
-import type Konva from 'konva';
+import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { clamp } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -58,8 +58,9 @@ export class CanvasStageModule extends CanvasModuleBase {
   });
 
   subscriptions = new Set<() => void>();
+  resizeObserver: ResizeObserver | null = null;
 
-  constructor(stage: Konva.Stage, container: HTMLDivElement, manager: CanvasManager) {
+  constructor(container: HTMLDivElement, manager: CanvasManager) {
     super();
     this.id = getPrefixedId('stage');
     this.parent = manager;
@@ -70,34 +71,42 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.log.debug('Creating module');
 
     this.container = container;
-    this.konva = { stage };
+    this.konva = {
+      stage: new Konva.Stage({
+        id: getPrefixedId('konva_stage'),
+        container,
+      }),
+    };
   }
 
-  setEventListeners = () => {
-    this.konva.stage.on('wheel', this.onStageMouseWheel);
-    this.konva.stage.on('dragmove', this.onStageDragMove);
-    this.konva.stage.on('dragend', this.onStageDragEnd);
+  setContainer = (container: HTMLDivElement) => {
+    this.container = container;
+    this.konva.stage.container(container);
+    this.setResizeObserver();
+  };
 
-    return () => {
-      this.konva.stage.off('wheel', this.onStageMouseWheel);
-      this.konva.stage.off('dragmove', this.onStageDragMove);
-      this.konva.stage.off('dragend', this.onStageDragEnd);
-    };
+  setResizeObserver = () => {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+    this.resizeObserver = new ResizeObserver(this.fitStageToContainer);
+    this.resizeObserver.observe(this.container);
   };
 
   initialize = () => {
     this.log.debug('Initializing module');
     this.konva.stage.container(this.container);
-    const resizeObserver = new ResizeObserver(this.fitStageToContainer);
-    resizeObserver.observe(this.container);
+    this.setResizeObserver();
     this.fitStageToContainer();
     this.fitLayersToStage();
-    const cleanupListeners = this.setEventListeners();
 
-    this.subscriptions.add(cleanupListeners);
-    this.subscriptions.add(() => {
-      resizeObserver.disconnect();
-    });
+    this.konva.stage.on('wheel', this.onStageMouseWheel);
+    this.konva.stage.on('dragmove', this.onStageDragMove);
+    this.konva.stage.on('dragend', this.onStageDragEnd);
+
+    this.subscriptions.add(() => this.konva.stage.off('wheel', this.onStageMouseWheel));
+    this.subscriptions.add(() => this.konva.stage.off('dragmove', this.onStageDragMove));
+    this.subscriptions.add(() => this.konva.stage.off('dragend', this.onStageDragEnd));
   };
 
   /**
@@ -120,13 +129,7 @@ export class CanvasStageModule extends CanvasModuleBase {
 
     this.konva.stage.width(containerWidth);
     this.konva.stage.height(containerHeight);
-    this.$stageAttrs.set({
-      x: this.konva.stage.x(),
-      y: this.konva.stage.y(),
-      width: this.konva.stage.width(),
-      height: this.konva.stage.height(),
-      scale: this.konva.stage.scaleX(),
-    });
+    this.syncStageAttrs();
 
     if (shouldFitLayersAfterFittingStage) {
       this.fitLayersToStage();
@@ -143,7 +146,9 @@ export class CanvasStageModule extends CanvasModuleBase {
       if (type && adapter.state.type !== type) {
         continue;
       }
-      rects.push(adapter.transformer.getRelativeRect());
+      if (adapter.renderer.hasObjects()) {
+        rects.push(adapter.transformer.getRelativeRect());
+      }
     }
 
     return getRectUnion(...rects);
@@ -204,12 +209,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       scaleY: scale,
     });
 
-    this.$stageAttrs.set({
-      ...this.$stageAttrs.get(),
-      x,
-      y,
-      scale,
-    });
+    this.syncStageAttrs({ x, y, scale });
   };
 
   /**
@@ -265,13 +265,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       scaleY: newScale,
     });
 
-    this.$stageAttrs.set({
-      x: Math.floor(this.konva.stage.x()),
-      y: Math.floor(this.konva.stage.y()),
-      width: this.konva.stage.width(),
-      height: this.konva.stage.height(),
-      scale: this.konva.stage.scaleX(),
-    });
+    this.syncStageAttrs();
   };
 
   onStageMouseWheel = (e: KonvaEventObject<WheelEvent>) => {
@@ -297,14 +291,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       return;
     }
 
-    this.$stageAttrs.set({
-      // Stage position should always be an integer, else we get fractional pixels which are blurry
-      x: Math.floor(this.konva.stage.x()),
-      y: Math.floor(this.konva.stage.y()),
-      width: this.konva.stage.width(),
-      height: this.konva.stage.height(),
-      scale: this.konva.stage.scaleX(),
-    });
+    this.syncStageAttrs();
   };
 
   onStageDragEnd = (e: KonvaEventObject<DragEvent>) => {
@@ -312,14 +299,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       return;
     }
 
-    this.$stageAttrs.set({
-      // Stage position should always be an integer, else we get fractional pixels which are blurry
-      x: Math.floor(this.konva.stage.x()),
-      y: Math.floor(this.konva.stage.y()),
-      width: this.konva.stage.width(),
-      height: this.konva.stage.height(),
-      scale: this.konva.stage.scaleX(),
-    });
+    this.syncStageAttrs();
   };
 
   /**
@@ -345,17 +325,29 @@ export class CanvasStageModule extends CanvasModuleBase {
   }
 
   /**
-   * Scales a number of pixels by the current stage scale. For example, if the stage is scaled by 5, then 10 pixels
-   * would be scaled to 10px / 5 = 2 pixels.
-   * @param pixels The number of pixels to scale
-   * @returns The number of pixels scaled by the current stage scale
+   * Unscales a value by the current stage scale. For example, if the stage scale is 5, and you want to unscale 10
+   * pixels, would be scaled to 10px / 5 = 2 pixels.
    */
-  getScaledPixels = (pixels: number): number => {
-    return pixels / this.getScale();
+  unscale = (value: number): number => {
+    return value / this.getScale();
   };
 
   setCursor = (cursor: Property.Cursor) => {
+    if (this.container.style.cursor === cursor) {
+      return;
+    }
     this.container.style.cursor = cursor;
+  };
+
+  syncStageAttrs = (overrides?: Partial<StageAttrs>) => {
+    this.$stageAttrs.set({
+      x: this.konva.stage.x(),
+      y: this.konva.stage.y(),
+      width: this.konva.stage.width(),
+      height: this.konva.stage.height(),
+      scale: this.konva.stage.scaleX(),
+      ...overrides,
+    });
   };
 
   setIsDraggable = (isDraggable: boolean) => {
@@ -366,10 +358,42 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.konva.stage.add(layer);
   };
 
+  /**
+   * Gets the rectangle of the stage in the absolute coordinates. This can be used to draw a rect that covers the
+   * entire stage.
+   */
+  getScaledStageRect = (): Rect => {
+    const { x, y } = this.getPosition();
+    const { width, height } = this.getSize();
+    const scale = this.getScale();
+    return {
+      x: -x / scale,
+      y: -y / scale,
+      width: width / scale,
+      height: height / scale,
+    };
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      config: this.config,
+      $stageAttrs: this.$stageAttrs.get(),
+      konva: {
+        stage: getKonvaNodeDebugAttrs(this.konva.stage),
+      },
+    };
+  };
+
   destroy = () => {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.subscriptions.clear();
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
     this.konva.stage.destroy();
   };
 }

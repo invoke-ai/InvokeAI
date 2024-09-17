@@ -11,9 +11,9 @@ export const CanvasEntityList = memo(() => {
   return (
     <ScrollableContent>
       <Flex flexDir="column" gap={2} data-testid="control-layers-layer-list" w="full" h="full">
+        <IPAdapterList />
         <InpaintMaskList />
         <RegionalGuidanceEntityList />
-        <IPAdapterList />
         <ControlLayerEntityList />
         <RasterLayerEntityList />
       </Flex>

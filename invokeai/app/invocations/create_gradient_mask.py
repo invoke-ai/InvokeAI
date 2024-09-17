@@ -28,7 +28,10 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_t
 class GradientMaskOutput(BaseInvocationOutput):
     """Outputs a denoise mask and an image representing the total gradient of the mask."""
 
-    denoise_mask: DenoiseMaskField = OutputField(description="Mask for denoise model run")
+    denoise_mask: DenoiseMaskField = OutputField(
+        description="Mask for denoise model run. Values of 0.0 represent the regions to be fully denoised, and 1.0 "
+        + "represent the regions to be preserved."
+    )
     expanded_mask_area: ImageField = OutputField(
         description="Image representing the total gradient area of the mask. For paste-back purposes."
     )

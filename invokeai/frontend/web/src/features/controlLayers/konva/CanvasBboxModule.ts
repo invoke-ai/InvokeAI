@@ -6,7 +6,8 @@ import {
 } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
+import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -50,6 +51,8 @@ export class CanvasBboxModule extends CanvasModuleBase {
     group: Konva.Group;
     transformer: Konva.Transformer;
     proxyRect: Konva.Rect;
+    overlayRect: Konva.Rect;
+    overlayGroup: Konva.Group;
   };
 
   /**
@@ -75,14 +78,58 @@ export class CanvasBboxModule extends CanvasModuleBase {
       proxyRect: new Konva.Rect({
         name: `${this.type}:rect`,
         listening: false,
-        strokeEnabled: false,
+        strokeEnabled: true,
         draggable: true,
+        stroke: 'rgb(42,42,42)',
+        strokeWidth: 1,
+        strokeScaleEnabled: false,
+      }),
+      overlayGroup: new Konva.Group({
+        name: `${this.type}:overlayGroup`,
+        listening: false,
+        clipFunc: (ctx) => {
+          /**
+           * We want to clip the overlay so that the bbox region shows through, but konva's clip clips everything
+           * _outside_ the clip bounds. For example, if we used `overlayGroup.clip(bboxRect)`, we would be rendering
+           * the overlay inside the bbox rect. We need the inverse - only render the overlay outside the bbox rect.
+           *
+           * To do this, we can use the clipFunc to define a custom clipping path. We can use canvas winding rules to
+           * define a shape that covers exactly the area outside the bbox rect. First, draw a _clockwise_ path around
+           * the whole stage, then draw a _counter-clockwise_ path around the bbox rect. The area between the two paths
+           * will be used as the clipping region.
+           *
+           * Here's a good overview of winding rules: https://www.bit-101.com/2003/?p=3702
+           */
+
+          const stageRect = this.manager.stage.getScaledStageRect();
+          const bboxRect = this.manager.stateApi.runSelector(selectBbox).rect;
+
+          ctx.beginPath();
+          ctx.moveTo(stageRect.x, stageRect.y);
+          ctx.lineTo(stageRect.x + stageRect.width, stageRect.y);
+          ctx.lineTo(stageRect.x + stageRect.width, stageRect.y + stageRect.height);
+          ctx.lineTo(stageRect.x, stageRect.y + stageRect.height);
+          ctx.closePath();
+          ctx.moveTo(bboxRect.x, bboxRect.y);
+          ctx.lineTo(bboxRect.x, bboxRect.y + bboxRect.height);
+          ctx.lineTo(bboxRect.x + bboxRect.width, bboxRect.y + bboxRect.height);
+          ctx.lineTo(bboxRect.x + bboxRect.width, bboxRect.y);
+          ctx.closePath();
+        },
+      }),
+      overlayRect: new Konva.Rect({
+        name: `${this.type}:overlay`,
+        listening: false,
+        strokeEnabled: false,
+        draggable: false,
+        fill: 'hsl(220 12% 10% / 0.8)',
       }),
       transformer: new Konva.Transformer({
         name: `${this.type}:transformer`,
         borderDash: [5, 5],
         borderStroke: 'rgba(212,216,234,1)',
         borderEnabled: true,
+        borderStrokeWidth: 1,
         rotateEnabled: false,
         keepRatio: false,
         ignoreStroke: true,
@@ -105,6 +152,9 @@ export class CanvasBboxModule extends CanvasModuleBase {
 
     // The transformer will always be transforming the proxy rect
     this.konva.transformer.nodes([this.konva.proxyRect]);
+
+    this.konva.overlayGroup.add(this.konva.overlayRect);
+    this.konva.group.add(this.konva.overlayGroup);
     this.konva.group.add(this.konva.proxyRect);
     this.konva.group.add(this.konva.transformer);
 
@@ -113,6 +163,15 @@ export class CanvasBboxModule extends CanvasModuleBase {
 
     // Also listen to redux state to update the bbox's position and dimensions.
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectBbox, this.render));
+
+    // Listen for stage changes to update the overlay's size
+    this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.syncOverlay));
+
+    // Listen for the bbox overlay setting to update the overlay's visibility
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectBboxOverlay, this.render));
+
+    // Update on busy state changes
+    this.subscriptions.add(this.manager.$isBusy.listen(this.render));
   }
 
   initialize = () => {
@@ -148,17 +207,32 @@ export class CanvasBboxModule extends CanvasModuleBase {
       scaleY: 1,
       listening: tool === 'bbox',
     });
+
+    this.syncOverlay();
+
     this.konva.transformer.setAttrs({
       listening: tool === 'bbox',
       enabledAnchors: tool === 'bbox' ? ALL_ANCHORS : NO_ANCHORS,
     });
   };
 
-  destroy = () => {
-    this.log.trace('Destroying module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-    this.subscriptions.clear();
-    this.konva.group.destroy();
+  syncOverlay = () => {
+    const bboxOverlay = this.manager.stateApi.getSettings().bboxOverlay;
+
+    this.konva.overlayGroup.visible(bboxOverlay);
+
+    if (!bboxOverlay) {
+      return;
+    }
+
+    const stageAttrs = this.manager.stage.$stageAttrs.get();
+
+    this.konva.overlayRect.setAttrs({
+      x: -stageAttrs.x / stageAttrs.scale,
+      y: -stageAttrs.y / stageAttrs.scale,
+      width: stageAttrs.width / stageAttrs.scale,
+      height: stageAttrs.height / stageAttrs.scale,
+    });
   };
 
   /**
@@ -347,5 +421,26 @@ export class CanvasBboxModule extends CanvasModuleBase {
       x: roundToMultiple(newAbsPos.x, scaledGridSize) + offsetX,
       y: roundToMultiple(newAbsPos.y, scaledGridSize) + offsetY,
     };
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      aspectRatioBuffer: this.$aspectRatioBuffer.get(),
+      konva: {
+        group: getKonvaNodeDebugAttrs(this.konva.group),
+        proxyRect: getKonvaNodeDebugAttrs(this.konva.proxyRect),
+        transformer: getKonvaNodeDebugAttrs(this.konva.transformer),
+      },
+    };
+  };
+
+  destroy = () => {
+    this.log.trace('Destroying module');
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
+    this.konva.group.destroy();
   };
 }

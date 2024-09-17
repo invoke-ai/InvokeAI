@@ -4,7 +4,7 @@ import { selectDynamicPromptsIsLoading } from 'features/dynamicPrompts/store/dyn
 import { QueueIterationsNumberInput } from 'features/queue/components/QueueIterationsNumberInput';
 import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import { memo } from 'react';
-import { RiSparkling2Fill } from 'react-icons/ri';
+import { PiSparkleFill } from 'react-icons/pi';
 
 import { QueueButtonTooltip } from './QueueButtonTooltip';
 
@@ -15,7 +15,7 @@ export const InvokeQueueBackButton = memo(() => {
   const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
 
   return (
-    <Flex pos="relative" w="240px">
+    <Flex pos="relative" w="200px">
       <QueueIterationsNumberInput />
       <QueueButtonTooltip>
         <Button
@@ -23,7 +23,7 @@ export const InvokeQueueBackButton = memo(() => {
           isLoading={isLoading || isLoadingDynamicPrompts}
           loadingText={invoke}
           isDisabled={isDisabled}
-          rightIcon={<RiSparkling2Fill />}
+          rightIcon={<PiSparkleFill />}
           variant="solid"
           colorScheme="invokeYellow"
           size="lg"

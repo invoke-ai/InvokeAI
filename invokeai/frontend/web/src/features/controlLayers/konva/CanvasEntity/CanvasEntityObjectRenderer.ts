@@ -11,6 +11,7 @@ import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/k
 import { LightnessToAlphaFilter } from 'features/controlLayers/konva/filters';
 import { getPatternSVG } from 'features/controlLayers/konva/patterns/getPatternSVG';
 import {
+  getKonvaNodeDebugAttrs,
   getPrefixedId,
   konvaNodeToBlob,
   konvaNodeToCanvas,
@@ -18,7 +19,7 @@ import {
   previewBlob,
 } from 'features/controlLayers/konva/util';
 import type { Rect } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import { debounce } from 'lodash-es';
@@ -192,6 +193,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     if (this.renderers.size === 0) {
       this.log.trace('Clearing object group cache');
       this.konva.objectGroup.clearCache();
+      this.$canvasCache.set(null);
     } else if (force || !this.konva.objectGroup.isCached()) {
       this.log.trace('Caching object group');
       this.konva.objectGroup.clearCache();
@@ -233,15 +235,12 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
 
     assert(this.konva.compositing, 'Missing compositing rect');
 
-    const { x, y, width, height, scale } = this.manager.stage.$stageAttrs.get();
+    const scale = this.manager.stage.unscale(1);
 
     this.konva.compositing.rect.setAttrs({
-      x: -x / scale,
-      y: -y / scale,
-      width: width / scale,
-      height: height / scale,
-      fillPatternScaleX: 1 / scale,
-      fillPatternScaleY: 1 / scale,
+      ...this.manager.stage.getScaledStageRect(),
+      fillPatternScaleX: scale,
+      fillPatternScaleY: scale,
     });
   };
 
@@ -324,18 +323,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     return didRender;
   };
 
-  hideObjects = (except: string[] = []) => {
-    for (const renderer of this.renderers.values()) {
-      renderer.setVisibility(except.includes(renderer.id));
-    }
-  };
-
-  showObjects = (except: string[] = []) => {
-    for (const renderer of this.renderers.values()) {
-      renderer.setVisibility(!except.includes(renderer.id));
-    }
-  };
-
   /**
    * Determines if the objects in the renderer require a pixel bbox calculation.
    *
@@ -384,6 +371,11 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     attrs?: GroupConfig;
     bg?: string;
   }): Promise<ImageDTO> => {
+    const rasterizingAdapter = this.manager.stateApi.$rasterizingAdapter.get();
+    if (rasterizingAdapter) {
+      assert(false, `Already rasterizing an entity: ${rasterizingAdapter.id}`);
+    }
+
     const { rect, replaceObjects, attrs, bg } = { replaceObjects: false, attrs: {}, ...options };
     let imageDTO: ImageDTO | null = null;
     const rasterizeArgs = { rect, attrs, bg };
@@ -399,6 +391,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     }
 
     this.log.trace({ rasterizeArgs }, 'Rasterizing entity');
+    this.manager.stateApi.$rasterizingAdapter.set(this.parent);
 
     const blob = await this.getBlob(rasterizeArgs);
     if (this.manager._isDebugging) {
@@ -418,11 +411,11 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.entityIdentifier,
       imageObject,
-      rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: imageDTO.width, height: imageDTO.height },
+      position: { x: Math.round(rect.x), y: Math.round(rect.y) },
       replaceObjects,
     });
     this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
-
+    this.manager.stateApi.$rasterizingAdapter.set(null);
     return imageDTO;
   };
 
@@ -459,7 +452,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     if (attrs) {
       clone.setAttrs(attrs);
     }
-    clone.cache();
+    clone.cache({ pixelRatio: 1, imageSmoothingEnabled: false });
     return clone;
   };
 
@@ -503,6 +496,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       path: this.path,
       parent: this.parent.id,
       renderers: Array.from(this.renderers.values()).map((renderer) => renderer.repr()),
+      konva: {
+        objectGroup: getKonvaNodeDebugAttrs(this.konva.objectGroup),
+      },
+      hasCache: this.$canvasCache.get() !== null,
     };
   };
 }

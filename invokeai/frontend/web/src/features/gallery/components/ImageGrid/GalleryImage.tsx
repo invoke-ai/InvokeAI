@@ -10,18 +10,15 @@ import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import type { GallerySelectionDraggableData, ImageDraggableData, TypesafeDraggableData } from 'features/dnd/types';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
-import {
-  imageToCompareChanged,
-  isImageViewerOpenChanged,
-  selectGallerySlice,
-} from 'features/gallery/store/gallerySlice';
-import type { MouseEvent, MouseEventHandler } from 'react';
+import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
+import { PiArrowsOutBold, PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
@@ -49,7 +46,17 @@ const selectAlwaysShouldImageSizeBadge = createSelector(
   (gallery) => gallery.alwaysShowImageSizeBadge
 );
 
-const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
+export const GalleryImage = memo(({ index, imageDTO }: HoverableImageProps) => {
+  if (!imageDTO) {
+    return <IAIFillSkeleton />;
+  }
+
+  return <GalleryImageContent index={index} imageDTO={imageDTO} />;
+});
+
+GalleryImage.displayName = 'GalleryImage';
+
+const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
   const dispatch = useAppDispatch();
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const selectIsSelectedForCompare = useMemo(
@@ -63,17 +70,6 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
   const customStarUi = useStore($customStarUI);
 
   const imageContainerRef = useScrollIntoView(isSelected, index, areMultiplesSelected);
-
-  const handleDelete = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      if (!imageDTO) {
-        return;
-      }
-      dispatch(imagesToDeleteSelected([imageDTO]));
-    },
-    [dispatch, imageDTO]
-  );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
     if (areMultiplesSelected) {
@@ -115,10 +111,11 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
     setIsHovered(true);
   }, []);
 
+  const imageViewer = useImageViewer();
   const onDoubleClick = useCallback(() => {
-    dispatch(isImageViewerOpenChanged(true));
+    imageViewer.open();
     dispatch(imageToCompareChanged(null));
-  }, [dispatch]);
+  }, [dispatch, imageViewer]);
 
   const handleMouseOut = useCallback(() => {
     setIsHovered(false);
@@ -126,10 +123,10 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
 
   const starIcon = useMemo(() => {
     if (imageDTO.starred) {
-      return customStarUi ? customStarUi.on.icon : <PiStarFill size="20" />;
+      return customStarUi ? customStarUi.on.icon : <PiStarFill />;
     }
     if (!imageDTO.starred && isHovered) {
-      return customStarUi ? customStarUi.off.icon : <PiStarBold size="20" />;
+      return customStarUi ? customStarUi.off.icon : <PiStarBold />;
     }
   }, [imageDTO.starred, isHovered, customStarUi]);
 
@@ -150,7 +147,7 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
   }
 
   return (
-    <Box w="full" h="full" p={1.5} className={GALLERY_IMAGE_CLASS_NAME} data-testid={dataTestId} sx={boxSx}>
+    <Box w="full" h="full" className={GALLERY_IMAGE_CLASS_NAME} data-testid={dataTestId} sx={boxSx}>
       <Flex
         ref={imageContainerRef}
         userSelect="none"
@@ -183,13 +180,12 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
                 color="base.50"
                 fontSize="sm"
                 fontWeight="semibold"
-                bottom={0}
-                left={0}
+                bottom={1}
+                left={1}
                 opacity={0.7}
                 px={2}
                 lineHeight={1.25}
                 borderTopEndRadius="base"
-                borderBottomStartRadius="base"
                 sx={badgeSx}
                 pointerEvents="none"
               >{`${imageDTO.width}x${imageDTO.height}`}</Text>
@@ -199,23 +195,34 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
               icon={starIcon}
               tooltip={starTooltip}
               position="absolute"
-              top={1}
-              insetInlineEnd={1}
+              top={2}
+              insetInlineEnd={2}
             />
-
-            {isHovered && <DeleteIcon onClick={handleDelete} />}
+            {isHovered && <DeleteIcon imageDTO={imageDTO} />}
+            {isHovered && <OpenInViewerIconButton imageDTO={imageDTO} />}
           </>
         </IAIDndImage>
       </Flex>
     </Box>
   );
-};
+});
 
-export default memo(GalleryImage);
+GalleryImageContent.displayName = 'GalleryImageContent';
 
-const DeleteIcon = ({ onClick }: { onClick: MouseEventHandler }) => {
+const DeleteIcon = ({ imageDTO }: { imageDTO: ImageDTO }) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const onClick = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      if (!imageDTO) {
+        return;
+      }
+      dispatch(imagesToDeleteSelected([imageDTO]));
+    },
+    [dispatch, imageDTO]
+  );
 
   if (!shift) {
     return null;
@@ -224,11 +231,31 @@ const DeleteIcon = ({ onClick }: { onClick: MouseEventHandler }) => {
   return (
     <IAIDndImageIcon
       onClick={onClick}
-      icon={<PiTrashSimpleFill size="16px" />}
+      icon={<PiTrashSimpleFill />}
       tooltip={t('gallery.deleteImage_one')}
       position="absolute"
-      bottom={1}
-      insetInlineEnd={1}
+      bottom={2}
+      insetInlineEnd={2}
+    />
+  );
+};
+
+const OpenInViewerIconButton = ({ imageDTO }: { imageDTO: ImageDTO }) => {
+  const imageViewer = useImageViewer();
+  const { t } = useTranslation();
+
+  const onClick = useCallback(() => {
+    imageViewer.openImageInViewer(imageDTO);
+  }, [imageDTO, imageViewer]);
+
+  return (
+    <IAIDndImageIcon
+      onClick={onClick}
+      icon={<PiArrowsOutBold />}
+      tooltip={t('gallery.openInViewer')}
+      position="absolute"
+      insetBlockStart={2}
+      insetInlineStart={2}
     />
   );
 };

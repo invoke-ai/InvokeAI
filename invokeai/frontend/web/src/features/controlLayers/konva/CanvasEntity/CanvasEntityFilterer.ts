@@ -1,18 +1,30 @@
 import type { SerializableObject } from 'common/types';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectAutoPreviewFilter } from 'features/controlLayers/store/canvasSettingsSlice';
-import type { CanvasImageState, FilterConfig } from 'features/controlLayers/store/types';
-import { IMAGE_FILTERS, imageDTOToImageObject } from 'features/controlLayers/store/types';
+import { selectAutoProcessFilter } from 'features/controlLayers/store/canvasSettingsSlice';
+import type { FilterConfig } from 'features/controlLayers/store/filters';
+import { getFilterForModel, IMAGE_FILTERS } from 'features/controlLayers/store/filters';
+import type { CanvasImageState } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { debounce } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO } from 'services/api/endpoints/images';
-import type { BatchConfig, ImageDTO, S } from 'services/api/types';
+import { buildSelectModelConfig } from 'services/api/hooks/modelsByType';
+import { type BatchConfig, type ImageDTO, isControlNetOrT2IAdapterModelConfig, type S } from 'services/api/types';
 import { assert } from 'tsafe';
+
+type CanvasEntityFiltererConfig = {
+  processDebounceMs: number;
+};
+
+const DEFAULT_CONFIG: CanvasEntityFiltererConfig = {
+  processDebounceMs: 1000,
+};
 
 export class CanvasEntityFilterer extends CanvasModuleBase {
   readonly type = 'canvas_filterer';
@@ -24,10 +36,12 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
   imageState: CanvasImageState | null = null;
   subscriptions = new Set<() => void>();
+  config: CanvasEntityFiltererConfig = DEFAULT_CONFIG;
 
   $isFiltering = atom<boolean>(false);
+  $hasProcessed = atom<boolean>(false);
   $isProcessing = atom<boolean>(false);
-  $filterConfig = atom<FilterConfig>(IMAGE_FILTERS.canny_image_processor.buildDefaults());
+  $filterConfig = atom<FilterConfig>(IMAGE_FILTERS.canny_edge_detection.buildDefaults());
 
   constructor(parent: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer) {
     super();
@@ -41,79 +55,113 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
     this.subscriptions.add(
       this.$filterConfig.listen(() => {
-        if (this.manager.stateApi.getSettings().autoPreviewFilter && this.$isFiltering.get()) {
-          this.previewFilter();
+        if (this.manager.stateApi.getSettings().autoProcessFilter && this.$isFiltering.get()) {
+          this.process();
         }
       })
     );
     this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectAutoPreviewFilter, (autoPreviewFilter) => {
+      this.manager.stateApi.createStoreSubscription(selectAutoProcessFilter, (autoPreviewFilter) => {
         if (autoPreviewFilter && this.$isFiltering.get()) {
-          this.previewFilter();
+          this.process();
         }
       })
     );
   }
 
-  startFilter = (config?: FilterConfig) => {
+  start = (config?: FilterConfig) => {
+    const filteringAdapter = this.manager.stateApi.$filteringAdapter.get();
+    if (filteringAdapter) {
+      assert(false, `Already filtering an entity: ${filteringAdapter.id}`);
+    }
+
     this.log.trace('Initializing filter');
     if (config) {
       this.$filterConfig.set(config);
+    } else if (this.parent.type === 'control_layer_adapter' && this.parent.state.controlAdapter.model) {
+      // If the parent is a control layer adapter, we should check if the model has a default filter and set it if so
+      const selectModelConfig = buildSelectModelConfig(
+        this.parent.state.controlAdapter.model.key,
+        isControlNetOrT2IAdapterModelConfig
+      );
+      const modelConfig = this.manager.stateApi.runSelector(selectModelConfig);
+      const filter = getFilterForModel(modelConfig);
+      this.$filterConfig.set(filter.buildDefaults());
+    } else {
+      // Otherwise, set the default filter
+      this.$filterConfig.set(IMAGE_FILTERS.canny_edge_detection.buildDefaults());
     }
     this.$isFiltering.set(true);
     this.manager.stateApi.$filteringAdapter.set(this.parent);
-    this.previewFilter();
+    if (this.manager.stateApi.getSettings().autoProcessFilter) {
+      this.processImmediate();
+    }
   };
 
-  previewFilter = debounce(
-    async () => {
-      const config = this.$filterConfig.get();
-      const isValid = IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
-      if (!isValid) {
+  processImmediate = async () => {
+    const config = this.$filterConfig.get();
+    const isValid = IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
+    if (!isValid) {
+      return;
+    }
+
+    this.log.trace({ config }, 'Previewing filter');
+    const rect = this.parent.transformer.getRelativeRect();
+    const imageDTO = await this.parent.renderer.rasterize({ rect, attrs: { filters: [], opacity: 1 } });
+    const nodeId = getPrefixedId('filter_node');
+    const batch = this.buildBatchConfig(imageDTO, config, nodeId);
+
+    // Listen for the filter processing completion event
+    const completedListener = async (event: S['InvocationCompleteEvent']) => {
+      if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
         return;
       }
+      this.manager.socket.off('invocation_complete', completedListener);
+      this.manager.socket.off('invocation_error', errorListener);
 
-      this.log.trace({ config }, 'Previewing filter');
-      const rect = this.parent.transformer.getRelativeRect();
-      const imageDTO = await this.parent.renderer.rasterize({ rect, attrs: { filters: [] } });
-      const nodeId = getPrefixedId('filter_node');
-      const batch = this.buildBatchConfig(imageDTO, config, nodeId);
+      this.log.trace({ event } as SerializableObject, 'Handling filter processing completion');
 
-      // Listen for the filter processing completion event
-      const listener = async (event: S['InvocationCompleteEvent']) => {
-        if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
-          return;
-        }
-        this.manager.socket.off('invocation_complete', listener);
+      const { result } = event;
+      assert(result.type === 'image_output', `Processor did not return an image output, got: ${result}`);
 
-        this.log.trace({ event } as SerializableObject, 'Handling filter processing completion');
+      const imageDTO = await getImageDTO(result.image.image_name);
+      assert(imageDTO, "Failed to fetch processor output's image DTO");
 
-        const { result } = event;
-        assert(result.type === 'image_output', `Processor did not return an image output, got: ${result}`);
+      this.imageState = imageDTOToImageObject(imageDTO);
 
-        const imageDTO = await getImageDTO(result.image.image_name);
-        assert(imageDTO, "Failed to fetch processor output's image DTO");
+      await this.parent.bufferRenderer.setBuffer(this.imageState, true);
 
-        this.imageState = imageDTOToImageObject(imageDTO);
+      this.$isProcessing.set(false);
+      this.$hasProcessed.set(true);
+    };
+    const errorListener = (event: S['InvocationErrorEvent']) => {
+      if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
+        return;
+      }
+      this.manager.socket.off('invocation_complete', completedListener);
+      this.manager.socket.off('invocation_error', errorListener);
 
-        await this.parent.bufferRenderer.setBuffer(this.imageState, true);
+      this.log.error({ event } as SerializableObject, 'Error processing filter');
+      this.$isProcessing.set(false);
+    };
 
-        this.parent.renderer.hideObjects();
-        this.$isProcessing.set(false);
-      };
+    this.manager.socket.on('invocation_complete', completedListener);
+    this.manager.socket.on('invocation_error', errorListener);
 
-      this.manager.socket.on('invocation_complete', listener);
+    this.log.trace({ batch } as SerializableObject, 'Enqueuing filter batch');
 
-      this.log.trace({ batch } as SerializableObject, 'Enqueuing filter batch');
+    this.$isProcessing.set(true);
+    const req = this.manager.stateApi.enqueueBatch(batch);
+    const result = await withResultAsync(req.unwrap);
+    if (result.isErr()) {
+      this.$isProcessing.set(false);
+    }
+    req.reset();
+  };
 
-      this.$isProcessing.set(true);
-      this.manager.stateApi.enqueueBatch(batch);
-    },
-    1000,
-    { leading: true, trailing: true }
-  );
+  process = debounce(this.processImmediate, this.config.processDebounceMs);
 
-  applyFilter = () => {
+  apply = () => {
     const imageState = this.imageState;
     if (!imageState) {
       this.log.warn('No image state to apply filter to');
@@ -125,29 +173,35 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.entityIdentifier,
       imageObject: imageState,
-      rect: {
+      position: {
         x: Math.round(rect.x),
         y: Math.round(rect.y),
-        width: imageState.image.height,
-        height: imageState.image.width,
       },
       replaceObjects: true,
     });
     this.imageState = null;
     this.$isFiltering.set(false);
+    this.$hasProcessed.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
   };
 
-  cancelFilter = () => {
-    this.log.trace('Cancelling filter');
+  reset = () => {
+    this.log.trace('Resetting filter');
 
     this.parent.bufferRenderer.clearBuffer();
-    this.parent.renderer.showObjects();
     this.parent.transformer.updatePosition();
     this.parent.renderer.syncCache(true);
     this.imageState = null;
+    this.$hasProcessed.set(false);
+  };
+
+  cancel = () => {
+    this.log.trace('Cancelling filter');
+
+    this.reset();
     this.$isProcessing.set(false);
     this.$isFiltering.set(false);
+    this.$hasProcessed.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
   };
 
@@ -174,5 +228,18 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     };
 
     return batch;
+  };
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      config: this.config,
+      $isFiltering: this.$isFiltering.get(),
+      $hasProcessed: this.$hasProcessed.get(),
+      $isProcessing: this.$isProcessing.get(),
+      $filterConfig: this.$filterConfig.get(),
+    };
   };
 }

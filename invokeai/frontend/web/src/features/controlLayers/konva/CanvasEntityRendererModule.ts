@@ -64,8 +64,8 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
   };
 
   createNewRegionalGuidance = async (state: CanvasState, prevState: CanvasState | null) => {
-    if (!prevState || state.regions.entities !== prevState.regions.entities) {
-      for (const entityState of state.regions.entities) {
+    if (!prevState || state.regionalGuidance.entities !== prevState.regionalGuidance.entities) {
+      for (const entityState of state.regionalGuidance.entities) {
         if (!this.manager.adapters.regionMasks.has(entityState.id)) {
           const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
           await adapter.initialize();
@@ -90,7 +90,7 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
       !prevState ||
       state.rasterLayers.entities !== prevState.rasterLayers.entities ||
       state.controlLayers.entities !== prevState.controlLayers.entities ||
-      state.regions.entities !== prevState.regions.entities ||
+      state.regionalGuidance.entities !== prevState.regionalGuidance.entities ||
       state.inpaintMasks.entities !== prevState.inpaintMasks.entities ||
       state.selectedEntityIdentifier?.id !== prevState.selectedEntityIdentifier?.id
     ) {
@@ -106,25 +106,25 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
       // 5. Inpaint masks
       // 6. Preview layer (bbox, staging area, progress image, tool)
 
-      this.manager.background.konva.layer.zIndex(++zIndex);
+      this.manager.background.konva.layer.zIndex(zIndex++);
 
       for (const { id } of this.manager.stateApi.getRasterLayersState().entities) {
-        this.manager.adapters.rasterLayers.get(id)?.konva.layer.zIndex(++zIndex);
+        this.manager.adapters.rasterLayers.get(id)?.konva.layer.zIndex(zIndex++);
       }
 
       for (const { id } of this.manager.stateApi.getControlLayersState().entities) {
-        this.manager.adapters.controlLayers.get(id)?.konva.layer.zIndex(++zIndex);
+        this.manager.adapters.controlLayers.get(id)?.konva.layer.zIndex(zIndex++);
       }
 
       for (const { id } of this.manager.stateApi.getRegionsState().entities) {
-        this.manager.adapters.regionMasks.get(id)?.konva.layer.zIndex(++zIndex);
+        this.manager.adapters.regionMasks.get(id)?.konva.layer.zIndex(zIndex++);
       }
 
       for (const { id } of this.manager.stateApi.getInpaintMasksState().entities) {
-        this.manager.adapters.inpaintMasks.get(id)?.konva.layer.zIndex(++zIndex);
+        this.manager.adapters.inpaintMasks.get(id)?.konva.layer.zIndex(zIndex++);
       }
 
-      this.manager.konva.previewLayer.zIndex(++zIndex);
+      this.manager.konva.previewLayer.zIndex(zIndex++);
     }
   };
 

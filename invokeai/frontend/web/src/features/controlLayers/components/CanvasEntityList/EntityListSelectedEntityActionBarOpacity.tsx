@@ -137,7 +137,7 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
       <FormControl
         w="min-content"
         gap={2}
-        isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'ip_adapter'}
+        isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'reference_image'}
       >
         <FormLabel m={0}>{t('controlLayers.opacity')}</FormLabel>
         <PopoverAnchor>
@@ -167,7 +167,7 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
                 position="absolute"
                 insetInlineEnd={0}
                 h="full"
-                isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'ip_adapter'}
+                isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'reference_image'}
               />
             </PopoverTrigger>
           </NumberInput>
@@ -185,7 +185,7 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
             marks={marks}
             formatValue={formatSliderValue}
             alwaysShowMarks
-            isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'ip_adapter'}
+            isDisabled={selectedEntityIdentifier === null || selectedEntityIdentifier.type === 'reference_image'}
           />
         </PopoverBody>
       </PopoverContent>

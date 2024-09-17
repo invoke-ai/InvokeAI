@@ -2,7 +2,12 @@ import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { canvasToImageData, getEmptyRect, getPrefixedId } from 'features/controlLayers/konva/util';
+import {
+  canvasToImageData,
+  getEmptyRect,
+  getKonvaNodeDebugAttrs,
+  getPrefixedId,
+} from 'features/controlLayers/konva/util';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -10,6 +15,7 @@ import type { GroupConfig } from 'konva/lib/Group';
 import { debounce, get } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
+import { assert } from 'tsafe';
 
 type CanvasEntityTransformerConfig = {
   /**
@@ -228,6 +234,12 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       this.manager.stateApi.createStoreSubscription(selectSelectedEntityIdentifier, this.syncInteractionState)
     );
 
+    /**
+     * When the canvas global state changes, we need to update the transformer's interaction state. This implies
+     * a change to staging or some other global state that affects the transformer.
+     */
+    this.subscriptions.add(this.manager.$isBusy.listen(this.syncInteractionState));
+
     this.parent.konva.layer.add(this.konva.outlineRect);
     this.parent.konva.layer.add(this.konva.proxyRect);
     this.parent.konva.layer.add(this.konva.transformer);
@@ -277,7 +289,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     // If the user is not holding shift, the transform is retaining aspect ratio. It's not possible to snap to the grid
     // in this case, because that would change the aspect ratio. So, we only snap to the grid when shift is held.
-    const gridSize = this.manager.stateApi.$shiftKey.get() ? this.manager.stateApi.getSettings().gridSize : 1;
+    const gridSize = this.manager.stateApi.$shiftKey.get() ? this.manager.stateApi.getGridSize() : 1;
 
     // We need to snap the anchor to the selected grid size, but the positions provided to this callback are absolute,
     // scaled coordinates. They need to be converted to stage coordinates, snapped, then converted back to absolute
@@ -380,15 +392,16 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   onDragMove = () => {
     // Snap the interaction rect to the grid
-    const { gridSize } = this.manager.stateApi.getSettings();
+    const gridSize = this.manager.stateApi.getGridSize();
     this.konva.proxyRect.x(roundToMultiple(this.konva.proxyRect.x(), gridSize));
     this.konva.proxyRect.y(roundToMultiple(this.konva.proxyRect.y(), gridSize));
 
     // The bbox should be updated to reflect the new position of the interaction rect, taking into account its padding
     // and border
+    const padding = this.manager.stage.unscale(this.config.OUTLINE_PADDING);
     this.konva.outlineRect.setAttrs({
-      x: this.konva.proxyRect.x() - this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING),
-      y: this.konva.proxyRect.y() - this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING),
+      x: this.konva.proxyRect.x() - padding,
+      y: this.konva.proxyRect.y() - padding,
     });
 
     // The object group is translated by the difference between the interaction rect's new and old positions (which is
@@ -433,8 +446,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * @param bbox The bounding box of the parent entity
    */
   update = (position: Coordinate, bbox: Rect) => {
-    const onePixel = this.manager.stage.getScaledPixels(1);
-    const bboxPadding = this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING);
+    const onePixel = this.manager.stage.unscale(1);
+    const bboxPadding = this.manager.stage.unscale(this.config.OUTLINE_PADDING);
 
     this.konva.outlineRect.setAttrs({
       x: position.x + bbox.x - bboxPadding,
@@ -458,6 +471,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
 
+    if (this.manager.$isBusy.get() && !this.$isTransforming.get()) {
+      // The canvas is busy, we can't interact with the transformer
+      this.parent.konva.layer.listening(false);
+      this._setInteractionMode('off');
+      return;
+    }
+
     // Not all entities have a filterer - only raster layer and control layer adapters
     if (this.parent.filterer?.$isFiltering.get()) {
       // May not interact with the entity when the filter is active
@@ -466,7 +486,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
 
-    if (this.manager.stateApi.$isTranforming.get() && !this.$isTransforming.get()) {
+    if (this.manager.stateApi.$isTransforming.get() && !this.$isTransforming.get()) {
       // If another entity is being transformed, we can't interact with this transformer
       this.parent.konva.layer.listening(false);
       this._setInteractionMode('off');
@@ -486,7 +506,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const tool = this.manager.tool.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
 
-    if (!this.parent.renderer.hasObjects() || !this.parent.getIsInteractable()) {
+    if (this.parent.$isEmpty.get()) {
       // The layer is totally empty, we can just disable the layer
       this.parent.konva.layer.listening(false);
       this._setInteractionMode('off');
@@ -521,8 +541,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * Updates the transformer's scale. This is called when the stage is scaled.
    */
   syncScale = () => {
-    const onePixel = this.manager.stage.getScaledPixels(1);
-    const bboxPadding = this.manager.stage.getScaledPixels(this.config.OUTLINE_PADDING);
+    const onePixel = this.manager.stage.unscale(1);
+    const bboxPadding = this.manager.stage.unscale(this.config.OUTLINE_PADDING);
 
     this.konva.outlineRect.setAttrs({
       x: this.konva.proxyRect.x() - bboxPadding,
@@ -538,6 +558,10 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * Starts the transformation of the entity.
    */
   startTransform = () => {
+    const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
+    if (transformingAdapter) {
+      assert(false, `Already transforming an entity: ${transformingAdapter.id}`);
+    }
     this.log.debug('Starting transform');
     this.$isTransforming.set(true);
     this.manager.stateApi.$transformingAdapter.set(this.parent);
@@ -739,6 +763,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.calculateRect();
   };
 
+  // TODO(psyche): After resetting an entity, this can return stale data...
   getRelativeRect = (): Rect => {
     return this.konva.proxyRect.getClientRect({ relativeTo: this.parent.konva.layer });
   };
@@ -782,14 +807,20 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       id: this.id,
       type: this.type,
       path: this.path,
-      nodeRect: this.$nodeRect.get(),
-      pixelRect: this.$pixelRect.get(),
-      isPendingRectCalculation: this.$isPendingRectCalculation.get(),
-      isTransforming: this.$isTransforming.get(),
-      interactionMode: this.$interactionMode.get(),
-      isDragEnabled: this.$isDragEnabled.get(),
-      isTransformEnabled: this.$isTransformEnabled.get(),
-      isProcessing: this.$isProcessing.get(),
+      config: this.config,
+      $nodeRect: this.$nodeRect.get(),
+      $pixelRect: this.$pixelRect.get(),
+      $isPendingRectCalculation: this.$isPendingRectCalculation.get(),
+      $isTransforming: this.$isTransforming.get(),
+      $interactionMode: this.$interactionMode.get(),
+      $isDragEnabled: this.$isDragEnabled.get(),
+      $isTransformEnabled: this.$isTransformEnabled.get(),
+      $isProcessing: this.$isProcessing.get(),
+      konva: {
+        transformer: getKonvaNodeDebugAttrs(this.konva.transformer),
+        proxyRect: getKonvaNodeDebugAttrs(this.konva.proxyRect),
+        outlineRect: getKonvaNodeDebugAttrs(this.konva.outlineRect),
+      },
     };
   };
 

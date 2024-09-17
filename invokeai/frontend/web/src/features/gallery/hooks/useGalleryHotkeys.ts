@@ -5,7 +5,7 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
-import { $isGalleryPanelOpen } from 'features/ui/store/uiSlice';
+import { $isRightPanelOpen } from 'features/ui/store/uiSlice';
 import { computed } from 'nanostores';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useListImagesQuery } from 'services/api/endpoints/images';
@@ -15,7 +15,7 @@ const $leftRightHotkeysEnabled = computed($activeScopes, (activeScopes) => {
   return !activeScopes.has('canvas') || activeScopes.has('imageViewer');
 });
 
-const $upDownHotkeysEnabled = computed([$activeScopes, $isGalleryPanelOpen], (activeScopes, isGalleryPanelOpen) => {
+const $upDownHotkeysEnabled = computed([$activeScopes, $isRightPanelOpen], (activeScopes, isGalleryPanelOpen) => {
   // The up and down hotkeys can be used when the gallery is focused and the canvas is not focused, and the gallery panel is open.
   return !activeScopes.has('canvas') && isGalleryPanelOpen;
 });

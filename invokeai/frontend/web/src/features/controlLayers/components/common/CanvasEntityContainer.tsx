@@ -21,6 +21,7 @@ export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
 
   return (
     <Flex
+      position="relative"
       flexDir="column"
       w="full"
       bg={isSelected ? 'base.800' : 'base.850'}

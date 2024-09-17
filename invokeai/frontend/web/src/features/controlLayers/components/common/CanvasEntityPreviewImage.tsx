@@ -4,7 +4,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { useEntityAdapter } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
+import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
@@ -18,7 +18,7 @@ const CONTAINER_WIDTH_PX = `${CONTAINER_WIDTH}px`;
 
 export const CanvasEntityPreviewImage = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
-  const adapter = useEntityAdapter();
+  const adapter = useEntityAdapter(entityIdentifier);
   const selectMaskColor = useMemo(
     () =>
       createSelector(selectCanvasSlice, (state) => {
@@ -37,13 +37,20 @@ export const CanvasEntityPreviewImage = memo(() => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cache = useStore(adapter.renderer.$canvasCache);
   useEffect(() => {
-    if (!cache || !canvasRef.current) {
+    if (!canvasRef.current) {
       return;
     }
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) {
       return;
     }
+
+    if (!cache) {
+      // Draw an empty canvas
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      return;
+    }
+
     const { rect, canvas } = cache;
 
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -81,6 +88,7 @@ export const CanvasEntityPreviewImage = memo(() => {
       borderRadius="sm"
       borderWidth={1}
       bg="base.900"
+      flexShrink={0}
     >
       <Box
         position="absolute"
@@ -88,11 +96,10 @@ export const CanvasEntityPreviewImage = memo(() => {
         right={0}
         bottom={0}
         left={0}
-        bgImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DATAURL}
+        bgImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL}
         bgSize="5px"
-        opacity={0.1}
       />
-      <ChakraCanvas ref={canvasRef} objectFit="contain" maxW="full" maxH="full" />
+      <ChakraCanvas position="relative" ref={canvasRef} objectFit="contain" maxW="full" maxH="full" />
     </Flex>
   );
 });

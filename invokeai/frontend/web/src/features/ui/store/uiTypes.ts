@@ -1,10 +1,10 @@
-export type TabName = 'generation' | 'upscaling' | 'workflows' | 'models' | 'queue';
+export type TabName = 'canvas' | 'upscaling' | 'workflows' | 'models' | 'queue';
 
 export interface UIState {
   /**
    * Slice schema version.
    */
-  _version: 2;
+  _version: 3;
   /**
    * The currently active tab.
    */
@@ -17,10 +17,6 @@ export interface UIState {
    * Whether or not to show progress in the viewer.
    */
   shouldShowProgressInViewer: boolean;
-  /**
-   * The react-resizable-panels state. The shape is managed by react-resizable-panels.
-   */
-  panels: Record<string, string>;
   /**
    * The state of accordions. The key is the id of the accordion, and the value is a boolean representing the open state.
    */

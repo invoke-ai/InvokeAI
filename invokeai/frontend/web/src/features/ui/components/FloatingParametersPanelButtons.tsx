@@ -7,8 +7,7 @@ import { useQueueBack } from 'features/queue/hooks/useQueueBack';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCircleNotchBold, PiSlidersHorizontalBold, PiTrashSimpleBold } from 'react-icons/pi';
-import { RiSparklingFill } from 'react-icons/ri';
+import { PiCircleNotchBold, PiSlidersHorizontalBold, PiSparkleFill, PiTrashSimpleBold } from 'react-icons/pi';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 const floatingButtonStyles: SystemStyleObject = {
@@ -31,7 +30,7 @@ const FloatingSidePanelButtons = (props: Props) => {
     if (!isDisabled && isProcessing) {
       return <Icon boxSize={6} as={PiCircleNotchBold} animation={spinAnimation} />;
     }
-    return <RiSparklingFill size="16px" />;
+    return <PiSparkleFill size="16px" />;
   }, [isDisabled, queueStatus]);
 
   if (!props.panelApi.isCollapsed) {

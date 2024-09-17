@@ -4,13 +4,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $activeScopes } from 'common/hooks/interactionScopes';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
-import { $isGalleryPanelOpen } from 'features/ui/store/uiSlice';
+import { $isRightPanelOpen } from 'features/ui/store/uiSlice';
 import { computed } from 'nanostores';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
-const $isSelectAllEnabled = computed([$activeScopes, $isGalleryPanelOpen], (activeScopes, isGalleryPanelOpen) => {
+const $isSelectAllEnabled = computed([$activeScopes, $isRightPanelOpen], (activeScopes, isGalleryPanelOpen) => {
   return activeScopes.has('gallery') && !activeScopes.has('workflows') && isGalleryPanelOpen;
 });
 
@@ -22,8 +22,11 @@ export const GallerySelectionCountTag = () => {
   const isSelectAllEnabled = useStore($isSelectAllEnabled);
 
   const onClearSelection = useCallback(() => {
-    dispatch(selectionChanged([]));
-  }, [dispatch]);
+    const firstImage = selection[0];
+    if (firstImage) {
+      dispatch(selectionChanged([firstImage]));
+    }
+  }, [dispatch, selection]);
 
   const onSelectPage = useCallback(() => {
     dispatch(selectionChanged([...selection, ...imageDTOs]));

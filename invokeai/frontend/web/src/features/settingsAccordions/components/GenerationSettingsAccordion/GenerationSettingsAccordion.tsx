@@ -4,9 +4,11 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
+import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
+import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import { NavigateToModelManagerButton } from 'features/parameters/components/MainModel/NavigateToModelManagerButton';
@@ -27,6 +29,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const modelConfig = useSelectedModelConfig();
   const activeTabName = useAppSelector(selectActiveTab);
+  const isFLUX = useAppSelector(selectIsFLUX);
   const selectBadges = useMemo(
     () =>
       createMemoizedSelector(selectLoRAsSlice, (loras) => {
@@ -71,9 +74,9 @@ export const GenerationSettingsAccordion = memo(() => {
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              <ParamScheduler />
+              {!isFLUX && <ParamScheduler />}
               <ParamSteps />
-              <ParamCFGScale />
+              {isFLUX ? <ParamGuidance /> : <ParamCFGScale />}
             </FormControlGroup>
           </Flex>
         </Expander>

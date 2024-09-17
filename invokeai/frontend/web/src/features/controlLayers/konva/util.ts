@@ -233,6 +233,7 @@ export function imageDataToDataURL(imageData: ImageData): string {
   if (!ctx) {
     throw new Error('Unable to get canvas context');
   }
+  ctx.imageSmoothingEnabled = false;
   ctx.putImageData(imageData, 0, 0);
 
   // Convert the canvas to a data URL (base64)
@@ -251,6 +252,7 @@ export function imageDataToBlob(imageData: ImageData): Promise<Blob | null> {
     return Promise.resolve(null);
   }
 
+  ctx.imageSmoothingEnabled = false;
   ctx.putImageData(imageData, 0, 0);
 
   return new Promise<Blob | null>((resolve) => {
@@ -281,7 +283,6 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    const image = new Image();
 
     if (!ctx) {
       canvas.remove();
@@ -289,6 +290,9 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
       return;
     }
 
+    ctx.imageSmoothingEnabled = false;
+
+    const image = new Image();
     image.onload = function () {
       ctx.drawImage(image, 0, 0);
       canvas.remove();
@@ -306,7 +310,7 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
 
 export const konvaNodeToCanvas = (arg: { node: Konva.Node; rect?: Rect; bg?: string }): HTMLCanvasElement => {
   const { node, rect, bg } = arg;
-  const canvas = node.toCanvas({ ...(rect ?? {}) });
+  const canvas = node.toCanvas({ ...(rect ?? {}), imageSmoothingEnabled: false });
 
   if (!bg) {
     return canvas;
@@ -318,6 +322,7 @@ export const konvaNodeToCanvas = (arg: { node: Konva.Node; rect?: Rect; bg?: str
   bgCanvas.height = canvas.height;
   const bgCtx = bgCanvas.getContext('2d');
   assert(bgCtx !== null, 'bgCtx is null');
+  bgCtx.imageSmoothingEnabled = false;
   bgCtx.fillStyle = bg;
   bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
   bgCtx.drawImage(canvas, 0, 0);
@@ -325,10 +330,9 @@ export const konvaNodeToCanvas = (arg: { node: Konva.Node; rect?: Rect; bg?: str
 };
 
 /**
- * Converts a Konva node to a Blob
- * @param node - The Konva node to convert to a Blob
- * @param bbox - The bounding box to crop to
- * @returns A Promise that resolves with Blob of the node cropped to the bounding box
+ * Converts a HTMLCanvasElement to a Blob
+ * @param canvas - The canvas to convert to a Blob
+ * @returns A Promise that resolves to the Blob, or rejects if the conversion fails
  */
 export const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob> => {
   return new Promise((resolve, reject) => {
@@ -345,6 +349,7 @@ export const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob> => {
 export const canvasToImageData = (canvas: HTMLCanvasElement): ImageData => {
   const ctx = canvas.getContext('2d');
   assert(ctx, 'ctx is null');
+  ctx.imageSmoothingEnabled = false;
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 };
 
@@ -517,4 +522,18 @@ export const createReduxSubscription = <T, U>(
   });
 
   return unsubscribe;
+};
+
+export const getKonvaNodeDebugAttrs = (node: Konva.Node) => {
+  return {
+    x: node.x(),
+    y: node.y(),
+    width: node.width(),
+    height: node.height(),
+    scaleX: node.scaleX(),
+    scaleY: node.scaleY(),
+    offsetX: node.offsetX(),
+    offsetY: node.offsetY(),
+    rotation: node.rotation(),
+  };
 };

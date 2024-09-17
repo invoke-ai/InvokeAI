@@ -1,4 +1,5 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
+import { EntityListGlobalActionBarAddLayerMenu } from 'features/controlLayers/components/CanvasEntityList/EntityListGlobalActionBarAddLayerMenu';
 import { EntityListSelectedEntityActionBarDuplicateButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarDuplicateButton';
 import { EntityListSelectedEntityActionBarFill } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFill';
 import { EntityListSelectedEntityActionBarFilterButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFilterButton';
@@ -8,14 +9,15 @@ import { memo } from 'react';
 
 export const EntityListSelectedEntityActionBar = memo(() => {
   return (
-    <Flex w="full" py={1} px={1} gap={2} alignItems="center">
+    <Flex w="full" gap={2} alignItems="center" ps={1}>
       <EntityListSelectedEntityActionBarOpacity />
       <Spacer />
       <EntityListSelectedEntityActionBarFill />
-      <Flex>
+      <Flex h="full">
         <EntityListSelectedEntityActionBarFilterButton />
         <EntityListSelectedEntityActionBarTransformButton />
         <EntityListSelectedEntityActionBarDuplicateButton />
+        <EntityListGlobalActionBarAddLayerMenu />
       </Flex>
     </Flex>
   );

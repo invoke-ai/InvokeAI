@@ -70,12 +70,12 @@ export const IPAdapterModel = memo(({ modelKey, onChangeModel, clipVisionModel, 
   );
 
   return (
-    <Flex gap={4}>
+    <Flex gap={2}>
       <Tooltip label={selectedModel?.description}>
         <FormControl isInvalid={!value || currentBaseModel !== selectedModel?.base} w="full">
           <Combobox
             options={options}
-            placeholder={t('controlnet.selectModel')}
+            placeholder={t('common.placeholderSelectAModel')}
             value={value}
             onChange={onChange}
             noOptionsMessage={noOptionsMessage}
@@ -86,7 +86,7 @@ export const IPAdapterModel = memo(({ modelKey, onChangeModel, clipVisionModel, 
         <FormControl isInvalid={!value || currentBaseModel !== selectedModel?.base} width="max-content" minWidth={28}>
           <Combobox
             options={CLIP_VISION_OPTIONS}
-            placeholder={t('controlnet.selectCLIPVisionModel')}
+            placeholder={t('common.placeholderSelectAModel')}
             value={clipVisionModelValue}
             onChange={_onChangeCLIPVisionModel}
           />

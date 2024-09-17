@@ -1,4 +1,5 @@
 import type { SerializableObject } from 'common/types';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import {
@@ -10,6 +11,7 @@ import {
 } from 'features/controlLayers/konva/util';
 import type { GenerationMode, Rect } from 'features/controlLayers/store/types';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -29,6 +31,16 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   readonly log: Logger;
   readonly parent: CanvasManager;
   readonly manager: CanvasManager;
+
+  $isCompositing = atom(false);
+  $isProcessing = atom(false);
+  $isUploading = atom(false);
+  $isBusy = computed(
+    [this.$isCompositing, this.$isProcessing, this.$isUploading],
+    (isCompositing, isProcessing, isUploading) => {
+      return isCompositing || isProcessing || isUploading;
+    }
+  );
 
   constructor(manager: CanvasManager) {
     super();
@@ -100,11 +112,12 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     const cachedCanvas = this.manager.cache.canvasElementCache.get(hash);
 
     if (cachedCanvas) {
-      this.log.trace({ rect }, 'Using cached composite inpaint mask canvas');
+      this.log.trace({ rect }, 'Using cached composite raster layer canvas');
       return cachedCanvas;
     }
 
     this.log.trace({ rect }, 'Building composite raster layer canvas');
+    this.$isCompositing.set(true);
 
     const canvas = document.createElement('canvas');
     canvas.width = rect.width;
@@ -112,6 +125,8 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     const ctx = canvas.getContext('2d');
     assert(ctx !== null, 'Canvas 2D context is null');
+
+    ctx.imageSmoothingEnabled = false;
 
     for (const id of this.getCompositeRasterLayerEntityIds()) {
       const adapter = this.manager.adapters.rasterLayers.get(id);
@@ -124,6 +139,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       ctx.drawImage(adapterCanvas, 0, 0);
     }
     this.manager.cache.canvasElementCache.set(hash, canvas);
+    this.$isCompositing.set(false);
     return canvas;
   };
 
@@ -139,20 +155,39 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   rasterizeAndUploadCompositeRasterLayer = async (rect: Rect, saveToGallery: boolean): Promise<ImageDTO> => {
     this.log.trace({ rect }, 'Rasterizing composite raster layer');
 
+    assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
+
     const canvas = this.getCompositeRasterLayerCanvas(rect);
-    const blob = await canvasToBlob(canvas);
+
+    this.$isProcessing.set(true);
+    const blobResult = await withResultAsync(() => canvasToBlob(canvas));
+    this.$isProcessing.set(false);
+
+    if (blobResult.isErr()) {
+      throw blobResult.error;
+    }
+    const blob = blobResult.value;
 
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Composite raster layer canvas');
     }
 
-    return uploadImage({
-      blob,
-      fileName: 'composite-raster-layer.png',
-      image_category: 'general',
-      is_intermediate: !saveToGallery,
-      board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
-    });
+    this.$isUploading.set(true);
+    const uploadResult = await withResultAsync(() =>
+      uploadImage({
+        blob,
+        fileName: 'composite-raster-layer.png',
+        image_category: 'general',
+        is_intermediate: !saveToGallery,
+        board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
+      })
+    );
+    this.$isUploading.set(false);
+    if (uploadResult.isErr()) {
+      throw uploadResult.error;
+    }
+    const imageDTO = uploadResult.value;
+    return imageDTO;
   };
 
   /**
@@ -247,13 +282,15 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     }
 
     this.log.trace({ rect }, 'Building composite inpaint mask canvas');
-
+    this.$isCompositing.set(true);
     const canvas = document.createElement('canvas');
     canvas.width = rect.width;
     canvas.height = rect.height;
 
     const ctx = canvas.getContext('2d');
     assert(ctx !== null);
+
+    ctx.imageSmoothingEnabled = false;
 
     for (const id of this.getCompositeInpaintMaskEntityIds()) {
       const adapter = this.manager.adapters.inpaintMasks.get(id);
@@ -266,6 +303,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       ctx.drawImage(adapterCanvas, 0, 0);
     }
     this.manager.cache.canvasElementCache.set(hash, canvas);
+    this.$isCompositing.set(false);
     return canvas;
   };
 
@@ -281,19 +319,39 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   rasterizeAndUploadCompositeInpaintMask = async (rect: Rect, saveToGallery: boolean) => {
     this.log.trace({ rect }, 'Rasterizing composite inpaint mask');
 
+    assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
+
     const canvas = this.getCompositeInpaintMaskCanvas(rect);
-    const blob = await canvasToBlob(canvas);
+
+    this.$isProcessing.set(true);
+    const blobResult = await withResultAsync(() => canvasToBlob(canvas));
+    this.$isProcessing.set(false);
+
+    if (blobResult.isErr()) {
+      throw blobResult.error;
+    }
+    const blob = blobResult.value;
+
     if (this.manager._isDebugging) {
       previewBlob(blob, 'Composite inpaint mask canvas');
     }
 
-    return uploadImage({
-      blob,
-      fileName: 'composite-inpaint-mask.png',
-      image_category: 'general',
-      is_intermediate: !saveToGallery,
-      board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
-    });
+    this.$isUploading.set(true);
+    const uploadResult = await withResultAsync(() =>
+      uploadImage({
+        blob,
+        fileName: 'composite-inpaint-mask.png',
+        image_category: 'general',
+        is_intermediate: !saveToGallery,
+        board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
+      })
+    );
+    this.$isUploading.set(false);
+    if (uploadResult.isErr()) {
+      throw uploadResult.error;
+    }
+    const imageDTO = uploadResult.value;
+    return imageDTO;
   };
 
   /**
@@ -355,12 +413,16 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     }
 
     const compositeInpaintMaskCanvas = this.getCompositeInpaintMaskCanvas(rect);
+    this.$isProcessing.set(true);
     const compositeInpaintMaskImageData = canvasToImageData(compositeInpaintMaskCanvas);
     const compositeInpaintMaskTransparency = getImageDataTransparency(compositeInpaintMaskImageData);
+    this.$isProcessing.set(false);
 
     const compositeRasterLayerCanvas = this.getCompositeRasterLayerCanvas(rect);
+    this.$isProcessing.set(true);
     const compositeRasterLayerImageData = canvasToImageData(compositeRasterLayerCanvas);
     const compositeRasterLayerTransparency = getImageDataTransparency(compositeRasterLayerImageData);
+    this.$isProcessing.set(false);
 
     let generationMode: GenerationMode;
     if (compositeRasterLayerTransparency === 'FULLY_TRANSPARENT') {
@@ -381,4 +443,16 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     this.manager.cache.generationModeCache.set(hash, generationMode);
     return generationMode;
   }
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      $isCompositing: this.$isCompositing.get(),
+      $isProcessing: this.$isProcessing.get(),
+      $isUploading: this.$isUploading.get(),
+      $isBusy: this.$isBusy.get(),
+    };
+  };
 }

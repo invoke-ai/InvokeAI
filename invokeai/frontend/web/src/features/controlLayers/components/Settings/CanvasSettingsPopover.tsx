@@ -10,27 +10,29 @@ import {
   useShiftModifier,
 } from '@invoke-ai/ui-library';
 import { CanvasSettingsAutoSaveCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsAutoSaveCheckbox';
+import { CanvasSettingsBboxOverlaySwitch } from 'features/controlLayers/components/Settings/CanvasSettingsBboxOverlaySwitch';
 import { CanvasSettingsClearCachesButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearCachesButton';
 import { CanvasSettingsClearHistoryButton } from 'features/controlLayers/components/Settings/CanvasSettingsClearHistoryButton';
 import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsClipToBboxCheckbox';
-import { CanvasSettingsCompositeMaskedRegionsCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsCompositeMaskedRegionsCheckbox';
 import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsDynamicGridSwitch';
-import { CanvasSettingsGridSize } from 'features/controlLayers/components/Settings/CanvasSettingsGridSize';
+import { CanvasSettingsSnapToGridCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsGridSize';
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
 import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
+import { CanvasSettingsOutputOnlyMaskedRegionsCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsOutputOnlyMaskedRegionsCheckbox';
+import { CanvasSettingsPreserveMaskCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPreserveMaskCheckbox';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
-import { CanvasSettingsResetButton } from 'features/controlLayers/components/Settings/CanvasSettingsResetButton';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
+import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RiSettings4Fill } from 'react-icons/ri';
+import { PiGearSixFill } from 'react-icons/pi';
 
 export const CanvasSettingsPopover = memo(() => {
   const { t } = useTranslation();
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <IconButton aria-label={t('common.settingsLabel')} icon={<RiSettings4Fill />} variant="ghost" />
+        <IconButton aria-label={t('common.settingsLabel')} icon={<PiGearSixFill />} variant="ghost" />
       </PopoverTrigger>
       <PopoverContent>
         <PopoverArrow />
@@ -38,12 +40,14 @@ export const CanvasSettingsPopover = memo(() => {
           <Flex direction="column" gap={2}>
             <CanvasSettingsAutoSaveCheckbox />
             <CanvasSettingsInvertScrollCheckbox />
+            <CanvasSettingsPreserveMaskCheckbox />
             <CanvasSettingsClipToBboxCheckbox />
-            <CanvasSettingsCompositeMaskedRegionsCheckbox />
+            <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
+            <CanvasSettingsSnapToGridCheckbox />
+            <CanvasSettingsShowProgressOnCanvas />
             <CanvasSettingsDynamicGridSwitch />
-            <CanvasSettingsGridSize />
+            <CanvasSettingsBboxOverlaySwitch />
             <CanvasSettingsShowHUDSwitch />
-            <CanvasSettingsResetButton />
             <DebugSettings />
           </Flex>
         </PopoverBody>

@@ -24,6 +24,7 @@ import { useRefreshAfterResetModal } from 'features/system/components/SettingsMo
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
 import { SettingsDeveloperLogNamespaces } from 'features/system/components/SettingsModal/SettingsDeveloperLogNamespaces';
+import { SettingsShowSendingToDifferentViewAlerts } from 'features/system/components/SettingsModal/SettingsShowSendingToDifferentViewAlerts';
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
@@ -41,8 +42,8 @@ import {
 } from 'features/system/store/systemSlice';
 import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import { setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
-import type { ChangeEvent } from 'react';
-import { memo, useCallback, useEffect } from 'react';
+import type { ChangeEvent, ReactElement } from 'react';
+import { cloneElement, memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 
@@ -63,12 +64,14 @@ const defaultConfig: ConfigOptions = {
 };
 
 type SettingsModalProps = {
+  /* The button to open the Settings Modal */
+  children: ReactElement;
   config?: ConfigOptions;
 };
 
-export const [useSettingsModal] = buildUseBoolean(false);
+const [useSettingsModal] = buildUseBoolean(false);
 
-const SettingsModal = ({ config = defaultConfig }: SettingsModalProps) => {
+const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -161,107 +164,116 @@ const SettingsModal = ({ config = defaultConfig }: SettingsModalProps) => {
   );
 
   return (
-    <Modal isOpen={settingsModal.isTrue} onClose={settingsModal.setFalse} size="2xl" isCentered useInert={false}>
-      <ModalOverlay />
-      <ModalContent maxH="80vh" h="68rem">
-        <ModalHeader bg="none">{t('common.settingsLabel')}</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody display="flex" flexDir="column" gap={4}>
-          <ScrollableContent>
-            <Flex flexDir="column" gap={4}>
-              <FormControlGroup formLabelProps={{ flexGrow: 1 }}>
-                <StickyScrollable title={t('settings.general')}>
-                  <FormControl>
-                    <FormLabel>{t('settings.confirmOnDelete')}</FormLabel>
-                    <Switch isChecked={shouldConfirmOnDelete} onChange={handleChangeShouldConfirmOnDelete} />
-                  </FormControl>
-                </StickyScrollable>
-
-                <StickyScrollable title={t('settings.generation')}>
-                  <FormControl isDisabled={!isNSFWCheckerAvailable}>
-                    <FormLabel>{t('settings.enableNSFWChecker')}</FormLabel>
-                    <Switch isChecked={shouldUseNSFWChecker} onChange={handleChangeShouldUseNSFWChecker} />
-                  </FormControl>
-                  <FormControl isDisabled={!isWatermarkerAvailable}>
-                    <FormLabel>{t('settings.enableInvisibleWatermark')}</FormLabel>
-                    <Switch isChecked={shouldUseWatermarker} onChange={handleChangeShouldUseWatermarker} />
-                  </FormControl>
-                </StickyScrollable>
-
-                <StickyScrollable title={t('settings.ui')}>
-                  <FormControl>
-                    <FormLabel>{t('settings.showProgressInViewer')}</FormLabel>
-                    <Switch isChecked={shouldShowProgressInViewer} onChange={handleChangeShouldShowProgressInViewer} />
-                  </FormControl>
-                  <FormControl>
-                    <FormLabel>{t('settings.antialiasProgressImages')}</FormLabel>
-                    <Switch
-                      isChecked={shouldAntialiasProgressImage}
-                      onChange={handleChangeShouldAntialiasProgressImage}
-                    />
-                  </FormControl>
-                  <FormControl>
-                    <InformationalPopover feature="noiseUseCPU" inPortal={false}>
-                      <FormLabel>{t('parameters.useCpuNoise')}</FormLabel>
-                    </InformationalPopover>
-                    <Switch isChecked={shouldUseCpuNoise} onChange={handleChangeShouldUseCpuNoise} />
-                  </FormControl>
-                  {Boolean(config?.shouldShowLocalizationToggle) && <SettingsLanguageSelect />}
-                  <FormControl>
-                    <FormLabel>{t('settings.enableInformationalPopovers')}</FormLabel>
-                    <Switch
-                      isChecked={shouldEnableInformationalPopovers}
-                      onChange={handleChangeShouldEnableInformationalPopovers}
-                    />
-                  </FormControl>
-                </StickyScrollable>
-
-                {Boolean(config?.shouldShowDeveloperSettings) && (
-                  <StickyScrollable title={t('settings.developer')}>
-                    <SettingsDeveloperLogIsEnabled />
-                    <SettingsDeveloperLogLevel />
-                    <SettingsDeveloperLogNamespaces />
+    <>
+      {cloneElement(children, {
+        onClick: settingsModal.setTrue,
+      })}
+      <Modal isOpen={settingsModal.isTrue} onClose={settingsModal.setFalse} size="2xl" isCentered useInert={false}>
+        <ModalOverlay />
+        <ModalContent maxH="80vh" h="68rem">
+          <ModalHeader bg="none">{t('common.settingsLabel')}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody display="flex" flexDir="column" gap={4}>
+            <ScrollableContent>
+              <Flex flexDir="column" gap={4}>
+                <FormControlGroup formLabelProps={{ flexGrow: 1 }}>
+                  <StickyScrollable title={t('settings.general')}>
+                    <FormControl>
+                      <FormLabel>{t('settings.confirmOnDelete')}</FormLabel>
+                      <Switch isChecked={shouldConfirmOnDelete} onChange={handleChangeShouldConfirmOnDelete} />
+                    </FormControl>
+                    <SettingsShowSendingToDifferentViewAlerts />
                   </StickyScrollable>
-                )}
 
-                {Boolean(config?.shouldShowClearIntermediates) && (
-                  <StickyScrollable title={t('settings.clearIntermediates')}>
-                    <Button
-                      tooltip={hasPendingItems ? t('settings.clearIntermediatesDisabled') : undefined}
-                      colorScheme="warning"
-                      onClick={clearIntermediates}
-                      isLoading={isLoadingClearIntermediates}
-                      isDisabled={!intermediatesCount || hasPendingItems}
-                    >
-                      {t('settings.clearIntermediatesWithCount', {
-                        count: intermediatesCount ?? 0,
-                      })}
-                    </Button>
-                    <Text fontWeight="bold">{t('settings.clearIntermediatesDesc1')}</Text>
-                    <Text variant="subtext">{t('settings.clearIntermediatesDesc2')}</Text>
-                    <Text variant="subtext">{t('settings.clearIntermediatesDesc3')}</Text>
+                  <StickyScrollable title={t('settings.generation')}>
+                    <FormControl isDisabled={!isNSFWCheckerAvailable}>
+                      <FormLabel>{t('settings.enableNSFWChecker')}</FormLabel>
+                      <Switch isChecked={shouldUseNSFWChecker} onChange={handleChangeShouldUseNSFWChecker} />
+                    </FormControl>
+                    <FormControl isDisabled={!isWatermarkerAvailable}>
+                      <FormLabel>{t('settings.enableInvisibleWatermark')}</FormLabel>
+                      <Switch isChecked={shouldUseWatermarker} onChange={handleChangeShouldUseWatermarker} />
+                    </FormControl>
                   </StickyScrollable>
-                )}
 
-                <StickyScrollable title={t('settings.resetWebUI')}>
-                  <Button colorScheme="error" onClick={handleClickResetWebUI}>
-                    {t('settings.resetWebUI')}
-                  </Button>
-                  {Boolean(config?.shouldShowResetWebUiText) && (
-                    <>
-                      <Text variant="subtext">{t('settings.resetWebUIDesc1')}</Text>
-                      <Text variant="subtext">{t('settings.resetWebUIDesc2')}</Text>
-                    </>
+                  <StickyScrollable title={t('settings.ui')}>
+                    <FormControl>
+                      <FormLabel>{t('settings.showProgressInViewer')}</FormLabel>
+                      <Switch
+                        isChecked={shouldShowProgressInViewer}
+                        onChange={handleChangeShouldShowProgressInViewer}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.antialiasProgressImages')}</FormLabel>
+                      <Switch
+                        isChecked={shouldAntialiasProgressImage}
+                        onChange={handleChangeShouldAntialiasProgressImage}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <InformationalPopover feature="noiseUseCPU" inPortal={false}>
+                        <FormLabel>{t('parameters.useCpuNoise')}</FormLabel>
+                      </InformationalPopover>
+                      <Switch isChecked={shouldUseCpuNoise} onChange={handleChangeShouldUseCpuNoise} />
+                    </FormControl>
+                    {Boolean(config?.shouldShowLocalizationToggle) && <SettingsLanguageSelect />}
+                    <FormControl>
+                      <FormLabel>{t('settings.enableInformationalPopovers')}</FormLabel>
+                      <Switch
+                        isChecked={shouldEnableInformationalPopovers}
+                        onChange={handleChangeShouldEnableInformationalPopovers}
+                      />
+                    </FormControl>
+                  </StickyScrollable>
+
+                  {Boolean(config?.shouldShowDeveloperSettings) && (
+                    <StickyScrollable title={t('settings.developer')}>
+                      <SettingsDeveloperLogIsEnabled />
+                      <SettingsDeveloperLogLevel />
+                      <SettingsDeveloperLogNamespaces />
+                    </StickyScrollable>
                   )}
-                </StickyScrollable>
-              </FormControlGroup>
-            </Flex>
-          </ScrollableContent>
-        </ModalBody>
 
-        <ModalFooter />
-      </ModalContent>
-    </Modal>
+                  {Boolean(config?.shouldShowClearIntermediates) && (
+                    <StickyScrollable title={t('settings.clearIntermediates')}>
+                      <Button
+                        tooltip={hasPendingItems ? t('settings.clearIntermediatesDisabled') : undefined}
+                        colorScheme="warning"
+                        onClick={clearIntermediates}
+                        isLoading={isLoadingClearIntermediates}
+                        isDisabled={!intermediatesCount || hasPendingItems}
+                      >
+                        {t('settings.clearIntermediatesWithCount', {
+                          count: intermediatesCount ?? 0,
+                        })}
+                      </Button>
+                      <Text fontWeight="bold">{t('settings.clearIntermediatesDesc1')}</Text>
+                      <Text variant="subtext">{t('settings.clearIntermediatesDesc2')}</Text>
+                      <Text variant="subtext">{t('settings.clearIntermediatesDesc3')}</Text>
+                    </StickyScrollable>
+                  )}
+
+                  <StickyScrollable title={t('settings.resetWebUI')}>
+                    <Button colorScheme="error" onClick={handleClickResetWebUI}>
+                      {t('settings.resetWebUI')}
+                    </Button>
+                    {Boolean(config?.shouldShowResetWebUiText) && (
+                      <>
+                        <Text variant="subtext">{t('settings.resetWebUIDesc1')}</Text>
+                        <Text variant="subtext">{t('settings.resetWebUIDesc2')}</Text>
+                      </>
+                    )}
+                  </StickyScrollable>
+                </FormControlGroup>
+              </Flex>
+            </ScrollableContent>
+          </ModalBody>
+
+          <ModalFooter />
+        </ModalContent>
+      </Modal>
+    </>
   );
 };
 

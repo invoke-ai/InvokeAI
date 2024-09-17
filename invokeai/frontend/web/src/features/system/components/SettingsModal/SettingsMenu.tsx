@@ -17,21 +17,21 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiBugBeetleBold,
+  PiGearSixFill,
   PiInfoBold,
   PiKeyboardBold,
   PiShareNetworkFill,
   PiToggleRightFill,
   PiUsersBold,
 } from 'react-icons/pi';
-import { RiDiscordFill, RiGithubFill, RiSettings4Line } from 'react-icons/ri';
+import { RiDiscordFill, RiGithubFill } from 'react-icons/ri';
 
-import { useSettingsModal } from './SettingsModal';
+import SettingsModal from './SettingsModal';
 import { SettingsUpsellMenuItem } from './SettingsUpsellMenuItem';
 const SettingsMenu = () => {
   const { t } = useTranslation();
   const { isOpen, onOpen, onClose } = useDisclosure();
   useGlobalMenuClose(onClose);
-  const settingsModal = useSettingsModal();
 
   const isBugLinkEnabled = useFeatureStatus('bugLink');
   const isDiscordLinkEnabled = useFeatureStatus('discordLink');
@@ -43,7 +43,7 @@ const SettingsMenu = () => {
         as={IconButton}
         variant="link"
         aria-label={t('accessibility.menu')}
-        icon={<RiSettings4Line fontSize={20} />}
+        icon={<PiGearSixFill fontSize={20} />}
         boxSize={8}
       />
       <Portal>
@@ -70,15 +70,18 @@ const SettingsMenu = () => {
               </MenuItem>
             )}
           </MenuGroup>
+
           <MenuGroup title={t('common.settingsLabel')}>
             <HotkeysModal>
               <MenuItem as="button" icon={<PiKeyboardBold />}>
                 {t('common.hotkeysLabel')}
               </MenuItem>
             </HotkeysModal>
-            <MenuItem onClick={settingsModal.setTrue} as="button" icon={<PiToggleRightFill />}>
-              {t('common.settingsLabel')}
-            </MenuItem>
+            <SettingsModal>
+              <MenuItem as="button" icon={<PiToggleRightFill />}>
+                {t('common.settingsLabel')}
+              </MenuItem>
+            </SettingsModal>
           </MenuGroup>
           <MenuGroup title={t('accessibility.about')}>
             <AboutModal>

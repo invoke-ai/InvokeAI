@@ -1,7 +1,7 @@
 import { usePruneQueue } from 'features/queue/hooks/usePruneQueue';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RiSparklingFill } from 'react-icons/ri';
+import { PiBroomBold } from 'react-icons/pi';
 
 import QueueButton from './common/QueueButton';
 
@@ -20,7 +20,7 @@ const PruneQueueButton = ({ asIconButton }: Props) => {
       asIconButton={asIconButton}
       label={t('queue.prune')}
       tooltip={t('queue.pruneTooltip', { item_count: finishedCount })}
-      icon={<RiSparklingFill />}
+      icon={<PiBroomBold />}
       onClick={pruneQueue}
       colorScheme="invokeBlue"
     />

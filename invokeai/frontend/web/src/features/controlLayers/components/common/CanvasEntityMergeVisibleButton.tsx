@@ -1,14 +1,13 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { isOk, withResultAsync } from 'common/util/result';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityTypeCount } from 'features/controlLayers/hooks/useEntityTypeCount';
 import { inpaintMaskAdded, rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
-import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +24,6 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const canvasManager = useCanvasManager();
-  const isStaging = useAppSelector(selectIsStaging);
   const isBusy = useCanvasIsBusy();
   const entityCount = useEntityTypeCount(type);
   const onClick = useCallback(async () => {
@@ -35,7 +33,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
         canvasManager.compositor.rasterizeAndUploadCompositeRasterLayer(rect, false)
       );
 
-      if (isOk(result)) {
+      if (result.isOk()) {
         dispatch(
           rasterLayerAdded({
             isSelected: true,
@@ -57,7 +55,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
         canvasManager.compositor.rasterizeAndUploadCompositeInpaintMask(rect, false)
       );
 
-      if (isOk(result)) {
+      if (result.isOk()) {
         dispatch(
           inpaintMaskAdded({
             isSelected: true,
@@ -87,7 +85,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
       icon={<PiStackBold />}
       onClick={onClick}
       alignSelf="stretch"
-      isDisabled={entityCount <= 1 || isStaging || isBusy}
+      isDisabled={entityCount <= 1 || isBusy}
     />
   );
 });

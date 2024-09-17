@@ -4,7 +4,7 @@ import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/c
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
 import { CanvasEntityMenuItemsFilter } from 'features/controlLayers/components/common/CanvasEntityMenuItemsFilter';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
-import { RasterLayerMenuItemsRasterToControl } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItemsRasterToControl';
+import { RasterLayerMenuItemsConvertRasterToControl } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItemsConvertRasterToControl';
 import { memo } from 'react';
 
 export const RasterLayerMenuItems = memo(() => {
@@ -12,7 +12,7 @@ export const RasterLayerMenuItems = memo(() => {
     <>
       <CanvasEntityMenuItemsTransform />
       <CanvasEntityMenuItemsFilter />
-      <RasterLayerMenuItemsRasterToControl />
+      <RasterLayerMenuItemsConvertRasterToControl />
       <MenuDivider />
       <CanvasEntityMenuItemsArrange />
       <MenuDivider />

@@ -3,7 +3,7 @@ import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { SerializableObject } from 'common/types';
 import type { Result } from 'common/util/result';
-import { isErr, withResult, withResultAsync } from 'common/util/result';
+import { withResult, withResultAsync } from 'common/util/result';
 import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
 import {
   selectIsStaging,
@@ -11,6 +11,7 @@ import {
   stagingAreaStartedStaging,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -24,7 +25,7 @@ const log = logger('generation');
 export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: (action): action is ReturnType<typeof enqueueRequested> =>
-      enqueueRequested.match(action) && action.payload.tabName === 'generation',
+      enqueueRequested.match(action) && action.payload.tabName === 'canvas',
     effect: async (action, { getState, dispatch }) => {
       const state = getState();
       const model = state.params.model;
@@ -47,7 +48,11 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       };
 
       let buildGraphResult: Result<
-        { g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'compel' | 'sdxl_compel_prompt'> },
+        {
+          g: Graph;
+          noise: Invocation<'noise' | 'flux_denoise'>;
+          posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+        },
         Error
       >;
 
@@ -62,11 +67,14 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         case `sd-2`:
           buildGraphResult = await withResultAsync(() => buildSD1Graph(state, manager));
           break;
+        case `flux`:
+          buildGraphResult = await withResultAsync(() => buildFLUXGraph(state, manager));
+          break;
         default:
           assert(false, `No graph builders for base ${base}`);
       }
 
-      if (isErr(buildGraphResult)) {
+      if (buildGraphResult.isErr()) {
         log.error({ error: serializeError(buildGraphResult.error) }, 'Failed to build graph');
         abortStaging();
         return;
@@ -80,7 +88,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         prepareLinearUIBatch(state, g, prepend, noise, posCond, 'generation', destination)
       );
 
-      if (isErr(prepareBatchResult)) {
+      if (prepareBatchResult.isErr()) {
         log.error({ error: serializeError(prepareBatchResult.error) }, 'Failed to prepare batch');
         abortStaging();
         return;
@@ -95,7 +103,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       const enqueueResult = await withResultAsync(() => req.unwrap());
 
-      if (isErr(enqueueResult)) {
+      if (enqueueResult.isErr()) {
         log.error({ error: serializeError(enqueueResult.error) }, 'Failed to enqueue batch');
         abortStaging();
         return;

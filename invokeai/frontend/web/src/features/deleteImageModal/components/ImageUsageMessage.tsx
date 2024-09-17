@@ -31,7 +31,7 @@ const ImageUsageMessage = (props: Props) => {
       <UnorderedList paddingInlineStart={6}>
         {imageUsage.isLayerImage && <ListItem>{t('controlLayers.layers')}</ListItem>}
         {imageUsage.isControlAdapterImage && <ListItem>{t('controlLayers.controlAdapters')}</ListItem>}
-        {imageUsage.isIPAdapterImage && <ListItem>{t('controlLayers.ipAdapters')}</ListItem>}
+        {imageUsage.isIPAdapterImage && <ListItem>{t('controlLayers.globalReferenceImages')}</ListItem>}
         {imageUsage.isNodesImage && <ListItem>{t('ui.tabs.workflowsTab')}</ListItem>}
       </UnorderedList>
       <Text>{bottomMessage}</Text>

@@ -73,11 +73,11 @@ export class CanvasManager extends CanvasModuleBase {
   _isDebugging: boolean = false;
 
   /**
-   * Whether the canvas is currently busy with a transformation or filtering operation.
+   * Whether the canvas is currently busy with a transformation, filter, rasterization, staging or compositing operation.
    */
   $isBusy: Atom<boolean>;
 
-  constructor(stage: Konva.Stage, container: HTMLDivElement, store: AppStore, socket: AppSocket) {
+  constructor(container: HTMLDivElement, store: AppStore, socket: AppSocket) {
     super();
     this.id = getPrefixedId(this.type);
     this.path = [this.id];
@@ -98,12 +98,26 @@ export class CanvasManager extends CanvasModuleBase {
     this.socket = socket;
 
     this.stateApi = new CanvasStateApiModule(this.store, this);
-    this.stage = new CanvasStageModule(stage, container, this);
+    this.stage = new CanvasStageModule(container, this);
     this.worker = new CanvasWorkerModule(this);
     this.cache = new CanvasCacheModule(this);
     this.entityRenderer = new CanvasEntityRendererModule(this);
 
     this.compositor = new CanvasCompositorModule(this);
+    this.stagingArea = new CanvasStagingAreaModule(this);
+
+    this.$isBusy = computed(
+      [
+        this.stateApi.$isFiltering,
+        this.stateApi.$isTransforming,
+        this.stateApi.$isRasterizing,
+        this.stagingArea.$isStaging,
+        this.compositor.$isBusy,
+      ],
+      (isFiltering, isTransforming, isRasterizing, isStaging, isCompositing) => {
+        return isFiltering || isTransforming || isRasterizing || isStaging || isCompositing;
+      }
+    );
 
     this.background = new CanvasBackgroundModule(this);
     this.stage.addLayer(this.background.konva.layer);
@@ -114,7 +128,6 @@ export class CanvasManager extends CanvasModuleBase {
     this.stage.addLayer(this.konva.previewLayer);
 
     this.tool = new CanvasToolModule(this);
-    this.stagingArea = new CanvasStagingAreaModule(this);
     this.progressImage = new CanvasProgressImageModule(this);
     this.bbox = new CanvasBboxModule(this);
 
@@ -123,13 +136,6 @@ export class CanvasManager extends CanvasModuleBase {
     this.konva.previewLayer.add(this.progressImage.konva.group);
     this.konva.previewLayer.add(this.bbox.konva.group);
     this.konva.previewLayer.add(this.tool.konva.group);
-
-    this.$isBusy = computed(
-      [this.stateApi.$isFiltering, this.stateApi.$isTranforming],
-      (isFiltering, isTransforming) => {
-        return isFiltering || isTransforming;
-      }
-    );
   }
 
   getAdapter = <T extends CanvasEntityType = CanvasEntityType>(
@@ -268,6 +274,7 @@ export class CanvasManager extends CanvasModuleBase {
       id: this.id,
       type: this.type,
       path: this.path,
+      $isBusy: this.$isBusy.get(),
       rasterLayers: Array.from(this.adapters.rasterLayers.values()).map((adapter) => adapter.repr()),
       controlLayers: Array.from(this.adapters.controlLayers.values()).map((adapter) => adapter.repr()),
       inpaintMasks: Array.from(this.adapters.inpaintMasks.values()).map((adapter) => adapter.repr()),
@@ -304,8 +311,11 @@ export class CanvasManager extends CanvasModuleBase {
   };
 
   logDebugInfo() {
+    /**
+     * We are logging the live manager instance here, so we cannot use the logger, which only accepts serializable
+     * objects.
+     */
     // eslint-disable-next-line no-console
-    console.log('Canvas manager', this);
-    this.log.debug({ manager: this.repr() }, 'Canvas manager');
+    console.log('Canvas manager', { managerInstance: this, managerInfo: this.repr() });
   }
 }

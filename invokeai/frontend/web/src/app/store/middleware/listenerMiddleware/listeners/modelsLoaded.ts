@@ -6,11 +6,18 @@ import {
   bboxHeightChanged,
   bboxWidthChanged,
   controlLayerModelChanged,
-  ipaModelChanged,
+  referenceImageIPAdapterModelChanged,
   rgIPAdapterModelChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
-import { modelChanged, refinerModelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import {
+  clipEmbedModelSelected,
+  fluxVAESelected,
+  modelChanged,
+  refinerModelChanged,
+  t5EncoderModelSelected,
+  vaeSelected,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
@@ -21,13 +28,16 @@ import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isCLIPEmbedModelConfig,
   isControlNetOrT2IAdapterModelConfig,
+  isFluxVAEModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
+  isNonFluxVAEModelConfig,
   isNonRefinerMainModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
-  isVAEModelConfig,
+  isT5EncoderModelConfig,
 } from 'services/api/types';
 
 const log = logger('models');
@@ -50,6 +60,9 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       handleControlAdapterModels(models, state, dispatch, log);
       handleSpandrelImageToImageModels(models, state, dispatch, log);
       handleIPAdapterModels(models, state, dispatch, log);
+      handleT5EncoderModels(models, state, dispatch, log);
+      handleCLIPEmbedModels(models, state, dispatch, log);
+      handleFLUXVAEModels(models, state, dispatch, log);
     },
   });
 };
@@ -131,7 +144,7 @@ const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
     // null is a valid VAE! it means "use the default with the main model"
     return;
   }
-  const vaeModels = models.filter(isVAEModelConfig);
+  const vaeModels = models.filter(isNonFluxVAEModelConfig);
 
   const isCurrentVAEAvailable = vaeModels.some((m) => m.key === currentVae.key);
 
@@ -181,22 +194,22 @@ const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log)
 
 const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
   const ipaModels = models.filter(isIPAdapterModelConfig);
-  selectCanvasSlice(state).ipAdapters.entities.forEach((entity) => {
+  selectCanvasSlice(state).referenceImages.entities.forEach((entity) => {
     const isModelAvailable = ipaModels.some((m) => m.key === entity.ipAdapter.model?.key);
     if (isModelAvailable) {
       return;
     }
-    dispatch(ipaModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
+    dispatch(referenceImageIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
   });
 
-  selectCanvasSlice(state).regions.entities.forEach((entity) => {
-    entity.ipAdapters.forEach(({ id: ipAdapterId, model }) => {
-      const isModelAvailable = ipaModels.some((m) => m.key === model?.key);
+  selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
+    entity.referenceImages.forEach(({ id: referenceImageId, ipAdapter }) => {
+      const isModelAvailable = ipaModels.some((m) => m.key === ipAdapter.model?.key);
       if (isModelAvailable) {
         return;
       }
       dispatch(
-        rgIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), ipAdapterId, modelConfig: null })
+        rgIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), referenceImageId, modelConfig: null })
       );
     });
   });
@@ -221,5 +234,47 @@ const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch,
 
   if (!isCurrentPostProcessingModelAvailable) {
     dispatch(postProcessingModelChanged(firstModel));
+  }
+};
+
+const handleT5EncoderModels: ModelHandler = (models, state, dispatch, _log) => {
+  const { t5EncoderModel: currentT5EncoderModel } = state.params;
+  const t5EncoderModels = models.filter(isT5EncoderModelConfig);
+  const firstModel = t5EncoderModels[0] || null;
+
+  const isCurrentT5EncoderModelAvailable = currentT5EncoderModel
+    ? t5EncoderModels.some((m) => m.key === currentT5EncoderModel.key)
+    : false;
+
+  if (!isCurrentT5EncoderModelAvailable) {
+    dispatch(t5EncoderModelSelected(firstModel));
+  }
+};
+
+const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, _log) => {
+  const { clipEmbedModel: currentCLIPEmbedModel } = state.params;
+  const CLIPEmbedModels = models.filter(isCLIPEmbedModelConfig);
+  const firstModel = CLIPEmbedModels[0] || null;
+
+  const isCurrentCLIPEmbedModelAvailable = currentCLIPEmbedModel
+    ? CLIPEmbedModels.some((m) => m.key === currentCLIPEmbedModel.key)
+    : false;
+
+  if (!isCurrentCLIPEmbedModelAvailable) {
+    dispatch(clipEmbedModelSelected(firstModel));
+  }
+};
+
+const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, _log) => {
+  const { fluxVAE: currentFLUXVAEModel } = state.params;
+  const fluxVAEModels = models.filter(isFluxVAEModelConfig);
+  const firstModel = fluxVAEModels[0] || null;
+
+  const isCurrentFLUXVAEModelAvailable = currentFLUXVAEModel
+    ? fluxVAEModels.some((m) => m.key === currentFLUXVAEModel.key)
+    : false;
+
+  if (!isCurrentFLUXVAEModelAvailable) {
+    dispatch(fluxVAESelected(firstModel));
   }
 };

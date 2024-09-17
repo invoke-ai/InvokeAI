@@ -11,7 +11,6 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
-import type { BoardDTO } from 'services/api/types';
 
 import AddBoardButton from './AddBoardButton';
 import GalleryBoard from './GalleryBoard';
@@ -19,10 +18,9 @@ import NoBoardBoard from './NoBoardBoard';
 
 type Props = {
   isPrivate: boolean;
-  setBoardToDelete: (board?: BoardDTO) => void;
 };
 
-export const BoardsList = ({ isPrivate, setBoardToDelete }: Props) => {
+export const BoardsList = ({ isPrivate }: Props) => {
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const boardSearchText = useAppSelector(selectBoardSearchText);
@@ -57,17 +55,12 @@ export const BoardsList = ({ isPrivate, setBoardToDelete }: Props) => {
 
     filteredBoards.forEach((board) => {
       elements.push(
-        <GalleryBoard
-          board={board}
-          isSelected={selectedBoardId === board.board_id}
-          setBoardToDelete={setBoardToDelete}
-          key={board.board_id}
-        />
+        <GalleryBoard board={board} isSelected={selectedBoardId === board.board_id} key={board.board_id} />
       );
     });
 
     return elements;
-  }, [allowPrivateBoards, isPrivate, boardSearchText.length, filteredBoards, selectedBoardId, setBoardToDelete]);
+  }, [allowPrivateBoards, isPrivate, boardSearchText.length, filteredBoards, selectedBoardId]);
 
   const boardListTitle = useMemo(() => {
     if (allowPrivateBoards) {

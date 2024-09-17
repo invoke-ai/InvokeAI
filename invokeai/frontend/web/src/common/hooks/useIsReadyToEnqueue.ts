@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { $isConnected } from 'app/hooks/useSocketIO';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { $true } from 'app/store/nanostores/util';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
@@ -18,19 +19,25 @@ import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
-import { atom } from 'nanostores';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
 
 const LAYER_TYPE_TO_TKEY = {
-  ip_adapter: 'controlLayers.ipAdapter',
+  reference_image: 'controlLayers.referenceImage',
   inpaint_mask: 'controlLayers.inpaintMask',
   regional_guidance: 'controlLayers.regionalGuidance',
-  raster_layer: 'controlLayers.raster',
-  control_layer: 'controlLayers.globalControlAdapter',
+  raster_layer: 'controlLayers.rasterLayer',
+  control_layer: 'controlLayers.controlLayer',
 } as const;
 
-const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy: boolean) =>
+const createSelector = (
+  templates: Templates,
+  isConnected: boolean,
+  canvasIsFiltering: boolean,
+  canvasIsTransforming: boolean,
+  canvasIsRasterizing: boolean,
+  canvasIsCompositing: boolean
+) =>
   createMemoizedSelector(
     [
       selectSystemSlice,
@@ -119,8 +126,17 @@ const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy
           reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
         }
       } else {
-        if (canvasIsBusy) {
-          reasons.push({ content: i18n.t('parameters.invoke.canvasBusy') });
+        if (canvasIsFiltering) {
+          reasons.push({ content: i18n.t('parameters.invoke.canvasIsFiltering') });
+        }
+        if (canvasIsTransforming) {
+          reasons.push({ content: i18n.t('parameters.invoke.canvasIsTransforming') });
+        }
+        if (canvasIsRasterizing) {
+          reasons.push({ content: i18n.t('parameters.invoke.canvasIsRasterizing') });
+        }
+        if (canvasIsCompositing) {
+          reasons.push({ content: i18n.t('parameters.invoke.canvasIsCompositing') });
         }
 
         if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
@@ -129,6 +145,18 @@ const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy
 
         if (!model) {
           reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
+        }
+
+        if (model?.base === 'flux') {
+          if (!params.t5EncoderModel) {
+            reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+          }
+          if (!params.clipEmbedModel) {
+            reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
+          }
+          if (!params.fluxVAE) {
+            reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+          }
         }
 
         canvas.controlLayers.entities
@@ -161,7 +189,7 @@ const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy
             }
           });
 
-        canvas.ipAdapters.entities
+        canvas.referenceImages.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layer_one');
@@ -189,7 +217,7 @@ const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy
             }
           });
 
-        canvas.regions.entities
+        canvas.regionalGuidance.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layer_one');
@@ -202,10 +230,14 @@ const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy
               problems.push(i18n.t('parameters.invoke.layer.rgNoRegion'));
             }
             // Must have at least 1 prompt or IP Adapter
-            if (entity.positivePrompt === null && entity.negativePrompt === null && entity.ipAdapters.length === 0) {
+            if (
+              entity.positivePrompt === null &&
+              entity.negativePrompt === null &&
+              entity.referenceImages.length === 0
+            ) {
               problems.push(i18n.t('parameters.invoke.layer.rgNoPromptsOrIPAdapters'));
             }
-            entity.ipAdapters.forEach((ipAdapter) => {
+            entity.referenceImages.forEach(({ ipAdapter }) => {
               // Must have model
               if (!ipAdapter.model) {
                 problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoModelSelected'));
@@ -246,16 +278,25 @@ const createSelector = (templates: Templates, isConnected: boolean, canvasIsBusy
     }
   );
 
-const dummyAtom = atom(true);
-
 export const useIsReadyToEnqueue = () => {
   const templates = useStore($templates);
   const isConnected = useStore($isConnected);
   const canvasManager = useCanvasManagerSafe();
-  const canvasIsBusy = useStore(canvasManager?.$isBusy ?? dummyAtom);
+  const canvasIsFiltering = useStore(canvasManager?.stateApi.$isFiltering ?? $true);
+  const canvasIsTransforming = useStore(canvasManager?.stateApi.$isTransforming ?? $true);
+  const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $true);
+  const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $true);
   const selector = useMemo(
-    () => createSelector(templates, isConnected, canvasIsBusy),
-    [templates, isConnected, canvasIsBusy]
+    () =>
+      createSelector(
+        templates,
+        isConnected,
+        canvasIsFiltering,
+        canvasIsTransforming,
+        canvasIsRasterizing,
+        canvasIsCompositing
+      ),
+    [templates, isConnected, canvasIsFiltering, canvasIsTransforming, canvasIsRasterizing, canvasIsCompositing]
   );
   const value = useAppSelector(selector);
   return value;

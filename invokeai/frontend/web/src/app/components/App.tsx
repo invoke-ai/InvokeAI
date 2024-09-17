@@ -13,12 +13,12 @@ import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
+import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
-import SettingsModal from 'features/system/components/SettingsModal/SettingsModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
@@ -137,8 +137,8 @@ const App = ({
       <StylePresetModal />
       <ClearQueueConfirmationsAlertDialog />
       <PreselectedImage selectedImage={selectedImage} />
-      <SettingsModal />
       <RefreshAfterResetModal />
+      <DeleteBoardModal />
     </ErrorBoundary>
   );
 };

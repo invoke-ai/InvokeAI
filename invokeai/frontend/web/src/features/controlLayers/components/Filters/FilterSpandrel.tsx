@@ -11,8 +11,8 @@ import {
   Tooltip,
 } from '@invoke-ai/ui-library';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
-import type { SpandrelFilterConfig } from 'features/controlLayers/store/types';
-import { IMAGE_FILTERS } from 'features/controlLayers/store/types';
+import type { SpandrelFilterConfig } from 'features/controlLayers/store/filters';
+import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import type { ChangeEvent } from 'react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +22,7 @@ import type { SpandrelImageToImageModelConfig } from 'services/api/types';
 import type { FilterComponentProps } from './types';
 
 type Props = FilterComponentProps<SpandrelFilterConfig>;
-const DEFAULTS = IMAGE_FILTERS['spandrel_filter'].buildDefaults();
+const DEFAULTS = IMAGE_FILTERS.spandrel_filter.buildDefaults();
 
 export const FilterSpandrel = ({ onChange, config }: Props) => {
   const { t } = useTranslation();
@@ -70,8 +70,9 @@ export const FilterSpandrel = ({ onChange, config }: Props) => {
   );
 
   useEffect(() => {
-    if (!config.model) {
-      onChangeModel(options[0] ?? null);
+    const firstModel = options[0];
+    if (!config.model && firstModel) {
+      onChangeModel(firstModel);
     }
   }, [config.model, onChangeModel, options]);
 
@@ -80,14 +81,14 @@ export const FilterSpandrel = ({ onChange, config }: Props) => {
       <FormControl w="full" orientation="vertical">
         <Flex w="full" alignItems="center">
           <FormLabel m={0} flexGrow={1}>
-            {t('controlLayers.filter.spandrel.paramAutoScale')}
+            {t('controlLayers.filter.spandrel_filter.autoScale')}
           </FormLabel>
           <Switch size="sm" isChecked={config.autoScale} onChange={onAutoscaleChanged} />
         </Flex>
-        <FormHelperText>{t('controlLayers.filter.spandrel.paramAutoScaleDesc')}</FormHelperText>
+        <FormHelperText>{t('controlLayers.filter.spandrel_filter.autoScaleDesc')}</FormHelperText>
       </FormControl>
       <FormControl isDisabled={!config.autoScale}>
-        <FormLabel m={0}>{t('controlLayers.filter.spandrel.paramScale')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.spandrel_filter.scale')}</FormLabel>
         <CompositeSlider
           value={config.scale}
           onChange={onScaleChanged}
@@ -104,7 +105,7 @@ export const FilterSpandrel = ({ onChange, config }: Props) => {
         />
       </FormControl>
       <FormControl>
-        <FormLabel m={0}>{t('controlLayers.filter.spandrel.paramModel')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.spandrel_filter.model')}</FormLabel>
         <Tooltip label={tooltipLabel}>
           <Box w="full">
             <Combobox

@@ -18,7 +18,7 @@ const BoardAutoAddSelect = () => {
       selectFromResult: ({ data }) => {
         const options: ComboboxOption[] = [
           {
-            label: t('controlnet.none'),
+            label: t('common.none'),
             value: 'none',
           },
         ].concat(

@@ -1,4 +1,4 @@
-import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
+import { Box, Button, Collapse, Divider, Flex, IconButton, Spacer, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
@@ -50,50 +50,37 @@ const GalleryPanelContent = () => {
     boardsListPanel.expand();
   }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
-  const handleToggleBoardPanel = useCallback(() => {
-    if (boardSearchText.length) {
-      dispatch(boardSearchTextChanged(''));
-    }
-    boardSearchDisclosure.onClose();
-    boardsListPanel.toggle();
-  }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
-
   return (
     <Flex ref={ref} position="relative" flexDirection="column" h="full" w="full" tabIndex={-1}>
-      <Flex alignItems="center" gap={0}>
-        <GalleryHeader />
-        <Flex alignItems="center" justifyContent="space-between" w="full">
-          <Button
+      <GalleryHeader />
+      <Flex alignItems="center" w="full">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={boardsListPanel.toggle}
+          rightIcon={boardsListPanel.isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
+        >
+          {boardsListPanel.isCollapsed ? t('boards.viewBoards') : t('boards.hideBoards')}
+        </Button>
+        <Spacer />
+        <Flex h="full">
+          <GallerySettingsPopover />
+          <IconButton
             size="sm"
-            variant="ghost"
-            onClick={handleToggleBoardPanel}
-            rightIcon={boardsListPanel.isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
-          >
-            {boardsListPanel.isCollapsed ? t('boards.viewBoards') : t('boards.hideBoards')}
-          </Button>
-          <Flex alignItems="center" justifyContent="space-between">
-            <GallerySettingsPopover />
-            <Flex>
-              <IconButton
-                w="full"
-                h="full"
-                onClick={handleClickBoardSearch}
-                tooltip={
-                  boardSearchDisclosure.isOpen
-                    ? `${t('gallery.exitBoardSearch')}`
-                    : `${t('gallery.displayBoardSearch')}`
-                }
-                aria-label={t('gallery.displayBoardSearch')}
-                icon={<PiMagnifyingGlassBold />}
-                colorScheme={boardSearchDisclosure.isOpen ? 'invokeBlue' : 'base'}
-                variant="link"
-              />
-            </Flex>
-          </Flex>
+            variant="link"
+            alignSelf="stretch"
+            onClick={handleClickBoardSearch}
+            tooltip={
+              boardSearchDisclosure.isOpen ? `${t('gallery.exitBoardSearch')}` : `${t('gallery.displayBoardSearch')}`
+            }
+            aria-label={t('gallery.displayBoardSearch')}
+            icon={<PiMagnifyingGlassBold />}
+            colorScheme={boardSearchDisclosure.isOpen ? 'invokeBlue' : 'base'}
+          />
         </Flex>
       </Flex>
 
-      <PanelGroup ref={panelGroupRef} direction="vertical">
+      <PanelGroup ref={panelGroupRef} direction="vertical" autoSaveId="boards-list-panel">
         <Panel collapsible {...boardsListPanel.panelProps}>
           <Flex flexDir="column" w="full" h="full">
             <Collapse in={boardSearchDisclosure.isOpen} style={COLLAPSE_STYLES}>

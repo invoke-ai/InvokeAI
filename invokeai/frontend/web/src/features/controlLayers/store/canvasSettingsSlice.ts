@@ -1,7 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import type { GridSize, RgbaColor } from 'features/controlLayers/store/types';
+import type { RgbaColor } from 'features/controlLayers/store/types';
 
 type CanvasSettingsState = {
   /**
@@ -51,19 +51,27 @@ type CanvasSettingsState = {
    *
    * When `sendToCanvas` is disabled, this setting is ignored, masked regions will always be composited.
    */
-  compositeMaskedRegions: boolean;
+  outputOnlyMaskedRegions: boolean;
   /**
-   * Whether to automatically preview the filter when the filter configuration changes.
+   * Whether to automatically process the filter when the filter configuration changes.
    */
-  autoPreviewFilter: boolean;
+  autoProcessFilter: boolean;
   /**
    * The snap-to-grid setting for the canvas.
    */
-  gridSize: GridSize;
-  // TODO(psyche): These are copied from old canvas state, need to be implemented
-  // imageSmoothing: boolean;
-  // preserveMaskedArea: boolean;
-  // cropToBboxOnSave: boolean;
+  snapToGrid: boolean;
+  /**
+   * Whether to show progress on the canvas when generating images.
+   */
+  showProgressOnCanvas: boolean;
+  /**
+   * Whether to show the bounding box overlay on the canvas.
+   */
+  bboxOverlay: boolean;
+  /**
+   * Whether to preserve the masked region instead of inpainting it.
+   */
+  preserveMask: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -76,9 +84,12 @@ const initialState: CanvasSettingsState = {
   invertScrollForToolWidth: false,
   color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
   sendToCanvas: false,
-  compositeMaskedRegions: false,
-  autoPreviewFilter: true,
-  gridSize: 64,
+  outputOnlyMaskedRegions: false,
+  autoProcessFilter: true,
+  snapToGrid: true,
+  showProgressOnCanvas: true,
+  bboxOverlay: false,
+  preserveMask: false,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -112,14 +123,23 @@ export const canvasSettingsSlice = createSlice({
     settingsSendToCanvasChanged: (state, action: PayloadAction<boolean>) => {
       state.sendToCanvas = action.payload;
     },
-    settingsCompositeMaskedRegionsChanged: (state, action: PayloadAction<boolean>) => {
-      state.compositeMaskedRegions = action.payload;
+    settingsOutputOnlyMaskedRegionsToggled: (state) => {
+      state.outputOnlyMaskedRegions = !state.outputOnlyMaskedRegions;
     },
-    settingsAutoPreviewFilterToggled: (state) => {
-      state.autoPreviewFilter = !state.autoPreviewFilter;
+    settingsAutoProcessFilterToggled: (state) => {
+      state.autoProcessFilter = !state.autoProcessFilter;
     },
-    settingsGridSizeChanged: (state, action: PayloadAction<GridSize>) => {
-      state.gridSize = action.payload;
+    settingsSnapToGridToggled: (state) => {
+      state.snapToGrid = !state.snapToGrid;
+    },
+    settingsShowProgressOnCanvasToggled: (state) => {
+      state.showProgressOnCanvas = !state.showProgressOnCanvas;
+    },
+    settingsBboxOverlayToggled: (state) => {
+      state.bboxOverlay = !state.bboxOverlay;
+    },
+    settingsPreserveMaskToggled: (state) => {
+      state.preserveMask = !state.preserveMask;
     },
   },
 });
@@ -134,9 +154,12 @@ export const {
   settingsColorChanged,
   settingsInvertScrollForToolWidthChanged,
   settingsSendToCanvasChanged,
-  settingsCompositeMaskedRegionsChanged,
-  settingsAutoPreviewFilterToggled,
-  settingsGridSizeChanged,
+  settingsOutputOnlyMaskedRegionsToggled,
+  settingsAutoProcessFilterToggled,
+  settingsSnapToGridToggled,
+  settingsShowProgressOnCanvasToggled,
+  settingsBboxOverlayToggled,
+  settingsPreserveMaskToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -156,7 +179,16 @@ const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState,
   createSelector(selectCanvasSettingsSlice, selector);
 
 export const selectAutoSave = createCanvasSettingsSelector((settings) => settings.autoSave);
+export const selectPreserveMask = createCanvasSettingsSelector((settings) => settings.preserveMask);
+export const selectOutputOnlyMaskedRegions = createCanvasSettingsSelector(
+  (settings) => settings.outputOnlyMaskedRegions
+);
 export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
+export const selectBboxOverlay = createCanvasSettingsSelector((settings) => settings.bboxOverlay);
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
-export const selectAutoPreviewFilter = createCanvasSettingsSelector((settings) => settings.autoPreviewFilter);
-export const selectGridSize = createCanvasSettingsSelector((settings) => settings.gridSize);
+export const selectAutoProcessFilter = createCanvasSettingsSelector((settings) => settings.autoProcessFilter);
+export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
+export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.sendToCanvas);
+export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
+  (canvasSettings) => canvasSettings.showProgressOnCanvas
+);

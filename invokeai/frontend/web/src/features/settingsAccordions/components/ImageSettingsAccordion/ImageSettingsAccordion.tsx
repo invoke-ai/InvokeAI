@@ -9,6 +9,7 @@ import BboxScaledHeight from 'features/parameters/components/Bbox/BboxScaledHeig
 import BboxScaledWidth from 'features/parameters/components/Bbox/BboxScaledWidth';
 import BboxScaleMethod from 'features/parameters/components/Bbox/BboxScaleMethod';
 import { BboxSettings } from 'features/parameters/components/Bbox/BboxSettings';
+import { ParamDenoisingStrength } from 'features/parameters/components/Core/ParamDenoisingStrength';
 import { ParamSeedNumberInput } from 'features/parameters/components/Seed/ParamSeedNumberInput';
 import { ParamSeedRandomize } from 'features/parameters/components/Seed/ParamSeedRandomize';
 import { ParamSeedShuffle } from 'features/parameters/components/Seed/ParamSeedShuffle';
@@ -67,11 +68,12 @@ export const ImageSettingsAccordion = memo(() => {
     >
       <Flex px={4} pt={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
         <BboxSettings />
-        <Flex pt={4} gap={4} alignItems="center">
+        <Flex py={3} gap={4} alignItems="center">
           <ParamSeedNumberInput />
           <ParamSeedShuffle />
           <ParamSeedRandomize />
         </Flex>
+        <ParamDenoisingStrength />
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             <BboxScaleMethod />

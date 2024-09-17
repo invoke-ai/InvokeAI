@@ -7,20 +7,22 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import {
-  selectAutoPreviewFilter,
-  settingsAutoPreviewFilterToggled,
+  selectAutoProcessFilter,
+  settingsAutoProcessFilterToggled,
 } from 'features/controlLayers/store/canvasSettingsSlice';
-import { type FilterConfig, IMAGE_FILTERS } from 'features/controlLayers/store/types';
+import type { FilterConfig } from 'features/controlLayers/store/filters';
+import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCheckBold, PiShootingStarBold, PiXBold } from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiCheckBold, PiShootingStarBold, PiXBold } from 'react-icons/pi';
 
 const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const config = useStore(adapter.filterer.$filterConfig);
   const isProcessing = useStore(adapter.filterer.$isProcessing);
-  const autoPreviewFilter = useAppSelector(selectAutoPreviewFilter);
+  const hasProcessed = useStore(adapter.filterer.$hasProcessed);
+  const autoProcessFilter = useAppSelector(selectAutoProcessFilter);
 
   const onChangeFilterConfig = useCallback(
     (filterConfig: FilterConfig) => {
@@ -36,8 +38,8 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
     [adapter.filterer.$filterConfig]
   );
 
-  const onChangeAutoPreviewFilter = useCallback(() => {
-    dispatch(settingsAutoPreviewFilterToggled());
+  const onChangeAutoProcessFilter = useCallback(() => {
+    dispatch(settingsAutoProcessFilterToggled());
   }, [dispatch]);
 
   const isValid = useMemo(() => {
@@ -63,8 +65,8 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
         </Heading>
         <Spacer />
         <FormControl w="min-content">
-          <FormLabel m={0}>{t('controlLayers.autoPreviewFilter')}</FormLabel>
-          <Switch size="sm" isChecked={autoPreviewFilter} onChange={onChangeAutoPreviewFilter} />
+          <FormLabel m={0}>{t('controlLayers.filter.autoProcess')}</FormLabel>
+          <Switch size="sm" isChecked={autoProcessFilter} onChange={onChangeAutoProcessFilter} />
         </FormControl>
       </Flex>
       <FilterTypeSelect filterType={config.type} onChange={onChangeFilterType} />
@@ -73,31 +75,39 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
         <Button
           variant="ghost"
           leftIcon={<PiShootingStarBold />}
-          onClick={adapter.filterer.previewFilter}
+          onClick={adapter.filterer.processImmediate}
           isLoading={isProcessing}
-          loadingText={t('controlLayers.filter.preview')}
-          isDisabled={!isValid}
+          loadingText={t('controlLayers.filter.process')}
+          isDisabled={!isValid || autoProcessFilter}
         >
-          {t('controlLayers.filter.preview')}
+          {t('controlLayers.filter.process')}
         </Button>
         <Spacer />
         <Button
+          leftIcon={<PiArrowsCounterClockwiseBold />}
+          onClick={adapter.filterer.reset}
+          isLoading={isProcessing}
+          loadingText={t('controlLayers.filter.reset')}
+          variant="ghost"
+        >
+          {t('controlLayers.filter.reset')}
+        </Button>
+        <Button
           variant="ghost"
           leftIcon={<PiCheckBold />}
-          onClick={adapter.filterer.applyFilter}
+          onClick={adapter.filterer.apply}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.apply')}
-          isDisabled={!isValid}
+          isDisabled={!isValid || !hasProcessed}
         >
           {t('controlLayers.filter.apply')}
         </Button>
         <Button
           variant="ghost"
           leftIcon={<PiXBold />}
-          onClick={adapter.filterer.cancelFilter}
+          onClick={adapter.filterer.cancel}
           isLoading={isProcessing}
           loadingText={t('controlLayers.filter.cancel')}
-          isDisabled={!isValid}
         >
           {t('controlLayers.filter.cancel')}
         </Button>

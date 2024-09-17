@@ -48,10 +48,9 @@ const _hover: SystemStyleObject = {
 interface GalleryBoardProps {
   board: BoardDTO;
   isSelected: boolean;
-  setBoardToDelete: (board?: BoardDTO) => void;
 }
 
-const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps) => {
+const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
@@ -118,7 +117,7 @@ const GalleryBoard = ({ board, isSelected, setBoardToDelete }: GalleryBoardProps
   }, []);
 
   return (
-    <BoardContextMenu board={board} setBoardToDelete={setBoardToDelete}>
+    <BoardContextMenu board={board}>
       {(ref) => (
         <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll p={2}>
           <Flex

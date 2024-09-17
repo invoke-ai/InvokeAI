@@ -16,9 +16,9 @@ export const useEntityTypeCount = (type: CanvasEntityIdentifier['type']): number
           case 'inpaint_mask':
             return canvas.inpaintMasks.entities.length;
           case 'regional_guidance':
-            return canvas.regions.entities.length;
-          case 'ip_adapter':
-            return canvas.ipAdapters.entities.length;
+            return canvas.regionalGuidance.entities.length;
+          case 'reference_image':
+            return canvas.referenceImages.entities.length;
           default:
             return 0;
         }

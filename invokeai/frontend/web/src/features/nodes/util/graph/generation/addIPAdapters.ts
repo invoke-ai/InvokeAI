@@ -1,4 +1,4 @@
-import type { CanvasIPAdapterState } from 'features/controlLayers/store/types';
+import type { CanvasReferenceImageState } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -8,7 +8,7 @@ type AddIPAdaptersResult = {
 };
 
 export const addIPAdapters = (
-  ipAdapters: CanvasIPAdapterState[],
+  ipAdapters: CanvasReferenceImageState[],
   g: Graph,
   collector: Invocation<'collect'>,
   base: BaseModelType
@@ -28,7 +28,7 @@ export const addIPAdapters = (
   return result;
 };
 
-const addIPAdapter = (entity: CanvasIPAdapterState, g: Graph, collector: Invocation<'collect'>) => {
+const addIPAdapter = (entity: CanvasReferenceImageState, g: Graph, collector: Invocation<'collect'>) => {
   const { id, ipAdapter } = entity;
   const { weight, model, clipVisionModel, method, beginEndStepPct, image } = ipAdapter;
   assert(image, 'IP Adapter image is required');
@@ -50,7 +50,7 @@ const addIPAdapter = (entity: CanvasIPAdapterState, g: Graph, collector: Invocat
   g.addEdge(ipAdapterNode, 'ip_adapter', collector, 'item');
 };
 
-const isValidIPAdapter = ({ isEnabled, ipAdapter }: CanvasIPAdapterState, base: BaseModelType): boolean => {
+const isValidIPAdapter = ({ isEnabled, ipAdapter }: CanvasReferenceImageState, base: BaseModelType): boolean => {
   // Must be have a model that matches the current base and must have a control image
   const hasModel = Boolean(ipAdapter.model);
   const modelMatchesBase = ipAdapter.model?.base === base;
