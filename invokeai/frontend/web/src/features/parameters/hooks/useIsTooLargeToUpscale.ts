@@ -1,12 +1,12 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 const createIsTooLargeToUpscaleSelector = (imageDTO?: ImageDTO | null) =>
-  createMemoizedSelector(selectUpscalelice, selectConfigSlice, (upscale, config) => {
+  createMemoizedSelector(selectUpscaleSlice, selectConfigSlice, (upscale, config) => {
     const { upscaleModel, scale } = upscale;
     const { maxUpscaleDimension } = config;
 

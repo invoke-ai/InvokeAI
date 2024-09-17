@@ -12,6 +12,7 @@ import {
 } from 'features/deleteImageModal/store/slice';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectSystemSlice, setShouldConfirmOnDelete } from 'features/system/store/systemSlice';
 import { some } from 'lodash-es';
 import type { ChangeEvent } from 'react';
@@ -21,14 +22,19 @@ import { useTranslation } from 'react-i18next';
 import ImageUsageMessage from './ImageUsageMessage';
 
 const selectImageUsages = createMemoizedSelector(
-  [selectDeleteImageModalSlice, selectNodesSlice, selectCanvasSlice, selectImageUsage],
-  (deleteImageModal, nodes, canvas, imagesUsage) => {
+  [selectDeleteImageModalSlice, selectNodesSlice, selectCanvasSlice, selectImageUsage, selectUpscaleSlice],
+  (deleteImageModal, nodes, canvas, imagesUsage, upscale) => {
     const { imagesToDelete } = deleteImageModal;
 
-    const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) => getImageUsage(nodes, canvas, image_name));
+    const allImageUsage = (imagesToDelete ?? []).map(({ image_name }) =>
+      getImageUsage(nodes, canvas, upscale, image_name)
+    );
 
     const imageUsageSummary: ImageUsage = {
-      isLayerImage: some(allImageUsage, (i) => i.isLayerImage),
+      isUpscaleImage: some(allImageUsage, (i) => i.isUpscaleImage),
+      isRasterLayerImage: some(allImageUsage, (i) => i.isRasterLayerImage),
+      isInpaintMaskImage: some(allImageUsage, (i) => i.isInpaintMaskImage),
+      isRegionalGuidanceImage: some(allImageUsage, (i) => i.isRegionalGuidanceImage),
       isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
       isControlAdapterImage: some(allImageUsage, (i) => i.isControlAdapterImage),
       isIPAdapterImage: some(allImageUsage, (i) => i.isIPAdapterImage),

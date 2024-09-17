@@ -13,10 +13,13 @@ export const addImageToDeleteSelectedListener = (startAppListening: AppStartList
       const imagesUsage = selectImageUsage(getState());
 
       const isImageInUse =
-        imagesUsage.some((i) => i.isLayerImage) ||
+        imagesUsage.some((i) => i.isRasterLayerImage) ||
         imagesUsage.some((i) => i.isControlAdapterImage) ||
         imagesUsage.some((i) => i.isIPAdapterImage) ||
-        imagesUsage.some((i) => i.isLayerImage);
+        imagesUsage.some((i) => i.isInpaintMaskImage) ||
+        imagesUsage.some((i) => i.isUpscaleImage) ||
+        imagesUsage.some((i) => i.isNodesImage) ||
+        imagesUsage.some((i) => i.isRegionalGuidanceImage);
 
       if (shouldConfirmOnDelete || isImageInUse) {
         dispatch(isModalOpenChanged(true));

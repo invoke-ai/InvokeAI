@@ -13,7 +13,7 @@ import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -46,7 +46,7 @@ const createSelector = (
       selectDynamicPromptsSlice,
       selectCanvasSlice,
       selectParamsSlice,
-      selectUpscalelice,
+      selectUpscaleSlice,
       selectConfigSlice,
       selectActiveTab,
     ],

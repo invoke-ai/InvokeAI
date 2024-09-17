@@ -28,10 +28,13 @@ const ImageUsageMessage = (props: Props) => {
   return (
     <>
       <Text>{topMessage}</Text>
-      <UnorderedList paddingInlineStart={6}>
-        {imageUsage.isLayerImage && <ListItem>{t('controlLayers.layers')}</ListItem>}
-        {imageUsage.isControlAdapterImage && <ListItem>{t('controlLayers.controlAdapters')}</ListItem>}
-        {imageUsage.isIPAdapterImage && <ListItem>{t('controlLayers.globalReferenceImages')}</ListItem>}
+      <UnorderedList paddingInlineStart={6} fontSize="sm">
+        {imageUsage.isControlAdapterImage && <ListItem>{t('controlLayers.controlLayer')}</ListItem>}
+        {imageUsage.isIPAdapterImage && <ListItem>{t('controlLayers.referenceImage')}</ListItem>}
+        {imageUsage.isInpaintMaskImage && <ListItem>{t('controlLayers.inpaintMask')}</ListItem>}
+        {imageUsage.isRasterLayerImage && <ListItem>{t('controlLayers.rasterLayer')}</ListItem>}
+        {imageUsage.isRegionalGuidanceImage && <ListItem>{t('controlLayers.regionalGuidance')}</ListItem>}
+        {imageUsage.isUpscaleImage && <ListItem>{t('ui.tabs.upscalingTab')}</ListItem>}
         {imageUsage.isNodesImage && <ListItem>{t('ui.tabs.workflowsTab')}</ListItem>}
       </UnorderedList>
       <Text>{bottomMessage}</Text>
