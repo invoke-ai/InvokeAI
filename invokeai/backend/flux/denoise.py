@@ -41,6 +41,7 @@ def denoise(
 
         if inpaint_extension is not None:
             img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+            preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
 
         step_callback(
             PipelineIntermediateState(
