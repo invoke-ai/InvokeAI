@@ -3,6 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityMenuItemsCopy } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCopy';
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsFilter } from 'features/controlLayers/components/common/CanvasEntityMenuItemsFilter';
+import { CanvasEntityMenuItemsSave } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSave';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
 import {
   EntityIdentifierContext,
@@ -22,6 +23,7 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
       {isFilterableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsFilter />}
       {isTransformableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsTransform />}
       <CanvasEntityMenuItemsCopy />
+      <CanvasEntityMenuItemsSave />
       <CanvasEntityMenuItemsDelete />
     </MenuGroup>
   );

@@ -7,12 +7,14 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { memo } from 'react';
 
 import { CanvasEntityCopyToClipboard } from './CanvasEntityCopyToClipboard';
+import { CanvasEntitySaveToAssets } from './CanvasEntitySaveToAssets';
 
 export const CanvasEntityHeaderCommonActions = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
 
   return (
     <Flex alignSelf="stretch">
+      <CanvasEntitySaveToAssets />
       <CanvasEntityCopyToClipboard />
       <CanvasEntityIsBookmarkedForQuickSwitchToggle />
       {entityIdentifier.type !== 'reference_image' && <CanvasEntityIsLockedToggle />}
