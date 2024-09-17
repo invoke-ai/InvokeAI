@@ -7,7 +7,7 @@ import StatusIndicator from 'features/system/components/StatusIndicator';
 import { TabMountGate } from 'features/ui/components/TabMountGate';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsOutBold, PiBoundingBoxBold, PiCubeBold, PiFlowArrowBold, PiQueueBold } from 'react-icons/pi';
+import { PiBoundingBoxBold, PiCubeBold, PiFlowArrowBold, PiFrameCornersBold, PiQueueBold } from 'react-icons/pi';
 
 import { TabButton } from './TabButton';
 
@@ -23,7 +23,7 @@ export const VerticalNavBar = memo(() => {
           <TabButton tab="canvas" icon={<PiBoundingBoxBold />} label={t('ui.tabs.canvas')} />
         </TabMountGate>
         <TabMountGate tab="upscaling">
-          <TabButton tab="upscaling" icon={<PiArrowsOutBold />} label={t('ui.tabs.upscaling')} />
+          <TabButton tab="upscaling" icon={<PiFrameCornersBold />} label={t('ui.tabs.upscaling')} />
         </TabMountGate>
         <TabMountGate tab="workflows">
           <TabButton tab="workflows" icon={<PiFlowArrowBold />} label={t('ui.tabs.workflows')} />
