@@ -13,6 +13,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     IsEmptyResult,
     IsFullResult,
     PruneResult,
+    SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueItemDTO,
     SessionQueueStatus,
@@ -67,6 +68,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def get_queue_status(self, queue_id: str) -> SessionQueueStatus:
         """Gets the status of the queue"""
+        pass
+
+    @abstractmethod
+    def get_counts_by_destination(self, queue_id: str, destination: str) -> SessionQueueCountsByDestination:
+        """Gets the counts of queue items by destination"""
         pass
 
     @abstractmethod

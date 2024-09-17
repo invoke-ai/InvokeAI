@@ -307,6 +307,17 @@ class SessionQueueStatus(BaseModel):
     total: int = Field(..., description="Total number of queue items")
 
 
+class SessionQueueCountsByDestination(BaseModel):
+    queue_id: str = Field(..., description="The ID of the queue")
+    destination: str = Field(..., description="The destination of queue items included in this status")
+    pending: int = Field(..., description="Number of queue items with status 'pending' for the destination")
+    in_progress: int = Field(..., description="Number of queue items with status 'in_progress' for the destination")
+    completed: int = Field(..., description="Number of queue items with status 'complete' for the destination")
+    failed: int = Field(..., description="Number of queue items with status 'error' for the destination")
+    canceled: int = Field(..., description="Number of queue items with status 'canceled' for the destination")
+    total: int = Field(..., description="Total number of queue items for the destination")
+
+
 class BatchStatus(BaseModel):
     queue_id: str = Field(..., description="The ID of the queue")
     batch_id: str = Field(..., description="The ID of the batch")
