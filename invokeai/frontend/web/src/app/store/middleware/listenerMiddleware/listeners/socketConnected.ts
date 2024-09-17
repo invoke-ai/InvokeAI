@@ -1,3 +1,4 @@
+import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
@@ -6,11 +7,11 @@ import { atom } from 'nanostores';
 import { api } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, selectQueueStatus } from 'services/api/endpoints/queue';
-import { socketConnected } from 'services/events/setEventListeners';
 
 const log = logger('events');
 
 const $isFirstConnection = atom(true);
+export const socketConnected = createAction('socket/connected');
 
 export const addSocketConnectedEventListener = (startAppListening: AppStartListening) => {
   startAppListening({

@@ -1,48 +1,40 @@
 import { ExternalLink } from '@invoke-ai/ui-library';
-import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
-import { getIsCancelled } from 'app/store/middleware/listenerMiddleware/listeners/cancellationsListeners';
+import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $bulkDownloadId } from 'app/store/nanostores/bulkDownloadId';
 import { $queueId } from 'app/store/nanostores/queueId';
-import type { AppDispatch, RootState } from 'app/store/store';
+import type { AppStore } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
-import { $lastCanvasProgressEvent } from 'features/controlLayers/store/canvasSlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { forEach } from 'lodash-es';
-import { atom, computed } from 'nanostores';
 import { api, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
-import type { S } from 'services/api/types';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 
-export const socketConnected = createAction('socket/connected');
+import { $lastProgressEvent } from './stores';
 
 const log = logger('events');
 
 type SetEventListenersArg = {
   socket: Socket<ServerToClientEvents, ClientToServerEvents>;
-  dispatch: AppDispatch;
-  getState: () => RootState;
+  store: AppStore;
   setIsConnected: (isConnected: boolean) => void;
 };
 
 const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
-const nodeTypeDenylist = ['load_image', 'image'];
-export const $lastProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
-export const $hasProgress = computed($lastProgressEvent, (val) => Boolean(val));
-export const $progressImage = computed($lastProgressEvent, (val) => val?.progress_image ?? null);
-export const $isProgressFromCanvas = computed($lastProgressEvent, (val) => val?.destination === 'canvas');
 
-export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }: SetEventListenersArg) => {
+export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg) => {
+  const { dispatch, getState } = store;
+
   socket.on('connect', () => {
     log.debug('Connected');
     setIsConnected(true);
@@ -54,14 +46,12 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
       socket.emit('subscribe_bulk_download', { bulk_download_id });
     }
     $lastProgressEvent.set(null);
-    $lastCanvasProgressEvent.set(null);
   });
 
   socket.on('connect_error', (error) => {
     log.debug('Connect error');
     setIsConnected(false);
     $lastProgressEvent.set(null);
-    $lastCanvasProgressEvent.set(null);
     if (error && error.message) {
       const data: string | undefined = (error as unknown as { data: string | undefined }).data;
       if (data === 'ERR_UNAUTHENTICATED') {
@@ -78,7 +68,6 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
   socket.on('disconnect', () => {
     log.debug('Disconnected');
     $lastProgressEvent.set(null);
-    $lastCanvasProgressEvent.set(null);
     setIsConnected(false);
   });
 
@@ -93,24 +82,7 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
   });
 
   socket.on('invocation_denoise_progress', (data) => {
-    const {
-      invocation_source_id,
-      invocation,
-      step,
-      total_steps,
-      progress_image,
-      origin,
-      destination,
-      percentage,
-      session_id,
-      batch_id,
-    } = data;
-
-    if (getIsCancelled({ session_id, batch_id, destination })) {
-      // Do not update the progress if this session has been cancelled. This prevents a race condition where we get a
-      // progress update after the session has been cancelled.
-      return;
-    }
+    const { invocation_source_id, invocation, step, total_steps, progress_image, origin, percentage } = data;
 
     log.trace(
       { data } as SerializableObject,
@@ -127,11 +99,6 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
         nes.progressImage = progress_image ?? null;
         upsertExecutionState(nes.nodeId, nes);
       }
-    }
-
-    // This event is only relevant for the canvas
-    if (destination === 'canvas') {
-      $lastCanvasProgressEvent.set(data);
     }
   });
 
@@ -152,13 +119,7 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
     }
   });
 
-  const onInvocationComplete = buildOnInvocationComplete(
-    getState,
-    dispatch,
-    nodeTypeDenylist,
-    $lastProgressEvent.set,
-    $lastCanvasProgressEvent.set
-  );
+  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch);
   socket.on('invocation_complete', onInvocationComplete);
 
   socket.on('model_load_started', (data) => {
@@ -379,7 +340,6 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
       error_type,
       error_message,
       error_traceback,
-      origin,
     } = data;
 
     log.debug({ data }, `Queue item ${item_id} status updated: ${status}`);
@@ -402,12 +362,17 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
       })
     );
 
-    // Update the queue status (we do not get the processor status here)
+    // Optimistic update of the queue status. We prefer to do an optimistic update over tag invalidation due to the
+    // frequency of `queue_item_status_changed` events.
     dispatch(
       queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
         if (!draft) {
           return;
         }
+        /**
+         * Update the queue status - though the getQueueStatus query response contains the processor status (i.e. running
+         * or paused), that data is not provided in the event we are handling. So we can only update `draft.queue` here.
+         */
         Object.assign(draft.queue, queue_status);
       })
     );
@@ -442,11 +407,6 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
     } else if (status === 'failed' && error_type) {
       const isLocal = getState().config.isLocal ?? true;
       const sessionId = session_id;
-      $lastProgressEvent.set(null);
-
-      if (origin === 'canvas') {
-        $lastCanvasProgressEvent.set(null);
-      }
 
       toast({
         id: `INVOCATION_ERROR_${error_type}`,
@@ -463,13 +423,6 @@ export const setEventListeners = ({ socket, dispatch, getState, setIsConnected }
           />
         ),
       });
-    } else if (status === 'canceled') {
-      $lastProgressEvent.set(null);
-      if (origin === 'canvas') {
-        $lastCanvasProgressEvent.set(null);
-      }
-    } else if (status === 'completed') {
-      $lastProgressEvent.set(null);
     }
   });
 

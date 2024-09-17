@@ -1,7 +1,6 @@
 import { Flex, useShiftModifier } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
@@ -16,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiRulerBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO, PostUploadAction } from 'services/api/types';
+import { $isConnected } from 'services/events/stores';
 
 type Props = {
   image: ImageWithDims | null;

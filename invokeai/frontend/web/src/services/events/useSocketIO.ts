@@ -3,13 +3,16 @@ import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $isDebugging } from 'app/store/nanostores/isDebugging';
 import { useAppStore } from 'app/store/nanostores/store';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import type { MapStore } from 'nanostores';
-import { atom, map } from 'nanostores';
 import { useEffect, useMemo } from 'react';
+import { selectQueueStatus } from 'services/api/endpoints/queue';
 import { setEventListeners } from 'services/events/setEventListeners';
-import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
-import type { ManagerOptions, Socket, SocketOptions } from 'socket.io-client';
+import type { AppSocket } from 'services/events/types';
+import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 import { io } from 'socket.io-client';
+
+import { $isConnected, $lastProgressEvent, $socket, $socketOptions } from './stores';
 
 // Inject socket options and url into window for debugging
 declare global {
@@ -18,19 +21,12 @@ declare global {
   }
 }
 
-export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
-
-export const $socket = atom<AppSocket | null>(null);
-export const $socketOptions = map<Partial<ManagerOptions & SocketOptions>>({});
-
-const $isSocketInitialized = atom<boolean>(false);
-export const $isConnected = atom<boolean>(false);
-
 /**
  * Initializes the socket.io connection and sets up event listeners.
  */
 export const useSocketIO = () => {
-  const { dispatch, getState } = useAppStore();
+  useAssertSingleton('useSocketIO');
+  const store = useAppStore();
   const baseUrl = useStore($baseUrl);
   const authToken = useStore($authToken);
   const addlSocketOptions = useStore($socketOptions);
@@ -61,14 +57,11 @@ export const useSocketIO = () => {
   }, [authToken, addlSocketOptions, baseUrl]);
 
   useEffect(() => {
-    if ($isSocketInitialized.get()) {
-      // Singleton!
-      return;
-    }
-
     const socket: AppSocket = io(socketUrl, socketOptions);
     $socket.set(socket);
-    setEventListeners({ socket, dispatch, getState, setIsConnected: $isConnected.set });
+
+    setEventListeners({ socket, store, setIsConnected: $isConnected.set });
+
     socket.connect();
 
     if ($isDebugging.get() || import.meta.env.MODE === 'development') {
@@ -78,7 +71,12 @@ export const useSocketIO = () => {
       console.log('Socket initialized', socket);
     }
 
-    $isSocketInitialized.set(true);
+    const unsubscribeQueueStatusListener = store.subscribe(() => {
+      const queueStatusData = selectQueueStatus(store.getState()).data;
+      if (!queueStatusData || queueStatusData.queue.in_progress === 0) {
+        $lastProgressEvent.set(null);
+      }
+    });
 
     return () => {
       if ($isDebugging.get() || import.meta.env.MODE === 'development') {
@@ -87,8 +85,8 @@ export const useSocketIO = () => {
         /* eslint-disable-next-line no-console */
         console.log('Socket teardown', socket);
       }
+      unsubscribeQueueStatusListener();
       socket.disconnect();
-      $isSocketInitialized.set(false);
     };
-  }, [dispatch, getState, socketOptions, socketUrl]);
+  }, [socketOptions, socketUrl, store]);
 };

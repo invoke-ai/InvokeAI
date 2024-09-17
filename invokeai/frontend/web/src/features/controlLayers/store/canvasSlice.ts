@@ -30,13 +30,7 @@ import type { IRect } from 'konva/lib/types';
 import { merge, omit } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { UndoableOptions } from 'redux-undo';
-import type {
-  ControlNetModelConfig,
-  ImageDTO,
-  IPAdapterModelConfig,
-  S,
-  T2IAdapterModelConfig,
-} from 'services/api/types';
+import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import type {
@@ -1236,7 +1230,6 @@ function actionsThrottlingFilter(action: UnknownAction) {
   return true;
 }
 
-export const $lastCanvasProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
 /**
  * The global canvas manager instance.
  */
