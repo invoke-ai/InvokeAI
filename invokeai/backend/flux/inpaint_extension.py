@@ -28,8 +28,19 @@ class InpaintExtension:
 
         This function should be called after each denoising step.
         """
+        timestep_cutoff = 0.5
+        if timestep > timestep_cutoff:
+            # Early in the denoising process, use the smaller mask.
+            # I.e. treat gradient values as 0.0.
+            mask = self._inpaint_mask.where(self._inpaint_mask >= (1.0 - 1e-3), 0.0)
+        else:
+            # After the cut-off, use the larger mask.
+            # I.e. treat gradient values as 1.0.
+            mask = self._inpaint_mask.where(self._inpaint_mask <= (0.0 + 1e-3), 1.0)
+            # mask = (self._inpaint_mask > (0.0 + 1e-5)).float()
+
         # Noise the init latents for the current timestep.
         noised_init_latents = self._noise * timestep + (1.0 - timestep) * self._init_latents
 
         # Merge the intermediate latents with the noised_init_latents using the inpaint_mask.
-        return intermediate_latents * self._inpaint_mask + noised_init_latents * (1.0 - self._inpaint_mask)
+        return intermediate_latents * mask + noised_init_latents * (1.0 - mask)
