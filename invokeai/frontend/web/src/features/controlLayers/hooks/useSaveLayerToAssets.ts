@@ -15,7 +15,7 @@ export const useSaveLayerToAssets = () => {
   const [uploadImage] = useUploadImageMutation();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
 
-  const copyLayerToCipboard = useCallback(
+  const saveLayerToAssets = useCallback(
     async (
       adapter:
         | CanvasEntityAdapterRasterLayer
@@ -53,5 +53,5 @@ export const useSaveLayerToAssets = () => {
     [t, autoAddBoardId, uploadImage]
   );
 
-  return copyLayerToCipboard;
+  return saveLayerToAssets;
 };
