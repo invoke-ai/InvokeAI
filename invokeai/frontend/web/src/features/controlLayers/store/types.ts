@@ -384,6 +384,21 @@ export function isTransformableEntityIdentifier(
   );
 }
 
+export function isSaveableEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is
+  | CanvasEntityIdentifier<'raster_layer'>
+  | CanvasEntityIdentifier<'control_layer'>
+  | CanvasEntityIdentifier<'inpaint_mask'>
+  | CanvasEntityIdentifier<'regional_guidance'> {
+  return (
+    isRasterLayerEntityIdentifier(entityIdentifier) ||
+    isControlLayerEntityIdentifier(entityIdentifier) ||
+    isInpaintMaskEntityIdentifier(entityIdentifier) ||
+    isRegionalGuidanceEntityIdentifier(entityIdentifier)
+  );
+}
+
 export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {
   return isRenderableEntityType(entity.type);
 }

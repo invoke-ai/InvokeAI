@@ -7,6 +7,8 @@ import { EntityListSelectedEntityActionBarOpacity } from 'features/controlLayers
 import { EntityListSelectedEntityActionBarTransformButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarTransformButton';
 import { memo } from 'react';
 
+import { EntityListSelectedEntityActionBarSaveToAssetsButton } from './EntityListSelectedEntityActionBarSaveToAssetsButton';
+
 export const EntityListSelectedEntityActionBar = memo(() => {
   return (
     <Flex w="full" gap={2} alignItems="center" ps={1}>
@@ -16,6 +18,7 @@ export const EntityListSelectedEntityActionBar = memo(() => {
       <Flex h="full">
         <EntityListSelectedEntityActionBarFilterButton />
         <EntityListSelectedEntityActionBarTransformButton />
+        <EntityListSelectedEntityActionBarSaveToAssetsButton />
         <EntityListSelectedEntityActionBarDuplicateButton />
         <EntityListGlobalActionBarAddLayerMenu />
       </Flex>
