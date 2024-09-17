@@ -5,11 +5,6 @@ import type { SerializableObject } from 'common/types';
 import type { Result } from 'common/util/result';
 import { withResult, withResultAsync } from 'common/util/result';
 import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
-import {
-  selectIsStaging,
-  stagingAreaReset,
-  stagingAreaStartedStaging,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
@@ -33,19 +28,6 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       const manager = $canvasManager.get();
       assert(manager, 'No model found in state');
-
-      let didStartStaging = false;
-
-      if (!selectIsStaging(state) && state.canvasSettings.sendToCanvas) {
-        dispatch(stagingAreaStartedStaging());
-        didStartStaging = true;
-      }
-
-      const abortStaging = () => {
-        if (didStartStaging && selectIsStaging(getState())) {
-          dispatch(stagingAreaReset());
-        }
-      };
 
       let buildGraphResult: Result<
         {
@@ -76,7 +58,6 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       if (buildGraphResult.isErr()) {
         log.error({ error: serializeError(buildGraphResult.error) }, 'Failed to build graph');
-        abortStaging();
         return;
       }
 
@@ -90,7 +71,6 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       if (prepareBatchResult.isErr()) {
         log.error({ error: serializeError(prepareBatchResult.error) }, 'Failed to prepare batch');
-        abortStaging();
         return;
       }
 
@@ -105,7 +85,6 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       if (enqueueResult.isErr()) {
         log.error({ error: serializeError(enqueueResult.error) }, 'Failed to enqueue batch');
-        abortStaging();
         return;
       }
 
