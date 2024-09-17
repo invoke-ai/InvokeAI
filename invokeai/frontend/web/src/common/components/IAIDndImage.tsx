@@ -66,7 +66,7 @@ type IAIDndImageProps = FlexProps & {
   fitContainer?: boolean;
   droppableData?: TypesafeDroppableData;
   draggableData?: TypesafeDraggableData;
-  dropLabel?: ReactNode;
+  dropLabel?: string;
   isSelected?: boolean;
   isSelectedForCompare?: boolean;
   thumbnail?: boolean;

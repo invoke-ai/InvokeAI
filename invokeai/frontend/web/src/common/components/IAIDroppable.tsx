@@ -3,14 +3,13 @@ import { useDroppableTypesafe } from 'features/dnd/hooks/typesafeHooks';
 import type { TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import { AnimatePresence } from 'framer-motion';
-import type { ReactNode } from 'react';
 import { memo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 import IAIDropOverlay from './IAIDropOverlay';
 
 type IAIDroppableProps = {
-  dropLabel?: ReactNode;
+  dropLabel?: string;
   disabled?: boolean;
   data?: TypesafeDroppableData;
 };
