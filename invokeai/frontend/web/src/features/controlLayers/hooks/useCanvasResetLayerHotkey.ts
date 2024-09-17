@@ -25,11 +25,12 @@ export function useCanvasResetLayerHotkey() {
   const isInteractable = useStore(adapter?.$isInteractable ?? $false);
 
   const resetSelectedLayer = useCallback(() => {
-    if (selectedEntityIdentifier === null) {
+    if (selectedEntityIdentifier === null || adapter === null) {
       return;
     }
+    adapter.bufferRenderer.clearBuffer();
     dispatch(entityReset({ entityIdentifier: selectedEntityIdentifier }));
-  }, [dispatch, selectedEntityIdentifier]);
+  }, [adapter, dispatch, selectedEntityIdentifier]);
 
   const isResetEnabled = useMemo(
     () => selectedEntityIdentifier !== null && isMaskEntityIdentifier(selectedEntityIdentifier),
