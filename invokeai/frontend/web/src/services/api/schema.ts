@@ -1284,6 +1284,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/counts_by_destination": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Counts By Destination
+         * @description Gets the counts of queue items by destination
+         */
+        get: operations["counts_by_destination"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workflows/i/{workflow_id}": {
         parameters: {
             query?: never;
@@ -5109,7 +5129,7 @@ export type components = {
              */
             latents?: components["schemas"]["LatentsField"] | null;
             /**
-             * @description A mask of the region to apply the denoising process to.
+             * @description A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.
              * @default null
              */
             denoise_mask?: components["schemas"]["DenoiseMaskField"] | null;
@@ -6293,7 +6313,7 @@ export type components = {
              */
             latents?: components["schemas"]["LatentsField"] | null;
             /**
-             * @description A mask of the region to apply the denoising process to.
+             * @description A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.
              * @default null
              */
             denoise_mask?: components["schemas"]["DenoiseMaskField"] | null;
@@ -6700,7 +6720,7 @@ export type components = {
          * @description Outputs a denoise mask and an image representing the total gradient of the mask.
          */
         GradientMaskOutput: {
-            /** @description Mask for denoise model run */
+            /** @description Mask for denoise model run. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved. */
             denoise_mask: components["schemas"]["DenoiseMaskField"];
             /** @description Image representing the total gradient area of the mask. For paste-back purposes. */
             expanded_mask_area: components["schemas"]["ImageField"];
@@ -14301,6 +14321,49 @@ export type components = {
             queue: components["schemas"]["SessionQueueStatus"];
             processor: components["schemas"]["SessionProcessorStatus"];
         };
+        /** SessionQueueCountsByDestination */
+        SessionQueueCountsByDestination: {
+            /**
+             * Queue Id
+             * @description The ID of the queue
+             */
+            queue_id: string;
+            /**
+             * Destination
+             * @description The destination of queue items included in this status
+             */
+            destination: string;
+            /**
+             * Pending
+             * @description Number of queue items with status 'pending' for the destination
+             */
+            pending: number;
+            /**
+             * In Progress
+             * @description Number of queue items with status 'in_progress' for the destination
+             */
+            in_progress: number;
+            /**
+             * Completed
+             * @description Number of queue items with status 'complete' for the destination
+             */
+            completed: number;
+            /**
+             * Failed
+             * @description Number of queue items with status 'error' for the destination
+             */
+            failed: number;
+            /**
+             * Canceled
+             * @description Number of queue items with status 'canceled' for the destination
+             */
+            canceled: number;
+            /**
+             * Total
+             * @description Total number of queue items for the destination
+             */
+            total: number;
+        };
         /** SessionQueueItem */
         SessionQueueItem: {
             /**
@@ -19492,6 +19555,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionQueueItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    counts_by_destination: {
+        parameters: {
+            query: {
+                /** @description The destination to query */
+                destination: string;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to query */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionQueueCountsByDestination"];
                 };
             };
             /** @description Validation Error */
