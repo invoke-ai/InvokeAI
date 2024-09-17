@@ -7,7 +7,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCopyBold } from 'react-icons/pi';
 
-export const CanvasEntityMenuItemsCopy = memo(() => {
+export const CanvasEntityMenuItemsCopyToClipboard = memo(() => {
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
   const adapter = useEntityAdapterSafe(entityIdentifier);
@@ -25,4 +25,4 @@ export const CanvasEntityMenuItemsCopy = memo(() => {
   );
 });
 
-CanvasEntityMenuItemsCopy.displayName = 'CanvasEntityMenuItemsCopy';
+CanvasEntityMenuItemsCopyToClipboard.displayName = 'CanvasEntityMenuItemsCopyToClipboard';
