@@ -92,7 +92,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
             </Text>
             {autoAddBoardId === 'none' && <AutoAddBadge />}
             <Text variant="subtext">{imagesTotal}</Text>
-            <IAIDroppable data={droppableData} dropLabel={<Text fontSize="lg">{t('unifiedCanvas.move')}</Text>} />
+            <IAIDroppable data={droppableData} dropLabel={t('unifiedCanvas.move')} />
           </Flex>
         </Tooltip>
       )}

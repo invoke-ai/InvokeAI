@@ -75,7 +75,6 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
         postUploadAction={postUploadAction}
         useThumbailFallback
         uploadElement={<UploadElement />}
-        dropLabel={<DropLabel />}
         minSize={8}
       >
         <IAIDndImageIcon
@@ -100,14 +99,3 @@ const UploadElement = memo(() => {
 });
 
 UploadElement.displayName = 'UploadElement';
-
-const DropLabel = memo(() => {
-  const { t } = useTranslation();
-  return (
-    <Text fontSize={16} fontWeight="semibold">
-      {t('gallery.drop')}
-    </Text>
-  );
-});
-
-DropLabel.displayName = 'DropLabel';
