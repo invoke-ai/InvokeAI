@@ -6,11 +6,14 @@ import { CanvasEntityIsLockedToggle } from 'features/controlLayers/components/co
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { memo } from 'react';
 
+import { CanvasEntityCopyToClipboard } from './CanvasEntityCopyToClipboard';
+
 export const CanvasEntityHeaderCommonActions = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
 
   return (
     <Flex alignSelf="stretch">
+      <CanvasEntityCopyToClipboard />
       <CanvasEntityIsBookmarkedForQuickSwitchToggle />
       {entityIdentifier.type !== 'reference_image' && <CanvasEntityIsLockedToggle />}
       <CanvasEntityEnabledToggle />
