@@ -13,7 +13,7 @@ import type { CSSProperties, PropsWithChildren } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { NodeProps } from 'reactflow';
-import { $lastProgressEvent } from 'services/events/setEventListeners';
+import { $lastProgressEvent } from 'services/events/stores';
 
 const CurrentImageNode = (props: NodeProps) => {
   const imageDTO = useAppSelector(selectLastSelectedImage);

@@ -1,7 +1,6 @@
 import { ButtonGroup, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
@@ -30,7 +29,7 @@ import {
   PiRulerBold,
 } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { $progressImage } from 'services/events/setEventListeners';
+import { $isConnected, $progressImage } from 'services/events/stores';
 
 const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();

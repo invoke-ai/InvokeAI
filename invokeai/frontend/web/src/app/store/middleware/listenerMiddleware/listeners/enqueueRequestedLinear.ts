@@ -66,7 +66,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
 
       const prepareBatchResult = withResult(() =>
-        prepareLinearUIBatch(state, g, prepend, noise, posCond, 'generation', destination)
+        prepareLinearUIBatch(state, g, prepend, noise, posCond, 'canvas', destination)
       );
 
       if (prepareBatchResult.isErr()) {

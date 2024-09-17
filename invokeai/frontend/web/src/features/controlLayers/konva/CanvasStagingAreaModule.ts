@@ -96,7 +96,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
 
       if (!this.image.isLoading && !this.image.isError) {
         await this.image.update({ ...this.image.state, image: imageDTOToImageWithDims(imageDTO) }, true);
-        this.manager.stateApi.$lastCanvasProgressEvent.set(null);
+        this.manager.progressImage.$lastProgressEvent.set(null);
       }
       this.image.konva.group.visible(shouldShowStagedImage);
     } else {

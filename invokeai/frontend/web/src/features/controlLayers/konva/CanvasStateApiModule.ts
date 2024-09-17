@@ -15,7 +15,6 @@ import {
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
-  $lastCanvasProgressEvent,
   bboxChangedFromCanvas,
   entityBrushLineAdded,
   entityEraserLineAdded,
@@ -381,12 +380,6 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Whether an entity is currently being transformed. Derived from `$transformingAdapter`.
    */
   $isRasterizing = computed(this.$rasterizingAdapter, (rasterizingAdapter) => Boolean(rasterizingAdapter));
-
-  /**
-   * The last canvas progress event. This is set in a global event listener. The staging area may set it to null when it
-   * consumes the event.
-   */
-  $lastCanvasProgressEvent = $lastCanvasProgressEvent;
 
   /**
    * Whether the space key is currently pressed.

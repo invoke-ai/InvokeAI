@@ -1,4 +1,5 @@
 import type { S } from 'services/api/types';
+import type { Socket } from 'socket.io-client';
 
 type ClientEmitSubscribeQueue = { queue_id: string };
 type ClientEmitUnsubscribeQueue = ClientEmitSubscribeQueue;
@@ -40,3 +41,5 @@ export type ClientToServerEvents = {
   subscribe_bulk_download: (payload: ClientEmitSubscribeBulkDownload) => void;
   unsubscribe_bulk_download: (payload: ClientEmitUnsubscribeBulkDownload) => void;
 };
+
+export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;

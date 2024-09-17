@@ -1,9 +1,9 @@
 import { useStore } from '@nanostores/react';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useClearInvocationCacheMutation, useGetInvocationCacheStatusQuery } from 'services/api/endpoints/appInfo';
+import { $isConnected } from 'services/events/stores';
 
 export const useClearInvocationCache = () => {
   const { t } = useTranslation();

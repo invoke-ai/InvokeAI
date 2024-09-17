@@ -1,11 +1,10 @@
 import { Progress } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { useCurrentDestination } from 'features/queue/hooks/useCurrentDestination';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
-import { $lastProgressEvent } from 'services/events/setEventListeners';
+import { $isConnected, $lastProgressEvent } from 'services/events/stores';
 
 const ProgressBar = () => {
   const { t } = useTranslation();

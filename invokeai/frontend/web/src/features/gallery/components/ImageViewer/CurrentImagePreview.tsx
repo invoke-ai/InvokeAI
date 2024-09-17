@@ -15,7 +15,7 @@ import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { $hasProgress, $isProgressFromCanvas } from 'services/events/setEventListeners';
+import { $hasProgress, $isProgressFromCanvas } from 'services/events/stores';
 
 import ProgressImage from './ProgressImage';
 

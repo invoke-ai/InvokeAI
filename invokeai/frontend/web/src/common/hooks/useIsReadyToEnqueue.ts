@@ -1,5 +1,4 @@
 import { useStore } from '@nanostores/react';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $true } from 'app/store/nanostores/util';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -21,6 +20,7 @@ import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
+import { $isConnected } from 'services/events/stores';
 
 const LAYER_TYPE_TO_TKEY = {
   reference_image: 'controlLayers.referenceImage',

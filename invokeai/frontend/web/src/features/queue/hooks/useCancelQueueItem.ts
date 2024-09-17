@@ -1,9 +1,9 @@
 import { useStore } from '@nanostores/react';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCancelQueueItemMutation } from 'services/api/endpoints/queue';
+import { $isConnected } from 'services/events/stores';
 
 export const useCancelQueueItem = (item_id: number) => {
   const isConnected = useStore($isConnected);
