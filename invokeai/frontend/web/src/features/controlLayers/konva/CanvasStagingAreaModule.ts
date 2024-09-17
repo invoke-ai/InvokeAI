@@ -1,12 +1,8 @@
-import { addAppListener } from 'app/store/middleware/listenerMiddleware';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import {
-  selectCanvasStagingAreaSlice,
-  stagingAreaStartedStaging,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectCanvasStagingAreaSlice, selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import type { StagingAreaImage } from 'features/controlLayers/store/types';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import Konva from 'konva';
@@ -43,17 +39,23 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     this.image = null;
     this.selectedImage = null;
 
+    /**
+     * When we change this flag, we need to re-render the staging area, which hides or shows the staged image.
+     */
     this.subscriptions.add(this.$shouldShowStagedImage.listen(this.render));
+    /**
+     * When the staging redux state changes (i.e. when the selected staged image is changed, or we add/discard a staged
+     * image), we need to re-render the staging area.
+     */
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasStagingAreaSlice, this.render));
+    /**
+     * Sync the $isStaging flag with the redux state. $isStaging is used by the manager to determine the global busy
+     * state of the canvas.
+     */
     this.subscriptions.add(
-      this.manager.stateApi.store.dispatch(
-        addAppListener({
-          actionCreator: stagingAreaStartedStaging,
-          effect: () => {
-            this.$shouldShowStagedImage.set(true);
-          },
-        })
-      )
+      this.manager.stateApi.createStoreSubscription(selectIsStaging, (isStaging) => {
+        this.$isStaging.set(isStaging);
+      })
     );
   }
 
@@ -65,7 +67,6 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   render = async () => {
     this.log.trace('Rendering staging area');
     const stagingArea = this.manager.stateApi.runSelector(selectCanvasStagingAreaSlice);
-    this.$isStaging.set(stagingArea.isStaging);
 
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
     const shouldShowStagedImage = this.$shouldShowStagedImage.get();

@@ -3,15 +3,14 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { canvasReset } from 'features/controlLayers/store/canvasSlice';
 import type { StagingAreaImage } from 'features/controlLayers/store/types';
+import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
 
 type CanvasStagingAreaState = {
-  isStaging: boolean;
   stagedImages: StagingAreaImage[];
   selectedStagedImageIndex: number;
 };
 
 const initialState: CanvasStagingAreaState = {
-  isStaging: false,
   stagedImages: [],
   selectedStagedImageIndex: 0,
 };
@@ -20,13 +19,8 @@ export const canvasStagingAreaSlice = createSlice({
   name: 'canvasStagingArea',
   initialState,
   reducers: {
-    stagingAreaStartedStaging: (state) => {
-      state.isStaging = true;
-      state.selectedStagedImageIndex = 0;
-    },
     stagingAreaImageStaged: (state, action: PayloadAction<{ stagingAreaImage: StagingAreaImage }>) => {
       const { stagingAreaImage } = action.payload;
-      state.isStaging = true;
       state.stagedImages.push(stagingAreaImage);
       state.selectedStagedImageIndex = state.stagedImages.length - 1;
     },
@@ -41,12 +35,8 @@ export const canvasStagingAreaSlice = createSlice({
       const { index } = action.payload;
       state.stagedImages.splice(index, 1);
       state.selectedStagedImageIndex = Math.min(state.selectedStagedImageIndex, state.stagedImages.length - 1);
-      if (state.stagedImages.length === 0) {
-        state.isStaging = false;
-      }
     },
     stagingAreaReset: (state) => {
-      state.isStaging = false;
       state.stagedImages = [];
       state.selectedStagedImageIndex = 0;
     },
@@ -60,7 +50,6 @@ export const canvasStagingAreaSlice = createSlice({
 });
 
 export const {
-  stagingAreaStartedStaging,
   stagingAreaImageStaged,
   stagingAreaStagedImageDiscarded,
   stagingAreaReset,
@@ -83,4 +72,21 @@ export const canvasStagingAreaPersistConfig: PersistConfig<CanvasStagingAreaStat
 
 export const selectCanvasStagingAreaSlice = (s: RootState) => s.canvasStagingArea;
 
-export const selectIsStaging = createSelector(selectCanvasStagingAreaSlice, (stagingaArea) => stagingaArea.isStaging);
+/**
+ * Selects if we should be staging images. This is true if:
+ * - There are staged images.
+ * - There are any in-progress or pending canvas queue items.
+ */
+export const selectIsStaging = createSelector(
+  selectCanvasQueueCounts,
+  selectCanvasStagingAreaSlice,
+  ({ data }, staging) => {
+    if (staging.stagedImages.length > 0) {
+      return true;
+    }
+    if (!data) {
+      return false;
+    }
+    return data.in_progress > 0 || data.pending > 0;
+  }
+);

@@ -70,7 +70,7 @@ export const queueApi = api.injectEndpoints({
         body: arg,
         method: 'POST',
       }),
-      invalidatesTags: ['CurrentSessionQueueItem', 'NextSessionQueueItem'],
+      invalidatesTags: ['CurrentSessionQueueItem', 'NextSessionQueueItem', 'QueueCountsByDestination'],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
         try {
@@ -163,6 +163,7 @@ export const queueApi = api.injectEndpoints({
         'BatchStatus',
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
+        'QueueCountsByDestination',
       ],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
@@ -279,10 +280,14 @@ export const queueApi = api.injectEndpoints({
         if (!result) {
           return [];
         }
-        return [
+        const tags: ApiTagDescription[] = [
           { type: 'SessionQueueItem', id: result.item_id },
           { type: 'BatchStatus', id: result.batch_id },
         ];
+        if (result.destination) {
+          tags.push({ type: 'QueueCountsByDestination', id: result.destination });
+        }
+        return tags;
       },
     }),
     cancelByBatchIds: build.mutation<
@@ -303,7 +308,7 @@ export const queueApi = api.injectEndpoints({
           // no-op
         }
       },
-      invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
+      invalidatesTags: ['SessionQueueStatus', 'BatchStatus', 'QueueCountsByDestination'],
     }),
     cancelByBatchDestination: build.mutation<
       paths['/api/v1/queue/{queue_id}/cancel_by_destination']['put']['responses']['200']['content']['application/json'],
@@ -323,7 +328,12 @@ export const queueApi = api.injectEndpoints({
           // no-op
         }
       },
-      invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
+      invalidatesTags: (result, error, { destination }) => {
+        if (!result) {
+          return [];
+        }
+        return ['SessionQueueStatus', 'BatchStatus', { type: 'QueueCountsByDestination', id: destination }];
+      },
     }),
     listQueueItems: build.query<
       EntityState<components['schemas']['SessionQueueItemDTO'], string> & {
@@ -353,6 +363,16 @@ export const queueApi = api.injectEndpoints({
       keepUnusedDataFor: 60 * 5, // 5 minutes
       providesTags: ['FetchOnReconnect'],
     }),
+    getQueueCountsByDestination: build.query<
+      paths['/api/v1/queue/{queue_id}/counts_by_destination']['get']['responses']['200']['content']['application/json'],
+      paths['/api/v1/queue/{queue_id}/counts_by_destination']['get']['parameters']['query']
+    >({
+      query: (params) => ({ url: buildQueueUrl('counts_by_destination'), method: 'GET', params }),
+      providesTags: (result, error, { destination }) => [
+        'FetchOnReconnect',
+        { type: 'QueueCountsByDestination', id: destination },
+      ],
+    }),
   }),
 });
 
@@ -369,9 +389,11 @@ export const {
   useCancelQueueItemMutation,
   useGetBatchStatusQuery,
   useGetCurrentQueueItemQuery,
+  useGetQueueCountsByDestinationQuery,
 } = queueApi;
 
 export const selectQueueStatus = queueApi.endpoints.getQueueStatus.select();
+export const selectCanvasQueueCounts = queueApi.endpoints.getQueueCountsByDestination.select({ destination: 'canvas' });
 
 const resetListQueryData = (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
