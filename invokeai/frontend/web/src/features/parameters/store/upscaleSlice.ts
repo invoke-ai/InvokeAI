@@ -4,7 +4,7 @@ import type { PersistConfig, RootState } from 'app/store/store';
 import type { ParameterSpandrelImageToImageModel } from 'features/parameters/types/parameterSchemas';
 import type { ControlNetModelConfig, ImageDTO } from 'services/api/types';
 
-interface UpscaleState {
+export interface UpscaleState {
   _version: 1;
   upscaleModel: ParameterSpandrelImageToImageModel | null;
   upscaleInitialImage: ImageDTO | null;
@@ -79,8 +79,8 @@ export const upscalePersistConfig: PersistConfig<UpscaleState> = {
   persistDenylist: [],
 };
 
-export const selectUpscalelice = (state: RootState) => state.upscale;
-const createUpscaleSelector = <T>(selector: Selector<UpscaleState, T>) => createSelector(selectUpscalelice, selector);
+export const selectUpscaleSlice = (state: RootState) => state.upscale;
+const createUpscaleSelector = <T>(selector: Selector<UpscaleState, T>) => createSelector(selectUpscaleSlice, selector);
 export const selectPostProcessingModel = createUpscaleSelector((upscale) => upscale.postProcessingModel);
 export const selectCreativity = createUpscaleSelector((upscale) => upscale.creativity);
 export const selectUpscaleModel = createUpscaleSelector((upscale) => upscale.upscaleModel);

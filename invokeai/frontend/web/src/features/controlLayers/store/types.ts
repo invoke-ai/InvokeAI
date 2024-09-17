@@ -113,6 +113,7 @@ const zCanvasImageState = z.object({
   image: zImageWithDims,
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
+export const isCanvasImageState = (v: unknown): v is CanvasImageState => zCanvasImageState.safeParse(v).success;
 
 const zCanvasObjectState = z.discriminatedUnion('type', [
   zCanvasImageState,
