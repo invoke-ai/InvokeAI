@@ -5,8 +5,8 @@ import type { SingleValue } from 'chakra-react-select';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxAspectRatioIdChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectAspectRatioID } from 'features/controlLayers/store/selectors';
+import { isAspectRatioID } from 'features/controlLayers/store/types';
 import { ASPECT_RATIO_OPTIONS } from 'features/parameters/components/Bbox/constants';
-import { isAspectRatioID } from 'features/parameters/components/Bbox/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
