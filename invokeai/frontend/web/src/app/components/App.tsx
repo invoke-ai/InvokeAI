@@ -1,5 +1,4 @@
 import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
-import { useSocketIO } from 'app/hooks/useSocketIO';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
@@ -31,6 +30,7 @@ import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
+import { useSocketIO } from 'services/events/useSocketIO';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import PreselectedImage from './PreselectedImage';

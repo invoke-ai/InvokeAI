@@ -169,7 +169,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
             {board.archived && !editingDisclosure.isOpen && <Icon as={PiArchiveBold} fill="base.300" />}
             {!editingDisclosure.isOpen && <Text variant="subtext">{board.image_count}</Text>}
 
-            <IAIDroppable data={droppableData} dropLabel={<Text fontSize="lg">{t('unifiedCanvas.move')}</Text>} />
+            <IAIDroppable data={droppableData} dropLabel={t('unifiedCanvas.move')} />
           </Flex>
         </Tooltip>
       )}

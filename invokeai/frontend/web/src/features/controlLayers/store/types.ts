@@ -113,6 +113,7 @@ const zCanvasImageState = z.object({
   image: zImageWithDims,
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
+export const isCanvasImageState = (v: unknown): v is CanvasImageState => zCanvasImageState.safeParse(v).success;
 
 const zCanvasObjectState = z.discriminatedUnion('type', [
   zCanvasImageState,
@@ -381,6 +382,12 @@ export function isTransformableEntityIdentifier(
     isInpaintMaskEntityIdentifier(entityIdentifier) ||
     isRegionalGuidanceEntityIdentifier(entityIdentifier)
   );
+}
+
+export function isSaveableEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> | CanvasEntityIdentifier<'control_layer'> {
+  return isRasterLayerEntityIdentifier(entityIdentifier) || isControlLayerEntityIdentifier(entityIdentifier);
 }
 
 export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {

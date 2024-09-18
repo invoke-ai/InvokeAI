@@ -1,7 +1,6 @@
 import 'i18n';
 
 import type { Middleware } from '@reduxjs/toolkit';
-import { $socketOptions } from 'app/hooks/useSocketIO';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
@@ -24,6 +23,7 @@ import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
+import { $socketOptions } from 'services/events/stores';
 import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 
 const App = lazy(() => import('./App'));

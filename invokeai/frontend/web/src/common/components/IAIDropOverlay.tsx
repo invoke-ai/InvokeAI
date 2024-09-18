@@ -1,13 +1,12 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
-import type { ReactNode } from 'react';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { v4 as uuidv4 } from 'uuid';
 type Props = {
   isOver: boolean;
-  label?: ReactNode;
+  label?: string;
 };
 
 const initial: AnimationProps['initial'] = {
@@ -64,7 +63,7 @@ const IAIDropOverlay = (props: Props) => {
           p={4}
         >
           <Text
-            fontSize="xl"
+            fontSize="lg"
             fontWeight="semibold"
             color={isOver ? 'invokeYellow.300' : 'base.500'}
             transitionProperty="common"

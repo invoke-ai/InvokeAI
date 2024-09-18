@@ -1,4 +1,3 @@
-import type { AppSocket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
@@ -31,6 +30,7 @@ import Konva from 'konva';
 import type { Atom } from 'nanostores';
 import { computed } from 'nanostores';
 import type { Logger } from 'roarr';
+import type { AppSocket } from 'services/events/types';
 import { assert } from 'tsafe';
 
 import { CanvasBackgroundModule } from './CanvasBackgroundModule';

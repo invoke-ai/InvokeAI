@@ -5,7 +5,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo, useMemo } from 'react';
-import { $isProgressFromCanvas, $progressImage } from 'services/events/setEventListeners';
+import { $isProgressFromCanvas, $progressImage } from 'services/events/stores';
 
 const selectShouldAntialiasProgressImage = createSelector(
   selectSystemSlice,

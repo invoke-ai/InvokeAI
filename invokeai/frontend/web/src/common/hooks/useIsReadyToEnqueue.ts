@@ -1,5 +1,4 @@
 import { useStore } from '@nanostores/react';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $true } from 'app/store/nanostores/util';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -13,7 +12,7 @@ import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -21,6 +20,7 @@ import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
+import { $isConnected } from 'services/events/stores';
 
 const LAYER_TYPE_TO_TKEY = {
   reference_image: 'controlLayers.referenceImage',
@@ -46,7 +46,7 @@ const createSelector = (
       selectDynamicPromptsSlice,
       selectCanvasSlice,
       selectParamsSlice,
-      selectUpscalelice,
+      selectUpscaleSlice,
       selectConfigSlice,
       selectActiveTab,
     ],

@@ -19,6 +19,7 @@ import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMe
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { some } from 'lodash-es';
 import { atom } from 'nanostores';
 import { memo, useCallback, useMemo, useRef } from 'react';
@@ -38,14 +39,19 @@ const DeleteBoardModal = () => {
 
   const selectImageUsageSummary = useMemo(
     () =>
-      createMemoizedSelector([selectNodesSlice, selectCanvasSlice], (nodes, canvas) => {
-        const allImageUsage = (boardImageNames ?? []).map((imageName) => getImageUsage(nodes, canvas, imageName));
+      createMemoizedSelector([selectNodesSlice, selectCanvasSlice, selectUpscaleSlice], (nodes, canvas, upscale) => {
+        const allImageUsage = (boardImageNames ?? []).map((imageName) =>
+          getImageUsage(nodes, canvas, upscale, imageName)
+        );
 
         const imageUsageSummary: ImageUsage = {
-          isLayerImage: some(allImageUsage, (i) => i.isLayerImage),
+          isUpscaleImage: some(allImageUsage, (i) => i.isUpscaleImage),
+          isRasterLayerImage: some(allImageUsage, (i) => i.isRasterLayerImage),
+          isInpaintMaskImage: some(allImageUsage, (i) => i.isInpaintMaskImage),
+          isRegionalGuidanceImage: some(allImageUsage, (i) => i.isRegionalGuidanceImage),
           isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
-          isControlAdapterImage: some(allImageUsage, (i) => i.isControlAdapterImage),
-          isIPAdapterImage: some(allImageUsage, (i) => i.isIPAdapterImage),
+          isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
+          isReferenceImage: some(allImageUsage, (i) => i.isReferenceImage),
         };
 
         return imageUsageSummary;
