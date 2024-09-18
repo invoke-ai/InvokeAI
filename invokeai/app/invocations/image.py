@@ -1072,3 +1072,85 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
             width=image_dto.width,
             height=image_dto.height,
         )
+
+
+
+@invocation(
+    "crop_to_object",
+    title="Crop to Mask Object",
+    tags=["image", "crop"],
+    category="image",
+    version="1.0.0",
+)
+class CropToObjectInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Crops an image to a specified box around the object of specified color."""
+
+    image: ImageField = InputField(description="An input mask image with black and white content")
+    margin: int = InputField(default=0, ge=0, description="The desired margin around the object, as measured in pixels")
+    object_color: Literal['white', 'black'] = InputField(
+        default='white',
+        description="The color of the object to crop around (either 'white' or 'black')"
+    )
+
+    def invoke(self, context: InvocationContext) -> CropToObjectOutput:
+        # Load the image
+        image = context.images.get_pil(self.image.image_name)
+
+        # Convert image to grayscale
+        grayscale_image = image.convert("L")
+
+        # Convert to numpy array
+        np_image = np.array(grayscale_image)
+
+        # Depending on the object color, find the object pixels
+        if self.object_color == 'white':
+            # Find white pixels (value > 0)
+            object_pixels = np.argwhere(np_image > 0)
+        else:
+            # Find black pixels (value < 255)
+            object_pixels = np.argwhere(np_image < 255)
+
+        # If no object pixels are found, return the original image and zero offsets
+        if object_pixels.size == 0:
+            image_dto = context.images.save(image=image.copy())
+            return CropToObjectOutput(
+                image=ImageField(image_name=image_dto.image_name),
+                width=image.width,
+                height=image.height,
+                offset_top=0,
+                offset_left=0,
+                offset_right=0,
+                offset_bottom=0,
+            )
+
+        # Get bounding box of object pixels
+        y_min, x_min = object_pixels.min(axis=0)
+        y_max, x_max = object_pixels.max(axis=0)
+
+        # Expand bounding box by margin
+        x_min_expanded = max(x_min - self.margin, 0)
+        y_min_expanded = max(y_min - self.margin, 0)
+        x_max_expanded = min(x_max + self.margin, np_image.shape[1] - 1)
+        y_max_expanded = min(y_max + self.margin, np_image.shape[0] - 1)
+
+        # Crop the image
+        cropped_image = image.crop((x_min_expanded, y_min_expanded, x_max_expanded + 1, y_max_expanded + 1))
+
+        # Calculate offsets
+        offset_top = y_min_expanded
+        offset_left = x_min_expanded
+        offset_right = np_image.shape[1] - x_max_expanded - 1
+        offset_bottom = np_image.shape[0] - y_max_expanded - 1
+
+        # Save the cropped image
+        image_dto = context.images.save(image=cropped_image)
+
+        return CropToObjectOutput(
+            image=ImageField(image_name=image_dto.image_name),
+            width=cropped_image.width,
+            height=cropped_image.height,
+            offset_top=offset_top,
+            offset_left=offset_left,
+            offset_right=offset_right,
+            offset_bottom=offset_bottom,
+        )

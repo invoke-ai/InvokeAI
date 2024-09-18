@@ -96,29 +96,45 @@ class InvertTensorMaskInvocation(BaseInvocation):
     title="Image Mask to Tensor",
     tags=["conditioning"],
     category="conditioning",
-    version="1.0.0",
+    version="1.0.1",
 )
 class ImageMaskToTensorInvocation(BaseInvocation, WithMetadata):
     """Convert a mask image to a tensor. Converts the image to grayscale and uses thresholding at the specified value."""
 
     image: ImageField = InputField(description="The mask image to convert.")
     cutoff: int = InputField(ge=0, le=255, description="Cutoff (<)", default=128)
-    invert: bool = InputField(default=False, description="Whether to invert the mask.")
+    invert: bool = InputField(default=False, descimription="Whether to invert the mask.")
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
-        image = context.images.get_pil(self.image.image_name, mode="L")
+        image = context.images.get_pil(self.image.image_name)
+        np_image = np.array(image)
+        
+        # Handle different image modes
+        if image.mode == 'RGBA':
+            alpha_channel = np_image[:, :, 3]  # Extract alpha channel
+        elif image.mode == 'RGB':
+            # For RGB images, treat all non-black pixels as opaque.
+            non_black_mask = np.any(np_image > 0, axis=2)  # True for any non-black pixels
+            alpha_channel = non_black_mask.astype(np.uint8) * 255  # Convert to a mask of 0 or 255
+        elif image.mode == 'L':  # Grayscale images
+            alpha_channel = np_image  # Grayscale image, so we directly use it
+        else:
+            raise ValueError(f"Unsupported image mode: {image.mode}")
 
         mask = torch.zeros((1, image.height, image.width), dtype=torch.bool)
+
         if self.invert:
-            mask[0] = torch.tensor(np.array(image)[:, :] >= self.cutoff, dtype=torch.bool)
+            mask[0] = torch.tensor(alpha_channel == 0, dtype=torch.bool)  # Transparent where alpha or brightness is 0
         else:
-            mask[0] = torch.tensor(np.array(image)[:, :] < self.cutoff, dtype=torch.bool)
+            mask[0] = torch.tensor(alpha_channel > 0, dtype=torch.bool)  # Opaque where alpha or brightness is > 0
 
         return MaskOutput(
             mask=TensorField(tensor_name=context.tensors.save(mask)),
             height=mask.shape[1],
             width=mask.shape[2],
         )
+
+
 
 
 @invocation(
