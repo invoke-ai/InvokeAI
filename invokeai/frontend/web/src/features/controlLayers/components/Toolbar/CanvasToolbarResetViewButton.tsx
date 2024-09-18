@@ -2,8 +2,8 @@ import { $alt, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 
@@ -34,8 +34,20 @@ export const CanvasToolbarResetViewButton = memo(() => {
     }
   }, [resetView, resetZoom]);
 
-  useHotkeys('r', resetView, { enabled: isCanvasActive }, [isCanvasActive]);
-  useHotkeys('alt+r', resetZoom, { enabled: isCanvasActive }, [isCanvasActive]);
+  useRegisteredHotkeys({
+    id: 'fitLayersToCanvas',
+    category: 'canvas',
+    callback: resetView,
+    options: { enabled: isCanvasActive },
+    dependencies: [isCanvasActive],
+  });
+  useRegisteredHotkeys({
+    id: 'setZoomTo100Percent',
+    category: 'canvas',
+    callback: resetZoom,
+    options: { enabled: isCanvasActive },
+    dependencies: [isCanvasActive],
+  });
 
   return (
     <IconButton

@@ -8,8 +8,8 @@ import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityReset } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isMaskEntityIdentifier } from 'features/controlLayers/store/types';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useCallback, useMemo } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 
 const selectSelectedEntityIdentifier = createMemoizedSelector(
   selectCanvasSlice,
@@ -37,10 +37,11 @@ export function useCanvasResetLayerHotkey() {
     [selectedEntityIdentifier]
   );
 
-  useHotkeys('shift+c', resetSelectedLayer, { enabled: isResetEnabled && !isBusy && isInteractable }, [
-    isResetEnabled,
-    isBusy,
-    isInteractable,
-    resetSelectedLayer,
-  ]);
+  useRegisteredHotkeys({
+    id: 'resetSelected',
+    category: 'canvas',
+    callback: resetSelectedLayer,
+    options: { enabled: isResetEnabled && !isBusy && isInteractable },
+    dependencies: [isResetEnabled, isBusy, isInteractable, resetSelectedLayer],
+  });
 }

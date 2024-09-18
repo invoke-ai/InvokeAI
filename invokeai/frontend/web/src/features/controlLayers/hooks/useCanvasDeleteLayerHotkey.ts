@@ -5,9 +5,9 @@ import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
 import { $canvasRightPanelTab } from 'features/controlLayers/store/ephemeral';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useMemo } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 
 export function useCanvasDeleteLayerHotkey() {
   useAssertSingleton(useCanvasDeleteLayerHotkey.name);
@@ -29,8 +29,11 @@ export function useCanvasDeleteLayerHotkey() {
     [selectedEntityIdentifier, isBusy, canvasRightPanelTab, appTab]
   );
 
-  useHotkeys(['delete', 'backspace'], deleteSelectedLayer, { enabled: isDeleteEnabled }, [
-    isDeleteEnabled,
-    deleteSelectedLayer,
-  ]);
+  useRegisteredHotkeys({
+    id: 'deleteSelected',
+    category: 'canvas',
+    callback: deleteSelectedLayer,
+    options: { enabled: isDeleteEnabled },
+    dependencies: [isDeleteEnabled, deleteSelectedLayer],
+  });
 }

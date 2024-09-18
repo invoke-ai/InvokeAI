@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiEraserBold } from 'react-icons/pi';
 
@@ -10,7 +10,13 @@ export const ToolEraserButton = memo(() => {
   const isSelected = useToolIsSelected('eraser');
   const selectEraser = useSelectTool('eraser');
 
-  useHotkeys('e', selectEraser, { enabled: !isSelected }, [isSelected, selectEraser]);
+  useRegisteredHotkeys({
+    id: 'selectEraserTool',
+    category: 'canvas',
+    callback: selectEraser,
+    options: { enabled: !isSelected },
+    dependencies: [isSelected, selectEraser],
+  });
 
   return (
     <IconButton

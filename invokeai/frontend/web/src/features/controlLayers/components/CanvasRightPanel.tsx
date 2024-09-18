@@ -12,8 +12,8 @@ import {
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback, useMemo, useRef } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
 export const CanvasRightPanel = memo(() => {
@@ -28,7 +28,12 @@ export const CanvasRightPanel = memo(() => {
     }
     imageViewer.toggle();
   }, [imageViewer]);
-  useHotkeys('z', imageViewer.toggle);
+  useRegisteredHotkeys({
+    id: 'toggleViewer',
+    category: 'viewer',
+    callback: imageViewer.toggle,
+    dependencies: [imageViewer],
+  });
 
   return (
     <Tabs index={tabIndex} onChange={$canvasRightPanelTabIndex.set} w="full" h="full" display="flex" flexDir="column">

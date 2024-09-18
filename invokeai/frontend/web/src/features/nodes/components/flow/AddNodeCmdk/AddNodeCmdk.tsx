@@ -32,13 +32,13 @@ import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValid
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import { isInvocationNode } from 'features/nodes/types/invocation';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memoize } from 'lodash-es';
 import { computed } from 'nanostores';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiFlaskBold, PiHammerBold } from 'react-icons/pi';
 import type { EdgeChange, NodeChange } from 'reactflow';
@@ -169,7 +169,13 @@ export const AddNodeCmdk = memo(() => {
   const tab = useAppSelector(selectActiveTab);
   const throttledSearchTerm = useThrottle(searchTerm, 100);
 
-  useHotkeys(['shift+a', 'space'], addNodeCmdk.setTrue, { enabled: tab === 'workflows', preventDefault: true }, [tab]);
+  useRegisteredHotkeys({
+    id: 'addNode',
+    category: 'workflows',
+    callback: addNodeCmdk.setTrue,
+    options: { enabled: tab === 'workflows', preventDefault: true },
+    dependencies: [addNodeCmdk.setTrue, tab],
+  });
 
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
