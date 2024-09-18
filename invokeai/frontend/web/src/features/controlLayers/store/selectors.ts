@@ -1,5 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
+import { selectShowOnlyRasterLayersWhileStaging } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type {
   CanvasControlLayerState,
@@ -11,6 +13,7 @@ import type {
   CanvasRegionalGuidanceState,
   CanvasState,
 } from 'features/controlLayers/store/types';
+import { isRasterLayerEntityIdentifier } from 'features/controlLayers/store/types';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { assert } from 'tsafe';
 
@@ -269,7 +272,7 @@ const selectRegionalGuidanceIsHidden = createSelector(selectCanvasSlice, (canvas
 /**
  * Returns the hidden selector for the given entity type.
  */
-export const getIsHiddenSelector = (type: CanvasEntityType) => {
+const getSelectIsTypeHidden = (type: CanvasEntityType) => {
   switch (type) {
     case 'raster_layer':
       return selectRasterLayersIsHidden;
@@ -282,6 +285,42 @@ export const getIsHiddenSelector = (type: CanvasEntityType) => {
     default:
       assert(false, 'Unhandled entity type');
   }
+};
+
+/**
+ * Builds a selector taht selects if the entity is hidden.
+ */
+export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdentifier) => {
+  const selectIsTypeHidden = getSelectIsTypeHidden(entityIdentifier.type);
+  return createSelector(
+    [selectCanvasSlice, selectIsTypeHidden, selectIsStaging, selectShowOnlyRasterLayersWhileStaging],
+    (canvas, isTypeHidden, isStaging, showOnlyRasterLayersWhileStaging) => {
+      const entity = selectEntityOrThrow(canvas, entityIdentifier);
+
+      // An entity is hidden if:
+      // - The entity type is hidden
+      // - The entity is disabled
+      // - The entity is locked
+      // - The entity is not a raster layer and we are staging and the option to show only raster layers is enabled
+
+      if (isTypeHidden) {
+        return true;
+      }
+      if (!entity.isEnabled) {
+        return true;
+      }
+      if (entity.isLocked) {
+        return true;
+      }
+      if (isStaging && showOnlyRasterLayersWhileStaging) {
+        // When staging, we only show raster layers. This allows the user to easily see how the new generation fits in
+        // with the rest of the canvas without the masks and control layers getting in the way.
+        return !isRasterLayerEntityIdentifier(entityIdentifier);
+      }
+
+      return false;
+    }
+  );
 };
 
 export const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);
