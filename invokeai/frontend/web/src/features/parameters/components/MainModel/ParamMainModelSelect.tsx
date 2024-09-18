@@ -5,22 +5,26 @@ import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSDMainModels } from 'services/api/hooks/modelsByType';
-import type { MainModelConfig } from 'services/api/types';
+import { useMainModels } from 'services/api/hooks/modelsByType';
+import type { AnyModelConfig, MainModelConfig } from 'services/api/types';
 
 const ParamMainModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const activeTabName = useAppSelector(selectActiveTab);
   const selectedModel = useAppSelector(selectModel);
-  const [modelConfigs, { isLoading }] = useSDMainModels();
+  const [modelConfigs, { isLoading }] = useMainModels();
+
   const tooltipLabel = useMemo(() => {
     if (!modelConfigs.length || !selectedModel) {
       return;
     }
     return modelConfigs.find((m) => m.key === selectedModel?.key)?.description;
   }, [modelConfigs, selectedModel]);
+
   const _onChange = useCallback(
     (model: MainModelConfig | null) => {
       if (!model) {
@@ -35,11 +39,19 @@ const ParamMainModelSelect = () => {
     [dispatch]
   );
 
+  const getIsDisabled = useCallback(
+    (model: AnyModelConfig): boolean => {
+      return activeTabName === 'upscaling' && model.base === 'flux';
+    },
+    [activeTabName]
+  );
+
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
     modelConfigs,
     selectedModel,
     onChange: _onChange,
     isLoading,
+    getIsDisabled,
   });
 
   return (
@@ -55,6 +67,7 @@ const ParamMainModelSelect = () => {
             options={options}
             onChange={onChange}
             noOptionsMessage={noOptionsMessage}
+            isInvalid={value?.isDisabled}
           />
         </Box>
       </Tooltip>

@@ -1,5 +1,4 @@
 import type { SerializableObject } from 'common/types';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { AspectRatioState } from 'features/parameters/components/Bbox/types';
 import type { ParameterHeight, ParameterLoRAModel, ParameterWidth } from 'features/parameters/types/parameterSchemas';
@@ -114,6 +113,7 @@ const zCanvasImageState = z.object({
   image: zImageWithDims,
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
+export const isCanvasImageState = (v: unknown): v is CanvasImageState => zCanvasImageState.safeParse(v).success;
 
 const zCanvasObjectState = z.discriminatedUnion('type', [
   zCanvasImageState,
@@ -124,6 +124,7 @@ const zCanvasObjectState = z.discriminatedUnion('type', [
 export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
 
 const zIPAdapterConfig = z.object({
+  type: z.literal('ip_adapter'),
   image: zImageWithDims.nullable(),
   model: zModelIdentifierField.nullable(),
   weight: z.number().gte(-1).lte(2),
@@ -140,21 +141,22 @@ const zCanvasEntityBase = z.object({
   isLocked: z.boolean(),
 });
 
-const zCanvasIPAdapterState = zCanvasEntityBase.extend({
-  type: z.literal('ip_adapter'),
+const zCanvasReferenceImageState = zCanvasEntityBase.extend({
+  type: z.literal('reference_image'),
   ipAdapter: zIPAdapterConfig,
 });
-export type CanvasIPAdapterState = z.infer<typeof zCanvasIPAdapterState>;
+export type CanvasReferenceImageState = z.infer<typeof zCanvasReferenceImageState>;
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
 export const isFillStyle = (v: unknown): v is FillStyle => zFillStyle.safeParse(v).success;
 const zFill = z.object({ style: zFillStyle, color: zRgbColor });
 
-const zRegionalGuidanceIPAdapterConfig = zIPAdapterConfig.extend({
+const zRegionalGuidanceReferenceImageState = z.object({
   id: zId,
+  ipAdapter: zIPAdapterConfig,
 });
-export type RegionalGuidanceIPAdapterConfig = z.infer<typeof zRegionalGuidanceIPAdapterConfig>;
+export type RegionalGuidanceReferenceImageState = z.infer<typeof zRegionalGuidanceReferenceImageState>;
 
 const zCanvasRegionalGuidanceState = zCanvasEntityBase.extend({
   type: z.literal('regional_guidance'),
@@ -164,7 +166,7 @@ const zCanvasRegionalGuidanceState = zCanvasEntityBase.extend({
   fill: zFill,
   positivePrompt: zParameterPositivePrompt.nullable(),
   negativePrompt: zParameterNegativePrompt.nullable(),
-  ipAdapters: z.array(zRegionalGuidanceIPAdapterConfig),
+  referenceImages: z.array(zRegionalGuidanceReferenceImageState),
   autoNegative: z.boolean(),
 });
 export type CanvasRegionalGuidanceState = z.infer<typeof zCanvasRegionalGuidanceState>;
@@ -210,50 +212,6 @@ const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
 });
 export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
 
-export const initialControlNet: ControlNetConfig = {
-  type: 'controlnet',
-  model: null,
-  weight: 1,
-  beginEndStepPct: [0, 1],
-  controlMode: 'balanced',
-};
-
-export const initialT2IAdapter: T2IAdapterConfig = {
-  type: 't2i_adapter',
-  model: null,
-  weight: 1,
-  beginEndStepPct: [0, 1],
-};
-
-export const initialIPAdapter: IPAdapterConfig = {
-  image: null,
-  model: null,
-  beginEndStepPct: [0, 1],
-  method: 'full',
-  clipVisionModel: 'ViT-H',
-  weight: 1,
-};
-
-export const imageDTOToImageWithDims = ({ image_name, width, height }: ImageDTO): ImageWithDims => ({
-  image_name,
-  width,
-  height,
-});
-
-export const imageDTOToImageObject = (imageDTO: ImageDTO, overrides?: Partial<CanvasImageState>): CanvasImageState => {
-  const { width, height, image_name } = imageDTO;
-  return {
-    id: getPrefixedId('image'),
-    type: 'image',
-    image: {
-      image_name,
-      width,
-      height,
-    },
-    ...overrides,
-  };
-};
-
 const zBoundingBoxScaleMethod = z.enum(['none', 'auto', 'manual']);
 export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
@@ -264,7 +222,7 @@ export type CanvasEntityState =
   | CanvasControlLayerState
   | CanvasRegionalGuidanceState
   | CanvasInpaintMaskState
-  | CanvasIPAdapterState;
+  | CanvasReferenceImageState;
 
 export type CanvasRenderableEntityState =
   | CanvasRasterLayerState
@@ -304,12 +262,12 @@ export type CanvasState = {
     isHidden: boolean;
     entities: CanvasControlLayerState[];
   };
-  regions: {
+  regionalGuidance: {
     isHidden: boolean;
     entities: CanvasRegionalGuidanceState[];
   };
-  ipAdapters: {
-    entities: CanvasIPAdapterState[];
+  referenceImages: {
+    entities: CanvasReferenceImageState[];
   };
   bbox: {
     rect: {
@@ -424,6 +382,12 @@ export function isTransformableEntityIdentifier(
     isInpaintMaskEntityIdentifier(entityIdentifier) ||
     isRegionalGuidanceEntityIdentifier(entityIdentifier)
   );
+}
+
+export function isSaveableEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> | CanvasEntityIdentifier<'control_layer'> {
+  return isRasterLayerEntityIdentifier(entityIdentifier) || isControlLayerEntityIdentifier(entityIdentifier);
 }
 
 export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {

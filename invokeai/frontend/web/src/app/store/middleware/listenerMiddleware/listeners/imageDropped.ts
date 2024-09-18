@@ -1,18 +1,27 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { selectDefaultControlAdapter } from 'features/controlLayers/hooks/addLayerHooks';
+import { deepClone } from 'common/util/deepClone';
+import { selectDefaultControlAdapter, selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
   entityRasterized,
   entitySelected,
-  ipaImageChanged,
   rasterLayerAdded,
+  referenceImageAdded,
+  referenceImageIPAdapterImageChanged,
+  rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { CanvasControlLayerState, CanvasRasterLayerState } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/types';
+import type {
+  CanvasControlLayerState,
+  CanvasRasterLayerState,
+  CanvasReferenceImageState,
+  CanvasRegionalGuidanceState,
+} from 'features/controlLayers/store/types';
+import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
@@ -56,7 +65,10 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
       ) {
         const { id } = overData.context;
         dispatch(
-          ipaImageChanged({ entityIdentifier: { id, type: 'ip_adapter' }, imageDTO: activeData.payload.imageDTO })
+          referenceImageIPAdapterImageChanged({
+            entityIdentifier: { id, type: 'reference_image' },
+            imageDTO: activeData.payload.imageDTO,
+          })
         );
         return;
       }
@@ -69,11 +81,11 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         activeData.payloadType === 'IMAGE_DTO' &&
         activeData.payload.imageDTO
       ) {
-        const { id, ipAdapterId } = overData.context;
+        const { id, referenceImageId } = overData.context;
         dispatch(
           rgIPAdapterImageChanged({
             entityIdentifier: { id, type: 'regional_guidance' },
-            ipAdapterId,
+            referenceImageId,
             imageDTO: activeData.payload.imageDTO,
           })
         );
@@ -116,6 +128,36 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
           controlAdapter: defaultControlAdapter,
         };
         dispatch(controlLayerAdded({ overrides, isSelected: true }));
+        return;
+      }
+
+      if (
+        overData.actionType === 'ADD_REGIONAL_REFERENCE_IMAGE_FROM_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const state = getState();
+        const ipAdapter = deepClone(selectDefaultIPAdapter(state));
+        ipAdapter.image = imageDTOToImageWithDims(activeData.payload.imageDTO);
+        const overrides: Partial<CanvasRegionalGuidanceState> = {
+          referenceImages: [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }],
+        };
+        dispatch(rgAdded({ overrides, isSelected: true }));
+        return;
+      }
+
+      if (
+        overData.actionType === 'ADD_GLOBAL_REFERENCE_IMAGE_FROM_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const state = getState();
+        const ipAdapter = deepClone(selectDefaultIPAdapter(state));
+        ipAdapter.image = imageDTOToImageWithDims(activeData.payload.imageDTO);
+        const overrides: Partial<CanvasReferenceImageState> = {
+          ipAdapter,
+        };
+        dispatch(referenceImageAdded({ overrides, isSelected: true }));
         return;
       }
 

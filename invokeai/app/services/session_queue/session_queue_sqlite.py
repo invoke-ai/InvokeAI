@@ -17,6 +17,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     IsEmptyResult,
     IsFullResult,
     PruneResult,
+    SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueItemDTO,
     SessionQueueItemNotFoundError,
@@ -685,6 +686,40 @@ class SqliteSessionQueue(SessionQueueBase):
             origin=origin,
             destination=destination,
             queue_id=queue_id,
+            pending=counts.get("pending", 0),
+            in_progress=counts.get("in_progress", 0),
+            completed=counts.get("completed", 0),
+            failed=counts.get("failed", 0),
+            canceled=counts.get("canceled", 0),
+            total=total,
+        )
+
+    def get_counts_by_destination(self, queue_id: str, destination: str) -> SessionQueueCountsByDestination:
+        try:
+            self.__lock.acquire()
+            self.__cursor.execute(
+                """--sql
+                SELECT status, count(*)
+                FROM session_queue
+                WHERE queue_id = ?
+                AND destination = ?
+                GROUP BY status
+                """,
+                (queue_id, destination),
+            )
+            counts_result = cast(list[sqlite3.Row], self.__cursor.fetchall())
+        except Exception:
+            self.__conn.rollback()
+            raise
+        finally:
+            self.__lock.release()
+
+        total = sum(row[1] for row in counts_result)
+        counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
+
+        return SessionQueueCountsByDestination(
+            queue_id=queue_id,
+            destination=destination,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
             completed=counts.get("completed", 0),

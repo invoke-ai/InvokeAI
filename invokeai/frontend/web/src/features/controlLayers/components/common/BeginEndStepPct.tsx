@@ -18,9 +18,9 @@ export const BeginEndStepPct = memo(({ beginEndStepPct, onChange }: Props) => {
   }, [onChange]);
 
   return (
-    <FormControl orientation="horizontal" pe={1}>
+    <FormControl orientation="horizontal" pe={2}>
       <InformationalPopover feature="controlNetBeginEnd">
-        <FormLabel m={0}>{t('controlnet.beginEndStepPercentShort')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.beginEndStepPercentShort')}</FormLabel>
       </InformationalPopover>
       <CompositeRangeSlider
         aria-label={ariaLabel}

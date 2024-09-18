@@ -30,7 +30,7 @@ export type RGIPAdapterImageDropData = BaseDropData & {
   actionType: 'SET_RG_IP_ADAPTER_IMAGE';
   context: {
     id: string;
-    ipAdapterId: string;
+    referenceImageId: string;
   };
 };
 
@@ -40,6 +40,14 @@ export type AddRasterLayerFromImageDropData = BaseDropData & {
 
 export type AddControlLayerFromImageDropData = BaseDropData & {
   actionType: 'ADD_CONTROL_LAYER_FROM_IMAGE';
+};
+
+export type AddRegionalReferenceImageFromImageDropData = BaseDropData & {
+  actionType: 'ADD_REGIONAL_REFERENCE_IMAGE_FROM_IMAGE';
+};
+
+export type AddGlobalReferenceImageFromImageDropData = BaseDropData & {
+  actionType: 'ADD_GLOBAL_REFERENCE_IMAGE_FROM_IMAGE';
 };
 
 export type ReplaceLayerImageDropData = BaseDropData & {
@@ -88,7 +96,9 @@ export type TypesafeDroppableData =
   | UpscaleInitialImageDropData
   | AddRasterLayerFromImageDropData
   | AddControlLayerFromImageDropData
-  | ReplaceLayerImageDropData;
+  | ReplaceLayerImageDropData
+  | AddRegionalReferenceImageFromImageDropData
+  | AddGlobalReferenceImageFromImageDropData;
 
 type BaseDragData = {
   id: string;

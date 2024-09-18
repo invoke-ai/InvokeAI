@@ -9,9 +9,9 @@ export const prepareLinearUIBatch = (
   state: RootState,
   g: Graph,
   prepend: boolean,
-  noise: Invocation<'noise'>,
-  posCond: Invocation<'compel' | 'sdxl_compel_prompt'>,
-  origin: 'generation' | 'workflows' | 'upscaling',
+  noise: Invocation<'noise' | 'flux_denoise'>,
+  posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>,
+  origin: 'canvas' | 'workflows' | 'upscaling',
   destination: 'canvas' | 'gallery'
 ): BatchConfig => {
   const { iterations, model, shouldRandomizeSeed, seed, shouldConcatPrompts } = state.params;

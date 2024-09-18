@@ -2,11 +2,12 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
   inpaintMaskAdded,
-  ipaAdded,
   rasterLayerAdded,
+  referenceImageAdded,
   rgAdded,
   rgIPAdapterAdded,
   rgNegativePromptChanged,
@@ -16,11 +17,12 @@ import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
+  CanvasRegionalGuidanceState,
   ControlNetConfig,
   IPAdapterConfig,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
-import { initialControlNet, initialIPAdapter, initialT2IAdapter } from 'features/controlLayers/store/types';
+import { initialControlNet, initialIPAdapter, initialT2IAdapter } from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback } from 'react';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
@@ -71,78 +73,92 @@ export const selectDefaultIPAdapter = createSelector(
 export const useAddControlLayer = () => {
   const dispatch = useAppDispatch();
   const defaultControlAdapter = useAppSelector(selectDefaultControlAdapter);
-  const addControlLayer = useCallback(() => {
+  const func = useCallback(() => {
     const overrides = { controlAdapter: defaultControlAdapter };
     dispatch(controlLayerAdded({ isSelected: true, overrides }));
   }, [defaultControlAdapter, dispatch]);
 
-  return addControlLayer;
+  return func;
 };
 
 export const useAddRasterLayer = () => {
   const dispatch = useAppDispatch();
-  const addRasterLayer = useCallback(() => {
+  const func = useCallback(() => {
     dispatch(rasterLayerAdded({ isSelected: true }));
   }, [dispatch]);
 
-  return addRasterLayer;
+  return func;
 };
 
 export const useAddInpaintMask = () => {
   const dispatch = useAppDispatch();
-  const addInpaintMask = useCallback(() => {
+  const func = useCallback(() => {
     dispatch(inpaintMaskAdded({ isSelected: true }));
   }, [dispatch]);
 
-  return addInpaintMask;
+  return func;
 };
 
 export const useAddRegionalGuidance = () => {
   const dispatch = useAppDispatch();
-  const addRegionalGuidance = useCallback(() => {
+  const func = useCallback(() => {
     dispatch(rgAdded({ isSelected: true }));
   }, [dispatch]);
 
-  return addRegionalGuidance;
+  return func;
 };
 
-export const useAddIPAdapter = () => {
+export const useAddRegionalReferenceImage = () => {
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
-  const addControlLayer = useCallback(() => {
-    const overrides = { ipAdapter: defaultIPAdapter };
-    dispatch(ipaAdded({ isSelected: true, overrides }));
+
+  const func = useCallback(() => {
+    const overrides: Partial<CanvasRegionalGuidanceState> = {
+      referenceImages: [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter: defaultIPAdapter }],
+    };
+    dispatch(rgAdded({ isSelected: true, overrides }));
   }, [defaultIPAdapter, dispatch]);
 
-  return addControlLayer;
+  return func;
+};
+
+export const useAddGlobalReferenceImage = () => {
+  const dispatch = useAppDispatch();
+  const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
+  const func = useCallback(() => {
+    const overrides = { ipAdapter: defaultIPAdapter };
+    dispatch(referenceImageAdded({ isSelected: true, overrides }));
+  }, [defaultIPAdapter, dispatch]);
+
+  return func;
 };
 
 export const useAddRegionalGuidanceIPAdapter = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) => {
   const dispatch = useAppDispatch();
   const defaultIPAdapter = useAppSelector(selectDefaultIPAdapter);
-  const addRegionalGuidanceIPAdapter = useCallback(() => {
-    dispatch(rgIPAdapterAdded({ entityIdentifier, overrides: defaultIPAdapter }));
+  const func = useCallback(() => {
+    dispatch(rgIPAdapterAdded({ entityIdentifier, overrides: { ipAdapter: defaultIPAdapter } }));
   }, [defaultIPAdapter, dispatch, entityIdentifier]);
 
-  return addRegionalGuidanceIPAdapter;
+  return func;
 };
 
 export const useAddRegionalGuidancePositivePrompt = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) => {
   const dispatch = useAppDispatch();
-  const addRegionalGuidancePositivePrompt = useCallback(() => {
+  const func = useCallback(() => {
     dispatch(rgPositivePromptChanged({ entityIdentifier, prompt: '' }));
   }, [dispatch, entityIdentifier]);
 
-  return addRegionalGuidancePositivePrompt;
+  return func;
 };
 
 export const useAddRegionalGuidanceNegativePrompt = (entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>) => {
   const dispatch = useAppDispatch();
-  const addRegionalGuidanceNegativePrompt = useCallback(() => {
+  const runc = useCallback(() => {
     dispatch(rgNegativePromptChanged({ entityIdentifier, prompt: '' }));
   }, [dispatch, entityIdentifier]);
 
-  return addRegionalGuidanceNegativePrompt;
+  return runc;
 };
 
 export const buildSelectValidRegionalGuidanceActions = (

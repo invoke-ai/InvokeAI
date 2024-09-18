@@ -44,7 +44,7 @@ export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
       );
     }
 
-    if (entityIdentifier.type === 'ip_adapter') {
+    if (entityIdentifier.type === 'reference_image') {
       return (
         <MenuList>
           <IPAdapterMenuItems />

@@ -1,5 +1,4 @@
 import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
-import { useSocketIO } from 'app/hooks/useSocketIO';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
@@ -19,7 +18,6 @@ import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/Cl
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
-import SettingsModal from 'features/system/components/SettingsModal/SettingsModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
@@ -32,6 +30,7 @@ import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
+import { useSocketIO } from 'services/events/useSocketIO';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
 import PreselectedImage from './PreselectedImage';
@@ -138,7 +137,6 @@ const App = ({
       <StylePresetModal />
       <ClearQueueConfirmationsAlertDialog />
       <PreselectedImage selectedImage={selectedImage} />
-      <SettingsModal />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
     </ErrorBoundary>

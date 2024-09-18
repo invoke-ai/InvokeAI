@@ -52,7 +52,7 @@ export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
 export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
 export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
-export type ClipEmbedModelConfig = S['CLIPEmbedDiffusersConfig'];
+export type CLIPEmbedModelConfig = S['CLIPEmbedDiffusersConfig'];
 export type T5EncoderModelConfig = S['T5EncoderConfig'];
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = S['T5EncoderBnbQuantizedLlmInt8bConfig'];
 export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
@@ -68,7 +68,7 @@ export type AnyModelConfig =
   | IPAdapterModelConfig
   | T5EncoderModelConfig
   | T5EncoderBnbQuantizedLlmInt8bModelConfig
-  | ClipEmbedModelConfig
+  | CLIPEmbedModelConfig
   | T2IAdapterModelConfig
   | SpandrelImageToImageModelConfig
   | TextualInversionModelConfig
@@ -81,6 +81,10 @@ export const isLoRAModelConfig = (config: AnyModelConfig): config is LoRAModelCo
 
 export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
   return config.type === 'vae';
+};
+
+export const isNonFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return config.type === 'vae' && config.base !== 'flux';
 };
 
 export const isFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
@@ -105,7 +109,7 @@ export const isT5EncoderModelConfig = (
   return config.type === 't5_encoder';
 };
 
-export const isClipEmbedModelConfig = (config: AnyModelConfig): config is ClipEmbedModelConfig => {
+export const isCLIPEmbedModelConfig = (config: AnyModelConfig): config is CLIPEmbedModelConfig => {
   return config.type === 'clip_embed';
 };
 
@@ -123,10 +127,6 @@ export const isControlNetOrT2IAdapterModelConfig = (
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
-};
-
-export const isNonRefinerNonFluxMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base !== 'sdxl-refiner' && config.base !== 'flux';
 };
 
 export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
@@ -198,7 +198,7 @@ export type IPALayerImagePostUploadAction = {
 export type RGIPAdapterImagePostUploadAction = {
   type: 'SET_RG_IP_ADAPTER_IMAGE';
   id: string;
-  ipAdapterId: string;
+  referenceImageId: string;
 };
 
 type NodesAction = {

@@ -1,5 +1,4 @@
 import { useStore } from '@nanostores/react';
-import { $socket } from 'app/hooks/useSocketIO';
 import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
@@ -7,6 +6,7 @@ import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
 import Konva from 'konva';
 import { useLayoutEffect, useState } from 'react';
+import { $socket } from 'services/events/stores';
 import { useDevicePixelRatio } from 'use-device-pixel-ratio';
 
 const log = logger('canvas');

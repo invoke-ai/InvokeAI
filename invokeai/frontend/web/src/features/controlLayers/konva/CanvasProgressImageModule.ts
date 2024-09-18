@@ -4,7 +4,10 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { getPrefixedId, loadImage } from 'features/controlLayers/konva/util';
 import { selectShowProgressOnCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
 import Konva from 'konva';
+import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
+import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
+import type { S } from 'services/api/types';
 
 export class CanvasProgressImageModule extends CanvasModuleBase {
   readonly type = 'progress_image';
@@ -23,7 +26,8 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
   imageElement: HTMLImageElement | null = null;
 
   subscriptions = new Set<() => void>();
-
+  $lastProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
+  hasActiveGeneration: boolean = false;
   mutex: Mutex = new Mutex();
 
   constructor(manager: CanvasManager) {
@@ -41,10 +45,49 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
       image: null,
     };
 
-    this.subscriptions.add(this.manager.stateApi.$lastCanvasProgressEvent.listen(this.render));
     this.subscriptions.add(this.manager.stagingArea.$shouldShowStagedImage.listen(this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectShowProgressOnCanvas, this.render));
+    this.subscriptions.add(this.setSocketEventListeners());
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectCanvasQueueCounts, ({ data }) => {
+        if (data && (data.in_progress > 0 || data.pending > 0)) {
+          this.hasActiveGeneration = true;
+        } else {
+          this.hasActiveGeneration = false;
+          this.$lastProgressEvent.set(null);
+        }
+      })
+    );
+    this.subscriptions.add(this.$lastProgressEvent.listen(this.render));
   }
+
+  setSocketEventListeners = (): (() => void) => {
+    const progressListener = (data: S['InvocationDenoiseProgressEvent']) => {
+      if (data.destination !== 'canvas') {
+        return;
+      }
+      if (!this.hasActiveGeneration) {
+        return;
+      }
+      this.$lastProgressEvent.set(data);
+    };
+
+    const clearProgress = () => {
+      this.$lastProgressEvent.set(null);
+    };
+
+    this.manager.socket.on('invocation_denoise_progress', progressListener);
+    this.manager.socket.on('connect', clearProgress);
+    this.manager.socket.on('connect_error', clearProgress);
+    this.manager.socket.on('disconnect', clearProgress);
+
+    return () => {
+      this.manager.socket.off('invocation_denoise_progress', progressListener);
+      this.manager.socket.off('connect', clearProgress);
+      this.manager.socket.off('connect_error', clearProgress);
+      this.manager.socket.off('disconnect', clearProgress);
+    };
+  };
 
   getNodes = () => {
     return [this.konva.group];
@@ -53,7 +96,7 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
   render = async () => {
     const release = await this.mutex.acquire();
 
-    const event = this.manager.stateApi.$lastCanvasProgressEvent.get();
+    const event = this.$lastProgressEvent.get();
     const showProgressOnCanvas = this.manager.stateApi.runSelector(selectShowProgressOnCanvas);
 
     if (!event || !showProgressOnCanvas) {

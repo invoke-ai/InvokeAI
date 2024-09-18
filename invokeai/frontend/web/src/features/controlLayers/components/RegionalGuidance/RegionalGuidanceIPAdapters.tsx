@@ -13,7 +13,7 @@ export const RegionalGuidanceIPAdapters = memo(() => {
   const selectIPAdapterIds = useMemo(
     () =>
       createMemoizedSelector(selectCanvasSlice, (canvas) => {
-        const ipAdapterIds = selectEntityOrThrow(canvas, entityIdentifier).ipAdapters.map(({ id }) => id);
+        const ipAdapterIds = selectEntityOrThrow(canvas, entityIdentifier).referenceImages.map(({ id }) => id);
         if (ipAdapterIds.length === 0) {
           return EMPTY_ARRAY;
         }
@@ -33,7 +33,7 @@ export const RegionalGuidanceIPAdapters = memo(() => {
       {ipAdapterIds.map((ipAdapterId, index) => (
         <Fragment key={ipAdapterId}>
           {index > 0 && <Divider />}
-          <RegionalGuidanceIPAdapterSettings ipAdapterId={ipAdapterId} ipAdapterNumber={index + 1} />
+          <RegionalGuidanceIPAdapterSettings referenceImageId={ipAdapterId} />
         </Fragment>
       ))}
     </>

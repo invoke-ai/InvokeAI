@@ -1,8 +1,8 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import {
   useAddControlLayer,
+  useAddGlobalReferenceImage,
   useAddInpaintMask,
-  useAddIPAdapter,
   useAddRasterLayer,
   useAddRegionalGuidance,
 } from 'features/controlLayers/hooks/addLayerHooks';
@@ -23,7 +23,7 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
   const addRegionalGuidance = useAddRegionalGuidance();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
-  const addIPAdapter = useAddIPAdapter();
+  const addGlobalReferenceImage = useAddGlobalReferenceImage();
 
   const onClick = useCallback(() => {
     switch (type) {
@@ -39,11 +39,11 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
       case 'control_layer':
         addControlLayer();
         break;
-      case 'ip_adapter':
-        addIPAdapter();
+      case 'reference_image':
+        addGlobalReferenceImage();
         break;
     }
-  }, [addControlLayer, addIPAdapter, addInpaintMask, addRasterLayer, addRegionalGuidance, type]);
+  }, [addControlLayer, addGlobalReferenceImage, addInpaintMask, addRasterLayer, addRegionalGuidance, type]);
 
   const label = useMemo(() => {
     switch (type) {
@@ -55,8 +55,8 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
         return t('controlLayers.addRasterLayer');
       case 'control_layer':
         return t('controlLayers.addControlLayer');
-      case 'ip_adapter':
-        return t('controlLayers.addIPAdapter');
+      case 'reference_image':
+        return t('controlLayers.addGlobalReferenceImage');
     }
   }, [type, t]);
 

@@ -1,7 +1,9 @@
 import { MenuGroup } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasEntityMenuItemsCopyToClipboard } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCopyToClipboard';
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsFilter } from 'features/controlLayers/components/common/CanvasEntityMenuItemsFilter';
+import { CanvasEntityMenuItemsSave } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSave';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
 import {
   EntityIdentifierContext,
@@ -9,7 +11,11 @@ import {
 } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityTitle } from 'features/controlLayers/hooks/useEntityTitle';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
-import { isFilterableEntityIdentifier, isTransformableEntityIdentifier } from 'features/controlLayers/store/types';
+import {
+  isFilterableEntityIdentifier,
+  isSaveableEntityIdentifier,
+  isTransformableEntityIdentifier,
+} from 'features/controlLayers/store/types';
 import { memo } from 'react';
 
 const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
@@ -20,6 +26,8 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
     <MenuGroup title={title}>
       {isFilterableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsFilter />}
       {isTransformableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsTransform />}
+      {isSaveableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsCopyToClipboard />}
+      {isSaveableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsSave />}
       <CanvasEntityMenuItemsDelete />
     </MenuGroup>
   );

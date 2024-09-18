@@ -5,12 +5,8 @@ import type { SerializableObject } from 'common/types';
 import type { Result } from 'common/util/result';
 import { withResult, withResultAsync } from 'common/util/result';
 import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
-import {
-  selectIsStaging,
-  stagingAreaReset,
-  stagingAreaStartedStaging,
-} from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSDXLGraph } from 'features/nodes/util/graph/generation/buildSDXLGraph';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -33,21 +29,12 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const manager = $canvasManager.get();
       assert(manager, 'No model found in state');
 
-      let didStartStaging = false;
-
-      if (!selectIsStaging(state) && state.canvasSettings.sendToCanvas) {
-        dispatch(stagingAreaStartedStaging());
-        didStartStaging = true;
-      }
-
-      const abortStaging = () => {
-        if (didStartStaging && selectIsStaging(getState())) {
-          dispatch(stagingAreaReset());
-        }
-      };
-
       let buildGraphResult: Result<
-        { g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'compel' | 'sdxl_compel_prompt'> },
+        {
+          g: Graph;
+          noise: Invocation<'noise' | 'flux_denoise'>;
+          posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder'>;
+        },
         Error
       >;
 
@@ -62,13 +49,15 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         case `sd-2`:
           buildGraphResult = await withResultAsync(() => buildSD1Graph(state, manager));
           break;
+        case `flux`:
+          buildGraphResult = await withResultAsync(() => buildFLUXGraph(state, manager));
+          break;
         default:
           assert(false, `No graph builders for base ${base}`);
       }
 
       if (buildGraphResult.isErr()) {
         log.error({ error: serializeError(buildGraphResult.error) }, 'Failed to build graph');
-        abortStaging();
         return;
       }
 
@@ -77,12 +66,11 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
       const destination = state.canvasSettings.sendToCanvas ? 'canvas' : 'gallery';
 
       const prepareBatchResult = withResult(() =>
-        prepareLinearUIBatch(state, g, prepend, noise, posCond, 'generation', destination)
+        prepareLinearUIBatch(state, g, prepend, noise, posCond, 'canvas', destination)
       );
 
       if (prepareBatchResult.isErr()) {
         log.error({ error: serializeError(prepareBatchResult.error) }, 'Failed to prepare batch');
-        abortStaging();
         return;
       }
 
@@ -97,7 +85,6 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
 
       if (enqueueResult.isErr()) {
         log.error({ error: serializeError(enqueueResult.error) }, 'Failed to enqueue batch');
-        abortStaging();
         return;
       }
 

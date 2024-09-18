@@ -4,7 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import ParamCreativity from 'features/parameters/components/Upscale/ParamCreativity';
 import ParamSpandrelModel from 'features/parameters/components/Upscale/ParamSpandrelModel';
 import ParamStructure from 'features/parameters/components/Upscale/ParamStructure';
-import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { UpscaleScaleSlider } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleScaleSlider';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { UpscaleInitialImage } from './UpscaleInitialImage';
 import { UpscaleWarning } from './UpscaleWarning';
 
-const selector = createMemoizedSelector([selectUpscalelice], (upscaleSlice) => {
+const selector = createMemoizedSelector([selectUpscaleSlice], (upscaleSlice) => {
   const { upscaleModel, upscaleInitialImage, scale } = upscaleSlice;
 
   const badges: string[] = [];

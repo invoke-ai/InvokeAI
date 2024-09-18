@@ -1,9 +1,9 @@
 import { useStore } from '@nanostores/react';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery, useResumeProcessorMutation } from 'services/api/endpoints/queue';
+import { $isConnected } from 'services/events/stores';
 
 export const useResumeProcessor = () => {
   const isConnected = useStore($isConnected);

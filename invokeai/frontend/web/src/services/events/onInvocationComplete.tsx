@@ -17,13 +17,9 @@ const isCanvasOutputNode = (data: S['InvocationCompleteEvent']) => {
   return data.invocation_source_id.split(':')[0] === 'canvas_output';
 };
 
-export const buildOnInvocationComplete = (
-  getState: () => RootState,
-  dispatch: AppDispatch,
-  nodeTypeDenylist: string[],
-  setLastProgressEvent: (event: S['InvocationDenoiseProgressEvent'] | null) => void,
-  setLastCanvasProgressEvent: (event: S['InvocationDenoiseProgressEvent'] | null) => void
-) => {
+const nodeTypeDenylist = ['load_image', 'image'];
+
+export const buildOnInvocationComplete = (getState: () => RootState, dispatch: AppDispatch) => {
   const addImageToGallery = (imageDTO: ImageDTO) => {
     if (imageDTO.is_intermediate) {
       return;
@@ -113,7 +109,7 @@ export const buildOnInvocationComplete = (
     }
   };
 
-  const handleOriginGeneration = async (data: S['InvocationCompleteEvent']) => {
+  const handleOriginCanvas = async (data: S['InvocationCompleteEvent']) => {
     const imageDTO = await getResultImageDTO(data);
 
     if (!imageDTO) {
@@ -121,6 +117,7 @@ export const buildOnInvocationComplete = (
     }
 
     if (data.destination === 'canvas') {
+      // TODO(psyche): Can/should we let canvas handle this itself?
       if (isCanvasOutputNode(data)) {
         if (data.result.type === 'canvas_v2_mask_and_crop_output') {
           const { offset_x, offset_y } = data.result;
@@ -131,8 +128,7 @@ export const buildOnInvocationComplete = (
         addImageToGallery(imageDTO);
       }
     } else if (!imageDTO.is_intermediate) {
-      // session.mode === 'generate'
-      setLastCanvasProgressEvent(null);
+      // Desintaion is gallery
       addImageToGallery(imageDTO);
     }
   };
@@ -151,15 +147,17 @@ export const buildOnInvocationComplete = (
       `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
     );
 
-    // Update the node execution states - the image output is handled below
+    if (nodeTypeDenylist.includes(data.invocation.type)) {
+      log.trace('Skipping node type denylisted');
+      return;
+    }
+
     if (data.origin === 'workflows') {
       await handleOriginWorkflows(data);
-    } else if (data.origin === 'generation') {
-      await handleOriginGeneration(data);
+    } else if (data.origin === 'canvas') {
+      await handleOriginCanvas(data);
     } else {
       await handleOriginOther(data);
     }
-
-    setLastProgressEvent(null);
   };
 };

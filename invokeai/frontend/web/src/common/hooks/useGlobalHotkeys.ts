@@ -2,8 +2,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { addScope, removeScope, setScopes } from 'common/hooks/interactionScopes';
 import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
-import { useQueueBack } from 'features/queue/hooks/useQueueBack';
-import { useQueueFront } from 'features/queue/hooks/useQueueFront';
+import { useInvoke } from 'features/queue/hooks/useInvoke';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -11,30 +10,28 @@ import { useHotkeys } from 'react-hotkeys-hook';
 export const useGlobalHotkeys = () => {
   const dispatch = useAppDispatch();
   const isModelManagerEnabled = useFeatureStatus('modelManager');
-  const { queueBack, isDisabled: isDisabledQueueBack, isLoading: isLoadingQueueBack } = useQueueBack();
+  const queue = useInvoke();
 
   useHotkeys(
     ['ctrl+enter', 'meta+enter'],
-    queueBack,
+    queue.queueBack,
     {
-      enabled: !isDisabledQueueBack && !isLoadingQueueBack,
+      enabled: !queue.isDisabled && !queue.isLoading,
       preventDefault: true,
       enableOnFormTags: ['input', 'textarea', 'select'],
     },
-    [queueBack, isDisabledQueueBack, isLoadingQueueBack]
+    [queue]
   );
-
-  const { queueFront, isDisabled: isDisabledQueueFront, isLoading: isLoadingQueueFront } = useQueueFront();
 
   useHotkeys(
     ['ctrl+shift+enter', 'meta+shift+enter'],
-    queueFront,
+    queue.queueFront,
     {
-      enabled: !isDisabledQueueFront && !isLoadingQueueFront,
+      enabled: !queue.isDisabled && !queue.isLoading,
       preventDefault: true,
       enableOnFormTags: ['input', 'textarea', 'select'],
     },
-    [queueFront, isDisabledQueueFront, isLoadingQueueFront]
+    [queue]
   );
 
   const {

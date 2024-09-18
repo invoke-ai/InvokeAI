@@ -115,3 +115,15 @@ export const getInfill = (
 
   assert(false, 'Unknown infill method');
 };
+
+export const addImageToLatents = (g: Graph, isFlux: boolean, fp32: boolean, image_name?: string) => {
+  if (isFlux) {
+    return g.addNode({
+      id: 'flux_vae_encode',
+      type: 'flux_vae_encode',
+      image: image_name ? { image_name } : undefined,
+    });
+  } else {
+    return g.addNode({ id: 'i2l', type: 'i2l', fp32, image: image_name ? { image_name } : undefined });
+  }
+};

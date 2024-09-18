@@ -1,5 +1,4 @@
 import { useStore } from '@nanostores/react';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { $true } from 'app/store/nanostores/util';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -13,7 +12,7 @@ import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { Templates } from 'features/nodes/store/types';
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { selectUpscalelice } from 'features/parameters/store/upscaleSlice';
+import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -21,13 +20,14 @@ import i18n from 'i18next';
 import { forEach, upperFirst } from 'lodash-es';
 import { useMemo } from 'react';
 import { getConnectedEdges } from 'reactflow';
+import { $isConnected } from 'services/events/stores';
 
 const LAYER_TYPE_TO_TKEY = {
-  ip_adapter: 'controlLayers.ipAdapter',
+  reference_image: 'controlLayers.referenceImage',
   inpaint_mask: 'controlLayers.inpaintMask',
   regional_guidance: 'controlLayers.regionalGuidance',
-  raster_layer: 'controlLayers.raster',
-  control_layer: 'controlLayers.globalControlAdapter',
+  raster_layer: 'controlLayers.rasterLayer',
+  control_layer: 'controlLayers.controlLayer',
 } as const;
 
 const createSelector = (
@@ -46,7 +46,7 @@ const createSelector = (
       selectDynamicPromptsSlice,
       selectCanvasSlice,
       selectParamsSlice,
-      selectUpscalelice,
+      selectUpscaleSlice,
       selectConfigSlice,
       selectActiveTab,
     ],
@@ -147,6 +147,18 @@ const createSelector = (
           reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
         }
 
+        if (model?.base === 'flux') {
+          if (!params.t5EncoderModel) {
+            reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+          }
+          if (!params.clipEmbedModel) {
+            reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
+          }
+          if (!params.fluxVAE) {
+            reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+          }
+        }
+
         canvas.controlLayers.entities
           .filter((controlLayer) => controlLayer.isEnabled)
           .forEach((controlLayer, i) => {
@@ -177,7 +189,7 @@ const createSelector = (
             }
           });
 
-        canvas.ipAdapters.entities
+        canvas.referenceImages.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layer_one');
@@ -205,7 +217,7 @@ const createSelector = (
             }
           });
 
-        canvas.regions.entities
+        canvas.regionalGuidance.entities
           .filter((entity) => entity.isEnabled)
           .forEach((entity, i) => {
             const layerLiteral = i18n.t('controlLayers.layer_one');
@@ -218,10 +230,14 @@ const createSelector = (
               problems.push(i18n.t('parameters.invoke.layer.rgNoRegion'));
             }
             // Must have at least 1 prompt or IP Adapter
-            if (entity.positivePrompt === null && entity.negativePrompt === null && entity.ipAdapters.length === 0) {
+            if (
+              entity.positivePrompt === null &&
+              entity.negativePrompt === null &&
+              entity.referenceImages.length === 0
+            ) {
               problems.push(i18n.t('parameters.invoke.layer.rgNoPromptsOrIPAdapters'));
             }
-            entity.ipAdapters.forEach((ipAdapter) => {
+            entity.referenceImages.forEach(({ ipAdapter }) => {
               // Must have model
               if (!ipAdapter.model) {
                 problems.push(i18n.t('parameters.invoke.layer.ipAdapterNoModelSelected'));

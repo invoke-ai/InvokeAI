@@ -33,7 +33,7 @@ export const RegionalGuidanceMenuItemsAddPromptsAndIPAdapter = memo(() => {
         {t('controlLayers.addNegativePrompt')}
       </MenuItem>
       <MenuItem onClick={addRegionalGuidanceIPAdapter} isDisabled={isBusy}>
-        {t('controlLayers.addIPAdapter')}
+        {t('controlLayers.addReferenceImage')}
       </MenuItem>
     </>
   );

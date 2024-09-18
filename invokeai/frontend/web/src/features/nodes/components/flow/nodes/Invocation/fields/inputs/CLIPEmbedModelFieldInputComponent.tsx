@@ -5,8 +5,8 @@ import { fieldCLIPEmbedValueChanged } from 'features/nodes/store/nodesSlice';
 import type { CLIPEmbedModelFieldInputInstance, CLIPEmbedModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useClipEmbedModels } from 'services/api/hooks/modelsByType';
-import type { ClipEmbedModelConfig } from 'services/api/types';
+import { useCLIPEmbedModels } from 'services/api/hooks/modelsByType';
+import type { CLIPEmbedModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -17,9 +17,9 @@ const CLIPEmbedModelFieldInputComponent = (props: Props) => {
   const { t } = useTranslation();
   const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
   const dispatch = useAppDispatch();
-  const [modelConfigs, { isLoading }] = useClipEmbedModels();
+  const [modelConfigs, { isLoading }] = useCLIPEmbedModels();
   const _onChange = useCallback(
-    (value: ClipEmbedModelConfig | null) => {
+    (value: CLIPEmbedModelConfig | null) => {
       if (!value) {
         return;
       }

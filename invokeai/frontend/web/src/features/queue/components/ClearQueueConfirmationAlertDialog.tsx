@@ -1,6 +1,5 @@
 import { ConfirmationAlertDialog, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
@@ -8,6 +7,7 @@ import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useClearQueueMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import { $isConnected } from 'services/events/stores';
 
 const [useClearQueueConfirmationAlertDialog] = buildUseBoolean(false);
 

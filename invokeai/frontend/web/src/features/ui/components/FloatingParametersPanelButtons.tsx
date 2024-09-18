@@ -1,13 +1,19 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { ButtonGroup, Flex, Icon, IconButton, Portal, spinAnimation } from '@invoke-ai/ui-library';
+import { ButtonGroup, Flex, Icon, IconButton, Portal, spinAnimation, useShiftModifier } from '@invoke-ai/ui-library';
 import CancelCurrentQueueItemIconButton from 'features/queue/components/CancelCurrentQueueItemIconButton';
 import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { QueueButtonTooltip } from 'features/queue/components/QueueButtonTooltip';
-import { useQueueBack } from 'features/queue/hooks/useQueueBack';
+import { useInvoke } from 'features/queue/hooks/useInvoke';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCircleNotchBold, PiSlidersHorizontalBold, PiSparkleFill, PiTrashSimpleBold } from 'react-icons/pi';
+import {
+  PiCircleNotchBold,
+  PiLightningFill,
+  PiSlidersHorizontalBold,
+  PiSparkleFill,
+  PiTrashSimpleBold,
+} from 'react-icons/pi';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
 const floatingButtonStyles: SystemStyleObject = {
@@ -21,17 +27,21 @@ type Props = {
 
 const FloatingSidePanelButtons = (props: Props) => {
   const { t } = useTranslation();
-  const { queueBack, isLoading, isDisabled } = useQueueBack();
+  const queue = useInvoke();
+  const shift = useShiftModifier();
   const clearQueue = useClearQueue();
   const { data: queueStatus } = useGetQueueStatusQuery();
 
   const queueButtonIcon = useMemo(() => {
     const isProcessing = (queueStatus?.queue.in_progress ?? 0) > 0;
-    if (!isDisabled && isProcessing) {
+    if (!queue.isDisabled && isProcessing) {
       return <Icon boxSize={6} as={PiCircleNotchBold} animation={spinAnimation} />;
     }
+    if (shift) {
+      return <PiLightningFill size="16px" />;
+    }
     return <PiSparkleFill size="16px" />;
-  }, [isDisabled, queueStatus]);
+  }, [queue.isDisabled, queueStatus?.queue.in_progress, shift]);
 
   if (!props.panelApi.isCollapsed) {
     return null;
@@ -58,12 +68,12 @@ const FloatingSidePanelButtons = (props: Props) => {
             sx={floatingButtonStyles}
             icon={<PiSlidersHorizontalBold size="16px" />}
           />
-          <QueueButtonTooltip>
+          <QueueButtonTooltip prepend={shift}>
             <IconButton
               aria-label={t('queue.queueBack')}
-              onClick={queueBack}
-              isLoading={isLoading}
-              isDisabled={isDisabled}
+              onClick={shift ? queue.queueFront : queue.queueBack}
+              isLoading={queue.isLoading}
+              isDisabled={queue.isDisabled}
               icon={queueButtonIcon}
               colorScheme="invokeYellow"
               sx={floatingButtonStyles}

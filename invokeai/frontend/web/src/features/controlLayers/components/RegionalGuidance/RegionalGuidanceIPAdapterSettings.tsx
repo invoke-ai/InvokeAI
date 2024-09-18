@@ -7,7 +7,7 @@ import { IPAdapterImagePreview } from 'features/controlLayers/components/IPAdapt
 import { IPAdapterMethod } from 'features/controlLayers/components/IPAdapter/IPAdapterMethod';
 import { IPAdapterModel } from 'features/controlLayers/components/IPAdapter/IPAdapterModel';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { usePullBboxIntoRegionalGuidanceIPAdapter } from 'features/controlLayers/hooks/saveCanvasHooks';
+import { usePullBboxIntoRegionalGuidanceReferenceImage } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   rgIPAdapterBeginEndStepPctChanged,
@@ -18,111 +18,114 @@ import {
   rgIPAdapterModelChanged,
   rgIPAdapterWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice, selectRegionalGuidanceIPAdapter } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { RGIPAdapterImageDropData } from 'features/dnd/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBoundingBoxBold, PiTrashSimpleBold } from 'react-icons/pi';
+import { PiBoundingBoxBold, PiTrashSimpleFill } from 'react-icons/pi';
 import type { ImageDTO, IPAdapterModelConfig, RGIPAdapterImagePostUploadAction } from 'services/api/types';
 import { assert } from 'tsafe';
 
 type Props = {
-  ipAdapterId: string;
-  ipAdapterNumber: number;
+  referenceImageId: string;
 };
 
-export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterNumber }: Props) => {
+export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Props) => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const onDeleteIPAdapter = useCallback(() => {
-    dispatch(rgIPAdapterDeleted({ entityIdentifier, ipAdapterId }));
-  }, [dispatch, entityIdentifier, ipAdapterId]);
+    dispatch(rgIPAdapterDeleted({ entityIdentifier, referenceImageId }));
+  }, [dispatch, entityIdentifier, referenceImageId]);
   const selectIPAdapter = useMemo(
     () =>
       createSelector(selectCanvasSlice, (canvas) => {
-        const ipAdapter = selectRegionalGuidanceIPAdapter(canvas, entityIdentifier, ipAdapterId);
-        assert(ipAdapter, `Regional GuidanceIP Adapter with id ${ipAdapterId} not found`);
-        return ipAdapter;
+        const referenceImage = selectRegionalGuidanceReferenceImage(canvas, entityIdentifier, referenceImageId);
+        assert(referenceImage, `Regional Guidance IP Adapter with id ${referenceImageId} not found`);
+        return referenceImage.ipAdapter;
       }),
-    [entityIdentifier, ipAdapterId]
+    [entityIdentifier, referenceImageId]
   );
   const ipAdapter = useAppSelector(selectIPAdapter);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
-      dispatch(rgIPAdapterBeginEndStepPctChanged({ entityIdentifier, ipAdapterId, beginEndStepPct }));
+      dispatch(rgIPAdapterBeginEndStepPctChanged({ entityIdentifier, referenceImageId, beginEndStepPct }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeWeight = useCallback(
     (weight: number) => {
-      dispatch(rgIPAdapterWeightChanged({ entityIdentifier, ipAdapterId, weight }));
+      dispatch(rgIPAdapterWeightChanged({ entityIdentifier, referenceImageId, weight }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeIPMethod = useCallback(
     (method: IPMethodV2) => {
-      dispatch(rgIPAdapterMethodChanged({ entityIdentifier, ipAdapterId, method }));
+      dispatch(rgIPAdapterMethodChanged({ entityIdentifier, referenceImageId, method }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeModel = useCallback(
     (modelConfig: IPAdapterModelConfig) => {
-      dispatch(rgIPAdapterModelChanged({ entityIdentifier, ipAdapterId, modelConfig }));
+      dispatch(rgIPAdapterModelChanged({ entityIdentifier, referenceImageId, modelConfig }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeCLIPVisionModel = useCallback(
     (clipVisionModel: CLIPVisionModelV2) => {
-      dispatch(rgIPAdapterCLIPVisionModelChanged({ entityIdentifier, ipAdapterId, clipVisionModel }));
+      dispatch(rgIPAdapterCLIPVisionModelChanged({ entityIdentifier, referenceImageId, clipVisionModel }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const onChangeImage = useCallback(
     (imageDTO: ImageDTO | null) => {
-      dispatch(rgIPAdapterImageChanged({ entityIdentifier, ipAdapterId, imageDTO }));
+      dispatch(rgIPAdapterImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
     },
-    [dispatch, entityIdentifier, ipAdapterId]
+    [dispatch, entityIdentifier, referenceImageId]
   );
 
   const droppableData = useMemo<RGIPAdapterImageDropData>(
     () => ({
       actionType: 'SET_RG_IP_ADAPTER_IMAGE',
-      context: { id: entityIdentifier.id, ipAdapterId },
+      context: { id: entityIdentifier.id, referenceImageId: referenceImageId },
       id: entityIdentifier.id,
     }),
-    [entityIdentifier.id, ipAdapterId]
+    [entityIdentifier.id, referenceImageId]
   );
   const postUploadAction = useMemo<RGIPAdapterImagePostUploadAction>(
-    () => ({ type: 'SET_RG_IP_ADAPTER_IMAGE', id: entityIdentifier.id, ipAdapterId }),
-    [entityIdentifier.id, ipAdapterId]
+    () => ({ type: 'SET_RG_IP_ADAPTER_IMAGE', id: entityIdentifier.id, referenceImageId: referenceImageId }),
+    [entityIdentifier.id, referenceImageId]
   );
-  const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceIPAdapter(entityIdentifier, ipAdapterId);
+  const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
   const isBusy = useCanvasIsBusy();
 
   return (
-    <Flex flexDir="column" gap={3}>
-      <Flex alignItems="center" gap={3}>
-        <Text fontWeight="semibold" color="base.400">{`IP Adapter ${ipAdapterNumber}`}</Text>
+    <Flex flexDir="column" gap={2}>
+      <Flex alignItems="center" gap={2}>
+        <Text fontWeight="semibold" color="base.400">
+          {t('controlLayers.referenceImage')}
+        </Text>
         <Spacer />
         <IconButton
           size="sm"
-          icon={<PiTrashSimpleBold />}
-          aria-label="Delete IP Adapter"
+          variant="link"
+          alignSelf="stretch"
+          icon={<PiTrashSimpleFill />}
+          tooltip={t('controlLayers.deleteReferenceImage')}
+          aria-label={t('controlLayers.deleteReferenceImage')}
           onClick={onDeleteIPAdapter}
-          variant="ghost"
           colorScheme="error"
         />
       </Flex>
-      <Flex flexDir="column" gap={4} position="relative" w="full">
-        <Flex gap={3} alignItems="center" w="full">
+      <Flex flexDir="column" gap={2} position="relative" w="full">
+        <Flex gap={2} alignItems="center" w="full">
           <Box minW={0} w="full" transitionProperty="common" transitionDuration="0.1s">
             <IPAdapterModel
               modelKey={ipAdapter.model?.key ?? null}
@@ -135,22 +138,21 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ ipAdapterId, ipAdapterN
             onClick={pullBboxIntoIPAdapter}
             isDisabled={isBusy}
             variant="ghost"
-            aria-label={t('controlLayers.pullBboxIntoIPAdapter')}
-            tooltip={t('controlLayers.pullBboxIntoIPAdapter')}
+            aria-label={t('controlLayers.pullBboxIntoReferenceImage')}
+            tooltip={t('controlLayers.pullBboxIntoReferenceImage')}
             icon={<PiBoundingBoxBold />}
           />
         </Flex>
-        <Flex gap={4} w="full" alignItems="center">
-          <Flex flexDir="column" gap={3} w="full">
+        <Flex gap={2} w="full">
+          <Flex flexDir="column" gap={2} w="full">
             <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
             <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
             <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
-          <Flex alignItems="center" justifyContent="center" h={36} w={36} aspectRatio="1/1">
+          <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
             <IPAdapterImagePreview
               image={ipAdapter.image ?? null}
               onChangeImage={onChangeImage}
-              ipAdapterId={ipAdapter.id}
               droppableData={droppableData}
               postUploadAction={postUploadAction}
             />

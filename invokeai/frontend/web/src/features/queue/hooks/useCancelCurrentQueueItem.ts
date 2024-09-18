@@ -1,10 +1,10 @@
 import { useStore } from '@nanostores/react';
-import { $isConnected } from 'app/hooks/useSocketIO';
 import { toast } from 'features/toast/toast';
 import { isNil } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCancelQueueItemMutation, useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import { $isConnected } from 'services/events/stores';
 
 export const useCancelCurrentQueueItem = () => {
   const isConnected = useStore($isConnected);

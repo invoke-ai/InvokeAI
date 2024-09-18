@@ -8,7 +8,7 @@ import { selectCanvasSlice, selectSelectedEntityIdentifier } from 'features/cont
 import { memo } from 'react';
 
 const selectEntityIds = createMemoizedSelector(selectCanvasSlice, (canvas) => {
-  return canvas.regions.entities.map(mapId).reverse();
+  return canvas.regionalGuidance.entities.map(mapId).reverse();
 });
 const selectIsSelected = createSelector(selectSelectedEntityIdentifier, (selectedEntityIdentifier) => {
   return selectedEntityIdentifier?.type === 'regional_guidance';

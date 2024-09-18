@@ -66,7 +66,7 @@ type IAIDndImageProps = FlexProps & {
   fitContainer?: boolean;
   droppableData?: TypesafeDroppableData;
   draggableData?: TypesafeDraggableData;
-  dropLabel?: ReactNode;
+  dropLabel?: string;
   isSelected?: boolean;
   isSelectedForCompare?: boolean;
   thumbnail?: boolean;
@@ -155,12 +155,18 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     return styles;
   }, [isUploadDisabled, minSize]);
 
-  const openInNewTab = useCallback(() => {
-    if (!imageDTO) {
-      return;
-    }
-    window.open(imageDTO.image_url, '_blank');
-  }, [imageDTO]);
+  const openInNewTab = useCallback(
+    (e: MouseEvent) => {
+      if (!imageDTO) {
+        return;
+      }
+      if (e.button !== 1) {
+        return;
+      }
+      window.open(imageDTO.image_url, '_blank');
+    },
+    [imageDTO]
+  );
 
   return (
     <ImageContextMenu imageDTO={imageDTO}>

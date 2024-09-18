@@ -13,7 +13,7 @@ type Props = {
 };
 
 export const IPAdapter = memo(({ id }: Props) => {
-  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'ip_adapter' }), [id]);
+  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'reference_image' }), [id]);
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>

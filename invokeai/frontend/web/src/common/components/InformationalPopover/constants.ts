@@ -30,6 +30,7 @@ export type Feature =
   | 'noiseUseCPU'
   | 'paramAspect'
   | 'paramCFGScale'
+  | 'paramGuidance'
   | 'paramCFGRescaleMultiplier'
   | 'paramDenoisingStrength'
   | 'paramHeight'

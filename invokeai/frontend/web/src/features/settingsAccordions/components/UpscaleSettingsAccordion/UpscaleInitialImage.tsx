@@ -46,7 +46,7 @@ export const UpscaleInitialImage = () => {
               <IAIDndImageIcon
                 onClick={onReset}
                 icon={<PiArrowCounterClockwiseBold size={16} />}
-                tooltip={t('controlnet.resetControlImage')}
+                tooltip={t('common.reset')}
               />
             </Flex>
             <Text

@@ -31,18 +31,18 @@ const getIndexAndCount = (
     };
   } else if (type === 'regional_guidance') {
     return {
-      index: canvas.regions.entities.findIndex((entity) => entity.id === id),
-      count: canvas.regions.entities.length,
+      index: canvas.regionalGuidance.entities.findIndex((entity) => entity.id === id),
+      count: canvas.regionalGuidance.entities.length,
     };
   } else if (type === 'inpaint_mask') {
     return {
       index: canvas.inpaintMasks.entities.findIndex((entity) => entity.id === id),
       count: canvas.inpaintMasks.entities.length,
     };
-  } else if (type === 'ip_adapter') {
+  } else if (type === 'reference_image') {
     return {
-      index: canvas.ipAdapters.entities.findIndex((entity) => entity.id === id),
-      count: canvas.ipAdapters.entities.length,
+      index: canvas.referenceImages.entities.findIndex((entity) => entity.id === id),
+      count: canvas.referenceImages.entities.length,
     };
   } else {
     return {

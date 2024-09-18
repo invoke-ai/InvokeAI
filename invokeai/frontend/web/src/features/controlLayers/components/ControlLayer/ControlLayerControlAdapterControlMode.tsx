@@ -16,10 +16,10 @@ export const ControlLayerControlAdapterControlMode = memo(({ controlMode, onChan
   const { t } = useTranslation();
   const CONTROL_MODE_DATA = useMemo(
     () => [
-      { label: t('controlnet.balanced'), value: 'balanced' },
-      { label: t('controlnet.prompt'), value: 'more_prompt' },
-      { label: t('controlnet.control'), value: 'more_control' },
-      { label: t('controlnet.megaControl'), value: 'unbalanced' },
+      { label: t('controlLayers.controlMode.balanced'), value: 'balanced' },
+      { label: t('controlLayers.controlMode.prompt'), value: 'more_prompt' },
+      { label: t('controlLayers.controlMode.control'), value: 'more_control' },
+      { label: t('controlLayers.controlMode.megaControl'), value: 'unbalanced' },
     ],
     [t]
   );
@@ -44,7 +44,7 @@ export const ControlLayerControlAdapterControlMode = memo(({ controlMode, onChan
   return (
     <FormControl>
       <InformationalPopover feature="controlNetControlMode">
-        <FormLabel m={0}>{t('controlnet.control')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.controlMode.controlMode')}</FormLabel>
       </InformationalPopover>
       <Combobox
         value={value}

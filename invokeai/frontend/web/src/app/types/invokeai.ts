@@ -22,7 +22,6 @@ export type AppFeature =
   | 'multiselect'
   | 'pauseQueue'
   | 'resumeQueue'
-  | 'prependQueue'
   | 'invocationCache'
   | 'bulkDownload'
   | 'starterModels'
@@ -113,6 +112,9 @@ export type AppConfig = {
     ca: {
       weight: NumericalParameterConfig;
     };
+  };
+  flux: {
+    guidance: NumericalParameterConfig;
   };
 };
 

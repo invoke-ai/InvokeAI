@@ -6,6 +6,7 @@ import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { addImageToLatents } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
@@ -13,10 +14,10 @@ export const addInpaint = async (
   state: RootState,
   g: Graph,
   manager: CanvasManager,
-  l2i: Invocation<'l2i'>,
-  denoise: Invocation<'denoise_latents'>,
-  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'seamless' | 'vae_loader'>,
-  modelLoader: Invocation<'main_model_loader' | 'sdxl_model_loader'>,
+  l2i: Invocation<'l2i' | 'flux_vae_decode'>,
+  denoise: Invocation<'denoise_latents' | 'flux_denoise'>,
+  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader' | 'seamless' | 'vae_loader'>,
+  modelLoader: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader'>,
   originalSize: Dimensions,
   scaledSize: Dimensions,
   denoising_start: number,
@@ -35,7 +36,8 @@ export const addInpaint = async (
 
   if (!isEqual(scaledSize, originalSize)) {
     // Scale before processing requires some resizing
-    const i2l = g.addNode({ id: getPrefixedId('i2l'), type: 'i2l', fp32 });
+    const i2l = addImageToLatents(g, modelLoader.type === 'flux_model_loader', fp32, initialImage.image_name);
+
     const resizeImageToScaledSize = g.addNode({
       type: 'img_resize',
       id: getPrefixedId('resize_image_to_scaled_size'),
@@ -84,7 +86,9 @@ export const addInpaint = async (
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
 
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
-    g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
+    if (modelLoader.type !== 'flux_model_loader') {
+      g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
+    }
     g.addEdge(resizeImageToScaledSize, 'image', createGradientMask, 'image');
     g.addEdge(resizeMaskToScaledSize, 'image', createGradientMask, 'mask');
 
@@ -107,12 +111,8 @@ export const addInpaint = async (
     return canvasPasteBack;
   } else {
     // No scale before processing, much simpler
-    const i2l = g.addNode({
-      id: getPrefixedId('i2l'),
-      type: 'i2l',
-      image: { image_name: initialImage.image_name },
-      fp32,
-    });
+    const i2l = addImageToLatents(g, modelLoader.type === 'flux_model_loader', fp32, initialImage.image_name);
+
     const alphaToMask = g.addNode({
       id: getPrefixedId('alpha_to_mask'),
       type: 'tomask',
@@ -138,7 +138,9 @@ export const addInpaint = async (
     g.addEdge(i2l, 'latents', denoise, 'latents');
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(vaeSource, 'vae', createGradientMask, 'vae');
-    g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
+    if (modelLoader.type !== 'flux_model_loader') {
+      g.addEdge(modelLoader, 'unet', createGradientMask, 'unet');
+    }
     g.addEdge(createGradientMask, 'denoise_mask', denoise, 'denoise_mask');
     g.addEdge(createGradientMask, 'expanded_mask_area', canvasPasteBack, 'mask');
 

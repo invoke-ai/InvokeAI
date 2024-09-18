@@ -9,7 +9,7 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
-  isClipEmbedModelConfig,
+  isCLIPEmbedModelConfig,
   isControlNetModelConfig,
   isControlNetOrT2IAdapterModelConfig,
   isFluxMainModelModelConfig,
@@ -17,7 +17,6 @@ import {
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
-  isNonRefinerNonFluxMainModelConfig,
   isNonSDXLMainModelConfig,
   isRefinerMainModelModelConfig,
   isSDXLMainModelModelConfig,
@@ -43,7 +42,6 @@ const buildModelsHook =
     return [modelConfigs, result] as const;
   };
 
-export const useSDMainModels = buildModelsHook(isNonRefinerNonFluxMainModelConfig);
 export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
@@ -54,7 +52,7 @@ export const useControlNetAndT2IAdapterModels = buildModelsHook(isControlNetOrT2
 export const useControlNetModels = buildModelsHook(isControlNetModelConfig);
 export const useT2IAdapterModels = buildModelsHook(isT2IAdapterModelConfig);
 export const useT5EncoderModels = buildModelsHook(isT5EncoderModelConfig);
-export const useClipEmbedModels = buildModelsHook(isClipEmbedModelConfig);
+export const useCLIPEmbedModels = buildModelsHook(isCLIPEmbedModelConfig);
 export const useSpandrelImageToImageModels = buildModelsHook(isSpandrelImageToImageModelConfig);
 export const useIPAdapterModels = buildModelsHook(isIPAdapterModelConfig);
 export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
