@@ -1,7 +1,9 @@
+from typing import Optional
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, TransformerField
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.config import BaseModelType
 
 
 @invocation_output("flux_lora_loader_output")
@@ -51,3 +53,48 @@ class FluxLoRALoaderInvocation(BaseInvocation):
         )
 
         return FluxLoRALoaderOutput(transformer=transformer)
+
+
+@invocation(
+    "flux_lora_collection_loader",
+    title="FLUX LoRA Collection Loader",
+    tags=["lora", "model", "flux"],
+    category="model",
+    version="1.0.0",
+)
+class FLUXLoRACollectionLoader(BaseInvocation):
+    """Applies a collection of FLUX LoRAs to the provided UNet and CLIP models."""
+
+    loras: LoRAField | list[LoRAField] = InputField(
+        description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
+    )
+
+    transformer: Optional[TransformerField] = InputField(
+        default=None,
+        description=FieldDescriptions.transformer,
+        input=Input.Connection,
+        title="Transformer",
+    )
+
+    def invoke(self, context: InvocationContext) -> FluxLoRALoaderOutput:
+        output = FluxLoRALoaderOutput()
+        loras = self.loras if isinstance(self.loras, list) else [self.loras]
+        added_loras: list[str] = []
+
+        for lora in loras:
+            if lora.lora.key in added_loras:
+                continue
+
+            if not context.models.exists(lora.lora.key):
+                raise Exception(f"Unknown lora: {lora.lora.key}!")
+
+            assert lora.lora.base is BaseModelType.Flux
+
+            added_loras.append(lora.lora.key)
+
+            if self.transformer is not None:
+                if output.transformer is None:
+                    output.transformer = self.transformer.model_copy(deep=True)
+                output.transformer.loras.append(lora)
+
+        return output
