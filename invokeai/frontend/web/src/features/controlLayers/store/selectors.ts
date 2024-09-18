@@ -288,3 +288,5 @@ export const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.
 export const selectHeight = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.height);
 export const selectAspectRatioID = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.id);
 export const selectAspectRatioValue = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.value);
+export const selectScaledSize = createSelector(selectBbox, (bbox) => bbox.scaledSize);
+export const selectScaleMethod = createSelector(selectBbox, (bbox) => bbox.scaleMethod);
