@@ -36,7 +36,6 @@ const CurrentImageButtons = () => {
   const isConnected = useStore($isConnected);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const progressImage = useStore($progressImage);
-  const selection = useAppSelector((s) => s.gallery.selection);
   const shouldDisableToolbarButtons = useMemo(() => {
     return Boolean(progressImage) || !lastSelectedImage;
   }, [lastSelectedImage, progressImage]);
@@ -73,8 +72,8 @@ const CurrentImageButtons = () => {
     if (!imageDTO) {
       return;
     }
-    dispatch(imagesToDeleteSelected(selection));
-  }, [dispatch, imageDTO, selection]);
+    dispatch(imagesToDeleteSelected([imageDTO]));
+  }, [dispatch, imageDTO]);
 
   useHotkeys('w', handleLoadWorkflow, { enabled: isImageViewerActive }, [lastSelectedImage, isImageViewerActive]);
   useHotkeys('a', recallAll, { enabled: isImageViewerActive }, [recallAll, isImageViewerActive]);
@@ -88,8 +87,6 @@ const CurrentImageButtons = () => {
     { enabled: Boolean(isUpscalingEnabled && isImageViewerActive && isConnected) },
     [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected, isImageViewerActive]
   );
-
-  useHotkeys(['delete', 'backspace'], handleDelete, { enabled: isImageViewerActive }, [imageDTO, isImageViewerActive]);
 
   return (
     <>
