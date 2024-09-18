@@ -48,10 +48,11 @@ class InpaintExtension:
         # - What curve should we follow in-between? Linear? Step function?
 
         # This is completely arbitrary that we are using the same value for max_change_timestep_cutoff and max_change. = 0.0
-        val = 1.0
-        max_change_timestep_cutoff = val
+        max_change_timestep_cutoff = 1.0
         if t_prev > max_change_timestep_cutoff:
-            max_change = val
+            total_time_to_cutoff = 1.0 - max_change_timestep_cutoff
+            cur_time_elapsed = 1.0 - t_prev
+            max_change = cur_time_elapsed / total_time_to_cutoff
         else:
             max_change = 1.0
         mask = mask * max_change
