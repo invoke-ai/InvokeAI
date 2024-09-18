@@ -1871,7 +1871,8 @@
             "preserveMask": {
                 "label": "Preserve Masked Region",
                 "alert": "Preserving Masked Region"
-            }
+            },
+            "showOnlyRasterLayersWhileStaging": "Show Only Raster Layers While Staging"
         },
         "HUD": {
             "bbox": "Bbox",
