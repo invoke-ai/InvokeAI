@@ -37,11 +37,15 @@ def denoise(
             guidance=guidance_vec,
         )
         preview_img = img - t_curr * pred
+        old_img = img
         img = img + (t_prev - t_curr) * pred
 
         if inpaint_extension is not None:
-            img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
-            preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
+            img = inpaint_extension.merge_intermediate_latents_with_init_latents(
+                t_curr_latents=old_img, pred_noise=pred, t_curr=t_curr, t_prev=t_prev
+            )
+            # img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+            # preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
 
         step_callback(
             PipelineIntermediateState(
@@ -49,7 +53,7 @@ def denoise(
                 order=1,
                 total_steps=len(timesteps),
                 timestep=int(t_curr),
-                latents=preview_img,
+                latents=img,
             ),
         )
         step += 1
