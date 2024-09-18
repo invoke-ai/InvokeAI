@@ -7,12 +7,13 @@ import { CanvasLayersPanelContent } from 'features/controlLayers/components/Canv
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { atom } from 'nanostores';
+import { atom, computed } from 'nanostores';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
 const $tabIndex = atom(0);
+export const $canvasRightPanelTab = computed($tabIndex, (index) => (index === 0 ? 'layers' : 'gallery'));
 export const setRightPanelTabToLayers = () => $tabIndex.set(0);
 export const setRightPanelTabToGallery = () => $tabIndex.set(1);
 

@@ -1,12 +1,16 @@
 import { useStore } from '@nanostores/react';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $activeScopes } from 'common/hooks/interactionScopes';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { $canvasRightPanelTab } from 'features/controlLayers/components/CanvasRightPanel';
+import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { $isRightPanelOpen } from 'features/ui/store/uiSlice';
 import { computed } from 'nanostores';
+import { useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
@@ -26,10 +30,23 @@ const $upDownHotkeysEnabled = computed([$activeScopes, $isRightPanelOpen], (acti
 export const useGalleryHotkeys = () => {
   useAssertSingleton('useGalleryHotkeys');
   const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
+  const dispatch = useAppDispatch();
+  const selection = useAppSelector((s) => s.gallery.selection);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const queryResult = useListImagesQuery(queryArgs);
   const leftRightHotkeysEnabled = useStore($leftRightHotkeysEnabled);
   const upDownHotkeysEnabled = useStore($upDownHotkeysEnabled);
+  const canvasRightPanelTab = useStore($canvasRightPanelTab);
+  const appTab = useAppSelector(selectActiveTab);
+
+  // When we are on the canvas tab, we need to disable the delete hotkey when the user is focused on the layers tab in
+  // the right hand panel, because the same hotkey is used to delete layers.
+  const isDeleteEnabledByTab = useMemo(() => {
+    if (appTab !== 'canvas') {
+      return true;
+    }
+    return canvasRightPanelTab === 'gallery';
+  }, [appTab, canvasRightPanelTab]);
 
   const {
     handleLeftImage,
@@ -95,4 +112,16 @@ export const useGalleryHotkeys = () => {
     { preventDefault: true, enabled: upDownHotkeysEnabled },
     [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage, upDownHotkeysEnabled]
   );
+
+  const handleDelete = useCallback(() => {
+    if (!selection.length) {
+      return;
+    }
+    dispatch(imagesToDeleteSelected(selection));
+  }, [dispatch, selection]);
+
+  useHotkeys(['delete', 'backspace'], handleDelete, { enabled: leftRightHotkeysEnabled && isDeleteEnabledByTab }, [
+    leftRightHotkeysEnabled,
+    isDeleteEnabledByTab,
+  ]);
 };
