@@ -1,6 +1,5 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
-
-import type { AspectRatioID, AspectRatioState } from './types';
+import type { AspectRatioID } from 'features/controlLayers/store/types';
 
 export const ASPECT_RATIO_OPTIONS: ComboboxOption[] = [
   { label: 'Free' as const, value: 'Free' },
@@ -21,10 +20,4 @@ export const ASPECT_RATIO_MAP: Record<Exclude<AspectRatioID, 'Free'>, { ratio: n
   '3:4': { ratio: 3 / 4, inverseID: '4:3' },
   '2:3': { ratio: 2 / 3, inverseID: '3:2' },
   '9:16': { ratio: 9 / 16, inverseID: '16:9' },
-};
-
-export const initialAspectRatioState: AspectRatioState = {
-  id: '1:1',
-  value: 1,
-  isLocked: false,
 };

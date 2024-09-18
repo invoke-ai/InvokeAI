@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { canvasReset } from 'features/controlLayers/store/canvasSlice';
+import { canvasReset } from 'features/controlLayers/store/actions';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashBold } from 'react-icons/pi';

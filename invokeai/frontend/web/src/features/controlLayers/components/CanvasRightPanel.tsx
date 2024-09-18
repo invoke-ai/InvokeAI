@@ -4,34 +4,39 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
+import {
+  $canvasRightPanelTabIndex,
+  selectCanvasRightPanelGalleryTab,
+  selectCanvasRightPanelLayersTab,
+} from 'features/controlLayers/store/ephemeral';
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { atom } from 'nanostores';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback, useMemo, useRef } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-
-const $tabIndex = atom(0);
-export const setRightPanelTabToLayers = () => $tabIndex.set(0);
-export const setRightPanelTabToGallery = () => $tabIndex.set(1);
 
 export const CanvasRightPanel = memo(() => {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
-  const tabIndex = useStore($tabIndex);
+  const tabIndex = useStore($canvasRightPanelTabIndex);
   useScopeOnFocus('gallery', ref);
   const imageViewer = useImageViewer();
   const onClickViewerToggleButton = useCallback(() => {
-    if ($tabIndex.get() !== 1) {
-      $tabIndex.set(1);
+    if ($canvasRightPanelTabIndex.get() !== 1) {
+      $canvasRightPanelTabIndex.set(1);
     }
     imageViewer.toggle();
   }, [imageViewer]);
-  useHotkeys('z', imageViewer.toggle);
+  useRegisteredHotkeys({
+    id: 'toggleViewer',
+    category: 'viewer',
+    callback: imageViewer.toggle,
+    dependencies: [imageViewer],
+  });
 
   return (
-    <Tabs index={tabIndex} onChange={$tabIndex.set} w="full" h="full" display="flex" flexDir="column">
+    <Tabs index={tabIndex} onChange={$canvasRightPanelTabIndex.set} w="full" h="full" display="flex" flexDir="column">
       <TabList alignItems="center">
         <PanelTabs />
         <Spacer />
@@ -62,7 +67,7 @@ const PanelTabs = memo(() => {
   const onOnMouseOverLayersTab = useCallback(() => {
     tabTimeout.current = window.setTimeout(() => {
       if (dndCtx.active) {
-        setRightPanelTabToLayers();
+        selectCanvasRightPanelLayersTab();
       }
     }, 300);
   }, [dndCtx.active]);
@@ -70,7 +75,7 @@ const PanelTabs = memo(() => {
   const onOnMouseOverGalleryTab = useCallback(() => {
     tabTimeout.current = window.setTimeout(() => {
       if (dndCtx.active) {
-        setRightPanelTabToGallery();
+        selectCanvasRightPanelGalleryTab();
       }
     }, 300);
   }, [dndCtx.active]);

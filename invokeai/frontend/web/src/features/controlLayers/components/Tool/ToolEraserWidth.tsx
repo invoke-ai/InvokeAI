@@ -19,10 +19,10 @@ import {
   selectCanvasSettingsSlice,
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { clamp } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
@@ -130,8 +130,20 @@ export const ToolEraserWidth = memo(() => {
     setLocalValue(width);
   }, [width]);
 
-  useHotkeys('[', decrement, { enabled: isSelected }, [decrement, isSelected]);
-  useHotkeys(']', increment, { enabled: isSelected }, [increment, isSelected]);
+  useRegisteredHotkeys({
+    id: 'incrementToolWidth',
+    category: 'canvas',
+    callback: decrement,
+    options: { enabled: isSelected },
+    dependencies: [decrement, isSelected],
+  });
+  useRegisteredHotkeys({
+    id: 'incrementToolWidth',
+    category: 'canvas',
+    callback: increment,
+    options: { enabled: isSelected },
+    dependencies: [increment, isSelected],
+  });
 
   return (
     <Popover>

@@ -82,18 +82,19 @@ export const isParameterSeed = (val: unknown): val is ParameterSeed => zParamete
 // #endregion
 
 // #region Width
-const zParameterWidth = z
+export const zParameterImageDimension = z
   .number()
   .min(64)
   .transform((val) => roundToMultiple(val, 8));
-export type ParameterWidth = z.infer<typeof zParameterWidth>;
-export const isParameterWidth = (val: unknown): val is ParameterWidth => zParameterWidth.safeParse(val).success;
+export type ParameterWidth = z.infer<typeof zParameterImageDimension>;
+export const isParameterWidth = (val: unknown): val is ParameterWidth =>
+  zParameterImageDimension.safeParse(val).success;
 // #endregion
 
 // #region Height
-const zParameterHeight = zParameterWidth;
-export type ParameterHeight = z.infer<typeof zParameterHeight>;
-export const isParameterHeight = (val: unknown): val is ParameterHeight => zParameterHeight.safeParse(val).success;
+export type ParameterHeight = z.infer<typeof zParameterImageDimension>;
+export const isParameterHeight = (val: unknown): val is ParameterHeight =>
+  zParameterImageDimension.safeParse(val).success;
 // #endregion
 
 // #region Model

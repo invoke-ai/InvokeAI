@@ -353,230 +353,272 @@
         "closeViewer": "Close Viewer"
     },
     "hotkeys": {
+        "hotkeys": "Hotkeys",
         "searchHotkeys": "Search Hotkeys",
         "clearSearch": "Clear Search",
         "noHotkeysFound": "No Hotkeys Found",
-        "acceptStagingImage": {
-            "desc": "Accept Current Staging Area Image",
-            "title": "Accept Staging Image"
+        "app": {
+            "title": "App",
+            "invoke": {
+                "title": "Invoke",
+                "desc": "Queue a generation, adding it to the end of the queue."
+            },
+            "invokeFront": {
+                "title": "Invoke (Front)",
+                "desc": "Queue a generation, adding it to the front of the queue."
+            },
+            "cancelQueueItem": {
+                "title": "Cancel",
+                "desc": "Cancel the currently processing queue item."
+            },
+            "clearQueue": {
+                "title": "Clear Queue",
+                "desc": "Cancel and clear all queue items."
+            },
+            "selectCanvasTab": {
+                "title": "Select the Canvas Tab",
+                "desc": "Selects the Canvas tab."
+            },
+            "selectUpscalingTab": {
+                "title": "Select the Upscaling Tab",
+                "desc": "Selects the Upscaling tab."
+            },
+            "selectWorkflowsTab": {
+                "title": "Select the Workflows Tab",
+                "desc": "Selects the Workflows tab."
+            },
+            "selectModelsTab": {
+                "title": "Select the Models Tab",
+                "desc": "Selects the Models tab."
+            },
+            "selectQueueTab": {
+                "title": "Select the Queue Tab",
+                "desc": "Selects the Queue tab."
+            },
+            "focusPrompt": {
+                "title": "Focus Prompt",
+                "desc": "Move cursor focus to the positive prompt."
+            },
+            "toggleLeftPanel": {
+                "title": "Toggle Left Panel",
+                "desc": "Show or hide the left panel."
+            },
+            "toggleRightPanel": {
+                "title": "Toggle Right Panel",
+                "desc": "Show or hide the right panel."
+            },
+            "resetPanelLayout": {
+                "title": "Reset Panel Layout",
+                "desc": "Reset the left and right panels to their default size and layout."
+            },
+            "togglePanels": {
+                "title": "Toggle Panels",
+                "desc": "Show or hide both left and right panels at once."
+            }
         },
-        "addNodes": {
-            "desc": "Opens the add node menu",
-            "title": "Add Nodes"
+        "canvas": {
+            "title": "Canvas",
+            "selectBrushTool": {
+                "title": "Brush Tool",
+                "desc": "Select the brush tool."
+            },
+            "selectBboxTool": {
+                "title": "Bbox Tool",
+                "desc": "Select the bounding box tool."
+            },
+            "decrementToolWidth": {
+                "title": "Decrement Tool Width",
+                "desc": "Decrement the brush or eraser tool width, whichever is selected."
+            },
+            "incrementToolWidth": {
+                "title": "Increment Tool Width",
+                "desc": "Increment the brush or eraser tool width, whichever is selected."
+            },
+            "selectColorPickerTool": {
+                "title": "Color Picker Tool",
+                "desc": "Select the color picker tool."
+            },
+            "selectEraserTool": {
+                "title": "Eraser Tool",
+                "desc": "Select the eraser tool."
+            },
+            "selectMoveTool": {
+                "title": "Move Tool",
+                "desc": "Select the move tool."
+            },
+            "selectRectTool": {
+                "title": "Rect Tool",
+                "desc": "Select the rect tool."
+            },
+            "selectViewTool": {
+                "title": "View Tool",
+                "desc": "Select the view tool."
+            },
+            "fitLayersToCanvas": {
+                "title": "Fit Layers to Canvas",
+                "desc": "Scales and positions the view to fit all visible layers."
+            },
+            "setZoomTo100Percent": {
+                "title": "Reset Zoom",
+                "desc": "Resets the canvas zoom to 100%."
+            },
+            "quickSwitch": {
+                "title": "Layer Quick Switch",
+                "desc": "Switch between the last two selected layers. If a layer is bookmarked, always switch between it and the last non-bookmarked layer."
+            },
+            "deleteSelected": {
+                "title": "Delete Layer",
+                "desc": "Delete the selected layer."
+            },
+            "resetSelected": {
+                "title": "Reset Layer",
+                "desc": "Reset the selected layer. Only applies to Inpaint Mask and Regional Guidance."
+            },
+            "undo": {
+                "title": "Undo",
+                "desc": "Undo the last canvas action."
+            },
+            "redo": {
+                "title": "redo",
+                "desc": "Redo the last canvas action."
+            },
+            "nextEntity": {
+                "title": "Next Layer",
+                "desc": "Select the next layer in the list."
+            },
+            "prevEntity": {
+                "title": "Prev Layer",
+                "desc": "Select the previous layer in the list."
+            }
         },
-        "appHotkeys": "App",
-        "cancel": {
-            "desc": "Cancel current queue item",
-            "title": "Cancel"
+        "workflows": {
+            "title": "Workflows",
+            "addNode": {
+                "title": "Add Node",
+                "descl": "Open the add node menu."
+            },
+            "copySelection": {
+                "title": "Copy",
+                "descl": "Copy selected nodes and edges."
+            },
+            "pasteSelection": {
+                "title": "Paste",
+                "descl": "Paste copied nodes and edges."
+            },
+            "pasteSelectionWithEdges": {
+                "title": "Paste with Edges",
+                "descl": "Paste copied nodes, edges, and all edges connected to copied nodes."
+            },
+            "selectAll": {
+                "title": "Select All",
+                "descl": "Select all nodes and edges."
+            },
+            "deleteSelection": {
+                "title": "Delete",
+                "descl": "Delete selected nodes and edges."
+            },
+            "undo": {
+                "title": "Undo",
+                "descl": "Undo the last workflow action."
+            },
+            "redo": {
+                "title": "Redo",
+                "descl": "Redo the last workflow action."
+            }
         },
-        "cancelAndClear": {
-            "desc": "Cancel current queue item and clear all pending items",
-            "title": "Cancel and Clear"
+        "viewer": {
+            "title": "Image Viewer",
+            "toggleViewer": {
+                "title": "Show/Hide Image Viewer",
+                "desc": "Show or hide the image viewer. Only available on the Canvas tab."
+            },
+            "swapImages": {
+                "title": "Swap Comparison Images",
+                "desc": "Swap the images being compared."
+            },
+            "nextComparisonMode": {
+                "title": "Next Comparison Mode",
+                "desc": "Cycle through comparison modes."
+            },
+            "loadWorkflow": {
+                "title": "Load Workflow",
+                "desc": "Load the current image's saved workflow (if it has one)."
+            },
+            "recallAll": {
+                "title": "Recall All Metadata",
+                "desc": "Recall all metadata for the current image."
+            },
+            "recallSeed": {
+                "title": "Recall Seed",
+                "desc": "Recall the seed for the current image."
+            },
+            "recallPrompts": {
+                "title": "Recall Prompts",
+                "desc": "Recall the positive and negative prompts for the current image."
+            },
+            "remix": {
+                "title": "Remix",
+                "desc": "Recall all metadata except for the seed for the current image."
+            },
+            "useSize": {
+                "title": "Use Size",
+                "desc": "Use the current image's size as the bbox size."
+            },
+            "runPostprocessing": {
+                "title": "Run Postprocessing",
+                "desc": "Run the selected postprocessing on the current image."
+            },
+            "toggleMetadata": {
+                "title": "Show/Hide Metadata",
+                "desc": "Show or hide the current image's metadata overlay."
+            }
         },
-        "changeTabs": {
-            "desc": "Switch to another workspace",
-            "title": "Change Tabs"
-        },
-        "clearMask": {
-            "desc": "Clear the entire mask",
-            "title": "Clear Mask"
-        },
-        "closePanels": {
-            "desc": "Closes open panels",
-            "title": "Close Panels"
-        },
-        "colorPicker": {
-            "desc": "Selects the canvas color picker",
-            "title": "Select Color Picker"
-        },
-        "consoleToggle": {
-            "desc": "Open and close console",
-            "title": "Console Toggle"
-        },
-        "copyToClipboard": {
-            "desc": "Copy current canvas to clipboard",
-            "title": "Copy to Clipboard"
-        },
-        "decreaseBrushOpacity": {
-            "desc": "Decreases the opacity of the canvas brush",
-            "title": "Decrease Brush Opacity"
-        },
-        "decreaseBrushSize": {
-            "desc": "Decreases the size of the canvas brush/eraser",
-            "title": "Decrease Brush Size"
-        },
-        "decreaseGalleryThumbSize": {
-            "desc": "Decreases gallery thumbnails size",
-            "title": "Decrease Gallery Image Size"
-        },
-        "deleteImage": {
-            "desc": "Delete the current image",
-            "title": "Delete Image"
-        },
-        "downloadImage": {
-            "desc": "Download current canvas",
-            "title": "Download Image"
-        },
-        "eraseBoundingBox": {
-            "desc": "Erases the bounding box area",
-            "title": "Erase Bounding Box"
-        },
-        "fillBoundingBox": {
-            "desc": "Fills the bounding box with brush color",
-            "title": "Fill Bounding Box"
-        },
-        "focusPrompt": {
-            "desc": "Focus the prompt input area",
-            "title": "Focus Prompt"
-        },
-        "galleryHotkeys": "Gallery",
-        "generalHotkeys": "General",
-        "hideMask": {
-            "desc": "Hide and unhide mask",
-            "title": "Hide Mask"
-        },
-        "increaseBrushOpacity": {
-            "desc": "Increases the opacity of the canvas brush",
-            "title": "Increase Brush Opacity"
-        },
-        "increaseBrushSize": {
-            "desc": "Increases the size of the canvas brush/eraser",
-            "title": "Increase Brush Size"
-        },
-        "increaseGalleryThumbSize": {
-            "desc": "Increases gallery thumbnails size",
-            "title": "Increase Gallery Image Size"
-        },
-        "invoke": {
-            "desc": "Generate an image",
-            "title": "Invoke"
-        },
-        "keyboardShortcuts": "Hotkeys",
-        "maximizeWorkSpace": {
-            "desc": "Close panels and maximize work area",
-            "title": "Maximize Workspace"
-        },
-        "mergeVisible": {
-            "desc": "Merge all visible layers of canvas",
-            "title": "Merge Visible"
-        },
-        "moveTool": {
-            "desc": "Allows canvas navigation",
-            "title": "Move Tool"
-        },
-        "nextImage": {
-            "desc": "Display the next image in gallery",
-            "title": "Next Image"
-        },
-        "nextStagingImage": {
-            "desc": "Next Staging Area Image",
-            "title": "Next Staging Image"
-        },
-        "nodesHotkeys": "Nodes",
-        "pinOptions": {
-            "desc": "Pin the options panel",
-            "title": "Pin Options"
-        },
-        "previousImage": {
-            "desc": "Display the previous image in gallery",
-            "title": "Previous Image"
-        },
-        "previousStagingImage": {
-            "desc": "Previous Staging Area Image",
-            "title": "Previous Staging Image"
-        },
-        "quickToggleMove": {
-            "desc": "Temporarily toggles Move mode",
-            "title": "Quick Toggle Move"
-        },
-        "redoStroke": {
-            "desc": "Redo a brush stroke",
-            "title": "Redo Stroke"
-        },
-        "resetView": {
-            "desc": "Reset Canvas View",
-            "title": "Reset View"
-        },
-        "restoreFaces": {
-            "desc": "Restore the current image",
-            "title": "Restore Faces"
-        },
-        "saveToGallery": {
-            "desc": "Save current canvas to gallery",
-            "title": "Save To Gallery"
-        },
-        "selectBrush": {
-            "desc": "Selects the canvas brush",
-            "title": "Select Brush"
-        },
-        "selectEraser": {
-            "desc": "Selects the canvas eraser",
-            "title": "Select Eraser"
-        },
-        "sendToImageToImage": {
-            "desc": "Send current image to Image to Image",
-            "title": "Send To Image To Image"
-        },
-        "remixImage": {
-            "desc": "Use all parameters except seed from the current image",
-            "title": "Remix image"
-        },
-        "setParameters": {
-            "desc": "Use all parameters of the current image",
-            "title": "Set Parameters"
-        },
-        "setPrompt": {
-            "desc": "Use the prompt of the current image",
-            "title": "Set Prompt"
-        },
-        "setSeed": {
-            "desc": "Use the seed of the current image",
-            "title": "Set Seed"
-        },
-        "showHideBoundingBox": {
-            "desc": "Toggle visibility of bounding box",
-            "title": "Show/Hide Bounding Box"
-        },
-        "showInfo": {
-            "desc": "Show metadata info of the current image",
-            "title": "Show Info"
-        },
-        "toggleGallery": {
-            "desc": "Open and close the gallery drawer",
-            "title": "Toggle Gallery"
-        },
-        "toggleOptions": {
-            "desc": "Open and close the options panel",
-            "title": "Toggle Options"
-        },
-        "toggleOptionsAndGallery": {
-            "desc": "Open and close the options and gallery panels",
-            "title": "Toggle Options and Gallery"
-        },
-        "resetOptionsAndGallery": {
-            "desc": "Resets the options and gallery panels",
-            "title": "Reset Options and Gallery"
-        },
-        "toggleLayer": {
-            "desc": "Toggles mask/base layer selection",
-            "title": "Toggle Layer"
-        },
-        "toggleSnap": {
-            "desc": "Toggles Snap to Grid",
-            "title": "Toggle Snap"
-        },
-        "undoStroke": {
-            "desc": "Undo a brush stroke",
-            "title": "Undo Stroke"
-        },
-        "unifiedCanvasHotkeys": "Unified Canvas",
-        "postProcess": {
-            "desc": "Process the current image using the selected post-processing model",
-            "title": "Process Image"
-        },
-        "toggleViewer": {
-            "desc": "Switches between the Image Viewer and workspace for the current tab.",
-            "title": "Toggle Image Viewer"
+        "gallery": {
+            "title": "Gallery",
+            "selectAllOnPage": {
+                "title": "Select All On Page",
+                "desc": "Select all images on the current page."
+            },
+            "clearSelection": {
+                "title": "Clear Selection",
+                "desc": "Clear the current selection, if any."
+            },
+            "galleryNavUp": {
+                "title": "Navigate Up",
+                "desc": "Navigate up in the gallery grid, selecting that image. If at the top of the page, go to the previous page."
+            },
+            "galleryNavRight": {
+                "title": "Navigate Right",
+                "desc": "Navigate right in the gallery grid, selecting that image. If at the last image of the row, go to the next row. If at the last image of the page, go to the next page."
+            },
+            "galleryNavDown": {
+                "title": "Navigate Down",
+                "desc": "Navigate down in the gallery grid, selecting that image. If at the bottom of the page, go to the next page."
+            },
+            "galleryNavLeft": {
+                "title": "Navigate Left",
+                "desc": "Navigate left in the gallery grid, selecting that image. If at the first image of the row, go to the previous row. If at the first image of the page, go to the previous page."
+            },
+            "galleryNavUpAlt": {
+                "title": "Navigate Up (Compare Image)",
+                "desc": "Same as Navigate Up, but selects the compare image, opening compare mode if it isn't already open."
+            },
+            "galleryNavRightAlt": {
+                "title": "Navigate Right (Compare Image)",
+                "desc": "Same as Navigate Right, but selects the compare image, opening compare mode if it isn't already open."
+            },
+            "galleryNavDownAlt": {
+                "title": "Navigate Down (Compare Image)",
+                "desc": "Same as Navigate Down, but selects the compare image, opening compare mode if it isn't already open."
+            },
+            "galleryNavLeftAlt": {
+                "title": "Navigate Left (Compare Image)",
+                "desc": "Same as Navigate Left, but selects the compare image, opening compare mode if it isn't already open."
+            },
+            "deleteSelection": {
+                "title": "Delete",
+                "desc": "Delete all selected images. By default, you will be prompted to confirm deletion. If the images are currently in use in the app, you will be warned."
+            }
         }
     },
     "metadata": {
@@ -1877,7 +1919,8 @@
             "preserveMask": {
                 "label": "Preserve Masked Region",
                 "alert": "Preserving Masked Region"
-            }
+            },
+            "showOnlyRasterLayersWhileStaging": "Show Only Raster Layers While Staging"
         },
         "HUD": {
             "bbox": "Bbox",

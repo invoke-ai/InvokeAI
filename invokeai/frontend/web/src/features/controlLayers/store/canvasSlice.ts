@@ -4,8 +4,8 @@ import type { PersistConfig } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
-import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { canvasReset } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
@@ -23,17 +23,16 @@ import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getS
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
-import { ASPECT_RATIO_MAP, initialAspectRatioState } from 'features/parameters/components/Bbox/constants';
-import type { AspectRatioID } from 'features/parameters/components/Bbox/types';
+import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants';
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import { merge, omit } from 'lodash-es';
-import { atom } from 'nanostores';
 import type { UndoableOptions } from 'redux-undo';
 import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 import type {
+  AspectRatioID,
   BoundingBoxScaleMethod,
   CanvasControlLayerState,
   CanvasEntityIdentifier,
@@ -91,7 +90,11 @@ const getInitialState = (): CanvasState => {
     bbox: {
       rect: { x: 0, y: 0, width: 512, height: 512 },
       optimalDimension: 512,
-      aspectRatio: deepClone(initialAspectRatioState),
+      aspectRatio: {
+        id: '1:1',
+        value: 1,
+        isLocked: false,
+      },
       scaleMethod: 'auto',
       scaledSize: {
         width: 512,
@@ -738,7 +741,7 @@ export const canvasSlice = createSlice({
         state.bbox.rect.width = width;
         state.bbox.rect.height = height;
       } else {
-        state.bbox.aspectRatio = deepClone(initialAspectRatioState);
+        state.bbox.aspectRatio = deepClone(initialState.bbox.aspectRatio);
         state.bbox.rect.width = state.bbox.optimalDimension;
         state.bbox.rect.height = state.bbox.optimalDimension;
       }
@@ -1033,22 +1036,6 @@ export const canvasSlice = createSlice({
           break;
       }
     },
-    canvasReset: (state) => {
-      const newState = getInitialState();
-
-      // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
-      // from the old state, then recalculate the bbox size & scaled size.
-      newState.bbox.optimalDimension = state.bbox.optimalDimension;
-      const rect = calculateNewSize(
-        newState.bbox.aspectRatio.value,
-        newState.bbox.optimalDimension * newState.bbox.optimalDimension
-      );
-      newState.bbox.rect.width = rect.width;
-      newState.bbox.rect.height = rect.height;
-      syncScaledSize(newState);
-
-      return newState;
-    },
     canvasUndo: () => {},
     canvasRedo: () => {},
     canvasClearHistory: () => {},
@@ -1074,11 +1061,27 @@ export const canvasSlice = createSlice({
         syncScaledSize(state);
       }
     });
+
+    builder.addCase(canvasReset, (state) => {
+      const newState = getInitialState();
+
+      // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
+      // from the old state, then recalculate the bbox size & scaled size.
+      newState.bbox.optimalDimension = state.bbox.optimalDimension;
+      const rect = calculateNewSize(
+        newState.bbox.aspectRatio.value,
+        newState.bbox.optimalDimension * newState.bbox.optimalDimension
+      );
+      newState.bbox.rect.width = rect.width;
+      newState.bbox.rect.height = rect.height;
+      syncScaledSize(newState);
+
+      return newState;
+    });
   },
 });
 
 export const {
-  canvasReset,
   canvasUndo,
   canvasRedo,
   canvasClearHistory,
@@ -1229,8 +1232,3 @@ function actionsThrottlingFilter(action: UnknownAction) {
   }, THROTTLE_MS);
   return true;
 }
-
-/**
- * The global canvas manager instance.
- */
-export const $canvasManager = atom<CanvasManager | null>(null);

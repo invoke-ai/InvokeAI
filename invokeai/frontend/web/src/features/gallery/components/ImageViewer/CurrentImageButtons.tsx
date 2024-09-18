@@ -13,11 +13,11 @@ import { parseAndRecallImageDimensions } from 'features/metadata/util/handlers';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { useIsQueueMutationInProgress } from 'features/queue/hooks/useIsQueueMutationInProgress';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { size } from 'lodash-es';
 import { memo, useCallback, useMemo } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowsCounterClockwiseBold,
@@ -36,7 +36,6 @@ const CurrentImageButtons = () => {
   const isConnected = useStore($isConnected);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const progressImage = useStore($progressImage);
-  const selection = useAppSelector((s) => s.gallery.selection);
   const shouldDisableToolbarButtons = useMemo(() => {
     return Boolean(progressImage) || !lastSelectedImage;
   }, [lastSelectedImage, progressImage]);
@@ -73,23 +72,58 @@ const CurrentImageButtons = () => {
     if (!imageDTO) {
       return;
     }
-    dispatch(imagesToDeleteSelected(selection));
-  }, [dispatch, imageDTO, selection]);
+    dispatch(imagesToDeleteSelected([imageDTO]));
+  }, [dispatch, imageDTO]);
 
-  useHotkeys('w', handleLoadWorkflow, { enabled: isImageViewerActive }, [lastSelectedImage, isImageViewerActive]);
-  useHotkeys('a', recallAll, { enabled: isImageViewerActive }, [recallAll, isImageViewerActive]);
-  useHotkeys('s', recallSeed, { enabled: isImageViewerActive }, [recallSeed, isImageViewerActive]);
-  useHotkeys('p', recallPrompts, { enabled: isImageViewerActive }, [recallPrompts, isImageViewerActive]);
-  useHotkeys('r', remix, { enabled: isImageViewerActive }, [remix, isImageViewerActive]);
-  useHotkeys('d', handleUseSize, { enabled: isImageViewerActive }, [handleUseSize, isImageViewerActive]);
-  useHotkeys(
-    'shift+u',
-    handleClickUpscale,
-    { enabled: Boolean(isUpscalingEnabled && isImageViewerActive && isConnected) },
-    [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected, isImageViewerActive]
-  );
-
-  useHotkeys(['delete', 'backspace'], handleDelete, { enabled: isImageViewerActive }, [imageDTO, isImageViewerActive]);
+  useRegisteredHotkeys({
+    id: 'loadWorkflow',
+    category: 'viewer',
+    callback: handleLoadWorkflow,
+    options: { enabled: isImageViewerActive },
+    dependencies: [handleLoadWorkflow, isImageViewerActive],
+  });
+  useRegisteredHotkeys({
+    id: 'recallAll',
+    category: 'viewer',
+    callback: recallAll,
+    options: { enabled: isImageViewerActive },
+    dependencies: [recallAll, isImageViewerActive],
+  });
+  useRegisteredHotkeys({
+    id: 'recallSeed',
+    category: 'viewer',
+    callback: recallSeed,
+    options: { enabled: isImageViewerActive },
+    dependencies: [recallSeed, isImageViewerActive],
+  });
+  useRegisteredHotkeys({
+    id: 'recallPrompts',
+    category: 'viewer',
+    callback: recallPrompts,
+    options: { enabled: isImageViewerActive },
+    dependencies: [recallPrompts, isImageViewerActive],
+  });
+  useRegisteredHotkeys({
+    id: 'remix',
+    category: 'viewer',
+    callback: remix,
+    options: { enabled: isImageViewerActive },
+    dependencies: [remix, isImageViewerActive],
+  });
+  useRegisteredHotkeys({
+    id: 'useSize',
+    category: 'viewer',
+    callback: handleUseSize,
+    options: { enabled: isImageViewerActive },
+    dependencies: [handleUseSize, isImageViewerActive],
+  });
+  useRegisteredHotkeys({
+    id: 'runPostprocessing',
+    category: 'viewer',
+    callback: handleClickUpscale,
+    options: { enabled: Boolean(isUpscalingEnabled && isImageViewerActive && isConnected) },
+    dependencies: [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected, isImageViewerActive],
+  });
 
   return (
     <>

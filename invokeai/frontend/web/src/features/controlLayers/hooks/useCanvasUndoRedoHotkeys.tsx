@@ -3,8 +3,8 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { canvasRedo, canvasUndo } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasMayRedo, selectCanvasMayUndo } from 'features/controlLayers/store/selectors';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useCallback } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useDispatch } from 'react-redux';
 
 export const useCanvasUndoRedoHotkeys = () => {
@@ -16,20 +16,23 @@ export const useCanvasUndoRedoHotkeys = () => {
   const handleUndo = useCallback(() => {
     dispatch(canvasUndo());
   }, [dispatch]);
-  useHotkeys(['meta+z', 'ctrl+z'], handleUndo, { enabled: mayUndo && !isBusy, preventDefault: true }, [
-    mayUndo,
-    isBusy,
-    handleUndo,
-  ]);
+  useRegisteredHotkeys({
+    id: 'undo',
+    category: 'canvas',
+    callback: handleUndo,
+    options: { enabled: mayUndo && !isBusy, preventDefault: true },
+    dependencies: [mayUndo, isBusy, handleUndo],
+  });
 
   const mayRedo = useAppSelector(selectCanvasMayRedo);
   const handleRedo = useCallback(() => {
     dispatch(canvasRedo());
   }, [dispatch]);
-  useHotkeys(
-    ['meta+shift+z', 'ctrl+shift+z', 'meta+y', 'ctrl+y'],
-    handleRedo,
-    { enabled: mayRedo && !isBusy, preventDefault: true },
-    [mayRedo, handleRedo, isBusy]
-  );
+  useRegisteredHotkeys({
+    id: 'redo',
+    category: 'canvas',
+    callback: handleRedo,
+    options: { enabled: mayRedo && !isBusy, preventDefault: true },
+    dependencies: [mayRedo, handleRedo, isBusy],
+  });
 };
