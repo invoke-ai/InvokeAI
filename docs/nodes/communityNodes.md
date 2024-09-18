@@ -10,7 +10,7 @@ The suggested method is to use `git clone` to clone the repository the node is f
 
 If you'd prefer, you can also just download the whole node folder from the linked repository and add it to the `nodes` folder. 
 
-To use a community workflow, download the the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
+To use a community workflow, download the `.json` node graph file and load it into Invoke AI via the **Load Workflow** button in the Workflow Editor. 
 
 - Community Nodes
     + [Adapters-Linked](#adapters-linked-nodes)
@@ -427,7 +427,7 @@ This node works best with SDXL models, especially as the style can be described 
 5. `Prompt Strength Combine` - Combines weighted prompts for .and()/.blend()
 6. `CSV To Index String` - Gets a string from a CSV by index. Includes a Random index option
 
-The following Nodes are now included in v3.2 of Invoke and are nolonger in this set of tools.<br>
+The following Nodes are now included in v3.2 of Invoke and are no longer in this set of tools.<br>
 - `Prompt Join` -> `String Join`
 - `Prompt Join Three` -> `String Join Three`
 - `Prompt Replace` -> `String Replace`
@@ -456,7 +456,7 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 
 ### BriaAI Remove Background
 
-**Description**: Implements one click background removal with BriaAI's new version 1.4 model which seems to be be producing better results than any other previous background removal tool.
+**Description**: Implements one click background removal with BriaAI's new version 1.4 model which seems to be producing better results than any other previous background removal tool.
 
 **Node Link:** https://github.com/blessedcoolant/invoke_bria_rmbg
 
