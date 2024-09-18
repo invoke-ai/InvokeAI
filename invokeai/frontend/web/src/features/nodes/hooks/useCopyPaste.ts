@@ -26,7 +26,7 @@ const copySelection = () => {
   $edgesToCopiedNodes.set(edgesToSelectedNodes);
 };
 
-const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
+const _pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
   const { getState, dispatch } = getStore();
   const { nodes, edges } = selectNodesSlice(getState());
   const cursorPos = $cursorPos.get();
@@ -116,7 +116,15 @@ const pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
   }
 };
 
-const api = { copySelection, pasteSelection };
+const pasteSelection = () => {
+  _pasteSelection(false);
+};
+
+const pasteSelectionWithEdges = () => {
+  _pasteSelection(true);
+};
+
+const api = { copySelection, pasteSelection, pasteSelectionWithEdges };
 
 export const useCopyPaste = () => {
   return api;

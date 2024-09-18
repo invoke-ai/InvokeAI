@@ -5,8 +5,8 @@ import {
   selectSelectedEntityIdentifier,
 } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useCallback, useEffect, useState } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 
 export const useCanvasEntityQuickSwitchHotkey = () => {
   const dispatch = useAppDispatch();
@@ -43,5 +43,10 @@ export const useCanvasEntityQuickSwitchHotkey = () => {
     }
   }, [bookmarked, current, dispatch, prev]);
 
-  useHotkeys('q', onQuickSwitch);
+  useRegisteredHotkeys({
+    id: 'quickSwitch',
+    category: 'canvas',
+    callback: onQuickSwitch,
+    dependencies: [onQuickSwitch],
+  });
 };

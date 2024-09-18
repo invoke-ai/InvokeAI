@@ -18,6 +18,7 @@ import {
   comparisonModeCycled,
   imageToCompareChanged,
 } from 'features/gallery/store/gallerySlice';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { Trans, useTranslation } from 'react-i18next';
@@ -40,7 +41,12 @@ export const CompareToolbar = memo(() => {
   const swapImages = useCallback(() => {
     dispatch(comparedImagesSwapped());
   }, [dispatch]);
-  useHotkeys('c', swapImages, [swapImages]);
+  useRegisteredHotkeys({
+    id: 'swapImages',
+    category: 'viewer',
+    callback: swapImages,
+    dependencies: [swapImages],
+  });
   const toggleComparisonFit = useCallback(() => {
     dispatch(comparisonFitChanged(comparisonFit === 'contain' ? 'fill' : 'contain'));
   }, [dispatch, comparisonFit]);
@@ -51,7 +57,7 @@ export const CompareToolbar = memo(() => {
   const nextMode = useCallback(() => {
     dispatch(comparisonModeCycled());
   }, [dispatch]);
-  useHotkeys('m', nextMode, [nextMode]);
+  useRegisteredHotkeys({ id: 'nextComparisonMode', category: 'viewer', callback: nextMode, dependencies: [nextMode] });
 
   return (
     <Flex w="full" gap={2}>
