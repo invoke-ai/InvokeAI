@@ -1074,8 +1074,6 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
 
-
-
 @invocation_output("crop_to_object_output")
 class CropToObjectOutput(ImageOutput):
     offset_top: int = OutputField(description="The number of pixels cropped from the top")
@@ -1096,9 +1094,8 @@ class CropToObjectInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     image: ImageField = InputField(description="An input mask image with black and white content")
     margin: int = InputField(default=0, ge=0, description="The desired margin around the object, as measured in pixels")
-    object_color: Literal['white', 'black'] = InputField(
-        default='white',
-        description="The color of the object to crop around (either 'white' or 'black')"
+    object_color: Literal["white", "black"] = InputField(
+        default="white", description="The color of the object to crop around (either 'white' or 'black')"
     )
 
     def invoke(self, context: InvocationContext) -> CropToObjectOutput:
@@ -1112,7 +1109,7 @@ class CropToObjectInvocation(BaseInvocation, WithMetadata, WithBoard):
         np_image = numpy.array(grayscale_image)
 
         # Depending on the object color, find the object pixels
-        if self.object_color == 'white':
+        if self.object_color == "white":
             # Find white pixels (value > 0)
             object_pixels = numpy.argwhere(np_image > 0)
         else:
