@@ -1,7 +1,7 @@
 import { $alt, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
-import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
+import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { memo, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';

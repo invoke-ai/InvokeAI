@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $activeScopes } from 'common/hooks/interactionScopes';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { $canvasRightPanelTab } from 'features/controlLayers/components/CanvasRightPanel';
+import { $canvasRightPanelTab } from 'features/controlLayers/store/ephemeral';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';

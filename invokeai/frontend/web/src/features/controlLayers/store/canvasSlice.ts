@@ -4,7 +4,6 @@ import type { PersistConfig } from 'app/store/store';
 import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/util/arrayUtils';
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
-import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
@@ -28,7 +27,6 @@ import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants'
 import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import { merge, omit } from 'lodash-es';
-import { atom } from 'nanostores';
 import type { UndoableOptions } from 'redux-undo';
 import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -1234,8 +1232,3 @@ function actionsThrottlingFilter(action: UnknownAction) {
   }, THROTTLE_MS);
   return true;
 }
-
-/**
- * The global canvas manager instance.
- */
-export const $canvasManager = atom<CanvasManager | null>(null);

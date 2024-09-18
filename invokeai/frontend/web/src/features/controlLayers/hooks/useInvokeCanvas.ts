@@ -3,7 +3,7 @@ import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
+import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import Konva from 'konva';
 import { useLayoutEffect, useState } from 'react';
 import { $socket } from 'services/events/stores';

@@ -4,7 +4,7 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { SerializableObject } from 'common/types';
 import type { Result } from 'common/util/result';
 import { withResult, withResultAsync } from 'common/util/result';
-import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
+import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
