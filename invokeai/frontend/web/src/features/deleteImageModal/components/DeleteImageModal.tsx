@@ -36,8 +36,8 @@ const selectImageUsages = createMemoizedSelector(
       isInpaintMaskImage: some(allImageUsage, (i) => i.isInpaintMaskImage),
       isRegionalGuidanceImage: some(allImageUsage, (i) => i.isRegionalGuidanceImage),
       isNodesImage: some(allImageUsage, (i) => i.isNodesImage),
-      isControlAdapterImage: some(allImageUsage, (i) => i.isControlAdapterImage),
-      isIPAdapterImage: some(allImageUsage, (i) => i.isIPAdapterImage),
+      isControlLayerImage: some(allImageUsage, (i) => i.isControlLayerImage),
+      isReferenceImage: some(allImageUsage, (i) => i.isReferenceImage),
     };
 
     return {

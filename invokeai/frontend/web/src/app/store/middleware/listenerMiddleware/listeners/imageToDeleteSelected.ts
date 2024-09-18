@@ -14,8 +14,8 @@ export const addImageToDeleteSelectedListener = (startAppListening: AppStartList
 
       const isImageInUse =
         imagesUsage.some((i) => i.isRasterLayerImage) ||
-        imagesUsage.some((i) => i.isControlAdapterImage) ||
-        imagesUsage.some((i) => i.isIPAdapterImage) ||
+        imagesUsage.some((i) => i.isControlLayerImage) ||
+        imagesUsage.some((i) => i.isReferenceImage) ||
         imagesUsage.some((i) => i.isInpaintMaskImage) ||
         imagesUsage.some((i) => i.isUpscaleImage) ||
         imagesUsage.some((i) => i.isNodesImage) ||

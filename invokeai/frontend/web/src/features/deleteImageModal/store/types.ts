@@ -11,6 +11,6 @@ export type ImageUsage = {
   isInpaintMaskImage: boolean;
   isRegionalGuidanceImage: boolean;
   isNodesImage: boolean;
-  isControlAdapterImage: boolean;
-  isIPAdapterImage: boolean;
+  isControlLayerImage: boolean;
+  isReferenceImage: boolean;
 };

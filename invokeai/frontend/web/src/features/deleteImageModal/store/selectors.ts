@@ -21,7 +21,7 @@ export const getImageUsage = (nodes: NodesState, canvas: CanvasState, upscale: U
 
   const isUpscaleImage = upscale.upscaleInitialImage?.image_name === image_name;
 
-  const isIPAdapterImage = canvas.referenceImages.entities.some(
+  const isReferenceImage = canvas.referenceImages.entities.some(
     ({ ipAdapter }) => ipAdapter.image?.image_name === image_name
   );
 
@@ -29,7 +29,7 @@ export const getImageUsage = (nodes: NodesState, canvas: CanvasState, upscale: U
     objects.some((obj) => isCanvasImageState(obj) && obj.image.image_name === image_name)
   );
 
-  const isControlAdapterImage = canvas.controlLayers.entities.some(({ objects }) =>
+  const isControlLayerImage = canvas.controlLayers.entities.some(({ objects }) =>
     objects.some((obj) => isCanvasImageState(obj) && obj.image.image_name === image_name)
   );
 
@@ -47,8 +47,8 @@ export const getImageUsage = (nodes: NodesState, canvas: CanvasState, upscale: U
     isInpaintMaskImage,
     isRegionalGuidanceImage,
     isNodesImage,
-    isControlAdapterImage,
-    isIPAdapterImage,
+    isControlLayerImage,
+    isReferenceImage,
   };
 
   return imageUsage;
