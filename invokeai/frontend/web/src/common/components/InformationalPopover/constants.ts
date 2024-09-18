@@ -1,5 +1,7 @@
 import type { PopoverProps } from '@invoke-ai/ui-library';
 
+import invokeBflImage from '/assets/images/invoke-bfl.png';
+
 export type Feature =
   | 'clipSkip'
   | 'hrf'
@@ -58,7 +60,8 @@ export type Feature =
   | 'upscaleModel'
   | 'scale'
   | 'creativity'
-  | 'structure';
+  | 'structure'
+  | 'fluxDev';
 
 export type PopoverData = PopoverProps & {
   image?: string;
@@ -185,6 +188,10 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   seamlessTilingYAxis: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings',
+  },
+  fluxDev: {
+    href: 'https://www.invoke.com/get-a-commercial-license-for-flux',
+    image: invokeBflImage,
   },
 } as const;
 

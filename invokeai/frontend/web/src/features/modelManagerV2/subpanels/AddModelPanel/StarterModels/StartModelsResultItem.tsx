@@ -23,6 +23,7 @@ export const StarterModelsResultItem = memo(({ result, modelList }: Props) => {
           type: result.type,
           base: result.base,
           format: result.format,
+          variant: result.variant,
         },
       },
     ];
@@ -30,7 +31,14 @@ export const StarterModelsResultItem = memo(({ result, modelList }: Props) => {
       for (const d of result.dependencies) {
         _allSources.push({
           source: d.source,
-          config: { name: d.name, description: d.description, type: d.type, base: d.base, format: d.format },
+          config: {
+            name: d.name,
+            description: d.description,
+            type: d.type,
+            base: d.base,
+            format: d.format,
+            variant: d.variant,
+          },
         });
       }
     }
