@@ -295,14 +295,16 @@ export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdenti
   return createSelector(
     [selectCanvasSlice, selectIsTypeHidden, selectIsStaging, selectShowOnlyRasterLayersWhileStaging],
     (canvas, isTypeHidden, isStaging, showOnlyRasterLayersWhileStaging) => {
-      const entity = selectEntityOrThrow(canvas, entityIdentifier);
+      const entity = selectEntity(canvas, entityIdentifier);
 
       // An entity is hidden if:
       // - The entity type is hidden
       // - The entity is disabled
       // - The entity is locked
       // - The entity is not a raster layer and we are staging and the option to show only raster layers is enabled
-
+      if (!entity) {
+        return true;
+      }
       if (isTypeHidden) {
         return true;
       }
