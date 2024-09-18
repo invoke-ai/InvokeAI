@@ -5,6 +5,7 @@ import { entitySelected } from 'features/controlLayers/store/canvasSlice';
 import { selectAllEntities, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityState } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
@@ -59,6 +60,9 @@ export const useNextPrevEntityHotkeys = () => {
     }
   }, [dispatch, prevEntityIdentifier]);
 
+  // There's some weirdness with the key codes - I need to register both `“` and `alt+[` for prev, and `‘` and `alt+]`
+  // for next to get these to work as expected.
+
   useHotkeys(
     // “ === alt+[
     ['“'],
@@ -66,8 +70,13 @@ export const useNextPrevEntityHotkeys = () => {
     { preventDefault: true, ignoreModifiers: true },
     [selectPrevEntity]
   );
-
-  useHotkeys(['alt+['], selectPrevEntity, { preventDefault: true }, [selectPrevEntity]);
+  useRegisteredHotkeys({
+    category: 'canvas',
+    id: 'prevEntity',
+    callback: selectPrevEntity,
+    options: { preventDefault: true },
+    dependencies: [selectPrevEntity],
+  });
   useHotkeys(
     // ‘ === alt+]
     ['‘'],
@@ -75,5 +84,11 @@ export const useNextPrevEntityHotkeys = () => {
     { preventDefault: true, ignoreModifiers: true },
     [selectNextEntity]
   );
-  useHotkeys(['alt+]'], selectNextEntity, { preventDefault: true }, [selectNextEntity]);
+  useRegisteredHotkeys({
+    category: 'canvas',
+    id: 'nextEntity',
+    callback: selectNextEntity,
+    options: { preventDefault: true },
+    dependencies: [selectNextEntity],
+  });
 };

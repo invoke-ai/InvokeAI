@@ -1,7 +1,7 @@
 import { createSelector, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
-import { canvasReset } from 'features/controlLayers/store/canvasSlice';
+import { canvasReset } from 'features/controlLayers/store/actions';
 import type { StagingAreaImage } from 'features/controlLayers/store/types';
 import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
 

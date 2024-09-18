@@ -69,6 +69,7 @@ class CLIPField(BaseModel):
 
 class TransformerField(BaseModel):
     transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
+    loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
 
 
 class T5EncoderField(BaseModel):
@@ -202,7 +203,7 @@ class FluxModelLoaderInvocation(BaseInvocation):
         assert isinstance(transformer_config, CheckpointConfigBase)
 
         return FluxModelLoaderOutput(
-            transformer=TransformerField(transformer=transformer),
+            transformer=TransformerField(transformer=transformer, loras=[]),
             clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], skipped_layers=0),
             t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder),
             vae=VAEField(vae=vae),

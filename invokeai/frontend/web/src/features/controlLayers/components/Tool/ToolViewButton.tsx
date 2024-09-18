@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiHandBold } from 'react-icons/pi';
 
@@ -10,7 +10,13 @@ export const ToolViewButton = memo(() => {
   const isSelected = useToolIsSelected('view');
   const selectView = useSelectTool('view');
 
-  useHotkeys('h', selectView, { enabled: !isSelected }, [selectView, isSelected]);
+  useRegisteredHotkeys({
+    id: 'selectViewTool',
+    category: 'canvas',
+    callback: selectView,
+    options: { enabled: !isSelected },
+    dependencies: [selectView, isSelected],
+  });
 
   return (
     <IconButton

@@ -12,9 +12,9 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
 import {
-  setRightPanelTabToGallery,
-  setRightPanelTabToLayers,
-} from 'features/controlLayers/components/CanvasRightPanel';
+  selectCanvasRightPanelGalleryTab,
+  selectCanvasRightPanelLayersTab,
+} from 'features/controlLayers/store/ephemeral';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useCurrentDestination } from 'features/queue/hooks/useCurrentDestination';
 import { selectShowSendingToAlerts, showSendingToAlertsChanged } from 'features/system/store/systemSlice';
@@ -29,7 +29,7 @@ const ActivateImageViewerButton = (props: PropsWithChildren) => {
   const imageViewer = useImageViewer();
   const onClick = useCallback(() => {
     imageViewer.open();
-    setRightPanelTabToGallery();
+    selectCanvasRightPanelGalleryTab();
   }, [imageViewer]);
   return (
     <Button onClick={onClick} size="sm" variant="link" color="base.50">
@@ -69,7 +69,7 @@ const ActivateCanvasButton = (props: PropsWithChildren) => {
   const imageViewer = useImageViewer();
   const onClick = useCallback(() => {
     dispatch(setActiveTab('canvas'));
-    setRightPanelTabToLayers();
+    selectCanvasRightPanelLayersTab();
     imageViewer.close();
   }, [dispatch, imageViewer]);
   return (

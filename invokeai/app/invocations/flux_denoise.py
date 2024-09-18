@@ -1,4 +1,5 @@
-from typing import Callable, Optional
+from contextlib import ExitStack
+from typing import Callable, Iterator, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -29,6 +30,9 @@ from invokeai.backend.flux.sampling_utils import (
     pack,
     unpack,
 )
+from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
+from invokeai.backend.lora.lora_patcher import LoRAPatcher
+from invokeai.backend.model_manager.config import ModelFormat
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -187,8 +191,40 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 noise=noise,
             )
 
-        with transformer_info as transformer:
+        with (
+            transformer_info.model_on_device() as (cached_weights, transformer),
+            ExitStack() as exit_stack,
+        ):
             assert isinstance(transformer, Flux)
+
+            config = transformer_info.config
+            assert config is not None
+
+            # Apply LoRA models to the transformer.
+            # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
+            if config.format in [ModelFormat.Checkpoint]:
+                # The model is non-quantized, so we can apply the LoRA weights directly into the model.
+                exit_stack.enter_context(
+                    LoRAPatcher.apply_lora_patches(
+                        model=transformer,
+                        patches=self._lora_iterator(context),
+                        prefix="",
+                        cached_weights=cached_weights,
+                    )
+                )
+            elif config.format in [ModelFormat.BnbQuantizedLlmInt8b, ModelFormat.BnbQuantizednf4b]:
+                # The model is quantized, so apply the LoRA weights as sidecar layers. This results in slower inference,
+                # than directly patching the weights, but is agnostic to the quantization format.
+                exit_stack.enter_context(
+                    LoRAPatcher.apply_lora_sidecar_patches(
+                        model=transformer,
+                        patches=self._lora_iterator(context),
+                        prefix="",
+                        dtype=inference_dtype,
+                    )
+                )
+            else:
+                raise ValueError(f"Unsupported model format: {config.format}")
 
             x = denoise(
                 model=transformer,
@@ -246,6 +282,13 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Expand the inpaint mask to the same shape as `latents` so that when we 'pack' `mask` it lines up with
         # `latents`.
         return mask.expand_as(latents)
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            assert isinstance(lora_info.model, LoRAModelRaw)
+            yield (lora_info.model, lora.weight)
+            del lora_info
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

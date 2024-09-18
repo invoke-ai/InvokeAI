@@ -18,7 +18,7 @@ import { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStag
 import { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { CanvasWorkerModule } from 'features/controlLayers/konva/CanvasWorkerModule.js';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { $canvasManager } from 'features/controlLayers/store/canvasSlice';
+import { $canvasManager } from 'features/controlLayers/store/ephemeral';
 import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import {
   isControlLayerEntityIdentifier,
