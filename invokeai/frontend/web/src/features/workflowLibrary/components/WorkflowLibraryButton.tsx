@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { $isWorkflowLibraryModalOpen } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
-import { memo, useCallback } from 'react';
+import { useWorkflowLibraryModal } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFolderOpenBold } from 'react-icons/pi';
 
@@ -8,10 +8,7 @@ import WorkflowLibraryModal from './WorkflowLibraryModal';
 
 const WorkflowLibraryButton = () => {
   const { t } = useTranslation();
-
-  const onClick = useCallback(() => {
-    $isWorkflowLibraryModalOpen.set(true);
-  }, []);
+  const workflowLibraryModal = useWorkflowLibraryModal();
 
   return (
     <>
@@ -19,7 +16,7 @@ const WorkflowLibraryButton = () => {
         aria-label={t('workflows.workflowLibrary')}
         tooltip={t('workflows.workflowLibrary')}
         icon={<PiFolderOpenBold />}
-        onClick={onClick}
+        onClick={workflowLibraryModal.setTrue}
         pointerEvents="auto"
       />
       <WorkflowLibraryModal />

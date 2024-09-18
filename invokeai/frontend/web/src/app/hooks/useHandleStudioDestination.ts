@@ -3,7 +3,7 @@ import { settingsSendToCanvasChanged } from 'features/controlLayers/store/canvas
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
 import { setActiveTab } from 'features/ui/store/uiSlice';
-import { $isWorkflowLibraryModalOpen } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
+import { useWorkflowLibraryModal } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
 import { useCallback } from 'react';
 
 export type StudioDestination =
@@ -17,6 +17,7 @@ export type StudioDestination =
 export const useHandleStudioDestination = () => {
   const dispatch = useAppDispatch();
   const imageViewer = useImageViewer();
+  const workflowLibraryModal = useWorkflowLibraryModal();
 
   const handleStudioDestination = useCallback(
     (destination: StudioDestination) => {
@@ -39,7 +40,7 @@ export const useHandleStudioDestination = () => {
           break;
         case 'viewAllWorkflows':
           dispatch(setActiveTab('workflows'));
-          $isWorkflowLibraryModalOpen.set(true);
+          workflowLibraryModal.setTrue();
           break;
         case 'viewAllStylePresets':
           dispatch(setActiveTab('canvas'));
@@ -50,7 +51,7 @@ export const useHandleStudioDestination = () => {
           break;
       }
     },
-    [dispatch, imageViewer]
+    [dispatch, imageViewer, workflowLibraryModal]
   );
 
   return handleStudioDestination;
