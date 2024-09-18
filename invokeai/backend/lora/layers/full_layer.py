@@ -3,35 +3,32 @@ from typing import Dict, Optional
 import torch
 
 from invokeai.backend.lora.layers.lora_layer_base import LoRALayerBase
+from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
 class FullLayer(LoRALayerBase):
-    # bias handled in LoRALayerBase(calc_size, to)
-    # weight: torch.Tensor
-    # bias: Optional[torch.Tensor]
+    def __init__(self, weight: torch.Tensor, bias: Optional[torch.Tensor]):
+        super().__init__(alpha=None, bias=bias)
+        self.weight = torch.nn.Parameter(weight)
 
-    def __init__(
-        self,
-        layer_key: str,
+    @classmethod
+    def from_state_dict_values(
+        cls,
         values: Dict[str, torch.Tensor],
     ):
-        super().__init__(layer_key, values)
+        layer = cls(weight=values["diff"], bias=values.get("diff_b", None))
+        cls.warn_on_unhandled_keys(values=values, handled_keys={"diff", "diff_b"})
+        return layer
 
-        self.weight = values["diff"]
-        self.bias = values.get("diff_b", None)
-
-        self.rank = None  # unscaled
-        self.check_keys(values, {"diff", "diff_b"})
+    def rank(self) -> int | None:
+        return None
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         return self.weight
 
-    def calc_size(self) -> int:
-        model_size = super().calc_size()
-        model_size += self.weight.nelement() * self.weight.element_size()
-        return model_size
-
-    def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         super().to(device=device, dtype=dtype)
-
         self.weight = self.weight.to(device=device, dtype=dtype)
+
+    def calc_size(self) -> int:
+        return super().calc_size() + calc_tensor_size(self.weight)
