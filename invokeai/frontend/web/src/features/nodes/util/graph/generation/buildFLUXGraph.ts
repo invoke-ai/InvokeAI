@@ -162,13 +162,15 @@ export const buildFLUXGraph = async (
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  const shouldSaveToGallery = !canvasSettings.sendToCanvas || canvasSettings.autoSave;
+  // This image will be staged, should not be saved to the gallery or added to a board.
+  const is_intermediate = canvasSettings.sendToCanvas;
+  const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
 
   g.updateNode(canvasOutput, {
     id: getPrefixedId('canvas_output'),
-    is_intermediate: !shouldSaveToGallery,
+    is_intermediate,
     use_cache: false,
-    board: getBoardField(state),
+    board,
   });
 
   g.setMetadataReceivingNode(canvasOutput);
