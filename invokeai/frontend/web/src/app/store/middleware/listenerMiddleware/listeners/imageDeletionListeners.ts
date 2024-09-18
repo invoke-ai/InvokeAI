@@ -40,19 +40,22 @@ const deleteNodesImages = (state: RootState, dispatch: AppDispatch, imageDTO: Im
   });
 };
 
-// const deleteControlAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
-//   state.canvas.present.controlAdapters.entities.forEach(({ id, imageObject, processedImageObject }) => {
-//     if (
-//       imageObject?.image.image_name === imageDTO.image_name ||
-//       processedImageObject?.image.image_name === imageDTO.image_name
-//     ) {
-//       dispatch(caImageChanged({ id, imageDTO: null }));
-//       dispatch(caProcessedImageChanged({ id, imageDTO: null }));
-//     }
-//   });
-// };
+const deleteControlLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+  selectCanvasSlice(state).controlLayers.entities.forEach(({ id, objects }) => {
+    let shouldDelete = false;
+    for (const obj of objects) {
+      if (obj.type === 'image' && obj.image.image_name === imageDTO.image_name) {
+        shouldDelete = true;
+        break;
+      }
+    }
+    if (shouldDelete) {
+      dispatch(entityDeleted({ entityIdentifier: { id, type: 'control_layer' } }));
+    }
+  });
+};
 
-const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+const deleteReferenceImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   selectCanvasSlice(state).referenceImages.entities.forEach((entity) => {
     if (entity.ipAdapter.image?.image_name === imageDTO.image_name) {
       dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier: getEntityIdentifier(entity), imageDTO: null }));
@@ -60,7 +63,7 @@ const deleteIPAdapterImages = (state: RootState, dispatch: AppDispatch, imageDTO
   });
 };
 
-const deleteLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
+const deleteRasterLayerImages = (state: RootState, dispatch: AppDispatch, imageDTO: ImageDTO) => {
   selectCanvasSlice(state).rasterLayers.entities.forEach(({ id, objects }) => {
     let shouldDelete = false;
     for (const obj of objects) {
@@ -124,9 +127,9 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
         }
 
         deleteNodesImages(state, dispatch, imageDTO);
-        // deleteControlAdapterImages(state, dispatch, imageDTO);
-        deleteIPAdapterImages(state, dispatch, imageDTO);
-        deleteLayerImages(state, dispatch, imageDTO);
+        deleteReferenceImages(state, dispatch, imageDTO);
+        deleteRasterLayerImages(state, dispatch, imageDTO);
+        deleteControlLayerImages(state, dispatch, imageDTO);
       } catch {
         // no-op
       } finally {
@@ -165,9 +168,9 @@ export const addImageDeletionListeners = (startAppListening: AppStartListening) 
 
         imageDTOs.forEach((imageDTO) => {
           deleteNodesImages(state, dispatch, imageDTO);
-          // deleteControlAdapterImages(state, dispatch, imageDTO);
-          deleteIPAdapterImages(state, dispatch, imageDTO);
-          deleteLayerImages(state, dispatch, imageDTO);
+          deleteControlLayerImages(state, dispatch, imageDTO);
+          deleteReferenceImages(state, dispatch, imageDTO);
+          deleteRasterLayerImages(state, dispatch, imageDTO);
         });
       } catch {
         // no-op
