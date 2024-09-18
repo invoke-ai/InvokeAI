@@ -29,8 +29,8 @@ const ImageUsageMessage = (props: Props) => {
     <>
       <Text>{topMessage}</Text>
       <UnorderedList paddingInlineStart={6} fontSize="sm">
-        {imageUsage.isControlAdapterImage && <ListItem>{t('controlLayers.controlLayer')}</ListItem>}
-        {imageUsage.isIPAdapterImage && <ListItem>{t('controlLayers.referenceImage')}</ListItem>}
+        {imageUsage.isControlLayerImage && <ListItem>{t('controlLayers.controlLayer')}</ListItem>}
+        {imageUsage.isReferenceImage && <ListItem>{t('controlLayers.referenceImage')}</ListItem>}
         {imageUsage.isInpaintMaskImage && <ListItem>{t('controlLayers.inpaintMask')}</ListItem>}
         {imageUsage.isRasterLayerImage && <ListItem>{t('controlLayers.rasterLayer')}</ListItem>}
         {imageUsage.isRegionalGuidanceImage && <ListItem>{t('controlLayers.regionalGuidance')}</ListItem>}
