@@ -46,7 +46,7 @@ export const InformationalPopover = memo(
 
     const popoverProps = useMemo(() => merge(omit(data, ['image', 'href', 'buttonLabel']), rest), [data, rest]);
 
-    if (!shouldEnableInformationalPopovers) {
+    if (!hideDisable && !shouldEnableInformationalPopovers) {
       return children;
     }
 

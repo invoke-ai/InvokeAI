@@ -1,6 +1,5 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
 import { Box, Combobox, Flex, FormControl, FormLabel, Image, Tooltip } from '@invoke-ai/ui-library';
-import { optionOrAltSymbol } from '@storybook/manager-api';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase, SingleValueProps } from 'chakra-react-select';
 import { chakraComponents } from 'chakra-react-select';
@@ -97,7 +96,7 @@ const ParamMainModelSelect = () => {
               menuIsOpen={true}
               value={value}
               placeholder={placeholder}
-              options={optionOrAltSymbol}
+              options={options}
               onChange={onChange}
               noOptionsMessage={noOptionsMessage}
               isInvalid={value?.isDisabled}
@@ -112,10 +111,7 @@ const ParamMainModelSelect = () => {
               menuIsOpen={true}
               value={value}
               placeholder={placeholder}
-              options={options.map((opt) => ({
-                ...opt,
-                icon: <Image src={commercialLicenseIcon} />,
-              }))}
+              options={options}
               onChange={onChange}
               noOptionsMessage={noOptionsMessage}
               isInvalid={value?.isDisabled}
