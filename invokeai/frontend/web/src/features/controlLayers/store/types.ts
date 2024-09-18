@@ -1,8 +1,11 @@
 import type { SerializableObject } from 'common/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import type { AspectRatioState } from 'features/parameters/components/Bbox/types';
-import type { ParameterHeight, ParameterLoRAModel, ParameterWidth } from 'features/parameters/types/parameterSchemas';
-import { zParameterNegativePrompt, zParameterPositivePrompt } from 'features/parameters/types/parameterSchemas';
+import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
+import {
+  zParameterImageDimension,
+  zParameterNegativePrompt,
+  zParameterPositivePrompt,
+} from 'features/parameters/types/parameterSchemas';
 import type { ImageDTO } from 'services/api/types';
 import { z } from 'zod';
 
@@ -217,20 +220,36 @@ export type BoundingBoxScaleMethod = z.infer<typeof zBoundingBoxScaleMethod>;
 export const isBoundingBoxScaleMethod = (v: unknown): v is BoundingBoxScaleMethod =>
   zBoundingBoxScaleMethod.safeParse(v).success;
 
-export type CanvasEntityState =
-  | CanvasRasterLayerState
-  | CanvasControlLayerState
-  | CanvasRegionalGuidanceState
-  | CanvasInpaintMaskState
-  | CanvasReferenceImageState;
+const zCanvasEntityState = z.discriminatedUnion('type', [
+  zCanvasRasterLayerState,
+  zCanvasControlLayerState,
+  zCanvasRegionalGuidanceState,
+  zCanvasInpaintMaskState,
+  zCanvasReferenceImageState,
+]);
+export type CanvasEntityState = z.infer<typeof zCanvasEntityState>;
 
-export type CanvasRenderableEntityState =
-  | CanvasRasterLayerState
-  | CanvasControlLayerState
-  | CanvasRegionalGuidanceState
-  | CanvasInpaintMaskState;
+const zCanvasRenderableEntityState = z.discriminatedUnion('type', [
+  zCanvasRasterLayerState,
+  zCanvasControlLayerState,
+  zCanvasRegionalGuidanceState,
+  zCanvasInpaintMaskState,
+]);
+export type CanvasRenderableEntityState = z.infer<typeof zCanvasRenderableEntityState>;
 
-export type CanvasEntityType = CanvasEntityState['type'];
+const zCanvasEntityType = z.union([
+  zCanvasRasterLayerState.shape.type,
+  zCanvasControlLayerState.shape.type,
+  zCanvasRegionalGuidanceState.shape.type,
+  zCanvasInpaintMaskState.shape.type,
+  zCanvasReferenceImageState.shape.type,
+]);
+export type CanvasEntityType = z.infer<typeof zCanvasEntityType>;
+
+export const zCanvasEntityIdentifer = z.object({
+  id: zId,
+  type: zCanvasEntityType,
+});
 export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
 
 export type LoRA = {
@@ -246,45 +265,55 @@ export type StagingAreaImage = {
   offsetY: number;
 };
 
-export type CanvasState = {
-  _version: 3;
-  selectedEntityIdentifier: CanvasEntityIdentifier | null;
-  bookmarkedEntityIdentifier: CanvasEntityIdentifier | null;
-  inpaintMasks: {
-    isHidden: boolean;
-    entities: CanvasInpaintMaskState[];
-  };
-  rasterLayers: {
-    isHidden: boolean;
-    entities: CanvasRasterLayerState[];
-  };
-  controlLayers: {
-    isHidden: boolean;
-    entities: CanvasControlLayerState[];
-  };
-  regionalGuidance: {
-    isHidden: boolean;
-    entities: CanvasRegionalGuidanceState[];
-  };
-  referenceImages: {
-    entities: CanvasReferenceImageState[];
-  };
-  bbox: {
-    rect: {
-      x: number;
-      y: number;
-      width: ParameterWidth;
-      height: ParameterHeight;
-    };
-    aspectRatio: AspectRatioState;
-    scaledSize: {
-      width: ParameterWidth;
-      height: ParameterHeight;
-    };
-    scaleMethod: BoundingBoxScaleMethod;
-    optimalDimension: number;
-  };
-};
+const zAspectRatioID = z.enum(['Free', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);
+export type AspectRatioID = z.infer<typeof zAspectRatioID>;
+export const isAspectRatioID = (v: string): v is AspectRatioID => zAspectRatioID.safeParse(v).success;
+
+const zCanvasState = z.object({
+  _version: z.literal(3),
+  selectedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
+  bookmarkedEntityIdentifier: zCanvasEntityIdentifer.nullable(),
+  inpaintMasks: z.object({
+    isHidden: z.boolean(),
+    entities: z.array(zCanvasInpaintMaskState),
+  }),
+  rasterLayers: z.object({
+    isHidden: z.boolean(),
+    entities: z.array(zCanvasRasterLayerState),
+  }),
+  controlLayers: z.object({
+    isHidden: z.boolean(),
+    entities: z.array(zCanvasControlLayerState),
+  }),
+  regionalGuidance: z.object({
+    isHidden: z.boolean(),
+    entities: z.array(zCanvasRegionalGuidanceState),
+  }),
+  referenceImages: z.object({
+    entities: z.array(zCanvasReferenceImageState),
+  }),
+  bbox: z.object({
+    rect: z.object({
+      x: z.number().int(),
+      y: z.number().int(),
+      width: zParameterImageDimension,
+      height: zParameterImageDimension,
+    }),
+    aspectRatio: z.object({
+      id: zAspectRatioID,
+      value: z.number().gt(0),
+      isLocked: z.boolean(),
+    }),
+    scaledSize: z.object({
+      width: zParameterImageDimension,
+      height: zParameterImageDimension,
+    }),
+    scaleMethod: zBoundingBoxScaleMethod,
+    optimalDimension: z.number().int().positive(),
+  }),
+});
+
+export type CanvasState = z.infer<typeof zCanvasState>;
 
 export type StageAttrs = {
   x: Coordinate['x'];
