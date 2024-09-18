@@ -476,9 +476,17 @@ class CheckpointProbeBase(ProbeBase):
     def get_variant_type(self) -> ModelVariantType:
         model_type = ModelProbe.get_model_type_from_checkpoint(self.model_path, self.checkpoint)
         base_type = self.get_base_type()
-        if model_type != ModelType.Main or base_type == BaseModelType.Flux:
+        if model_type != ModelType.Main:
             return ModelVariantType.Normal
         state_dict = self.checkpoint.get("state_dict") or self.checkpoint
+        if base_type == BaseModelType.Flux:
+            if (
+                "guidance_in.out_layer.weight" in state_dict
+                or "model.diffusion_model.guidance_in.out_layer.weight" in state_dict
+            ):
+                return ModelVariantType.Dev
+            else:
+                return ModelVariantType.Schnell
         in_channels = state_dict["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
         if in_channels == 9:
             return ModelVariantType.Inpaint

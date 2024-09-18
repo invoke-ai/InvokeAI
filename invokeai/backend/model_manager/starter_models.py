@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.model_manager.config import BaseModelType, ModelFormat, ModelType, ModelVariantType
 
 
 class StarterModelWithoutDependencies(BaseModel):
@@ -13,6 +13,7 @@ class StarterModelWithoutDependencies(BaseModel):
     type: ModelType
     format: Optional[ModelFormat] = None
     is_installed: bool = False
+    variant: Optional[ModelVariantType] = None
 
 
 class StarterModel(StarterModelWithoutDependencies):
@@ -96,6 +97,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/flux_schnell::transformer/bnb_nf4/flux1-schnell-bnb_nf4.safetensors",
         description="FLUX schnell transformer quantized to bitsandbytes NF4 format. Total size with dependencies: ~12GB",
         type=ModelType.Main,
+        variant=ModelVariantType.Schnell,
         dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
     ),
     StarterModel(
@@ -104,6 +106,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/flux_dev::transformer/bnb_nf4/flux1-dev-bnb_nf4.safetensors",
         description="FLUX dev transformer quantized to bitsandbytes NF4 format. Total size with dependencies: ~12GB",
         type=ModelType.Main,
+        variant=ModelVariantType.Dev,
         dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
     ),
     StarterModel(
@@ -112,6 +115,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/flux_schnell::transformer/base/flux1-schnell.safetensors",
         description="FLUX schnell transformer in bfloat16. Total size with dependencies: ~33GB",
         type=ModelType.Main,
+        variant=ModelVariantType.Schnell,
         dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
     ),
     StarterModel(
@@ -120,6 +124,7 @@ STARTER_MODELS: list[StarterModel] = [
         source="InvokeAI/flux_dev::transformer/base/flux1-dev.safetensors",
         description="FLUX dev transformer in bfloat16. Total size with dependencies: ~33GB",
         type=ModelType.Main,
+        variant=ModelVariantType.Dev,
         dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
     ),
     StarterModel(

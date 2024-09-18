@@ -98,6 +98,8 @@ class ModelVariantType(str, Enum):
     Normal = "normal"
     Inpaint = "inpaint"
     Depth = "depth"
+    Dev = "dev"
+    Schnell = "schnell"
 
 
 class ModelFormat(str, Enum):
