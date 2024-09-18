@@ -1,6 +1,6 @@
-import { IconButton, useDisclosure } from '@invoke-ai/ui-library';
-import { WorkflowLibraryModalContext } from 'features/workflowLibrary/context/WorkflowLibraryModalContext';
-import { memo } from 'react';
+import { IconButton } from '@invoke-ai/ui-library';
+import { $isWorkflowLibraryModalOpen } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFolderOpenBold } from 'react-icons/pi';
 
@@ -8,19 +8,22 @@ import WorkflowLibraryModal from './WorkflowLibraryModal';
 
 const WorkflowLibraryButton = () => {
   const { t } = useTranslation();
-  const disclosure = useDisclosure();
+
+  const onClick = useCallback(() => {
+    $isWorkflowLibraryModalOpen.set(true);
+  }, []);
 
   return (
-    <WorkflowLibraryModalContext.Provider value={disclosure}>
+    <>
       <IconButton
         aria-label={t('workflows.workflowLibrary')}
         tooltip={t('workflows.workflowLibrary')}
         icon={<PiFolderOpenBold />}
-        onClick={disclosure.onOpen}
+        onClick={onClick}
         pointerEvents="auto"
       />
       <WorkflowLibraryModal />
-    </WorkflowLibraryModalContext.Provider>
+    </>
   );
 };
 
