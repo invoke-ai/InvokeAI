@@ -6,6 +6,7 @@ import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { canvasReset } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
@@ -1033,22 +1034,6 @@ export const canvasSlice = createSlice({
           break;
       }
     },
-    canvasReset: (state) => {
-      const newState = getInitialState();
-
-      // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
-      // from the old state, then recalculate the bbox size & scaled size.
-      newState.bbox.optimalDimension = state.bbox.optimalDimension;
-      const rect = calculateNewSize(
-        newState.bbox.aspectRatio.value,
-        newState.bbox.optimalDimension * newState.bbox.optimalDimension
-      );
-      newState.bbox.rect.width = rect.width;
-      newState.bbox.rect.height = rect.height;
-      syncScaledSize(newState);
-
-      return newState;
-    },
     canvasUndo: () => {},
     canvasRedo: () => {},
     canvasClearHistory: () => {},
@@ -1074,11 +1059,27 @@ export const canvasSlice = createSlice({
         syncScaledSize(state);
       }
     });
+
+    builder.addCase(canvasReset, (state) => {
+      const newState = getInitialState();
+
+      // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
+      // from the old state, then recalculate the bbox size & scaled size.
+      newState.bbox.optimalDimension = state.bbox.optimalDimension;
+      const rect = calculateNewSize(
+        newState.bbox.aspectRatio.value,
+        newState.bbox.optimalDimension * newState.bbox.optimalDimension
+      );
+      newState.bbox.rect.width = rect.width;
+      newState.bbox.rect.height = rect.height;
+      syncScaledSize(newState);
+
+      return newState;
+    });
   },
 });
 
 export const {
-  canvasReset,
   canvasUndo,
   canvasRedo,
   canvasClearHistory,
