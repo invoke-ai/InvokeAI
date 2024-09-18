@@ -108,15 +108,14 @@ class ImageMaskToTensorInvocation(BaseInvocation, WithMetadata):
     def invoke(self, context: InvocationContext) -> MaskOutput:
         image = context.images.get_pil(self.image.image_name)
         np_image = np.array(image)
-        
         # Handle different image modes
-        if image.mode == 'RGBA':
+        if image.mode == "RGBA":
             alpha_channel = np_image[:, :, 3]  # Extract alpha channel
-        elif image.mode == 'RGB':
+        elif image.mode == "RGB":
             # For RGB images, treat all non-black pixels as opaque.
             non_black_mask = np.any(np_image > 0, axis=2)  # True for any non-black pixels
             alpha_channel = non_black_mask.astype(np.uint8) * 255  # Convert to a mask of 0 or 255
-        elif image.mode == 'L':  # Grayscale images
+        elif image.mode == "L":  # Grayscale images
             alpha_channel = np_image  # Grayscale image, so we directly use it
         else:
             raise ValueError(f"Unsupported image mode: {image.mode}")
@@ -133,8 +132,6 @@ class ImageMaskToTensorInvocation(BaseInvocation, WithMetadata):
             height=mask.shape[1],
             width=mask.shape[2],
         )
-
-
 
 
 @invocation(
