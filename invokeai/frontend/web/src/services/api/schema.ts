@@ -12312,7 +12312,7 @@ export type components = {
          * @description Variant type.
          * @enum {string}
          */
-        ModelVariantType: "normal" | "inpaint" | "depth";
+        ModelVariantType: "normal" | "inpaint" | "depth" | "dev" | "schnell";
         /**
          * ModelsList
          * @description Return list of configs.
@@ -14834,6 +14834,7 @@ export type components = {
              * @default false
              */
             is_installed?: boolean;
+            variant?: components["schemas"]["ModelVariantType"] | null;
             /** Dependencies */
             dependencies?: components["schemas"]["StarterModelWithoutDependencies"][] | null;
         };
@@ -14853,6 +14854,7 @@ export type components = {
              * @default false
              */
             is_installed?: boolean;
+            variant?: components["schemas"]["ModelVariantType"] | null;
         };
         /**
          * Step Param Easing

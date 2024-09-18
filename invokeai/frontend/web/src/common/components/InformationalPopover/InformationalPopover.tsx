@@ -29,6 +29,7 @@ import { OPEN_DELAY, POPOVER_DATA, POPPER_MODIFIERS } from './constants';
 type Props = {
   feature: Feature;
   inPortal?: boolean;
+  hideDisable?: boolean;
   children: ReactElement;
 };
 
@@ -37,48 +38,51 @@ const selectShouldEnableInformationalPopovers = createSelector(
   (system) => system.shouldEnableInformationalPopovers
 );
 
-export const InformationalPopover = memo(({ feature, children, inPortal = true, ...rest }: Props) => {
-  const shouldEnableInformationalPopovers = useAppSelector(selectShouldEnableInformationalPopovers);
+export const InformationalPopover = memo(
+  ({ feature, children, inPortal = true, hideDisable = false, ...rest }: Props) => {
+    const shouldEnableInformationalPopovers = useAppSelector(selectShouldEnableInformationalPopovers);
 
-  const data = useMemo(() => POPOVER_DATA[feature], [feature]);
+    const data = useMemo(() => POPOVER_DATA[feature], [feature]);
 
-  const popoverProps = useMemo(() => merge(omit(data, ['image', 'href', 'buttonLabel']), rest), [data, rest]);
+    const popoverProps = useMemo(() => merge(omit(data, ['image', 'href', 'buttonLabel']), rest), [data, rest]);
 
-  if (!shouldEnableInformationalPopovers) {
-    return children;
+    if (!shouldEnableInformationalPopovers) {
+      return children;
+    }
+
+    return (
+      <Popover
+        isLazy
+        closeOnBlur={false}
+        trigger="hover"
+        variant="informational"
+        openDelay={OPEN_DELAY}
+        modifiers={POPPER_MODIFIERS}
+        placement="top"
+        {...popoverProps}
+      >
+        <PopoverTrigger>{children}</PopoverTrigger>
+        {inPortal ? (
+          <Portal>
+            <Content data={data} feature={feature} hideDisable={hideDisable} />
+          </Portal>
+        ) : (
+          <Content data={data} feature={feature} hideDisable={hideDisable} />
+        )}
+      </Popover>
+    );
   }
-
-  return (
-    <Popover
-      isLazy
-      closeOnBlur={false}
-      trigger="hover"
-      variant="informational"
-      openDelay={OPEN_DELAY}
-      modifiers={POPPER_MODIFIERS}
-      placement="top"
-      {...popoverProps}
-    >
-      <PopoverTrigger>{children}</PopoverTrigger>
-      {inPortal ? (
-        <Portal>
-          <Content data={data} feature={feature} />
-        </Portal>
-      ) : (
-        <Content data={data} feature={feature} />
-      )}
-    </Popover>
-  );
-});
+);
 
 InformationalPopover.displayName = 'InformationalPopover';
 
 type ContentProps = {
   data?: PopoverData;
   feature: Feature;
+  hideDisable: boolean;
 };
 
-const Content = ({ data, feature }: ContentProps) => {
+const Content = ({ data, feature, hideDisable }: ContentProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const heading = useMemo<string | undefined>(() => t(`popovers.${feature}.heading`), [feature, t]);
@@ -120,14 +124,7 @@ const Content = ({ data, feature }: ContentProps) => {
           )}
           {data?.image && (
             <>
-              <Image
-                objectFit="contain"
-                maxW="60%"
-                maxH="60%"
-                backgroundColor="white"
-                src={data.image}
-                alt="Optional Image"
-              />
+              <Image objectFit="contain" backgroundColor="white" src={data.image} alt="Optional Image" />
               <Divider />
             </>
           )}
@@ -137,9 +134,11 @@ const Content = ({ data, feature }: ContentProps) => {
 
           <Divider />
           <Flex alignItems="center" justifyContent="space-between" w="full">
-            <Button onClick={onClickDontShowMeThese} variant="link" size="sm">
-              {t('common.dontShowMeThese')}
-            </Button>
+            {!hideDisable && (
+              <Button onClick={onClickDontShowMeThese} variant="link" size="sm">
+                {t('common.dontShowMeThese')}
+              </Button>
+            )}
             <Spacer />
             {data?.href && (
               <Button onClick={onClickLearnMore} leftIcon={<PiArrowSquareOutBold />} variant="link" size="sm">
