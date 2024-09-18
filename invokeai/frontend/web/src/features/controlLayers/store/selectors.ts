@@ -191,9 +191,9 @@ export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
 export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
   // These are in the same order as they are displayed in the list!
   return [
+    ...state.referenceImages.entities.toReversed(),
     ...state.inpaintMasks.entities.toReversed(),
     ...state.regionalGuidance.entities.toReversed(),
-    ...state.referenceImages.entities.toReversed(),
     ...state.controlLayers.entities.toReversed(),
     ...state.rasterLayers.entities.toReversed(),
   ];
