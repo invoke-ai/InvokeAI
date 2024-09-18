@@ -103,7 +103,7 @@ class ImageMaskToTensorInvocation(BaseInvocation, WithMetadata):
 
     image: ImageField = InputField(description="The mask image to convert.")
     cutoff: int = InputField(ge=0, le=255, description="Cutoff (<)", default=128)
-    invert: bool = InputField(default=False, descimription="Whether to invert the mask.")
+    invert: bool = InputField(default=False, description="Whether to invert the mask.")
 
     def invoke(self, context: InvocationContext) -> MaskOutput:
         image = context.images.get_pil(self.image.image_name)
