@@ -29,13 +29,33 @@ import type { ImageDTO } from 'services/api/types';
  * Gets the number of images per row in the gallery by grabbing their DOM elements.
  */
 const getImagesPerRow = (): number => {
-  const widthOfGalleryImage =
-    document.querySelector(`.${GALLERY_IMAGE_CLASS_NAME}`)?.getBoundingClientRect().width ?? 1;
+  const imageEl = document.querySelector(`.${GALLERY_IMAGE_CLASS_NAME}`);
+  const gridEl = document.querySelector(`.${GALLERY_GRID_CLASS_NAME}`);
 
-  const widthOfGalleryGrid = document.querySelector(`.${GALLERY_GRID_CLASS_NAME}`)?.getBoundingClientRect().width ?? 0;
+  if (!imageEl || !gridEl) {
+    return 0;
+  }
 
-  const imagesPerRow = Math.round(widthOfGalleryGrid / widthOfGalleryImage);
-  return imagesPerRow
+  const container = gridEl.parentElement;
+  if (!container) {
+    return 0;
+  }
+
+  const imageRect = imageEl.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+
+  const gridElStyle = window.getComputedStyle(gridEl);
+  const gap = parseFloat(gridElStyle.gap);
+
+  // Validate input values
+  if (imageRect.width <= 0 || gap < 0) {
+    return 0;
+  }
+
+  // Calculate maximum number of images per row
+  const imagesPerRow = Math.floor((containerRect.width + 1) / (imageRect.width + gap));
+
+  return imagesPerRow;
 };
 
 /**
