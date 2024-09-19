@@ -1,4 +1,5 @@
 import { getArbitraryBaseColor } from '@invoke-ai/ui-library';
+import { $authToken } from 'app/store/nanostores/authToken';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
@@ -94,6 +95,7 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
       this.konva.patternRect.fillPatternImage(this.checkboardPattern);
       this.render();
     };
+    this.checkboardPattern.src = $authToken.get() ? 'use-credentials' : 'anonymous';
     this.checkboardPattern.src = this.config.CHECKERBOARD_PATTERN_DATAURL;
     this.render();
   };
