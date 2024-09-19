@@ -13,6 +13,7 @@ import type { GenerationMode, Rect } from 'features/controlLayers/store/types';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
+import type { UploadOptions } from 'services/api/endpoints/images';
 import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
@@ -149,10 +150,13 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * If the hash of the composite raster layer is found in the cache, the cached image DTO is returned.
    *
    * @param rect The region to include in the rasterized image
-   * @param saveToGallery Whether to save the image to the gallery or just return the uploaded image DTO
+   * @param options Options for uploading the image
    * @returns A promise that resolves to the uploaded image DTO
    */
-  rasterizeAndUploadCompositeRasterLayer = async (rect: Rect, saveToGallery: boolean): Promise<ImageDTO> => {
+  rasterizeAndUploadCompositeRasterLayer = async (
+    rect: Rect,
+    options: Pick<UploadOptions, 'is_intermediate' | 'metadata'>
+  ): Promise<ImageDTO> => {
     this.log.trace({ rect }, 'Rasterizing composite raster layer');
 
     assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
@@ -178,8 +182,9 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         blob,
         fileName: 'composite-raster-layer.png',
         image_category: 'general',
-        is_intermediate: !saveToGallery,
-        board_id: saveToGallery ? selectAutoAddBoardId(this.manager.store.getState()) : undefined,
+        is_intermediate: options.is_intermediate,
+        board_id: options.is_intermediate ? undefined : selectAutoAddBoardId(this.manager.store.getState()),
+        metadata: options.metadata,
       })
     );
     this.$isUploading.set(false);
@@ -212,7 +217,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       }
     }
 
-    imageDTO = await this.rasterizeAndUploadCompositeRasterLayer(rect, false);
+    imageDTO = await this.rasterizeAndUploadCompositeRasterLayer(rect, { is_intermediate: true });
     this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
     return imageDTO;
   };
