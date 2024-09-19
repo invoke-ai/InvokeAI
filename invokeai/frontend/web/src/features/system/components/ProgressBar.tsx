@@ -21,7 +21,7 @@ const ProgressBar = () => {
 
   const colorScheme = useMemo(() => {
     if (destination === 'canvas') {
-      return 'invokePurple';
+      return 'invokeGreen';
     } else if (destination === 'gallery') {
       return 'invokeBlue';
     } else {
