@@ -296,7 +296,7 @@ finding and fixing three problems that can arise over time:
    into the database.
    
 3. The thumbnail for an image is missing, again causing a black
-   gallery thumbnail. This is fixed by running the "thumbnaiils"
+   gallery thumbnail. This is fixed by running the "thumbnails"
    operation, which simply regenerates and re-registers the missing
    thumbnail.
    

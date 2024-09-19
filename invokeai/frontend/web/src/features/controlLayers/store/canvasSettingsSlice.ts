@@ -9,12 +9,6 @@ type CanvasSettingsState = {
    */
   showHUD: boolean;
   /**
-   * Whether to automatically save canvas generations to the gallery.
-   *
-   * When `sendToCanvas` is disabled, this setting is ignored, and images are always saved to the gallery.
-   */
-  autoSave: boolean;
-  /**
    * Whether to clip lines and shapes to the generation bounding box. If disabled, lines and shapes will be clipped to
    * the canvas bounds.
    */
@@ -72,10 +66,13 @@ type CanvasSettingsState = {
    * Whether to preserve the masked region instead of inpainting it.
    */
   preserveMask: boolean;
+  /**
+   * Whether to show only raster layers while staging.
+   */
+  showOnlyRasterLayersWhileStaging: boolean;
 };
 
 const initialState: CanvasSettingsState = {
-  autoSave: false,
   showHUD: true,
   clipToBbox: false,
   dynamicGrid: false,
@@ -90,6 +87,7 @@ const initialState: CanvasSettingsState = {
   showProgressOnCanvas: true,
   bboxOverlay: false,
   preserveMask: false,
+  showOnlyRasterLayersWhileStaging: true,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -101,9 +99,6 @@ export const canvasSettingsSlice = createSlice({
     },
     settingsDynamicGridToggled: (state) => {
       state.dynamicGrid = !state.dynamicGrid;
-    },
-    settingsAutoSaveToggled: (state) => {
-      state.autoSave = !state.autoSave;
     },
     settingsShowHUDToggled: (state) => {
       state.showHUD = !state.showHUD;
@@ -141,12 +136,14 @@ export const canvasSettingsSlice = createSlice({
     settingsPreserveMaskToggled: (state) => {
       state.preserveMask = !state.preserveMask;
     },
+    settingsShowOnlyRasterLayersWhileStagingToggled: (state) => {
+      state.showOnlyRasterLayersWhileStaging = !state.showOnlyRasterLayersWhileStaging;
+    },
   },
 });
 
 export const {
   settingsClipToBboxChanged,
-  settingsAutoSaveToggled,
   settingsDynamicGridToggled,
   settingsShowHUDToggled,
   settingsBrushWidthChanged,
@@ -160,6 +157,7 @@ export const {
   settingsShowProgressOnCanvasToggled,
   settingsBboxOverlayToggled,
   settingsPreserveMaskToggled,
+  settingsShowOnlyRasterLayersWhileStagingToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -178,7 +176,6 @@ export const selectCanvasSettingsSlice = (s: RootState) => s.canvasSettings;
 const createCanvasSettingsSelector = <T>(selector: Selector<CanvasSettingsState, T>) =>
   createSelector(selectCanvasSettingsSlice, selector);
 
-export const selectAutoSave = createCanvasSettingsSelector((settings) => settings.autoSave);
 export const selectPreserveMask = createCanvasSettingsSelector((settings) => settings.preserveMask);
 export const selectOutputOnlyMaskedRegions = createCanvasSettingsSelector(
   (settings) => settings.outputOnlyMaskedRegions
@@ -191,4 +188,7 @@ export const selectSnapToGrid = createCanvasSettingsSelector((settings) => setti
 export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.sendToCanvas);
 export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
   (canvasSettings) => canvasSettings.showProgressOnCanvas
+);
+export const selectShowOnlyRasterLayersWhileStaging = createCanvasSettingsSelector(
+  (canvasSettings) => canvasSettings.showOnlyRasterLayersWhileStaging
 );

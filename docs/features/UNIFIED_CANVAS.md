@@ -232,7 +232,7 @@ clarity on the intent and common use cases we expect for utilizing them.
 ### Compositing / Seam Correction
 
 When doing Inpainting or Outpainting, Invoke needs to merge the pixels generated
-by Stable Diffusion into your existing image. This is achieved through compositing - the area around the the boundary between your image and the new generation is
+by Stable Diffusion into your existing image. This is achieved through compositing - the area around the boundary between your image and the new generation is
 automatically blended to produce a seamless output. In a fully automatic
 process, a mask is generated to cover the boundary, and then the area of the boundary is
 Inpainted.
@@ -242,13 +242,13 @@ help to alter the parameters that control the Compositing. A larger blur and
 a blur setting  have been noted as producing
 consistently strong results . Strength of 0.7 is best for reducing hard seams.
 
-- **Mode** - What part of the image will have the the Compositing applied to it.
+- **Mode** - What part of the image will have the Compositing applied to it.
   - **Mask edge** will apply Compositing to the edge of the masked area
   - **Mask** will apply Compositing to the entire masked area
   - **Unmasked** will apply Compositing to the entire image
 - **Steps** - Number of generation steps that will occur during the Coherence Pass, similar to Denoising Steps. Higher step counts will generally have better results.
 - **Strength** - How much noise is added for the Coherence Pass, similar to Denoising Strength. A strength of 0 will result in an unchanged image, while a strength of 1 will result in an image with a completely new area as defined by the Mode setting.
-- **Blur** - Adjusts the pixel radius of the the mask. A larger blur radius will cause the mask to extend past the visibly masked area, while too small of a blur radius will result in a mask that is smaller than the visibly masked area.
+- **Blur** - Adjusts the pixel radius of the mask. A larger blur radius will cause the mask to extend past the visibly masked area, while too small of a blur radius will result in a mask that is smaller than the visibly masked area.
 - **Blur Method** - The method of blur applied to the masked area. 
 
 

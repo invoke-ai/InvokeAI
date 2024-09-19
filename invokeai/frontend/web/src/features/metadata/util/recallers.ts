@@ -1,5 +1,5 @@
 import { getStore } from 'app/store/nanostores/store';
-import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
+import { bboxHeightChanged, bboxWidthChanged, canvasMetadataRecalled } from 'features/controlLayers/store/canvasSlice';
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
   negativePrompt2Changed,
@@ -22,7 +22,7 @@ import {
   t5EncoderModelSelected,
   vaeSelected,
 } from 'features/controlLayers/store/paramsSlice';
-import type { LoRA } from 'features/controlLayers/store/types';
+import type { CanvasMetadata, LoRA } from 'features/controlLayers/store/types';
 import { setHrfEnabled, setHrfMethod, setHrfStrength } from 'features/hrf/store/hrfSlice';
 import type { MetadataRecallFunc } from 'features/metadata/types';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -175,6 +175,22 @@ const recallAllLoRAs: MetadataRecallFunc<LoRA[]> = (loras) => {
   });
 };
 
+const recallCanvasV2Metadata: MetadataRecallFunc<CanvasMetadata> = (canvasMetadata) => {
+  if (
+    canvasMetadata.controlLayers.length === 0 &&
+    canvasMetadata.rasterLayers.length === 0 &&
+    canvasMetadata.inpaintMasks.length === 0 &&
+    canvasMetadata.referenceImages.length === 0 &&
+    canvasMetadata.regionalGuidance.length === 0
+  ) {
+    // Nothing to recall
+    return;
+  }
+
+  const { dispatch } = getStore();
+  dispatch(canvasMetadataRecalled(canvasMetadata));
+};
+
 export const recallers = {
   positivePrompt: recallPositivePrompt,
   negativePrompt: recallNegativePrompt,
@@ -203,4 +219,5 @@ export const recallers = {
   lora: recallLoRA,
   loras: recallAllLoRAs,
   t5EncoderModel: recallT5Encoder,
+  canvasV2Metadata: recallCanvasV2Metadata,
 } as const;

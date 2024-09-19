@@ -1,13 +1,17 @@
 import { useStore } from '@nanostores/react';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $activeScopes } from 'common/hooks/interactionScopes';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { $canvasRightPanelTab } from 'features/controlLayers/store/ephemeral';
+import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { $isRightPanelOpen } from 'features/ui/store/uiSlice';
 import { computed } from 'nanostores';
-import { useHotkeys } from 'react-hotkeys-hook';
+import { useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
 const $leftRightHotkeysEnabled = computed($activeScopes, (activeScopes) => {
@@ -26,10 +30,23 @@ const $upDownHotkeysEnabled = computed([$activeScopes, $isRightPanelOpen], (acti
 export const useGalleryHotkeys = () => {
   useAssertSingleton('useGalleryHotkeys');
   const { goNext, goPrev, isNextEnabled, isPrevEnabled } = useGalleryPagination();
+  const dispatch = useAppDispatch();
+  const selection = useAppSelector((s) => s.gallery.selection);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const queryResult = useListImagesQuery(queryArgs);
   const leftRightHotkeysEnabled = useStore($leftRightHotkeysEnabled);
   const upDownHotkeysEnabled = useStore($upDownHotkeysEnabled);
+  const canvasRightPanelTab = useStore($canvasRightPanelTab);
+  const appTab = useAppSelector(selectActiveTab);
+
+  // When we are on the canvas tab, we need to disable the delete hotkey when the user is focused on the layers tab in
+  // the right hand panel, because the same hotkey is used to delete layers.
+  const isDeleteEnabledByTab = useMemo(() => {
+    if (appTab !== 'canvas') {
+      return true;
+    }
+    return canvasRightPanelTab === 'gallery';
+  }, [appTab, canvasRightPanelTab]);
 
   const {
     handleLeftImage,
@@ -42,57 +59,160 @@ export const useGalleryHotkeys = () => {
     isOnLastImageOfView,
   } = useGalleryNavigation();
 
-  useHotkeys(
-    ['left', 'alt+left'],
-    (e) => {
+  useRegisteredHotkeys({
+    id: 'galleryNavLeft',
+    category: 'gallery',
+    callback: () => {
       if (isOnFirstImageOfView && isPrevEnabled && !queryResult.isFetching) {
-        goPrev(e.altKey ? 'alt+arrow' : 'arrow');
+        goPrev('arrow');
         return;
       }
-      handleLeftImage(e.altKey);
+      handleLeftImage(false);
     },
-    { preventDefault: true, enabled: leftRightHotkeysEnabled },
-    [handleLeftImage, isOnFirstImageOfView, goPrev, isPrevEnabled, queryResult.isFetching, leftRightHotkeysEnabled]
-  );
+    options: { preventDefault: true, enabled: leftRightHotkeysEnabled },
+    dependencies: [
+      handleLeftImage,
+      isOnFirstImageOfView,
+      goPrev,
+      isPrevEnabled,
+      queryResult.isFetching,
+      leftRightHotkeysEnabled,
+    ],
+  });
 
-  useHotkeys(
-    ['right', 'alt+right'],
-    (e) => {
+  useRegisteredHotkeys({
+    id: 'galleryNavRight',
+    category: 'gallery',
+    callback: () => {
       if (isOnLastImageOfView && isNextEnabled && !queryResult.isFetching) {
-        goNext(e.altKey ? 'alt+arrow' : 'arrow');
+        goNext('arrow');
         return;
       }
       if (!isOnLastImageOfView) {
-        handleRightImage(e.altKey);
+        handleRightImage(false);
       }
     },
-    { preventDefault: true, enabled: leftRightHotkeysEnabled },
-    [isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage, leftRightHotkeysEnabled]
-  );
+    options: { preventDefault: true, enabled: leftRightHotkeysEnabled },
+    dependencies: [
+      isOnLastImageOfView,
+      goNext,
+      isNextEnabled,
+      queryResult.isFetching,
+      handleRightImage,
+      leftRightHotkeysEnabled,
+    ],
+  });
 
-  useHotkeys(
-    ['up', 'alt+up'],
-    (e) => {
+  useRegisteredHotkeys({
+    id: 'galleryNavUp',
+    category: 'gallery',
+    callback: () => {
       if (isOnFirstRow && isPrevEnabled && !queryResult.isFetching) {
-        goPrev(e.altKey ? 'alt+arrow' : 'arrow');
+        goPrev('arrow');
         return;
       }
-      handleUpImage(e.altKey);
+      handleUpImage(false);
     },
-    { preventDefault: true, enabled: upDownHotkeysEnabled },
-    [handleUpImage, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching, upDownHotkeysEnabled]
-  );
+    options: { preventDefault: true, enabled: upDownHotkeysEnabled },
+    dependencies: [handleUpImage, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching, upDownHotkeysEnabled],
+  });
 
-  useHotkeys(
-    ['down', 'alt+down'],
-    (e) => {
+  useRegisteredHotkeys({
+    id: 'galleryNavDown',
+    category: 'gallery',
+    callback: () => {
       if (isOnLastRow && isNextEnabled && !queryResult.isFetching) {
-        goNext(e.altKey ? 'alt+arrow' : 'arrow');
+        goNext('arrow');
         return;
       }
-      handleDownImage(e.altKey);
+      handleDownImage(false);
     },
-    { preventDefault: true, enabled: upDownHotkeysEnabled },
-    [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage, upDownHotkeysEnabled]
-  );
+    options: { preventDefault: true, enabled: upDownHotkeysEnabled },
+    dependencies: [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage, upDownHotkeysEnabled],
+  });
+
+  useRegisteredHotkeys({
+    id: 'galleryNavLeftAlt',
+    category: 'gallery',
+    callback: () => {
+      if (isOnFirstImageOfView && isPrevEnabled && !queryResult.isFetching) {
+        goPrev('alt+arrow');
+        return;
+      }
+      handleLeftImage(true);
+    },
+    options: { preventDefault: true, enabled: leftRightHotkeysEnabled },
+    dependencies: [
+      handleLeftImage,
+      isOnFirstImageOfView,
+      goPrev,
+      isPrevEnabled,
+      queryResult.isFetching,
+      leftRightHotkeysEnabled,
+    ],
+  });
+
+  useRegisteredHotkeys({
+    id: 'galleryNavRightAlt',
+    category: 'gallery',
+    callback: () => {
+      if (isOnLastImageOfView && isNextEnabled && !queryResult.isFetching) {
+        goNext('alt+arrow');
+        return;
+      }
+      if (!isOnLastImageOfView) {
+        handleRightImage(true);
+      }
+    },
+    options: { preventDefault: true, enabled: leftRightHotkeysEnabled },
+    dependencies: [
+      isOnLastImageOfView,
+      goNext,
+      isNextEnabled,
+      queryResult.isFetching,
+      handleRightImage,
+      leftRightHotkeysEnabled,
+    ],
+  });
+
+  useRegisteredHotkeys({
+    id: 'galleryNavUpAlt',
+    category: 'gallery',
+    callback: () => {
+      if (isOnFirstRow && isPrevEnabled && !queryResult.isFetching) {
+        goPrev('alt+arrow');
+        return;
+      }
+      handleUpImage(true);
+    },
+    options: { preventDefault: true, enabled: upDownHotkeysEnabled },
+    dependencies: [handleUpImage, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching, upDownHotkeysEnabled],
+  });
+
+  useRegisteredHotkeys({
+    id: 'galleryNavDownAlt',
+    category: 'gallery',
+    callback: () => {
+      if (isOnLastRow && isNextEnabled && !queryResult.isFetching) {
+        goNext('alt+arrow');
+        return;
+      }
+      handleDownImage(true);
+    },
+    options: { preventDefault: true, enabled: upDownHotkeysEnabled },
+    dependencies: [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage, upDownHotkeysEnabled],
+  });
+
+  useRegisteredHotkeys({
+    id: 'deleteSelection',
+    category: 'gallery',
+    callback: () => {
+      if (!selection.length) {
+        return;
+      }
+      dispatch(imagesToDeleteSelected(selection));
+    },
+    options: { enabled: leftRightHotkeysEnabled && isDeleteEnabledByTab },
+    dependencies: [leftRightHotkeysEnabled, isDeleteEnabledByTab],
+  });
 };

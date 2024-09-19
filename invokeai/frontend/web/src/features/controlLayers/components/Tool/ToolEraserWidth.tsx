@@ -19,10 +19,11 @@ import {
   selectCanvasSettingsSlice,
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { clamp } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
@@ -71,6 +72,7 @@ const sliderDefaultValue = mapRawValueToSliderValue(50);
 export const ToolEraserWidth = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const imageViewer = useImageViewer();
   const isSelected = useToolIsSelected('eraser');
   const width = useAppSelector(selectEraserWidth);
   const [localValue, setLocalValue] = useState(width);
@@ -130,8 +132,20 @@ export const ToolEraserWidth = memo(() => {
     setLocalValue(width);
   }, [width]);
 
-  useHotkeys('[', decrement, { enabled: isSelected }, [decrement, isSelected]);
-  useHotkeys(']', increment, { enabled: isSelected }, [increment, isSelected]);
+  useRegisteredHotkeys({
+    id: 'incrementToolWidth',
+    category: 'canvas',
+    callback: decrement,
+    options: { enabled: isSelected && !imageViewer.isOpen },
+    dependencies: [decrement, isSelected, imageViewer.isOpen],
+  });
+  useRegisteredHotkeys({
+    id: 'incrementToolWidth',
+    category: 'canvas',
+    callback: increment,
+    options: { enabled: isSelected && !imageViewer.isOpen },
+    dependencies: [increment, isSelected, imageViewer.isOpen],
+  });
 
   return (
     <Popover>
@@ -139,6 +153,7 @@ export const ToolEraserWidth = memo(() => {
         <FormLabel m={0}>{t('controlLayers.width')}</FormLabel>
         <PopoverAnchor>
           <NumberInput
+            variant="outline"
             display="flex"
             alignItems="center"
             min={1}

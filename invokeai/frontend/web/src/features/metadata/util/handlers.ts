@@ -285,6 +285,12 @@ export const handlers = {
     itemValidator: validators.lora,
     renderItemValue: renderLoRAValue,
   }),
+
+  canvasV2Metadata: buildHandlers({
+    getLabel: () => t('metadata.canvasV2Metadata'),
+    parser: parsers.canvasV2Metadata,
+    recaller: recallers.canvasV2Metadata,
+  }),
 } as const;
 
 type ParsedValue = Awaited<ReturnType<(typeof handlers)[keyof typeof handlers]['parse']>>;

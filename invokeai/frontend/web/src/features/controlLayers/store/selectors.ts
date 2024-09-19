@@ -1,5 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
+import { selectShowOnlyRasterLayersWhileStaging } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type {
   CanvasControlLayerState,
@@ -7,10 +9,12 @@ import type {
   CanvasEntityState,
   CanvasEntityType,
   CanvasInpaintMaskState,
+  CanvasMetadata,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasState,
 } from 'features/controlLayers/store/types';
+import { isRasterLayerEntityIdentifier } from 'features/controlLayers/store/types';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { assert } from 'tsafe';
 
@@ -188,9 +192,9 @@ export function selectAllEntitiesOfType<T extends CanvasEntityState['type']>(
 export function selectAllEntities(state: CanvasState): CanvasEntityState[] {
   // These are in the same order as they are displayed in the list!
   return [
+    ...state.referenceImages.entities.toReversed(),
     ...state.inpaintMasks.entities.toReversed(),
     ...state.regionalGuidance.entities.toReversed(),
-    ...state.referenceImages.entities.toReversed(),
     ...state.controlLayers.entities.toReversed(),
     ...state.rasterLayers.entities.toReversed(),
   ];
@@ -269,7 +273,7 @@ const selectRegionalGuidanceIsHidden = createSelector(selectCanvasSlice, (canvas
 /**
  * Returns the hidden selector for the given entity type.
  */
-export const getIsHiddenSelector = (type: CanvasEntityType) => {
+const getSelectIsTypeHidden = (type: CanvasEntityType) => {
   switch (type) {
     case 'raster_layer':
       return selectRasterLayersIsHidden;
@@ -284,7 +288,57 @@ export const getIsHiddenSelector = (type: CanvasEntityType) => {
   }
 };
 
+/**
+ * Builds a selector taht selects if the entity is hidden.
+ */
+export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdentifier) => {
+  const selectIsTypeHidden = getSelectIsTypeHidden(entityIdentifier.type);
+  return createSelector(
+    [selectCanvasSlice, selectIsTypeHidden, selectIsStaging, selectShowOnlyRasterLayersWhileStaging],
+    (canvas, isTypeHidden, isStaging, showOnlyRasterLayersWhileStaging) => {
+      const entity = selectEntity(canvas, entityIdentifier);
+
+      // An entity is hidden if:
+      // - The entity type is hidden
+      // - The entity is disabled
+      // - The entity is not a raster layer and we are staging and the option to show only raster layers is enabled
+      if (!entity) {
+        return true;
+      }
+      if (isTypeHidden) {
+        return true;
+      }
+      if (!entity.isEnabled) {
+        return true;
+      }
+      if (isStaging && showOnlyRasterLayersWhileStaging) {
+        // When staging, we only show raster layers. This allows the user to easily see how the new generation fits in
+        // with the rest of the canvas without the masks and control layers getting in the way.
+        return !isRasterLayerEntityIdentifier(entityIdentifier);
+      }
+
+      return false;
+    }
+  );
+};
+
 export const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);
 export const selectHeight = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.height);
 export const selectAspectRatioID = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.id);
 export const selectAspectRatioValue = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.value);
+export const selectScaledSize = createSelector(selectBbox, (bbox) => bbox.scaledSize);
+export const selectScaleMethod = createSelector(selectBbox, (bbox) => bbox.scaleMethod);
+
+export const selectCanvasMetadata = createSelector(
+  selectCanvasSlice,
+  (canvas): { canvas_v2_metadata: CanvasMetadata } => {
+    const canvas_v2_metadata: CanvasMetadata = {
+      referenceImages: selectAllEntitiesOfType(canvas, 'reference_image'),
+      controlLayers: selectAllEntitiesOfType(canvas, 'control_layer'),
+      inpaintMasks: selectAllEntitiesOfType(canvas, 'inpaint_mask'),
+      rasterLayers: selectAllEntitiesOfType(canvas, 'raster_layer'),
+      regionalGuidance: selectAllEntitiesOfType(canvas, 'regional_guidance'),
+    };
+    return { canvas_v2_metadata };
+  }
+);

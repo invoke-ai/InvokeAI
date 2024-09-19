@@ -1,4 +1,6 @@
+import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
+import type { RootState } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
@@ -7,7 +9,7 @@ import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/Ca
 import type { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getIsHiddenSelector, selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import { buildEntityIsHiddenSelector, selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, CanvasRenderableEntityState, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom, computed } from 'nanostores';
@@ -72,6 +74,8 @@ export abstract class CanvasEntityAdapterBase<
    * Gets a hashable representation of the entity's state.
    */
   abstract getHashableState: () => SerializableObject;
+
+  private _selectIsHidden: Selector<RootState, boolean> | null = null;
 
   /**
    * The Konva nodes that make up the entity adapter:
@@ -149,13 +153,13 @@ export abstract class CanvasEntityAdapterBase<
      * - The entity's opacity/visibility
      * - The entity's transformer interaction state, which will show/hide the entity's selection outline
      */
-    this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(getIsHiddenSelector(this.entityIdentifier.type), (isHidden) => {
-        this.$isHidden.set(isHidden);
-        this.syncOpacity();
-        this.transformer.syncInteractionState();
-      })
-    );
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsHidden, this.syncVisibility));
+
+    /**
+     * The tool preview may need to be updated when the entity is locked or disabled. For example, when we disable the
+     * entity, we should hide the tool preview & change the cursor.
+     */
+    this.subscriptions.add(this.$isInteractable.subscribe(this.manager.tool.render));
   }
 
   /**
@@ -166,12 +170,21 @@ export abstract class CanvasEntityAdapterBase<
     (canvas) => selectEntity(canvas, this.entityIdentifier) as T | undefined
   );
 
+  // This must be a getter because the selector depends on the entityIdentifier, which is set in the constructor.
+  get selectIsHidden() {
+    if (!this._selectIsHidden) {
+      this._selectIsHidden = buildEntityIsHiddenSelector(this.entityIdentifier);
+    }
+    return this._selectIsHidden;
+  }
+
   initialize = async () => {
     this.log.debug('Initializing module');
     await this.sync(this.manager.stateApi.runSelector(this.selectState), undefined);
     this.transformer.initialize();
     await this.renderer.initialize();
     this.syncZIndices();
+    this.syncVisibility();
   };
 
   syncZIndices = () => {
@@ -222,6 +235,12 @@ export abstract class CanvasEntityAdapterBase<
    */
   syncOpacity = () => {
     this.renderer.updateOpacity();
+  };
+
+  syncVisibility = () => {
+    const isHidden = this.manager.stateApi.runSelector(this.selectIsHidden);
+    this.$isHidden.set(isHidden);
+    this.konva.layer.visible(!isHidden);
   };
 
   /**

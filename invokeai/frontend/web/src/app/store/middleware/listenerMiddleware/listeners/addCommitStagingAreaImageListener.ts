@@ -1,7 +1,8 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { canvasReset, rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
+import { canvasReset } from 'features/controlLayers/store/actions';
+import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import { stagingAreaImageAccepted, stagingAreaReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';

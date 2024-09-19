@@ -3,12 +3,13 @@ import { defaultLoRAConfig } from 'features/controlLayers/store/lorasSlice';
 import type {
   CanvasControlLayerState,
   CanvasInpaintMaskState,
+  CanvasMetadata,
   CanvasRasterLayerState,
   CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   LoRA,
 } from 'features/controlLayers/store/types';
-import { zCanvasRasterLayerState } from 'features/controlLayers/store/types';
+import { zCanvasMetadata, zCanvasRasterLayerState } from 'features/controlLayers/store/types';
 import {
   imageDTOToImageWithDims,
   initialControlNet,
@@ -396,6 +397,11 @@ const parseLayer: MetadataParseFunc<
   | CanvasInpaintMaskState
 > = (metadataItem) => zCanvasRasterLayerState.parseAsync(metadataItem);
 
+const parseCanvasV2Metadata: MetadataParseFunc<CanvasMetadata> = async (metadata) => {
+  const metadataItem = await getProperty(metadata, 'canvas_v2_metadata', undefined);
+  return zCanvasMetadata.parseAsync(metadataItem);
+};
+
 const parseLayers: MetadataParseFunc<
   (
     | CanvasRasterLayerState
@@ -660,4 +666,5 @@ export const parsers = {
   ipAdapterToIPAdapterLayer: parseIPAdapterToIPAdapterLayer,
   layer: parseLayer,
   layers: parseLayers,
+  canvasV2Metadata: parseCanvasV2Metadata,
 } as const;

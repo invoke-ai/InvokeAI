@@ -5,8 +5,9 @@ import {
   selectSelectedEntityIdentifier,
 } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useCallback, useEffect, useState } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 
 export const useCanvasEntityQuickSwitchHotkey = () => {
   const dispatch = useAppDispatch();
@@ -14,6 +15,7 @@ export const useCanvasEntityQuickSwitchHotkey = () => {
   const [current, setCurrent] = useState<CanvasEntityIdentifier | null>(null);
   const selected = useAppSelector(selectSelectedEntityIdentifier);
   const bookmarked = useAppSelector(selectBookmarkedEntityIdentifier);
+  const imageViewer = useImageViewer();
 
   // Update prev and current when selected entity changes
   useEffect(() => {
@@ -43,5 +45,11 @@ export const useCanvasEntityQuickSwitchHotkey = () => {
     }
   }, [bookmarked, current, dispatch, prev]);
 
-  useHotkeys('q', onQuickSwitch);
+  useRegisteredHotkeys({
+    id: 'quickSwitch',
+    category: 'canvas',
+    callback: onQuickSwitch,
+    options: { enabled: !imageViewer.isOpen },
+    dependencies: [onQuickSwitch, imageViewer.isOpen],
+  });
 };

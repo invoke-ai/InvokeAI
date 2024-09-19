@@ -441,7 +441,7 @@ export const getEmptyRect = (): Rect => {
   return { x: 0, y: 0, width: 0, height: 0 };
 };
 
-export function snapToNearest(value: number, candidateValues: number[], threshold: number): number {
+export function snapToNearest(value: number, candidateValues: number[], threshold: number = Infinity): number {
   let closest = value;
   let minDiff = Number.MAX_VALUE;
 

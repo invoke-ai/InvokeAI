@@ -1,7 +1,8 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiRectangleBold } from 'react-icons/pi';
 
@@ -9,8 +10,15 @@ export const ToolRectButton = memo(() => {
   const { t } = useTranslation();
   const isSelected = useToolIsSelected('rect');
   const selectRect = useSelectTool('rect');
+  const imageViewer = useImageViewer();
 
-  useHotkeys('u', selectRect, { enabled: !isSelected }, [isSelected, selectRect]);
+  useRegisteredHotkeys({
+    id: 'selectRectTool',
+    category: 'canvas',
+    callback: selectRect,
+    options: { enabled: !isSelected && !imageViewer.isOpen },
+    dependencies: [isSelected, selectRect, imageViewer.isOpen],
+  });
 
   return (
     <IconButton

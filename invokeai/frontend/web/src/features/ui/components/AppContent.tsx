@@ -7,6 +7,7 @@ import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
 import QueueControls from 'features/queue/components/QueueControls';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import FloatingGalleryButton from 'features/ui/components/FloatingGalleryButton';
 import FloatingParametersPanelButtons from 'features/ui/components/FloatingParametersPanelButtons';
 import ParametersPanelTextToImage from 'features/ui/components/ParametersPanels/ParametersPanelTextToImage';
@@ -29,7 +30,6 @@ import {
 } from 'features/ui/store/uiSlice';
 import type { CSSProperties } from 'react';
 import { memo, useMemo, useRef } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -61,7 +61,13 @@ export const AppContent = memo(() => {
     []
   );
   const leftPanel = usePanel(leftPanelUsePanelOptions);
-  useHotkeys(['t', 'o'], leftPanel.toggle, { enabled: withLeftPanel }, [leftPanel.toggle, withLeftPanel]);
+  useRegisteredHotkeys({
+    id: 'toggleLeftPanel',
+    category: 'app',
+    callback: leftPanel.toggle,
+    options: { enabled: withLeftPanel },
+    dependencies: [leftPanel.toggle, withLeftPanel],
+  });
 
   const withRightPanel = useAppSelector(selectWithRightPanel);
   const rightPanelUsePanelOptions = useMemo<UsePanelOptions>(
@@ -77,19 +83,27 @@ export const AppContent = memo(() => {
     []
   );
   const rightPanel = usePanel(rightPanelUsePanelOptions);
-  useHotkeys('g', rightPanel.toggle, { enabled: withRightPanel }, [rightPanel.toggle, withRightPanel]);
+  useRegisteredHotkeys({
+    id: 'toggleRightPanel',
+    category: 'app',
+    callback: rightPanel.toggle,
+    options: { enabled: withRightPanel },
+    dependencies: [rightPanel.toggle, withRightPanel],
+  });
 
-  useHotkeys(
-    'shift+r',
-    () => {
+  useRegisteredHotkeys({
+    id: 'resetPanelLayout',
+    category: 'app',
+    callback: () => {
       leftPanel.reset();
       rightPanel.reset();
     },
-    [leftPanel.reset, rightPanel.reset]
-  );
-  useHotkeys(
-    'f',
-    () => {
+    dependencies: [leftPanel.reset, rightPanel.reset],
+  });
+  useRegisteredHotkeys({
+    id: 'togglePanels',
+    category: 'app',
+    callback: () => {
       if (leftPanel.isCollapsed || rightPanel.isCollapsed) {
         leftPanel.expand();
         rightPanel.expand();
@@ -98,20 +112,20 @@ export const AppContent = memo(() => {
         rightPanel.collapse();
       }
     },
-    [
+    dependencies: [
       leftPanel.isCollapsed,
       rightPanel.isCollapsed,
       leftPanel.expand,
       rightPanel.expand,
       leftPanel.collapse,
       rightPanel.collapse,
-    ]
-  );
+    ],
+  });
 
   return (
     <Flex ref={ref} id="invoke-app-tabs" w="full" h="full" gap={4} p={4}>
       <VerticalNavBar />
-      <Flex position="relative" w="full" h="full" gap={4}>
+      <Flex position="relative" w="full" h="full" gap={4} minW={0}>
         <PanelGroup
           ref={panelGroupRef}
           id="app-panel-group"

@@ -146,7 +146,11 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
             self._lock.acquire()
             self._cursor.execute(
                 """--sql
-                SELECT COUNT(*) FROM board_images WHERE board_id = ?;
+                SELECT COUNT(*)
+                FROM board_images
+                INNER JOIN images ON board_images.image_name = images.image_name
+                WHERE images.is_intermediate = FALSE
+                AND board_images.board_id = ?;
                 """,
                 (board_id,),
             )

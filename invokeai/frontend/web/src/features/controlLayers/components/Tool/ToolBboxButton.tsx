@@ -1,7 +1,8 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold } from 'react-icons/pi';
 
@@ -9,8 +10,15 @@ export const ToolBboxButton = memo(() => {
   const { t } = useTranslation();
   const selectBbox = useSelectTool('bbox');
   const isSelected = useToolIsSelected('bbox');
+  const imageViewer = useImageViewer();
 
-  useHotkeys('c', selectBbox, { enabled: !isSelected }, [selectBbox, isSelected]);
+  useRegisteredHotkeys({
+    id: 'selectBboxTool',
+    category: 'canvas',
+    callback: selectBbox,
+    options: { enabled: !isSelected && !imageViewer.isOpen },
+    dependencies: [selectBbox, isSelected, imageViewer.isOpen],
+  });
 
   return (
     <IconButton

@@ -423,6 +423,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
           />
         ),
       });
+    } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
+      // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
+      $lastProgressEvent.set(null);
     }
   });
 
