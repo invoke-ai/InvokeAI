@@ -1,4 +1,5 @@
 import { MenuGroup, MenuItem } from '@invoke-ai/ui-library';
+import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import {
   useNewControlLayerFromBbox,
   useNewGlobalReferenceImageFromBbox,
@@ -10,7 +11,7 @@ import {
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFloppyDiskBold, PiStackPlusFill } from 'react-icons/pi';
+import { PiFloppyDiskBold } from 'react-icons/pi';
 
 export const CanvasContextMenuGlobalMenuItems = memo(() => {
   const { t } = useTranslation();
@@ -33,16 +34,16 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
         </MenuItem>
       </MenuGroup>
       <MenuGroup title={t('controlLayers.canvasContextMenu.bboxGroup')}>
-        <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={newGlobalReferenceImageFromBbox}>
+        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newGlobalReferenceImageFromBbox}>
           {t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
         </MenuItem>
-        <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={newRegionalReferenceImageFromBbox}>
+        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newRegionalReferenceImageFromBbox}>
           {t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
         </MenuItem>
-        <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={newControlLayerFromBbox}>
+        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newControlLayerFromBbox}>
           {t('controlLayers.canvasContextMenu.newControlLayer')}
         </MenuItem>
-        <MenuItem icon={<PiStackPlusFill />} isDisabled={isBusy} onClick={newRasterLayerFromBbox}>
+        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newRasterLayerFromBbox}>
           {t('controlLayers.canvasContextMenu.newRasterLayer')}
         </MenuItem>
       </MenuGroup>
