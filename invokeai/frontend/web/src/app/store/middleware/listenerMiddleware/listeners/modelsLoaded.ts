@@ -3,12 +3,13 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import {
-  bboxHeightChanged,
-  bboxWidthChanged,
+  bboxOptimalDimensionChanged,
+  bboxSyncedToOptimalDimension,
   controlLayerModelChanged,
   referenceImageIPAdapterModelChanged,
   rgIPAdapterModelChanged,
 } from 'features/controlLayers/store/canvasSlice';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import {
   clipEmbedModelSelected,
@@ -20,10 +21,9 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
-import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
-import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
@@ -95,15 +95,11 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     const result = zParameterModel.safeParse(defaultModelInList);
     if (result.success) {
       dispatch(modelChanged({ model: defaultModelInList, previousModel: currentModel }));
-      const { bbox } = selectCanvasSlice(state);
-      const optimalDimension = getOptimalDimension(defaultModelInList);
-      if (getIsSizeOptimal(bbox.rect.width, bbox.rect.height, optimalDimension)) {
-        return;
+      // When staging, we don't want to change the bbox, but we must keep the optimal dimension in sync.
+      dispatch(bboxOptimalDimensionChanged({ optimalDimension: getOptimalDimension(defaultModelInList) }));
+      if (!selectIsStaging(state)) {
+        dispatch(bboxSyncedToOptimalDimension());
       }
-      const { width, height } = calculateNewSize(bbox.aspectRatio.value, optimalDimension * optimalDimension);
-
-      dispatch(bboxWidthChanged({ width }));
-      dispatch(bboxHeightChanged({ height }));
       return;
     }
   }
@@ -116,6 +112,11 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   }
 
   dispatch(modelChanged({ model: result.data, previousModel: currentModel }));
+  // When staging, we don't want to change the bbox, but we must keep the optimal dimension in sync.
+  dispatch(bboxOptimalDimensionChanged({ optimalDimension: getOptimalDimension(result.data) }));
+  if (!selectIsStaging(state)) {
+    dispatch(bboxSyncedToOptimalDimension());
+  }
 };
 
 const handleRefinerModels: ModelHandler = (models, state, dispatch, _log) => {
