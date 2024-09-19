@@ -15,6 +15,7 @@ import {
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasInpaintMaskState,
+  CanvasMetadata,
   FillStyle,
   RegionalGuidanceReferenceImageState,
   RgbColor,
@@ -1036,6 +1037,16 @@ export const canvasSlice = createSlice({
           break;
       }
     },
+    canvasMetadataRecalled: (state, action: PayloadAction<CanvasMetadata>) => {
+      const newState = resetState(state);
+      const { controlLayers, inpaintMasks, rasterLayers, referenceImages, regionalGuidance } = action.payload;
+      newState.controlLayers.entities = controlLayers;
+      newState.inpaintMasks.entities = inpaintMasks;
+      newState.rasterLayers.entities = rasterLayers;
+      newState.referenceImages.entities = referenceImages;
+      newState.regionalGuidance.entities = regionalGuidance;
+      return newState;
+    },
     canvasUndo: () => {},
     canvasRedo: () => {},
     canvasClearHistory: () => {},
@@ -1063,25 +1074,30 @@ export const canvasSlice = createSlice({
     });
 
     builder.addCase(canvasReset, (state) => {
-      const newState = getInitialState();
-
-      // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
-      // from the old state, then recalculate the bbox size & scaled size.
-      newState.bbox.optimalDimension = state.bbox.optimalDimension;
-      const rect = calculateNewSize(
-        newState.bbox.aspectRatio.value,
-        newState.bbox.optimalDimension * newState.bbox.optimalDimension
-      );
-      newState.bbox.rect.width = rect.width;
-      newState.bbox.rect.height = rect.height;
-      syncScaledSize(newState);
-
-      return newState;
+      return resetState(state);
     });
   },
 });
 
+const resetState = (state: CanvasState) => {
+  const newState = getInitialState();
+
+  // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
+  // from the old state, then recalculate the bbox size & scaled size.
+  newState.bbox.optimalDimension = state.bbox.optimalDimension;
+  const rect = calculateNewSize(
+    newState.bbox.aspectRatio.value,
+    newState.bbox.optimalDimension * newState.bbox.optimalDimension
+  );
+  newState.bbox.rect.width = rect.width;
+  newState.bbox.rect.height = rect.height;
+  syncScaledSize(newState);
+
+  return newState;
+};
+
 export const {
+  canvasMetadataRecalled,
   canvasUndo,
   canvasRedo,
   canvasClearHistory,
