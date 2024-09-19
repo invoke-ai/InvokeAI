@@ -94,11 +94,12 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('canvas', 'selectBboxTool', ['c']);
     addHotkey('canvas', 'decrementToolWidth', ['[']);
     addHotkey('canvas', 'incrementToolWidth', [']']);
-    addHotkey('canvas', 'selectColorPickerTool', ['i']);
     addHotkey('canvas', 'selectEraserTool', ['e']);
     addHotkey('canvas', 'selectMoveTool', ['v']);
     addHotkey('canvas', 'selectRectTool', ['r']);
     addHotkey('canvas', 'selectViewTool', ['h']);
+    addHotkey('canvas', 'selectColorPickerTool', ['i']);
+    addHotkey('canvas', 'setFillToWhite', ['d']);
     addHotkey('canvas', 'fitLayersToCanvas', ['r']);
     addHotkey('canvas', 'setZoomTo100Percent', ['alt+r']);
     addHotkey('canvas', 'quickSwitch', ['q']);
