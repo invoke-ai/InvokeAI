@@ -6,7 +6,6 @@ import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
-import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
   selectAllEntitiesOfType,
@@ -15,6 +14,7 @@ import {
 } from 'features/controlLayers/store/selectors';
 import type {
   CanvasInpaintMaskState,
+  CanvasMetadata,
   FillStyle,
   RegionalGuidanceReferenceImageState,
   RgbColor,
@@ -24,7 +24,7 @@ import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
 import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants';
-import { getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { getIsSizeOptimal } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import { merge, omit } from 'lodash-es';
 import type { UndoableOptions } from 'redux-undo';
@@ -748,6 +748,22 @@ export const canvasSlice = createSlice({
 
       syncScaledSize(state);
     },
+    bboxOptimalDimensionChanged: (state, action: PayloadAction<{ optimalDimension: number }>) => {
+      // When staging, we don't want to change the bbox, but we must keep the optimal dimension in sync.
+      // This action does the syncing. `bboxSyncedToOptimalDimension` below will actually change the bbox,
+      // and is only called when we are not staging.
+      const { optimalDimension } = action.payload;
+      state.bbox.optimalDimension = optimalDimension;
+    },
+    bboxSyncedToOptimalDimension: (state) => {
+      const { optimalDimension } = state.bbox;
+      if (!getIsSizeOptimal(state.bbox.rect.width, state.bbox.rect.height, optimalDimension)) {
+        const bboxDims = calculateNewSize(state.bbox.aspectRatio.value, optimalDimension * optimalDimension);
+        state.bbox.rect.width = bboxDims.width;
+        state.bbox.rect.height = bboxDims.height;
+        syncScaledSize(state);
+      }
+    },
     //#region Shared entity
     entitySelected: (state, action: PayloadAction<EntityIdentifierPayload>) => {
       const { entityIdentifier } = action.payload;
@@ -1036,52 +1052,46 @@ export const canvasSlice = createSlice({
           break;
       }
     },
+    canvasMetadataRecalled: (state, action: PayloadAction<CanvasMetadata>) => {
+      const newState = resetState(state);
+      const { controlLayers, inpaintMasks, rasterLayers, referenceImages, regionalGuidance } = action.payload;
+      newState.controlLayers.entities = controlLayers;
+      newState.inpaintMasks.entities = inpaintMasks;
+      newState.rasterLayers.entities = rasterLayers;
+      newState.referenceImages.entities = referenceImages;
+      newState.regionalGuidance.entities = regionalGuidance;
+      return newState;
+    },
     canvasUndo: () => {},
     canvasRedo: () => {},
     canvasClearHistory: () => {},
   },
   extraReducers(builder) {
-    builder.addCase(modelChanged, (state, action) => {
-      const { model, previousModel } = action.payload;
-
-      // If the model base changes (e.g. SD1.5 -> SDXL), we need to change a few things
-      if (model === null || previousModel?.base === model.base) {
-        return;
-      }
-
-      // Update the bbox size to match the new model's optimal size
-      const optimalDimension = getOptimalDimension(model);
-
-      state.bbox.optimalDimension = optimalDimension;
-
-      if (!getIsSizeOptimal(state.bbox.rect.width, state.bbox.rect.height, optimalDimension)) {
-        const bboxDims = calculateNewSize(state.bbox.aspectRatio.value, optimalDimension * optimalDimension);
-        state.bbox.rect.width = bboxDims.width;
-        state.bbox.rect.height = bboxDims.height;
-        syncScaledSize(state);
-      }
-    });
-
     builder.addCase(canvasReset, (state) => {
-      const newState = getInitialState();
-
-      // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
-      // from the old state, then recalculate the bbox size & scaled size.
-      newState.bbox.optimalDimension = state.bbox.optimalDimension;
-      const rect = calculateNewSize(
-        newState.bbox.aspectRatio.value,
-        newState.bbox.optimalDimension * newState.bbox.optimalDimension
-      );
-      newState.bbox.rect.width = rect.width;
-      newState.bbox.rect.height = rect.height;
-      syncScaledSize(newState);
-
-      return newState;
+      return resetState(state);
     });
   },
 });
 
+const resetState = (state: CanvasState) => {
+  const newState = getInitialState();
+
+  // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
+  // from the old state, then recalculate the bbox size & scaled size.
+  newState.bbox.optimalDimension = state.bbox.optimalDimension;
+  const rect = calculateNewSize(
+    newState.bbox.aspectRatio.value,
+    newState.bbox.optimalDimension * newState.bbox.optimalDimension
+  );
+  newState.bbox.rect.width = rect.width;
+  newState.bbox.rect.height = rect.height;
+  syncScaledSize(newState);
+
+  return newState;
+};
+
 export const {
+  canvasMetadataRecalled,
   canvasUndo,
   canvasRedo,
   canvasClearHistory,
@@ -1119,6 +1129,8 @@ export const {
   bboxAspectRatioIdChanged,
   bboxDimensionsSwapped,
   bboxSizeOptimized,
+  bboxOptimalDimensionChanged,
+  bboxSyncedToOptimalDimension,
   // Raster layers
   rasterLayerAdded,
   // rasterLayerRecalled,
@@ -1197,6 +1209,11 @@ export const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> =
   filter: (action, _state, _history) => {
     // Ignore all actions from other slices
     if (!action.type.startsWith(canvasSlice.name)) {
+      return false;
+    }
+    if (bboxOptimalDimensionChanged.match(action)) {
+      // This action is not triggered by the user. it's dispatched when the model is changed and will have no visible
+      // effect on the canvas.
       return false;
     }
     // Throttle rapid actions of the same type

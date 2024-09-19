@@ -154,6 +154,12 @@ export abstract class CanvasEntityAdapterBase<
      * - The entity's transformer interaction state, which will show/hide the entity's selection outline
      */
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsHidden, this.syncVisibility));
+
+    /**
+     * The tool preview may need to be updated when the entity is locked or disabled. For example, when we disable the
+     * entity, we should hide the tool preview & change the cursor.
+     */
+    this.subscriptions.add(this.$isInteractable.subscribe(this.manager.tool.render));
   }
 
   /**

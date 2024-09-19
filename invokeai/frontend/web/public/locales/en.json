@@ -456,11 +456,23 @@
             },
             "fitLayersToCanvas": {
                 "title": "Fit Layers to Canvas",
-                "desc": "Scales and positions the view to fit all visible layers."
+                "desc": "Scale and position the view to fit all visible layers."
             },
             "setZoomTo100Percent": {
-                "title": "Reset Zoom",
-                "desc": "Resets the canvas zoom to 100%."
+                "title": "Zoom to 100%",
+                "desc": "Set the canvas zoom to 100%."
+            },
+            "setZoomTo200Percent": {
+                "title": "Zoom to 200%",
+                "desc": "Set the canvas zoom to 200%."
+            },
+            "setZoomTo400Percent": {
+                "title": "Zoom to 400%",
+                "desc": "Set the canvas zoom to 400%."
+            },
+            "setZoomTo800Percent": {
+                "title": "Zoom to 800%",
+                "desc": "Set the canvas zoom to 800%."
             },
             "quickSwitch": {
                 "title": "Layer Quick Switch",
@@ -479,7 +491,7 @@
                 "desc": "Undo the last canvas action."
             },
             "redo": {
-                "title": "redo",
+                "title": "Redo",
                 "desc": "Redo the last canvas action."
             },
             "nextEntity": {
@@ -489,6 +501,10 @@
             "prevEntity": {
                 "title": "Prev Layer",
                 "desc": "Select the previous layer in the list."
+            },
+            "setFillToWhite": {
+                "title": "Set Color to White",
+                "desc": "Set the current tool color to white."
             }
         },
         "workflows": {
@@ -925,7 +941,8 @@
         "prototypeDesc": "This invocation is a prototype. It may have breaking changes during app updates and may be removed at any time.",
         "imageAccessError": "Unable to find image {{image_name}}, resetting to default",
         "boardAccessError": "Unable to find board {{board_id}}, resetting to default",
-        "modelAccessError": "Unable to find model {{key}}, resetting to default"
+        "modelAccessError": "Unable to find model {{key}}, resetting to default",
+        "saveToGallery": "Save To Gallery"
     },
     "parameters": {
         "aspect": "Aspect",
@@ -1711,11 +1728,13 @@
         "referenceImage": "Reference Image",
         "regionalReferenceImage": "Regional Reference Image",
         "globalReferenceImage": "Global Reference Image",
-        "sendingToCanvas": "Sending to Canvas",
-        "sendingToGallery": "Sending to Gallery",
+        "sendingToCanvas": "Staging Generations on Canvas",
+        "sendingToGallery": "Sending Generations to Gallery",
         "sendToGallery": "Send To Gallery",
         "sendToGalleryDesc": "Pressing Invoke generates and saves a unique image to your gallery.",
         "sendToCanvas": "Send To Canvas",
+        "newLayerFromImage": "New Layer from Image",
+        "newCanvasFromImage": "New Canvas from Image",
         "copyToClipboard": "Copy to Clipboard",
         "sendToCanvasDesc": "Pressing Invoke stages your work in progress on the canvas.",
         "viewProgressInViewer": "View progress and outputs in the <Btn>Image Viewer</Btn>.",

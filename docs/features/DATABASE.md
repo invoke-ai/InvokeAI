@@ -8,7 +8,7 @@ Invoke uses a SQLite database to store image, workflow, model, and execution dat
 
 We take great care to ensure your data is safe, by utilizing transactions and a database migration system.
 
-Even so, when testing an prerelease version of the app, we strongly suggest either backing up your database or using an in-memory database. This ensures any prelease hiccups or databases schema changes will not cause problems for your data.
+Even so, when testing a prerelease version of the app, we strongly suggest either backing up your database or using an in-memory database. This ensures any prelease hiccups or databases schema changes will not cause problems for your data.
 
 ## Database Backup
 

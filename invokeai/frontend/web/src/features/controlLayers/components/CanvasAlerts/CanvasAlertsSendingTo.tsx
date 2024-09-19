@@ -11,6 +11,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   selectCanvasRightPanelGalleryTab,
   selectCanvasRightPanelLayersTab,
@@ -82,7 +83,11 @@ const ActivateCanvasButton = (props: PropsWithChildren) => {
 export const CanvasAlertsSendingToCanvas = () => {
   const { t } = useTranslation();
   const destination = useCurrentDestination();
+  const isStaging = useAppSelector(selectIsStaging);
   const isVisible = useMemo(() => {
+    if (isStaging) {
+      return true;
+    }
     if (!destination) {
       return false;
     }
@@ -92,7 +97,7 @@ export const CanvasAlertsSendingToCanvas = () => {
     }
 
     return true;
-  }, [destination]);
+  }, [destination, isStaging]);
 
   return (
     <AlertWrapper

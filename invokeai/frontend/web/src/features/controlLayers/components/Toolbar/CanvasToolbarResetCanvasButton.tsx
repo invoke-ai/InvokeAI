@@ -21,7 +21,8 @@ export const CanvasToolbarResetCanvasButton = memo(() => {
       onClick={onClick}
       colorScheme="error"
       icon={<PiTrashBold />}
-      variant="ghost"
+      variant="link"
+      alignSelf="stretch"
     />
   );
 });

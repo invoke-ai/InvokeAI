@@ -1,5 +1,6 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   setCfgRescaleMultiplier,
   setCfgScale,
@@ -96,13 +97,15 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           }
         }
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
-        if (width) {
+
+        const isStaging = selectIsStaging(getState());
+        if (!isStaging && width) {
           if (isParameterWidth(width)) {
             dispatch(bboxWidthChanged({ width, ...setSizeOptions }));
           }
         }
 
-        if (height) {
+        if (!isStaging && height) {
           if (isParameterHeight(height)) {
             dispatch(bboxHeightChanged({ height, ...setSizeOptions }));
           }

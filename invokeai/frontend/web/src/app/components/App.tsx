@@ -1,4 +1,6 @@
 import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
+import type { StudioDestination } from 'app/hooks/useHandleStudioDestination';
+import { useHandleStudioDestination } from 'app/hooks/useHandleStudioDestination';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
@@ -21,8 +23,6 @@ import RefreshAfterResetModal from 'features/system/components/SettingsModal/Ref
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
-import { setActiveTab } from 'features/ui/store/uiSlice';
-import type { TabName } from 'features/ui/store/uiTypes';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
@@ -45,7 +45,7 @@ interface Props {
   };
   selectedWorkflowId?: string;
   selectedStylePresetId?: string;
-  destination?: TabName;
+  studioDestination?: StudioDestination;
 }
 
 const App = ({
@@ -53,7 +53,7 @@ const App = ({
   selectedImage,
   selectedWorkflowId,
   selectedStylePresetId,
-  destination,
+  studioDestination,
 }: Props) => {
   const language = useAppSelector(selectLanguage);
   const logger = useLogger('system');
@@ -65,6 +65,8 @@ const App = ({
   useGlobalModifiersInit();
   useGlobalHotkeys();
   useGetOpenAPISchemaQuery();
+
+  const handleStudioDestination = useHandleStudioDestination();
 
   const { dropzone, isHandlingUpload, setIsHandlingUpload } = useFullscreenDropzone();
 
@@ -100,10 +102,10 @@ const App = ({
   }, [dispatch, selectedStylePresetId]);
 
   useEffect(() => {
-    if (destination) {
-      dispatch(setActiveTab(destination));
+    if (studioDestination) {
+      handleStudioDestination(studioDestination);
     }
-  }, [dispatch, destination]);
+  }, [handleStudioDestination, studioDestination]);
 
   useEffect(() => {
     dispatch(appStarted());

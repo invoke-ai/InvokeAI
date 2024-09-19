@@ -70,7 +70,7 @@ Each image also has a context menu (ctrl+click / right-click).
 - ***Use Prompt **** this will load only the image's text prompts into the left-hand control panel
 - ***Use Seed **** this will load only the image's Seed into the left-hand control panel
 - ***Use All **** this will load all of the image's generation information into the left-hand control panel
-- ***Send to Image to Image*** this will put the image into the left-hand panel in the Image to Image tab ana automatically open it
+- ***Send to Image to Image*** this will put the image into the left-hand panel in the Image to Image tab and automatically open it
 - ***Send to Unified Canvas*** This will (bold)replace whatever is already present(bold) in the Unified Canvas tab with the image and automatically open the tab
 - ***Change Board*** this will oipen a small window that will let you move the image to a different board. This is the same as dragging the image to that board's thumbnail.
 - ***Star Image*** this will add the image to the board's list of starred images that are always kept at the top of the gallery. This is the same as clicking on the star on the top right-hand side of the image that appears when you hover over the image with the mouse

@@ -1,6 +1,6 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { type CanvasState, isCanvasImageState } from 'features/controlLayers/store/types';
+import type { CanvasState } from 'features/controlLayers/store/types';
 import { selectDeleteImageModalSlice } from 'features/deleteImageModal/store/slice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState } from 'features/nodes/store/types';
@@ -26,15 +26,15 @@ export const getImageUsage = (nodes: NodesState, canvas: CanvasState, upscale: U
   );
 
   const isRasterLayerImage = canvas.rasterLayers.entities.some(({ objects }) =>
-    objects.some((obj) => isCanvasImageState(obj) && obj.image.image_name === image_name)
+    objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
   );
 
   const isControlLayerImage = canvas.controlLayers.entities.some(({ objects }) =>
-    objects.some((obj) => isCanvasImageState(obj) && obj.image.image_name === image_name)
+    objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
   );
 
   const isInpaintMaskImage = canvas.inpaintMasks.entities.some(({ objects }) =>
-    objects.some((obj) => isCanvasImageState(obj) && obj.image.image_name === image_name)
+    objects.some((obj) => obj.type === 'image' && obj.image.image_name === image_name)
   );
 
   const isRegionalGuidanceImage = canvas.regionalGuidance.entities.some(({ referenceImages }) =>
