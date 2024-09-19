@@ -5,10 +5,10 @@ import {
   Image,
   Popover,
   PopoverBody,
-  PopoverCloseButton,
   PopoverContent,
   PopoverHeader,
   PopoverTrigger,
+  Text,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { shouldShowNotificationIndicatorChanged } from 'features/ui/store/uiSlice';
@@ -16,6 +16,7 @@ import InvokeSymbol from 'public/assets/images/invoke-favicon.png';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiLightbulbFilamentBold } from 'react-icons/pi';
+import { useGetAppVersionQuery } from 'services/api/endpoints/appInfo';
 
 import { CanvasV2Announcement } from './CanvasV2Announcement';
 
@@ -26,6 +27,11 @@ export const Notifications = () => {
   const resetIndicator = useCallback(() => {
     dispatch(shouldShowNotificationIndicatorChanged(false));
   }, [dispatch]);
+  const { data } = useGetAppVersionQuery();
+
+  if (!data) {
+    return null;
+  }
 
   return (
     <Popover onOpen={resetIndicator} placement="top-start">
@@ -56,6 +62,7 @@ export const Notifications = () => {
           <Flex alignItems="center" gap={3}>
             <Image src={InvokeSymbol} boxSize={6} />
             {t('whatsNew.whatsNewInInvoke')}
+            <Text variant="subtext">{`v${data.version}`}</Text>
           </Flex>
         </PopoverHeader>
         <PopoverBody p={2}>
