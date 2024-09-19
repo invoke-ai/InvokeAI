@@ -27,17 +27,18 @@ import { Trans, useTranslation } from 'react-i18next';
 import { PiImageBold, PiPaintBrushBold } from 'react-icons/pi';
 
 const getSx = (padding: string | number): SystemStyleObject => ({
-  bg: 'invokeBlue.500',
+  bg: 'base.700',
   w: '72px',
+  cursor: 'pointer',
   '&[data-checked]': {
-    bg: 'invokePurple.300',
-    '.checked-bg-slider': {
+    '.thumb': {
       left: `calc(100% - ${padding})`,
       transform: 'translateX(-100%)',
+      bg: 'invokeGreen.300',
     },
     '.unchecked-icon': {
-      color: 'invokePurple.800',
-      opacity: 0,
+      color: 'base.50',
+      opacity: 0.4,
     },
     '.checked-icon': {
       color: 'base.900',
@@ -46,7 +47,7 @@ const getSx = (padding: string | number): SystemStyleObject => ({
   },
   '&[data-disabled]': {
     bg: 'base.700',
-    '.checked-bg-slider': {
+    '.thumb': {
       bg: 'base.500',
     },
     '.unchecked-icon': {
@@ -56,22 +57,20 @@ const getSx = (padding: string | number): SystemStyleObject => ({
       color: 'base.800',
     },
   },
-  '.checked-bg-slider': {
+  '.thumb': {
     transition: 'left 0.1s ease-in-out, transform 0.1s ease-in-out',
     left: padding,
     transform: 'translateX(0)',
-    bg: 'base.50',
+    bg: 'invokeBlue.400',
     shadow: 'md',
   },
   '.unchecked-icon': {
-    transition: 'all 0.15s ease-in-out',
     color: 'base.900',
     opacity: 1,
   },
   '.checked-icon': {
-    transition: 'all 0.15s ease-in-out',
-    color: 'invokeBlue.800',
-    opacity: 0,
+    color: 'base.50',
+    opacity: 0.4,
   },
 });
 
@@ -103,7 +102,7 @@ export const SendToToggle = memo(() => {
         <chakra.label {...htmlProps}>
           <Flex
             position="relative"
-            borderRadius="full"
+            borderRadius="base"
             alignItems="center"
             justifyContent="space-between"
             h="full"
@@ -113,7 +112,7 @@ export const SendToToggle = memo(() => {
             {...getCheckboxProps()}
           >
             <input {...getInputProps()} hidden />
-            <Box className="checked-bg-slider" position="absolute" borderRadius="full" w={10} top={gap} bottom={gap} />
+            <Box className="thumb" position="absolute" borderRadius="base" w={10} top={gap} bottom={gap} />
             <Flex w={10} h="full" alignItems="center" justifyContent="center" pos="relative">
               <Icon
                 className="unchecked-icon"
@@ -137,7 +136,12 @@ export const SendToToggle = memo(() => {
       </PopoverTrigger>
       <Portal>
         <PopoverContent maxW={296} p={2} bg="base.200" color="base.800">
-          <PopoverArrow bg="base.200" />
+          <PopoverArrow
+            bg="base.200"
+            left={sendToCanvas ? '18px !important' : '-18px !important'}
+            transitionProperty="all"
+            transitionDuration="0.2s"
+          />
           <PopoverBody>
             <TooltipContent sendToCanvas={sendToCanvas} isStaging={isStaging} />
           </PopoverBody>
