@@ -18,6 +18,8 @@ import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { $hasProgress, $isProgressFromCanvas } from 'services/events/stores';
 
 import ProgressImage from './ProgressImage';
+import { useHasImages } from '../../hooks/useHasImages';
+import { NoContentForViewer } from './NoContentForViewer';
 
 const CurrentImagePreview = () => {
   const { t } = useTranslation();
@@ -26,6 +28,8 @@ const CurrentImagePreview = () => {
   const hasDenoiseProgress = useStore($hasProgress);
   const isProgressFromCanvas = useStore($isProgressFromCanvas);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+
+  const hasImages = useHasImages();
 
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
 
@@ -72,7 +76,7 @@ const CurrentImagePreview = () => {
           isUploadDisabled={true}
           fitContainer
           useThumbailFallback
-          noContentFallback={<IAINoContentFallback icon={PiImageBold} label={t('gallery.noImageSelected')} />}
+          noContentFallback={<NoContentForViewer />}
           dataTestId="image-preview"
         />
       )}

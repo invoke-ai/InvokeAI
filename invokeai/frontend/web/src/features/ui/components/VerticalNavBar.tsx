@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiCubeBold, PiFlowArrowBold, PiFrameCornersBold, PiQueueBold } from 'react-icons/pi';
 
 import { TabButton } from './TabButton';
+import { Notifications } from './Notifications';
 
 export const VerticalNavBar = memo(() => {
   const { t } = useTranslation();
@@ -37,6 +38,7 @@ export const VerticalNavBar = memo(() => {
       </Flex>
       <Spacer />
       <StatusIndicator />
+      <Notifications />
       {customNavComponent ? customNavComponent : <SettingsMenu />}
     </Flex>
   );
