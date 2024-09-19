@@ -9,8 +9,8 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiCubeBold, PiFlowArrowBold, PiFrameCornersBold, PiQueueBold } from 'react-icons/pi';
 
-import { TabButton } from './TabButton';
 import { Notifications } from './Notifications';
+import { TabButton } from './TabButton';
 
 export const VerticalNavBar = memo(() => {
   const { t } = useTranslation();
