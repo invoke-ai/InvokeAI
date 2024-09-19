@@ -1,4 +1,5 @@
 import type { SerializableObject } from 'common/types';
+import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import {
@@ -6,17 +7,33 @@ import {
   zParameterNegativePrompt,
   zParameterPositivePrompt,
 } from 'features/parameters/types/parameterSchemas';
+import { getImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { z } from 'zod';
 
 const zId = z.string().min(1);
 const zName = z.string().min(1).nullable();
 
-const zImageWithDims = z.object({
-  image_name: z.string(),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
+const zServerValidatedModelIdentifierField = zModelIdentifierField.refine(async (modelIdentifier) => {
+  try {
+    await fetchModelConfigByIdentifier(modelIdentifier);
+    return true;
+  } catch {
+    return false;
+  }
 });
+
+const zImageWithDims = z
+  .object({
+    image_name: z.string(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  })
+  .refine(async (v) => {
+    const { image_name } = v;
+    const imageDTO = await getImageDTO(image_name);
+    return imageDTO !== null;
+  });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
 
 const zBeginEndStepPct = z
@@ -116,9 +133,8 @@ const zCanvasImageState = z.object({
   image: zImageWithDims,
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
-export const isCanvasImageState = (v: unknown): v is CanvasImageState => zCanvasImageState.safeParse(v).success;
 
-const zCanvasObjectState = z.discriminatedUnion('type', [
+const zCanvasObjectState = z.union([
   zCanvasImageState,
   zCanvasBrushLineState,
   zCanvasEraserLineState,
@@ -129,7 +145,7 @@ export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
 const zIPAdapterConfig = z.object({
   type: z.literal('ip_adapter'),
   image: zImageWithDims.nullable(),
-  model: zModelIdentifierField.nullable(),
+  model: zServerValidatedModelIdentifierField.nullable(),
   weight: z.number().gte(-1).lte(2),
   beginEndStepPct: zBeginEndStepPct,
   method: zIPMethodV2,
@@ -185,7 +201,7 @@ export type CanvasInpaintMaskState = z.infer<typeof zCanvasInpaintMaskState>;
 
 const zControlNetConfig = z.object({
   type: z.literal('controlnet'),
-  model: zModelIdentifierField.nullable(),
+  model: zServerValidatedModelIdentifierField.nullable(),
   weight: z.number().gte(-1).lte(2),
   beginEndStepPct: zBeginEndStepPct,
   controlMode: zControlModeV2,
@@ -194,7 +210,7 @@ export type ControlNetConfig = z.infer<typeof zControlNetConfig>;
 
 const zT2IAdapterConfig = z.object({
   type: z.literal('t2i_adapter'),
-  model: zModelIdentifierField.nullable(),
+  model: zServerValidatedModelIdentifierField.nullable(),
   weight: z.number().gte(-1).lte(2),
   beginEndStepPct: zBeginEndStepPct,
 });
@@ -312,8 +328,16 @@ const zCanvasState = z.object({
     optimalDimension: z.number().int().positive(),
   }),
 });
-
 export type CanvasState = z.infer<typeof zCanvasState>;
+
+export const zCanvasMetadata = z.object({
+  inpaintMasks: z.array(zCanvasInpaintMaskState),
+  rasterLayers: z.array(zCanvasRasterLayerState),
+  controlLayers: z.array(zCanvasControlLayerState),
+  regionalGuidance: z.array(zCanvasRegionalGuidanceState),
+  referenceImages: z.array(zCanvasReferenceImageState),
+});
+export type CanvasMetadata = z.infer<typeof zCanvasMetadata>;
 
 export type StageAttrs = {
   x: Coordinate['x'];
