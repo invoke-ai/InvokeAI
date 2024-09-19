@@ -31,7 +31,7 @@ const zImageWithDims = z
   })
   .refine(async (v) => {
     const { image_name } = v;
-    const imageDTO = await getImageDTO(image_name);
+    const imageDTO = await getImageDTO(image_name, true);
     return imageDTO !== null;
   });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
