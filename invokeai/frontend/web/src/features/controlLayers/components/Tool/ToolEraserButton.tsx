@@ -28,7 +28,6 @@ export const ToolEraserButton = memo(() => {
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="solid"
       onClick={selectEraser}
-      isDisabled={isSelected}
     />
   );
 });

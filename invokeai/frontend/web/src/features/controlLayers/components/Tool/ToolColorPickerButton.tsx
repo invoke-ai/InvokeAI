@@ -28,7 +28,6 @@ export const ToolColorPickerButton = memo(() => {
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="solid"
       onClick={selectColorPicker}
-      isDisabled={isSelected}
     />
   );
 });
