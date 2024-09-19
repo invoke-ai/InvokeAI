@@ -12,6 +12,7 @@ import {
   stagingAreaReset,
   stagingAreaStagedImageDiscarded,
 } from 'features/controlLayers/store/canvasStagingAreaSlice';
+import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,7 @@ import {
   PiTrashSimpleBold,
   PiXBold,
 } from 'react-icons/pi';
-import { useChangeImageIsIntermediateMutation } from 'services/api/endpoints/images';
+import { useAddImagesToBoardMutation, useChangeImageIsIntermediateMutation } from 'services/api/endpoints/images';
 
 const selectStagedImageIndex = createSelector(
   selectCanvasStagingAreaSlice,
@@ -42,11 +43,13 @@ const selectImageCount = createSelector(selectCanvasStagingAreaSlice, (stagingAr
 export const StagingAreaToolbar = memo(() => {
   const dispatch = useAppDispatch();
   const canvasManager = useCanvasManager();
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const index = useAppSelector(selectStagedImageIndex);
   const selectedImage = useAppSelector(selectSelectedImage);
   const imageCount = useAppSelector(selectImageCount);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
   const isCanvasActive = useStore(INTERACTION_SCOPES.canvas.$isActive);
+  const [addImageToBoard] = useAddImagesToBoardMutation();
   const [changeIsImageIntermediate] = useChangeImageIsIntermediateMutation();
   useScopeOnMount('stagingArea');
 
@@ -86,12 +89,25 @@ export const StagingAreaToolbar = memo(() => {
     canvasManager.stagingArea.$shouldShowStagedImage.set(!shouldShowStagedImage);
   }, [canvasManager.stagingArea.$shouldShowStagedImage, shouldShowStagedImage]);
 
-  const onSaveStagingImage = useCallback(() => {
+  const onSaveStagingImage = useCallback(async () => {
     if (!selectedImage) {
       return;
     }
-    changeIsImageIntermediate({ imageDTO: selectedImage.imageDTO, is_intermediate: false });
-  }, [changeIsImageIntermediate, selectedImage]);
+    if (autoAddBoardId !== 'none') {
+      await addImageToBoard({ imageDTOs: [selectedImage.imageDTO], board_id: autoAddBoardId }).unwrap();
+      // The changeIsImageIntermediate request will use the board_id on this specific imageDTO object, so we need to
+      // update it before making the request - else the optimistic board updates will get out of whack.
+      changeIsImageIntermediate({
+        imageDTO: { ...selectedImage.imageDTO, board_id: autoAddBoardId },
+        is_intermediate: false,
+      });
+    } else {
+      changeIsImageIntermediate({
+        imageDTO: selectedImage.imageDTO,
+        is_intermediate: false,
+      });
+    }
+  }, [addImageToBoard, autoAddBoardId, changeIsImageIntermediate, selectedImage]);
 
   useHotkeys(
     ['left'],
