@@ -1,5 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { handlers, parseAndRecallAllMetadata, parseAndRecallPrompts } from 'features/metadata/util/handlers';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import {
@@ -17,6 +18,7 @@ export const useImageActions = (image_name?: string) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
+  const isStaging = useAppSelector(selectIsStaging);
   const activeTabName = useAppSelector(selectActiveTab);
   const { metadata, isLoading: isLoadingMetadata } = useDebouncedMetadata(image_name);
   const [hasMetadata, setHasMetadata] = useState(false);
@@ -66,9 +68,9 @@ export const useImageActions = (image_name?: string) => {
   }, [dispatch, activeStylePresetId, t]);
 
   const recallAll = useCallback(() => {
-    parseAndRecallAllMetadata(metadata, activeTabName === 'canvas');
+    parseAndRecallAllMetadata(metadata, activeTabName === 'canvas', isStaging ? ['width', 'height'] : []);
     clearStylePreset();
-  }, [activeTabName, metadata, clearStylePreset]);
+  }, [metadata, activeTabName, isStaging, clearStylePreset]);
 
   const remix = useCallback(() => {
     // Recalls all metadata parameters except seed

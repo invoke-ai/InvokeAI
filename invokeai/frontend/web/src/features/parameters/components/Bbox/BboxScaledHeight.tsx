@@ -2,6 +2,7 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { bboxScaledHeightChanged } from 'features/controlLayers/store/canvasSlice';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectCanvasSlice, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
@@ -17,6 +18,7 @@ const selectScaledBoundingBoxHeightConfig = createSelector(
 const BboxScaledHeight = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const isStaging = useAppSelector(selectIsStaging);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const isManual = useAppSelector(selectIsManual);
   const scaledHeight = useAppSelector(selectScaledHeight);
@@ -30,7 +32,7 @@ const BboxScaledHeight = () => {
   );
 
   return (
-    <FormControl isDisabled={!isManual}>
+    <FormControl isDisabled={!isManual || isStaging}>
       <FormLabel>{t('parameters.scaledHeight')}</FormLabel>
       <CompositeSlider
         min={config.sliderMin}

@@ -2,6 +2,7 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectOptimalDimension, selectWidth } from 'features/controlLayers/store/selectors';
 import { selectWidthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -13,6 +14,7 @@ export const BboxWidth = memo(() => {
   const width = useAppSelector(selectWidth);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const config = useAppSelector(selectWidthConfig);
+  const isStaging = useAppSelector(selectIsStaging);
 
   const onChange = useCallback(
     (v: number) => {
@@ -27,7 +29,7 @@ export const BboxWidth = memo(() => {
   );
 
   return (
-    <FormControl>
+    <FormControl isDisabled={isStaging}>
       <InformationalPopover feature="paramWidth">
         <FormLabel>{t('parameters.width')}</FormLabel>
       </InformationalPopover>
