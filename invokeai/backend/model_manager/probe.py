@@ -30,6 +30,8 @@ from invokeai.backend.model_manager.config import (
     SchedulerPredictionType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
+from invokeai.backend.quantization.gguf.layers import GGUFTensor
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
@@ -187,6 +189,7 @@ class ModelProbe(object):
         if fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE] and fields["format"] in [
             ModelFormat.Checkpoint,
             ModelFormat.BnbQuantizednf4b,
+            ModelFormat.GGUFQuantized,
         ]:
             ckpt_config_path = cls._get_checkpoint_config_path(
                 model_path,
@@ -220,7 +223,7 @@ class ModelProbe(object):
 
     @classmethod
     def get_model_type_from_checkpoint(cls, model_path: Path, checkpoint: Optional[CkptType] = None) -> ModelType:
-        if model_path.suffix not in (".bin", ".pt", ".ckpt", ".safetensors", ".pth"):
+        if model_path.suffix not in (".bin", ".pt", ".ckpt", ".safetensors", ".pth", ".gguf"):
             raise InvalidModelConfigException(f"{model_path}: unrecognized suffix")
 
         if model_path.name == "learned_embeds.bin":
@@ -408,6 +411,8 @@ class ModelProbe(object):
                 model = torch.load(model_path, map_location="cpu")
                 assert isinstance(model, dict)
                 return model
+            elif model_path.suffix.endswith(".gguf"):
+                return gguf_sd_loader(model_path)
             else:
                 return safetensors.torch.load_file(model_path)
 
@@ -477,6 +482,8 @@ class CheckpointProbeBase(ProbeBase):
             or "model.diffusion_model.double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict
         ):
             return ModelFormat.BnbQuantizednf4b
+        elif any(isinstance(v, GGUFTensor) for v in state_dict.values()):
+            return ModelFormat.GGUFQuantized
         return ModelFormat("checkpoint")
 
     def get_variant_type(self) -> ModelVariantType:
