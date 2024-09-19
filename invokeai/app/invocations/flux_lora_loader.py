@@ -17,7 +17,7 @@ from invokeai.backend.model_manager.config import BaseModelType
 class FluxLoRALoaderOutput(BaseInvocationOutput):
     """FLUX LoRA Loader Output"""
 
-    transformer: TransformerField = OutputField(
+    transformer: Optional[TransformerField] = OutputField(
         default=None, description=FieldDescriptions.transformer, title="FLUX Transformer"
     )
 
