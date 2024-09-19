@@ -4,7 +4,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -165,6 +165,10 @@ export const buildFLUXGraph = async (
   // This image will be staged, should not be saved to the gallery or added to a board.
   const is_intermediate = canvasSettings.sendToCanvas;
   const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
+
+  if (!canvasSettings.sendToCanvas) {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
 
   g.updateNode(canvasOutput, {
     id: getPrefixedId('canvas_output'),
