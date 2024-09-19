@@ -118,6 +118,7 @@ export const CanvasToolbarScale = memo(() => {
       <Popover>
         <PopoverAnchor>
           <NumberInput
+            variant="outline"
             display="flex"
             alignItems="center"
             min={canvasManager.stage.config.MIN_SCALE * 100}

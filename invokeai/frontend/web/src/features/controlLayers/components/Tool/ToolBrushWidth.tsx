@@ -150,6 +150,7 @@ export const ToolBrushWidth = memo(() => {
         <FormLabel m={0}>{t('controlLayers.width')}</FormLabel>
         <PopoverAnchor>
           <NumberInput
+            variant="outline"
             display="flex"
             alignItems="center"
             min={1}

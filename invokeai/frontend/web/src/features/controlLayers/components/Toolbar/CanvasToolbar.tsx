@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import { Flex, Spacer } from '@invoke-ai/ui-library';
+import { Divider, Flex, Spacer } from '@invoke-ai/ui-library';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { ToolColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
@@ -29,8 +29,9 @@ export const CanvasToolbar = memo(() => {
       <ToolColorPicker />
       <ToolSettings />
       <Spacer />
+      <CanvasToolbarScale />
+      <Divider orientation="vertical" />
       <Flex alignItems="center" h="full">
-        <CanvasToolbarScale />
         <CanvasToolbarResetViewButton />
         <CanvasToolbarFitBboxToLayersButton />
         <CanvasToolbarSaveToGalleryButton />
