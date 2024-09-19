@@ -13,14 +13,14 @@ export const EntityListSelectedEntityActionBar = memo(() => {
   return (
     <Flex w="full" gap={2} alignItems="center" ps={1}>
       <EntityListSelectedEntityActionBarOpacity />
-      <Spacer />
       <EntityListSelectedEntityActionBarFill />
+      <Spacer />
       <Flex h="full">
-        <EntityListSelectedEntityActionBarFilterButton />
-        <EntityListSelectedEntityActionBarTransformButton />
-        <EntityListSelectedEntityActionBarSaveToAssetsButton />
-        <EntityListSelectedEntityActionBarDuplicateButton />
         <EntityListGlobalActionBarAddLayerMenu />
+        <EntityListSelectedEntityActionBarDuplicateButton />
+        <EntityListSelectedEntityActionBarTransformButton />
+        <EntityListSelectedEntityActionBarFilterButton />
+        <EntityListSelectedEntityActionBarSaveToAssetsButton />
       </Flex>
     </Flex>
   );
