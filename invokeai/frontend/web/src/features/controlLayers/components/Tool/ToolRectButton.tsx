@@ -22,8 +22,8 @@ export const ToolRectButton = memo(() => {
 
   return (
     <IconButton
-      aria-label={`${t('controlLayers.tool.rectangle')} (U)`}
-      tooltip={`${t('controlLayers.tool.rectangle')} (U)`}
+      aria-label={`${t('controlLayers.tool.rectangle')} (R)`}
+      tooltip={`${t('controlLayers.tool.rectangle')} (R)`}
       icon={<PiRectangleBold />}
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="solid"
