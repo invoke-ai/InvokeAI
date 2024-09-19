@@ -3,8 +3,8 @@ import { useListAllBoardsQuery } from "services/api/endpoints/boards";
 import { useListImagesQuery } from "services/api/endpoints/images";
 
 export const useHasImages = () => {
-    const { data: boardList } = useListAllBoardsQuery({ include_archived: true })
-    const { data: uncategorizedImages } = useListImagesQuery({
+    const { data: boardList, isLoading: loadingBoards } = useListAllBoardsQuery({ include_archived: true })
+    const { data: uncategorizedImages, isLoading: loadingImages } = useListImagesQuery({
         board_id: "none",
         offset: 0,
         limit: 0,
@@ -12,6 +12,11 @@ export const useHasImages = () => {
     })
 
     const hasImages = useMemo(() => {
+        // default to true
+        if (loadingBoards || loadingImages) {
+            return true
+        }
+
         const hasBoards = boardList && boardList.length > 0;
 
         if (hasBoards) {
@@ -19,10 +24,10 @@ export const useHasImages = () => {
                 return true
             }
         }
-        return uncategorizedImages ? uncategorizedImages.total > 0 : false
+        return uncategorizedImages ? uncategorizedImages.total > 0 : true
 
 
-    }, [boardList, uncategorizedImages])
+    }, [boardList, uncategorizedImages, loadingBoards, loadingImages])
 
     return hasImages
 }

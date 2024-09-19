@@ -2077,16 +2077,5 @@
     "newUserExperience": {
         "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>",
         "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio."
-    },
-    "whatsNew": {
-        "whatsNewInInvoke": "What's New in Invoke",
-        "canvasV2Announcement": {
-            "newCanvas": "A powerful new control canvas",
-            "newLayerTypes": "New layer types for even more control",
-            "fluxSupport": "Support for the Flux family of models",
-            "readReleaseNotes": "Read Release Notes",
-            "watchReleaseVideo": "Watch Release Video",
-            "watchUiUpdatesOverview": "Watch UI Updates Overview"
-        }
     }
 }
