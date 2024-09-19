@@ -1,4 +1,10 @@
+from typing import Callable
+
 import torch
+
+
+def build_line(x1: float, y1: float, x2: float, y2: float) -> Callable[[float], float]:
+    return lambda x: (y2 - y1) / (x2 - x1) * (x - x1) + y1
 
 
 class InpaintExtension:
@@ -48,26 +54,42 @@ class InpaintExtension:
         # - What curve should we follow in-between? Linear? Step function?
 
         # This is completely arbitrary that we are using the same value for max_change_timestep_cutoff and max_change = 0.0
-        denoise_strength = 0.2
+        denoise_strength = 0.4
 
-        # Map denoise_strength to guidance schedule.
-        # Limits:
-        # - denoise_strength = 1.0: max_change_before_cutoff = 1.0, cutoff = 1.0
-        # - denoise_strength = 0.0: max_change_before_cutoff = 0.0, cutoff = 0.0
-        # - denoise_strength = 0.5: max_change_before_cutoff = 0.5, cutoff = 0.25
-        max_change_before_cutoff_at_ds_0 = 0.2
-        max_change_before_cutoff_at_ds_1 = 1.0
-        max_change_before_cutoff = (
-            max_change_before_cutoff_at_ds_0
-            + (max_change_before_cutoff_at_ds_1 - max_change_before_cutoff_at_ds_0) * denoise_strength
-        )
+        # # Alg 1
+        # # -----
 
-        t_cutoff_at_ds_0 = 0.5
-        t_cutoff_at_ds_1 = 1.0
-        t_cutoff = t_cutoff_at_ds_0 + (t_cutoff_at_ds_1 - t_cutoff_at_ds_0) * denoise_strength
+        # # Map denoise_strength to guidance schedule.
+        # # Limits:
+        # # - denoise_strength = 1.0: max_change_before_cutoff = 1.0, cutoff = 1.0
+        # # - denoise_strength = 0.0: max_change_before_cutoff = 0.0, cutoff = 0.0
+        # # - denoise_strength = 0.5: max_change_before_cutoff = 0.5, cutoff = 0.25
+        # max_change_before_cutoff_at_ds_0 = 0.2
+        # max_change_before_cutoff_at_ds_1 = 1.0
+        # max_change_before_cutoff = (
+        #     max_change_before_cutoff_at_ds_0
+        #     + (max_change_before_cutoff_at_ds_1 - max_change_before_cutoff_at_ds_0) * denoise_strength
+        # )
+
+        # t_cutoff_at_ds_0 = 0.5
+        # t_cutoff_at_ds_1 = 1.0
+        # t_cutoff = t_cutoff_at_ds_0 + (t_cutoff_at_ds_1 - t_cutoff_at_ds_0) * denoise_strength
+        # t_cutoff = 0.8
+
+        # # Alg 2
+        # # -----
+        max_change_at_t_1 = build_line(x1=0.0, y1=0.0, x2=1.0, y2=1.0)(denoise_strength)
+        max_change_at_cutoff = 1.0
+        t_cutoff = build_line(x1=0.0, y1=0.5, x2=1.0, y2=1.0)(denoise_strength)
+        # t_cutoff = 0.75
 
         if t_prev > t_cutoff:
-            max_change = max_change_before_cutoff
+            max_change = max_change_at_t_1 + (max_change_at_cutoff - max_change_at_t_1) * (1.0 - t_prev) / (
+                1.0 - t_cutoff
+            )
+
+            # max_change = max_change_before_cutoff
+
             # total_time_to_cutoff = 1.0 - max_change_timestep_cutoff
             # cur_time_elapsed = 1.0 - t_prev
             # max_change = cur_time_elapsed / total_time_to_cutoff
@@ -75,7 +97,7 @@ class InpaintExtension:
             # After cut-off, max_change is 1.0 (i.e. no guidance).
             max_change = 1.0
         mask = mask * max_change
-        print(f">>> {max_change=}, {denoise_strength=}, {max_change_before_cutoff=}, {t_cutoff=}")
+        print(f">>> {max_change=}, {denoise_strength=}, {t_cutoff=}")
 
         # Noise guidance
         # --------------
