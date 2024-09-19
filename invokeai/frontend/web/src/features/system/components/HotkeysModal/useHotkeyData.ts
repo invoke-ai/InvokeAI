@@ -100,8 +100,11 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('canvas', 'selectViewTool', ['h']);
     addHotkey('canvas', 'selectColorPickerTool', ['i']);
     addHotkey('canvas', 'setFillToWhite', ['d']);
-    addHotkey('canvas', 'fitLayersToCanvas', ['r']);
-    addHotkey('canvas', 'setZoomTo100Percent', ['alt+r']);
+    addHotkey('canvas', 'fitLayersToCanvas', ['mod+0']);
+    addHotkey('canvas', 'setZoomTo100Percent', ['mod+1']);
+    addHotkey('canvas', 'setZoomTo200Percent', ['mod+2']);
+    addHotkey('canvas', 'setZoomTo400Percent', ['mod+3']);
+    addHotkey('canvas', 'setZoomTo800Percent', ['mod+4']);
     addHotkey('canvas', 'quickSwitch', ['q']);
     addHotkey('canvas', 'deleteSelected', ['delete', 'backspace']);
     addHotkey('canvas', 'resetSelected', ['shift+c']);
