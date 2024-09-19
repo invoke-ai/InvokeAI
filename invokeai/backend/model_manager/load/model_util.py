@@ -20,6 +20,7 @@ from invokeai.backend.model_manager.config import AnyModel
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
+from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
 def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
@@ -83,10 +84,9 @@ def _calc_pipeline_by_data(pipeline: DiffusionPipeline) -> int:
 
 def calc_module_size(model: torch.nn.Module) -> int:
     """Calculate the size (in bytes) of a torch.nn.Module."""
-    mem_params = sum([param.nelement() * param.element_size() for param in model.parameters()])
-    mem_bufs = sum([buf.nelement() * buf.element_size() for buf in model.buffers()])
-    mem: int = mem_params + mem_bufs  # in bytes
-    return mem
+    mem_params = sum([calc_tensor_size(param) for param in model.parameters()])
+    mem_bufs = sum([calc_tensor_size(buf) for buf in model.buffers()])
+    return mem_params + mem_bufs
 
 
 def _calc_onnx_model_by_data(model: IAIOnnxRuntimeModel) -> int:

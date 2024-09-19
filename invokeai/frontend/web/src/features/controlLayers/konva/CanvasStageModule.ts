@@ -199,8 +199,8 @@ export class CanvasStageModule extends CanvasModuleBase {
     const scale = this.constrainScale(
       Math.min(Math.min(availableWidth / rect.width, availableHeight / rect.height), 1)
     );
-    const x = -rect.x * scale + padding + (availableWidth - rect.width * scale) / 2;
-    const y = -rect.y * scale + padding + (availableHeight - rect.height * scale) / 2;
+    const x = Math.floor(-rect.x * scale + padding + (availableWidth - rect.width * scale) / 2);
+    const y = Math.floor(-rect.y * scale + padding + (availableHeight - rect.height * scale) / 2);
 
     this.konva.stage.setAttrs({
       x,
@@ -255,8 +255,8 @@ export class CanvasStageModule extends CanvasModuleBase {
     const deltaX = (center.x - x) / oldScale;
     const deltaY = (center.y - y) / oldScale;
 
-    const newX = center.x - deltaX * newScale;
-    const newY = center.y - deltaY * newScale;
+    const newX = Math.floor(center.x - deltaX * newScale);
+    const newY = Math.floor(center.y - deltaY * newScale);
 
     this.konva.stage.setAttrs({
       x: newX,

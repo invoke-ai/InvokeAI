@@ -72,6 +72,10 @@ type CanvasSettingsState = {
    * Whether to preserve the masked region instead of inpainting it.
    */
   preserveMask: boolean;
+  /**
+   * Whether to show only raster layers while staging.
+   */
+  showOnlyRasterLayersWhileStaging: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -90,6 +94,7 @@ const initialState: CanvasSettingsState = {
   showProgressOnCanvas: true,
   bboxOverlay: false,
   preserveMask: false,
+  showOnlyRasterLayersWhileStaging: true,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -141,6 +146,9 @@ export const canvasSettingsSlice = createSlice({
     settingsPreserveMaskToggled: (state) => {
       state.preserveMask = !state.preserveMask;
     },
+    settingsShowOnlyRasterLayersWhileStagingToggled: (state) => {
+      state.showOnlyRasterLayersWhileStaging = !state.showOnlyRasterLayersWhileStaging;
+    },
   },
 });
 
@@ -160,6 +168,7 @@ export const {
   settingsShowProgressOnCanvasToggled,
   settingsBboxOverlayToggled,
   settingsPreserveMaskToggled,
+  settingsShowOnlyRasterLayersWhileStagingToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -191,4 +200,7 @@ export const selectSnapToGrid = createCanvasSettingsSelector((settings) => setti
 export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.sendToCanvas);
 export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
   (canvasSettings) => canvasSettings.showProgressOnCanvas
+);
+export const selectShowOnlyRasterLayersWhileStaging = createCanvasSettingsSelector(
+  (canvasSettings) => canvasSettings.showOnlyRasterLayersWhileStaging
 );

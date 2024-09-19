@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiCursorBold } from 'react-icons/pi';
 
@@ -10,7 +10,13 @@ export const ToolMoveButton = memo(() => {
   const isSelected = useToolIsSelected('move');
   const selectMove = useSelectTool('move');
 
-  useHotkeys('v', selectMove, { enabled: !isSelected }, [isSelected, selectMove]);
+  useRegisteredHotkeys({
+    id: 'selectMoveTool',
+    category: 'canvas',
+    callback: selectMove,
+    options: { enabled: !isSelected },
+    dependencies: [isSelected, selectMove],
+  });
 
   return (
     <IconButton

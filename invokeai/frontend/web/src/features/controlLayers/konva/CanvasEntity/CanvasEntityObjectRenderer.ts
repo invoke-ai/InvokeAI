@@ -247,9 +247,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   updateOpacity = () => {
     this.log.trace('Updating opacity');
 
-    const opacity = this.manager.stateApi.getIsTypeHidden(this.parent.entityIdentifier.type)
-      ? 0
-      : this.parent.state.opacity;
+    const opacity = this.parent.state.opacity;
 
     if (this.konva.compositing) {
       this.konva.compositing.group.opacity(opacity);

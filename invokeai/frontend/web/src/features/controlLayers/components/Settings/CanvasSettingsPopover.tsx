@@ -22,6 +22,7 @@ import { CanvasSettingsOutputOnlyMaskedRegionsCheckbox } from 'features/controlL
 import { CanvasSettingsPreserveMaskCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPreserveMaskCheckbox';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
+import { CanvasSettingsShowOnlyRasterLayersWhileStagingSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowOnlyRasterLayersWhileStagingSwitch';
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -45,6 +46,7 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
             <CanvasSettingsSnapToGridCheckbox />
             <CanvasSettingsShowProgressOnCanvas />
+            <CanvasSettingsShowOnlyRasterLayersWhileStagingSwitch />
             <CanvasSettingsDynamicGridSwitch />
             <CanvasSettingsBboxOverlaySwitch />
             <CanvasSettingsShowHUDSwitch />

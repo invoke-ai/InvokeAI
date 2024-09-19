@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiEyedropperBold } from 'react-icons/pi';
 
@@ -10,7 +10,13 @@ export const ToolColorPickerButton = memo(() => {
   const isSelected = useToolIsSelected('colorPicker');
   const selectColorPicker = useSelectTool('colorPicker');
 
-  useHotkeys('i', selectColorPicker, { enabled: !isSelected }, [selectColorPicker, isSelected]);
+  useRegisteredHotkeys({
+    id: 'selectColorPickerTool',
+    category: 'canvas',
+    callback: selectColorPicker,
+    options: { enabled: !isSelected },
+    dependencies: [selectColorPicker, isSelected],
+  });
 
   return (
     <IconButton

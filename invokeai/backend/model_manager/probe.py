@@ -9,6 +9,10 @@ import torch
 from picklescan.scanner import scan_file_path
 
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_diffusers_format,
+)
+from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import is_state_dict_likely_in_flux_kohya_format
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -245,7 +249,9 @@ class ModelProbe(object):
                 return ModelType.VAE
             elif key.startswith(("lora_te_", "lora_unet_")):
                 return ModelType.LoRA
-            elif key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight")):
+            # "lora_A.weight" and "lora_B.weight" are associated with models in PEFT format. We don't support all PEFT
+            # LoRA models, but as of the time of writing, we support Diffusers FLUX PEFT LoRA models.
+            elif key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight", "lora_A.weight", "lora_B.weight")):
                 return ModelType.LoRA
             elif key.startswith(("controlnet", "control_model", "input_blocks")):
                 return ModelType.ControlNet
@@ -559,12 +565,21 @@ class LoRACheckpointProbe(CheckpointProbeBase):
     """Class for LoRA checkpoints."""
 
     def get_format(self) -> ModelFormat:
-        return ModelFormat("lycoris")
+        if is_state_dict_likely_in_flux_diffusers_format(self.checkpoint):
+            # TODO(ryand): This is an unusual case. In other places throughout the codebase, we treat
+            # ModelFormat.Diffusers as meaning that the model is in a directory. In this case, the model is a single
+            # file, but the weight keys are in the diffusers format.
+            return ModelFormat.Diffusers
+        return ModelFormat.LyCORIS
 
     def get_base_type(self) -> BaseModelType:
-        checkpoint = self.checkpoint
-        token_vector_length = lora_token_vector_length(checkpoint)
+        if is_state_dict_likely_in_flux_kohya_format(self.checkpoint) or is_state_dict_likely_in_flux_diffusers_format(
+            self.checkpoint
+        ):
+            return BaseModelType.Flux
 
+        # If we've gotten here, we assume that the model is a Stable Diffusion model.
+        token_vector_length = lora_token_vector_length(self.checkpoint)
         if token_vector_length == 768:
             return BaseModelType.StableDiffusion1
         elif token_vector_length == 1024:

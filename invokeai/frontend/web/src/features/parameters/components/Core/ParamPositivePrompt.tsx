@@ -13,9 +13,9 @@ import {
   selectStylePresetActivePresetId,
   selectStylePresetViewMode,
 } from 'features/stylePresets/store/stylePresetSlice';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback, useRef } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
 
@@ -58,7 +58,13 @@ export const ParamPositivePrompt = memo(() => {
     [onFocus]
   );
 
-  useHotkeys('alt+a', focus, []);
+  useRegisteredHotkeys({
+    id: 'focusPrompt',
+    category: 'app',
+    callback: focus,
+    options: { preventDefault: true, enableOnFormTags: ['INPUT', 'SELECT', 'TEXTAREA'] },
+    dependencies: [focus],
+  });
 
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
