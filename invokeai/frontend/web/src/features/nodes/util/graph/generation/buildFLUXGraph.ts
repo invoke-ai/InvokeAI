@@ -18,6 +18,8 @@ import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
+import { addFLUXLoRAs } from './addFLUXLoRAs';
+
 const log = logger('system');
 
 export const buildFLUXGraph = async (
@@ -83,6 +85,8 @@ export const buildFLUXGraph = async (
 
   g.addEdge(modelLoader, 'transformer', noise, 'transformer');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
+
+  addFLUXLoRAs(state, g, noise, modelLoader);
 
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
   g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
