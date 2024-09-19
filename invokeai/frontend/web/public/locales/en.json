@@ -489,6 +489,10 @@
             "prevEntity": {
                 "title": "Prev Layer",
                 "desc": "Select the previous layer in the list."
+            },
+            "setFillToWhite": {
+                "title": "Set Color to White",
+                "desc": "Set the current tool color to white."
             }
         },
         "workflows": {

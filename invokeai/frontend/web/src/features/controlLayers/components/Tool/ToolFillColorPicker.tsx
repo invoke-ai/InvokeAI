@@ -5,6 +5,8 @@ import IAIColorPicker from 'common/components/IAIColorPicker';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import { selectCanvasSettingsSlice, settingsColorChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { RgbaColor } from 'features/controlLayers/store/types';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -34,6 +36,16 @@ export const ToolColorPicker = memo(() => {
     },
     [dispatch]
   );
+  const imageViewer = useImageViewer();
+
+  useRegisteredHotkeys({
+    id: 'setFillToWhite',
+    category: 'canvas',
+    callback: () => dispatch(settingsColorChanged({ r: 255, g: 255, b: 255, a: 1 })),
+    options: { preventDefault: true, enabled: !imageViewer.isOpen },
+    dependencies: [dispatch, imageViewer.isOpen],
+  });
+
   return (
     <Popover isLazy>
       <PopoverTrigger>
@@ -55,7 +67,7 @@ export const ToolColorPicker = memo(() => {
       <PopoverContent>
         <PopoverBody minH={64}>
           <Flex flexDir="column" gap={4}>
-          <IAIColorPicker color={fill} onChange={onChange} withNumberInput />
+            <IAIColorPicker color={fill} onChange={onChange} withNumberInput />
             <Flex gap={2} justifyContent="space-between">
               {SWATCHES.map((color, i) => (
                 <ColorSwatch key={i} color={color} />
