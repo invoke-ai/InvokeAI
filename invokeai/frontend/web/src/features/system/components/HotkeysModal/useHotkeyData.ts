@@ -142,11 +142,11 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('gallery', 'galleryNavUp', ['up']);
     addHotkey('gallery', 'galleryNavRight', ['right']);
     addHotkey('gallery', 'galleryNavDown', ['down']);
-    addHotkey('gallery', 'galleryNavLeft', ['up']);
+    addHotkey('gallery', 'galleryNavLeft', ['left']);
     addHotkey('gallery', 'galleryNavUpAlt', ['alt+up']);
     addHotkey('gallery', 'galleryNavRightAlt', ['alt+right']);
     addHotkey('gallery', 'galleryNavDownAlt', ['alt+down']);
-    addHotkey('gallery', 'galleryNavLeftAlt', ['alt+up']);
+    addHotkey('gallery', 'galleryNavLeftAlt', ['alt+left']);
     addHotkey('gallery', 'deleteSelection', ['delete', 'backspace']);
 
     return data;
