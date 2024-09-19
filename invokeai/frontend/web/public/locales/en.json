@@ -491,7 +491,7 @@
                 "desc": "Undo the last canvas action."
             },
             "redo": {
-                "title": "redo",
+                "title": "Redo",
                 "desc": "Redo the last canvas action."
             },
             "nextEntity": {
