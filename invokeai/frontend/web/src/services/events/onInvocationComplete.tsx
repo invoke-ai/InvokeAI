@@ -10,6 +10,7 @@ import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
+import { $lastProgressEvent } from 'services/events/stores';
 
 const log = logger('events');
 
@@ -159,5 +160,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     } else {
       await handleOriginOther(data);
     }
+
+    $lastProgressEvent.set(null);
   };
 };
