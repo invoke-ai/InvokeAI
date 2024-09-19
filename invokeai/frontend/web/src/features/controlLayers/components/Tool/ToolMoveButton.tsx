@@ -28,7 +28,6 @@ export const ToolMoveButton = memo(() => {
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="solid"
       onClick={selectMove}
-      isDisabled={isSelected}
     />
   );
 });

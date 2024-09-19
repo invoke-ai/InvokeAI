@@ -28,7 +28,6 @@ export const ToolViewButton = memo(() => {
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="solid"
       onClick={selectView}
-      isDisabled={isSelected}
     />
   );
 });
