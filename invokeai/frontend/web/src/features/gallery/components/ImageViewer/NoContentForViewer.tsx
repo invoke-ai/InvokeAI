@@ -1,10 +1,10 @@
 import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import Loading from 'common/components/Loading/Loading';
 import { LOADING_SYMBOL, useHasImages } from 'features/gallery/hooks/useHasImages';
 import InvokeSymbol from 'public/assets/images/invoke-symbol-char-lrg.svg';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
-import Loading from '../../../../common/components/Loading/Loading';
 
 export const NoContentForViewer = () => {
   const hasImages = useHasImages();
