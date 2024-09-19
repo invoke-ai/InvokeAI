@@ -1732,6 +1732,8 @@
         "sendToGallery": "Send To Gallery",
         "sendToGalleryDesc": "Pressing Invoke generates and saves a unique image to your gallery.",
         "sendToCanvas": "Send To Canvas",
+        "newLayerFromImage": "New Layer from Image",
+        "newCanvasFromImage": "New Canvas from Image",
         "copyToClipboard": "Copy to Clipboard",
         "sendToCanvasDesc": "Pressing Invoke stages your work in progress on the canvas.",
         "viewProgressInViewer": "View progress and outputs in the <Btn>Image Viewer</Btn>.",

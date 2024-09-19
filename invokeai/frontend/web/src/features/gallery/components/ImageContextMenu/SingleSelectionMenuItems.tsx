@@ -5,10 +5,11 @@ import { ImageMenuItemDelete } from 'features/gallery/components/ImageContextMen
 import { ImageMenuItemDownload } from 'features/gallery/components/ImageContextMenu/ImageMenuItemDownload';
 import { ImageMenuItemLoadWorkflow } from 'features/gallery/components/ImageContextMenu/ImageMenuItemLoadWorkflow';
 import { ImageMenuItemMetadataRecallActions } from 'features/gallery/components/ImageContextMenu/ImageMenuItemMetadataRecallActions';
+import { ImageMenuItemNewCanvasFromImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewCanvasFromImage';
+import { ImageMenuItemNewLayerFromImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewLayerFromImage';
 import { ImageMenuItemOpenInNewTab } from 'features/gallery/components/ImageContextMenu/ImageMenuItemOpenInNewTab';
 import { ImageMenuItemOpenInViewer } from 'features/gallery/components/ImageContextMenu/ImageMenuItemOpenInViewer';
 import { ImageMenuItemSelectForCompare } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSelectForCompare';
-import { ImageMenuItemSendToCanvas } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSendToCanvas';
 import { ImageMenuItemSendToUpscale } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSendToUpscale';
 import { ImageMenuItemStarUnstar } from 'features/gallery/components/ImageContextMenu/ImageMenuItemStarUnstar';
 import { ImageDTOContextProvider } from 'features/gallery/contexts/ImageDTOContext';
@@ -32,7 +33,8 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       <ImageMenuItemMetadataRecallActions />
       <MenuDivider />
       <ImageMenuItemSendToUpscale />
-      <ImageMenuItemSendToCanvas />
+      <ImageMenuItemNewLayerFromImage />
+      <ImageMenuItemNewCanvasFromImage />
       <MenuDivider />
       <ImageMenuItemChangeBoard />
       <ImageMenuItemStarUnstar />
