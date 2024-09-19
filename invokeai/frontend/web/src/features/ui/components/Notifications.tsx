@@ -10,13 +10,14 @@ import {
   PopoverHeader,
   PopoverTrigger,
 } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { shouldShowNotificationIndicatorChanged } from 'features/ui/store/uiSlice';
 import InvokeSymbol from 'public/assets/images/invoke-favicon.png';
-import { useTranslation } from 'react-i18next';
-import { useAppDispatch, useAppSelector } from '../../../app/store/storeHooks';
-import { PiLightbulbFilamentBold } from 'react-icons/pi';
-import { CanvasV2Announcement } from './canvasV2Announcement';
 import { useCallback } from 'react';
-import { shouldShowNotificationIndicatorChanged } from '../store/uiSlice';
+import { useTranslation } from 'react-i18next';
+import { PiLightbulbFilamentBold } from 'react-icons/pi';
+
+import { CanvasV2Announcement } from './CanvasV2Announcement';
 
 export const Notifications = () => {
   const { t } = useTranslation();
@@ -40,7 +41,7 @@ export const Notifications = () => {
             <Box
               pos="absolute"
               top={0}
-              right={'2px'}
+              right="2px"
               w={2}
               h={2}
               backgroundColor="invokeYellow.500"
