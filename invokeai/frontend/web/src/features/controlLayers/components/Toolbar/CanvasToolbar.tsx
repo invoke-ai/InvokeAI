@@ -26,13 +26,11 @@ export const CanvasToolbar = memo(() => {
   return (
     <Flex w="full" gap={2} alignItems="center">
       <ToolChooser />
-      <Spacer />
+      <ToolColorPicker />
       <ToolSettings />
       <Spacer />
       <CanvasToolbarScale />
       <CanvasToolbarResetViewButton />
-      <Spacer />
-      <ToolColorPicker />
       <CanvasToolbarFitBboxToLayersButton />
       <CanvasToolbarSaveToGalleryButton />
       <CanvasToolbarResetCanvasButton />
