@@ -1,5 +1,6 @@
 import { Spacer } from '@invoke-ai/ui-library';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
+import { CanvasEntityEnabledToggle } from 'features/controlLayers/components/common/CanvasEntityEnabledToggle';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityHeaderCommonActions } from 'features/controlLayers/components/common/CanvasEntityHeaderCommonActions';
 import { CanvasEntityPreviewImage } from 'features/controlLayers/components/common/CanvasEntityPreviewImage';
@@ -23,6 +24,7 @@ export const RegionalGuidance = memo(({ id }: Props) => {
       <RegionalGuidanceAdapterGate>
         <CanvasEntityContainer>
           <CanvasEntityHeader>
+            <CanvasEntityEnabledToggle />
             <CanvasEntityPreviewImage />
             <CanvasEntityEditableTitle />
             <Spacer />
