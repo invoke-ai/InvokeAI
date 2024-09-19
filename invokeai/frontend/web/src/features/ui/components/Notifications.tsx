@@ -4,6 +4,7 @@ import {
   IconButton,
   Image,
   Popover,
+  PopoverArrow,
   PopoverBody,
   PopoverContent,
   PopoverHeader,
@@ -56,8 +57,8 @@ export const Notifications = () => {
           )}
         </Flex>
       </PopoverTrigger>
-      <PopoverContent>
-        <PopoverCloseButton />
+      <PopoverContent p={2}>
+        <PopoverArrow />
         <PopoverHeader fontSize="md" fontWeight="semibold">
           <Flex alignItems="center" gap={3}>
             <Image src={InvokeSymbol} boxSize={6} />
