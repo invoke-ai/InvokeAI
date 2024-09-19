@@ -213,6 +213,6 @@ export const useGalleryHotkeys = () => {
       dispatch(imagesToDeleteSelected(selection));
     },
     options: { enabled: leftRightHotkeysEnabled && isDeleteEnabledByTab },
-    dependencies: [leftRightHotkeysEnabled, isDeleteEnabledByTab],
+    dependencies: [leftRightHotkeysEnabled, isDeleteEnabledByTab, selection],
   });
 };
