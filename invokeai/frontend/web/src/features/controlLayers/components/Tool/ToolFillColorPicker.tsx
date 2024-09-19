@@ -54,10 +54,10 @@ export const ToolColorPicker = memo(() => {
             <Flex w="full" h="full" alignItems="center" justifyContent="center">
               <Box
                 borderRadius="full"
-                borderColor="base.300"
+                borderColor="base.600"
                 w={6}
                 h={6}
-                borderWidth={1}
+                borderWidth={2}
                 bg={rgbaColorToString(fill)}
               />
             </Flex>
