@@ -35,7 +35,6 @@ const getImagesPerRow = (): number => {
   if (!imageEl || !gridEl) {
     return 0;
   }
-
   const container = gridEl.parentElement;
   if (!container) {
     return 0;
@@ -44,6 +43,7 @@ const getImagesPerRow = (): number => {
   const imageRect = imageEl.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
 
+  // We need to account for the gap between images
   const gridElStyle = window.getComputedStyle(gridEl);
   const gap = parseFloat(gridElStyle.gap);
 
@@ -64,9 +64,6 @@ const getImagesPerRow = (): number => {
       spaceUsed += gap; // Add gap size to the used space after each image except after the last image
     }
   }
-
-  // Calculate maximum number of images per row
-  const imagesPerRow = Math.floor((containerRect.width + 1) / (imageRect.width + gap));
 
   return imagesPerRow;
 };
