@@ -1,6 +1,6 @@
 import { Button } from '@invoke-ai/ui-library';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
-import { $isWorkflowLibraryModalOpen } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
+import { useWorkflowLibraryModal } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
 import { memo, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
@@ -9,11 +9,9 @@ import { PiUploadSimpleBold } from 'react-icons/pi';
 const UploadWorkflowButton = () => {
   const { t } = useTranslation();
   const resetRef = useRef<() => void>(null);
-  const onClose = useCallback(() => {
-    $isWorkflowLibraryModalOpen.set(false);
-  }, []);
+  const workflowLibraryModal = useWorkflowLibraryModal();
 
-  const loadWorkflowFromFile = useLoadWorkflowFromFile({ resetRef, onSuccess: onClose });
+  const loadWorkflowFromFile = useLoadWorkflowFromFile({ resetRef, onSuccess: workflowLibraryModal.setFalse });
   const onDropAccepted = useCallback(
     (files: File[]) => {
       if (!files[0]) {
