@@ -20,7 +20,12 @@ const isCanvasOutputNode = (data: S['InvocationCompleteEvent']) => {
 const nodeTypeDenylist = ['load_image', 'image'];
 
 export const buildOnInvocationComplete = (getState: () => RootState, dispatch: AppDispatch) => {
-  const addImageToGallery = (imageDTO: ImageDTO) => {
+  const addImageToGallery = (data: S['InvocationCompleteEvent'], imageDTO: ImageDTO) => {
+    if (nodeTypeDenylist.includes(data.invocation.type)) {
+      log.trace('Skipping node type denylisted');
+      return;
+    }
+
     if (imageDTO.is_intermediate) {
       return;
     }
@@ -105,7 +110,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     const imageDTO = await getResultImageDTO(data);
 
     if (imageDTO && !imageDTO.is_intermediate) {
-      addImageToGallery(imageDTO);
+      addImageToGallery(data, imageDTO);
     }
   };
 
@@ -125,11 +130,11 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
         } else if (data.result.type === 'image_output') {
           dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
         }
-        addImageToGallery(imageDTO);
+        addImageToGallery(data, imageDTO);
       }
     } else if (!imageDTO.is_intermediate) {
       // Desintaion is gallery
-      addImageToGallery(imageDTO);
+      addImageToGallery(data, imageDTO);
     }
   };
 
@@ -137,7 +142,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     const imageDTO = await getResultImageDTO(data);
 
     if (imageDTO && !imageDTO.is_intermediate) {
-      addImageToGallery(imageDTO);
+      addImageToGallery(data, imageDTO);
     }
   };
 
@@ -146,11 +151,6 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
       { data } as SerializableObject,
       `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
     );
-
-    if (nodeTypeDenylist.includes(data.invocation.type)) {
-      log.trace('Skipping node type denylisted');
-      return;
-    }
 
     if (data.origin === 'workflows') {
       await handleOriginWorkflows(data);
