@@ -1,6 +1,3 @@
-import { atom } from 'nanostores';
+import { buildUseBoolean } from 'common/hooks/useBoolean';
 
-/**
- * Tracks whether or not the workflow library modal is open.
- */
-export const $isWorkflowLibraryModalOpen = atom<boolean>(false);
+export const [useWorkflowLibraryModal] = buildUseBoolean(false);

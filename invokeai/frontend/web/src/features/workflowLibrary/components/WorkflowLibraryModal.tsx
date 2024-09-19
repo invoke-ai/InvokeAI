@@ -7,22 +7,17 @@ import {
   ModalHeader,
   ModalOverlay,
 } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import WorkflowLibraryContent from 'features/workflowLibrary/components/WorkflowLibraryContent';
-import { $isWorkflowLibraryModalOpen } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
-import { memo, useCallback } from 'react';
+import { useWorkflowLibraryModal } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const WorkflowLibraryModal = () => {
   const { t } = useTranslation();
-  const isWorkflowLibraryModalOpen = useStore($isWorkflowLibraryModalOpen);
-
-  const onClose = useCallback(() => {
-    $isWorkflowLibraryModalOpen.set(false);
-  }, []);
+  const workflowLibraryModal = useWorkflowLibraryModal();
 
   return (
-    <Modal isOpen={isWorkflowLibraryModalOpen} onClose={onClose} isCentered useInert={false}>
+    <Modal isOpen={workflowLibraryModal.isTrue} onClose={workflowLibraryModal.setFalse} isCentered useInert={false}>
       <ModalOverlay />
       <ModalContent w="80%" h="80%" minW="unset" minH="unset" maxW="1200px" maxH="664px">
         <ModalHeader>{t('workflows.workflowLibrary')}</ModalHeader>

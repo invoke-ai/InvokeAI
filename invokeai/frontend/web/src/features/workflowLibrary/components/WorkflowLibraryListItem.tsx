@@ -5,7 +5,7 @@ import dateFormat, { masks } from 'dateformat';
 import { selectWorkflowId } from 'features/nodes/store/workflowSlice';
 import { useDeleteLibraryWorkflow } from 'features/workflowLibrary/hooks/useDeleteLibraryWorkflow';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
-import { $isWorkflowLibraryModalOpen } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
+import { useWorkflowLibraryModal } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { WorkflowRecordListItemDTO } from 'services/api/types';
@@ -17,11 +17,12 @@ type Props = {
 const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
   const { t } = useTranslation();
   const workflowId = useAppSelector(selectWorkflowId);
-  const onClose = useCallback(() => {
-    $isWorkflowLibraryModalOpen.set(false);
-  }, []);
+  const workflowLibraryModal = useWorkflowLibraryModal();
+
   const { deleteWorkflow, deleteWorkflowResult } = useDeleteLibraryWorkflow(EMPTY_OBJECT);
-  const { getAndLoadWorkflow, getAndLoadWorkflowResult } = useGetAndLoadLibraryWorkflow({ onSuccess: onClose });
+  const { getAndLoadWorkflow, getAndLoadWorkflowResult } = useGetAndLoadLibraryWorkflow({
+    onSuccess: workflowLibraryModal.setFalse,
+  });
 
   const handleDeleteWorkflow = useCallback(() => {
     deleteWorkflow(workflowDTO.workflow_id);
