@@ -9,6 +9,7 @@ import type {
   CanvasEntityState,
   CanvasEntityType,
   CanvasInpaintMaskState,
+  CanvasMetadata,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasState,
@@ -331,3 +332,17 @@ export const selectAspectRatioID = createSelector(selectCanvasSlice, (canvas) =>
 export const selectAspectRatioValue = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.value);
 export const selectScaledSize = createSelector(selectBbox, (bbox) => bbox.scaledSize);
 export const selectScaleMethod = createSelector(selectBbox, (bbox) => bbox.scaleMethod);
+
+export const selectCanvasMetadata = createSelector(
+  selectCanvasSlice,
+  (canvas): { canvas_v2_metadata: CanvasMetadata } => {
+    const canvas_v2_metadata: CanvasMetadata = {
+      referenceImages: selectAllEntitiesOfType(canvas, 'reference_image'),
+      controlLayers: selectAllEntitiesOfType(canvas, 'control_layer'),
+      inpaintMasks: selectAllEntitiesOfType(canvas, 'inpaint_mask'),
+      rasterLayers: selectAllEntitiesOfType(canvas, 'raster_layer'),
+      regionalGuidance: selectAllEntitiesOfType(canvas, 'regional_guidance'),
+    };
+    return { canvas_v2_metadata };
+  }
+);
