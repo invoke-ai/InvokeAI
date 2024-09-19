@@ -1,8 +1,7 @@
 import {
   $shift,
   CompositeSlider,
-  FormControl,
-  FormLabel,
+  Flex,
   IconButton,
   NumberInput,
   NumberInputField,
@@ -20,8 +19,7 @@ import { round } from 'lodash-es';
 import { computed } from 'nanostores';
 import type { KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiCaretDownBold } from 'react-icons/pi';
+import { PiCaretDownBold, PiMagnifyingGlassMinusBold, PiMagnifyingGlassPlusBold } from 'react-icons/pi';
 
 function formatPct(v: number | string) {
   if (isNaN(Number(v))) {
@@ -71,7 +69,6 @@ const sliderDefaultValue = mapRawValueToSliderValue(100);
 const snapCandidates = marks.slice(1, marks.length - 1);
 
 export const CanvasToolbarScale = memo(() => {
-  const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const scale = useStore(computed(canvasManager.stage.$stageAttrs, (attrs) => attrs.scale));
   const [localScale, setLocalScale] = useState(scale * 100);
@@ -116,9 +113,9 @@ export const CanvasToolbarScale = memo(() => {
   }, [scale]);
 
   return (
-    <Popover>
-      <FormControl w="min-content" gap={2}>
-        <FormLabel m={0}>{t('controlLayers.zoom')}</FormLabel>
+    <Flex alignItems="center">
+      <ZoomOutButton />
+      <Popover>
         <PopoverAnchor>
           <NumberInput
             display="flex"
@@ -148,24 +145,70 @@ export const CanvasToolbarScale = memo(() => {
             </PopoverTrigger>
           </NumberInput>
         </PopoverAnchor>
-      </FormControl>
-      <PopoverContent w={200} pt={0} pb={2} px={4}>
-        <PopoverArrow />
-        <PopoverBody>
-          <CompositeSlider
-            min={0}
-            max={100}
-            value={mapRawValueToSliderValue(localScale)}
-            onChange={onChangeSlider}
-            defaultValue={sliderDefaultValue}
-            marks={marks}
-            formatValue={formatSliderValue}
-            alwaysShowMarks
-          />
-        </PopoverBody>
-      </PopoverContent>
-    </Popover>
+        <PopoverContent w={200} pt={0} pb={2} px={4}>
+          <PopoverArrow />
+          <PopoverBody>
+            <CompositeSlider
+              min={0}
+              max={100}
+              value={mapRawValueToSliderValue(localScale)}
+              onChange={onChangeSlider}
+              defaultValue={sliderDefaultValue}
+              marks={marks}
+              formatValue={formatSliderValue}
+              alwaysShowMarks
+            />
+          </PopoverBody>
+        </PopoverContent>
+      </Popover>
+      <ZoomInButton />
+    </Flex>
   );
 });
 
 CanvasToolbarScale.displayName = 'CanvasToolbarScale';
+
+const SCALE_SNAPS = [0.1, 0.15, 0.2, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 5, 7.5, 10, 15, 20];
+
+const ZoomOutButton = () => {
+  const canvasManager = useCanvasManager();
+  const scale = useStore(computed(canvasManager.stage.$stageAttrs, (attrs) => attrs.scale));
+  const onClick = useCallback(() => {
+    const nextScale =
+      SCALE_SNAPS.slice()
+        .reverse()
+        .find((snap) => snap < scale) ?? canvasManager.stage.config.MIN_SCALE;
+    canvasManager.stage.setScale(Math.max(nextScale, canvasManager.stage.config.MIN_SCALE));
+  }, [canvasManager.stage, scale]);
+
+  return (
+    <IconButton
+      onClick={onClick}
+      icon={<PiMagnifyingGlassMinusBold />}
+      aria-label="Zoom out"
+      variant="link"
+      alignSelf="stretch"
+      isDisabled={scale <= canvasManager.stage.config.MIN_SCALE}
+    />
+  );
+};
+
+const ZoomInButton = () => {
+  const canvasManager = useCanvasManager();
+  const scale = useStore(computed(canvasManager.stage.$stageAttrs, (attrs) => attrs.scale));
+  const onClick = useCallback(() => {
+    const nextScale = SCALE_SNAPS.find((snap) => snap > scale) ?? canvasManager.stage.config.MAX_SCALE;
+    canvasManager.stage.setScale(Math.min(nextScale, canvasManager.stage.config.MAX_SCALE));
+  }, [canvasManager.stage, scale]);
+
+  return (
+    <IconButton
+      onClick={onClick}
+      icon={<PiMagnifyingGlassPlusBold />}
+      aria-label="Zoom out"
+      variant="link"
+      alignSelf="stretch"
+      isDisabled={scale >= canvasManager.stage.config.MAX_SCALE}
+    />
+  );
+};

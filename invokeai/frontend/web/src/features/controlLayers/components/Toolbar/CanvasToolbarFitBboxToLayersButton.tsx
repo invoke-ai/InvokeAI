@@ -3,7 +3,7 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsOut } from 'react-icons/pi';
+import { PiResizeBold } from 'react-icons/pi';
 
 export const CanvasToolbarFitBboxToLayersButton = memo(() => {
   const { t } = useTranslation();
@@ -19,7 +19,7 @@ export const CanvasToolbarFitBboxToLayersButton = memo(() => {
       variant="ghost"
       aria-label={t('controlLayers.fitBboxToLayers')}
       tooltip={t('controlLayers.fitBboxToLayers')}
-      icon={<PiArrowsOut />}
+      icon={<PiResizeBold />}
       isDisabled={isBusy}
     />
   );

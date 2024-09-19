@@ -456,11 +456,23 @@
             },
             "fitLayersToCanvas": {
                 "title": "Fit Layers to Canvas",
-                "desc": "Scales and positions the view to fit all visible layers."
+                "desc": "Scale and position the view to fit all visible layers."
             },
             "setZoomTo100Percent": {
-                "title": "Reset Zoom",
-                "desc": "Resets the canvas zoom to 100%."
+                "title": "Zoom to 100%",
+                "desc": "Set the canvas zoom to 100%."
+            },
+            "setZoomTo200Percent": {
+                "title": "Zoom to 200%",
+                "desc": "Set the canvas zoom to 200%."
+            },
+            "setZoomTo400Percent": {
+                "title": "Zoom to 400%",
+                "desc": "Set the canvas zoom to 400%."
+            },
+            "setZoomTo800Percent": {
+                "title": "Zoom to 800%",
+                "desc": "Set the canvas zoom to 800%."
             },
             "quickSwitch": {
                 "title": "Layer Quick Switch",
