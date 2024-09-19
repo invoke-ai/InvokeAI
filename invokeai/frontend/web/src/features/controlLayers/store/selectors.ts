@@ -301,7 +301,6 @@ export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdenti
       // An entity is hidden if:
       // - The entity type is hidden
       // - The entity is disabled
-      // - The entity is locked
       // - The entity is not a raster layer and we are staging and the option to show only raster layers is enabled
       if (!entity) {
         return true;
@@ -310,9 +309,6 @@ export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdenti
         return true;
       }
       if (!entity.isEnabled) {
-        return true;
-      }
-      if (entity.isLocked) {
         return true;
       }
       if (isStaging && showOnlyRasterLayersWhileStaging) {
