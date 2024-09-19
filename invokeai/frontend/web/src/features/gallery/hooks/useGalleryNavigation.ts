@@ -52,8 +52,18 @@ const getImagesPerRow = (): number => {
     return 0;
   }
 
-  // Calculate maximum number of images per row, considering gap
-  const imagesPerRow = Math.floor((containerRect.width + 1) / (imageRect.width + gap)) + 1;
+  let imagesPerRow = 0;
+  let spaceUsed = 0;
+
+  // Floating point precision can cause imagesPerRow to be 1 too small. Adding 1px to the container size fixes
+  // this, without the possibility of accidentally adding an extra column.
+  while (spaceUsed + imageRect.width <= containerRect.width + 1) {
+    imagesPerRow++; // Increment the number of images
+    spaceUsed += imageRect.width; // Add image size to the used space
+    if (spaceUsed + gap <= containerRect.width) {
+      spaceUsed += gap; // Add gap size to the used space after each image except after the last image
+    }
+  }
 
   return imagesPerRow;
 };
