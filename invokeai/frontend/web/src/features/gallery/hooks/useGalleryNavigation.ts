@@ -29,12 +29,36 @@ import type { ImageDTO } from 'services/api/types';
  * Gets the number of images per row in the gallery by grabbing their DOM elements.
  */
 const getImagesPerRow = (): number => {
-  const widthOfGalleryImage =
-    document.querySelector(`.${GALLERY_IMAGE_CLASS_NAME}`)?.getBoundingClientRect().width ?? 1;
+  const imageEl = document.querySelector(`.${GALLERY_IMAGE_CLASS_NAME}`);
+  const gridEl = document.querySelector(`.${GALLERY_GRID_CLASS_NAME}`);
 
-  const widthOfGalleryGrid = document.querySelector(`.${GALLERY_GRID_CLASS_NAME}`)?.getBoundingClientRect().width ?? 0;
+  if (!imageEl || !gridEl) {
+    return 0;
+  }
+  const container = gridEl.parentElement;
+  if (!container) {
+    return 0;
+  }
 
-  const imagesPerRow = Math.round(widthOfGalleryGrid / widthOfGalleryImage);
+  const imageRect = imageEl.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+
+  // We need to account for the gap between images
+  const gridElStyle = window.getComputedStyle(gridEl);
+  const gap = parseFloat(gridElStyle.gap);
+
+  let imagesPerRow = 0;
+  let spaceUsed = 0;
+
+  // Floating point precision can cause imagesPerRow to be 1 too small. Adding 1px to the container size fixes
+  // this, without the possibility of accidentally adding an extra column.
+  while (spaceUsed + imageRect.width <= containerRect.width + 1) {
+    imagesPerRow++; // Increment the number of images
+    spaceUsed += imageRect.width; // Add image size to the used space
+    if (spaceUsed + gap <= containerRect.width) {
+      spaceUsed += gap; // Add gap size to the used space after each image except after the last image
+    }
+  }
 
   return imagesPerRow;
 };
