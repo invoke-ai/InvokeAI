@@ -1,4 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import {
   useAddControlLayer,
   useAddGlobalReferenceImage,
@@ -10,7 +11,6 @@ import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiPlusBold } from 'react-icons/pi';
 
 type Props = {
   type: CanvasEntityIdentifier['type'];
@@ -66,7 +66,7 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
       aria-label={label}
       tooltip={label}
       variant="link"
-      icon={<PiPlusBold />}
+      icon={<NewLayerIcon />}
       onClick={onClick}
       alignSelf="stretch"
       isDisabled={isBusy}
