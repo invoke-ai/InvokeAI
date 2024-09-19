@@ -265,6 +265,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('pointerup', this.onWindowPointerUp);
+    window.addEventListener('blur', this.revertToolBuffer);
 
     return () => {
       this.konva.stage.off('mouseenter', this.onStageMouseEnter);
@@ -277,6 +278,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       window.removeEventListener('keydown', this.onKeyDown);
       window.removeEventListener('keyup', this.onKeyUp);
       window.removeEventListener('pointerup', this.onWindowPointerUp);
+      window.removeEventListener('blur', this.revertToolBuffer);
     };
   };
 
@@ -657,6 +659,14 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
+  /**
+   * We want to reset any "quick-switch" tool selection on window blur. Fixes an issue where you alt-tab out of the app
+   * and the color picker tool is still active when you come back.
+   */
+  onWindowBlur = () => {
+    this.revertToolBuffer();
+  };
+
   onKeyDown = (e: KeyboardEvent) => {
     if (e.repeat) {
       return;
@@ -711,9 +721,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     if (e.key === ' ') {
       // Revert the tool to the previous tool on space key up
       e.preventDefault();
-      const toolBuffer = this.$toolBuffer.get();
-      this.$tool.set(toolBuffer ?? 'move');
-      this.$toolBuffer.set(null);
+      this.revertToolBuffer();
       this.manager.stateApi.$spaceKey.set(false);
       return;
     }
@@ -721,11 +729,15 @@ export class CanvasToolModule extends CanvasModuleBase {
     if (e.key === 'Alt') {
       // Revert the tool to the previous tool on alt key up
       e.preventDefault();
-      const toolBuffer = this.$toolBuffer.get();
-      this.$tool.set(toolBuffer ?? 'move');
-      this.$toolBuffer.set(null);
+      this.revertToolBuffer();
       return;
     }
+  };
+
+  revertToolBuffer = () => {
+    const toolBuffer = this.$toolBuffer.get();
+    this.$tool.set(toolBuffer ?? 'move');
+    this.$toolBuffer.set(null);
   };
 
   repr = () => {
