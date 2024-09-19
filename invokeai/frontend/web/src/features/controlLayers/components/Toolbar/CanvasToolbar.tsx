@@ -5,10 +5,12 @@ import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser'
 import { ToolColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolSettings } from 'features/controlLayers/components/Tool/ToolSettings';
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
+import { CanvasToolbarRedoButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarRedoButton';
 import { CanvasToolbarResetCanvasButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarResetCanvasButton';
 import { CanvasToolbarResetViewButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarResetViewButton';
 import { CanvasToolbarSaveToGalleryButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSaveToGalleryButton';
 import { CanvasToolbarScale } from 'features/controlLayers/components/Toolbar/CanvasToolbarScale';
+import { CanvasToolbarUndoButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarUndoButton';
 import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanvasDeleteLayerHotkey';
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
@@ -35,6 +37,8 @@ export const CanvasToolbar = memo(() => {
         <CanvasToolbarResetViewButton />
         <CanvasToolbarFitBboxToLayersButton />
         <CanvasToolbarSaveToGalleryButton />
+        <CanvasToolbarUndoButton />
+        <CanvasToolbarRedoButton />
         <CanvasToolbarResetCanvasButton />
         <CanvasSettingsPopover />
       </Flex>
