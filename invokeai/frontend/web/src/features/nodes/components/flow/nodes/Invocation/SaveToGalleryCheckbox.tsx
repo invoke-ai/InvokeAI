@@ -30,7 +30,7 @@ const SaveToGalleryCheckbox = ({ nodeId }: { nodeId: string }) => {
 
   return (
     <FormControl className="nopan">
-      <FormLabel>{t('hotkeys.saveToGallery.title')} </FormLabel>
+      <FormLabel>{t('nodes.saveToGallery')} </FormLabel>
       <Checkbox onChange={handleChange} isChecked={!isIntermediate} />
     </FormControl>
   );
