@@ -13,6 +13,7 @@ const initialUIState: UIState = {
   shouldShowProgressInViewer: true,
   accordions: {},
   expanders: {},
+  shouldShowNotificationIndicator: true,
 };
 
 export const uiSlice = createSlice({
@@ -36,6 +37,9 @@ export const uiSlice = createSlice({
       const { id, isOpen } = action.payload;
       state.expanders[id] = isOpen;
     },
+    shouldShowNotificationIndicatorChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowNotificationIndicator = action.payload;
+    },
   },
   extraReducers(builder) {
     builder.addCase(workflowLoadRequested, (state) => {
@@ -50,6 +54,7 @@ export const {
   setShouldShowProgressInViewer,
   accordionStateChanged,
   expanderStateChanged,
+  shouldShowNotificationIndicatorChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;

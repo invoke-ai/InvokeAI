@@ -133,7 +133,7 @@ export const ToolEraserWidth = memo(() => {
   }, [width]);
 
   useRegisteredHotkeys({
-    id: 'incrementToolWidth',
+    id: 'decrementToolWidth',
     category: 'canvas',
     callback: decrement,
     options: { enabled: isSelected && !imageViewer.isOpen },

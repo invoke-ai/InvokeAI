@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $activeScopes } from 'common/hooks/interactionScopes';
+import { $activeScopes, INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { $canvasRightPanelTab } from 'features/controlLayers/store/ephemeral';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
@@ -38,6 +38,7 @@ export const useGalleryHotkeys = () => {
   const upDownHotkeysEnabled = useStore($upDownHotkeysEnabled);
   const canvasRightPanelTab = useStore($canvasRightPanelTab);
   const appTab = useAppSelector(selectActiveTab);
+  const isWorkflowsScopeActive = useStore(INTERACTION_SCOPES.workflows.$isActive);
 
   // When we are on the canvas tab, we need to disable the delete hotkey when the user is focused on the layers tab in
   // the right hand panel, because the same hotkey is used to delete layers.
@@ -212,7 +213,7 @@ export const useGalleryHotkeys = () => {
       }
       dispatch(imagesToDeleteSelected(selection));
     },
-    options: { enabled: leftRightHotkeysEnabled && isDeleteEnabledByTab },
-    dependencies: [leftRightHotkeysEnabled, isDeleteEnabledByTab],
+    options: { enabled: leftRightHotkeysEnabled && isDeleteEnabledByTab && !isWorkflowsScopeActive },
+    dependencies: [leftRightHotkeysEnabled, isDeleteEnabledByTab, selection, isWorkflowsScopeActive],
   });
 };
