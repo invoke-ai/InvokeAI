@@ -29,12 +29,14 @@ export const CanvasToolbar = memo(() => {
       <ToolColorPicker />
       <ToolSettings />
       <Spacer />
-      <CanvasToolbarScale />
-      <CanvasToolbarResetViewButton />
-      <CanvasToolbarFitBboxToLayersButton />
-      <CanvasToolbarSaveToGalleryButton />
-      <CanvasToolbarResetCanvasButton />
-      <CanvasSettingsPopover />
+      <Flex alignItems="center" h="full">
+        <CanvasToolbarScale />
+        <CanvasToolbarResetViewButton />
+        <CanvasToolbarFitBboxToLayersButton />
+        <CanvasToolbarSaveToGalleryButton />
+        <CanvasToolbarResetCanvasButton />
+        <CanvasSettingsPopover />
+      </Flex>
     </Flex>
   );
 });

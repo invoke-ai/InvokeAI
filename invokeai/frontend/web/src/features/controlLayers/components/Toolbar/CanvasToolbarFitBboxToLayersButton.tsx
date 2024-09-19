@@ -16,7 +16,8 @@ export const CanvasToolbarFitBboxToLayersButton = memo(() => {
   return (
     <IconButton
       onClick={onClick}
-      variant="ghost"
+      variant="link"
+      alignSelf="stretch"
       aria-label={t('controlLayers.fitBboxToLayers')}
       tooltip={t('controlLayers.fitBboxToLayers')}
       icon={<PiResizeBold />}

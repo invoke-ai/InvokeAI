@@ -32,7 +32,12 @@ export const CanvasSettingsPopover = memo(() => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <IconButton aria-label={t('common.settingsLabel')} icon={<PiGearSixFill />} variant="ghost" />
+        <IconButton
+          aria-label={t('common.settingsLabel')}
+          icon={<PiGearSixFill />}
+          variant="link"
+          alignSelf="stretch"
+        />
       </PopoverTrigger>
       <PopoverContent>
         <PopoverArrow />
