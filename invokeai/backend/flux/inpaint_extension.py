@@ -47,34 +47,37 @@ class InpaintExtension:
         # - max_change_timestep_cutoff: the timestep at which max_change of 1.0 is reached
         # - What curve should we follow in-between? Linear? Step function?
 
-        # This is completely arbitrary that we are using the same value for max_change_timestep_cutoff and max_change. = 0.0
-        # max_change_timestep_cutoff = 0.0
-        # if t_prev > max_change_timestep_cutoff:
-        #     total_time_to_cutoff = 1.0 - max_change_timestep_cutoff
-        #     cur_time_elapsed = 1.0 - t_prev
-        #     max_change = cur_time_elapsed / total_time_to_cutoff
-        # else:
-        #     max_change = 1.0
-        max_change = 0.1
+        # This is completely arbitrary that we are using the same value for max_change_timestep_cutoff and max_change = 0.0
+        denoise_strength = 0.2
+
+        # Map denoise_strength to guidance schedule.
+        # Limits:
+        # - denoise_strength = 1.0: max_change_before_cutoff = 1.0, cutoff = 1.0
+        # - denoise_strength = 0.0: max_change_before_cutoff = 0.0, cutoff = 0.0
+        # - denoise_strength = 0.5: max_change_before_cutoff = 0.5, cutoff = 0.25
+        max_change_before_cutoff_at_ds_0 = 0.2
+        max_change_before_cutoff_at_ds_1 = 1.0
+        max_change_before_cutoff = (
+            max_change_before_cutoff_at_ds_0
+            + (max_change_before_cutoff_at_ds_1 - max_change_before_cutoff_at_ds_0) * denoise_strength
+        )
+
+        t_cutoff_at_ds_0 = 0.5
+        t_cutoff_at_ds_1 = 1.0
+        t_cutoff = t_cutoff_at_ds_0 + (t_cutoff_at_ds_1 - t_cutoff_at_ds_0) * denoise_strength
+
+        if t_prev > t_cutoff:
+            max_change = max_change_before_cutoff
+            # total_time_to_cutoff = 1.0 - max_change_timestep_cutoff
+            # cur_time_elapsed = 1.0 - t_prev
+            # max_change = cur_time_elapsed / total_time_to_cutoff
+        else:
+            # After cut-off, max_change is 1.0 (i.e. no guidance).
+            max_change = 1.0
         mask = mask * max_change
+        print(f">>> {max_change=}, {denoise_strength=}, {max_change_before_cutoff=}, {t_cutoff=}")
 
-        # # Noise guidance
-        # # --------------
-        # # What noise should the model have predicted at this timestep to step towards self._init_latents?
-        # # Derivation:
-        # # > Recall the noise model:
-        # # > t_prev_latents = t_curr_latents + (t_prev - t_curr) * pred_noise
-        # # > t_0_latents = t_curr_latents + (0 - t_curr) * init_traj_noise
-        # # > t_0_latents = t_curr_latents - t_curr * init_traj_noise
-        # # > init_traj_noise = (t_curr_latents - t_0_latents) / t_curr)
-        # init_traj_noise = (t_curr_latents - self._init_latents) / t_curr
-
-        # # Blend the init_traj_noise with the pred_noise according to the inpaint mask.
-        # noise = pred_noise * mask + init_traj_noise * (1.0 - mask)
-
-        # return t_curr_latents + (t_prev - t_curr) * noise
-
-        # Noise guidance with normaliztion
+        # Noise guidance
         # --------------
         # What noise should the model have predicted at this timestep to step towards self._init_latents?
         # Derivation:
@@ -85,15 +88,31 @@ class InpaintExtension:
         # > init_traj_noise = (t_curr_latents - t_0_latents) / t_curr)
         init_traj_noise = (t_curr_latents - self._init_latents) / t_curr
 
-        # Normalize the init_traj_noise to have the same norm as the pred_noise.
-        init_traj_noise = (
-            init_traj_noise / (torch.linalg.matrix_norm(init_traj_noise) + 1e-6) * torch.linalg.matrix_norm(pred_noise)
-        )
-
         # Blend the init_traj_noise with the pred_noise according to the inpaint mask.
         noise = pred_noise * mask + init_traj_noise * (1.0 - mask)
 
         return t_curr_latents + (t_prev - t_curr) * noise
+
+        # # Noise guidance with normaliztion
+        # # --------------
+        # # What noise should the model have predicted at this timestep to step towards self._init_latents?
+        # # Derivation:
+        # # > Recall the noise model:
+        # # > t_prev_latents = t_curr_latents + (t_prev - t_curr) * pred_noise
+        # # > t_0_latents = t_curr_latents + (0 - t_curr) * init_traj_noise
+        # # > t_0_latents = t_curr_latents - t_curr * init_traj_noise
+        # # > init_traj_noise = (t_curr_latents - t_0_latents) / t_curr)
+        # init_traj_noise = (t_curr_latents - self._init_latents) / t_curr
+
+        # # Normalize the init_traj_noise to have the same norm as the pred_noise.
+        # init_traj_noise = (
+        #     init_traj_noise / (torch.linalg.matrix_norm(init_traj_noise) + 1e-6) * torch.linalg.matrix_norm(pred_noise)
+        # )
+
+        # # Blend the init_traj_noise with the pred_noise according to the inpaint mask.
+        # noise = pred_noise * mask + init_traj_noise * (1.0 - mask)
+
+        # return t_curr_latents + (t_prev - t_curr) * noise
 
         # # Trajectory guidance
         # # -------------------
