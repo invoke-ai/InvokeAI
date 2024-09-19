@@ -1,4 +1,4 @@
-import { Flex, UnorderedList, ListItem, Icon, Text } from '@invoke-ai/ui-library';
+import { Flex, Icon, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
 import { useTranslation } from 'react-i18next';
 import { PiArrowSquareOutBold } from 'react-icons/pi';
 
