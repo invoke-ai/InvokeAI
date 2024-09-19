@@ -72,7 +72,7 @@ class FluxLoRALoaderInvocation(BaseInvocation):
     classification=Classification.Prototype,
 )
 class FLUXLoRACollectionLoader(BaseInvocation):
-    """Applies a collection of FLUX LoRAs to the provided UNet and CLIP models."""
+    """Applies a collection of LoRAs to a FLUX transformer."""
 
     loras: LoRAField | list[LoRAField] = InputField(
         description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"
