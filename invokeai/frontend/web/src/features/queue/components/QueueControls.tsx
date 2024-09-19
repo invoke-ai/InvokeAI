@@ -1,5 +1,6 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { ClearQueueIconButton } from 'features/queue/components/ClearQueueIconButton';
 import { QueueActionsMenuButton } from 'features/queue/components/QueueActionsMenuButton';
 import { SendToToggle } from 'features/queue/components/SendToToggle';
@@ -17,7 +18,11 @@ const QueueControls = () => {
       <Flex gap={2}>
         <InvokeButton />
         <Spacer />
-        {tab === 'canvas' && <SendToToggle />}
+        {tab === 'canvas' && (
+          <CanvasManagerProviderGate>
+            <SendToToggle />
+          </CanvasManagerProviderGate>
+        )}
         <QueueActionsMenuButton />
         <ClearQueueIconButton />
       </Flex>

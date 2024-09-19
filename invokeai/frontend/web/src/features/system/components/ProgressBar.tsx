@@ -19,6 +19,16 @@ const ProgressBar = () => {
     return (lastProgressEvent.percentage ?? 0) * 100;
   }, [lastProgressEvent]);
 
+  const colorScheme = useMemo(() => {
+    if (destination === 'canvas') {
+      return 'invokePurple';
+    } else if (destination === 'gallery') {
+      return 'invokeBlue';
+    } else {
+      return 'base';
+    }
+  }, [destination]);
+
   return (
     <Progress
       value={value}
@@ -26,7 +36,7 @@ const ProgressBar = () => {
       isIndeterminate={isConnected && Boolean(queueStatus?.queue.in_progress) && !lastProgressEvent}
       h={2}
       w="full"
-      colorScheme={destination === 'canvas' ? 'invokeGreen' : 'invokeBlue'}
+      colorScheme={colorScheme}
     />
   );
 };
