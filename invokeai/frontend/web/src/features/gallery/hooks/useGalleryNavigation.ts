@@ -35,7 +35,6 @@ const getImagesPerRow = (): number => {
   if (!imageEl || !gridEl) {
     return 0;
   }
-
   const container = gridEl.parentElement;
   if (!container) {
     return 0;
@@ -44,16 +43,27 @@ const getImagesPerRow = (): number => {
   const imageRect = imageEl.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
 
+  // We need to account for the gap between images
   const gridElStyle = window.getComputedStyle(gridEl);
   const gap = parseFloat(gridElStyle.gap);
 
-  // Validate input values
-  if (imageRect.width <= 0 || gap < 0) {
+  if (!imageRect.width || !imageRect.height || !containerRect.width || !containerRect.height) {
+    // Gallery is too small to fit images or not rendered yet
     return 0;
   }
 
-  // Calculate maximum number of images per row
-  const imagesPerRow = Math.floor((containerRect.width + 1) / (imageRect.width + gap));
+  let imagesPerRow = 0;
+  let spaceUsed = 0;
+
+  // Floating point precision can cause imagesPerRow to be 1 too small. Adding 1px to the container size fixes
+  // this, without the possibility of accidentally adding an extra column.
+  while (spaceUsed + imageRect.width <= containerRect.width + 1) {
+    imagesPerRow++; // Increment the number of images
+    spaceUsed += imageRect.width; // Add image size to the used space
+    if (spaceUsed + gap <= containerRect.width) {
+      spaceUsed += gap; // Add gap size to the used space after each image except after the last image
+    }
+  }
 
   return imagesPerRow;
 };
