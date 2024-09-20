@@ -1,4 +1,4 @@
-import { Flex, Link, Spacer, Text } from '@invoke-ai/ui-library';
+import { Flex, Link, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $projectName, $projectUrl } from 'app/store/nanostores/projectId';
 import { memo } from 'react';
@@ -9,7 +9,7 @@ export const GalleryHeader = memo(() => {
 
   if (projectName && projectUrl) {
     return (
-      <Flex gap={2} alignItems="center" justifyContent="space-evenly" pe={2} w="50%">
+      <Flex gap={2} w="full" alignItems="center" justifyContent="space-evenly" pe={2}>
         <Text fontSize="md" fontWeight="semibold" noOfLines={1} wordBreak="break-all" w="full" textAlign="center">
           <Link href={projectUrl}>{projectName}</Link>
         </Text>
@@ -17,7 +17,7 @@ export const GalleryHeader = memo(() => {
     );
   }
 
-  return <Spacer />;
+  return null;
 });
 
 GalleryHeader.displayName = 'GalleryHeader';
