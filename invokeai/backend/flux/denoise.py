@@ -38,12 +38,12 @@ def denoise(
         )
 
         if traj_guidance_extension is not None:
-            img = traj_guidance_extension.step(t_curr_latents=img, pred_noise=pred, t_curr=t_curr, t_prev=t_prev)
-            # TODO(ryand): Generate a better preview image.
-            preview_img = img
-        else:
-            preview_img = img - t_curr * pred
-            img = img + (t_prev - t_curr) * pred
+            pred = traj_guidance_extension.update_noise(
+                t_curr_latents=img, pred_noise=pred, t_curr=t_curr, t_prev=t_prev
+            )
+
+        preview_img = img - t_curr * pred
+        img = img + (t_prev - t_curr) * pred
 
         step_callback(
             PipelineIntermediateState(

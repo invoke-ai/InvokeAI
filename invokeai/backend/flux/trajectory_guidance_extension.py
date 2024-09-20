@@ -96,7 +96,7 @@ class TrajectoryGuidanceExtension:
         assert 0.0 - eps <= change_ratio <= 1.0 + eps
         return change_ratio
 
-    def step(
+    def update_noise(
         self, t_curr_latents: torch.Tensor, pred_noise: torch.Tensor, t_curr: float, t_prev: float
     ) -> torch.Tensor:
         # Handle gradient cutoff.
@@ -131,5 +131,4 @@ class TrajectoryGuidanceExtension:
         # Blend the init_traj_noise with the pred_noise according to the inpaint mask and the trajectory guidance.
         noise = pred_noise * mask + init_traj_noise * (1.0 - mask)
 
-        # Take a denoising step.
-        return t_curr_latents + (t_prev - t_curr) * noise
+        return noise
