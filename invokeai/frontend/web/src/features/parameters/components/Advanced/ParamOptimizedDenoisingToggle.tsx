@@ -25,7 +25,7 @@ export const ParamOptimizedDenoisingToggle = memo(() => {
   return (
     <FormControl w="min-content">
       <InformationalPopover feature="optimizedDenoising">
-        <FormLabel m={0}>{t('parameters.optimizedDenoising')}</FormLabel>
+        <FormLabel m={0}>{t('parameters.optimizedInpainting')}</FormLabel>
       </InformationalPopover>
       <Switch isChecked={optimizedDenoisingEnabled} onChange={onChange} />
     </FormControl>
