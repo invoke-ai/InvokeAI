@@ -22,7 +22,7 @@ export const zColorField = z.object({
 });
 export type ColorField = z.infer<typeof zColorField>;
 
-export const zClassification = z.enum(['stable', 'beta', 'prototype', 'deprecated']);
+export const zClassification = z.enum(['stable', 'beta', 'prototype', 'deprecated', 'internal']);
 export type Classification = z.infer<typeof zClassification>;
 
 export const zSchedulerField = z.enum([
