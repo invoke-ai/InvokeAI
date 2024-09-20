@@ -28,7 +28,6 @@ export const ToolRectButton = memo(() => {
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="solid"
       onClick={selectRect}
-      isDisabled={isSelected}
     />
   );
 });

@@ -28,7 +28,6 @@ export const ToolBboxButton = memo(() => {
       colorScheme={isSelected ? 'invokeBlue' : 'base'}
       variant="solid"
       onClick={selectBbox}
-      isDisabled={isSelected}
     />
   );
 });
