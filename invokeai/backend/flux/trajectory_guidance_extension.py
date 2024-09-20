@@ -55,7 +55,7 @@ class TrajectoryGuidanceExtension:
             # This value will be broadcasted and treated as a mask of all 1s.
             self._inpaint_mask = torch.ones(1, device=init_latents.device, dtype=init_latents.dtype)
         else:
-            self._inpaint_mask = self._inpaint_mask
+            self._inpaint_mask = inpaint_mask
 
     def step(
         self, t_curr_latents: torch.Tensor, pred_noise: torch.Tensor, t_curr: float, t_prev: float
