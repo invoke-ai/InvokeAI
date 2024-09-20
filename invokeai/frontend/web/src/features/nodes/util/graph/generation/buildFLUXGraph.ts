@@ -102,8 +102,8 @@ export const buildFLUXGraph = async (
   g.upsertMetadata({
     generation_mode: 'flux_txt2img',
     guidance,
-    width: scaledSize.width,
-    height: scaledSize.height,
+    width: originalSize.width,
+    height: originalSize.height,
     positive_prompt: positivePrompt,
     model: Graph.getModelMetadataField(modelConfig),
     seed,
