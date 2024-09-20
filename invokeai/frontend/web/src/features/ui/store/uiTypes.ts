@@ -26,7 +26,7 @@ export interface UIState {
    */
   expanders: Record<string, boolean>;
   /**
-   * Whether or not to show the user an indicator on notifications icon.
+   * Whether or not to show the user the open notification.
    */
-  shouldShowNotificationIndicator: boolean;
+  shouldShowNotification: boolean;
 }

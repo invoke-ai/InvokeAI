@@ -1,18 +1,18 @@
 import {
-  Box,
   Flex,
   IconButton,
   Image,
   Popover,
   PopoverArrow,
   PopoverBody,
+  PopoverCloseButton,
   PopoverContent,
   PopoverHeader,
   PopoverTrigger,
   Text,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { shouldShowNotificationIndicatorChanged } from 'features/ui/store/uiSlice';
+import { shouldShowNotificationChanged } from 'features/ui/store/uiSlice';
 import InvokeSymbol from 'public/assets/images/invoke-favicon.png';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,9 +24,9 @@ import { CanvasV2Announcement } from './CanvasV2Announcement';
 export const Notifications = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const shouldShowNotificationIndicator = useAppSelector((s) => s.ui.shouldShowNotificationIndicator);
+  const shouldShowNotification = useAppSelector((s) => s.ui.shouldShowNotification);
   const resetIndicator = useCallback(() => {
-    dispatch(shouldShowNotificationIndicatorChanged(false));
+    dispatch(shouldShowNotificationChanged(false));
   }, [dispatch]);
   const { data } = useGetAppVersionQuery();
 
@@ -35,7 +35,7 @@ export const Notifications = () => {
   }
 
   return (
-    <Popover onOpen={resetIndicator} placement="top-start">
+    <Popover onClose={resetIndicator} placement="top-start" autoFocus={false} defaultIsOpen={shouldShowNotification}>
       <PopoverTrigger>
         <Flex pos="relative">
           <IconButton
@@ -44,22 +44,12 @@ export const Notifications = () => {
             icon={<PiLightbulbFilamentBold fontSize={20} />}
             boxSize={8}
           />
-          {shouldShowNotificationIndicator && (
-            <Box
-              pos="absolute"
-              top={0}
-              right="2px"
-              w={2}
-              h={2}
-              backgroundColor="invokeYellow.500"
-              borderRadius="100%"
-            />
-          )}
         </Flex>
       </PopoverTrigger>
       <PopoverContent p={2}>
         <PopoverArrow />
-        <PopoverHeader fontSize="md" fontWeight="semibold">
+        <PopoverCloseButton />
+        <PopoverHeader fontSize="md" fontWeight="semibold" pt={5}>
           <Flex alignItems="center" gap={3}>
             <Image src={InvokeSymbol} boxSize={6} />
             {t('whatsNew.whatsNewInInvoke')}
