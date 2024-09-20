@@ -1,4 +1,4 @@
-import { Box, Button, Collapse, Divider, Flex, IconButton, Spacer, useDisclosure } from '@invoke-ai/ui-library';
+import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
@@ -52,18 +52,19 @@ const GalleryPanelContent = () => {
 
   return (
     <Flex ref={ref} position="relative" flexDirection="column" h="full" w="full" tabIndex={-1}>
-      <GalleryHeader />
       <Flex alignItems="center" w="full">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={boardsListPanel.toggle}
-          rightIcon={boardsListPanel.isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
-        >
-          {boardsListPanel.isCollapsed ? t('boards.viewBoards') : t('boards.hideBoards')}
-        </Button>
-        <Spacer />
-        <Flex h="full">
+        <Flex w="25%">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={boardsListPanel.toggle}
+            rightIcon={boardsListPanel.isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
+          >
+            {boardsListPanel.isCollapsed ? t('boards.viewBoards') : t('boards.hideBoards')}
+          </Button>
+        </Flex>
+        <GalleryHeader />
+        <Flex h="full" w="25%" justifyContent="flex-end">
           <GallerySettingsPopover />
           <IconButton
             size="sm"
