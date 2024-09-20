@@ -3,8 +3,9 @@ import { Expander, Flex, FormControlGroup, StandaloneAccordion } from '@invoke-a
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectIsFLUX, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectScaleMethod } from 'features/controlLayers/store/selectors';
+import { ParamOptimizedDenoisingToggle } from 'features/parameters/components/Advanced/ParamOptimizedDenoisingToggle';
 import BboxScaledHeight from 'features/parameters/components/Bbox/BboxScaledHeight';
 import BboxScaledWidth from 'features/parameters/components/Bbox/BboxScaledWidth';
 import BboxScaleMethod from 'features/parameters/components/Bbox/BboxScaleMethod';
@@ -59,6 +60,7 @@ export const ImageSettingsAccordion = memo(() => {
     id: 'image-settings-advanced',
     defaultIsOpen: false,
   });
+  const isFLUX = useAppSelector(selectIsFLUX);
 
   return (
     <StandaloneAccordion
@@ -77,6 +79,7 @@ export const ImageSettingsAccordion = memo(() => {
         <ParamDenoisingStrength />
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
+            {isFLUX && <ParamOptimizedDenoisingToggle />}
             <BboxScaleMethod />
             {scaleMethod !== 'none' && (
               <FormControlGroup formLabelProps={scalingLabelProps}>

@@ -1042,6 +1042,7 @@
         "strength": "Strength",
         "symmetry": "Symmetry",
         "tileSize": "Tile Size",
+        "optimizedInpainting": "Optimized Inpainting",
         "type": "Type",
         "postProcessing": "Post-Processing (Shift + U)",
         "processImage": "Process Image",
@@ -1546,6 +1547,12 @@
             "heading": "Non-Commercial License",
             "paragraphs": [
                 "FLUX.1 [dev] models are licensed under the FLUX [dev] non-commercial license. To use this model type for commercial purposes in Invoke, visit our website to learn more."
+            ]
+        },
+        "optimizedDenoising": {
+            "heading": "Optimized Inpainting",
+            "paragraphs": [
+                "Enable optimized denoising for enhanced inpainting transformations with Flux models. This setting improves detail and clarity during generation, but may be turned off to preserve more of your original image."
             ]
         }
     },

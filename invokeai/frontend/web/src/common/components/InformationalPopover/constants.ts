@@ -60,6 +60,7 @@ export type Feature =
   | 'scale'
   | 'creativity'
   | 'structure'
+  | 'optimizedDenoising'
   | 'fluxDevLicense';
 
 export type PopoverData = PopoverProps & {
