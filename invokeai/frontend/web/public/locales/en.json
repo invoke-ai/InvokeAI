@@ -1040,6 +1040,7 @@
         "strength": "Strength",
         "symmetry": "Symmetry",
         "tileSize": "Tile Size",
+        "optimizedDenoising": "Optimized Denoising",
         "type": "Type",
         "postProcessing": "Post-Processing (Shift + U)",
         "processImage": "Process Image",
@@ -1538,6 +1539,12 @@
             "heading": "Structure",
             "paragraphs": [
                 "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
+            ]
+        },
+        "optimizedDenoising": {
+            "heading": "Optimized Denoising",
+            "paragraphs": [
+                "Enable optimized denoising for enhanced image-to-image transformations with Flux models. This setting improves detail and clarity during generation, but may be turned off to preserve more of your original image."
             ]
         }
     },
