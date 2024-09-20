@@ -67,7 +67,7 @@ import {
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import { get, isArray, isString } from 'lodash-es';
-import { getImageDTO } from 'services/api/endpoints/images';
+import { getImageDTOSafe } from 'services/api/endpoints/images';
 import {
   isControlNetModelConfig,
   isIPAdapterModelConfig,
@@ -603,7 +603,7 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasReferenceImageStat
     begin_step_percent ?? initialIPAdapter.beginEndStepPct[0],
     end_step_percent ?? initialIPAdapter.beginEndStepPct[1],
   ];
-  const imageDTO = image ? await getImageDTO(image.image_name) : null;
+  const imageDTO = image ? await getImageDTOSafe(image.image_name) : null;
 
   const layer: CanvasReferenceImageState = {
     id: getPrefixedId('ip_adapter'),

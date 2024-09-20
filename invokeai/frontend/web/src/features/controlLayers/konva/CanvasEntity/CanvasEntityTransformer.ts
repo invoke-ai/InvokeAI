@@ -1,3 +1,4 @@
+import { withResultAsync } from 'common/util/result';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -15,6 +16,7 @@ import type { GroupConfig } from 'konva/lib/Group';
 import { debounce, get } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
+import { serializeError } from 'serialize-error';
 import { assert } from 'tsafe';
 
 type CanvasEntityTransformerConfig = {
@@ -575,7 +577,12 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.log.debug('Applying transform');
     this.$isProcessing.set(true);
     const rect = this.getRelativeRect();
-    await this.parent.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1, filters: [] } });
+    const rasterizeResult = await withResultAsync(() =>
+      this.parent.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1, filters: [] } })
+    );
+    if (rasterizeResult.isErr()) {
+      this.log.error({ error: serializeError(rasterizeResult.error) }, 'Failed to rasterize entity');
+    }
     this.requestRectCalculation();
     this.stopTransform();
   };

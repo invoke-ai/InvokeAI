@@ -32,10 +32,12 @@ export type GraphType = { id: string; nodes: Record<string, AnyInvocation>; edge
 export class Graph {
   _graph: GraphType;
   _metadataNodeId = getPrefixedId('core_metadata');
+  id: string;
 
   constructor(id?: string) {
+    this.id = id ?? Graph.getId('graph');
     this._graph = {
-      id: id ?? uuidv4(),
+      id: this.id,
       nodes: {},
       edges: [],
     };

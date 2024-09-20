@@ -4,7 +4,7 @@ import { useImageViewer } from 'features/gallery/components/ImageViewer/useImage
 import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useWorkflowLibraryModal } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 export type StudioDestination =
   | 'generation'
@@ -16,22 +16,26 @@ export type StudioDestination =
 
 export const useHandleStudioDestination = () => {
   const dispatch = useAppDispatch();
-  const imageViewer = useImageViewer();
+  const { open: imageViewerOpen, close: imageViewerClose } = useImageViewer();
+  const [initialized, setInitialized] = useState(false);
 
   const workflowLibraryModal = useWorkflowLibraryModal();
 
   const handleStudioDestination = useCallback(
     (destination: StudioDestination) => {
+      if (initialized) {
+        return;
+      }
       switch (destination) {
         case 'generation':
           dispatch(setActiveTab('canvas'));
           dispatch(settingsSendToCanvasChanged(false));
-          imageViewer.open();
+          imageViewerOpen();
           break;
         case 'canvas':
           dispatch(setActiveTab('canvas'));
           dispatch(settingsSendToCanvasChanged(true));
-          imageViewer.close();
+          imageViewerClose();
           break;
         case 'workflows':
           dispatch(setActiveTab('workflows'));
@@ -41,7 +45,7 @@ export const useHandleStudioDestination = () => {
           break;
         case 'viewAllWorkflows':
           dispatch(setActiveTab('workflows'));
-          workflowLibraryModal.setFalse();
+          workflowLibraryModal.setTrue();
           break;
         case 'viewAllStylePresets':
           dispatch(setActiveTab('canvas'));
@@ -51,8 +55,9 @@ export const useHandleStudioDestination = () => {
           dispatch(setActiveTab('canvas'));
           break;
       }
+      setInitialized(true);
     },
-    [dispatch, imageViewer, workflowLibraryModal]
+    [dispatch, imageViewerOpen, imageViewerClose, workflowLibraryModal, initialized]
   );
 
   return handleStudioDestination;

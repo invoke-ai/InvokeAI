@@ -1,3 +1,5 @@
+import { logger } from 'app/logging/logger';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import type {
   CanvasControlLayerState,
@@ -6,8 +8,11 @@ import type {
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { serializeError } from 'serialize-error';
 import type { BaseModelType, ImageDTO, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
+
+const log = logger('system');
 
 type AddControlNetsResult = {
   addedControlNets: number;
@@ -33,9 +38,17 @@ export const addControlNets = async (
   for (const layer of validControlLayers) {
     result.addedControlNets++;
 
-    const adapter = manager.adapters.controlLayers.get(layer.id);
-    assert(adapter, 'Adapter not found');
-    const imageDTO = await adapter.renderer.rasterize({ rect, attrs: { opacity: 1, filters: [] }, bg: 'black' });
+    const getImageDTOResult = await withResultAsync(() => {
+      const adapter = manager.adapters.controlLayers.get(layer.id);
+      assert(adapter, 'Adapter not found');
+      return adapter.renderer.rasterize({ rect, attrs: { opacity: 1, filters: [] }, bg: 'black' });
+    });
+    if (getImageDTOResult.isErr()) {
+      log.warn({ error: serializeError(getImageDTOResult.error) }, 'Error rasterizing control layer');
+      continue;
+    }
+
+    const imageDTO = getImageDTOResult.value;
     addControlNetToGraph(g, layer, imageDTO, collector);
   }
 
@@ -66,9 +79,17 @@ export const addT2IAdapters = async (
   for (const layer of validControlLayers) {
     result.addedT2IAdapters++;
 
-    const adapter = manager.adapters.controlLayers.get(layer.id);
-    assert(adapter, 'Adapter not found');
-    const imageDTO = await adapter.renderer.rasterize({ rect, attrs: { opacity: 1, filters: [], bg: 'black' } });
+    const getImageDTOResult = await withResultAsync(() => {
+      const adapter = manager.adapters.controlLayers.get(layer.id);
+      assert(adapter, 'Adapter not found');
+      return adapter.renderer.rasterize({ rect, attrs: { opacity: 1, filters: [] }, bg: 'black' });
+    });
+    if (getImageDTOResult.isErr()) {
+      log.warn({ error: serializeError(getImageDTOResult.error) }, 'Error rasterizing control layer');
+      continue;
+    }
+
+    const imageDTO = getImageDTOResult.value;
     addT2IAdapterToGraph(g, layer, imageDTO, collector);
   }
 

@@ -4,7 +4,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectIsFLUX, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectScaleMethod } from 'features/controlLayers/store/selectors';
 import { ParamOptimizedDenoisingToggle } from 'features/parameters/components/Advanced/ParamOptimizedDenoisingToggle';
 import BboxScaledHeight from 'features/parameters/components/Bbox/BboxScaledHeight';
 import BboxScaledWidth from 'features/parameters/components/Bbox/BboxScaledWidth';
@@ -51,6 +51,7 @@ const scalingLabelProps: FormLabelProps = {
 export const ImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const badges = useAppSelector(selectBadges);
+  const scaleMethod = useAppSelector(selectScaleMethod);
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
     id: 'image-settings',
     defaultIsOpen: true,
@@ -80,10 +81,12 @@ export const ImageSettingsAccordion = memo(() => {
           <Flex gap={4} pb={4} flexDir="column">
             {isFLUX && <ParamOptimizedDenoisingToggle />}
             <BboxScaleMethod />
-            <FormControlGroup formLabelProps={scalingLabelProps}>
-              <BboxScaledWidth />
-              <BboxScaledHeight />
-            </FormControlGroup>
+            {scaleMethod !== 'none' && (
+              <FormControlGroup formLabelProps={scalingLabelProps}>
+                <BboxScaledWidth />
+                <BboxScaledHeight />
+              </FormControlGroup>
+            )}
           </Flex>
         </Expander>
       </Flex>

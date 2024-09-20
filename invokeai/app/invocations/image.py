@@ -10,7 +10,6 @@ from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     Classification,
     invocation,
-    invocation_output,
 )
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import (
@@ -18,7 +17,6 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
     InputField,
-    OutputField,
     WithBoard,
     WithMetadata,
 )
@@ -1015,19 +1013,13 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
         return ImageOutput.build(image_dto)
 
 
-@invocation_output("canvas_v2_mask_and_crop_output")
-class CanvasV2MaskAndCropOutput(ImageOutput):
-    offset_x: int = OutputField(description="The x offset of the image, after cropping")
-    offset_y: int = OutputField(description="The y offset of the image, after cropping")
-
-
 @invocation(
     "canvas_v2_mask_and_crop",
     title="Canvas V2 Mask and Crop",
     tags=["image", "mask", "id"],
     category="image",
     version="1.0.0",
-    classification=Classification.Prototype,
+    classification=Classification.Internal,
 )
 class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Handles Canvas V2 image output masking and cropping"""
@@ -1049,7 +1041,7 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
             mask = dilated_mask.filter(ImageFilter.GaussianBlur(self.mask_blur))
         return ImageOps.invert(mask.convert("L"))
 
-    def invoke(self, context: InvocationContext) -> CanvasV2MaskAndCropOutput:
+    def invoke(self, context: InvocationContext) -> ImageOutput:
         mask = self._prepare_mask(context.images.get_pil(self.mask.image_name))
 
         if self.source_image:
@@ -1062,13 +1054,4 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
             generated_image.putalpha(mask)
             image_dto = context.images.save(image=generated_image)
 
-        # bbox = image.getbbox()
-        # image = image.crop(bbox)
-
-        return CanvasV2MaskAndCropOutput(
-            image=ImageField(image_name=image_dto.image_name),
-            offset_x=0,
-            offset_y=0,
-            width=image_dto.width,
-            height=image_dto.height,
-        )
+        return ImageOutput.build(image_dto)
