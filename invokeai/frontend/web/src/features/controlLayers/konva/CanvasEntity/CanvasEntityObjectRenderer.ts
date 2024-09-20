@@ -27,7 +27,7 @@ import { debounce } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
-import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
+import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -383,7 +383,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     const cachedImageName = this.manager.cache.imageNameCache.get(hash);
 
     if (cachedImageName) {
-      imageDTO = await getImageDTO(cachedImageName);
+      imageDTO = await getImageDTOSafe(cachedImageName);
       if (imageDTO) {
         this.log.trace({ rect, cachedImageName, imageDTO }, 'Using cached rasterized image');
         return imageDTO;

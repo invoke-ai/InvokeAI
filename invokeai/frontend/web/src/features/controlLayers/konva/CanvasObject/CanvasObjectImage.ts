@@ -11,7 +11,7 @@ import type { CanvasImageState } from 'features/controlLayers/store/types';
 import { t } from 'i18next';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
-import { getImageDTO } from 'services/api/endpoints/images';
+import { getImageDTOSafe } from 'services/api/endpoints/images';
 
 export class CanvasObjectImage extends CanvasModuleBase {
   readonly type = 'object_image';
@@ -100,7 +100,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
         this.konva.placeholder.text.text(t('common.loadingImage', 'Loading Image'));
       }
 
-      const imageDTO = await getImageDTO(imageName);
+      const imageDTO = await getImageDTOSafe(imageName);
       if (imageDTO === null) {
         this.onFailedToLoadImage();
         return;

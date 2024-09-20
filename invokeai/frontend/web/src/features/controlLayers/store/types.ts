@@ -7,7 +7,7 @@ import {
   zParameterNegativePrompt,
   zParameterPositivePrompt,
 } from 'features/parameters/types/parameterSchemas';
-import { getImageDTO } from 'services/api/endpoints/images';
+import { getImageDTOSafe } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { z } from 'zod';
 
@@ -31,7 +31,7 @@ const zImageWithDims = z
   })
   .refine(async (v) => {
     const { image_name } = v;
-    const imageDTO = await getImageDTO(image_name, true);
+    const imageDTO = await getImageDTOSafe(image_name, { forceRefetch: true });
     return imageDTO !== null;
   });
 export type ImageWithDims = z.infer<typeof zImageWithDims>;
