@@ -34,7 +34,7 @@
   ],
   "meta": {
     "version": "3.0.0",
-    "category": "user"
+    "category": "default"
   },
   "nodes": [
     {
@@ -43,7 +43,7 @@
       "data": {
         "id": "eebd7252-0bd8-401a-bb26-2b8bc64892fa",
         "type": "flux_denoise",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "label": "",
         "notes": "",
         "isOpen": true,
