@@ -37,7 +37,17 @@ export const buildFLUXGraph = async (
 
   const { originalSize, scaledSize } = getSizes(bbox);
 
-  const { model, guidance, seed, steps, fluxVAE, t5EncoderModel, clipEmbedModel, img2imgStrength } = params;
+  const {
+    model,
+    guidance,
+    seed,
+    steps,
+    fluxVAE,
+    t5EncoderModel,
+    clipEmbedModel,
+    img2imgStrength,
+    optimizedDenoisingEnabled,
+  } = params;
 
   assert(model, 'No model found in state');
   assert(t5EncoderModel, 'No T5 Encoder model found in state');
@@ -68,7 +78,8 @@ export const buildFLUXGraph = async (
     guidance,
     num_steps: steps,
     seed,
-    denoising_start: 0, // denoising_start should be 0 when latents are not provided
+    trajectory_guidance_strength: 0,
+    denoising_start: 0,
     denoising_end: 1,
     width: scaledSize.width,
     height: scaledSize.height,
@@ -113,6 +124,8 @@ export const buildFLUXGraph = async (
     clip_embed_model: clipEmbedModel,
   });
 
+  const denoisingValue = 1 - img2imgStrength;
+
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
   } else if (generationMode === 'img2img') {
@@ -125,9 +138,15 @@ export const buildFLUXGraph = async (
       originalSize,
       scaledSize,
       bbox,
-      1 - img2imgStrength,
+      denoisingValue,
       false
     );
+    if (optimizedDenoisingEnabled) {
+      g.updateNode(noise, {
+        denoising_start: 0,
+        trajectory_guidance_strength: denoisingValue,
+      });
+    }
   } else if (generationMode === 'inpaint') {
     canvasOutput = await addInpaint(
       state,
@@ -139,9 +158,15 @@ export const buildFLUXGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      1 - img2imgStrength,
+      denoisingValue,
       false
     );
+    if (optimizedDenoisingEnabled) {
+      g.updateNode(noise, {
+        denoising_start: 0,
+        trajectory_guidance_strength: denoisingValue,
+      });
+    }
   } else if (generationMode === 'outpaint') {
     canvasOutput = await addOutpaint(
       state,
@@ -153,9 +178,15 @@ export const buildFLUXGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      1 - img2imgStrength,
+      denoisingValue,
       false
     );
+    if (optimizedDenoisingEnabled) {
+      g.updateNode(noise, {
+        denoising_start: 0,
+        trajectory_guidance_strength: denoisingValue,
+      });
+    }
   }
 
   if (state.system.shouldUseNSFWChecker) {

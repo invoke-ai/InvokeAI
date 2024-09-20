@@ -58,7 +58,8 @@ export type Feature =
   | 'upscaleModel'
   | 'scale'
   | 'creativity'
-  | 'structure';
+  | 'structure'
+  | 'optimizedDenoising';
 
 export type PopoverData = PopoverProps & {
   image?: string;

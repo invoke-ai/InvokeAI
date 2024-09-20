@@ -5706,7 +5706,7 @@ export type components = {
         };
         /**
          * FLUX LoRA Collection Loader
-         * @description Applies a collection of FLUX LoRAs to the provided UNet and CLIP models.
+         * @description Applies a collection of LoRAs to a FLUX transformer.
          */
         FLUXLoRACollectionLoader: {
             /**
@@ -6372,6 +6372,12 @@ export type components = {
              */
             denoising_end?: number;
             /**
+             * Trajectory Guidance Strength
+             * @description Value indicating how strongly to guide the denoising process towards the initial latents (during image-to-image). Range [0, 1]. A value of 0.0 is equivalent to vanilla image-to-image. A value of 1.0 will guide the denoising process very close to the original latents.
+             * @default 0
+             */
+            trajectory_guidance_strength?: number;
+            /**
              * Transformer
              * @description Flux model (Transformer) to load
              * @default null
@@ -6478,7 +6484,7 @@ export type components = {
              * @description Transformer
              * @default null
              */
-            transformer: components["schemas"]["TransformerField"];
+            transformer: components["schemas"]["TransformerField"] | null;
             /**
              * type
              * @default flux_lora_loader_output
