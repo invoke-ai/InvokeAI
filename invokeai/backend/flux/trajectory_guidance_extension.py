@@ -91,6 +91,9 @@ class TrajectoryGuidanceExtension:
                 x1=1.0, y1=self._change_ratio_at_t_1, x2=self._t_cutoff, y2=self._change_ratio_at_cutoff
             )(t_prev)
 
+        # The change_ratio should be in the range [0, 1]. Assert that we didn't make any mistakes.
+        eps = 1e-5
+        assert 0.0 - eps <= change_ratio <= 1.0 + eps
         return change_ratio
 
     def step(
