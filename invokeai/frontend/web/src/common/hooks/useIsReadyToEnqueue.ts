@@ -157,6 +157,9 @@ const createSelector = (
           if (!params.fluxVAE) {
             reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
           }
+          if (bbox.rect.width % 16 !== 0 || bbox.rect.height % 16 !== 0) {
+            reasons.push({ content: i18n.t('parameters.invoke.fluxModelIncompatibleDimensions') });
+          }
         }
 
         canvas.controlLayers.entities

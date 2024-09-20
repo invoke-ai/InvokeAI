@@ -993,6 +993,7 @@
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
             "canvasManagerNotLoaded": "Canvas Manager not loaded",
+            "fluxModelIncompatibleDimensions": "FLUX requires image dimension to be multiples of 16",
             "canvasIsFiltering": "Canvas is filtering",
             "canvasIsTransforming": "Canvas is transforming",
             "canvasIsRasterizing": "Canvas is rasterizing",
