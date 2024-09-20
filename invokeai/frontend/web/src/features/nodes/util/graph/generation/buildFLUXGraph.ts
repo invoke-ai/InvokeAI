@@ -124,7 +124,7 @@ export const buildFLUXGraph = async (
     clip_embed_model: clipEmbedModel,
   });
 
-  const denoisingStart = 1 - img2imgStrength;
+  const denoisingValue = 1 - img2imgStrength;
 
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
@@ -138,13 +138,13 @@ export const buildFLUXGraph = async (
       originalSize,
       scaledSize,
       bbox,
-      denoisingStart,
+      denoisingValue,
       false
     );
     if (optimizedDenoisingEnabled) {
       g.updateNode(noise, {
         denoising_start: 0,
-        trajectory_guidance_strength: img2imgStrength,
+        trajectory_guidance_strength: denoisingValue,
       });
     }
   } else if (generationMode === 'inpaint') {
@@ -158,13 +158,13 @@ export const buildFLUXGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      denoisingStart,
+      denoisingValue,
       false
     );
     if (optimizedDenoisingEnabled) {
       g.updateNode(noise, {
         denoising_start: 0,
-        trajectory_guidance_strength: img2imgStrength,
+        trajectory_guidance_strength: denoisingValue,
       });
     }
   } else if (generationMode === 'outpaint') {
@@ -178,13 +178,13 @@ export const buildFLUXGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      denoisingStart,
+      denoisingValue,
       false
     );
     if (optimizedDenoisingEnabled) {
       g.updateNode(noise, {
         denoising_start: 0,
-        trajectory_guidance_strength: img2imgStrength,
+        trajectory_guidance_strength: denoisingValue,
       });
     }
   }
