@@ -87,7 +87,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
 
   const getResultImageDTO = (data: S['InvocationCompleteEvent']) => {
     const { result } = data;
-    if (result.type === 'image_output' || result.type === 'canvas_v2_mask_and_crop_output') {
+    if (result.type === 'image_output') {
       return getImageDTOSafe(result.image.image_name);
     }
     return null;
@@ -123,10 +123,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     if (data.destination === 'canvas') {
       // TODO(psyche): Can/should we let canvas handle this itself?
       if (isCanvasOutputNode(data)) {
-        if (data.result.type === 'canvas_v2_mask_and_crop_output') {
-          const { offset_x, offset_y } = data.result;
-          dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
-        } else if (data.result.type === 'image_output') {
+        if (data.result.type === 'image_output') {
           dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
         }
         addImageToGallery(data, imageDTO);
