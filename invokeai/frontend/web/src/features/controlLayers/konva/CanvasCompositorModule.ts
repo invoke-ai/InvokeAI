@@ -14,7 +14,7 @@ import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import type { UploadOptions } from 'services/api/endpoints/images';
-import { getImageDTO, uploadImage } from 'services/api/endpoints/images';
+import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
@@ -210,7 +210,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     const cachedImageName = this.manager.cache.imageNameCache.get(hash);
 
     if (cachedImageName) {
-      imageDTO = await getImageDTO(cachedImageName);
+      imageDTO = await getImageDTOSafe(cachedImageName);
       if (imageDTO) {
         this.log.trace({ rect, imageName: cachedImageName, imageDTO }, 'Using cached composite raster layer image');
         return imageDTO;
@@ -374,7 +374,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     const cachedImageName = this.manager.cache.imageNameCache.get(hash);
 
     if (cachedImageName) {
-      imageDTO = await getImageDTO(cachedImageName);
+      imageDTO = await getImageDTOSafe(cachedImageName);
       if (imageDTO) {
         this.log.trace({ rect, cachedImageName, imageDTO }, 'Using cached composite inpaint mask image');
         return imageDTO;

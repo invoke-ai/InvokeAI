@@ -1,3 +1,4 @@
+import type { StartQueryActionCreatorOptions } from '@reduxjs/toolkit/dist/query/core/buildInitiate';
 import { getStore } from 'app/store/nanostores/store';
 import type { SerializableObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
@@ -568,23 +569,38 @@ export const {
 /**
  * Imperative RTKQ helper to fetch an ImageDTO.
  * @param image_name The name of the image to fetch
- * @param forceRefetch Whether to force a refetch of the image
- * @returns
+ * @param options The options for the query. By default, the query will not subscribe to the store.
+ * @returns The ImageDTO if found, otherwise null
  */
-export const getImageDTO = async (image_name: string, forceRefetch?: boolean): Promise<ImageDTO | null> => {
-  const options = {
+export const getImageDTOSafe = async (
+  image_name: string,
+  options?: StartQueryActionCreatorOptions
+): Promise<ImageDTO | null> => {
+  const _options = {
     subscribe: false,
-    forceRefetch,
+    ...options,
   };
-  const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, options));
+  const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, _options));
   try {
-    const imageDTO = await req.unwrap();
-    req.unsubscribe();
-    return imageDTO;
+    return await req.unwrap();
   } catch {
-    req.unsubscribe();
     return null;
   }
+};
+
+/**
+ * Imperative RTKQ helper to fetch an ImageDTO.
+ * @param image_name The name of the image to fetch
+ * @param options The options for the query. By default, the query will not subscribe to the store.
+ * @raises Error if the image is not found or there is an error fetching the image
+ */
+export const getImageDTO = (image_name: string, options?: StartQueryActionCreatorOptions): Promise<ImageDTO> => {
+  const _options = {
+    subscribe: false,
+    ...options,
+  };
+  const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, _options));
+  return req.unwrap();
 };
 
 export type UploadOptions = {
