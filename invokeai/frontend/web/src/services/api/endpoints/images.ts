@@ -612,7 +612,7 @@ export type UploadOptions = {
   board_id?: BoardId;
   metadata?: SerializableObject;
 };
-export const uploadImage = async (arg: UploadOptions): Promise<ImageDTO> => {
+export const uploadImage = (arg: UploadOptions): Promise<ImageDTO> => {
   const { blob, fileName, image_category, is_intermediate, crop_visible = false, board_id, metadata } = arg;
 
   const { dispatch } = getStore();
@@ -628,5 +628,5 @@ export const uploadImage = async (arg: UploadOptions): Promise<ImageDTO> => {
     })
   );
   req.reset();
-  return await req.unwrap();
+  return req.unwrap();
 };
