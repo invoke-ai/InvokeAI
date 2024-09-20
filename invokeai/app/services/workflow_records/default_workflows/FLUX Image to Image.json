@@ -2,7 +2,7 @@
   "name": "FLUX Image to Image",
   "author": "InvokeAI",
   "description": "A simple image-to-image workflow using a FLUX dev model. ",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "contact": "",
   "tags": "image2image, flux, image-to-image",
   "notes": "Prerequisite model downloads: T5 Encoder, CLIP-L Encoder, and FLUX VAE. Quantized and un-quantized versions can be found in the starter models tab within your Model Manager. We recommend using FLUX dev models for image-to-image workflows. The image-to-image performance with FLUX schnell models is poor.",
@@ -24,66 +24,32 @@
       "fieldName": "vae_model"
     },
     {
-      "nodeId": "ace0258f-67d7-4eee-a218-6fff27065214",
-      "fieldName": "denoising_start"
-    },
-    {
       "nodeId": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
       "fieldName": "prompt"
     },
     {
-      "nodeId": "ace0258f-67d7-4eee-a218-6fff27065214",
-      "fieldName": "num_steps"
+      "nodeId": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "fieldName": "image"
     }
   ],
   "meta": {
     "version": "3.0.0",
-    "category": "default"
+    "category": "user"
   },
   "nodes": [
     {
-      "id": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "id": "eebd7252-0bd8-401a-bb26-2b8bc64892fa",
       "type": "invocation",
       "data": {
-        "id": "2981a67c-480f-4237-9384-26b68dbf912b",
-        "type": "flux_vae_encode",
-        "version": "1.0.0",
-        "label": "",
-        "notes": "",
-        "isOpen": true,
-        "isIntermediate": true,
-        "useCache": true,
-        "inputs": {
-          "image": {
-            "name": "image",
-            "label": "",
-            "value": {
-              "image_name": "8a5c62aa-9335-45d2-9c71-89af9fc1f8d4.png"
-            }
-          },
-          "vae": {
-            "name": "vae",
-            "label": ""
-          }
-        }
-      },
-      "position": {
-        "x": 732.7680166609682,
-        "y": -24.37398171806909
-      }
-    },
-    {
-      "id": "ace0258f-67d7-4eee-a218-6fff27065214",
-      "type": "invocation",
-      "data": {
-        "id": "ace0258f-67d7-4eee-a218-6fff27065214",
+        "id": "eebd7252-0bd8-401a-bb26-2b8bc64892fa",
         "type": "flux_denoise",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "label": "",
         "notes": "",
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true,
+        "nodePack": "invokeai",
         "inputs": {
           "board": {
             "name": "board",
@@ -111,6 +77,11 @@
             "label": "",
             "value": 1
           },
+          "trajectory_guidance_strength": {
+            "name": "trajectory_guidance_strength",
+            "label": "",
+            "value": 0.0
+          },
           "transformer": {
             "name": "transformer",
             "label": ""
@@ -131,7 +102,7 @@
           },
           "num_steps": {
             "name": "num_steps",
-            "label": "Steps (Recommend 30 for Dev, 4 for Schnell)",
+            "label": "",
             "value": 30
           },
           "guidance": {
@@ -147,8 +118,36 @@
         }
       },
       "position": {
-        "x": 1182.8836633018684,
-        "y": -251.38882958913183
+        "x": 1159.584057771928,
+        "y": -175.90561201366845
+      }
+    },
+    {
+      "id": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "type": "invocation",
+      "data": {
+        "id": "2981a67c-480f-4237-9384-26b68dbf912b",
+        "type": "flux_vae_encode",
+        "version": "1.0.0",
+        "label": "",
+        "notes": "",
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true,
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          }
+        }
+      },
+      "position": {
+        "x": 732.7680166609682,
+        "y": -24.37398171806909
       }
     },
     {
@@ -202,18 +201,32 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "Model (dev variant recommended for Image-to-Image)"
+            "label": "Model (dev variant recommended for Image-to-Image)",
+            "value": {
+              "key": "b4990a6c-0899-48e9-969b-d6f3801acc6a",
+              "hash": "random:aad8f7bc19ce76541dfb394b62a30f77722542b66e48064a9f25453263b45fba",
+              "name": "FLUX Dev (Quantized)_2",
+              "base": "flux",
+              "type": "main"
+            }
           },
           "t5_encoder_model": {
             "name": "t5_encoder_model",
-            "label": ""
+            "label": "",
+            "value": {
+              "key": "d18d5575-96b6-4da3-b3d8-eb58308d6705",
+              "hash": "random:f2f9ed74acdfb4bf6fec200e780f6c25f8dd8764a35e65d425d606912fdf573a",
+              "name": "t5_bnb_int8_quantized_encoder",
+              "base": "any",
+              "type": "t5_encoder"
+            }
           },
           "clip_embed_model": {
             "name": "clip_embed_model",
             "label": "",
             "value": {
-              "key": "fa23a584-b623-415d-832a-21b5098ff1a1",
-              "hash": "blake3:17c19f0ef941c3b7609a9c94a659ca5364de0be364a91d4179f0e39ba17c3b70",
+              "key": "5a19d7e5-8d98-43cd-8a81-87515e4b3b4e",
+              "hash": "random:4bd08514c08fb6ff04088db9aeb45def3c488e8b5fd09a35f2cc4f2dc346f99f",
               "name": "clip-vit-large-patch14",
               "base": "any",
               "type": "clip_embed"
@@ -223,8 +236,8 @@
             "name": "vae_model",
             "label": "",
             "value": {
-              "key": "74fc82ba-c0a8-479d-a890-2126f82da758",
-              "hash": "blake3:ce21cb76364aa6e2421311cf4a4b5eb052a76c4f1cd207b50703d8978198a068",
+              "key": "9172beab-5c1d-43f0-b2f0-6e0b956710d9",
+              "hash": "random:c54dde288e5fa2e6137f1c92e9d611f598049e6f16e360207b6d96c9f5a67ba0",
               "name": "FLUX.1-schnell_ae",
               "base": "flux",
               "type": "vae"
@@ -308,28 +321,60 @@
   ],
   "edges": [
     {
-      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912bheight-ace0258f-67d7-4eee-a218-6fff27065214height",
+      "id": "reactflow__edge-eebd7252-0bd8-401a-bb26-2b8bc64892falatents-7e5172eb-48c1-44db-a770-8fd83e1435d1latents",
       "type": "default",
-      "source": "2981a67c-480f-4237-9384-26b68dbf912b",
-      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
-      "sourceHandle": "height",
-      "targetHandle": "height"
+      "source": "eebd7252-0bd8-401a-bb26-2b8bc64892fa",
+      "target": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
     },
     {
-      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912bwidth-ace0258f-67d7-4eee-a218-6fff27065214width",
+      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90transformer-eebd7252-0bd8-401a-bb26-2b8bc64892fatransformer",
+      "type": "default",
+      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "target": "eebd7252-0bd8-401a-bb26-2b8bc64892fa",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "reactflow__edge-01f674f8-b3d1-4df1-acac-6cb8e0bfb63cconditioning-eebd7252-0bd8-401a-bb26-2b8bc64892fapositive_text_conditioning",
+      "type": "default",
+      "source": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "target": "eebd7252-0bd8-401a-bb26-2b8bc64892fa",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_text_conditioning"
+    },
+    {
+      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912blatents-eebd7252-0bd8-401a-bb26-2b8bc64892falatents",
       "type": "default",
       "source": "2981a67c-480f-4237-9384-26b68dbf912b",
-      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
+      "target": "eebd7252-0bd8-401a-bb26-2b8bc64892fa",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
+    },
+    {
+      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912bwidth-eebd7252-0bd8-401a-bb26-2b8bc64892fawidth",
+      "type": "default",
+      "source": "2981a67c-480f-4237-9384-26b68dbf912b",
+      "target": "eebd7252-0bd8-401a-bb26-2b8bc64892fa",
       "sourceHandle": "width",
       "targetHandle": "width"
     },
     {
-      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912blatents-ace0258f-67d7-4eee-a218-6fff27065214latents",
+      "id": "reactflow__edge-2981a67c-480f-4237-9384-26b68dbf912bheight-eebd7252-0bd8-401a-bb26-2b8bc64892faheight",
       "type": "default",
       "source": "2981a67c-480f-4237-9384-26b68dbf912b",
-      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
-      "sourceHandle": "latents",
-      "targetHandle": "latents"
+      "target": "eebd7252-0bd8-401a-bb26-2b8bc64892fa",
+      "sourceHandle": "height",
+      "targetHandle": "height"
+    },
+    {
+      "id": "reactflow__edge-4754c534-a5f3-4ad0-9382-7887985e668cvalue-eebd7252-0bd8-401a-bb26-2b8bc64892faseed",
+      "type": "default",
+      "source": "4754c534-a5f3-4ad0-9382-7887985e668c",
+      "target": "eebd7252-0bd8-401a-bb26-2b8bc64892fa",
+      "sourceHandle": "value",
+      "targetHandle": "seed"
     },
     {
       "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90vae-2981a67c-480f-4237-9384-26b68dbf912bvae",
@@ -338,38 +383,6 @@
       "target": "2981a67c-480f-4237-9384-26b68dbf912b",
       "sourceHandle": "vae",
       "targetHandle": "vae"
-    },
-    {
-      "id": "reactflow__edge-ace0258f-67d7-4eee-a218-6fff27065214latents-7e5172eb-48c1-44db-a770-8fd83e1435d1latents",
-      "type": "default",
-      "source": "ace0258f-67d7-4eee-a218-6fff27065214",
-      "target": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
-      "sourceHandle": "latents",
-      "targetHandle": "latents"
-    },
-    {
-      "id": "reactflow__edge-4754c534-a5f3-4ad0-9382-7887985e668cvalue-ace0258f-67d7-4eee-a218-6fff27065214seed",
-      "type": "default",
-      "source": "4754c534-a5f3-4ad0-9382-7887985e668c",
-      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
-      "sourceHandle": "value",
-      "targetHandle": "seed"
-    },
-    {
-      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90transformer-ace0258f-67d7-4eee-a218-6fff27065214transformer",
-      "type": "default",
-      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
-      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
-      "sourceHandle": "transformer",
-      "targetHandle": "transformer"
-    },
-    {
-      "id": "reactflow__edge-01f674f8-b3d1-4df1-acac-6cb8e0bfb63cconditioning-ace0258f-67d7-4eee-a218-6fff27065214positive_text_conditioning",
-      "type": "default",
-      "source": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
-      "target": "ace0258f-67d7-4eee-a218-6fff27065214",
-      "sourceHandle": "conditioning",
-      "targetHandle": "positive_text_conditioning"
     },
     {
       "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90vae-7e5172eb-48c1-44db-a770-8fd83e1435d1vae",
