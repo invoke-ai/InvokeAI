@@ -4,8 +4,8 @@ from typing import List, Optional, TypedDict
 from diffusers.models import UNet2DConditionModel
 
 from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
-from invokeai.backend.stable_diffusion.diffusion.custom_atttention import (
-    CustomAttnProcessor2_0,
+from invokeai.backend.stable_diffusion.diffusion.custom_attention import (
+    CustomAttnProcessor,
     IPAdapterAttentionWeights,
 )
 
@@ -16,7 +16,7 @@ class UNetIPAdapterData(TypedDict):
 
 
 class UNetAttentionPatcher:
-    """A class for patching a UNet with CustomAttnProcessor2_0 attention layers."""
+    """A class for patching a UNet with CustomAttnProcessor attention layers."""
 
     def __init__(self, ip_adapter_data: Optional[List[UNetIPAdapterData]]):
         self._ip_adapters = ip_adapter_data
@@ -27,11 +27,12 @@ class UNetAttentionPatcher:
         Note that the `unet` param is only used to determine attention block dimensions and naming.
         """
         # Construct a dict of attention processors based on the UNet's architecture.
+
         attn_procs = {}
         for idx, name in enumerate(unet.attn_processors.keys()):
             if name.endswith("attn1.processor") or self._ip_adapters is None:
                 # "attn1" processors do not use IP-Adapters.
-                attn_procs[name] = CustomAttnProcessor2_0()
+                attn_procs[name] = CustomAttnProcessor()
             else:
                 # Collect the weights from each IP Adapter for the idx'th attention processor.
                 ip_adapter_attention_weights_collection: list[IPAdapterAttentionWeights] = []
@@ -48,12 +49,14 @@ class UNetAttentionPatcher:
                     )
                     ip_adapter_attention_weights_collection.append(ip_adapter_attention_weights)
 
-                attn_procs[name] = CustomAttnProcessor2_0(ip_adapter_attention_weights_collection)
+                attn_procs[name] = CustomAttnProcessor(
+                    ip_adapter_attention_weights=ip_adapter_attention_weights_collection,
+                )
 
         return attn_procs
 
     @contextmanager
-    def apply_ip_adapter_attention(self, unet: UNet2DConditionModel):
+    def apply_custom_attention(self, unet: UNet2DConditionModel):
         """A context manager that patches `unet` with CustomAttnProcessor2_0 attention layers."""
         attn_procs = self._prepare_attention_processors(unet)
         orig_attn_processors = unet.attn_processors

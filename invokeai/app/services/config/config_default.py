@@ -28,11 +28,11 @@ DEFAULT_RAM_CACHE = 10.0
 DEFAULT_VRAM_CACHE = 0.25
 DEVICE = Literal["auto", "cpu", "cuda", "cuda:1", "mps"]
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
-ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
-ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
+ATTENTION_TYPE = Literal["auto", "normal", "xformers", "torch-sdp"]
+ATTENTION_SLICE_SIZE = Literal["auto", "none", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
-CONFIG_SCHEMA_VERSION = "4.0.2"
+CONFIG_SCHEMA_VERSION = "4.0.3"
 
 
 def get_default_ram_cache_size() -> float:
@@ -108,8 +108,8 @@ class InvokeAIAppConfig(BaseSettings):
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `cuda:1`, `mps`
         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
-        attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
-        attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
+        attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `torch-sdp`
+        attention_slice_size: Slice size<br>Valid values: `auto`, `none`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
         max_queue_size: Maximum number of items in the session queue.
@@ -183,7 +183,7 @@ class InvokeAIAppConfig(BaseSettings):
     # GENERATION
     sequential_guidance:           bool = Field(default=False,              description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.")
     attention_type:      ATTENTION_TYPE = Field(default="auto",             description="Attention type.")
-    attention_slice_size: ATTENTION_SLICE_SIZE = Field(default="auto",      description='Slice size, valid when attention_type=="sliced".')
+    attention_slice_size: ATTENTION_SLICE_SIZE = Field(default="auto",      description='Slice size')
     force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).")
     pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
     max_queue_size:                 int = Field(default=10000, gt=0,        description="Maximum number of items in the session queue.")
@@ -440,6 +440,30 @@ def migrate_v4_0_1_to_4_0_2_config_dict(config_dict: dict[str, Any]) -> dict[str
     return parsed_config_dict
 
 
+def migrate_v4_0_2_to_4_0_3_config_dict(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate v4.0.2 config dictionary to a v4.0.3 config dictionary.
+
+    Args:
+        config_dict: A dictionary of settings from a v4.0.2 config file.
+
+    Returns:
+        An config dict with the settings migrated to v4.0.3.
+    """
+    parsed_config_dict: dict[str, Any] = copy.deepcopy(config_dict)
+    attention_type = parsed_config_dict.get("attention_type", None)
+
+    # now attention_slice_size means enabling slicing attention
+    if attention_type != "sliced" and "attention_slice_size" in parsed_config_dict:
+        del parsed_config_dict["attention_slice_size"]
+
+    # sliced moved to attention_slice_size
+    if attention_type == "sliced":
+        parsed_config_dict["attention_type"] = "auto"
+
+    parsed_config_dict["schema_version"] = "4.0.3"
+    return parsed_config_dict
+
+
 def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     """Load and migrate a config file to the latest version.
 
@@ -465,6 +489,9 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     if loaded_config_dict["schema_version"] == "4.0.1":
         migrated = True
         loaded_config_dict = migrate_v4_0_1_to_4_0_2_config_dict(loaded_config_dict)
+    if loaded_config_dict["schema_version"] == "4.0.2":
+        migrated = True
+        loaded_config_dict = migrate_v4_0_2_to_4_0_3_config_dict(loaded_config_dict)
 
     if migrated:
         shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))

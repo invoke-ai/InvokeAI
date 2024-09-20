@@ -802,8 +802,11 @@ except Exception:
 
 if xformers_available:
     # TODO: remove when fixed in diffusers
+    from invokeai.backend.stable_diffusion.diffusion.custom_attention import CustomAttnProcessor
+
     _xformers_memory_efficient_attention = xformers.ops.memory_efficient_attention
 
+    # TODO: remove? or there still possible calls to xformers not by our attention processor?
     def new_memory_efficient_attention(
         query: torch.Tensor,
         key: torch.Tensor,
@@ -815,16 +818,8 @@ if xformers_available:
         op=None,
     ):
         # diffusers not align shape to 8, which is required by xformers
-        if attn_bias is not None and type(attn_bias) is torch.Tensor:
-            orig_size = attn_bias.shape[-1]
-            new_size = ((orig_size + 7) // 8) * 8
-            aligned_attn_bias = torch.zeros(
-                (attn_bias.shape[0], attn_bias.shape[1], new_size),
-                device=attn_bias.device,
-                dtype=attn_bias.dtype,
-            )
-            aligned_attn_bias[:, :, :orig_size] = attn_bias
-            attn_bias = aligned_attn_bias[:, :, :orig_size]
+        if attn_bias is not None and isinstance(attn_bias, torch.Tensor):
+            attn_bias = CustomAttnProcessor._align_attention_mask_memory(attn_bias)
 
         return _xformers_memory_efficient_attention(
             query=query,
