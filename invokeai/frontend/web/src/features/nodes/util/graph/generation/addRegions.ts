@@ -1,4 +1,6 @@
+import { logger } from 'app/logging/logger';
 import { deepClone } from 'common/util/deepClone';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
@@ -8,8 +10,11 @@ import type {
   RegionalGuidanceReferenceImageState,
 } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { serializeError } from 'serialize-error';
 import type { BaseModelType, Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
+
+const log = logger('system');
 
 type AddedRegionResult = {
   addedPositivePrompt: boolean;
@@ -64,9 +69,18 @@ export const addRegions = async (
       addedAutoNegativePositivePrompt: false,
       addedIPAdapters: 0,
     };
-    const adapter = manager.adapters.regionMasks.get(region.id);
-    assert(adapter, 'Adapter not found');
-    const imageDTO = await adapter.renderer.rasterize({ rect: bbox });
+
+    const getImageDTOResult = await withResultAsync(() => {
+      const adapter = manager.adapters.regionMasks.get(region.id);
+      assert(adapter, 'Adapter not found');
+      return adapter.renderer.rasterize({ rect: bbox, attrs: { opacity: 1, filters: [] } });
+    });
+    if (getImageDTOResult.isErr()) {
+      log.warn({ error: serializeError(getImageDTOResult.error) }, 'Error rasterizing region mask');
+      continue;
+    }
+
+    const imageDTO = getImageDTOResult.value;
 
     // The main mask-to-tensor node
     const maskToTensor = g.addNode({
