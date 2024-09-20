@@ -13,7 +13,7 @@ const initialUIState: UIState = {
   shouldShowProgressInViewer: true,
   accordions: {},
   expanders: {},
-  shouldShowNotificationIndicator: true,
+  shouldShowNotification: true,
 };
 
 export const uiSlice = createSlice({
@@ -37,8 +37,8 @@ export const uiSlice = createSlice({
       const { id, isOpen } = action.payload;
       state.expanders[id] = isOpen;
     },
-    shouldShowNotificationIndicatorChanged: (state, action: PayloadAction<boolean>) => {
-      state.shouldShowNotificationIndicator = action.payload;
+    shouldShowNotificationChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldShowNotification = action.payload;
     },
   },
   extraReducers(builder) {
@@ -54,7 +54,7 @@ export const {
   setShouldShowProgressInViewer,
   accordionStateChanged,
   expanderStateChanged,
-  shouldShowNotificationIndicatorChanged,
+  shouldShowNotificationChanged,
 } = uiSlice.actions;
 
 export const selectUiSlice = (state: RootState) => state.ui;
