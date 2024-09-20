@@ -61,12 +61,14 @@ class Classification(str, Enum, metaclass=MetaEnum):
     - `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.
     - `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.
     - `Deprecated`: The invocation is deprecated and may be removed in a future version.
+    - `Internal`: The invocation is not intended for use by end-users. It may be changed or removed at any time, but is exposed for users to play with.
     """
 
     Stable = "stable"
     Beta = "beta"
     Prototype = "prototype"
     Deprecated = "deprecated"
+    Internal = "internal"
 
 
 class UIConfigBase(BaseModel):
