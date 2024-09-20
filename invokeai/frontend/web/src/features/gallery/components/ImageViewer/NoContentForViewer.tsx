@@ -1,8 +1,7 @@
-import { Flex, Image, Text } from '@invoke-ai/ui-library';
+import { Flex, Spinner, Text } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import Loading from 'common/components/Loading/Loading';
+import { InvokeLogoIcon } from 'common/components/InvokeLogoIcon';
 import { LOADING_SYMBOL, useHasImages } from 'features/gallery/hooks/useHasImages';
-import InvokeSymbol from 'public/assets/images/invoke-symbol-char-lrg.svg';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
 
@@ -11,7 +10,15 @@ export const NoContentForViewer = () => {
   const { t } = useTranslation();
 
   if (hasImages === LOADING_SYMBOL) {
-    return <Loading />;
+    return (
+      // Blank bg w/ a spinner. The new user experience components below have an invoke logo, but it's not centered.
+      // If we show the logo while loading, there is an awkward layout shift where the invoke logo moves a bit. Less
+      // jarring to show a blank bg with a spinner - it will only be shown for a moment as we do the initial images
+      // fetching.
+      <Flex position="relative" width="full" height="full" alignItems="center" justifyContent="center">
+        <Spinner label="Loading" color="grey" position="absolute" size="sm" width={8} height={8} right={4} bottom={4} />
+      </Flex>
+    );
   }
 
   if (hasImages) {
@@ -20,8 +27,8 @@ export const NoContentForViewer = () => {
 
   return (
     <Flex flexDir="column" gap={4} alignItems="center" textAlign="center" maxW="600px">
-      <Image src={InvokeSymbol} w="8rem" h="8rem" />
-      <Text fontSize="md" color="base.200">
+      <InvokeLogoIcon w={40} h={40} />
+      <Text fontSize="md" color="base.200" pt={16}>
         <Trans
           i18nKey="newUserExperience.toGetStarted"
           components={{
