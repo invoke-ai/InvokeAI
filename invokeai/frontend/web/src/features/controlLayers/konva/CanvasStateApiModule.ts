@@ -2,6 +2,7 @@ import { $alt, $ctrl, $meta, $shift } from '@invoke-ai/ui-library';
 import type { Selector } from '@reduxjs/toolkit';
 import { addAppListener } from 'app/store/middleware/listenerMiddleware';
 import type { AppStore, RootState } from 'app/store/store';
+import { withResultAsync } from 'common/util/result';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -38,10 +39,13 @@ import type {
   RgbaColor,
 } from 'features/controlLayers/store/types';
 import { RGBA_BLACK } from 'features/controlLayers/store/types';
+import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
+import { getImageDTO } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
-import type { BatchConfig } from 'services/api/types';
+import type { BatchConfig, ImageDTO, S } from 'services/api/types';
+import { QueueError } from 'services/events/errors';
 import { assert } from 'tsafe';
 
 import type { CanvasEntityAdapter } from './CanvasEntity/types';
@@ -187,14 +191,200 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   };
 
   /**
-   * Enqueues a batch, pushing state to redux.
+   * Run a graph and return an image output. The specified output node must return an image output, else the promise
+   * will reject with an error.
+   *
+   * @param arg The arguments for the function.
+   * @param arg.graph The graph to execute.
+   * @param arg.outputNodeId The id of the node whose output will be retrieved.
+   * @param arg.destination The destination to assign to the batch. If omitted, the destination is not set.
+   * @param arg.prepend Whether to prepend the graph to the front of the queue. If omitted, the graph is appended to the end of the queue.
+   * @param arg.timeout The timeout for the batch. If omitted, there is no timeout.
+   * @param arg.signal An optional signal to cancel the operation. If omitted, the operation cannot be canceled!
+   *
+   * @returns A promise that resolves to the image output or rejects with an error.
+   *
+   * @example
+   *
+   * ```ts
+   * const graph = new Graph();
+   * const outputNode = graph.addNode({ id: 'my-resize-node', type: 'img_resize', image: { image_name: 'my-image.png' } });
+   * const controller = new AbortController();
+   * const imageDTO = await this.manager.stateApi.runGraphAndReturnImageOutput({
+   *  graph,
+   *  outputNodeId: outputNode.id,
+   *  prepend: true,
+   *  signal: controller.signal,
+   * });
+   * // To cancel the operation:
+   * controller.abort();
+   * ```
    */
-  enqueueBatch = (batch: BatchConfig) => {
-    return this.store.dispatch(
+  runGraphAndReturnImageOutput = async (arg: {
+    graph: Graph;
+    outputNodeId: string;
+    destination?: string;
+    prepend?: boolean;
+    timeout?: number;
+    signal?: AbortSignal;
+  }): Promise<ImageDTO> => {
+    const { graph, outputNodeId, destination, prepend, timeout, signal } = arg;
+
+    /**
+     * We will use the origin to handle events from the graph. Ideally we'd just use the queue item's id, but there's a
+     * race condition:
+     * - The queue item id is not available until the graph is enqueued
+     * - The graph may complete before we can set up the listeners to handle the completion event
+     *
+     * The origin is the only unique identifier we have that is guaranteed to be available before the graph is enqueued,
+     * so we will use that to filter events.
+     */
+    const origin = getPrefixedId(graph.id);
+
+    const batch: BatchConfig = {
+      prepend,
+      batch: {
+        graph: graph.getGraph(),
+        origin,
+        destination,
+        runs: 1,
+      },
+    };
+
+    /**
+     * If a timeout is provided, we will cancel the graph if it takes too long - but we need a way to clear the timeout
+     * if the graph completes or errors before the timeout.
+     */
+    let timeoutId: number | null = null;
+    const _clearTimeout = () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+
+    /**
+     * First, enqueue the graph - we need the `batch_id` to cancel the graph. But to get the `batch_id`, we need to
+     * `await` the request. You might be tempted to `await` the request inside the result promise, but we should not
+     * `await` inside a promise executor.
+     *
+     * See: https://eslint.org/docs/latest/rules/no-async-promise-executor
+     */
+    const enqueueRequest = this.store.dispatch(
       queueApi.endpoints.enqueueBatch.initiate(batch, {
+        // Use the same cache key for all enqueueBatch requests, so that all consumers of this query get the same status
+        // updates.
         fixedCacheKey: 'enqueueBatch',
+        // We do not need RTK to track this request in the store
+        track: false,
       })
     );
+
+    // The `batch_id` should _always_ be present - the OpenAPI schema from which the types are generated is incorrect.
+    // TODO(psyche): Fix the OpenAPI schema.
+    const { batch_id } = (await enqueueRequest.unwrap()).batch;
+    assert(batch_id, 'Enqueue result is missing batch_id');
+
+    const resultPromise = new Promise<ImageDTO>((resolve, reject) => {
+      const invocationCompleteHandler = async (event: S['InvocationCompleteEvent']) => {
+        // Ignore events that are not for this graph
+        if (event.origin !== origin) {
+          return;
+        }
+        // Ignore events that are not from the output node
+        if (event.invocation_source_id !== outputNodeId) {
+          return;
+        }
+
+        // If we get here, the event is for the correct graph and output node.
+
+        // Clear the timeout and socket listeners
+        _clearTimeout();
+        clearListeners();
+
+        // The result must be an image output
+        const { result } = event;
+        if (result.type !== 'image_output') {
+          reject(new Error(`Graph output node did not return an image output, got: ${result}`));
+          return;
+        }
+
+        // Get the result image DTO
+        const getImageDTOResult = await withResultAsync(() => getImageDTO(result.image.image_name));
+        if (getImageDTOResult.isErr()) {
+          reject(getImageDTOResult.error);
+          return;
+        }
+
+        // Ok!
+        resolve(getImageDTOResult.value);
+      };
+
+      const queueItemStatusChangedHandler = (event: S['QueueItemStatusChangedEvent']) => {
+        // Ignore events that are not for this graph
+        if (event.origin !== origin) {
+          return;
+        }
+
+        // Ignore events where the status is pending or in progress - no need to do anything for these
+        if (event.status === 'pending' || event.status === 'in_progress') {
+          return;
+        }
+
+        // event.status is 'failed', 'canceled' or 'completed' - something has gone awry
+        _clearTimeout();
+        clearListeners();
+
+        if (event.status === 'completed') {
+          // If we get a queue item completed event, that means we never got a completion event for the output node!
+          reject(new Error('Queue item completed without output node completion event'));
+        } else if (event.status === 'failed') {
+          // We expect the event to have error details, but technically it's possible that it doesn't
+          const { error_type, error_message, error_traceback } = event;
+          if (error_type && error_message && error_traceback) {
+            reject(new QueueError(error_type, error_message, error_traceback));
+          } else {
+            reject(new Error('Queue item failed, but no error details were provided'));
+          }
+        } else {
+          // event.status is 'canceled'
+          reject(new Error('Graph canceled'));
+        }
+      };
+
+      this.manager.socket.on('invocation_complete', invocationCompleteHandler);
+      this.manager.socket.on('queue_item_status_changed', queueItemStatusChangedHandler);
+
+      const clearListeners = () => {
+        this.manager.socket.off('invocation_complete', invocationCompleteHandler);
+        this.manager.socket.off('queue_item_status_changed', queueItemStatusChangedHandler);
+      };
+
+      const cancelGraph = () => {
+        this.store.dispatch(queueApi.endpoints.cancelByBatchIds.initiate({ batch_ids: [batch_id] }, { track: false }));
+      };
+
+      if (timeout) {
+        timeoutId = window.setTimeout(() => {
+          this.log.trace('Graph canceled by timeout');
+          clearListeners();
+          cancelGraph();
+          reject(new Error('Graph timed out'));
+        }, timeout);
+      }
+
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          this.log.trace('Graph canceled by signal');
+          _clearTimeout();
+          clearListeners();
+          cancelGraph();
+          reject(new Error('Graph canceled'));
+        });
+      }
+    });
+
+    return resultPromise;
   };
 
   /**

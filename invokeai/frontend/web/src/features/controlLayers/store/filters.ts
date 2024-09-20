@@ -1,7 +1,8 @@
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import type { AnyInvocation, ControlNetModelConfig, Invocation, T2IAdapterModelConfig } from 'services/api/types';
+import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import { z } from 'zod';
 
@@ -132,7 +133,10 @@ export const isFilterType = (v: unknown): v is FilterType => zFilterType.safePar
 type ImageFilterData<T extends FilterConfig['type']> = {
   type: T;
   buildDefaults(): Extract<FilterConfig, { type: T }>;
-  buildNode(imageDTO: ImageWithDims, config: Extract<FilterConfig, { type: T }>): AnyInvocation;
+  buildGraph(
+    imageDTO: ImageWithDims,
+    config: Extract<FilterConfig, { type: T }>
+  ): { graph: Graph; outputNodeId: string };
   validateConfig?(config: Extract<FilterConfig, { type: T }>): boolean;
 };
 
@@ -144,13 +148,20 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       low_threshold: 100,
       high_threshold: 200,
     }),
-    buildNode: ({ image_name }, { low_threshold, high_threshold }): Invocation<'canny_edge_detection'> => ({
-      id: getPrefixedId('canny_edge_detection'),
-      type: 'canny_edge_detection',
-      image: { image_name },
-      low_threshold,
-      high_threshold,
-    }),
+    buildGraph: ({ image_name }, { low_threshold, high_threshold }) => {
+      const graph = new Graph(getPrefixedId('canny_edge_detection_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('canny_edge_detection'),
+        type: 'canny_edge_detection',
+        image: { image_name },
+        low_threshold,
+        high_threshold,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   color_map: {
     type: 'color_map',
@@ -158,12 +169,19 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       type: 'color_map',
       tile_size: 64,
     }),
-    buildNode: ({ image_name }, { tile_size }): Invocation<'color_map'> => ({
-      id: getPrefixedId('color_map'),
-      type: 'color_map',
-      image: { image_name },
-      tile_size,
-    }),
+    buildGraph: ({ image_name }, { tile_size }) => {
+      const graph = new Graph(getPrefixedId('color_map_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('color_map'),
+        type: 'color_map',
+        image: { image_name },
+        tile_size,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   content_shuffle: {
     type: 'content_shuffle',
@@ -171,12 +189,19 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       type: 'content_shuffle',
       scale_factor: 256,
     }),
-    buildNode: ({ image_name }, { scale_factor }): Invocation<'content_shuffle'> => ({
-      id: getPrefixedId('content_shuffle'),
-      type: 'content_shuffle',
-      image: { image_name },
-      scale_factor,
-    }),
+    buildGraph: ({ image_name }, { scale_factor }) => {
+      const graph = new Graph(getPrefixedId('content_shuffle_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('content_shuffle'),
+        type: 'content_shuffle',
+        image: { image_name },
+        scale_factor,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   depth_anything_depth_estimation: {
     type: 'depth_anything_depth_estimation',
@@ -184,12 +209,19 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       type: 'depth_anything_depth_estimation',
       model_size: 'small_v2',
     }),
-    buildNode: ({ image_name }, { model_size }): Invocation<'depth_anything_depth_estimation'> => ({
-      id: getPrefixedId('depth_anything_depth_estimation'),
-      type: 'depth_anything_depth_estimation',
-      image: { image_name },
-      model_size,
-    }),
+    buildGraph: ({ image_name }, { model_size }) => {
+      const graph = new Graph(getPrefixedId('depth_anything_depth_estimation_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('depth_anything_depth_estimation'),
+        type: 'depth_anything_depth_estimation',
+        image: { image_name },
+        model_size,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   hed_edge_detection: {
     type: 'hed_edge_detection',
@@ -197,23 +229,37 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       type: 'hed_edge_detection',
       scribble: false,
     }),
-    buildNode: ({ image_name }, { scribble }): Invocation<'hed_edge_detection'> => ({
-      id: getPrefixedId('hed_edge_detection'),
-      type: 'hed_edge_detection',
-      image: { image_name },
-      scribble,
-    }),
+    buildGraph: ({ image_name }, { scribble }) => {
+      const graph = new Graph(getPrefixedId('hed_edge_detection_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('hed_edge_detection'),
+        type: 'hed_edge_detection',
+        image: { image_name },
+        scribble,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   lineart_anime_edge_detection: {
     type: 'lineart_anime_edge_detection',
     buildDefaults: () => ({
       type: 'lineart_anime_edge_detection',
     }),
-    buildNode: ({ image_name }): Invocation<'lineart_anime_edge_detection'> => ({
-      id: getPrefixedId('lineart_anime_edge_detection'),
-      type: 'lineart_anime_edge_detection',
-      image: { image_name },
-    }),
+    buildGraph: ({ image_name }) => {
+      const graph = new Graph(getPrefixedId('lineart_anime_edge_detection_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('lineart_anime_edge_detection'),
+        type: 'lineart_anime_edge_detection',
+        image: { image_name },
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   lineart_edge_detection: {
     type: 'lineart_edge_detection',
@@ -221,12 +267,19 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       type: 'lineart_edge_detection',
       coarse: false,
     }),
-    buildNode: ({ image_name }, { coarse }): Invocation<'lineart_edge_detection'> => ({
-      id: getPrefixedId('lineart_edge_detection'),
-      type: 'lineart_edge_detection',
-      image: { image_name },
-      coarse,
-    }),
+    buildGraph: ({ image_name }, { coarse }) => {
+      const graph = new Graph(getPrefixedId('lineart_edge_detection_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('lineart_edge_detection'),
+        type: 'lineart_edge_detection',
+        image: { image_name },
+        coarse,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   mediapipe_face_detection: {
     type: 'mediapipe_face_detection',
@@ -235,13 +288,20 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       max_faces: 1,
       min_confidence: 0.5,
     }),
-    buildNode: ({ image_name }, { max_faces, min_confidence }): Invocation<'mediapipe_face_detection'> => ({
-      id: getPrefixedId('mediapipe_face_detection'),
-      type: 'mediapipe_face_detection',
-      image: { image_name },
-      max_faces,
-      min_confidence,
-    }),
+    buildGraph: ({ image_name }, { max_faces, min_confidence }) => {
+      const graph = new Graph(getPrefixedId('mediapipe_face_detection_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('mediapipe_face_detection'),
+        type: 'mediapipe_face_detection',
+        image: { image_name },
+        max_faces,
+        min_confidence,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   mlsd_detection: {
     type: 'mlsd_detection',
@@ -250,24 +310,38 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       score_threshold: 0.1,
       distance_threshold: 20.0,
     }),
-    buildNode: ({ image_name }, { score_threshold, distance_threshold }): Invocation<'mlsd_detection'> => ({
-      id: getPrefixedId('mlsd_detection'),
-      type: 'mlsd_detection',
-      image: { image_name },
-      score_threshold,
-      distance_threshold,
-    }),
+    buildGraph: ({ image_name }, { score_threshold, distance_threshold }) => {
+      const graph = new Graph(getPrefixedId('mlsd_detection_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('mlsd_detection'),
+        type: 'mlsd_detection',
+        image: { image_name },
+        score_threshold,
+        distance_threshold,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   normal_map: {
     type: 'normal_map',
     buildDefaults: () => ({
       type: 'normal_map',
     }),
-    buildNode: ({ image_name }): Invocation<'normal_map'> => ({
-      id: getPrefixedId('normal_map'),
-      type: 'normal_map',
-      image: { image_name },
-    }),
+    buildGraph: ({ image_name }) => {
+      const graph = new Graph(getPrefixedId('normal_map_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('normal_map'),
+        type: 'normal_map',
+        image: { image_name },
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   pidi_edge_detection: {
     type: 'pidi_edge_detection',
@@ -276,13 +350,20 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       quantize_edges: false,
       scribble: false,
     }),
-    buildNode: ({ image_name }, { quantize_edges, scribble }): Invocation<'pidi_edge_detection'> => ({
-      id: getPrefixedId('pidi_edge_detection'),
-      type: 'pidi_edge_detection',
-      image: { image_name },
-      quantize_edges,
-      scribble,
-    }),
+    buildGraph: ({ image_name }, { quantize_edges, scribble }) => {
+      const graph = new Graph(getPrefixedId('pidi_edge_detection_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('pidi_edge_detection'),
+        type: 'pidi_edge_detection',
+        image: { image_name },
+        quantize_edges,
+        scribble,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   dw_openpose_detection: {
     type: 'dw_openpose_detection',
@@ -292,14 +373,21 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       draw_face: true,
       draw_hands: true,
     }),
-    buildNode: ({ image_name }, { draw_body, draw_face, draw_hands }): Invocation<'dw_openpose_detection'> => ({
-      id: getPrefixedId('dw_openpose_detection'),
-      type: 'dw_openpose_detection',
-      image: { image_name },
-      draw_body,
-      draw_face,
-      draw_hands,
-    }),
+    buildGraph: ({ image_name }, { draw_body, draw_face, draw_hands }) => {
+      const graph = new Graph(getPrefixedId('dw_openpose_detection_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('dw_openpose_detection'),
+        type: 'dw_openpose_detection',
+        image: { image_name },
+        draw_body,
+        draw_face,
+        draw_hands,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
   },
   spandrel_filter: {
     type: 'spandrel_filter',
@@ -309,29 +397,30 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
       autoScale: true,
       scale: 1,
     }),
-    buildNode: (
-      { image_name },
-      { model, scale, autoScale }
-    ): Invocation<'spandrel_image_to_image' | 'spandrel_image_to_image_autoscale'> => {
+    buildGraph: ({ image_name }, { model, scale, autoScale }) => {
       assert(model !== null);
-      if (autoScale) {
-        const node: Invocation<'spandrel_image_to_image_autoscale'> = {
-          id: getPrefixedId('spandrel_image_to_image_autoscale'),
-          type: 'spandrel_image_to_image_autoscale',
-          image_to_image_model: model,
-          image: { image_name },
-          scale,
-        };
-        return node;
-      } else {
-        const node: Invocation<'spandrel_image_to_image'> = {
-          id: getPrefixedId('spandrel_image_to_image'),
-          type: 'spandrel_image_to_image',
-          image_to_image_model: model,
-          image: { image_name },
-        };
-        return node;
-      }
+      const graph = new Graph(getPrefixedId('spandrel_filter'));
+      const node = graph.addNode(
+        autoScale
+          ? {
+              id: getPrefixedId('spandrel_image_to_image_autoscale'),
+              type: 'spandrel_image_to_image_autoscale',
+              image_to_image_model: model,
+              image: { image_name },
+              scale,
+            }
+          : {
+              id: getPrefixedId('spandrel_image_to_image'),
+              type: 'spandrel_image_to_image',
+              image_to_image_model: model,
+              image: { image_name },
+            }
+      );
+
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
     },
     validateConfig: (config): boolean => {
       if (!config.model) {

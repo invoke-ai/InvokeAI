@@ -106,7 +106,6 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
           variant="ghost"
           leftIcon={<PiXBold />}
           onClick={adapter.filterer.cancel}
-          isLoading={isProcessing}
           loadingText={t('controlLayers.filter.cancel')}
         >
           {t('controlLayers.filter.cancel')}
