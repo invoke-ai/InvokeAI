@@ -1541,6 +1541,12 @@
             "paragraphs": [
                 "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
             ]
+        },
+        "fluxDevLicense": {
+            "heading": "Non-Commercial License",
+            "paragraphs": [
+                "FLUX.1 [dev] models are licensed under the FLUX [dev] non-commercial license. To use this model type for commercial purposes in Invoke, visit our website to learn more."
+            ]
         }
     },
     "unifiedCanvas": {
