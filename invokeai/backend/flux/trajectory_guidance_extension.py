@@ -4,6 +4,35 @@ from invokeai.backend.util.build_line import build_line
 
 
 class TrajectoryGuidanceExtension:
+    """An implementation of trajectory guidance for FLUX.
+
+    What is trajectory guidance?
+    ----------------------------
+    With SD 1 and SDXL, the amount of change in image-to-image denoising is largely controlled by the denoising_start
+    parameter. Doing the same thing with the FLUX model does not work as well, because the FLUX model converges very
+    quickly (roughly time 1.0 to 0.9) to the structure of the final image. The result of this model characteristic is
+    that you typically get one of two outcomes:
+    1) a result that is very similar to the original image
+    2) a result that is very different from the original image, as though it was generated from the text prompt with
+       pure noise.
+
+    To address this issue with image-to-image workflows with FLUX, we employ the concept of trajectory guidance. The
+    idea is that in addition to controlling the denoising_start parameter (i.e. the amount of noise added to the
+    original image), we can also guide the denoising process to stay close to the trajectory that would reproduce the
+    original. By controlling the strength of the trajectory guidance throughout the denoising process, we can achieve
+    FLUX image-to-image behavior with the same level of control offered by SD1 and SDXL.
+
+    What is the trajectory_guidance_strength?
+    -----------------------------------------
+    In the limit, we could apply a different trajectory guidance 'strength' for every latent value in every timestep.
+    This would be impractical for a user, so instead we have engineered a strength schedule that is more convenient to
+    use. The `trajectory_guidance_strength` parameter is a single scalar value that maps to a schedule. The engineered
+    schedule is defined as:
+    1) An initial change_ratio at t=1.0.
+    2) A linear ramp up to change_ratio=1.0 at t = t_cutoff.
+    3) A constant change_ratio=1.0 after t = t_cutoff.
+    """
+
     def __init__(
         self, init_latents: torch.Tensor, inpaint_mask: torch.Tensor | None, trajectory_guidance_strength: float
     ):
@@ -44,32 +73,29 @@ class TrajectoryGuidanceExtension:
             mask = self._inpaint_mask.where(self._inpaint_mask <= (0.0 + 1e-3), 1.0)
             # mask = (self._inpaint_mask > (0.0 + 1e-5)).float()
 
-        # Calculate the change_ratio based on the trajectory guidance strength.
+        # Calculate the change_ratio based on the trajectory_guidance_strength.
         change_ratio_at_t_1 = build_line(x1=0.0, y1=1.0, x2=1.0, y2=0.0)(self._trajectory_guidance_strength)
         change_ratio_at_cutoff = 1.0
         t_cutoff = build_line(x1=0.0, y1=1.0, x2=1.0, y2=0.5)(self._trajectory_guidance_strength)
         change_ratio = 1.0
         if t_prev > t_cutoff:
-            # If we are before the cutoff, lineaarly interpolate between the change_ratio at t=1.0 and the change_ratio
+            # If we are before the cutoff, linearly interpolate between the change_ratio at t=1.0 and the change_ratio
             # at the cutoff.
             change_ratio = build_line(x1=1.0, y1=change_ratio_at_t_1, x2=t_cutoff, y2=change_ratio_at_cutoff)(t_prev)
-            # change_ratio = change_ratio_at_t_1 + (change_ratio_at_cutoff - change_ratio_at_t_1) * (1.0 - t_prev) / (
-            #     1.0 - t_cutoff
-            # )
 
         mask = mask * change_ratio
 
         # NOTE(ryand): During inpainting, it is common to guide the denoising process by noising the initial latents for
         # the current timestep and then blending the predicted intermediate latents with the noised initial latents.
-        # For example, we could do this here with something like:
+        # For example:
         # ```
-        # noised_init_latents = self._noise * timestep + (1.0 - timestep) * self._init_latents
-        # return intermediate_latents * self._inpaint_mask + noised_init_latents * (1.0 - self._inpaint_mask)
+        # noised_init_latents = self._noise * t_prev + (1.0 - t_prev) * self._init_latents
+        # return t_prev_latents * self._inpaint_mask + noised_init_latents * (1.0 - self._inpaint_mask)
         # ```
         # Instead of guiding based on the noised initial latents, we have decided to guide based on the noise prediction
         # that points towards the initial latents. The difference between these guidance strategies is minor, but
-        # qualitatively we found the latter to produce slightly better results. When the guidance strength is 0.0 or 1.0
-        # there is no difference between the two strategies.
+        # qualitatively we found the latter to produce slightly better results. When change_ratio is 0.0 or 1.0 there is
+        # no difference between the two strategies.
         #
         # We experimented with a number of related guidance strategies, but not exhaustively. It's entirely possible
         # that there's a much better way to do this.
