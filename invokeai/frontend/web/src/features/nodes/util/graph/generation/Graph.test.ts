@@ -2,7 +2,6 @@ import { deepClone } from 'common/util/deepClone';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { AnyInvocation, Invocation } from 'services/api/types';
 import { assert, AssertionError, is } from 'tsafe';
-import { validate } from 'uuid';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -11,11 +10,12 @@ describe('Graph', () => {
     it('should create a new graph with the correct id', () => {
       const g = new Graph('test-id');
       expect(g._graph.id).toBe('test-id');
+      expect(g.id).toBe('test-id');
     });
-    it('should create a new graph with a uuid id if none is provided', () => {
+    it('should create an id if none is provided', () => {
       const g = new Graph();
       expect(g._graph.id).not.toBeUndefined();
-      expect(validate(g._graph.id)).toBeTruthy();
+      expect(g.id).not.toBeUndefined();
     });
   });
 
