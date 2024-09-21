@@ -81,7 +81,7 @@ class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
 
         callback(
             PipelineIntermediateState(
-                step=-1,
+                step=0,
                 order=self.scheduler.order,
                 total_steps=len(timesteps),
                 timestep=self.scheduler.config.num_train_timesteps,
@@ -182,7 +182,7 @@ class MultiDiffusionPipeline(StableDiffusionGeneratorPipeline):
 
             callback(
                 PipelineIntermediateState(
-                    step=i,
+                    step=i + 1,
                     order=self.scheduler.order,
                     total_steps=len(timesteps),
                     timestep=int(t),

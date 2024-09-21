@@ -366,7 +366,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         with attn_ctx:
             callback(
                 PipelineIntermediateState(
-                    step=-1,
+                    step=0,  # initial latents
                     order=self.scheduler.order,
                     total_steps=len(timesteps),
                     timestep=self.scheduler.config.num_train_timesteps,
@@ -395,7 +395,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
                 callback(
                     PipelineIntermediateState(
-                        step=i,
+                        step=i + 1,  # final latents
                         order=self.scheduler.order,
                         total_steps=len(timesteps),
                         timestep=int(t),
