@@ -12,7 +12,7 @@ import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { forEach } from 'lodash-es';
+import { forEach, isNil, round } from 'lodash-es';
 import { api, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
@@ -81,13 +81,19 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
   });
 
-  socket.on('invocation_denoise_progress', (data) => {
-    const { invocation_source_id, invocation, step, total_steps, progress_image, origin, percentage } = data;
+  socket.on('invocation_progress', (data) => {
+    const { invocation_source_id, invocation, image, origin, percentage, message } = data;
 
-    log.trace(
-      { data } as SerializableObject,
-      `Denoise ${Math.round(percentage * 100)}% (${invocation.type}, ${invocation_source_id})`
-    );
+    let _message = 'Invocation progress';
+    if (message) {
+      _message += `: ${message}`;
+    }
+    if (!isNil(percentage)) {
+      _message += ` ${round(percentage * 100, 2)}%`;
+    }
+    _message += ` (${invocation.type}, ${invocation_source_id})`;
+
+    log.trace({ data } as SerializableObject, _message);
 
     $lastProgressEvent.set(data);
 
@@ -95,8 +101,8 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
       if (nes) {
         nes.status = zNodeStatus.enum.IN_PROGRESS;
-        nes.progress = (step + 1) / total_steps;
-        nes.progressImage = progress_image ?? null;
+        nes.progress = percentage;
+        nes.progressImage = image ?? null;
         upsertExecutionState(nes.nodeId, nes);
       }
     }
