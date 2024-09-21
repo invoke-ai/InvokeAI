@@ -14,6 +14,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.util.step_callback import flux_step_callback, stable_diffusion_step_callback
 from invokeai.backend.model_manager.config import (
     AnyModel,
@@ -573,6 +574,68 @@ class UtilInterface(InvocationContextInterface):
             intermediate_state=intermediate_state,
             events=self._services.events,
             is_canceled=self.is_canceled,
+        )
+
+    def signal_progress(
+        self,
+        message: str,
+        percentage: float | None = None,
+        image: Image | None = None,
+        image_size: tuple[int, int] | None = None,
+    ) -> None:
+        """Signals the progress of some long-running invocation. The progress is displayed in the UI.
+
+        If a percentage is provided, the UI will display a progress bar and automatically append the percentage to the
+        message. You should not include the percentage in the message.
+
+        Example:
+            ```py
+            total_steps = 10
+            for i in range(total_steps):
+                percentage = i / (total_steps - 1)
+                context.util.signal_progress("Doing something cool", percentage)
+            ```
+
+        If an image is provided, the UI will display it. If your image should be displayed at a different size, provide
+        a tuple of `(width, height)` for the `image_size` parameter. The image will be displayed at the specified size
+        in the UI.
+
+        For example, SD denoising progress images are 1/8 the size of the original image, so you'd do this to ensure the
+        image is displayed at the correct size:
+            ```py
+            # Calculate the output size of the image (8x the progress image's size)
+            width = progress_image.width * 8
+            height = progress_image.height * 8
+            # Signal the progress with the image and output size
+            signal_progress("Denoising", percentage, progress_image, (width, height))
+            ```
+
+        If your progress image is very large, consider downscaling it to reduce the payload size and provide the original
+        size to the `image_size` parameter. The PIL `thumbnail` method is useful for this, as it maintains the aspect
+        ratio of the image:
+            ```py
+            # `thumbnail` modifies the image in-place, so we need to first make a copy
+            thumbnail_image = progress_image.copy()
+            # Resize the image to a maximum of 256x256 pixels, maintaining the aspect ratio
+            thumbnail_image.thumbnail((256, 256))
+            # Signal the progress with the thumbnail, passing the original size
+            signal_progress("Denoising", percentage, thumbnail, progress_image.size)
+            ```
+
+        Args:
+            message: A message describing the current status. Do not include the percentage in this message.
+            percentage: The current percentage completion for the process. Omit for indeterminate progress.
+            image: An optional image to display.
+            image_size: The optional size of the image to display. If omitted, the image will be displayed at its
+                original size.
+        """
+
+        self._services.events.emit_invocation_progress(
+            queue_item=self._data.queue_item,
+            invocation=self._data.invocation,
+            message=message,
+            percentage=percentage,
+            image=ProgressImage.build(image, image_size) if image else None,
         )
 
 
