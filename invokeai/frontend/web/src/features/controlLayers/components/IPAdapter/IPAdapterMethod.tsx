@@ -17,8 +17,8 @@ export const IPAdapterMethod = memo(({ method, onChange }: Props) => {
   const options: { label: string; value: IPMethodV2 }[] = useMemo(
     () => [
       { label: t('controlLayers.ipAdapterMethod.full'), value: 'full' },
-      { label: `${t('controlLayers.ipAdapterMethod.style')} (${t('common.beta')})`, value: 'style' },
-      { label: `${t('controlLayers.ipAdapterMethod.composition')} (${t('common.beta')})`, value: 'composition' },
+      { label: t('controlLayers.ipAdapterMethod.style'), value: 'style' },
+      { label: t('controlLayers.ipAdapterMethod.composition'), value: 'composition' },
     ],
     [t]
   );
