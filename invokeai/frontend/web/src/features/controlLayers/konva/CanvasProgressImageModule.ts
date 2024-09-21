@@ -8,6 +8,11 @@ import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
 import type { S } from 'services/api/types';
+import type { O } from 'ts-toolbelt';
+
+type ProgressEventWithImage = O.NonNullable<S['InvocationProgressEvent'], 'image'>;
+const isProgressEventWithImage = (val: S['InvocationProgressEvent']): val is ProgressEventWithImage =>
+  Boolean(val.image);
 
 export class CanvasProgressImageModule extends CanvasModuleBase {
   readonly type = 'progress_image';
@@ -26,7 +31,7 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
   imageElement: HTMLImageElement | null = null;
 
   subscriptions = new Set<() => void>();
-  $lastProgressEvent = atom<S['InvocationDenoiseProgressEvent'] | null>(null);
+  $lastProgressEvent = atom<ProgressEventWithImage | null>(null);
   hasActiveGeneration: boolean = false;
   mutex: Mutex = new Mutex();
 
@@ -62,8 +67,11 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
   }
 
   setSocketEventListeners = (): (() => void) => {
-    const progressListener = (data: S['InvocationDenoiseProgressEvent']) => {
+    const progressListener = (data: S['InvocationProgressEvent']) => {
       if (data.destination !== 'canvas') {
+        return;
+      }
+      if (!isProgressEventWithImage(data)) {
         return;
       }
       if (!this.hasActiveGeneration) {
@@ -76,13 +84,13 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
       this.$lastProgressEvent.set(null);
     };
 
-    this.manager.socket.on('invocation_denoise_progress', progressListener);
+    this.manager.socket.on('invocation_progress', progressListener);
     this.manager.socket.on('connect', clearProgress);
     this.manager.socket.on('connect_error', clearProgress);
     this.manager.socket.on('disconnect', clearProgress);
 
     return () => {
-      this.manager.socket.off('invocation_denoise_progress', progressListener);
+      this.manager.socket.off('invocation_progress', progressListener);
       this.manager.socket.off('connect', clearProgress);
       this.manager.socket.off('connect_error', clearProgress);
       this.manager.socket.off('disconnect', clearProgress);
@@ -111,9 +119,8 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
     this.isLoading = true;
 
     const { x, y, width, height } = this.manager.stateApi.getBbox().rect;
-    const { dataURL } = event.progress_image;
     try {
-      this.imageElement = await loadImage(dataURL);
+      this.imageElement = await loadImage(event.image.dataURL);
       if (this.konva.image) {
         this.konva.image.setAttrs({
           image: this.imageElement,

@@ -19,16 +19,10 @@ const CurrentImageNode = (props: NodeProps) => {
   const imageDTO = useAppSelector(selectLastSelectedImage);
   const lastProgressEvent = useStore($lastProgressEvent);
 
-  if (lastProgressEvent?.progress_image) {
+  if (lastProgressEvent?.image) {
     return (
       <Wrapper nodeProps={props}>
-        <Image
-          src={lastProgressEvent?.progress_image.dataURL}
-          w="full"
-          h="full"
-          objectFit="contain"
-          borderRadius="base"
-        />
+        <Image src={lastProgressEvent?.image.dataURL} w="full" h="full" objectFit="contain" borderRadius="base" />
       </Wrapper>
     );
   }

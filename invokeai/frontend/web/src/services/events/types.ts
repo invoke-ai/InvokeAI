@@ -7,7 +7,7 @@ type ClientEmitSubscribeBulkDownload = { bulk_download_id: string };
 type ClientEmitUnsubscribeBulkDownload = ClientEmitSubscribeBulkDownload;
 
 export type ServerToClientEvents = {
-  invocation_denoise_progress: (payload: S['InvocationDenoiseProgressEvent']) => void;
+  invocation_progress: (payload: S['InvocationProgressEvent']) => void;
   invocation_complete: (payload: S['InvocationCompleteEvent']) => void;
   invocation_error: (payload: S['InvocationErrorEvent']) => void;
   invocation_started: (payload: S['InvocationStartedEvent']) => void;
