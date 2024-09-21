@@ -754,6 +754,10 @@ export const canvasSlice = createSlice({
       // and is only called when we are not staging.
       const { optimalDimension } = action.payload;
       state.bbox.optimalDimension = optimalDimension;
+
+      // But! We do want to update the _scaled_ size. This handles the case where the user changes the base model type
+      // during staging. Though the generation bbox must be unchanged, the scaled bbox should adapt to the model.
+      syncScaledSize(state);
     },
     bboxSyncedToOptimalDimension: (state) => {
       const { optimalDimension } = state.bbox;
