@@ -551,10 +551,9 @@ class UtilInterface(InvocationContextInterface):
         """
 
         stable_diffusion_step_callback(
-            context_data=self._data,
+            signal_progress=self.signal_progress,
             intermediate_state=intermediate_state,
             base_model=base_model,
-            events=self._services.events,
             is_canceled=self.is_canceled,
         )
 
@@ -570,9 +569,8 @@ class UtilInterface(InvocationContextInterface):
         """
 
         flux_step_callback(
-            context_data=self._data,
+            signal_progress=self.signal_progress,
             intermediate_state=intermediate_state,
-            events=self._services.events,
             is_canceled=self.is_canceled,
         )
 
