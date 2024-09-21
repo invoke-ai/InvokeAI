@@ -17,6 +17,7 @@ from invokeai.app.services.events.events_common import (
     InvocationCompleteEvent,
     InvocationDenoiseProgressEvent,
     InvocationErrorEvent,
+    InvocationProgressEvent,
     InvocationStartedEvent,
     ModelInstallCancelledEvent,
     ModelInstallCompleteEvent,
@@ -67,6 +68,17 @@ class EventServiceBase:
     ) -> None:
         """Emitted at each step during denoising of an invocation."""
         self.dispatch(InvocationDenoiseProgressEvent.build(queue_item, invocation, intermediate_state, progress_image))
+
+    def emit_invocation_progress(
+        self,
+        queue_item: "SessionQueueItem",
+        invocation: "BaseInvocation",
+        message: str,
+        percentage: float | None = None,
+        image: ProgressImage | None = None,
+    ) -> None:
+        """Emitted at periodically during an invocation"""
+        self.dispatch(InvocationProgressEvent.build(queue_item, invocation, message, percentage, image))
 
     def emit_invocation_complete(
         self, queue_item: "SessionQueueItem", invocation: "BaseInvocation", output: "BaseInvocationOutput"
