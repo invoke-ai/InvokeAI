@@ -265,7 +265,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('pointerup', this.onWindowPointerUp);
-    window.addEventListener('blur', this.revertToolBuffer);
+    window.addEventListener('blur', this.onWindowBlur);
 
     return () => {
       this.konva.stage.off('mouseenter', this.onStageMouseEnter);
@@ -278,7 +278,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       window.removeEventListener('keydown', this.onKeyDown);
       window.removeEventListener('keyup', this.onKeyUp);
       window.removeEventListener('pointerup', this.onWindowPointerUp);
-      window.removeEventListener('blur', this.revertToolBuffer);
+      window.removeEventListener('blur', this.onWindowBlur);
     };
   };
 
@@ -736,8 +736,10 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   revertToolBuffer = () => {
     const toolBuffer = this.$toolBuffer.get();
-    this.$tool.set(toolBuffer ?? 'move');
-    this.$toolBuffer.set(null);
+    if (toolBuffer) {
+      this.$tool.set(toolBuffer);
+      this.$toolBuffer.set(null);
+    }
   };
 
   repr = () => {
