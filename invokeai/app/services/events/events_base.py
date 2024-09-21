@@ -63,7 +63,7 @@ class EventServiceBase:
         invocation: "BaseInvocation",
         message: str,
         percentage: float | None = None,
-        image: ProgressImage | None = None,
+        image: "ProgressImage | None" = None,
     ) -> None:
         """Emitted at periodically during an invocation"""
         self.dispatch(InvocationProgressEvent.build(queue_item, invocation, message, percentage, image))
