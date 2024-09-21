@@ -173,6 +173,44 @@ class InvocationDenoiseProgressEvent(InvocationEventBase):
 
 
 @payload_schema.register
+class InvocationProgressEvent(InvocationEventBase):
+    """Event model for invocation_progress"""
+
+    __event_name__ = "invocation_progress"
+
+    message: str = Field(description="A message to display")
+    percentage: float | None = Field(
+        default=None, ge=0, le=1, description="The percentage of the progress (omit to indicate indeterminate progress)"
+    )
+    image: ProgressImage | None = Field(
+        default=None, description="An image representing the current state of the progress"
+    )
+
+    @classmethod
+    def build(
+        cls,
+        queue_item: SessionQueueItem,
+        invocation: AnyInvocation,
+        message: str,
+        percentage: float | None = None,
+        image: ProgressImage | None = None,
+    ) -> "InvocationProgressEvent":
+        return cls(
+            queue_id=queue_item.queue_id,
+            item_id=queue_item.item_id,
+            batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
+            session_id=queue_item.session_id,
+            invocation=invocation,
+            invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
+            percentage=percentage,
+            image=image,
+            message=message,
+        )
+
+
+@payload_schema.register
 class InvocationCompleteEvent(InvocationEventBase):
     """Event model for invocation_complete"""
 
