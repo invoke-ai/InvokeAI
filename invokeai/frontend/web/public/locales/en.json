@@ -505,6 +505,14 @@
             "setFillToWhite": {
                 "title": "Set Color to White",
                 "desc": "Set the current tool color to white."
+            },
+            "filterSelected": {
+                "title": "Filter",
+                "desc": "Filter the selected layer. Only applies to Raster and Control layers."
+            },
+            "transformSelected": {
+                "title": "Transform",
+                "desc": "Transform the selected layer."
             }
         },
         "workflows": {

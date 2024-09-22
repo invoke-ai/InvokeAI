@@ -13,7 +13,9 @@ import { CanvasToolbarScale } from 'features/controlLayers/components/Toolbar/Ca
 import { CanvasToolbarUndoButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarUndoButton';
 import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanvasDeleteLayerHotkey';
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
+import { useCanvasFilterHotkey } from 'features/controlLayers/hooks/useCanvasFilterHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
+import { useCanvasTransformHotkey } from 'features/controlLayers/hooks/useCanvasTransformHotkey';
 import { useCanvasUndoRedoHotkeys } from 'features/controlLayers/hooks/useCanvasUndoRedoHotkeys';
 import { useNextPrevEntityHotkeys } from 'features/controlLayers/hooks/useNextPrevEntity';
 import { memo } from 'react';
@@ -24,6 +26,8 @@ export const CanvasToolbar = memo(() => {
   useCanvasUndoRedoHotkeys();
   useCanvasEntityQuickSwitchHotkey();
   useNextPrevEntityHotkeys();
+  useCanvasTransformHotkey();
+  useCanvasFilterHotkey();
 
   return (
     <Flex w="full" gap={2} alignItems="center">
