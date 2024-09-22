@@ -1,5 +1,4 @@
-import type { SerializableObject } from 'common/types';
-import { withResultAsync } from 'common/util/result';
+import { withResult, withResultAsync } from 'common/util/result';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -13,9 +12,9 @@ import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { debounce } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
-import { getImageDTO } from 'services/api/endpoints/images';
+import { serializeError } from 'serialize-error';
 import { buildSelectModelConfig } from 'services/api/hooks/modelsByType';
-import { type BatchConfig, type ImageDTO, isControlNetOrT2IAdapterModelConfig, type S } from 'services/api/types';
+import { isControlNetOrT2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 type CanvasEntityFiltererConfig = {
@@ -37,6 +36,11 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   imageState: CanvasImageState | null = null;
   subscriptions = new Set<() => void>();
   config: CanvasEntityFiltererConfig = DEFAULT_CONFIG;
+
+  /**
+   * The AbortController used to cancel the filter processing.
+   */
+  abortController: AbortController | null = null;
 
   $isFiltering = atom<boolean>(false);
   $hasProcessed = atom<boolean>(false);
@@ -100,63 +104,82 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
   processImmediate = async () => {
     const config = this.$filterConfig.get();
-    const isValid = IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
+    const filterData = IMAGE_FILTERS[config.type];
+
+    // Cannot get TS to be happy with `config`, thinks it should be `never`... eh...
+    const isValid = filterData.validateConfig?.(config as never) ?? true;
     if (!isValid) {
+      this.log.error({ config }, 'Invalid filter config');
       return;
     }
 
-    this.log.trace({ config }, 'Previewing filter');
+    this.log.trace({ config }, 'Processing filter');
     const rect = this.parent.transformer.getRelativeRect();
-    const imageDTO = await this.parent.renderer.rasterize({ rect, attrs: { filters: [], opacity: 1 } });
-    const nodeId = getPrefixedId('filter_node');
-    const batch = this.buildBatchConfig(imageDTO, config, nodeId);
 
-    // Listen for the filter processing completion event
-    const completedListener = async (event: S['InvocationCompleteEvent']) => {
-      if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
-        return;
-      }
-      this.manager.socket.off('invocation_complete', completedListener);
-      this.manager.socket.off('invocation_error', errorListener);
-
-      this.log.trace({ event } as SerializableObject, 'Handling filter processing completion');
-
-      const { result } = event;
-      assert(result.type === 'image_output', `Processor did not return an image output, got: ${result}`);
-
-      const imageDTO = await getImageDTO(result.image.image_name);
-      assert(imageDTO, "Failed to fetch processor output's image DTO");
-
-      this.imageState = imageDTOToImageObject(imageDTO);
-
-      await this.parent.bufferRenderer.setBuffer(this.imageState, true);
-
+    const rasterizeResult = await withResultAsync(() =>
+      this.parent.renderer.rasterize({ rect, attrs: { filters: [], opacity: 1 } })
+    );
+    if (rasterizeResult.isErr()) {
+      this.log.error({ error: serializeError(rasterizeResult.error) }, 'Error rasterizing entity');
       this.$isProcessing.set(false);
-      this.$hasProcessed.set(true);
-    };
-    const errorListener = (event: S['InvocationErrorEvent']) => {
-      if (event.origin !== this.id || event.invocation_source_id !== nodeId) {
-        return;
-      }
-      this.manager.socket.off('invocation_complete', completedListener);
-      this.manager.socket.off('invocation_error', errorListener);
-
-      this.log.error({ event } as SerializableObject, 'Error processing filter');
-      this.$isProcessing.set(false);
-    };
-
-    this.manager.socket.on('invocation_complete', completedListener);
-    this.manager.socket.on('invocation_error', errorListener);
-
-    this.log.trace({ batch } as SerializableObject, 'Enqueuing filter batch');
+      return;
+    }
 
     this.$isProcessing.set(true);
-    const req = this.manager.stateApi.enqueueBatch(batch);
-    const result = await withResultAsync(req.unwrap);
-    if (result.isErr()) {
+
+    const imageDTO = rasterizeResult.value;
+
+    // Cannot get TS to be happy with `config`, thinks it should be `never`... eh...
+    const buildGraphResult = withResult(() => filterData.buildGraph(imageDTO, config as never));
+    if (buildGraphResult.isErr()) {
+      this.log.error({ error: serializeError(buildGraphResult.error) }, 'Error building filter graph');
       this.$isProcessing.set(false);
+      return;
     }
-    req.reset();
+
+    const controller = new AbortController();
+    this.abortController = controller;
+
+    const { graph, outputNodeId } = buildGraphResult.value;
+    const filterResult = await withResultAsync(() =>
+      this.manager.stateApi.runGraphAndReturnImageOutput({
+        graph,
+        outputNodeId,
+        // The filter graph should always be prepended to the queue so it's processed ASAP.
+        prepend: true,
+        /**
+         * The filter node may need to download a large model. Currently, the models required by the filter nodes are
+         * downloaded just-in-time, as required by the filter. If we use a timeout here, we might get into a catch-22
+         * where the filter node is waiting for the model to download, but the download gets canceled if the filter
+         * node times out.
+         *
+         * (I suspect the model download will actually _not_ be canceled if the graph is canceled, but let's not chance it!)
+         *
+         * TODO(psyche): Figure out a better way to handle this. Probably need to download the models ahead of time.
+         */
+        // timeout: 5000,
+        /**
+         * The filter node should be able to cancel the request if it's taking too long. This will cancel the graph's
+         * queue item and clear any event listeners on the request.
+         */
+        signal: controller.signal,
+      })
+    );
+    if (filterResult.isErr()) {
+      this.log.error({ error: serializeError(filterResult.error) }, 'Error processing filter');
+      this.$isProcessing.set(false);
+      this.abortController = null;
+      return;
+    }
+
+    this.log.trace({ imageDTO: filterResult.value }, 'Filter processed');
+    this.imageState = imageDTOToImageObject(filterResult.value);
+
+    await this.parent.bufferRenderer.setBuffer(this.imageState, true);
+
+    this.$isProcessing.set(false);
+    this.$hasProcessed.set(true);
+    this.abortController = null;
   };
 
   process = debounce(this.processImmediate, this.config.processDebounceMs);
@@ -188,6 +211,8 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   reset = () => {
     this.log.trace('Resetting filter');
 
+    this.abortController?.abort();
+    this.abortController = null;
     this.parent.bufferRenderer.clearBuffer();
     this.parent.transformer.updatePosition();
     this.parent.renderer.syncCache(true);
@@ -203,31 +228,6 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.$isFiltering.set(false);
     this.$hasProcessed.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
-  };
-
-  buildBatchConfig = (imageDTO: ImageDTO, config: FilterConfig, id: string): BatchConfig => {
-    // TODO(psyche): I can't get TS to be happy, it thinkgs `config` is `never` but it should be inferred from the generic... I'll just cast it for now
-    const node = IMAGE_FILTERS[config.type].buildNode(imageDTO, config as never);
-    node.id = id;
-    const batch: BatchConfig = {
-      prepend: true,
-      batch: {
-        graph: {
-          nodes: {
-            [node.id]: {
-              ...node,
-              // filtered images are always intermediate - do not save to gallery
-              is_intermediate: true,
-            },
-          },
-          edges: [],
-        },
-        origin: this.id,
-        runs: 1,
-      },
-    };
-
-    return batch;
   };
 
   repr = () => {

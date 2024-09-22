@@ -3,8 +3,8 @@ from typing import Callable
 import torch
 from tqdm import tqdm
 
-from invokeai.backend.flux.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
+from invokeai.backend.flux.trajectory_guidance_extension import TrajectoryGuidanceExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 
@@ -20,7 +20,7 @@ def denoise(
     timesteps: list[float],
     step_callback: Callable[[PipelineIntermediateState], None],
     guidance: float,
-    inpaint_extension: InpaintExtension | None,
+    traj_guidance_extension: TrajectoryGuidanceExtension | None,  # noqa: F821
 ):
     step = 0
     # guidance_vec is ignored for schnell.
@@ -36,12 +36,14 @@ def denoise(
             timesteps=t_vec,
             guidance=guidance_vec,
         )
+
+        if traj_guidance_extension is not None:
+            pred = traj_guidance_extension.update_noise(
+                t_curr_latents=img, pred_noise=pred, t_curr=t_curr, t_prev=t_prev
+            )
+
         preview_img = img - t_curr * pred
         img = img + (t_prev - t_curr) * pred
-
-        if inpaint_extension is not None:
-            img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
-            preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
 
         step_callback(
             PipelineIntermediateState(

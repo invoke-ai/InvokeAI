@@ -30,7 +30,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
     if (type === 'raster_layer') {
       const rect = canvasManager.stage.getVisibleRect('raster_layer');
       const result = await withResultAsync(() =>
-        canvasManager.compositor.rasterizeAndUploadCompositeRasterLayer(rect, false)
+        canvasManager.compositor.rasterizeAndUploadCompositeRasterLayer(rect, { is_intermediate: true })
       );
 
       if (result.isOk()) {

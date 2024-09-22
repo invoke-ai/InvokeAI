@@ -4,6 +4,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import SingleSelectionMenuItems from 'features/gallery/components/ImageContextMenu/SingleSelectionMenuItems';
@@ -34,6 +35,7 @@ import { $isConnected, $progressImage } from 'services/events/stores';
 const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
   const isConnected = useStore($isConnected);
+  const isStaging = useAppSelector(selectIsStaging);
   const lastSelectedImage = useAppSelector(selectLastSelectedImage);
   const progressImage = useStore($progressImage);
   const shouldDisableToolbarButtons = useMemo(() => {
@@ -59,8 +61,11 @@ const CurrentImageButtons = () => {
   }, [getAndLoadEmbeddedWorkflow, lastSelectedImage]);
 
   const handleUseSize = useCallback(() => {
+    if (isStaging) {
+      return;
+    }
     parseAndRecallImageDimensions(lastSelectedImage);
-  }, [lastSelectedImage]);
+  }, [isStaging, lastSelectedImage]);
   const handleClickUpscale = useCallback(() => {
     if (!imageDTO) {
       return;
@@ -179,6 +184,7 @@ const CurrentImageButtons = () => {
           tooltip={`${t('parameters.useSize')} (D)`}
           aria-label={`${t('parameters.useSize')} (D)`}
           onClick={handleUseSize}
+          isDisabled={isStaging}
         />
         <IconButton
           isLoading={isLoadingMetadata}

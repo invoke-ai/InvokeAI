@@ -7,9 +7,10 @@ import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } fro
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { boardsApi } from 'services/api/endpoints/boards';
-import { getImageDTO, imagesApi } from 'services/api/endpoints/images';
+import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
+import { $lastProgressEvent } from 'services/events/stores';
 
 const log = logger('events');
 
@@ -20,7 +21,12 @@ const isCanvasOutputNode = (data: S['InvocationCompleteEvent']) => {
 const nodeTypeDenylist = ['load_image', 'image'];
 
 export const buildOnInvocationComplete = (getState: () => RootState, dispatch: AppDispatch) => {
-  const addImageToGallery = (imageDTO: ImageDTO) => {
+  const addImageToGallery = (data: S['InvocationCompleteEvent'], imageDTO: ImageDTO) => {
+    if (nodeTypeDenylist.includes(data.invocation.type)) {
+      log.trace('Skipping node type denylisted');
+      return;
+    }
+
     if (imageDTO.is_intermediate) {
       return;
     }
@@ -82,9 +88,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
   const getResultImageDTO = (data: S['InvocationCompleteEvent']) => {
     const { result } = data;
     if (result.type === 'image_output') {
-      return getImageDTO(result.image.image_name);
-    } else if (result.type === 'canvas_v2_mask_and_crop_output') {
-      return getImageDTO(result.image.image_name);
+      return getImageDTOSafe(result.image.image_name);
     }
     return null;
   };
@@ -105,7 +109,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     const imageDTO = await getResultImageDTO(data);
 
     if (imageDTO && !imageDTO.is_intermediate) {
-      addImageToGallery(imageDTO);
+      addImageToGallery(data, imageDTO);
     }
   };
 
@@ -119,17 +123,14 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     if (data.destination === 'canvas') {
       // TODO(psyche): Can/should we let canvas handle this itself?
       if (isCanvasOutputNode(data)) {
-        if (data.result.type === 'canvas_v2_mask_and_crop_output') {
-          const { offset_x, offset_y } = data.result;
-          dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: offset_x, offsetY: offset_y } }));
-        } else if (data.result.type === 'image_output') {
+        if (data.result.type === 'image_output') {
           dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
         }
-        addImageToGallery(imageDTO);
+        addImageToGallery(data, imageDTO);
       }
     } else if (!imageDTO.is_intermediate) {
       // Desintaion is gallery
-      addImageToGallery(imageDTO);
+      addImageToGallery(data, imageDTO);
     }
   };
 
@@ -137,7 +138,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     const imageDTO = await getResultImageDTO(data);
 
     if (imageDTO && !imageDTO.is_intermediate) {
-      addImageToGallery(imageDTO);
+      addImageToGallery(data, imageDTO);
     }
   };
 
@@ -147,11 +148,6 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
       `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
     );
 
-    if (nodeTypeDenylist.includes(data.invocation.type)) {
-      log.trace('Skipping node type denylisted');
-      return;
-    }
-
     if (data.origin === 'workflows') {
       await handleOriginWorkflows(data);
     } else if (data.origin === 'canvas') {
@@ -159,5 +155,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     } else {
       await handleOriginOther(data);
     }
+
+    $lastProgressEvent.set(null);
   };
 };

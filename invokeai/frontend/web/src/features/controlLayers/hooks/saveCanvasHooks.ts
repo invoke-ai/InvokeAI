@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
+import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -14,6 +15,7 @@ import {
   rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
@@ -38,10 +40,12 @@ type UseSaveCanvasArg = {
   toastOk: string;
   toastError: string;
   onSave?: (imageDTO: ImageDTO, rect: Rect) => void;
+  withMetadata?: boolean;
 };
 
-const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave }: UseSaveCanvasArg) => {
+const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, withMetadata }: UseSaveCanvasArg) => {
   const { t } = useTranslation();
+  const store = useAppStore();
 
   const canvasManager = useCanvasManager();
 
@@ -58,8 +62,17 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave }: U
       return;
     }
 
+    let metadata: SerializableObject | undefined = undefined;
+
+    if (withMetadata) {
+      metadata = selectCanvasMetadata(store.getState());
+    }
+
     const result = await withResultAsync(() =>
-      canvasManager.compositor.rasterizeAndUploadCompositeRasterLayer(rect, saveToGallery)
+      canvasManager.compositor.rasterizeAndUploadCompositeRasterLayer(rect, {
+        is_intermediate: !saveToGallery,
+        metadata,
+      })
     );
 
     if (result.isOk()) {
@@ -78,9 +91,11 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave }: U
     onSave,
     region,
     saveToGallery,
+    store,
     t,
     toastError,
     toastOk,
+    withMetadata,
   ]);
 
   return saveCanvas;
@@ -94,6 +109,7 @@ export const useSaveCanvasToGallery = () => {
       saveToGallery: true,
       toastOk: t('controlLayers.savedToGalleryOk'),
       toastError: t('controlLayers.savedToGalleryError'),
+      withMetadata: true,
     }),
     [t]
   );
@@ -109,6 +125,7 @@ export const useSaveBboxToGallery = () => {
       saveToGallery: true,
       toastOk: t('controlLayers.savedToGalleryOk'),
       toastError: t('controlLayers.savedToGalleryError'),
+      withMetadata: true,
     }),
     [t]
   );

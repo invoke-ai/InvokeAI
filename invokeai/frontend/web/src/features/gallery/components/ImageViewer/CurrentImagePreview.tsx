@@ -3,7 +3,6 @@ import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
-import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import type { TypesafeDraggableData } from 'features/dnd/types';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
@@ -12,15 +11,13 @@ import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from '
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiImageBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { $hasProgress, $isProgressFromCanvas } from 'services/events/stores';
 
+import { NoContentForViewer } from './NoContentForViewer';
 import ProgressImage from './ProgressImage';
 
 const CurrentImagePreview = () => {
-  const { t } = useTranslation();
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
   const hasDenoiseProgress = useStore($hasProgress);
@@ -72,7 +69,7 @@ const CurrentImagePreview = () => {
           isUploadDisabled={true}
           fitContainer
           useThumbailFallback
-          noContentFallback={<IAINoContentFallback icon={PiImageBold} label={t('gallery.noImageSelected')} />}
+          noContentFallback={<NoContentForViewer />}
           dataTestId="image-preview"
         />
       )}

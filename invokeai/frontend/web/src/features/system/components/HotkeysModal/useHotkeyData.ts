@@ -94,13 +94,17 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('canvas', 'selectBboxTool', ['c']);
     addHotkey('canvas', 'decrementToolWidth', ['[']);
     addHotkey('canvas', 'incrementToolWidth', [']']);
-    addHotkey('canvas', 'selectColorPickerTool', ['i']);
     addHotkey('canvas', 'selectEraserTool', ['e']);
     addHotkey('canvas', 'selectMoveTool', ['v']);
-    addHotkey('canvas', 'selectRectTool', ['r']);
+    addHotkey('canvas', 'selectRectTool', ['u']);
     addHotkey('canvas', 'selectViewTool', ['h']);
-    addHotkey('canvas', 'fitLayersToCanvas', ['r']);
-    addHotkey('canvas', 'setZoomTo100Percent', ['alt+r']);
+    addHotkey('canvas', 'selectColorPickerTool', ['i']);
+    addHotkey('canvas', 'setFillToWhite', ['d']);
+    addHotkey('canvas', 'fitLayersToCanvas', ['mod+0']);
+    addHotkey('canvas', 'setZoomTo100Percent', ['mod+1']);
+    addHotkey('canvas', 'setZoomTo200Percent', ['mod+2']);
+    addHotkey('canvas', 'setZoomTo400Percent', ['mod+3']);
+    addHotkey('canvas', 'setZoomTo800Percent', ['mod+4']);
     addHotkey('canvas', 'quickSwitch', ['q']);
     addHotkey('canvas', 'deleteSelected', ['delete', 'backspace']);
     addHotkey('canvas', 'resetSelected', ['shift+c']);
@@ -138,11 +142,11 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('gallery', 'galleryNavUp', ['up']);
     addHotkey('gallery', 'galleryNavRight', ['right']);
     addHotkey('gallery', 'galleryNavDown', ['down']);
-    addHotkey('gallery', 'galleryNavLeft', ['up']);
+    addHotkey('gallery', 'galleryNavLeft', ['left']);
     addHotkey('gallery', 'galleryNavUpAlt', ['alt+up']);
     addHotkey('gallery', 'galleryNavRightAlt', ['alt+right']);
     addHotkey('gallery', 'galleryNavDownAlt', ['alt+down']);
-    addHotkey('gallery', 'galleryNavLeftAlt', ['alt+up']);
+    addHotkey('gallery', 'galleryNavLeftAlt', ['alt+left']);
     addHotkey('gallery', 'deleteSelection', ['delete', 'backspace']);
 
     return data;

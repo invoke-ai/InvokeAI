@@ -3,12 +3,13 @@ import { defaultLoRAConfig } from 'features/controlLayers/store/lorasSlice';
 import type {
   CanvasControlLayerState,
   CanvasInpaintMaskState,
+  CanvasMetadata,
   CanvasRasterLayerState,
   CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
   LoRA,
 } from 'features/controlLayers/store/types';
-import { zCanvasRasterLayerState } from 'features/controlLayers/store/types';
+import { zCanvasMetadata, zCanvasRasterLayerState } from 'features/controlLayers/store/types';
 import {
   imageDTOToImageWithDims,
   initialControlNet,
@@ -66,7 +67,7 @@ import {
   isParameterWidth,
 } from 'features/parameters/types/parameterSchemas';
 import { get, isArray, isString } from 'lodash-es';
-import { getImageDTO } from 'services/api/endpoints/images';
+import { getImageDTOSafe } from 'services/api/endpoints/images';
 import {
   isControlNetModelConfig,
   isIPAdapterModelConfig,
@@ -396,6 +397,11 @@ const parseLayer: MetadataParseFunc<
   | CanvasInpaintMaskState
 > = (metadataItem) => zCanvasRasterLayerState.parseAsync(metadataItem);
 
+const parseCanvasV2Metadata: MetadataParseFunc<CanvasMetadata> = async (metadata) => {
+  const metadataItem = await getProperty(metadata, 'canvas_v2_metadata', undefined);
+  return zCanvasMetadata.parseAsync(metadataItem);
+};
+
 const parseLayers: MetadataParseFunc<
   (
     | CanvasRasterLayerState
@@ -597,7 +603,7 @@ const parseIPAdapterToIPAdapterLayer: MetadataParseFunc<CanvasReferenceImageStat
     begin_step_percent ?? initialIPAdapter.beginEndStepPct[0],
     end_step_percent ?? initialIPAdapter.beginEndStepPct[1],
   ];
-  const imageDTO = image ? await getImageDTO(image.image_name) : null;
+  const imageDTO = image ? await getImageDTOSafe(image.image_name) : null;
 
   const layer: CanvasReferenceImageState = {
     id: getPrefixedId('ip_adapter'),
@@ -660,4 +666,5 @@ export const parsers = {
   ipAdapterToIPAdapterLayer: parseIPAdapterToIPAdapterLayer,
   layer: parseLayer,
   layers: parseLayers,
+  canvasV2Metadata: parseCanvasV2Metadata,
 } as const;

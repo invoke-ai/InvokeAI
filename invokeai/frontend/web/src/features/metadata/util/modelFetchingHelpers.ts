@@ -76,17 +76,17 @@ const fetchModelConfigByAttrs = async (name: string, base: BaseModelType, type: 
  * @returns A promise that resolves to the model config.
  * @throws {ModelConfigNotFoundError} If the model config is unable to be fetched.
  */
-// export const fetchModelConfigByIdentifier = async (identifier: ModelIdentifierField): Promise<AnyModelConfig> => {
-//   try {
-//     return await fetchModelConfig(identifier.key);
-//   } catch {
-//     try {
-//       return await fetchModelConfigByAttrs(identifier.name, identifier.base, identifier.type);
-//     } catch {
-//       throw new ModelConfigNotFoundError(`Unable to retrieve model config for identifier ${identifier}`);
-//     }
-//   }
-// };
+export const fetchModelConfigByIdentifier = async (identifier: ModelIdentifierField): Promise<AnyModelConfig> => {
+  try {
+    return await fetchModelConfig(identifier.key);
+  } catch {
+    try {
+      return await fetchModelConfigByAttrs(identifier.name, identifier.base, identifier.type);
+    } catch {
+      throw new ModelConfigNotFoundError(`Unable to retrieve model config for identifier ${identifier}`);
+    }
+  }
+};
 
 /**
  * Fetches the model config for a given model key and type, and ensures that the model config is of a specific type.

@@ -40,7 +40,7 @@ import { computed } from 'nanostores';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFlaskBold, PiHammerBold } from 'react-icons/pi';
+import { PiCircuitryBold, PiFlaskBold, PiHammerBold } from 'react-icons/pi';
 import type { EdgeChange, NodeChange } from 'reactflow';
 import type { S } from 'services/api/types';
 
@@ -413,6 +413,7 @@ const NodeCommandList = memo(({ searchTerm, onSelect }: { searchTerm: string; on
             <Flex alignItems="center" gap={2}>
               {item.classification === 'beta' && <Icon boxSize={4} color="invokeYellow.300" as={PiHammerBold} />}
               {item.classification === 'prototype' && <Icon boxSize={4} color="invokeRed.300" as={PiFlaskBold} />}
+              {item.classification === 'internal' && <Icon boxSize={4} color="invokePurple.300" as={PiCircuitryBold} />}
               <Text fontWeight="semibold">{item.label}</Text>
               <Spacer />
               <Text variant="subtext" fontWeight="semibold">

@@ -8,7 +8,7 @@ be used to teach an old model new tricks.
 
 ## How to Merge Models
 
-Model Merging can be be done by navigating to the Model Manager and clicking the "Merge Models" tab. From there, you can select the models and settings you want to use to merge th models. 
+Model Merging can be done by navigating to the Model Manager and clicking the "Merge Models" tab. From there, you can select the models and settings you want to use to merge the models. 
 
 ## Settings
 

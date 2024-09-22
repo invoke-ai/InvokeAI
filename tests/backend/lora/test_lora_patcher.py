@@ -192,4 +192,6 @@ def test_apply_lora_sidecar_patches_matches_apply_lora_patches(num_layers: int):
     with LoRAPatcher.apply_lora_sidecar_patches(model=model, patches=lora_models, prefix="", dtype=dtype):
         output_lora_sidecar_patches = model(input)
 
-    assert torch.allclose(output_lora_patches, output_lora_sidecar_patches)
+    # Note: We set atol=1e-5 because the test failed occasionally with the default atol=1e-8. Slight numerical
+    # differences are tolerable and expected due to the difference between sidecar vs. patching.
+    assert torch.allclose(output_lora_patches, output_lora_sidecar_patches, atol=1e-5)

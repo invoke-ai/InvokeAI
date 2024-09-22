@@ -19,6 +19,7 @@ import {
   selectCanvasSettingsSlice,
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { clamp } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
@@ -71,6 +72,7 @@ const sliderDefaultValue = mapRawValueToSliderValue(50);
 export const ToolEraserWidth = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const imageViewer = useImageViewer();
   const isSelected = useToolIsSelected('eraser');
   const width = useAppSelector(selectEraserWidth);
   const [localValue, setLocalValue] = useState(width);
@@ -131,18 +133,18 @@ export const ToolEraserWidth = memo(() => {
   }, [width]);
 
   useRegisteredHotkeys({
-    id: 'incrementToolWidth',
+    id: 'decrementToolWidth',
     category: 'canvas',
     callback: decrement,
-    options: { enabled: isSelected },
-    dependencies: [decrement, isSelected],
+    options: { enabled: isSelected && !imageViewer.isOpen },
+    dependencies: [decrement, isSelected, imageViewer.isOpen],
   });
   useRegisteredHotkeys({
     id: 'incrementToolWidth',
     category: 'canvas',
     callback: increment,
-    options: { enabled: isSelected },
-    dependencies: [increment, isSelected],
+    options: { enabled: isSelected && !imageViewer.isOpen },
+    dependencies: [increment, isSelected, imageViewer.isOpen],
   });
 
   return (
@@ -151,6 +153,7 @@ export const ToolEraserWidth = memo(() => {
         <FormLabel m={0}>{t('controlLayers.width')}</FormLabel>
         <PopoverAnchor>
           <NumberInput
+            variant="outline"
             display="flex"
             alignItems="center"
             min={1}

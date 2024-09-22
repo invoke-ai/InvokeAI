@@ -40,6 +40,7 @@ export type ParamsState = {
   cfgRescaleMultiplier: ParameterCFGRescaleMultiplier;
   guidance: ParameterGuidance;
   img2imgStrength: ParameterStrength;
+  optimizedDenoisingEnabled: boolean;
   iterations: number;
   scheduler: ParameterScheduler;
   seed: ParameterSeed;
@@ -83,6 +84,7 @@ const initialState: ParamsState = {
   cfgRescaleMultiplier: 0,
   guidance: 4,
   img2imgStrength: 0.75,
+  optimizedDenoisingEnabled: true,
   iterations: 1,
   scheduler: 'euler',
   seed: 0,
@@ -140,6 +142,9 @@ export const paramsSlice = createSlice({
     },
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
+    },
+    setOptimizedDenoisingEnabled: (state, action: PayloadAction<boolean>) => {
+      state.optimizedDenoisingEnabled = action.payload;
     },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessXAxis = action.payload;
@@ -273,6 +278,7 @@ export const {
   setScheduler,
   setSeed,
   setImg2imgStrength,
+  setOptimizedDenoisingEnabled,
   setSeamlessXAxis,
   setSeamlessYAxis,
   setShouldRandomizeSeed,
@@ -341,6 +347,7 @@ export const selectInfillPatchmatchDownscaleSize = createParamsSelector(
 );
 export const selectInfillColorValue = createParamsSelector((params) => params.infillColorValue);
 export const selectImg2imgStrength = createParamsSelector((params) => params.img2imgStrength);
+export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => params.optimizedDenoisingEnabled);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectPositivePrompt2 = createParamsSelector((params) => params.positivePrompt2);

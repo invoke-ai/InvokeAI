@@ -9,6 +9,7 @@ import type {
   CanvasEntityState,
   CanvasEntityType,
   CanvasInpaintMaskState,
+  CanvasMetadata,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasState,
@@ -300,7 +301,6 @@ export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdenti
       // An entity is hidden if:
       // - The entity type is hidden
       // - The entity is disabled
-      // - The entity is locked
       // - The entity is not a raster layer and we are staging and the option to show only raster layers is enabled
       if (!entity) {
         return true;
@@ -309,9 +309,6 @@ export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdenti
         return true;
       }
       if (!entity.isEnabled) {
-        return true;
-      }
-      if (entity.isLocked) {
         return true;
       }
       if (isStaging && showOnlyRasterLayersWhileStaging) {
@@ -331,3 +328,17 @@ export const selectAspectRatioID = createSelector(selectCanvasSlice, (canvas) =>
 export const selectAspectRatioValue = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.value);
 export const selectScaledSize = createSelector(selectBbox, (bbox) => bbox.scaledSize);
 export const selectScaleMethod = createSelector(selectBbox, (bbox) => bbox.scaleMethod);
+
+export const selectCanvasMetadata = createSelector(
+  selectCanvasSlice,
+  (canvas): { canvas_v2_metadata: CanvasMetadata } => {
+    const canvas_v2_metadata: CanvasMetadata = {
+      referenceImages: selectAllEntitiesOfType(canvas, 'reference_image'),
+      controlLayers: selectAllEntitiesOfType(canvas, 'control_layer'),
+      inpaintMasks: selectAllEntitiesOfType(canvas, 'inpaint_mask'),
+      rasterLayers: selectAllEntitiesOfType(canvas, 'raster_layer'),
+      regionalGuidance: selectAllEntitiesOfType(canvas, 'regional_guidance'),
+    };
+    return { canvas_v2_metadata };
+  }
+);

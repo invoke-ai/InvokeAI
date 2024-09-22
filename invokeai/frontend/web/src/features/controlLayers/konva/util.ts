@@ -1,4 +1,5 @@
 import type { Selector, Store } from '@reduxjs/toolkit';
+import { $authToken } from 'app/store/nanostores/authToken';
 import type { CanvasEntityIdentifier, CanvasObjectState, Coordinate, Rect } from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -304,6 +305,7 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
       reject(e);
     };
 
+    image.crossOrigin = $authToken.get() ? 'use-credentials' : 'anonymous';
     image.src = dataURL;
   });
 };
@@ -424,6 +426,7 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
     const imageElement = new Image();
     imageElement.onload = () => resolve(imageElement);
     imageElement.onerror = (error) => reject(error);
+    imageElement.crossOrigin = $authToken.get() ? 'use-credentials' : 'anonymous';
     imageElement.src = src;
   });
 }
@@ -441,7 +444,7 @@ export const getEmptyRect = (): Rect => {
   return { x: 0, y: 0, width: 0, height: 0 };
 };
 
-export function snapToNearest(value: number, candidateValues: number[], threshold: number): number {
+export function snapToNearest(value: number, candidateValues: number[], threshold: number = Infinity): number {
   let closest = value;
   let minDiff = Number.MAX_VALUE;
 

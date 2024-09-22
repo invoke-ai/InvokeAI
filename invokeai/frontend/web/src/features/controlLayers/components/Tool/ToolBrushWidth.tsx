@@ -16,6 +16,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { selectCanvasSettingsSlice, settingsBrushWidthChanged } from 'features/controlLayers/store/canvasSettingsSlice';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { clamp } from 'lodash-es';
 import type { KeyboardEvent } from 'react';
@@ -68,6 +69,7 @@ const sliderDefaultValue = mapRawValueToSliderValue(50);
 export const ToolBrushWidth = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const imageViewer = useImageViewer();
   const isSelected = useToolIsSelected('brush');
   const width = useAppSelector(selectBrushWidth);
   const [localValue, setLocalValue] = useState(width);
@@ -128,18 +130,18 @@ export const ToolBrushWidth = memo(() => {
   }, [width]);
 
   useRegisteredHotkeys({
-    id: 'incrementToolWidth',
+    id: 'decrementToolWidth',
     category: 'canvas',
     callback: decrement,
-    options: { enabled: isSelected },
-    dependencies: [decrement, isSelected],
+    options: { enabled: isSelected && !imageViewer.isOpen },
+    dependencies: [decrement, isSelected, imageViewer.isOpen],
   });
   useRegisteredHotkeys({
     id: 'incrementToolWidth',
     category: 'canvas',
     callback: increment,
-    options: { enabled: isSelected },
-    dependencies: [increment, isSelected],
+    options: { enabled: isSelected && !imageViewer.isOpen },
+    dependencies: [increment, isSelected, imageViewer.isOpen],
   });
 
   return (
@@ -148,6 +150,7 @@ export const ToolBrushWidth = memo(() => {
         <FormLabel m={0}>{t('controlLayers.width')}</FormLabel>
         <PopoverAnchor>
           <NumberInput
+            variant="outline"
             display="flex"
             alignItems="center"
             min={1}

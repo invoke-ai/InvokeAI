@@ -4,7 +4,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -17,6 +17,8 @@ import { getBoardField, getPresetModifiedPrompts, getSizes } from 'features/node
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
+
+import { addFLUXLoRAs } from './addFLUXLoRAs';
 
 const log = logger('system');
 
@@ -35,7 +37,17 @@ export const buildFLUXGraph = async (
 
   const { originalSize, scaledSize } = getSizes(bbox);
 
-  const { model, guidance, seed, steps, fluxVAE, t5EncoderModel, clipEmbedModel, img2imgStrength } = params;
+  const {
+    model,
+    guidance,
+    seed,
+    steps,
+    fluxVAE,
+    t5EncoderModel,
+    clipEmbedModel,
+    img2imgStrength,
+    optimizedDenoisingEnabled,
+  } = params;
 
   assert(model, 'No model found in state');
   assert(t5EncoderModel, 'No T5 Encoder model found in state');
@@ -66,7 +78,8 @@ export const buildFLUXGraph = async (
     guidance,
     num_steps: steps,
     seed,
-    denoising_start: 0, // denoising_start should be 0 when latents are not provided
+    trajectory_guidance_strength: 0,
+    denoising_start: 0,
     denoising_end: 1,
     width: scaledSize.width,
     height: scaledSize.height,
@@ -84,6 +97,8 @@ export const buildFLUXGraph = async (
   g.addEdge(modelLoader, 'transformer', noise, 'transformer');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
+  addFLUXLoRAs(state, g, noise, modelLoader);
+
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
   g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
   g.addEdge(modelLoader, 'max_seq_len', posCond, 't5_max_seq_len');
@@ -98,8 +113,8 @@ export const buildFLUXGraph = async (
   g.upsertMetadata({
     generation_mode: 'flux_txt2img',
     guidance,
-    width: scaledSize.width,
-    height: scaledSize.height,
+    width: originalSize.width,
+    height: originalSize.height,
     positive_prompt: positivePrompt,
     model: Graph.getModelMetadataField(modelConfig),
     seed,
@@ -108,6 +123,8 @@ export const buildFLUXGraph = async (
     t5_encoder: t5EncoderModel,
     clip_embed_model: clipEmbedModel,
   });
+
+  const denoisingValue = 1 - img2imgStrength;
 
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
@@ -121,7 +138,7 @@ export const buildFLUXGraph = async (
       originalSize,
       scaledSize,
       bbox,
-      1 - img2imgStrength,
+      denoisingValue,
       false
     );
   } else if (generationMode === 'inpaint') {
@@ -135,9 +152,15 @@ export const buildFLUXGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      1 - img2imgStrength,
+      denoisingValue,
       false
     );
+    if (optimizedDenoisingEnabled) {
+      g.updateNode(noise, {
+        denoising_start: 0,
+        trajectory_guidance_strength: denoisingValue,
+      });
+    }
   } else if (generationMode === 'outpaint') {
     canvasOutput = await addOutpaint(
       state,
@@ -149,7 +172,7 @@ export const buildFLUXGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      1 - img2imgStrength,
+      denoisingValue,
       false
     );
   }
@@ -162,13 +185,19 @@ export const buildFLUXGraph = async (
     canvasOutput = addWatermarker(g, canvasOutput);
   }
 
-  const shouldSaveToGallery = !canvasSettings.sendToCanvas || canvasSettings.autoSave;
+  // This image will be staged, should not be saved to the gallery or added to a board.
+  const is_intermediate = canvasSettings.sendToCanvas;
+  const board = canvasSettings.sendToCanvas ? undefined : getBoardField(state);
+
+  if (!canvasSettings.sendToCanvas) {
+    g.upsertMetadata(selectCanvasMetadata(state));
+  }
 
   g.updateNode(canvasOutput, {
     id: getPrefixedId('canvas_output'),
-    is_intermediate: !shouldSaveToGallery,
+    is_intermediate,
     use_cache: false,
-    board: getBoardField(state),
+    board,
   });
 
   g.setMetadataReceivingNode(canvasOutput);
