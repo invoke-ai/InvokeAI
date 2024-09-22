@@ -84,6 +84,12 @@ Please check out our **[:material-frequently-asked-questions:
 FAQ](help/FAQ/)** to
 get solutions for common installation problems and other issues.
 
+## :material-file-document: Training
+
+Invoke Training has moved to its own repository, with a dedicated UI for accessing common scripts like Textual Inversion and LoRA training.
+
+You can find more by visiting the repo at <https://github.com/invoke-ai/invoke-training>.
+
 ## :octicons-repo-push-24: Contributing
 
 Anyone who wishes to contribute to this project, whether documentation,
