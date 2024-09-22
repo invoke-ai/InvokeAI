@@ -1,5 +1,5 @@
 ---
-title: Home
+title: Invoke
 ---
 
 <!--
@@ -21,15 +21,10 @@ title: Home
 [![project logo](https://github.com/invoke-ai/InvokeAI/assets/31807370/6e3728c7-e90e-4711-905c-3b55844ff5be)](https://github.com/invoke-ai/InvokeAI)
 
 [![discord badge]][discord link]
-
 [![latest release badge]][latest release link]
 [![github stars badge]][github stars link]
 [![github forks badge]][github forks link]
-
-<!-- [![CI checks on main badge]][ci checks on main link]
-[![CI checks on dev badge]][ci checks on dev link]
-[![latest commit to dev badge]][latest commit to dev link] -->
-
+[![latest commit to main badge]][latest commit to main link]
 [![github open issues badge]][github open issues link]
 [![github open prs badge]][github open prs link]
 
@@ -43,12 +38,8 @@ title: Home
 [github open prs link]: https://github.com/invoke-ai/InvokeAI/pulls?q=is%3Apr+is%3Aopen
 [github stars badge]: https://flat.badgen.net/github/stars/invoke-ai/InvokeAI?icon=github
 [github stars link]: https://github.com/invoke-ai/InvokeAI/stargazers
-
-<!-- [latest commit to dev badge]:
-  https://flat.badgen.net/github/last-commit/invoke-ai/InvokeAI/development?icon=github&color=yellow&label=last%20dev%20commit&cache=900
-[latest commit to dev link]:
-  https://github.com/invoke-ai/InvokeAI/commits/main -->
-
+[latest commit to main badge]: https://flat.badgen.net/github/last-commit/invoke-ai/InvokeAI/main?icon=github&color=yellow&label=last%20commit&cache=900
+[latest commit to main link]: https://github.com/invoke-ai/InvokeAI/commits/main
 [latest release badge]: https://flat.badgen.net/github/release/invoke-ai/InvokeAI/development?icon=github
 [latest release link]: https://github.com/invoke-ai/InvokeAI/releases
 
