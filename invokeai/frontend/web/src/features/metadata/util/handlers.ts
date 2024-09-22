@@ -333,9 +333,6 @@ export const parseAndRecallAllMetadata = async (
     skipKeys.push(...NOT_TO_CONTROL_LAYERS_SKIP_KEYS);
   }
 
-  // We may need to take some further action depending on what was recalled. For example, we need to disable SDXL prompt
-  // concat if the negative or positive style prompt was set. Because the recalling is all async, we need to collect all
-  // results
   const keysToRecall = objectKeys(handlers).filter((key) => !skipKeys.includes(key));
   const recalled = await recallKeys(keysToRecall, metadata);
 
@@ -365,7 +362,16 @@ export const parseAndRecallAllMetadata = async (
 const recallKeys = async (keysToRecall: (keyof typeof handlers)[], metadata: unknown): Promise<RecallResults> => {
   const { dispatch } = getStore();
   const recalled: RecallResults = {};
-  for (const key of keysToRecall) {
+  // It's possible for some metadata item's recall to clobber the recall of another. For example, the model recall
+  // may change the width and height. If we are also recalling the width and height directly, we need to ensure that the
+  // model is recalled first, so it doesn't accidentally override the width and height.
+  const sortedKeysToRecall = keysToRecall.sort((a) => {
+    if (a === 'model') {
+      return -1;
+    }
+    return 0;
+  });
+  for (const key of sortedKeysToRecall) {
     const { parse, recall } = handlers[key];
     if (!recall) {
       continue;
