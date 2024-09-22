@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
 
 # General
-site_name: InvokeAI Documentation
+site_name: Invoke
 site_url: https://invoke-ai.github.io/InvokeAI
 site_author: mauwii
 dev_addr: '127.0.0.1:8080'
@@ -17,6 +17,7 @@ copyright: Copyright &copy; 2022-2024 InvokeAI Team
 # Configuration
 theme:
   name: material
+  logo: img/invoke-symbol-wht-lrg.svg
   icon:
     repo: fontawesome/brands/github
     edit: material/file-document-edit-outline
