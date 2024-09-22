@@ -1,30 +1,33 @@
 # Invocation API
 
-Each invocation's `invoke` method is provided a single arg - the Invocation
-Context.
+Each invocation's `invoke` method is provided a single arg - the Invocation Context.
 
-This object provides access to various methods, used to interact with the
-application. Loading and saving images, logging messages, etc.
+This object provides an API the invocation can use to interact with application services, for example:
 
-!!! warning ""
-
-    This API may shift slightly until the release of v4.0.0 as we work through a few final updates to the Model Manager.
+- Saving images
+- Logging messages
+- Loading models
 
 ```py
 class MyInvocation(BaseInvocation):
   ...
   def invoke(self, context: InvocationContext) -> ImageOutput:
-      image_pil = context.images.get_pil(image_name)
+      # Load an image
+      image_pil = context.images.get_pil(self.image.image_name)
       # Do something to the image
-      image_dto = context.images.save(image_pil)
+      output_image = do_something_cool(image_pil)
+      # Save the image
+      image_dto = context.images.save(output_image)
       # Log a message
       context.logger.info(f"Did something cool, image saved!")
+      # Return the output
+      return ImageOutput.build(image_dto)
       ...
 ```
 
 The full API is documented below.
 
-## Invocation Mixins
+## Mixins
 
 Two important mixins are provided to facilitate working with metadata and gallery boards.
 

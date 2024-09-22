@@ -1,48 +1,36 @@
 # Installation and Updating Overview
 
-Before installing, review the [installation requirements] to ensure your system is set up properly.
+Before installing, review the [installation requirements](./requirements.md) to ensure your system is set up properly.
 
-See the [FAQ] for frequently-encountered installation issues.
+See the [FAQ](../faq.md) for frequently-encountered installation issues.
 
-If you need more help, join our [discord] or [create an issue].
+If you need more help, join our [discord](https://discord.gg/ZmtBAhwWhy) or [create a GitHub issue](https://github.com/invoke-ai/InvokeAI/issues).
 
-<h2>Automatic Install & Updates </h2>
+## Automated Installer & Updates
 
-✅ The automatic install is the best way to run InvokeAI. Check out the [installation guide] to get started.
+✅ The automated [installer](./installer.md) is the best way to install Invoke.
 
-⬆️ The same installer is also the best way to update InvokeAI - Simply rerun it for the same folder you installed to.
+⬆️ The same installer is also the best way to update Invoke - simply rerun it for the same folder you installed to.
 
 The installation process simply manages installation for the core libraries & application dependencies that run Invoke.
-Any models, images, or other assets in the Invoke root folder won't be affected by the installation process.
 
-<h2>Manual Install</h2>
+Models, images, or other assets in the Invoke root folder won't be affected by the installation process.
 
-If you are familiar with python and want more control over the packages that are installed, you can [install InvokeAI manually via PyPI].
+## Manual Install
+
+If you are familiar with python and want more control over the packages that are installed, you can [install Invoke manually via PyPI](./manual.md).
 
 Updates are managed by reinstalling the latest version through PyPi.
 
-<h2>Developer Install</h2>
+## Developer Install
 
-If you want to contribute to InvokeAI, consult the [developer install guide].
+If you want to contribute to InvokeAI, you'll need to set up a [dev environment](../contributing/dev-environment.md).
 
-<h2>Docker Install</h2>
+## Docker
 
-This method is recommended for those familiar with running Docker containers.
+Invoke publishes docker images. See the [docker installation guide](./docker.md) for details.
 
-We offer a method for creating Docker containers containing InvokeAI and its dependencies. This method is recommended for individuals with experience with Docker containers and understand the pluses and minuses of a container-based install.
+## Other Installation Guides
 
-See the [docker installation guide].
-
-<h2>Other Installation Guides</h2>
-
-- [PyPatchMatch](060_INSTALL_PATCHMATCH.md)
-- [Installing Models](050_INSTALLING_MODELS.md)
-
-[install InvokeAI manually via PyPI]: 020_INSTALL_MANUAL.md
-[developer install guide]: INSTALL_DEVELOPMENT.md
-[docker installation guide]: 040_INSTALL_DOCKER.md
-[installation guide]: 010_INSTALL_AUTOMATED.md
-[FAQ]: ../help/FAQ.md
-[discord]: discord.gg/invoke-ai
-[create an issue]: https://github.com/invoke-ai/InvokeAI/issues
-[installation requirements]: INSTALL_REQUIREMENTS.md
+- [PyPatchMatch](./patchmatch.md)
+- [Installing Models](./models.md)

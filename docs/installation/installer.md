@@ -74,11 +74,17 @@ Find the install location you selected earlier. Double-click the launcher script
 
 Choose the first option to run the UI. After a series of startup messages, you'll see something like this:
 
-```
+```sh
 Uvicorn running on http://127.0.0.1:9090 (Press CTRL+C to quit)
 ```
 
 Copy the URL into your browser and you should see the UI.
+
+## Improved Outpainting with PatchMatch
+
+PatchMatch is an extra add-on that can improve outpainting. Windows users are in luck - it works out of the box.
+
+On macOS and Linux, a few extra steps are needed to set it up. See the [PatchMatch installation guide](./patchmatch.md).
 
 ## First-time Setup
 
@@ -100,10 +106,10 @@ Updating is exactly the same as installing - download the latest installer, choo
 
 If you have installation issues, please review the [FAQ]. You can also [create an issue] or ask for help on [discord].
 
-[installation requirements]: INSTALL_REQUIREMENTS.md
-[FAQ]: ../help/FAQ.md
-[install some models]: 050_INSTALLING_MODELS.md
-[configuration docs]: ../features/CONFIGURATION.md
+[installation requirements]: ./requirements.md
+[FAQ]: ../faq.md
+[install some models]: ./models.md
+[configuration docs]: ../configuration.md
 [latest release]: https://github.com/invoke-ai/InvokeAI/releases/latest
 [create an issue]: https://github.com/invoke-ai/InvokeAI/issues
 [discord]: https://discord.gg/ZmtBAhwWhy
