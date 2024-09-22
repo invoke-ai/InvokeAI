@@ -23,6 +23,7 @@ theme:
   favicon: img/favicon.ico
   palette:
     scheme: slate
+    primary: black
   features:
     - navigation.instant
     - navigation.tabs
