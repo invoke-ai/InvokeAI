@@ -1,8 +1,10 @@
 # Automatic Install & Updates
 
-**The same packaged installer file can be used for both new installs and updates.**
-Using the installer for updates will leave everything you've added since installation, and just update the core libraries used to run Invoke.
-Simply use the same path you installed to originally.
+!!! tip "Use the installer to update"
+
+    Using the installer for updates will not erase any of your data (images, models, boards, etc). It only updates the core libraries used to run Invoke.
+
+    Simply use the same path you installed to originally to update your existing installation.
 
 Both release and pre-release versions can be installed using the installer. It also supports install through a wheel if needed.
 
@@ -86,7 +88,7 @@ Check the [configuration docs] for details on configuring the application.
 
 ## Updating
 
-Updating is exactly the same as installing - download the latest installer, choose the latest version and off you go.
+Updating is exactly the same as installing - download the latest installer, choose the latest version, enter your existing installation path, and the app will update. None of your data (images, models, boards, etc) will be erased.
 
 !!! info "Dependency Resolution Issues"
 
