@@ -1,6 +1,6 @@
 import { Box, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIColorPicker from 'common/components/IAIColorPicker';
+import RgbaColorPicker from 'common/components/ColorPicker/RgbaColorPicker';
 import {
   selectInfillColorValue,
   selectInfillMethod,
@@ -30,7 +30,7 @@ const ParamInfillColorOptions = () => {
       <FormControl isDisabled={infillMethod !== 'color'}>
         <FormLabel>{t('parameters.infillColorValue')}</FormLabel>
         <Box w="full" pt={2} pb={2}>
-          <IAIColorPicker color={infillColor} onChange={handleInfillColor} />
+          <RgbaColorPicker color={infillColor} onChange={handleInfillColor} />
         </Box>
       </FormControl>
     </Flex>
