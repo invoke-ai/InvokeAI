@@ -59,13 +59,6 @@ The simple [installer script](installation/installer.md) is the suggested way to
 
 You may also install Invoke as python package [via PyPI](installation/manual.md) or [docker](installation/docker.md).
 
-### Image Management
-
-- [Image2Image](features/IMG2IMG.md)
-- [Adding custom styles and subjects](features/CONCEPTS.md)
-- [Upscaling and Face Reconstruction](features/POSTPROCESS.md)
-- [Other Features](features/OTHER.md)
-
 <!-- separator -->
 
 ### Model Management
