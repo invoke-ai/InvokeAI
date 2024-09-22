@@ -458,6 +458,10 @@
                 "title": "Fit Layers to Canvas",
                 "desc": "Scale and position the view to fit all visible layers."
             },
+            "fitBboxToCanvas": {
+                "title": "Fit Bbox to Canvas",
+                "desc": "Scale and position the view to fit the bbox."
+            },
             "setZoomTo100Percent": {
                 "title": "Zoom to 100%",
                 "desc": "Set the canvas zoom to 100%."

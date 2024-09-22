@@ -22,6 +22,13 @@ export const CanvasToolbarResetViewButton = memo(() => {
     dependencies: [isCanvasActive, imageViewer.isOpen],
   });
   useRegisteredHotkeys({
+    id: 'fitBboxToCanvas',
+    category: 'canvas',
+    callback: canvasManager.stage.fitBboxToStage,
+    options: { enabled: isCanvasActive && !imageViewer.isOpen, preventDefault: true },
+    dependencies: [isCanvasActive, imageViewer.isOpen],
+  });
+  useRegisteredHotkeys({
     id: 'setZoomTo100Percent',
     category: 'canvas',
     callback: () => canvasManager.stage.setScale(1),
