@@ -2,8 +2,6 @@
 title: Database
 ---
 
-# Invoke's SQLite Database
-
 Invoke uses a SQLite database to store image, workflow, model, and execution data.
 
 We take great care to ensure your data is safe, by utilizing transactions and a database migration system.
@@ -24,12 +22,10 @@ SQLite can run on an in-memory database. Your existing database is untouched whe
 
 This is very useful for testing, as there is no chance of a database change modifying your "physical" database.
 
-To run Invoke with a memory database, edit your `invokeai.yaml` file, and add `use_memory_db: true` to the `Paths:` stanza:
+To run Invoke with a memory database, edit your `invokeai.yaml` file and add `use_memory_db: true`:
 
 ```yaml
-InvokeAI:
-  Development:
-    use_memory_db: true
+use_memory_db: true
 ```
 
 Delete this line (or set it to `false`) to use your main database.
