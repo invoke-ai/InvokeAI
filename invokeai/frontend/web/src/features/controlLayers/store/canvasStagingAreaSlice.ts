@@ -90,3 +90,15 @@ export const selectIsStaging = createSelector(
     return data.in_progress > 0 || data.pending > 0;
   }
 );
+export const selectStagedImageIndex = createSelector(
+  selectCanvasStagingAreaSlice,
+  (stagingArea) => stagingArea.selectedStagedImageIndex
+);
+export const selectSelectedImage = createSelector(
+  [selectCanvasStagingAreaSlice, selectStagedImageIndex],
+  (stagingArea, index) => stagingArea.stagedImages[index] ?? null
+);
+export const selectImageCount = createSelector(
+  selectCanvasStagingAreaSlice,
+  (stagingArea) => stagingArea.stagedImages.length
+);
