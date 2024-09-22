@@ -50,9 +50,9 @@ title: Invoke
 
 ## Installation
 
-The simple [installer script](installation/installer.md) is the suggested way to install and update the application.
+The [installer script](installation/installer.md) is the easiest way to install and update the application.
 
-You may also install Invoke as python package [via PyPI](installation/manual.md) or [docker](installation/docker.md).
+You can also install Invoke as python package [via PyPI](installation/manual.md) or [docker](installation/docker.md).
 
 See the [installation section](./installation/index.md) for more information.
 
@@ -68,7 +68,7 @@ Invoke Training has moved to its own repository, with a dedicated UI for accessi
 
 You can find more by visiting the repo at <https://github.com/invoke-ai/invoke-training>.
 
-## :octicons-repo-push-24: Contributing
+## Contributing
 
 We welcome contributions, big and small. Please review our [contributing guide](contributing/index.md) if you'd like make a contribution.
 
