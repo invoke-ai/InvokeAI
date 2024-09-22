@@ -109,10 +109,10 @@ dependencies = [
 "onnx-directml" = ["onnxruntime-directml"]
 "dist" = ["pip-tools", "pipdeptree", "twine"]
 "docs" = [
-  "mkdocs-material>=9.5.13",
+  "mkdocs-material>=9.5.36",
   "mkdocs-git-revision-date-localized-plugin",
   "mkdocs-redirects",
-  "mkdocstrings[python]>=0.24.1",
+  "mkdocstrings[python]>=0.26.1",
 ]
 "dev" = ["jurigged", "pudb", "snakeviz", "gprof2dot"]
 "test" = [
