@@ -3,12 +3,14 @@ title: Home
 ---
 
 <!--
-  The Docs you find here (/docs/*) are built and deployed via mkdocs. If you want to run a local version to verify your changes, it's as simple as::
+  The docs are generated with using mkdocs: https://www.mkdocs.org/
 
-  ```bash
-  pip install -r docs/requirements-mkdocs.txt
-  mkdocs serve
+  To preview the docs locally, first install the requirements:
+  ```sh
+  pip install -e ".[docs]"
   ```
+
+  Then run the mkdocs server with `mkdocs serve`, or, on Unix systems, `make docs`.
 -->
 
 <!-- CSS styling -->
