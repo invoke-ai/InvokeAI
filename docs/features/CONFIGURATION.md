@@ -90,10 +90,9 @@ Following the table are additional explanations for certain settings.
 <!-- prettier-ignore-start -->
 ::: invokeai.app.services.config.config_default.InvokeAIAppConfig
     options:
-        heading_level: 4
+        show_root_heading: false
         members: false
         show_docstring_description: false
-        group_by_category: true
         show_category_heading: false
 <!-- prettier-ignore-end -->
 
@@ -155,12 +154,12 @@ log_handlers:
   locally or to a remote logging machine. `syslog` offers a variety
   of configuration options:
 
-```
-  syslog=/dev/log`      - log to the /dev/log device
-  syslog=localhost`     - log to the network logger running on the local machine
-  syslog=localhost:512` - same as above, but using a non-standard port
-  syslog=fredserver,facility=LOG_USER,socktype=SOCK_DRAM`
-                        - Log to LAN-connected server "fredserver" using the facility LOG_USER and datagram packets.
+```yaml
+syslog=/dev/log`      - log to the /dev/log device
+syslog=localhost`     - log to the network logger running on the local machine
+syslog=localhost:512` - same as above, but using a non-standard port
+syslog=fredserver,facility=LOG_USER,socktype=SOCK_DRAM`
+- Log to LAN-connected server "fredserver" using the facility LOG_USER and datagram packets.
 ```
 
 - `http` can be used to log to a remote web server. The server must be
@@ -169,8 +168,8 @@ log_handlers:
   indicating whether the message should be submitted using the GET or
   POST method.
 
-```
- http=http://my.server/path/to/logger,method=POST
+```yaml
+http=http://my.server/path/to/logger,method=POST
 ```
 
 The `log_format` option provides several alternative formats:
