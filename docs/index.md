@@ -68,14 +68,6 @@ The simple [installer script](installation/installer.md) is the suggested way to
 
 You may also install Invoke as python package [via PyPI](installation/manual.md) or [docker](installation/docker.md).
 
-### The InvokeAI Web Interface
-
-- [WebUI overview](features/WEB.md)
-- [WebUI hotkey reference guide](features/WEBUIHOTKEYS.md)
-- [WebUI Unified Canvas for Img2Img, inpainting and outpainting](features/UNIFIED_CANVAS.md)
-
-<!-- separator -->
-
 ### Image Management
 
 - [Image2Image](features/IMG2IMG.md)
