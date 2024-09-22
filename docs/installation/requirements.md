@@ -177,5 +177,5 @@ An alternative to installing ROCm locally is to use a [ROCm docker container] to
 [Nvidia Container Runtime]: https://developer.nvidia.com/container-runtime
 [linux install instructions]: https://docs.python-guide.org/starting/install3/linux/
 [Microsoft Visual C++ Redistributable]: https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
-[an official installer]: https://www.python.org/downloads/release/python-3118/
+[an official installer]: https://www.python.org/downloads/
 [CUDA Toolkit Downloads]: https://developer.nvidia.com/cuda-downloads
