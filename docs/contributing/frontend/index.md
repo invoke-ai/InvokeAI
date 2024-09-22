@@ -6,8 +6,8 @@ Invoke's UI is made possible by many contributors and open-source libraries. Tha
 
 ### Setup
 
-1. Install [node] and [pnpm].
-1. Run `pnpm i` to install all packages.
+1. Install [node] and [pnpm] v8.
+2. Run `pnpm i` to install all packages.
 
 #### Run in dev mode
 
@@ -19,7 +19,6 @@ Invoke's UI is made possible by many contributors and open-source libraries. Tha
 
 - `dev`: run the frontend in dev mode, enabling hot reloading
 - `build`: run all checks (madge, eslint, prettier, tsc) and then build the frontend
-- `typegen`: generate types from the OpenAPI schema (see [Type generation])
 - `lint:dpdm`: check circular dependencies
 - `lint:eslint`: check code quality
 - `lint:prettier`: check code formatting
@@ -27,6 +26,7 @@ Invoke's UI is made possible by many contributors and open-source libraries. Tha
 - `lint:knip`: check for unused exports or objects (failures here are just suggestions, not hard fails)
 - `lint`: run all checks concurrently
 - `fix`: run `eslint` and `prettier`, fixing fixable issues
+- `test:ui`: run `vitest` with the fancy web UI
 
 ### Type generation
 
@@ -34,11 +34,16 @@ We use [openapi-typescript] to generate types from the app's OpenAPI schema.
 
 The generated types are committed to the repo in [schema.ts].
 
+On macOS and Linux, there's a makefile target to regenerate the types. You don't need to have the application running.
+
 ```sh
-# from the repo root, start the server
-python scripts/invokeai-web.py
-# from invokeai/frontend/web/, run the script
-pnpm typegen
+make frontend-typegen
+```
+
+Otherwise, you'll need to run the script manually:
+
+```sh
+cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 ```
 
 ### Localization
@@ -107,13 +112,21 @@ Please use the [conventional commits] spec for the web UI, with a scope of "ui":
 - `feat(ui): add some cool new feature`
 - `fix(ui): fix some bug`
 
+### Tests
+
+We don't do any UI testing at this time, but consider adding tests for sensitive logic.
+
+We use `vitest`, and tests should be next to the file they are testing. If the logic is in `something.ts`, the tests should be in `something.test.ts`.
+
+In some situations, we may want to test types. For example, if you use `zod` to create a schema that should match a generated type, it's best to add a test to confirm that the types match. Use `tsafe`'s assert for this.
+
 ### Submitting a PR
 
 - Ensure your branch is tidy. Use an interactive rebase to clean up the commit history and reword the commit messages if they are not descriptive.
 - Run `pnpm lint`. Some issues are auto-fixable with `pnpm fix`.
 - Fill out the PR form when creating the PR.
   - It doesn't need to be super detailed, but a screenshot or video is nice if you changed something visually.
-  - If a section isn't relevant, delete it. There are no UI tests at this time.
+  - If a section isn't relevant, delete it.
 
 ## Other docs
 
@@ -126,8 +139,7 @@ Please use the [conventional commits] spec for the web UI, with a scope of "ui":
 [i18next]: https://github.com/i18next/react-i18next
 [Weblate]: https://hosted.weblate.org/engage/invokeai/
 [openapi-typescript]: https://github.com/drwpow/openapi-typescript
-[Type generation]: #type-generation
 [schema.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/services/api/schema.ts
 [conventional commits]: https://www.conventionalcommits.org/en/v1.0.0/
-[Workflows - Design and Implementation]: ./WORKFLOWS.md
-[State Management]: ./STATE_MGMT.md
+[Workflows - Design and Implementation]: ./workflows.md
+[State Management]: ./state-management.md

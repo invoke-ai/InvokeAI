@@ -4,7 +4,7 @@ The app makes heavy use of Redux Toolkit, its Query library, and `nanostores`.
 
 ## Redux
 
-TODO
+We use RTK extensively - slices, entity adapters, queries, reselect, the whole 9 yards. Their [docs](https://redux-toolkit.js.org/) are excellent.
 
 ## `nanostores`
 
