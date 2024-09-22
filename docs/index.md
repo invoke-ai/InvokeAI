@@ -72,4 +72,4 @@ You can find more by visiting the repo at <https://github.com/invoke-ai/invoke-t
 
 We welcome contributions, big and small. Please review our [contributing guide](contributing/index.md) if you'd like make a contribution.
 
-This software is a combined effort of various people from across the world. [Check out the list of all these amazing people](contributing/contributors.md). We thank them for their time, hard work and effort.
+This software is a combined effort of [people across the world](contributing/contributors.md). We thank them for their time, hard work and effort!
