@@ -1,4 +1,4 @@
-# Installing Models
+# Models
 
 ## Checkpoint and Diffusers Models
 
@@ -15,7 +15,7 @@ Today, there are thousands of models, fine tuned to excel at specific styles, ge
     - `safetensors`: Single file, like `.ckpt` files. Prevents malware from lurking in a model.
     - `diffusers`: Splits the model components into separate files, allowing very fast loading.
 
-    InvokeAI supports all three formats. Our backend will convert models to `diffusers` format before running them. This is a transparent process.
+    InvokeAI supports all three formats.
 
 ## Starter Models
 
@@ -27,7 +27,7 @@ Some models carry license terms that limit their use in commercial applications 
 
 ## Other Models
 
-You can install other models using the Model Manager. You'll find tabs for the following install methods:
+There are a few ways to install other models:
 
 - **URL or Local Path**: Provide the path to a model on your computer, or a direct link to the model. Some sites require you to use an API token to download models, which you can [set up in the config file].
 - **HuggingFace**: Paste a HF Repo ID to install it. If there are multiple models in the repo, you'll get a list to choose from. Repo IDs look like this: `XpucT/Deliberate`. There is a copy button on each repo to copy the ID.
@@ -49,4 +49,4 @@ In this situation, you may need to provide some additional information to identi
 
     Add `:v2` to the repo ID and use that when installing the model: `monster-labs/control_v1p_sd15_qrcode_monster:v2`
 
-[set up in the config file]: ../../features/CONFIGURATION#model-marketplace-api-keys
+[set up in the config file]: ../configuration.md#model-marketplace-api-keys

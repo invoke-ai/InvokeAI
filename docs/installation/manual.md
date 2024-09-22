@@ -1,40 +1,36 @@
 # Manual Install
 
-!!! warning "This is for Advanced Users"
+!!! warning
 
     **Python experience is mandatory.**
 
-## Introduction
+    If you want to use Invoke locally, you should probably use the [installer](./installer.md).
+
+    If you want to contribute to Invoke, instead follow the [dev environment](../contributing/dev-environment.md) guide.
 
 InvokeAI is distributed as a python package on PyPI, installable with `pip`. There are a few things that are handled by the installer and launcher that you'll need to manage manually, described in this guide.
 
-### Requirements
+## Requirements
 
-Before you start, go through the [installation requirements](./INSTALL_REQUIREMENTS.md).
+Before you start, go through the [installation requirements](./requirements.md).
 
-### Installation Walkthrough
+## Walkthrough
 
-1. Create a directory to contain your InvokeAI library, configuration
-    files, and models. This is known as the "runtime" or "root"
-    directory, and often lives in your home directory under the name `invokeai`.
-
-    We will refer to this directory as `INVOKEAI_ROOT`. For convenience, create an environment variable pointing to the directory.
+1. Create a directory to contain your InvokeAI library, configuration files, and models. This is known as the "runtime" or "root" directory, and typically lives in your home directory under the name `invokeai`.
 
     === "Linux/macOS"
 
         ```bash
-        export INVOKEAI_ROOT=~/invokeai
-        mkdir $INVOKEAI_ROOT
+        mkdir ~/invokeai
         ```
 
     === "Windows (PowerShell)"
 
         ```bash
-        Set-Variable -Name INVOKEAI_ROOT -Value $Home/invokeai
-        mkdir $INVOKEAI_ROOT
+        mkdir $Home/invokeai
         ```
 
-1. Enter the root (invokeai) directory and create a virtual Python environment within it named `.venv`.
+1. Enter the root directory and create a virtual Python environment within it named `.venv`.
 
     !!! warning "Virtual Environment Location"
 
@@ -42,10 +38,19 @@ Before you start, go through the [installation requirements](./INSTALL_REQUIREME
 
         If you choose a different location for the venv, then you _must_ set the `INVOKEAI_ROOT` environment variable or specify the root directory using the `--root` CLI arg.
 
-    ```terminal
-    cd $INVOKEAI_ROOT
-    python3 -m venv .venv --prompt InvokeAI
-    ```
+    === "Linux/macOS"
+
+        ```bash
+        cd ~/invokeai
+        python3 -m venv .venv --prompt InvokeAI
+        ```
+
+    === "Windows (PowerShell)"
+
+        ```bash
+        cd $Home/invokeai
+        python3 -m venv .venv --prompt InvokeAI
+        ```
 
 1. Activate the new environment:
 
@@ -63,13 +68,11 @@ Before you start, go through the [installation requirements](./INSTALL_REQUIREME
 
     !!! info "Permissions Error (Windows)"
 
-        If you get a permissions error at this point, run this command and try again
+        If you get a permissions error at this point, run this command and try again.
 
         `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
-    The command-line prompt should change to to show `(InvokeAI)` at the beginning of the prompt.
-
-    The following steps should be run while inside the `INVOKEAI_ROOT` directory.
+    The command-line prompt should change to to show `(InvokeAI)`, indicating the venv is active.
 
 1. Make sure that pip is installed in your virtual environment and up to date:
 
@@ -81,21 +84,17 @@ Before you start, go through the [installation requirements](./INSTALL_REQUIREME
 
     - You may need to provide an [extra index URL](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-extra-index-url). Select your platform configuration using [this tool on the PyTorch website](https://pytorch.org/get-started/locally/). Copy the `--extra-index-url` string from this and append it to your install command.
 
-        !!! example "Install with an extra index URL"
+        ```bash
+        pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
+        ```
 
-            ```bash
-            pip install InvokeAI --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
-            ```
+    - If you have a CUDA GPU and want to install with `xformers`, you need to add an option to the package name. Note that `xformers` is not strictly necessary. PyTorch includes an implementation of the SDP attention algorithm with similar performance for most GPUs.
 
-    - If you have a CUDA GPU and want to install with `xformers`, you need to add an option to the package name. Note that `xformers` is not necessary. PyTorch includes an implementation of the SDP attention algorithm with the same performance.
+        ```bash
+        pip install "InvokeAI[xformers]" --use-pep517
+        ```
 
-        !!! example "Install with `xformers`"
-
-            ```bash
-            pip install "InvokeAI[xformers]" --use-pep517
-            ```
-
-1. Deactivate and reactivate your runtime directory so that the invokeai-specific commands become available in the environment:
+1. Deactivate and reactivate your venv so that the invokeai-specific commands become available in the environment:
 
     === "Linux/macOS"
 

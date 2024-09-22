@@ -2,7 +2,7 @@
 
 !!! info "How to Reinstall"
 
-    Many issues can be resolved by re-installing the application. You won't lose any data by re-installing. We suggest downloading the [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest) and using it to re-install the application. Consult the [installer guide](../installation/010_INSTALL_AUTOMATED.md) for more information.
+    Many issues can be resolved by re-installing the application. You won't lose any data by re-installing. We suggest downloading the [latest release](https://github.com/invoke-ai/InvokeAI/releases/latest) and using it to re-install the application. Consult the [installer guide](./installation/installer.md) for more information.
 
     When you run the installer, you'll have an option to select the version to install. If you aren't ready to upgrade, you choose the current version to fix a broken install.
 
@@ -92,7 +92,7 @@ Most example images with prompts that you'll find on the internet have been gene
 
 During a zip file installation or an update, installation stops with an error like this:
 
-![broken-dependency-screenshot](../assets/troubleshooting/broken-dependency.png){:width="800px"}
+![broken-dependency-screenshot](./assets/troubleshooting/broken-dependency.png){:width="800px"}
 
 To resolve this, re-install the application as described above.
 
@@ -164,7 +164,7 @@ If you encounter this error, the solution is to remove the package from the `pip
 - Choose the developer console option
 - Run this command: `pip cache remove controlnet_aux`
 - Close the terminal window
-- Download and run the [installer](https://github.com/invoke-ai/InvokeAI/releases/latest), selecting your current install location
+- Download and run the [installer][latest release], selecting your current install location
 
 ## Out of Memory Issues
 
@@ -196,7 +196,7 @@ tips to reduce the problem:
     === "12GB VRAM GPU"
 
         This should be sufficient to generate larger images up to about 1280x1280.
-		
+  
 ## Checkpoint Models Load Slowly or Use Too Much RAM
 
 The difference between diffusers models (a folder containing multiple
@@ -251,10 +251,10 @@ To better understand how the `glibc` memory allocator works, see these reference
 
 Note the differences between memory allocated as chunks in an arena vs. memory allocated with `mmap`. Under `glibc`'s default configuration, most model tensors get allocated as chunks in an arena making them vulnerable to the problem of fragmentation.
 
-[model install docs]: ../installation/050_INSTALLING_MODELS.md
-[system requirements]: ../installation/INSTALL_REQUIREMENTS.md
+[model install docs]: ./installation/models.md
+[system requirements]: ./installation/requirements.md
 [latest release]: https://github.com/invoke-ai/InvokeAI/releases/latest
 [create an issue]: https://github.com/invoke-ai/InvokeAI/issues
 [discord]: https://discord.gg/ZmtBAhwWhy
-[configuration docs]: ../features/CONFIGURATION.md
+[configuration docs]: ./configuration.md
 [access token]: https://huggingface.co/docs/hub/security-tokens#how-to-manage-user-access-tokens
