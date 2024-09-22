@@ -47,11 +47,7 @@ export const CanvasAlertsSendingToGallery = () => {
       return false;
     }
 
-    if (destination === 'canvas') {
-      return false;
-    }
-
-    return true;
+    return destination === 'gallery';
   }, [destination]);
 
   return (
@@ -88,15 +84,12 @@ export const CanvasAlertsSendingToCanvas = () => {
     if (isStaging) {
       return true;
     }
+
     if (!destination) {
       return false;
     }
 
-    if (destination !== 'canvas') {
-      return false;
-    }
-
-    return true;
+    return destination === 'canvas';
   }, [destination, isStaging]);
 
   return (
