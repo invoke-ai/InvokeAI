@@ -70,14 +70,6 @@ You can find more by visiting the repo at <https://github.com/invoke-ai/invoke-t
 
 ## :octicons-repo-push-24: Contributing
 
-Anyone who wishes to contribute to this project, whether documentation,
-features, bug fixes, code cleanup, testing, or code reviews, is very much
-encouraged to do so.
+We welcome contributions, big and small. Please review our [contributing guide](contributing/index.md) if you'd like make a contribution.
 
-[Please take a look at our Contribution documentation to learn more about contributing to InvokeAI.](contributing/CONTRIBUTING.md)
-
-## :octicons-person-24: Contributors
-
-This software is a combined effort of various people from across the world.
-[Check out the list of all these amazing people](other/CONTRIBUTORS.md). We
-thank them for their time, hard work and effort.
+This software is a combined effort of various people from across the world. [Check out the list of all these amazing people](contributing/contributors.md). We thank them for their time, hard work and effort.
