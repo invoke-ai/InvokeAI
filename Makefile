@@ -77,5 +77,6 @@ openapi:
 	python scripts/generate_openapi_schema.py
 
 # Serve the mkdocs site w/ live reload
+.PHONY: docs
 docs:
 	mkdocs serve
