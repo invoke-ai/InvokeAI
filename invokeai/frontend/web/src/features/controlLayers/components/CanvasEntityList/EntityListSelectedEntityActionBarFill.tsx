@@ -1,6 +1,6 @@
 import { Box, Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import RgbColorPicker from 'common/components/RgbColorPicker';
+import RgbColorPicker from 'common/components/ColorPicker/RgbColorPicker';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { MaskFillStyle } from 'features/controlLayers/components/common/MaskFillStyle';
 import { entityFillColorChanged, entityFillStyleChanged } from 'features/controlLayers/store/canvasSlice';
@@ -65,7 +65,7 @@ export const EntityListSelectedEntityActionBarFill = memo(() => {
       <PopoverContent>
         <PopoverBody minH={64}>
           <Flex flexDir="column" gap={4}>
-            <RgbColorPicker color={fill.color} onChange={onChangeFillColor} withNumberInput />
+            <RgbColorPicker color={fill.color} onChange={onChangeFillColor} withNumberInput withSwatches />
             <MaskFillStyle style={fill.style} onChange={onChangeFillStyle} />
           </Flex>
         </PopoverBody>
