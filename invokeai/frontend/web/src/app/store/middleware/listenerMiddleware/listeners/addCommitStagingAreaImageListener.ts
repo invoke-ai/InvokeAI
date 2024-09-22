@@ -14,11 +14,11 @@ import { assert } from 'tsafe';
 
 const log = logger('canvas');
 
-const matchCanvasOrStagingAreaRest = isAnyOf(stagingAreaReset, canvasReset);
+const matchCanvasOrStagingAreaReset = isAnyOf(stagingAreaReset, canvasReset);
 
 export const addStagingListeners = (startAppListening: AppStartListening) => {
   startAppListening({
-    matcher: matchCanvasOrStagingAreaRest,
+    matcher: matchCanvasOrStagingAreaReset,
     effect: async (_, { dispatch }) => {
       try {
         const req = dispatch(
