@@ -1,6 +1,6 @@
 # Contributing
 
-Invoke AI originated as a project built by the community, and that vision carries forward today as we aim to build the best pro-grade tools available. We work together to incorporate the latest in AI/ML research, making these tools available in over 20 languages to artists and creatives around the world as part of our fully permissive OSS project designed for individual users to self-host and use.
+Invoke originated as a project built by the community, and that vision carries forward today as we aim to build the best pro-grade tools available. We work together to incorporate the latest in AI/ML research, making these tools available in over 20 languages to artists and creatives around the world as part of our fully permissive OSS project designed for individual users to self-host and use.
 
 We welcome contributions, whether features, bug fixes, code cleanup, testing, code reviews, documentation or translation. Please check in with us before diving in to code to ensure your work aligns with our vision.
 
