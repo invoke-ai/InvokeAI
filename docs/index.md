@@ -44,11 +44,7 @@ title: Invoke
 
 </div>
 
-<a href="https://github.com/invoke-ai/InvokeAI">InvokeAI</a> is an
-implementation of Stable Diffusion, the open source text-to-image and
-image-to-image generator. It provides a streamlined process with various new
-features and options to aid the image generation process. It runs on Windows,
-Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
+<a href="https://github.com/invoke-ai/InvokeAI">Invoke</a> is a leading creative engine built to empower professionals and enthusiasts alike. Generate and create stunning visual media using the latest AI-driven technologies. Invoke offers an industry leading web-based UI, and serves as the foundation for multiple commercial products.
 
 <div align="center"><img src="assets/invoke-web-server-1.png" width=640></div>
 
@@ -58,33 +54,15 @@ The simple [installer script](installation/installer.md) is the suggested way to
 
 You may also install Invoke as python package [via PyPI](installation/manual.md) or [docker](installation/docker.md).
 
-<!-- separator -->
+See the [installation section](./installation/index.md) for more information.
 
-### Model Management
+## Help
 
-- [Installing](installation/050_INSTALLING_MODELS.md)
-- [Model Merging](features/MODEL_MERGING.md)
-- [ControlNet Models](features/CONTROLNET.md)
-- [Style/Subject Concepts and Embeddings](features/CONCEPTS.md)
-- [Watermarking and the Not Safe for Work (NSFW) Checker](features/WATERMARK+NSFW.md)
-<!-- seperator -->
+Please first check the [FAQ](./faq.md) to see if there is a fix for your issue or answer to your question.
 
-### Prompt Engineering
+If you still have a problem, [create an issue](https://github.com/invoke-ai/InvokeAI/issues) or ask for help on [Discord](https://discord.gg/ZmtBAhwWhy).
 
-- [Prompt Syntax](features/PROMPTS.md)
-
-### InvokeAI Configuration
-
-- [Guide to InvokeAI Runtime Settings](features/CONFIGURATION.md)
-- [Database Maintenance and other Command Line Utilities](features/UTILITIES.md)
-
-## :material-target: Troubleshooting
-
-Please check out our **[:material-frequently-asked-questions:
-FAQ](help/FAQ/)** to
-get solutions for common installation problems and other issues.
-
-## :material-file-document: Training
+## Training
 
 Invoke Training has moved to its own repository, with a dedicated UI for accessing common scripts like Textual Inversion and LoRA training.
 
@@ -103,11 +81,3 @@ encouraged to do so.
 This software is a combined effort of various people from across the world.
 [Check out the list of all these amazing people](other/CONTRIBUTORS.md). We
 thank them for their time, hard work and effort.
-
-## :octicons-question-24: Support
-
-For support, please use this repository's GitHub Issues tracking service. Feel
-free to send me an email if you use and like the script.
-
-Original portions of the software are Copyright (c) 2022-23
-by [The InvokeAI Team](https://github.com/invoke-ai).

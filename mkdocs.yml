@@ -12,7 +12,7 @@ repo_url: 'https://github.com/invoke-ai/InvokeAI'
 edit_uri: edit/main/docs/
 
 # Copyright
-copyright: Copyright &copy; 2023 InvokeAI Team
+copyright: Copyright &copy; 2022-2024 InvokeAI Team
 
 # Configuration
 theme:
