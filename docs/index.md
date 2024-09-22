@@ -15,31 +15,6 @@ title: Home
 
 <!-- CSS styling -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.1/css/fontawesome.min.css">
-<style>
-    .button {
-      width: 100%;
-      max-width: 100%;
-      height: 50px;
-      background-color: #35A4DB;
-      color: #fff;
-      font-size: 16px;
-      border: none;
-      cursor: pointer;
-      border-radius: 0.2rem;
-    }
-
-    .button-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-      justify-content: center;
-    }
-
-    .button:hover {
-      background-color: #526CFE;
-    }
-
-</style>
 
 <div align="center" markdown>
 
@@ -87,26 +62,11 @@ Mac and Linux machines, and runs on GPU cards with as little as 4 GB of RAM.
 
 <div align="center"><img src="assets/invoke-web-server-1.png" width=640></div>
 
-## :octicons-link-24: Quick Links
+## Installation
 
-<div class="button-container">
-    <a href="installation/INSTALLATION"> <button class="button">Installation</button> </a>
-    <a href="features/"> <button class="button">Features</button> </a>
-    <a href="help/gettingStartedWithAI/"> <button class="button">Getting Started</button> </a>
-    <a href="help/FAQ/"> <button class="button">FAQ</button> </a>
-    <a href="contributing/CONTRIBUTING/"> <button class="button">Contributing</button> </a>
-    <a href="https://github.com/invoke-ai/InvokeAI/"> <button class="button">Code and Downloads</button> </a>
-    <a href="https://github.com/invoke-ai/InvokeAI/issues"> <button class="button">Bug Reports </button> </a>
-    <a href="https://discord.gg/ZmtBAhwWhy"> <button class="button"> Join the Discord Server!</button> </a>
-</div>
+The simple [installer script](installation/installer.md) is the suggested way to install and update the application.
 
-## :octicons-gift-24: InvokeAI Features
-
-### Installation
-
-- [Automated Installer](installation/010_INSTALL_AUTOMATED.md)
-- [Manual Installation](installation/020_INSTALL_MANUAL.md)
-- [Docker Installation](installation/040_INSTALL_DOCKER.md)
+You may also install Invoke as python package [via PyPI](installation/manual.md) or [docker](installation/docker.md).
 
 ### The InvokeAI Web Interface
 
