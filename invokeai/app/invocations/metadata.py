@@ -2,7 +2,13 @@ from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
+from invokeai.app.invocations.baseinvocation import (
+    BaseInvocation,
+    BaseInvocationOutput,
+    Classification,
+    invocation,
+    invocation_output,
+)
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -144,9 +150,16 @@ GENERATION_MODES = Literal[
 ]
 
 
-@invocation("core_metadata", title="Core Metadata", tags=["metadata"], category="metadata", version="2.0.0")
+@invocation(
+    "core_metadata",
+    title="Core Metadata",
+    tags=["metadata"],
+    category="metadata",
+    version="2.0.0",
+    classification=Classification.Internal,
+)
 class CoreMetadataInvocation(BaseInvocation):
-    """Collects core generation metadata into a MetadataField"""
+    """Used internally by Invoke to collect metadata for generations."""
 
     generation_mode: Optional[GENERATION_MODES] = InputField(
         default=None,

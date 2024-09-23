@@ -1,12 +1,11 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { bboxOptimalDimensionChanged, bboxSyncedToOptimalDimension } from 'features/controlLayers/store/canvasSlice';
+import { bboxSyncedToOptimalDimension } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
-import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 
@@ -71,8 +70,6 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       }
 
       dispatch(modelChanged({ model: newModel, previousModel: state.params.model }));
-      // When staging, we don't want to change the bbox, but we must keep the optimal dimension in sync.
-      dispatch(bboxOptimalDimensionChanged({ optimalDimension: getOptimalDimension(newModel) }));
       if (!selectIsStaging(state)) {
         dispatch(bboxSyncedToOptimalDimension());
       }

@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { bboxScaledWidthChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { selectCanvasSlice, selectOptimalDimension } from 'features/controlLayers/store/selectors';
+import { selectCanvasSlice, selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { selectConfigSlice } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +23,8 @@ const BboxScaledWidth = () => {
   const isManual = useAppSelector(selectIsManual);
   const scaledWidth = useAppSelector(selectScaledWidth);
   const config = useAppSelector(selectScaledBoundingBoxWidthConfig);
+  const gridSize = useAppSelector(selectGridSize);
+
   const onChange = useCallback(
     (width: number) => {
       dispatch(bboxScaledWidthChanged(width));
@@ -37,7 +39,7 @@ const BboxScaledWidth = () => {
         min={config.sliderMin}
         max={config.sliderMax}
         step={config.coarseStep}
-        fineStep={config.fineStep}
+        fineStep={gridSize}
         value={scaledWidth}
         onChange={onChange}
         defaultValue={optimalDimension}
@@ -47,7 +49,7 @@ const BboxScaledWidth = () => {
         min={config.numberInputMin}
         max={config.numberInputMax}
         step={config.coarseStep}
-        fineStep={config.fineStep}
+        fineStep={gridSize}
         value={scaledWidth}
         onChange={onChange}
         defaultValue={optimalDimension}

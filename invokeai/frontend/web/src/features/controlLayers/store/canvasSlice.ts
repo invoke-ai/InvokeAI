@@ -6,6 +6,7 @@ import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
+import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
   selectAllEntitiesOfType,
@@ -19,12 +20,15 @@ import type {
   RegionalGuidanceReferenceImageState,
   RgbColor,
 } from 'features/controlLayers/store/types';
-import { getScaledBoundingBoxDimensions } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
+import {
+  calculateNewSize,
+  getScaledBoundingBoxDimensions,
+} from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
-import { zModelIdentifierField } from 'features/nodes/types/common';
-import { calculateNewSize } from 'features/parameters/components/Bbox/calculateNewSize';
+import type { MainModelBase } from 'features/nodes/types/common';
+import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants';
-import { getIsSizeOptimal } from 'features/parameters/util/optimalDimension';
+import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import { merge, omit } from 'lodash-es';
 import type { UndoableOptions } from 'redux-undo';
@@ -89,7 +93,6 @@ const getInitialState = (): CanvasState => {
     referenceImages: { entities: [] },
     bbox: {
       rect: { x: 0, y: 0, width: 512, height: 512 },
-      optimalDimension: 512,
       aspectRatio: {
         id: '1:1',
         value: 1,
@@ -100,6 +103,7 @@ const getInitialState = (): CanvasState => {
         width: 512,
         height: 512,
       },
+      modelBase: 'sd-1',
     },
   };
   return initialState;
@@ -629,15 +633,27 @@ export const canvasSlice = createSlice({
     },
     //#region BBox
     bboxScaledWidthChanged: (state, action: PayloadAction<number>) => {
-      state.bbox.scaledSize.width = action.payload;
+      const gridSize = getGridSize(state.bbox.modelBase);
+
+      state.bbox.scaledSize.width = roundToMultiple(action.payload, gridSize);
+
       if (state.bbox.aspectRatio.isLocked) {
-        state.bbox.scaledSize.height = roundToMultiple(state.bbox.scaledSize.width / state.bbox.aspectRatio.value, 8);
+        state.bbox.scaledSize.height = roundToMultiple(
+          state.bbox.scaledSize.width / state.bbox.aspectRatio.value,
+          gridSize
+        );
       }
     },
     bboxScaledHeightChanged: (state, action: PayloadAction<number>) => {
-      state.bbox.scaledSize.height = action.payload;
+      const gridSize = getGridSize(state.bbox.modelBase);
+
+      state.bbox.scaledSize.height = roundToMultiple(action.payload, gridSize);
+
       if (state.bbox.aspectRatio.isLocked) {
-        state.bbox.scaledSize.width = roundToMultiple(state.bbox.scaledSize.height * state.bbox.aspectRatio.value, 8);
+        state.bbox.scaledSize.width = roundToMultiple(
+          state.bbox.scaledSize.height * state.bbox.aspectRatio.value,
+          gridSize
+        );
       }
     },
     bboxScaleMethodChanged: (state, action: PayloadAction<BoundingBoxScaleMethod>) => {
@@ -660,10 +676,11 @@ export const canvasSlice = createSlice({
       action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>
     ) => {
       const { width, updateAspectRatio, clamp } = action.payload;
-      state.bbox.rect.width = clamp ? Math.max(roundDownToMultiple(width, 8), 64) : width;
+      const gridSize = getGridSize(state.bbox.modelBase);
+      state.bbox.rect.width = clamp ? Math.max(roundDownToMultiple(width, gridSize), 64) : width;
 
       if (state.bbox.aspectRatio.isLocked) {
-        state.bbox.rect.height = roundToMultiple(state.bbox.rect.width / state.bbox.aspectRatio.value, 8);
+        state.bbox.rect.height = roundToMultiple(state.bbox.rect.width / state.bbox.aspectRatio.value, gridSize);
       }
 
       if (updateAspectRatio || !state.bbox.aspectRatio.isLocked) {
@@ -679,11 +696,11 @@ export const canvasSlice = createSlice({
       action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>
     ) => {
       const { height, updateAspectRatio, clamp } = action.payload;
-
-      state.bbox.rect.height = clamp ? Math.max(roundDownToMultiple(height, 8), 64) : height;
+      const gridSize = getGridSize(state.bbox.modelBase);
+      state.bbox.rect.height = clamp ? Math.max(roundDownToMultiple(height, gridSize), 64) : height;
 
       if (state.bbox.aspectRatio.isLocked) {
-        state.bbox.rect.width = roundToMultiple(state.bbox.rect.height * state.bbox.aspectRatio.value, 8);
+        state.bbox.rect.width = roundToMultiple(state.bbox.rect.height * state.bbox.aspectRatio.value, gridSize);
       }
 
       if (updateAspectRatio || !state.bbox.aspectRatio.isLocked) {
@@ -708,7 +725,8 @@ export const canvasSlice = createSlice({
         state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
         const { width, height } = calculateNewSize(
           state.bbox.aspectRatio.value,
-          state.bbox.rect.width * state.bbox.rect.height
+          state.bbox.rect.width * state.bbox.rect.height,
+          state.bbox.modelBase
         );
         state.bbox.rect.width = width;
         state.bbox.rect.height = height;
@@ -726,7 +744,8 @@ export const canvasSlice = createSlice({
       } else {
         const { width, height } = calculateNewSize(
           state.bbox.aspectRatio.value,
-          state.bbox.rect.width * state.bbox.rect.height
+          state.bbox.rect.width * state.bbox.rect.height,
+          state.bbox.modelBase
         );
         state.bbox.rect.width = width;
         state.bbox.rect.height = height;
@@ -736,33 +755,37 @@ export const canvasSlice = createSlice({
       syncScaledSize(state);
     },
     bboxSizeOptimized: (state) => {
+      const optimalDimension = getOptimalDimension(state.bbox.modelBase);
       if (state.bbox.aspectRatio.isLocked) {
-        const { width, height } = calculateNewSize(state.bbox.aspectRatio.value, state.bbox.optimalDimension ** 2);
+        const { width, height } = calculateNewSize(
+          state.bbox.aspectRatio.value,
+          optimalDimension * optimalDimension,
+          state.bbox.modelBase
+        );
         state.bbox.rect.width = width;
         state.bbox.rect.height = height;
       } else {
         state.bbox.aspectRatio = deepClone(initialState.bbox.aspectRatio);
-        state.bbox.rect.width = state.bbox.optimalDimension;
-        state.bbox.rect.height = state.bbox.optimalDimension;
+        state.bbox.rect.width = optimalDimension;
+        state.bbox.rect.height = optimalDimension;
       }
 
       syncScaledSize(state);
     },
-    bboxOptimalDimensionChanged: (state, action: PayloadAction<{ optimalDimension: number }>) => {
-      // When staging, we don't want to change the bbox, but we must keep the optimal dimension in sync.
-      // This action does the syncing. `bboxSyncedToOptimalDimension` below will actually change the bbox,
-      // and is only called when we are not staging.
-      const { optimalDimension } = action.payload;
-      state.bbox.optimalDimension = optimalDimension;
-
-      // But! We do want to update the _scaled_ size. This handles the case where the user changes the base model type
-      // during staging. Though the generation bbox must be unchanged, the scaled bbox should adapt to the model.
+    bboxModelBaseChanged: (state, action: PayloadAction<{ modelBase: MainModelBase }>) => {
+      const { modelBase } = action.payload;
+      state.bbox.modelBase = modelBase;
       syncScaledSize(state);
     },
     bboxSyncedToOptimalDimension: (state) => {
-      const { optimalDimension } = state.bbox;
-      if (!getIsSizeOptimal(state.bbox.rect.width, state.bbox.rect.height, optimalDimension)) {
-        const bboxDims = calculateNewSize(state.bbox.aspectRatio.value, optimalDimension * optimalDimension);
+      const optimalDimension = getOptimalDimension(state.bbox.modelBase);
+
+      if (!getIsSizeOptimal(state.bbox.rect.width, state.bbox.rect.height, state.bbox.modelBase)) {
+        const bboxDims = calculateNewSize(
+          state.bbox.aspectRatio.value,
+          optimalDimension * optimalDimension,
+          state.bbox.modelBase
+        );
         state.bbox.rect.width = bboxDims.width;
         state.bbox.rect.height = bboxDims.height;
         syncScaledSize(state);
@@ -1073,6 +1096,32 @@ export const canvasSlice = createSlice({
     builder.addCase(canvasReset, (state) => {
       return resetState(state);
     });
+    builder.addCase(modelChanged, (state, action) => {
+      const { model } = action.payload;
+      /**
+       * Because the bbox depends in part on the model, it needs to be in sync with the model. However, due to
+       * complications with managing undo/redo history, we need to store the model in a separate slice from the canvas
+       * state.
+       *
+       * Unfortunately, this means we need to manually sync the model with the canvas state. We only care about the
+       * model base, so we only need to update the bbox's modelBase field.
+       *
+       * When we do this, we also want to update the bbox's dimensions - but only if we are not staging images on the
+       * canvas, during which time the bbox must stay the same.
+       *
+       * Unfortunately (again), the staging state is in a different slice, to prevent issues with undo/redo history.
+       *
+       * There's some fanagling we must do to handle this correctly:
+       * - Store the model base in this slice, so that we can access it when the user changes the bbox dimensions.
+       * - Avoid updating the bbox dimensions when we are staging - only update the model base.
+       * - Provide a separate action that will update the bbox dimensions and be careful to not dispatch it when staging.
+       */
+      const base = model?.base;
+      if (isMainModelBase(base) && state.bbox.modelBase !== base) {
+        state.bbox.modelBase = base;
+        syncScaledSize(state);
+      }
+    });
   },
 });
 
@@ -1081,10 +1130,12 @@ const resetState = (state: CanvasState) => {
 
   // We need to retain the optimal dimension across resets, as it is changed only when the model changes. Copy it
   // from the old state, then recalculate the bbox size & scaled size.
-  newState.bbox.optimalDimension = state.bbox.optimalDimension;
+  newState.bbox.modelBase = state.bbox.modelBase;
+  const optimalDimension = getOptimalDimension(newState.bbox.modelBase);
   const rect = calculateNewSize(
     newState.bbox.aspectRatio.value,
-    newState.bbox.optimalDimension * newState.bbox.optimalDimension
+    optimalDimension * optimalDimension,
+    newState.bbox.modelBase
   );
   newState.bbox.rect.width = rect.width;
   newState.bbox.rect.height = rect.height;
@@ -1132,7 +1183,6 @@ export const {
   bboxAspectRatioIdChanged,
   bboxDimensionsSwapped,
   bboxSizeOptimized,
-  bboxOptimalDimensionChanged,
   bboxSyncedToOptimalDimension,
   // Raster layers
   rasterLayerAdded,
@@ -1191,13 +1241,13 @@ const syncScaledSize = (state: CanvasState) => {
   if (state.bbox.scaleMethod === 'auto') {
     // Sync both aspect ratio and size
     const { width, height } = state.bbox.rect;
-    state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.optimalDimension);
+    state.bbox.scaledSize = getScaledBoundingBoxDimensions({ width, height }, state.bbox.modelBase);
   } else if (state.bbox.scaleMethod === 'manual' && state.bbox.aspectRatio.isLocked) {
     // Only sync the aspect ratio if manual & locked
     state.bbox.scaledSize = calculateNewSize(
       state.bbox.aspectRatio.value,
       state.bbox.scaledSize.width * state.bbox.scaledSize.height,
-      64
+      state.bbox.modelBase
     );
   }
 };
@@ -1212,11 +1262,6 @@ export const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> =
   filter: (action, _state, _history) => {
     // Ignore all actions from other slices
     if (!action.type.startsWith(canvasSlice.name)) {
-      return false;
-    }
-    if (bboxOptimalDimensionChanged.match(action)) {
-      // This action is not triggered by the user. it's dispatched when the model is changed and will have no visible
-      // effect on the canvas.
       return false;
     }
     // Throttle rapid actions of the same type

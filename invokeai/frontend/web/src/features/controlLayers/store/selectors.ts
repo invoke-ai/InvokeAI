@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { selectShowOnlyRasterLayersWhileStaging } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectIsolatedStagingPreview } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type {
@@ -15,7 +15,7 @@ import type {
   CanvasState,
 } from 'features/controlLayers/store/types';
 import { isRasterLayerEntityIdentifier } from 'features/controlLayers/store/types';
-import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { assert } from 'tsafe';
 
 /**
@@ -102,10 +102,19 @@ export const selectEntityCountActive = createSelector(
 export const selectHasEntities = createSelector(selectEntityCountAll, (count) => count > 0);
 
 /**
- * Selects the optimal dimension for the canvas based on the currently-model
+ * Selects the optimal dimension for the canvas based on the currently-selected model
  */
-export const selectOptimalDimension = createSelector(selectParamsSlice, (params) => {
-  return getOptimalDimension(params.model);
+export const selectOptimalDimension = createSelector(selectParamsSlice, (params): number => {
+  const modelBase = params.model?.base;
+  return getOptimalDimension(modelBase ?? null);
+});
+
+/**
+ * Selects the grid size for the canvas based on the currently-selected model
+ */
+export const selectGridSize = createSelector(selectParamsSlice, (params): number => {
+  const modelBase = params.model?.base;
+  return getGridSize(modelBase ?? null);
 });
 
 /**
@@ -294,8 +303,8 @@ const getSelectIsTypeHidden = (type: CanvasEntityType) => {
 export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdentifier) => {
   const selectIsTypeHidden = getSelectIsTypeHidden(entityIdentifier.type);
   return createSelector(
-    [selectCanvasSlice, selectIsTypeHidden, selectIsStaging, selectShowOnlyRasterLayersWhileStaging],
-    (canvas, isTypeHidden, isStaging, showOnlyRasterLayersWhileStaging) => {
+    [selectCanvasSlice, selectIsTypeHidden, selectIsStaging, selectIsolatedStagingPreview],
+    (canvas, isTypeHidden, isStaging, isolatedStagingPreview) => {
       const entity = selectEntity(canvas, entityIdentifier);
 
       // An entity is hidden if:
@@ -311,7 +320,7 @@ export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdenti
       if (!entity.isEnabled) {
         return true;
       }
-      if (isStaging && showOnlyRasterLayersWhileStaging) {
+      if (isStaging && isolatedStagingPreview) {
         // When staging, we only show raster layers. This allows the user to easily see how the new generation fits in
         // with the rest of the canvas without the masks and control layers getting in the way.
         return !isRasterLayerEntityIdentifier(entityIdentifier);
@@ -328,6 +337,7 @@ export const selectAspectRatioID = createSelector(selectCanvasSlice, (canvas) =>
 export const selectAspectRatioValue = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.value);
 export const selectScaledSize = createSelector(selectBbox, (bbox) => bbox.scaledSize);
 export const selectScaleMethod = createSelector(selectBbox, (bbox) => bbox.scaleMethod);
+export const selectBboxRect = createSelector(selectBbox, (bbox) => bbox.rect);
 
 export const selectCanvasMetadata = createSelector(
   selectCanvasSlice,

@@ -3,7 +3,6 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import {
-  bboxOptimalDimensionChanged,
   bboxSyncedToOptimalDimension,
   controlLayerModelChanged,
   referenceImageIPAdapterModelChanged,
@@ -22,8 +21,13 @@ import {
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
-import { zParameterModel, zParameterVAEModel } from 'features/parameters/types/parameterSchemas';
-import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import {
+  zParameterCLIPEmbedModel,
+  zParameterModel,
+  zParameterSpandrelImageToImageModel,
+  zParameterT5EncoderModel,
+  zParameterVAEModel,
+} from 'features/parameters/types/parameterSchemas';
 import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
@@ -42,6 +46,17 @@ import {
 
 const log = logger('models');
 
+/**
+ * This listener handles resetting or selecting models as we receive the big list of models from the API.
+ *
+ * For example, if a selected model is no longer available, it resets that models selection in redux.
+ *
+ * Or, if the model selection is one that should always be populated if possible, like main models, the listener
+ * attempts to populate it.
+ *
+ * Some models, like VAEs, are optional and can be `null` - this listener will only clear the selection if the model is
+ * no longer available, it will not attempt to select a new model.
+ */
 export const addModelsLoadedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     predicate: modelsApi.endpoints.getModelConfigs.matchFulfilled,
@@ -54,6 +69,8 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       const models = modelConfigsAdapterSelectors.selectAll(action.payload);
 
       handleMainModels(models, state, dispatch, log);
+      // Upscale models are also "main" models, but they have their own handling
+      handleUpscalingModels(models, state, dispatch, log);
       handleRefinerModels(models, state, dispatch, log);
       handleVAEModels(models, state, dispatch, log);
       handleLoRAModels(models, state, dispatch, log);
@@ -75,28 +92,35 @@ type ModelHandler = (
 ) => undefined;
 
 const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
-  const currentModel = state.params.model;
-  const mainModels = models.filter(isNonRefinerMainModelConfig);
-  if (mainModels.length === 0) {
-    // No models loaded at all
-    dispatch(modelChanged({ model: null }));
+  const selectedMainModel = state.params.model;
+  const allMainModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
+
+  const firstModel = allMainModels[0];
+
+  // If we have no models, we may need to clear the selected model
+  if (!firstModel) {
+    // Only clear the model if we have one currently selected
+    if (selectedMainModel !== null) {
+      log.debug({ selectedMainModel }, 'No main models available, clearing');
+      dispatch(modelChanged({ model: null }));
+    }
     return;
   }
 
-  const isCurrentMainModelAvailable = currentModel ? mainModels.some((m) => m.key === currentModel.key) : false;
-  if (isCurrentMainModelAvailable) {
+  // If the current model is available, we don't need to do anything
+  if (allMainModels.some((m) => m.key === selectedMainModel?.key)) {
     return;
   }
 
-  const defaultModel = state.config.sd.defaultModel;
-  const defaultModelInList = defaultModel ? mainModels.find((m) => m.key === defaultModel) : false;
-
-  if (defaultModelInList) {
-    const result = zParameterModel.safeParse(defaultModelInList);
-    if (result.success) {
-      dispatch(modelChanged({ model: defaultModelInList, previousModel: currentModel }));
-      // When staging, we don't want to change the bbox, but we must keep the optimal dimension in sync.
-      dispatch(bboxOptimalDimensionChanged({ optimalDimension: getOptimalDimension(defaultModelInList) }));
+  // If we have a default model, try to use it
+  if (state.config.sd.defaultModel) {
+    const defaultModel = allMainModels.find((m) => m.key === state.config.sd.defaultModel);
+    if (defaultModel) {
+      log.debug(
+        { selectedMainModel, defaultModel },
+        'No selected main model or selected main model is not available, selecting default model'
+      );
+      dispatch(modelChanged({ model: zParameterModel.parse(defaultModel), previousModel: selectedMainModel }));
       if (!selectIsStaging(state)) {
         dispatch(bboxSyncedToOptimalDimension());
       }
@@ -104,111 +128,149 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     }
   }
 
-  const result = zParameterModel.safeParse(mainModels[0]);
-
-  if (!result.success) {
-    log.error({ error: result.error.format() }, 'Failed to parse main model');
-    return;
-  }
-
-  dispatch(modelChanged({ model: result.data, previousModel: currentModel }));
-  // When staging, we don't want to change the bbox, but we must keep the optimal dimension in sync.
-  dispatch(bboxOptimalDimensionChanged({ optimalDimension: getOptimalDimension(result.data) }));
+  log.debug(
+    { selectedMainModel, firstModel },
+    'No selected main model or selected main model is not available, selecting first available model'
+  );
+  dispatch(modelChanged({ model: zParameterModel.parse(firstModel), previousModel: selectedMainModel }));
   if (!selectIsStaging(state)) {
     dispatch(bboxSyncedToOptimalDimension());
   }
 };
 
-const handleRefinerModels: ModelHandler = (models, state, dispatch, _log) => {
-  const currentRefinerModel = state.params.refinerModel;
-  const refinerModels = models.filter(isRefinerMainModelModelConfig);
-  if (models.length === 0) {
-    // No models loaded at all
-    dispatch(refinerModelChanged(null));
+const handleUpscalingModels: ModelHandler = (models, state, dispatch, log) => {
+  const selectedUpscaleModel = state.upscale.upscaleModel;
+  const allUpscalingModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
+
+  const firstModel = allUpscalingModels[0] || null;
+
+  // If we have no models, we may need to clear the selected model
+  if (!firstModel) {
+    // Only clear the model if we have one currently selected
+    if (selectedUpscaleModel !== null) {
+      log.debug({ selectedUpscaleModel }, 'No upscaling models available, clearing');
+      dispatch(upscaleModelChanged(null));
+    }
     return;
   }
 
-  const isCurrentRefinerModelAvailable = currentRefinerModel
-    ? refinerModels.some((m) => m.key === currentRefinerModel.key)
-    : false;
-
-  if (!isCurrentRefinerModelAvailable) {
-    dispatch(refinerModelChanged(null));
+  // If the current model is available, we don't need to do anything
+  if (allUpscalingModels.some((m) => m.key === selectedUpscaleModel?.key)) {
     return;
   }
+
+  log.debug(
+    { selectedUpscaleModel, firstModel },
+    'No selected upscaling model or selected upscaling model is not available, selecting first available model'
+  );
+  dispatch(upscaleModelChanged(zParameterModel.parse(firstModel)));
+};
+
+const handleRefinerModels: ModelHandler = (models, state, dispatch, log) => {
+  const selectedRefinerModel = state.params.refinerModel;
+
+  // `null` is a valid refiner model - no need to do anything.
+  if (selectedRefinerModel === null) {
+    return;
+  }
+
+  // We have a refiner model selected, need to check if it is available
+
+  // Grab just the refiner models
+  const allRefinerModels = models.filter(isRefinerMainModelModelConfig);
+
+  // If the current refiner model is available, we don't need to do anything
+  if (allRefinerModels.some((m) => m.key === selectedRefinerModel.key)) {
+    return;
+  }
+
+  // Else, we need to clear the refiner model
+  log.debug({ selectedRefinerModel }, 'Selected refiner model is not available, clearing');
+  dispatch(refinerModelChanged(null));
+  return;
 };
 
 const handleVAEModels: ModelHandler = (models, state, dispatch, log) => {
-  const currentVae = state.params.vae;
+  const selectedVAEModel = state.params.vae;
 
-  if (currentVae === null) {
-    // null is a valid VAE! it means "use the default with the main model"
+  // `null` is a valid VAE - it means "use the VAE baked into the currently-selected main model"
+  if (selectedVAEModel === null) {
     return;
   }
+
+  // We have a VAE selected, need to check if it is available
+
+  // Grab just the VAE models
   const vaeModels = models.filter(isNonFluxVAEModelConfig);
 
-  const isCurrentVAEAvailable = vaeModels.some((m) => m.key === currentVae.key);
-
-  if (isCurrentVAEAvailable) {
+  // If the current VAE model is available, we don't need to do anything
+  if (vaeModels.some((m) => m.key === selectedVAEModel.key)) {
     return;
   }
 
-  const firstModel = vaeModels[0];
-
-  if (!firstModel) {
-    // No custom VAEs loaded at all; use the default
-    dispatch(vaeSelected(null));
-    return;
-  }
-
-  const result = zParameterVAEModel.safeParse(firstModel);
-
-  if (!result.success) {
-    log.error({ error: result.error.format() }, 'Failed to parse VAE model');
-    return;
-  }
-
-  dispatch(vaeSelected(result.data));
+  // Else, we need to clear the VAE model
+  log.debug({ selectedVAEModel }, 'Selected VAE model is not available, clearing');
+  dispatch(vaeSelected(null));
+  return;
 };
 
-const handleLoRAModels: ModelHandler = (models, state, dispatch, _log) => {
+const handleLoRAModels: ModelHandler = (models, state, dispatch, log) => {
   const loraModels = models.filter(isLoRAModelConfig);
   state.loras.loras.forEach((lora) => {
     const isLoRAAvailable = loraModels.some((m) => m.key === lora.model.key);
     if (isLoRAAvailable) {
       return;
     }
+    log.debug({ model: lora.model }, 'LoRA model is not available, clearing');
     dispatch(loraDeleted({ id: lora.id }));
   });
 };
 
-const handleControlAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
+const handleControlAdapterModels: ModelHandler = (models, state, dispatch, log) => {
   const caModels = models.filter(isControlNetOrT2IAdapterModelConfig);
   selectCanvasSlice(state).controlLayers.entities.forEach((entity) => {
-    const isModelAvailable = caModels.some((m) => m.key === entity.controlAdapter.model?.key);
+    const selectedControlAdapterModel = entity.controlAdapter.model;
+    // `null` is a valid control adapter model - no need to do anything.
+    if (!selectedControlAdapterModel) {
+      return;
+    }
+    const isModelAvailable = caModels.some((m) => m.key === selectedControlAdapterModel.key);
     if (isModelAvailable) {
       return;
     }
+    log.debug({ selectedControlAdapterModel }, 'Selected control adapter model is not available, clearing');
     dispatch(controlLayerModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
   });
 };
 
-const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
+const handleIPAdapterModels: ModelHandler = (models, state, dispatch, log) => {
   const ipaModels = models.filter(isIPAdapterModelConfig);
   selectCanvasSlice(state).referenceImages.entities.forEach((entity) => {
-    const isModelAvailable = ipaModels.some((m) => m.key === entity.ipAdapter.model?.key);
+    const selectedIPAdapterModel = entity.ipAdapter.model;
+    // `null` is a valid IP adapter model - no need to do anything.
+    if (!selectedIPAdapterModel) {
+      return;
+    }
+    const isModelAvailable = ipaModels.some((m) => m.key === selectedIPAdapterModel.key);
     if (isModelAvailable) {
       return;
     }
+    log.debug({ selectedIPAdapterModel }, 'Selected IP adapter model is not available, clearing');
     dispatch(referenceImageIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), modelConfig: null }));
   });
 
   selectCanvasSlice(state).regionalGuidance.entities.forEach((entity) => {
     entity.referenceImages.forEach(({ id: referenceImageId, ipAdapter }) => {
-      const isModelAvailable = ipaModels.some((m) => m.key === ipAdapter.model?.key);
+      const selectedIPAdapterModel = ipAdapter.model;
+      // `null` is a valid IP adapter model - no need to do anything.
+      if (!selectedIPAdapterModel) {
+        return;
+      }
+      const isModelAvailable = ipaModels.some((m) => m.key === selectedIPAdapterModel.key);
       if (isModelAvailable) {
         return;
       }
+      log.debug({ selectedIPAdapterModel }, 'Selected IP adapter model is not available, clearing');
       dispatch(
         rgIPAdapterModelChanged({ entityIdentifier: getEntityIdentifier(entity), referenceImageId, modelConfig: null })
       );
@@ -216,66 +278,113 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, _log) => {
   });
 };
 
-const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch, _log) => {
-  const { upscaleModel: currentUpscaleModel, postProcessingModel: currentPostProcessingModel } = state.upscale;
-  const upscaleModels = models.filter(isSpandrelImageToImageModelConfig);
-  const firstModel = upscaleModels[0] || null;
+const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch, log) => {
+  const selectedPostProcessingModel = state.upscale.postProcessingModel;
+  const allSpandrelModels = models.filter(isSpandrelImageToImageModelConfig);
 
-  const isCurrentUpscaleModelAvailable = currentUpscaleModel
-    ? upscaleModels.some((m) => m.key === currentUpscaleModel.key)
-    : false;
-
-  if (!isCurrentUpscaleModelAvailable) {
-    dispatch(upscaleModelChanged(firstModel));
+  // If the currently selected model is available, we don't need to do anything
+  if (selectedPostProcessingModel && allSpandrelModels.some((m) => m.key === selectedPostProcessingModel.key)) {
+    return;
   }
 
-  const isCurrentPostProcessingModelAvailable = currentPostProcessingModel
-    ? upscaleModels.some((m) => m.key === currentPostProcessingModel.key)
-    : false;
+  // Else we should select the first available model
+  const firstModel = allSpandrelModels[0] || null;
+  if (firstModel) {
+    log.debug(
+      { selectedPostProcessingModel, firstModel },
+      'No selected post-processing model or selected post-processing model is not available, selecting first available model'
+    );
+    dispatch(postProcessingModelChanged(zParameterSpandrelImageToImageModel.parse(firstModel)));
+    return;
+  }
 
-  if (!isCurrentPostProcessingModelAvailable) {
-    dispatch(postProcessingModelChanged(firstModel));
+  // No available models, we should clear the selected model - but only if we have one selected
+  if (selectedPostProcessingModel) {
+    log.debug({ selectedPostProcessingModel }, 'Selected post-processing model is not available, clearing');
+    dispatch(postProcessingModelChanged(null));
   }
 };
 
-const handleT5EncoderModels: ModelHandler = (models, state, dispatch, _log) => {
-  const { t5EncoderModel: currentT5EncoderModel } = state.params;
+const handleT5EncoderModels: ModelHandler = (models, state, dispatch, log) => {
+  const selectedT5EncoderModel = state.params.t5EncoderModel;
   const t5EncoderModels = models.filter(isT5EncoderModelConfig);
+
+  // If the currently selected model is available, we don't need to do anything
+  if (selectedT5EncoderModel && t5EncoderModels.some((m) => m.key === selectedT5EncoderModel.key)) {
+    return;
+  }
+
+  // Else we should select the first available model
   const firstModel = t5EncoderModels[0] || null;
+  if (firstModel) {
+    log.debug(
+      { selectedT5EncoderModel, firstModel },
+      'No selected T5 encoder model or selected T5 encoder model is not available, selecting first available model'
+    );
+    dispatch(t5EncoderModelSelected(zParameterT5EncoderModel.parse(firstModel)));
+    return;
+  }
 
-  const isCurrentT5EncoderModelAvailable = currentT5EncoderModel
-    ? t5EncoderModels.some((m) => m.key === currentT5EncoderModel.key)
-    : false;
-
-  if (!isCurrentT5EncoderModelAvailable) {
-    dispatch(t5EncoderModelSelected(firstModel));
+  // No available models, we should clear the selected model - but only if we have one selected
+  if (selectedT5EncoderModel) {
+    log.debug({ selectedT5EncoderModel }, 'Selected T5 encoder model is not available, clearing');
+    dispatch(t5EncoderModelSelected(null));
+    return;
   }
 };
 
-const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, _log) => {
-  const { clipEmbedModel: currentCLIPEmbedModel } = state.params;
+const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
+  const selectedCLIPEmbedModel = state.params.clipEmbedModel;
   const CLIPEmbedModels = models.filter(isCLIPEmbedModelConfig);
+
+  // If the currently selected model is available, we don't need to do anything
+  if (selectedCLIPEmbedModel && CLIPEmbedModels.some((m) => m.key === selectedCLIPEmbedModel.key)) {
+    return;
+  }
+
+  // Else we should select the first available model
   const firstModel = CLIPEmbedModels[0] || null;
+  if (firstModel) {
+    log.debug(
+      { selectedCLIPEmbedModel, firstModel },
+      'No selected CLIP embed model or selected CLIP embed model is not available, selecting first available model'
+    );
+    dispatch(clipEmbedModelSelected(zParameterCLIPEmbedModel.parse(firstModel)));
+    return;
+  }
 
-  const isCurrentCLIPEmbedModelAvailable = currentCLIPEmbedModel
-    ? CLIPEmbedModels.some((m) => m.key === currentCLIPEmbedModel.key)
-    : false;
-
-  if (!isCurrentCLIPEmbedModelAvailable) {
-    dispatch(clipEmbedModelSelected(firstModel));
+  // No available models, we should clear the selected model - but only if we have one selected
+  if (selectedCLIPEmbedModel) {
+    log.debug({ selectedCLIPEmbedModel }, 'Selected CLIP embed model is not available, clearing');
+    dispatch(clipEmbedModelSelected(null));
+    return;
   }
 };
 
-const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, _log) => {
-  const { fluxVAE: currentFLUXVAEModel } = state.params;
+const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
+  const selectedFLUXVAEModel = state.params.fluxVAE;
   const fluxVAEModels = models.filter(isFluxVAEModelConfig);
+
+  // If the currently selected model is available, we don't need to do anything
+  if (selectedFLUXVAEModel && fluxVAEModels.some((m) => m.key === selectedFLUXVAEModel.key)) {
+    return;
+  }
+
+  // Else we should select the first available model
   const firstModel = fluxVAEModels[0] || null;
+  if (firstModel) {
+    log.debug(
+      { selectedFLUXVAEModel, firstModel },
+      'No selected FLUX VAE model or selected FLUX VAE model is not available, selecting first available model'
+    );
+    dispatch(fluxVAESelected(zParameterVAEModel.parse(firstModel)));
+    return;
+  }
 
-  const isCurrentFLUXVAEModelAvailable = currentFLUXVAEModel
-    ? fluxVAEModels.some((m) => m.key === currentFLUXVAEModel.key)
-    : false;
-
-  if (!isCurrentFLUXVAEModelAvailable) {
-    dispatch(fluxVAESelected(firstModel));
+  // No available models, we should clear the selected model - but only if we have one selected
+  if (selectedFLUXVAEModel) {
+    log.debug({ selectedFLUXVAEModel }, 'Selected FLUX VAE model is not available, clearing');
+    dispatch(fluxVAESelected(null));
+    return;
   }
 };

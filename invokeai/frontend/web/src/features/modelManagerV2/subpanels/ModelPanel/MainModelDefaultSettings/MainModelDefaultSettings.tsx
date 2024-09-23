@@ -47,7 +47,10 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
 
   const defaultSettingsDefaults = useMainModelDefaultSettings(modelConfig);
-  const optimalDimension = useMemo(() => getOptimalDimension(modelConfig), [modelConfig]);
+  const optimalDimension = useMemo(() => {
+    const modelBase = modelConfig?.base;
+    return getOptimalDimension(modelBase ?? null);
+  }, [modelConfig]);
   const [updateModel, { isLoading: isLoadingUpdateModel }] = useUpdateModelMutation();
 
   const { handleSubmit, control, formState, reset } = useForm<MainModelDefaultSettingsFormData>({

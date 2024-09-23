@@ -16,12 +16,14 @@ import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/compone
 import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsDynamicGridSwitch';
 import { CanvasSettingsSnapToGridCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsGridSize';
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
+import { CanvasSettingsIsolatedFilteringPreviewSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsIsolatedFilteringPreviewSwitch';
+import { CanvasSettingsIsolatedStagingPreviewSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsIsolatedStagingPreviewSwitch';
+import { CanvasSettingsIsolatedTransformingPreviewSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsIsolatedTransformingPreviewSwitch';
 import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
 import { CanvasSettingsOutputOnlyMaskedRegionsCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsOutputOnlyMaskedRegionsCheckbox';
 import { CanvasSettingsPreserveMaskCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPreserveMaskCheckbox';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
-import { CanvasSettingsShowOnlyRasterLayersWhileStagingSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowOnlyRasterLayersWhileStagingSwitch';
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -49,7 +51,9 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
             <CanvasSettingsSnapToGridCheckbox />
             <CanvasSettingsShowProgressOnCanvas />
-            <CanvasSettingsShowOnlyRasterLayersWhileStagingSwitch />
+            <CanvasSettingsIsolatedStagingPreviewSwitch />
+            <CanvasSettingsIsolatedFilteringPreviewSwitch />
+            <CanvasSettingsIsolatedTransformingPreviewSwitch />
             <CanvasSettingsDynamicGridSwitch />
             <CanvasSettingsBboxOverlaySwitch />
             <CanvasSettingsShowHUDSwitch />

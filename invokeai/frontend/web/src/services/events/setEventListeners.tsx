@@ -13,6 +13,7 @@ import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/Err
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { forEach, isNil, round } from 'lodash-es';
+import type { ApiTagDescription } from 'services/api';
 import { api, LIST_TAG } from 'services/api';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
@@ -346,6 +347,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       error_type,
       error_message,
       error_traceback,
+      destination,
     } = data;
 
     log.debug({ data }, `Queue item ${item_id} status updated: ${status}`);
@@ -386,16 +388,17 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     // Update the batch status
     dispatch(queueApi.util.updateQueryData('getBatchStatus', { batch_id: batch_status.batch_id }, () => batch_status));
 
-    // Invalidate caches for things we cannot update
-    // TODO: technically, we could possibly update the current session queue item, but feels safer to just request it again
-    dispatch(
-      queueApi.util.invalidateTags([
-        'CurrentSessionQueueItem',
-        'NextSessionQueueItem',
-        'InvocationCacheStatus',
-        { type: 'SessionQueueItem', id: item_id },
-      ])
-    );
+    // Invalidate caches for things we cannot easily update
+    const tagsToInvalidate: ApiTagDescription[] = [
+      'CurrentSessionQueueItem',
+      'NextSessionQueueItem',
+      'InvocationCacheStatus',
+      { type: 'SessionQueueItem', id: item_id },
+    ];
+    if (destination) {
+      tagsToInvalidate.push({ type: 'QueueCountsByDestination', id: destination });
+    }
+    dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
 
     if (status === 'in_progress') {
       forEach($nodeExecutionStates.get(), (nes) => {

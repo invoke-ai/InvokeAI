@@ -1,14 +1,4 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  AlertTitle,
-  Button,
-  Flex,
-  Icon,
-  IconButton,
-  Spacer,
-} from '@invoke-ai/ui-library';
+import { Alert, AlertDescription, AlertIcon, AlertTitle, Button, Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
@@ -18,13 +8,11 @@ import {
 } from 'features/controlLayers/store/ephemeral';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useCurrentDestination } from 'features/queue/hooks/useCurrentDestination';
-import { selectShowSendingToAlerts, showSendingToAlertsChanged } from 'features/system/store/systemSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi';
 
 const ActivateImageViewerButton = (props: PropsWithChildren) => {
   const imageViewer = useImageViewer();
@@ -47,11 +35,7 @@ export const CanvasAlertsSendingToGallery = () => {
       return false;
     }
 
-    if (destination === 'canvas') {
-      return false;
-    }
-
-    return true;
+    return destination === 'gallery';
   }, [destination]);
 
   return (
@@ -88,15 +72,12 @@ export const CanvasAlertsSendingToCanvas = () => {
     if (isStaging) {
       return true;
     }
+
     if (!destination) {
       return false;
     }
 
-    if (destination !== 'canvas') {
-      return false;
-    }
-
-    return true;
+    return destination === 'canvas';
   }, [destination, isStaging]);
 
   return (
@@ -119,18 +100,11 @@ const AlertWrapper = ({
   description: ReactNode;
   isVisible: boolean;
 }) => {
-  const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const showSendToAlerts = useAppSelector(selectShowSendingToAlerts);
   const isHovered = useBoolean(false);
-  const onClickDontShowMeThese = useCallback(() => {
-    dispatch(showSendingToAlertsChanged(false));
-    isHovered.setFalse();
-  }, [dispatch, isHovered]);
 
   return (
     <AnimatePresence>
-      {(isVisible || isHovered.isTrue) && showSendToAlerts && (
+      {(isVisible || isHovered.isTrue) && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, transition: { duration: 0.1, ease: 'easeOut' } }}
@@ -154,17 +128,6 @@ const AlertWrapper = ({
             <Flex w="full" alignItems="center">
               <AlertIcon />
               <AlertTitle>{title}</AlertTitle>
-              <Spacer />
-              <IconButton
-                variant="link"
-                icon={<Icon as={PiXBold} fill="base.50 !important" />}
-                tooltip={t('common.dontShowMeThese')}
-                aria-label={t('common.dontShowMeThese')}
-                right={-1}
-                top={-2}
-                onClick={onClickDontShowMeThese}
-                minW="auto"
-              />
             </Flex>
             <AlertDescription>{description}</AlertDescription>
           </Alert>
