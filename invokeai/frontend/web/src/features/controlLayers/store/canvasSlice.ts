@@ -1057,14 +1057,13 @@ export const canvasSlice = createSlice({
       }
     },
     canvasMetadataRecalled: (state, action: PayloadAction<CanvasMetadata>) => {
-      const newState = resetState(state);
       const { controlLayers, inpaintMasks, rasterLayers, referenceImages, regionalGuidance } = action.payload;
-      newState.controlLayers.entities = controlLayers;
-      newState.inpaintMasks.entities = inpaintMasks;
-      newState.rasterLayers.entities = rasterLayers;
-      newState.referenceImages.entities = referenceImages;
-      newState.regionalGuidance.entities = regionalGuidance;
-      return newState;
+      state.controlLayers.entities = controlLayers;
+      state.inpaintMasks.entities = inpaintMasks;
+      state.rasterLayers.entities = rasterLayers;
+      state.referenceImages.entities = referenceImages;
+      state.regionalGuidance.entities = regionalGuidance;
+      return state;
     },
     canvasUndo: () => {},
     canvasRedo: () => {},
