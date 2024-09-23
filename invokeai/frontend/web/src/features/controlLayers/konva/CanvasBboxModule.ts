@@ -243,7 +243,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
   onDragMove = () => {
     // The grid size here is the _position_ grid size, not the _dimension_ grid size - it is not constratined by the
     // currently-selected model.
-    const gridSize = this.manager.stateApi.$ctrlKey.get() || this.manager.stateApi.$metaKey.get() ? 8 : 64;
+    const gridSize = this.manager.stateApi.getGridSize();
     const bbox = this.manager.stateApi.getBbox();
     const bboxRect: Rect = {
       ...bbox.rect,
