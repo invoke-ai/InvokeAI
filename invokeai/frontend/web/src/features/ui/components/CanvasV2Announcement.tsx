@@ -1,8 +1,8 @@
 import { ExternalLink, Flex, ListItem, UnorderedList } from '@invoke-ai/ui-library';
-import { useTranslation } from 'react-i18next';
-import { useAppSelector } from '../../../app/store/storeHooks';
 import { createSelector } from '@reduxjs/toolkit';
-import { selectConfigSlice } from '../../system/store/configSlice';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectConfigSlice } from 'features/system/store/configSlice';
+import { useTranslation } from 'react-i18next';
 
 const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLocal);
 
