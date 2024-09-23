@@ -141,6 +141,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.abortController = controller;
 
     const { graph, outputNodeId } = buildGraphResult.value;
+
     const filterResult = await withResultAsync(() =>
       this.manager.stateApi.runGraphAndReturnImageOutput({
         graph,
