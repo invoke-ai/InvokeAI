@@ -35,11 +35,13 @@ export const CanvasToolbar = memo(() => {
       <ToolColorPicker />
       <ToolSettings />
       <Spacer />
-      <CanvasToolbarScale />
-      <Divider orientation="vertical" />
       <Flex alignItems="center" h="full">
+        <CanvasToolbarScale />
         <CanvasToolbarResetViewButton />
         <CanvasToolbarFitBboxToLayersButton />
+      </Flex>
+      <Divider orientation="vertical" />
+      <Flex alignItems="center" h="full">
         <CanvasToolbarSaveToGalleryButton />
         <CanvasToolbarUndoButton />
         <CanvasToolbarRedoButton />
