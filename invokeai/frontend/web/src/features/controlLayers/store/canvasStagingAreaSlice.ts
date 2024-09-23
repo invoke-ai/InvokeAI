@@ -40,9 +40,6 @@ export const canvasStagingAreaSlice = createSlice({
       state.stagedImages = [];
       state.selectedStagedImageIndex = 0;
     },
-    stagingAreaImageAccepted: (_state, _action: PayloadAction<{ index: number }>) => {
-      // no-op, handled in a listener
-    },
   },
   extraReducers(builder) {
     builder.addCase(canvasReset, () => deepClone(initialState));
@@ -55,7 +52,6 @@ export const {
   stagingAreaReset,
   stagingAreaNextStagedImageSelected,
   stagingAreaPrevStagedImageSelected,
-  stagingAreaImageAccepted,
 } = canvasStagingAreaSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
