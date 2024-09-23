@@ -113,12 +113,12 @@ export type ParameterVAEModel = z.infer<typeof zParameterVAEModel>;
 // #endregion
 
 // #region T5Encoder Model
-const zParameterT5EncoderModel = zModelIdentifierField;
+export const zParameterT5EncoderModel = zModelIdentifierField;
 export type ParameterT5EncoderModel = z.infer<typeof zParameterT5EncoderModel>;
 // #endregion
 
 // #region CLIP embed Model
-const zParameterCLIPEmbedModel = zModelIdentifierField;
+export const zParameterCLIPEmbedModel = zModelIdentifierField;
 export type ParameterCLIPEmbedModel = z.infer<typeof zParameterCLIPEmbedModel>;
 // #endregion
 
@@ -128,7 +128,7 @@ export type ParameterLoRAModel = z.infer<typeof zParameterLoRAModel>;
 // #endregion
 
 // #region VAE Model
-const zParameterSpandrelImageToImageModel = zModelIdentifierField;
+export const zParameterSpandrelImageToImageModel = zModelIdentifierField;
 export type ParameterSpandrelImageToImageModel = z.infer<typeof zParameterSpandrelImageToImageModel>;
 // #endregion
 
