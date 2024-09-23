@@ -12,7 +12,7 @@ import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import { $hasProgress, $isProgressFromCanvas } from 'services/events/stores';
+import { $hasProgressImage, $isProgressFromCanvas } from 'services/events/stores';
 
 import { NoContentForViewer } from './NoContentForViewer';
 import ProgressImage from './ProgressImage';
@@ -20,7 +20,7 @@ import ProgressImage from './ProgressImage';
 const CurrentImagePreview = () => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
-  const hasDenoiseProgress = useStore($hasProgress);
+  const hasProgressImage = useStore($hasProgressImage);
   const isProgressFromCanvas = useStore($isProgressFromCanvas);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
 
@@ -59,7 +59,7 @@ const CurrentImagePreview = () => {
       justifyContent="center"
       position="relative"
     >
-      {hasDenoiseProgress && !isProgressFromCanvas && shouldShowProgressInViewer ? (
+      {hasProgressImage && !isProgressFromCanvas && shouldShowProgressInViewer ? (
         <ProgressImage />
       ) : (
         <IAIDndImage
