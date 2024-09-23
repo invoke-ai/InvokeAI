@@ -78,7 +78,7 @@ const ParamMainModelSelect = () => {
 
   return (
     <FormControl isDisabled={!modelConfigs.length} isInvalid={!value || !modelConfigs.length}>
-      <Flex>
+      <Flex alignItems="center">
         <InformationalPopover feature="paramModel">
           <FormLabel>{t('modelManager.model')}</FormLabel>
         </InformationalPopover>
