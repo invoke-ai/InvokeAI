@@ -100,7 +100,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
       }
       this.image.konva.group.visible(shouldShowStagedImage);
     } else {
-      this.image?.konva.group.visible(false);
+      this.image?.destroy();
+      this.image = null;
     }
   };
 
