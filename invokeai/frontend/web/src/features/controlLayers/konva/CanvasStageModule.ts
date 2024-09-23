@@ -98,7 +98,6 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.konva.stage.container(this.container);
     this.setResizeObserver();
     this.fitStageToContainer();
-    this.fitLayersToStage();
 
     this.konva.stage.on('wheel', this.onStageMouseWheel);
     this.konva.stage.on('dragmove', this.onStageDragMove);
