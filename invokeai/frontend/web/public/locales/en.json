@@ -523,35 +523,35 @@
             "title": "Workflows",
             "addNode": {
                 "title": "Add Node",
-                "descl": "Open the add node menu."
+                "desc": "Open the add node menu."
             },
             "copySelection": {
                 "title": "Copy",
-                "descl": "Copy selected nodes and edges."
+                "desc": "Copy selected nodes and edges."
             },
             "pasteSelection": {
                 "title": "Paste",
-                "descl": "Paste copied nodes and edges."
+                "desc": "Paste copied nodes and edges."
             },
             "pasteSelectionWithEdges": {
                 "title": "Paste with Edges",
-                "descl": "Paste copied nodes, edges, and all edges connected to copied nodes."
+                "desc": "Paste copied nodes, edges, and all edges connected to copied nodes."
             },
             "selectAll": {
                 "title": "Select All",
-                "descl": "Select all nodes and edges."
+                "desc": "Select all nodes and edges."
             },
             "deleteSelection": {
                 "title": "Delete",
-                "descl": "Delete selected nodes and edges."
+                "desc": "Delete selected nodes and edges."
             },
             "undo": {
                 "title": "Undo",
-                "descl": "Undo the last workflow action."
+                "desc": "Undo the last workflow action."
             },
             "redo": {
                 "title": "Redo",
-                "descl": "Redo the last workflow action."
+                "desc": "Redo the last workflow action."
             }
         },
         "viewer": {
