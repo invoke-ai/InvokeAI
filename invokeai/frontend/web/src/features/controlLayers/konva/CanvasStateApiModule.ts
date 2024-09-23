@@ -235,6 +235,10 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   }): Promise<ImageDTO> => {
     const { graph, outputNodeId, destination, prepend, timeout, signal } = arg;
 
+    if (!graph.hasNode(outputNodeId)) {
+      throw new Error(`Graph does not contain node with id: ${outputNodeId}`);
+    }
+
     /**
      * We will use the origin to handle events from the graph. Ideally we'd just use the queue item's id, but there's a
      * race condition:
@@ -281,6 +285,7 @@ export class CanvasStateApiModule extends CanvasModuleBase {
         if (event.origin !== origin) {
           return;
         }
+
         // Ignore events that are not from the output node
         if (event.invocation_source_id !== outputNodeId) {
           return;
@@ -326,8 +331,19 @@ export class CanvasStateApiModule extends CanvasModuleBase {
         clearListeners();
 
         if (event.status === 'completed') {
-          // If we get a queue item completed event, that means we never got a completion event for the output node!
-          reject(new Error('Queue item completed without output node completion event'));
+          /**
+           * The invocation_complete event should have been received before the queue item completed event, and the
+           * event listeners are cleared in the invocation_complete handler. If we get here, it means we never got
+           * the completion event for the output node! This should is a fail case.
+           *
+           * TODO(psyche): In the unexpected case where events are received out of order, this logic doesn't do what
+           * we expect. If we got a queue item completed event before the output node completion event, we'd erroneously
+           * triggers this error.
+           *
+           * For now, we'll just log a warning instead of rejecting the promise. This should be super rare anyways.
+           */
+          this.log.warn('Queue item completed without output node completion event');
+          // reject(new Error('Queue item completed without output node completion event'));
         } else if (event.status === 'failed') {
           // We expect the event to have error details, but technically it's possible that it doesn't
           const { error_type, error_message, error_traceback } = event;
