@@ -109,6 +109,8 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
 
     if (!event || !showProgressOnCanvas) {
       this.konva.group.visible(false);
+      this.konva.image?.destroy();
+      this.konva.image = null;
       this.imageElement = null;
       this.isLoading = false;
       this.isError = false;
