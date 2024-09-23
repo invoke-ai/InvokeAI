@@ -22,7 +22,6 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import {
   zParameterCLIPEmbedModel,
-  zParameterModel,
   zParameterSpandrelImageToImageModel,
   zParameterT5EncoderModel,
   zParameterVAEModel,
@@ -68,13 +67,12 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
       const models = modelConfigsAdapterSelectors.selectAll(action.payload);
 
       handleMainModels(models, state, dispatch, log);
-      // Upscale models are also "main" models, but they have their own handling
-      handleUpscalingModels(models, state, dispatch, log);
       handleRefinerModels(models, state, dispatch, log);
       handleVAEModels(models, state, dispatch, log);
       handleLoRAModels(models, state, dispatch, log);
       handleControlAdapterModels(models, state, dispatch, log);
-      handleSpandrelImageToImageModels(models, state, dispatch, log);
+      handlePostProcessingModel(models, state, dispatch, log);
+      handleUpscaleModel(models, state, dispatch, log);
       handleIPAdapterModels(models, state, dispatch, log);
       handleT5EncoderModels(models, state, dispatch, log);
       handleCLIPEmbedModels(models, state, dispatch, log);
@@ -129,34 +127,6 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     'No selected main model or selected main model is not available, selecting first available model'
   );
   dispatch(modelSelected(firstModel));
-};
-
-const handleUpscalingModels: ModelHandler = (models, state, dispatch, log) => {
-  const selectedUpscaleModel = state.upscale.upscaleModel;
-  const allUpscalingModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
-
-  const firstModel = allUpscalingModels[0] || null;
-
-  // If we have no models, we may need to clear the selected model
-  if (!firstModel) {
-    // Only clear the model if we have one currently selected
-    if (selectedUpscaleModel !== null) {
-      log.debug({ selectedUpscaleModel }, 'No upscaling models available, clearing');
-      dispatch(upscaleModelChanged(null));
-    }
-    return;
-  }
-
-  // If the current model is available, we don't need to do anything
-  if (allUpscalingModels.some((m) => m.key === selectedUpscaleModel?.key)) {
-    return;
-  }
-
-  log.debug(
-    { selectedUpscaleModel, firstModel },
-    'No selected upscaling model or selected upscaling model is not available, selecting first available model'
-  );
-  dispatch(upscaleModelChanged(zParameterModel.parse(firstModel)));
 };
 
 const handleRefinerModels: ModelHandler = (models, state, dispatch, log) => {
@@ -271,7 +241,7 @@ const handleIPAdapterModels: ModelHandler = (models, state, dispatch, log) => {
   });
 };
 
-const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch, log) => {
+const handlePostProcessingModel: ModelHandler = (models, state, dispatch, log) => {
   const selectedPostProcessingModel = state.upscale.postProcessingModel;
   const allSpandrelModels = models.filter(isSpandrelImageToImageModelConfig);
 
@@ -295,6 +265,33 @@ const handleSpandrelImageToImageModels: ModelHandler = (models, state, dispatch,
   if (selectedPostProcessingModel) {
     log.debug({ selectedPostProcessingModel }, 'Selected post-processing model is not available, clearing');
     dispatch(postProcessingModelChanged(null));
+  }
+};
+
+const handleUpscaleModel: ModelHandler = (models, state, dispatch, log) => {
+  const selectedUpscaleModel = state.upscale.upscaleModel;
+  const allSpandrelModels = models.filter(isSpandrelImageToImageModelConfig);
+
+  // If the currently selected model is available, we don't need to do anything
+  if (selectedUpscaleModel && allSpandrelModels.some((m) => m.key === selectedUpscaleModel.key)) {
+    return;
+  }
+
+  // Else we should select the first available model
+  const firstModel = allSpandrelModels[0] || null;
+  if (firstModel) {
+    log.debug(
+      { selectedUpscaleModel, firstModel },
+      'No selected upscale model or selected upscale model is not available, selecting first available model'
+    );
+    dispatch(upscaleModelChanged(zParameterSpandrelImageToImageModel.parse(firstModel)));
+    return;
+  }
+
+  // No available models, we should clear the selected model - but only if we have one selected
+  if (selectedUpscaleModel) {
+    log.debug({ selectedUpscaleModel }, 'Selected upscale model is not available, clearing');
+    dispatch(upscaleModelChanged(null));
   }
 };
 
