@@ -3,12 +3,10 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import {
-  bboxSyncedToOptimalDimension,
   controlLayerModelChanged,
   referenceImageIPAdapterModelChanged,
   rgIPAdapterModelChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import {
   clipEmbedModelSelected,
@@ -20,6 +18,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
+import { modelSelected } from 'features/parameters/store/actions';
 import { postProcessingModelChanged, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
 import {
   zParameterCLIPEmbedModel,
@@ -120,10 +119,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
         { selectedMainModel, defaultModel },
         'No selected main model or selected main model is not available, selecting default model'
       );
-      dispatch(modelChanged({ model: zParameterModel.parse(defaultModel), previousModel: selectedMainModel }));
-      if (!selectIsStaging(state)) {
-        dispatch(bboxSyncedToOptimalDimension());
-      }
+      dispatch(modelSelected(defaultModel));
       return;
     }
   }
@@ -132,10 +128,7 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     { selectedMainModel, firstModel },
     'No selected main model or selected main model is not available, selecting first available model'
   );
-  dispatch(modelChanged({ model: zParameterModel.parse(firstModel), previousModel: selectedMainModel }));
-  if (!selectIsStaging(state)) {
-    dispatch(bboxSyncedToOptimalDimension());
-  }
+  dispatch(modelSelected(firstModel));
 };
 
 const handleUpscalingModels: ModelHandler = (models, state, dispatch, log) => {
