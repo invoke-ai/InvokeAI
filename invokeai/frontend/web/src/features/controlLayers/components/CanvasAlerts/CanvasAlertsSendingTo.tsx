@@ -8,6 +8,7 @@ import {
 } from 'features/controlLayers/store/ephemeral';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useCurrentDestination } from 'features/queue/hooks/useCurrentDestination';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { PropsWithChildren, ReactNode } from 'react';
@@ -30,13 +31,18 @@ const ActivateImageViewerButton = (props: PropsWithChildren) => {
 export const CanvasAlertsSendingToGallery = () => {
   const { t } = useTranslation();
   const destination = useCurrentDestination();
+  const tab = useAppSelector(selectActiveTab);
   const isVisible = useMemo(() => {
+    // This alert should only be visible when the destination is gallery and the tab is canvas
+    if (tab !== 'canvas') {
+      return false;
+    }
     if (!destination) {
       return false;
     }
 
     return destination === 'gallery';
-  }, [destination]);
+  }, [destination, tab]);
 
   return (
     <AlertWrapper
@@ -68,7 +74,13 @@ export const CanvasAlertsSendingToCanvas = () => {
   const { t } = useTranslation();
   const destination = useCurrentDestination();
   const isStaging = useAppSelector(selectIsStaging);
+  const tab = useAppSelector(selectActiveTab);
   const isVisible = useMemo(() => {
+    // When we are on a non-canvas tab, and the current generation's destination is not the canvas, we don't show the alert
+    // For example, on the workflows tab, when the destinatin is gallery, we don't show the alert
+    if (tab !== 'canvas' && destination !== 'canvas') {
+      return false;
+    }
     if (isStaging) {
       return true;
     }
@@ -78,7 +90,7 @@ export const CanvasAlertsSendingToCanvas = () => {
     }
 
     return destination === 'canvas';
-  }, [destination, isStaging]);
+  }, [destination, isStaging, tab]);
 
   return (
     <AlertWrapper
