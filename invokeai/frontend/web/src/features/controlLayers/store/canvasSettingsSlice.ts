@@ -69,7 +69,15 @@ type CanvasSettingsState = {
   /**
    * Whether to show only raster layers while staging.
    */
-  showOnlyRasterLayersWhileStaging: boolean;
+  isolatedStagingPreview: boolean;
+  /**
+   * Whether to show only the selected layer while filtering.
+   */
+  isolatedFilteringPreview: boolean;
+  /**
+   * Whether to show only the selected layer while transforming.
+   */
+  isolatedTransformingPreview: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -87,7 +95,9 @@ const initialState: CanvasSettingsState = {
   showProgressOnCanvas: true,
   bboxOverlay: false,
   preserveMask: false,
-  showOnlyRasterLayersWhileStaging: true,
+  isolatedStagingPreview: true,
+  isolatedFilteringPreview: true,
+  isolatedTransformingPreview: true,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -136,8 +146,14 @@ export const canvasSettingsSlice = createSlice({
     settingsPreserveMaskToggled: (state) => {
       state.preserveMask = !state.preserveMask;
     },
-    settingsShowOnlyRasterLayersWhileStagingToggled: (state) => {
-      state.showOnlyRasterLayersWhileStaging = !state.showOnlyRasterLayersWhileStaging;
+    settingsIsolatedStagingPreviewToggled: (state) => {
+      state.isolatedStagingPreview = !state.isolatedStagingPreview;
+    },
+    settingsIsolatedFilteringPreviewToggled: (state) => {
+      state.isolatedFilteringPreview = !state.isolatedFilteringPreview;
+    },
+    settingsIsolatedTransformingPreviewToggled: (state) => {
+      state.isolatedTransformingPreview = !state.isolatedTransformingPreview;
     },
   },
 });
@@ -157,7 +173,9 @@ export const {
   settingsShowProgressOnCanvasToggled,
   settingsBboxOverlayToggled,
   settingsPreserveMaskToggled,
-  settingsShowOnlyRasterLayersWhileStagingToggled,
+  settingsIsolatedStagingPreviewToggled,
+  settingsIsolatedFilteringPreviewToggled,
+  settingsIsolatedTransformingPreviewToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -189,6 +207,10 @@ export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) 
 export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
   (canvasSettings) => canvasSettings.showProgressOnCanvas
 );
-export const selectShowOnlyRasterLayersWhileStaging = createCanvasSettingsSelector(
-  (canvasSettings) => canvasSettings.showOnlyRasterLayersWhileStaging
+export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settings) => settings.isolatedStagingPreview);
+export const selectIsolatedFilteringPreview = createCanvasSettingsSelector(
+  (settings) => settings.isolatedFilteringPreview
+);
+export const selectIsolatedTransformingPreview = createCanvasSettingsSelector(
+  (settings) => settings.isolatedTransformingPreview
 );

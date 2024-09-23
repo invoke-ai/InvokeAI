@@ -1960,7 +1960,10 @@
                 "label": "Preserve Masked Region",
                 "alert": "Preserving Masked Region"
             },
-            "showOnlyRasterLayersWhileStaging": "Show Only Raster Layers While Staging"
+            "isolatedPreview": "Isolated Preview",
+            "isolatedStagingPreview": "Isolated Staging Preview",
+            "isolatedFilteringPreview": "Isolated Filtering Preview",
+            "isolatedTransformingPreview": "Isolated Transforming Preview"
         },
         "HUD": {
             "bbox": "Bbox",

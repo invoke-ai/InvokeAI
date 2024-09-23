@@ -1,6 +1,6 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { selectShowOnlyRasterLayersWhileStaging } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectIsolatedStagingPreview } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type {
@@ -294,8 +294,8 @@ const getSelectIsTypeHidden = (type: CanvasEntityType) => {
 export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdentifier) => {
   const selectIsTypeHidden = getSelectIsTypeHidden(entityIdentifier.type);
   return createSelector(
-    [selectCanvasSlice, selectIsTypeHidden, selectIsStaging, selectShowOnlyRasterLayersWhileStaging],
-    (canvas, isTypeHidden, isStaging, showOnlyRasterLayersWhileStaging) => {
+    [selectCanvasSlice, selectIsTypeHidden, selectIsStaging, selectIsolatedStagingPreview],
+    (canvas, isTypeHidden, isStaging, isolatedStagingPreview) => {
       const entity = selectEntity(canvas, entityIdentifier);
 
       // An entity is hidden if:
@@ -311,7 +311,7 @@ export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdenti
       if (!entity.isEnabled) {
         return true;
       }
-      if (isStaging && showOnlyRasterLayersWhileStaging) {
+      if (isStaging && isolatedStagingPreview) {
         // When staging, we only show raster layers. This allows the user to easily see how the new generation fits in
         // with the rest of the canvas without the masks and control layers getting in the way.
         return !isRasterLayerEntityIdentifier(entityIdentifier);
