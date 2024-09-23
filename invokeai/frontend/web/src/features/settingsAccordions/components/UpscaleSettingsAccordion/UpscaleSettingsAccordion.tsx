@@ -1,10 +1,12 @@
 import { Expander, Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import ParamCreativity from 'features/parameters/components/Upscale/ParamCreativity';
 import ParamSpandrelModel from 'features/parameters/components/Upscale/ParamSpandrelModel';
 import ParamStructure from 'features/parameters/components/Upscale/ParamStructure';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import { getGridSize } from 'features/parameters/util/optimalDimension';
 import { UpscaleScaleSlider } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleScaleSlider';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -24,9 +26,10 @@ const selector = createMemoizedSelector([selectUpscaleSlice], (upscaleSlice) => 
   }
 
   if (upscaleInitialImage) {
+    const gridSize = upscaleModel ? getGridSize(upscaleModel.base) : getGridSize(null);
     // Output height and width are scaled and rounded down to the nearest multiple of 8
-    const outputWidth = Math.floor((upscaleInitialImage.width * scale) / 8) * 8;
-    const outputHeight = Math.floor((upscaleInitialImage.height * scale) / 8) * 8;
+    const outputWidth = roundDownToMultiple(upscaleInitialImage.width * scale, gridSize);
+    const outputHeight = roundDownToMultiple(upscaleInitialImage.height * scale, gridSize);
 
     badges.push(`${outputWidth}×${outputHeight}`);
   }

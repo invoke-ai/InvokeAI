@@ -1,6 +1,6 @@
 import type { SerializableObject } from 'common/types';
 import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
-import { zModelIdentifierField } from 'features/nodes/types/common';
+import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
 import {
   zParameterImageDimension,
@@ -325,7 +325,7 @@ const zCanvasState = z.object({
       height: zParameterImageDimension,
     }),
     scaleMethod: zBoundingBoxScaleMethod,
-    optimalDimension: z.number().int().positive(),
+    modelBase: zMainModelBase,
   }),
 });
 export type CanvasState = z.infer<typeof zCanvasState>;

@@ -3,7 +3,6 @@ import type { AppStartListening } from 'app/store/middleware/listenerMiddleware'
 import type { AppDispatch, RootState } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import {
-  bboxOptimalDimensionChanged,
   bboxSyncedToOptimalDimension,
   controlLayerModelChanged,
   referenceImageIPAdapterModelChanged,
@@ -29,7 +28,6 @@ import {
   zParameterT5EncoderModel,
   zParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
@@ -123,8 +121,6 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
         'No selected main model or selected main model is not available, selecting default model'
       );
       dispatch(modelChanged({ model: zParameterModel.parse(defaultModel), previousModel: selectedMainModel }));
-      // When staging, we don't want to change the bbox, but we must keep the optimal dimension in sync.
-      dispatch(bboxOptimalDimensionChanged({ optimalDimension: getOptimalDimension(defaultModel) }));
       if (!selectIsStaging(state)) {
         dispatch(bboxSyncedToOptimalDimension());
       }
@@ -137,8 +133,6 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     'No selected main model or selected main model is not available, selecting first available model'
   );
   dispatch(modelChanged({ model: zParameterModel.parse(firstModel), previousModel: selectedMainModel }));
-  // When staging, we don't want to change the bbox, but we must keep the optimal dimension in sync.
-  dispatch(bboxOptimalDimensionChanged({ optimalDimension: getOptimalDimension(firstModel) }));
   if (!selectIsStaging(state)) {
     dispatch(bboxSyncedToOptimalDimension());
   }
