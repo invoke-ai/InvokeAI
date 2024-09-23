@@ -47,7 +47,7 @@ export const NoContentForViewer = () => {
                 color="white"
                 fontSize="md"
                 fontWeight="semibold"
-                href="https://www.youtube.com/@invokeai/videos"
+                href="https://www.youtube.com/playlist?list=PLvWK1Kc8iXGrQy8r9TYg6QdUuJ5MMx-ZO"
                 target="_blank"
               />
             ),

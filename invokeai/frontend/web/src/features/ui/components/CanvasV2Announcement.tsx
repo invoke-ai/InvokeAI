@@ -15,19 +15,19 @@ export const CanvasV2Announcement = () => {
           fontSize="sm"
           fontWeight="semibold"
           label={t('whatsNew.canvasV2Announcement.readReleaseNotes')}
-          href="https://github.com/invoke-ai/InvokeAI/releases"
+          href="https://github.com/invoke-ai/InvokeAI/releases/tag/v5.0.0"
         />
         <ExternalLink
           fontSize="sm"
           fontWeight="semibold"
           label={t('whatsNew.canvasV2Announcement.watchReleaseVideo')}
-          href="https://www.youtube.com/@invokeai/videos"
+          href="https://www.youtube.com/watch?v=y80W3PjR0Gc"
         />
         <ExternalLink
           fontSize="sm"
           fontWeight="semibold"
           label={t('whatsNew.canvasV2Announcement.watchUiUpdatesOverview')}
-          href="https://www.youtube.com/@invokeai/videos"
+          href="https://www.youtube.com/watch?v=Tl-69JvwJ2s"
         />
       </Flex>
     </Flex>
