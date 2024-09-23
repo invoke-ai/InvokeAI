@@ -1,8 +1,15 @@
 import { ExternalLink, Flex, ListItem, UnorderedList } from '@invoke-ai/ui-library';
 import { useTranslation } from 'react-i18next';
+import { useAppSelector } from '../../../app/store/storeHooks';
+import { createSelector } from '@reduxjs/toolkit';
+import { selectConfigSlice } from '../../system/store/configSlice';
+
+const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLocal);
 
 export const CanvasV2Announcement = () => {
   const { t } = useTranslation();
+  const isLocal = useAppSelector(selectIsLocal);
+
   return (
     <Flex gap={4} flexDir="column">
       <UnorderedList fontSize="sm">
@@ -15,7 +22,11 @@ export const CanvasV2Announcement = () => {
           fontSize="sm"
           fontWeight="semibold"
           label={t('whatsNew.canvasV2Announcement.readReleaseNotes')}
-          href="https://github.com/invoke-ai/InvokeAI/releases/tag/v5.0.0"
+          href={
+            isLocal
+              ? 'https://github.com/invoke-ai/InvokeAI/releases/tag/v5.0.0'
+              : 'https://support.invoke.ai/support/solutions/articles/151000178246'
+          }
         />
         <ExternalLink
           fontSize="sm"
