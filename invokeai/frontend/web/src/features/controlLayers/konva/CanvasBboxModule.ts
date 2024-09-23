@@ -241,6 +241,8 @@ export class CanvasBboxModule extends CanvasModuleBase {
    * - Pushes the new bbox rect into app state
    */
   onDragMove = () => {
+    // The grid size here is the _position_ grid size, not the _dimension_ grid size - it is not constratined by the
+    // currently-selected model.
     const gridSize = this.manager.stateApi.$ctrlKey.get() || this.manager.stateApi.$metaKey.get() ? 8 : 64;
     const bbox = this.manager.stateApi.getBbox();
     const bboxRect: Rect = {
@@ -277,7 +279,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
     const shift = this.manager.stateApi.$shiftKey.get();
 
     // Grid size depends on the modifier keys
-    let gridSize = ctrl || meta ? 8 : 64;
+    let gridSize = ctrl || meta ? this.manager.stateApi.getBboxGridSize() : 64;
 
     // Alt key indicates we are using centered scaling. We need to double the gride size used when calculating the
     // new dimensions so that each size scales in the correct increments and doesn't mis-place the bbox. For example, if
@@ -384,7 +386,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
 
     // Determine the bbox size that fits within the visible rect. The bbox must be at least 64px in width and height,
     // and its width and height must be multiples of 8px.
-    const gridSize = 8;
+    const gridSize = this.manager.stateApi.getBboxGridSize();
 
     // To be conservative, we will round up the x and y to the nearest grid size, and round down the width and height.
     // This ensures the bbox is never _larger_ than the visible rect. If the bbox is larger than the visible, we
@@ -407,8 +409,12 @@ export class CanvasBboxModule extends CanvasModuleBase {
     const stage = this.konva.transformer.getStage();
     assert(stage, 'Stage must exist');
 
-    // We need to snap the anchors to the grid. If the user is holding ctrl/meta, we use the finer 8px grid.
-    const gridSize = this.manager.stateApi.$ctrlKey.get() || this.manager.stateApi.$metaKey.get() ? 8 : 64;
+    // We need to snap the anchors to the grid. If the user is holding ctrl/meta, we use the finest grid size allowed
+    // currently-selected model.
+    const gridSize =
+      this.manager.stateApi.$ctrlKey.get() || this.manager.stateApi.$metaKey.get()
+        ? this.manager.stateApi.getBboxGridSize()
+        : 64;
     // Because we are working in absolute coordinates, we need to scale the grid size by the stage scale.
     const scaledGridSize = gridSize * stage.scaleX();
     // To snap the anchor to the grid, we need to calculate an offset from the stage's absolute position.

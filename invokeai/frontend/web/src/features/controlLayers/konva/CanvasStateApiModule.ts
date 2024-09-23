@@ -25,7 +25,12 @@ import {
   entityReset,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasStagingAreaSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { selectAllRenderableEntities, selectBbox, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import {
+  selectAllRenderableEntities,
+  selectBbox,
+  selectCanvasSlice,
+  selectGridSize,
+} from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityType,
   CanvasState,
@@ -401,6 +406,10 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     return this.runSelector(selectCanvasSettingsSlice);
   };
 
+  /**
+   * Gets the _positional_ grid size for the current canvas. Note that this is not the same as bbox grid size, which is
+   * based on the currently-selected model.
+   */
   getGridSize = (): number => {
     const snapToGrid = this.getSettings().snapToGrid;
     if (!snapToGrid) {
@@ -446,6 +455,13 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   getStagingArea = () => {
     return this.runSelector(selectCanvasStagingAreaSlice);
+  };
+
+  /**
+   * Gets the grid size for the current canvas, based on the currently-selected model
+   */
+  getBboxGridSize = (): number => {
+    return this.runSelector(selectGridSize);
   };
 
   /**

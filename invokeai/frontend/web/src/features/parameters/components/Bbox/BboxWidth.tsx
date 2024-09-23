@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { selectOptimalDimension, selectWidth } from 'features/controlLayers/store/selectors';
+import { selectGridSize, selectOptimalDimension, selectWidth } from 'features/controlLayers/store/selectors';
 import { selectWidthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +15,7 @@ export const BboxWidth = memo(() => {
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const config = useAppSelector(selectWidthConfig);
   const isStaging = useAppSelector(selectIsStaging);
+  const gridSize = useAppSelector(selectGridSize);
 
   const onChange = useCallback(
     (v: number) => {
@@ -40,7 +41,7 @@ export const BboxWidth = memo(() => {
         min={config.sliderMin}
         max={config.sliderMax}
         step={config.coarseStep}
-        fineStep={config.fineStep}
+        fineStep={gridSize}
         marks={marks}
       />
       <CompositeNumberInput
@@ -50,7 +51,7 @@ export const BboxWidth = memo(() => {
         min={config.numberInputMin}
         max={config.numberInputMax}
         step={config.coarseStep}
-        fineStep={config.fineStep}
+        fineStep={gridSize}
       />
     </FormControl>
   );

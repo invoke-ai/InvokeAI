@@ -15,7 +15,7 @@ import type {
   CanvasState,
 } from 'features/controlLayers/store/types';
 import { isRasterLayerEntityIdentifier } from 'features/controlLayers/store/types';
-import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { assert } from 'tsafe';
 
 /**
@@ -102,10 +102,19 @@ export const selectEntityCountActive = createSelector(
 export const selectHasEntities = createSelector(selectEntityCountAll, (count) => count > 0);
 
 /**
- * Selects the optimal dimension for the canvas based on the currently-model
+ * Selects the optimal dimension for the canvas based on the currently-selected model
  */
-export const selectOptimalDimension = createSelector(selectParamsSlice, (params) => {
-  return getOptimalDimension(params.model);
+export const selectOptimalDimension = createSelector(selectParamsSlice, (params): number => {
+  const modelBase = params.model?.base;
+  return getOptimalDimension(modelBase ?? null);
+});
+
+/**
+ * Selects the grid size for the canvas based on the currently-selected model
+ */
+export const selectGridSize = createSelector(selectParamsSlice, (params): number => {
+  const modelBase = params.model?.base;
+  return getGridSize(modelBase ?? null);
 });
 
 /**
