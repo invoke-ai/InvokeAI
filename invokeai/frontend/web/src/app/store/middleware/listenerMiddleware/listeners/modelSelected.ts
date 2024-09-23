@@ -4,6 +4,7 @@ import { bboxSyncedToOptimalDimension } from 'features/controlLayers/store/canva
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import { modelChanged, vaeSelected } from 'features/controlLayers/store/paramsSlice';
+import { selectBboxModelBase } from 'features/controlLayers/store/selectors';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
@@ -70,7 +71,8 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
       }
 
       dispatch(modelChanged({ model: newModel, previousModel: state.params.model }));
-      if (!selectIsStaging(state)) {
+      const modelBase = selectBboxModelBase(state);
+      if (!selectIsStaging(state) && modelBase !== state.params.model?.base) {
         dispatch(bboxSyncedToOptimalDimension());
       }
     },
