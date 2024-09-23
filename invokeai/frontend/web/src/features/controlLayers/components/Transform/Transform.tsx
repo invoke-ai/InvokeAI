@@ -41,7 +41,7 @@ const TransformBox = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
           leftIcon={<PiArrowsCounterClockwiseBold />}
           onClick={adapter.transformer.resetTransform}
           isLoading={isProcessing}
-          loadingText={t('controlLayers.reset')}
+          loadingText={t('controlLayers.transform.reset')}
           variant="ghost"
         >
           {t('controlLayers.transform.reset')}
@@ -50,7 +50,7 @@ const TransformBox = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
           leftIcon={<PiCheckBold />}
           onClick={adapter.transformer.applyTransform}
           isLoading={isProcessing}
-          loadingText={t('common.apply')}
+          loadingText={t('controlLayers.transform.apply')}
           variant="ghost"
         >
           {t('controlLayers.transform.apply')}
