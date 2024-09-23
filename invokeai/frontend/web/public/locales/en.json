@@ -1560,7 +1560,7 @@
         "optimizedDenoising": {
             "heading": "Optimized Inpainting",
             "paragraphs": [
-                "Enable optimized denoising for enhanced inpainting transformations with Flux models. This setting improves detail and clarity during generation, but may be turned off to preserve more of your original image."
+                "Enable optimized denoising for enhanced inpainting transformations with Flux models. This setting improves detail and clarity during generation, but may be turned off to preserve more of your original image. This setting is still being tuned and is in beta status."
             ]
         }
     },
