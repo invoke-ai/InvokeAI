@@ -9,6 +9,10 @@ import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/Ca
 import type { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import {
+  selectIsolatedFilteringPreview,
+  selectIsolatedTransformingPreview,
+} from 'features/controlLayers/store/canvasSettingsSlice';
 import { buildEntityIsHiddenSelector, selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, CanvasRenderableEntityState, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
@@ -148,12 +152,22 @@ export abstract class CanvasEntityAdapterBase<
     this.state = state;
 
     /**
-     * When a group is hidden or shown, we need to update a few things:
-     * - The entity's individual isHidden flag
-     * - The entity's opacity/visibility
-     * - The entity's transformer interaction state, which will show/hide the entity's selection outline
+     * There are a number of reason we may need to show or hide a layer:
+     * - The entity is enabled/disabled
+     * - The entity type is hidden/shown
+     * - Staging status changes and `isolatedStagingPreview` is enabled
+     * - Global filtering status changes and `isolatedFilteringPreview` is enabled
+     * - Global transforming status changes and `isolatedTransformingPreview` is enabled
      */
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsHidden, this.syncVisibility));
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectIsolatedFilteringPreview, this.syncVisibility)
+    );
+    this.subscriptions.add(this.manager.stateApi.$filteringAdapter.listen(this.syncVisibility));
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectIsolatedTransformingPreview, this.syncVisibility)
+    );
+    this.subscriptions.add(this.manager.stateApi.$transformingAdapter.listen(this.syncVisibility));
 
     /**
      * The tool preview may need to be updated when the entity is locked or disabled. For example, when we disable the
@@ -238,7 +252,23 @@ export abstract class CanvasEntityAdapterBase<
   };
 
   syncVisibility = () => {
-    const isHidden = this.manager.stateApi.runSelector(this.selectIsHidden);
+    let isHidden = this.manager.stateApi.runSelector(this.selectIsHidden);
+
+    // Handle isolated preview modes - if another entity is filtering or transforming, we may need to hide this entity.
+    if (this.manager.stateApi.runSelector(selectIsolatedFilteringPreview)) {
+      const filteringEntityIdentifier = this.manager.stateApi.$filteringAdapter.get()?.entityIdentifier;
+      if (filteringEntityIdentifier && filteringEntityIdentifier.id !== this.id) {
+        isHidden = true;
+      }
+    }
+
+    if (this.manager.stateApi.runSelector(selectIsolatedTransformingPreview)) {
+      const transformingEntityIdentifier = this.manager.stateApi.$transformingAdapter.get()?.entityIdentifier;
+      if (transformingEntityIdentifier && transformingEntityIdentifier.id !== this.id) {
+        isHidden = true;
+      }
+    }
+
     this.$isHidden.set(isHidden);
     this.konva.layer.visible(!isHidden);
   };

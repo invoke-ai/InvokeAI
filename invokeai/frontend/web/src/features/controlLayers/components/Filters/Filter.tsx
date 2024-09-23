@@ -8,7 +8,9 @@ import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/kon
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import {
   selectAutoProcessFilter,
+  selectIsolatedFilteringPreview,
   settingsAutoProcessFilterToggled,
+  settingsIsolatedFilteringPreviewToggled,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
@@ -23,6 +25,10 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
   const isProcessing = useStore(adapter.filterer.$isProcessing);
   const hasProcessed = useStore(adapter.filterer.$hasProcessed);
   const autoProcessFilter = useAppSelector(selectAutoProcessFilter);
+  const isolatedFilteringPreview = useAppSelector(selectIsolatedFilteringPreview);
+  const onChangeIsolatedPreview = useCallback(() => {
+    dispatch(settingsIsolatedFilteringPreviewToggled());
+  }, [dispatch]);
 
   const onChangeFilterConfig = useCallback(
     (filterConfig: FilterConfig) => {
@@ -59,7 +65,7 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
       transitionProperty="height"
       transitionDuration="normal"
     >
-      <Flex w="full">
+      <Flex w="full" gap={4}>
         <Heading size="md" color="base.300" userSelect="none">
           {t('controlLayers.filter.filter')}
         </Heading>
@@ -67,6 +73,10 @@ const FilterBox = memo(({ adapter }: { adapter: CanvasEntityAdapterRasterLayer |
         <FormControl w="min-content">
           <FormLabel m={0}>{t('controlLayers.filter.autoProcess')}</FormLabel>
           <Switch size="sm" isChecked={autoProcessFilter} onChange={onChangeAutoProcessFilter} />
+        </FormControl>
+        <FormControl w="min-content">
+          <FormLabel m={0}>{t('controlLayers.settings.isolatedPreview')}</FormLabel>
+          <Switch size="sm" isChecked={isolatedFilteringPreview} onChange={onChangeIsolatedPreview} />
         </FormControl>
       </Flex>
       <FilterTypeSelect filterType={config.type} onChange={onChangeFilterType} />
