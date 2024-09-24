@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import type { RemoveFromBoardDropData } from 'features/dnd/types';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
-import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
+import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
 import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
 import {
   selectAutoAddBoardId,
@@ -58,13 +58,9 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
       {(ref) => (
         <Tooltip
           label={
-            <BoardTotalsTooltip
-              imageCount={data?.image_count ?? 0}
-              assetCount={data?.asset_count ?? 0}
-              isArchived={false}
-            />
+            <BoardTooltip imageCount={data?.image_count ?? 0} assetCount={data?.asset_count ?? 0} isArchived={false} />
           }
-          openDelay={1000}
+          openDelay={500}
           placement="left"
           closeOnScroll
         >
