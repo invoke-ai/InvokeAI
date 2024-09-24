@@ -139,7 +139,7 @@ export const AppContent = memo(() => {
                   </Box>
                 </Flex>
               </Panel>
-              <ResizeHandle id="left-main-handle" orientation="vertical" {...leftPanel.resizeHandleProps} />
+              <ResizeHandle id="left-main-handle" {...leftPanel.resizeHandleProps} />
             </>
           )}
           <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>
@@ -147,7 +147,7 @@ export const AppContent = memo(() => {
           </Panel>
           {withRightPanel && (
             <>
-              <ResizeHandle id="main-right-handle" orientation="vertical" {...rightPanel.resizeHandleProps} />
+              <ResizeHandle id="main-right-handle" {...rightPanel.resizeHandleProps} />
               <Panel order={2} style={panelStyles} collapsible {...rightPanel.panelProps}>
                 <RightPanelContent />
               </Panel>

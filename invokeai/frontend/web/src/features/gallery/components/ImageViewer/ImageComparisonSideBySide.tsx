@@ -42,11 +42,7 @@ export const ImageComparisonSideBySide = memo(({ firstImage, secondImage }: Comp
               </Flex>
             </Flex>
           </Panel>
-          <ResizeHandle
-            id="image-comparison-side-by-side-handle"
-            onDoubleClick={onDoubleClickHandle}
-            orientation="vertical"
-          />
+          <ResizeHandle id="image-comparison-side-by-side-handle" onDoubleClick={onDoubleClickHandle} />
 
           <Panel minSize={20}>
             <Flex position="relative" w="full" h="full" alignItems="center" justifyContent="center">
