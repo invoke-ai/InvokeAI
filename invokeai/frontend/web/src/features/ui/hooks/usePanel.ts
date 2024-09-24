@@ -12,48 +12,30 @@ import { getPanelGroupElement, getResizeHandleElementsForGroup } from 'react-res
 
 type Direction = 'horizontal' | 'vertical';
 
-export type UsePanelOptions =
-  | {
-      id: string;
-      /**
-       * The minimum size of the panel as a percentage.
-       */
-      minSize: number;
-      /**
-       * The default size of the panel as a percentage.
-       */
-      defaultSize?: number;
-      /**
-       * The unit of the minSize
-       */
-      unit: 'percentages';
-      onCollapse?: (isCollapsed: boolean) => void;
-    }
-  | {
-      id: string;
-      /**
-       * The minimum size of the panel in pixels.
-       */
-      minSize: number;
-      /**
-       * The default size of the panel in pixels.
-       */
-      defaultSize?: number;
-      /**
-       * The unit of the minSize.
-       */
-      unit: 'pixels';
-      /**
-       * The direction of the panel group.
-       * This is required to accurately calculate the available space for the panel, minus the space taken by the handles.
-       */
-      panelGroupDirection: Direction;
-      /**
-       * A ref to the panel group.
-       */
-      panelGroupRef: RefObject<ImperativePanelGroupHandle>;
-      onCollapse?: (isCollapsed: boolean) => void;
-    };
+export type UsePanelOptions = {
+  id: string;
+  /**
+   * The minimum size of the panel in pixels.
+   */
+  minSize: number;
+  /**
+   * The default size of the panel in pixels.
+   */
+  defaultSize?: number;
+  /**
+   * The direction of the panel group.
+   * This is required to accurately calculate the available space for the panel, minus the space taken by the handles.
+   */
+  panelGroupDirection: Direction;
+  /**
+   * A ref to the panel group.
+   */
+  imperativePanelGroupRef: RefObject<ImperativePanelGroupHandle>;
+  /**
+   * Called when the board's collapsed state changes.
+   */
+  onCollapse?: (isCollapsed: boolean) => void;
+};
 
 export type UsePanelReturn = {
   /**
@@ -80,22 +62,28 @@ export type UsePanelReturn = {
    * Resize the panel to the given size in the same units as the minSize.
    */
   resize: (size: number) => void;
+  /**
+   * The props to apply to the panel.
+   */
   panelProps: Partial<PanelProps & { ref: RefObject<ImperativePanelHandle> }>;
+  /**
+   * The props to apply to the resize handle.
+   */
   resizeHandleProps: Partial<PanelResizeHandleProps>;
 };
 
 export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
   const imperativePanelRef = useRef<ImperativePanelHandle>(null);
-  const [_minSize, _setMinSize] = useState<number>(arg.unit === 'percentages' ? arg.minSize : 0);
-  const [_defaultSize, _setDefaultSize] = useState<number>(arg.defaultSize ?? arg.minSize);
+  const [_minSize, _setMinSize] = useState<number>(0);
+  const [_defaultSize, _setDefaultSize] = useState<number>(0);
 
   // If the units are pixels, we need to calculate the min size as a percentage of the available space,
   // then resize the panel if it is too small.
   useLayoutEffect(() => {
-    if (arg.unit === 'percentages' || !arg.panelGroupRef.current) {
+    if (!arg.imperativePanelGroupRef.current) {
       return;
     }
-    const id = arg.panelGroupRef.current.getId();
+    const id = arg.imperativePanelGroupRef.current.getId();
     const panelGroupElement = getPanelGroupElement(id);
     const panelGroupHandleElements = getResizeHandleElementsForGroup(id);
     if (!panelGroupElement) {
@@ -106,7 +94,12 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
         return;
       }
 
-      const minSizePct = getSizeAsPercentage(arg.minSize, arg.panelGroupRef, arg.panelGroupDirection);
+      const minSizePct = getSizeAsPercentage(arg.minSize, arg.imperativePanelGroupRef, arg.panelGroupDirection);
+      const defaultSizePct = getSizeAsPercentage(
+        arg.defaultSize || arg.minSize,
+        arg.imperativePanelGroupRef,
+        arg.panelGroupDirection
+      );
 
       if (minSizePct > 100) {
         // This can happen when the panel is hidden
@@ -115,8 +108,8 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
 
       _setMinSize(minSizePct);
 
-      if (arg.defaultSize && arg.defaultSize > minSizePct) {
-        _setDefaultSize(arg.defaultSize);
+      if (defaultSizePct && defaultSizePct > minSizePct) {
+        _setDefaultSize(defaultSizePct);
       } else {
         _setDefaultSize(minSizePct);
       }
@@ -181,14 +174,8 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
 
   const resize = useCallback(
     (size: number) => {
-      // If we are using percentages, we can just resize to the given size
-      if (arg.unit === 'percentages') {
-        imperativePanelRef.current?.resize(size);
-        return;
-      }
-
-      // If we are using pixels, we need to calculate the size as a percentage of the available space
-      const sizeAsPct = getSizeAsPercentage(size, arg.panelGroupRef, arg.panelGroupDirection);
+      // We need to calculate the size as a percentage of the available space
+      const sizeAsPct = getSizeAsPercentage(size, arg.imperativePanelGroupRef, arg.panelGroupDirection);
       imperativePanelRef.current?.resize(sizeAsPct);
     },
     [arg]

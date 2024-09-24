@@ -25,17 +25,16 @@ const GalleryPanelContent = () => {
   const boardSearchText = useAppSelector(selectBoardSearchText);
   const dispatch = useAppDispatch();
   const boardSearchDisclosure = useDisclosure({ defaultIsOpen: !!boardSearchText.length });
-  const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
+  const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const ref = useRef<HTMLDivElement>(null);
   useScopeOnFocus('gallery', ref);
 
   const boardsListPanelOptions = useMemo<UsePanelOptions>(
     () => ({
       id: 'boards-list-panel',
-      unit: 'pixels',
       minSize: 128,
-      defaultSize: 20,
-      panelGroupRef,
+      defaultSize: 208,
+      imperativePanelGroupRef,
       panelGroupDirection: 'vertical',
     }),
     []
@@ -81,7 +80,7 @@ const GalleryPanelContent = () => {
         </Flex>
       </Flex>
 
-      <PanelGroup ref={panelGroupRef} direction="vertical" autoSaveId="boards-list-panel">
+      <PanelGroup ref={imperativePanelGroupRef} direction="vertical" autoSaveId="boards-list-panel">
         <Panel collapsible {...boardsListPanel.panelProps}>
           <Flex flexDir="column" w="full" h="full">
             <Collapse in={boardSearchDisclosure.isOpen} style={COLLAPSE_STYLES}>
