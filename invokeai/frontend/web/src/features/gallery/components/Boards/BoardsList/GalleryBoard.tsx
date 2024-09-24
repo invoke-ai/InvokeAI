@@ -7,7 +7,7 @@ import type { AddToBoardDropData } from 'features/dnd/types';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { BoardEditableTitle } from 'features/gallery/components/Boards/BoardsList/BoardEditableTitle';
-import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
+import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
 import {
   selectAutoAddBoardId,
   selectAutoAssignBoardOnClick,
@@ -57,7 +57,18 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   return (
     <BoardContextMenu board={board}>
       {(ref) => (
-        <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll p={2}>
+        <Tooltip
+          label={
+            <BoardTotalsTooltip
+              imageCount={board.image_count}
+              assetCount={board.asset_count}
+              isArchived={Boolean(board.archived)}
+            />
+          }
+          openDelay={1000}
+          placement="left"
+          closeOnScroll
+        >
           <Flex
             position="relative"
             ref={ref}
@@ -80,8 +91,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
             </Flex>
             {autoAddBoardId === board.board_id && <AutoAddBadge />}
             {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
-            <Text variant="subtext">{board.image_count}</Text>
-
+            <Text variant="subtext">{board.image_count + board.asset_count}</Text>
             <IAIDroppable data={droppableData} dropLabel={t('gallery.move')} />
           </Flex>
         </Tooltip>
