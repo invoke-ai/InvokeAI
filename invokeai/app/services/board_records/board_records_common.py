@@ -79,3 +79,8 @@ class BoardRecordDeleteException(Exception):
 
     def __init__(self, message="Board record not deleted"):
         super().__init__(message)
+
+
+class UncategorizedImageCounts(BaseModel):
+    image_count: int = Field(description="The number of uncategorized images.")
+    asset_count: int = Field(description="The number of uncategorized assets.")
