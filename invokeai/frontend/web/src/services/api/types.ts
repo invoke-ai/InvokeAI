@@ -37,7 +37,6 @@ export type AppDependencyVersions = S['AppDependencyVersions'];
 export type ImageDTO = S['ImageDTO'];
 export type BoardDTO = S['BoardDTO'];
 export type ImageCategory = S['ImageCategory'];
-export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDTO_'];
 
 // Models
 export type ModelType = S['ModelType'];
