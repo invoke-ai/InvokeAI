@@ -21,9 +21,7 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import {
   $isLeftPanelOpen,
   $isRightPanelOpen,
-  LEFT_PANEL_MIN_SIZE_PCT,
   LEFT_PANEL_MIN_SIZE_PX,
-  RIGHT_PANEL_MIN_SIZE_PCT,
   RIGHT_PANEL_MIN_SIZE_PX,
   selectWithLeftPanel,
   selectWithRightPanel,
@@ -45,16 +43,15 @@ export const AppContent = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
   useScopeOnFocus('gallery', ref);
 
-  const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
+  const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
 
   const withLeftPanel = useAppSelector(selectWithLeftPanel);
   const leftPanelUsePanelOptions = useMemo<UsePanelOptions>(
     () => ({
       id: 'left-panel',
-      unit: 'pixels',
       minSize: LEFT_PANEL_MIN_SIZE_PX,
-      defaultSize: LEFT_PANEL_MIN_SIZE_PCT,
-      panelGroupRef,
+      defaultSize: LEFT_PANEL_MIN_SIZE_PX,
+      imperativePanelGroupRef,
       panelGroupDirection: 'horizontal',
       onCollapse: onLeftPanelCollapse,
     }),
@@ -73,10 +70,9 @@ export const AppContent = memo(() => {
   const rightPanelUsePanelOptions = useMemo<UsePanelOptions>(
     () => ({
       id: 'right-panel',
-      unit: 'pixels',
       minSize: RIGHT_PANEL_MIN_SIZE_PX,
-      defaultSize: RIGHT_PANEL_MIN_SIZE_PCT,
-      panelGroupRef,
+      defaultSize: RIGHT_PANEL_MIN_SIZE_PX,
+      imperativePanelGroupRef,
       panelGroupDirection: 'horizontal',
       onCollapse: onRightPanelCollapse,
     }),
@@ -127,7 +123,7 @@ export const AppContent = memo(() => {
       <VerticalNavBar />
       <Flex position="relative" w="full" h="full" gap={4} minW={0}>
         <PanelGroup
-          ref={panelGroupRef}
+          ref={imperativePanelGroupRef}
           id="app-panel-group"
           autoSaveId="app-panel-group"
           direction="horizontal"

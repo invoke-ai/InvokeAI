@@ -82,14 +82,12 @@ export const uiPersistConfig: PersistConfig<UIState> = {
   persistDenylist: ['shouldShowImageDetails'],
 };
 
-export const LEFT_PANEL_MIN_SIZE_PX = 400;
-export const LEFT_PANEL_MIN_SIZE_PCT = 20;
 const TABS_WITH_LEFT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows'] as const;
+export const LEFT_PANEL_MIN_SIZE_PX = 400;
 export const $isLeftPanelOpen = atom(true);
 export const selectWithLeftPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_LEFT_PANEL.includes(ui.activeTab));
 
 const TABS_WITH_RIGHT_PANEL: TabName[] = ['canvas', 'upscaling', 'workflows'] as const;
 export const RIGHT_PANEL_MIN_SIZE_PX = 390;
-export const RIGHT_PANEL_MIN_SIZE_PCT = 20;
 export const $isRightPanelOpen = atom(true);
 export const selectWithRightPanel = createSelector(selectUiSlice, (ui) => TABS_WITH_RIGHT_PANEL.includes(ui.activeTab));
