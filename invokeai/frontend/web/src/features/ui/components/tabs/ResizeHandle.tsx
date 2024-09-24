@@ -1,61 +1,60 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, chakra, Flex } from '@invoke-ai/ui-library';
+import { chakra } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import type { PanelResizeHandleProps } from 'react-resizable-panels';
 import { PanelResizeHandle } from 'react-resizable-panels';
 
-type ResizeHandleProps = PanelResizeHandleProps & {
-  orientation: 'horizontal' | 'vertical';
-};
-
 const ChakraPanelResizeHandle = chakra(PanelResizeHandle);
 
-const ResizeHandle = (props: ResizeHandleProps) => {
-  const { orientation, ...rest } = props;
-
-  return (
-    <ChakraPanelResizeHandle {...rest}>
-      <Flex sx={sx} data-orientation={orientation}>
-        <Box className="resize-handle-inner" data-orientation={orientation} />
-      </Flex>
-    </ChakraPanelResizeHandle>
-  );
+const ResizeHandle = (props: Omit<PanelResizeHandleProps, 'style'>) => {
+  return <ChakraPanelResizeHandle {...props} sx={sx} />;
 };
 
 export default memo(ResizeHandle);
 
 const sx: SystemStyleObject = {
-  display: 'flex',
-  pos: 'relative',
-  '&[data-orientation="horizontal"]': {
-    w: 'full',
-    h: 5,
-  },
-  '&[data-orientation="vertical"]': { w: 5, h: 'full' },
-  alignItems: 'center',
-  justifyContent: 'center',
-  div: {
-    bg: 'base.800',
-  },
-  _hover: {
-    div: { bg: 'base.700' },
-  },
-  _active: {
-    div: { bg: 'base.600' },
-  },
-  transitionProperty: 'common',
-  transitionDuration: 'normal',
-  '.resize-handle-inner': {
-    '&[data-orientation="horizontal"]': {
-      w: '100%',
-      h: '2px',
+  '&[data-resize-handle-state="hover"]': {
+    _before: {
+      background: 'base.600 !important',
     },
-    '&[data-orientation="vertical"]': {
+  },
+  '&[data-resize-handle-state="drag"]': {
+    _before: {
+      background: 'base.500 !important',
+    },
+  },
+  '&[data-panel-group-direction="horizontal"]': {
+    w: 4,
+    h: 'full',
+    position: 'relative',
+    _before: {
+      transitionProperty: 'background',
+      transitionDuration: 'normal',
+      content: '""',
       w: '2px',
-      h: '100%',
+      h: 'full',
+      background: 'base.800',
+      position: 'absolute',
+      left: '50%',
+      top: 0,
+      transform: 'translateX(-50%)',
     },
-    borderRadius: 'base',
-    transitionProperty: 'inherit',
-    transitionDuration: 'inherit',
+  },
+  '&[data-panel-group-direction="vertical"]': {
+    h: 4,
+    w: 'full',
+    position: 'relative',
+    _before: {
+      transitionProperty: 'background',
+      transitionDuration: 'normal',
+      content: '""',
+      w: 'full',
+      h: '2px',
+      background: 'base.800',
+      position: 'absolute',
+      top: '50%',
+      left: 0,
+      transform: 'translateY(-50%)',
+    },
   },
 };

@@ -92,7 +92,7 @@ const GalleryPanelContent = () => {
             <BoardsListWrapper />
           </Flex>
         </Panel>
-        <ResizeHandle id="gallery-panel-handle" orientation="horizontal" {...boardsListPanel.resizeHandleProps} />
+        <ResizeHandle id="gallery-panel-handle" {...boardsListPanel.resizeHandleProps} />
         <Panel id="gallery-wrapper-panel" minSize={20}>
           <Gallery />
         </Panel>

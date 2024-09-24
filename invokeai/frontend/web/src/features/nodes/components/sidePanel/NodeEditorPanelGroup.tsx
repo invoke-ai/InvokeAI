@@ -51,7 +51,7 @@ const NodeEditorPanelGroup = () => {
           <Panel id="workflow" collapsible minSize={25}>
             <WorkflowPanel />
           </Panel>
-          <ResizeHandle orientation="horizontal" onDoubleClick={handleDoubleClickHandle} />
+          <ResizeHandle onDoubleClick={handleDoubleClickHandle} />
           <Panel id="inspector" collapsible minSize={25}>
             <InspectorPanel />
           </Panel>
