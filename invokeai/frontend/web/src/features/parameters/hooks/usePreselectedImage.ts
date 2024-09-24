@@ -1,35 +1,36 @@
 import { skipToken } from '@reduxjs/toolkit/query';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { canvasReset } from 'features/controlLayers/store/actions';
+import { settingsSendToCanvasChanged } from 'features/controlLayers/store/canvasSettingsSlice';
+import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
+import { selectBboxRect } from 'features/controlLayers/store/selectors';
+import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
 import { toast } from 'features/toast/toast';
-import { t } from 'i18next';
+import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGetImageDTOQuery, useGetImageMetadataQuery } from 'services/api/endpoints/images';
-import { rasterLayerAdded } from '../../controlLayers/store/canvasSlice';
-import { CanvasRasterLayerState } from '../../controlLayers/store/types';
-import { imageDTOToImageObject } from '../../controlLayers/store/util';
-import { sentImageToCanvas } from '../../gallery/store/actions';
-import { setActiveTab } from '../../ui/store/uiSlice';
-import { useAppDispatch, useAppSelector } from '../../../app/store/storeHooks';
-import { selectBboxRect } from '../../controlLayers/store/selectors';
-import { useImageViewer } from '../../gallery/components/ImageViewer/useImageViewer';
-import { canvasReset } from '../../controlLayers/store/actions';
-import { settingsSendToCanvasChanged } from '../../controlLayers/store/canvasSettingsSlice';
 
 export const usePreselectedImage = (selectedImage?: {
   imageName: string;
   action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
 }) => {
   const [isInit, setIsInit] = useState(false);
-  const dispatch = useAppDispatch()
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const bboxRect = useAppSelector(selectBboxRect);
-  const imageViewer = useImageViewer()
+  const imageViewer = useImageViewer();
   const { currentData: selectedImageDto } = useGetImageDTOQuery(selectedImage?.imageName ?? skipToken);
 
   const { currentData: selectedImageMetadata } = useGetImageMetadataQuery(selectedImage?.imageName ?? skipToken);
 
   const handleSendToCanvas = useCallback(() => {
     if (isInit) {
-      return
+      return;
     }
     if (selectedImageDto) {
       const imageObject = imageDTOToImageObject(selectedImageDto);
@@ -41,20 +42,19 @@ export const usePreselectedImage = (selectedImage?: {
       dispatch(rasterLayerAdded({ overrides, isSelected: true }));
       dispatch(setActiveTab('canvas'));
       dispatch(settingsSendToCanvasChanged(true));
-      imageViewer.close()
+      imageViewer.close();
       toast({
         id: 'SENT_TO_CANVAS',
         title: t('toast.sentToUnifiedCanvas'),
         status: 'info',
       });
-      setIsInit(true)
-
+      setIsInit(true);
     }
-  }, [selectedImageDto, dispatch, bboxRect, imageViewer, isInit]);
+  }, [selectedImageDto, dispatch, bboxRect, imageViewer, isInit, t]);
 
   const handleSendToImg2Img = useCallback(() => {
     if (isInit) {
-      return
+      return;
     }
     if (selectedImageDto) {
       const imageObject = imageDTOToImageObject(selectedImageDto);
@@ -72,9 +72,8 @@ export const usePreselectedImage = (selectedImage?: {
         title: t('toast.sentToCanvas'),
         status: 'success',
       });
-
     }
-  }, [bboxRect.x, bboxRect.y, dispatch, selectedImageDto, imageViewer, t]);
+  }, [bboxRect.x, bboxRect.y, dispatch, selectedImageDto, imageViewer, t, isInit]);
 
   const handleUseAllMetadata = useCallback(() => {
     if (selectedImageMetadata) {
