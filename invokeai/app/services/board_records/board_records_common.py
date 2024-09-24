@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -26,21 +26,25 @@ class BoardRecord(BaseModelExcludeNull):
     """Whether or not the board is archived."""
     is_private: Optional[bool] = Field(default=None, description="Whether the board is private.")
     """Whether the board is private."""
+    image_count: int = Field(description="The number of images in the board.")
+    asset_count: int = Field(description="The number of assets in the board.")
 
 
-def deserialize_board_record(board_dict: dict) -> BoardRecord:
+def deserialize_board_record(board_dict: dict[str, Any]) -> BoardRecord:
     """Deserializes a board record."""
 
     # Retrieve all the values, setting "reasonable" defaults if they are not present.
 
     board_id = board_dict.get("board_id", "unknown")
     board_name = board_dict.get("board_name", "unknown")
-    cover_image_name = board_dict.get("cover_image_name", "unknown")
+    cover_image_name = board_dict.get("cover_image_name", None)
     created_at = board_dict.get("created_at", get_iso_timestamp())
     updated_at = board_dict.get("updated_at", get_iso_timestamp())
     deleted_at = board_dict.get("deleted_at", get_iso_timestamp())
     archived = board_dict.get("archived", False)
     is_private = board_dict.get("is_private", False)
+    image_count = board_dict.get("image_count", 0)
+    asset_count = board_dict.get("asset_count", 0)
 
     return BoardRecord(
         board_id=board_id,
@@ -51,6 +55,8 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
         deleted_at=deleted_at,
         archived=archived,
         is_private=is_private,
+        image_count=image_count,
+        asset_count=asset_count,
     )
 
 
@@ -63,21 +69,21 @@ class BoardChanges(BaseModel, extra="forbid"):
 class BoardRecordNotFoundException(Exception):
     """Raised when an board record is not found."""
 
-    def __init__(self, message="Board record not found"):
+    def __init__(self, message: str = "Board record not found"):
         super().__init__(message)
 
 
 class BoardRecordSaveException(Exception):
     """Raised when an board record cannot be saved."""
 
-    def __init__(self, message="Board record not saved"):
+    def __init__(self, message: str = "Board record not saved"):
         super().__init__(message)
 
 
 class BoardRecordDeleteException(Exception):
     """Raised when an board record cannot be deleted."""
 
-    def __init__(self, message="Board record not deleted"):
+    def __init__(self, message: str = "Board record not deleted"):
         super().__init__(message)
 
 
