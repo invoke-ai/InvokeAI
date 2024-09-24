@@ -123,7 +123,15 @@ export const buildFLUXGraph = async (
     clip_embed_model: clipEmbedModel,
   });
 
-  const denoisingValue = 1 - img2imgStrength;
+  let denoisingStart: number;
+  if (optimizedDenoisingEnabled) {
+    // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
+    // more user-friendly for FLUX. Without this, most of the 'change' is concentrated in the high denoise strength
+    // range (>0.9).
+    denoisingStart = 1 - (img2imgStrength ** 0.2);
+  } else {
+    denoisingStart = 1 - img2imgStrength;
+  }
 
   if (generationMode === 'txt2img') {
     canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
@@ -137,7 +145,7 @@ export const buildFLUXGraph = async (
       originalSize,
       scaledSize,
       bbox,
-      denoisingValue,
+      denoisingStart,
       false
     );
   } else if (generationMode === 'inpaint') {
@@ -151,7 +159,7 @@ export const buildFLUXGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      denoisingValue,
+      denoisingStart,
       false
     );
   } else if (generationMode === 'outpaint') {
@@ -165,7 +173,7 @@ export const buildFLUXGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      denoisingValue,
+      denoisingStart,
       false
     );
   }
