@@ -17,8 +17,9 @@ from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.util.misc import uuid_string
 
-# This query is missing a GROUP BY clause, which is required for the query to be valid.
-BASE_UNTERMINATED_AND_MISSING_GROUP_BY_BOARD_RECORDS_QUERY = """
+BASE_BOARD_RECORD_QUERY = """
+    -- This query retrieves board records, joining with the board_images and images tables to get image counts and cover image names.
+    -- It is not a complete query, as it is missing a GROUP BY or WHERE clause (and is unterminated).
     SELECT b.board_id,
         b.board_name,
         b.created_at,
@@ -27,14 +28,14 @@ BASE_UNTERMINATED_AND_MISSING_GROUP_BY_BOARD_RECORDS_QUERY = """
         -- Count the number of images in the board, alias image_count
         COUNT(
             CASE
-                WHEN i.image_category in ('general') -- Images (UI category) are in the 'general' category
+                WHEN i.image_category in ('general') -- "Images" are images in the 'general' category
                 AND i.is_intermediate = 0 THEN 1 -- Intermediates are not counted
             END
         ) AS image_count,
         -- Count the number of assets in the board, alias asset_count
         COUNT(
             CASE
-                WHEN i.image_category in ('control', 'mask', 'user', 'other') -- Assets (UI category) are in one of these categories
+                WHEN i.image_category in ('control', 'mask', 'user', 'other') -- "Assets" are images in any of the other categories ('control', 'mask', 'user', 'other')
                 AND i.is_intermediate = 0 THEN 1 -- Intermediates are not counted
             END
         ) AS asset_count,
@@ -51,7 +52,6 @@ BASE_UNTERMINATED_AND_MISSING_GROUP_BY_BOARD_RECORDS_QUERY = """
     FROM boards b
         LEFT JOIN board_images bi ON b.board_id = bi.board_id
         LEFT JOIN images i ON bi.image_name = i.image_name
-    -- This query is missing a GROUP BY clause! The utility functions using this query must add it
     """
 
 
@@ -68,7 +68,7 @@ def get_paginated_list_board_records_queries(include_archived: bool) -> Paginate
 
     # The GROUP BY must be added _after_ the WHERE clause!
     main_query = f"""
-        {BASE_UNTERMINATED_AND_MISSING_GROUP_BY_BOARD_RECORDS_QUERY}
+        {BASE_BOARD_RECORD_QUERY}
         {archived_condition}
         GROUP BY b.board_id,
             b.board_name,
@@ -94,7 +94,7 @@ def get_list_all_board_records_query(include_archived: bool) -> str:
 
     # The GROUP BY must be added _after_ the WHERE clause!
     return f"""
-        {BASE_UNTERMINATED_AND_MISSING_GROUP_BY_BOARD_RECORDS_QUERY}
+        {BASE_BOARD_RECORD_QUERY}
         {archived_condition}
         GROUP BY b.board_id,
             b.board_name,
@@ -108,7 +108,7 @@ def get_board_record_query() -> str:
     """Gets a query to retrieve a board record."""
 
     return f"""
-        {BASE_UNTERMINATED_AND_MISSING_GROUP_BY_BOARD_RECORDS_QUERY}
+        {BASE_BOARD_RECORD_QUERY}
         WHERE b.board_id = ?;
         """
 
@@ -281,22 +281,23 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         try:
             self._lock.acquire()
             query = """
+                -- Get the count of uncategorized images and assets.
                 SELECT
                     CASE
-                        WHEN i.image_category = 'general' THEN 'images' -- Images (UI category) includes images in the 'general' DB category
-                        ELSE 'assets' -- Assets (UI category) includes all other DB categories: 'control', 'mask', 'user', 'other'
+                        WHEN i.image_category = 'general' THEN 'image_count' -- "Images" are images in the 'general' category
+                        ELSE 'asset_count' -- "Assets" are images in any of the other categories ('control', 'mask', 'user', 'other')
                     END AS category_type,
                     COUNT(*) AS unassigned_count
                 FROM images i
                 LEFT JOIN board_images bi ON i.image_name = bi.image_name
-                WHERE bi.board_id IS NULL -- Uncategorized images have no board
+                WHERE bi.board_id IS NULL -- Uncategorized images have no board association
                 AND i.is_intermediate = 0 -- Omit intermediates from the counts
                 GROUP BY category_type; -- Group by category_type alias, as derived from the image_category column earlier
                 """
             self._cursor.execute(query)
             results = self._cursor.fetchall()
-            image_count = dict(results)['images']
-            asset_count = dict(results)['assets']
+            image_count = dict(results)["image_count"]
+            asset_count = dict(results)["asset_count"]
             return UncategorizedImageCounts(image_count=image_count, asset_count=asset_count)
         finally:
             self._lock.release()
