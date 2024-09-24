@@ -22,7 +22,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.denoise import denoise
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
-    clip_timestep_schedule,
+    clip_timestep_schedule_fractional,
     generate_img_ids,
     get_noise,
     get_schedule,
@@ -137,7 +137,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         # Clip the timesteps schedule based on denoising_start and denoising_end.
-        timesteps = clip_timestep_schedule(timesteps, self.denoising_start, self.denoising_end)
+        timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
 
         # Prepare input latent image.
         if init_latents is not None:
