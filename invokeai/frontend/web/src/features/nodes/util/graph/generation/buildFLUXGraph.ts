@@ -78,7 +78,6 @@ export const buildFLUXGraph = async (
     guidance,
     num_steps: steps,
     seed,
-    trajectory_guidance_strength: 0,
     denoising_start: 0,
     denoising_end: 1,
     width: scaledSize.width,
@@ -155,12 +154,6 @@ export const buildFLUXGraph = async (
       denoisingValue,
       false
     );
-    if (optimizedDenoisingEnabled) {
-      g.updateNode(noise, {
-        denoising_start: 0,
-        trajectory_guidance_strength: denoisingValue,
-      });
-    }
   } else if (generationMode === 'outpaint') {
     canvasOutput = await addOutpaint(
       state,
