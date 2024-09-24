@@ -7,7 +7,7 @@ import type { AddToBoardDropData } from 'features/dnd/types';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { BoardEditableTitle } from 'features/gallery/components/Boards/BoardsList/BoardEditableTitle';
-import { BoardTotalsTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTotalsTooltip';
+import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
 import {
   selectAutoAddBoardId,
   selectAutoAssignBoardOnClick,
@@ -59,13 +59,14 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
       {(ref) => (
         <Tooltip
           label={
-            <BoardTotalsTooltip
+            <BoardTooltip
               imageCount={board.image_count}
               assetCount={board.asset_count}
-              isArchived={Boolean(board.archived)}
+              isArchived={board.archived}
+              coverImageName={board.cover_image_name}
             />
           }
-          openDelay={1000}
+          openDelay={500}
           placement="left"
           closeOnScroll
         >
