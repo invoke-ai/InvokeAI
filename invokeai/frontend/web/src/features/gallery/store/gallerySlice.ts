@@ -1,7 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
-import { uniqBy } from 'lodash-es';
+import { isEqual, uniqBy } from 'lodash-es';
 import type { ImageDTO } from 'services/api/types';
 
 import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderDir } from './types';
@@ -32,10 +32,54 @@ export const gallerySlice = createSlice({
   initialState: initialGalleryState,
   reducers: {
     imageSelected: (state, action: PayloadAction<ImageDTO | null>) => {
-      state.selection = action.payload ? [action.payload] : [];
+      // Let's be efficient here and not update the selection unless it has actually changed. This helps to prevent
+      // unnecessary re-renders of the gallery.
+
+      const selectedImage = action.payload;
+
+      // If we got `null`, clear the selection
+      if (!selectedImage) {
+        // But only if we have images selected
+        if (state.selection.length > 0) {
+          state.selection = [];
+        }
+        return;
+      }
+
+      // If we have multiple images selected, clear the selection and select the new image
+      if (state.selection.length !== 1) {
+        state.selection = [selectedImage];
+        return;
+      }
+
+      // If the selected image is different from the current selection, clear the selection and select the new image
+      if (isEqual(state.selection[0], selectedImage)) {
+        state.selection = [selectedImage];
+        return;
+      }
+
+      // Else we have the same image selected, do nothing
     },
     selectionChanged: (state, action: PayloadAction<ImageDTO[]>) => {
-      state.selection = uniqBy(action.payload, (i) => i.image_name);
+      // Let's be efficient here and not update the selection unless it has actually changed. This helps to prevent
+      // unnecessary re-renders of the gallery.
+
+      // Remove duplicates from the selection
+      const newSelection = uniqBy(action.payload, (i) => i.image_name);
+
+      // If the new selection has a different length, update the selection
+      if (newSelection.length !== state.selection.length) {
+        state.selection = newSelection;
+        return;
+      }
+
+      // If the new selection is different, update the selection
+      if (!isEqual(newSelection, state.selection)) {
+        state.selection = newSelection;
+        return;
+      }
+
+      // Else we have the same selection, do nothing
     },
     imageToCompareChanged: (state, action: PayloadAction<ImageDTO | null>) => {
       state.imageToCompare = action.payload;
