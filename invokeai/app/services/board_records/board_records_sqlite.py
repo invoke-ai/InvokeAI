@@ -9,6 +9,7 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordDeleteException,
     BoardRecordNotFoundException,
     BoardRecordSaveException,
+    UncategorizedImageCounts,
     deserialize_board_record,
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -226,5 +227,30 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         except sqlite3.Error as e:
             self._conn.rollback()
             raise e
+        finally:
+            self._lock.release()
+
+    def get_uncategorized_image_counts(self) -> UncategorizedImageCounts:
+        try:
+            self._lock.acquire()
+            query = """
+                -- Get the count of uncategorized images and assets.
+                SELECT
+                    CASE
+                        WHEN i.image_category = 'general' THEN 'image_count' -- "Images" are images in the 'general' category
+                        ELSE 'asset_count' -- "Assets" are images in any of the other categories ('control', 'mask', 'user', 'other')
+                    END AS category_type,
+                    COUNT(*) AS unassigned_count
+                FROM images i
+                LEFT JOIN board_images bi ON i.image_name = bi.image_name
+                WHERE bi.board_id IS NULL -- Uncategorized images have no board association
+                AND i.is_intermediate = 0 -- Omit intermediates from the counts
+                GROUP BY category_type; -- Group by category_type alias, as derived from the image_category column earlier
+                """
+            self._cursor.execute(query)
+            results = self._cursor.fetchall()
+            image_count = dict(results)["image_count"]
+            asset_count = dict(results)["asset_count"]
+            return UncategorizedImageCounts(image_count=image_count, asset_count=asset_count)
         finally:
             self._lock.release()

@@ -5,7 +5,7 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.board_records.board_records_common import BoardChanges
+from invokeai.app.services.board_records.board_records_common import BoardChanges, UncategorizedImageCounts
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 
@@ -146,3 +146,14 @@ async def list_all_board_image_names(
         board_id,
     )
     return image_names
+
+
+@boards_router.get(
+    "/uncategorized/counts",
+    operation_id="get_uncategorized_image_counts",
+    response_model=UncategorizedImageCounts,
+)
+async def get_uncategorized_image_counts() -> UncategorizedImageCounts:
+    """Gets count of images and assets for uncategorized images (images with no board assocation)"""
+
+    return ApiDependencies.invoker.services.board_records.get_uncategorized_image_counts()
