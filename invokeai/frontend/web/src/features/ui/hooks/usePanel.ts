@@ -250,5 +250,5 @@ const getSizeAsPercentage = (
   });
 
   // The final value is a percentage of the available space
-  return (sizeInPixels / availableSpace) * 100;
+  return Math.min((sizeInPixels / availableSpace) * 100, 100);
 };
