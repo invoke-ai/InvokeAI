@@ -34,7 +34,6 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     // update the total images for the board
     dispatch(
       boardsApi.util.updateQueryData('getBoardImagesTotal', imageDTO.board_id ?? 'none', (draft) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         draft.total += 1;
       })
     );
@@ -52,15 +51,11 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
       ])
     );
 
-    const { shouldAutoSwitch, galleryView, selectedBoardId } = getState().gallery;
+    const { shouldAutoSwitch, selectedBoardId } = getState().gallery;
 
     // If auto-switch is enabled, select the new image
     if (shouldAutoSwitch) {
-      // if auto-add is enabled, switch the gallery view and board if needed as the image comes in
-      if (galleryView !== 'images') {
-        dispatch(galleryViewChanged('images'));
-      }
-
+      // If the image is from a different board, switch to that board - this will also select the image
       if (imageDTO.board_id && imageDTO.board_id !== selectedBoardId) {
         dispatch(
           boardIdSelected({
@@ -68,20 +63,21 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
             selectedImageName: imageDTO.image_name,
           })
         );
-      }
-
-      dispatch(offsetChanged({ offset: 0 }));
-
-      if (!imageDTO.board_id && selectedBoardId !== 'none') {
+      } else if (!imageDTO.board_id && selectedBoardId !== 'none') {
         dispatch(
           boardIdSelected({
             boardId: 'none',
             selectedImageName: imageDTO.image_name,
           })
         );
+      } else {
+        // Else just select the image
+        dispatch(imageSelected(imageDTO));
       }
 
-      dispatch(imageSelected(imageDTO));
+      // We also need to update the gallery view to images and reset the offset to 0
+      dispatch(galleryViewChanged('images'));
+      dispatch(offsetChanged({ offset: 0 }));
     }
   };
 
