@@ -326,10 +326,6 @@ export class CanvasStateApiModule extends CanvasModuleBase {
           return;
         }
 
-        // event.status is 'failed', 'canceled' or 'completed' - something has gone awry
-        _clearTimeout();
-        clearListeners();
-
         if (event.status === 'completed') {
           /**
            * The invocation_complete event should have been received before the queue item completed event, and the
@@ -342,9 +338,16 @@ export class CanvasStateApiModule extends CanvasModuleBase {
            *
            * For now, we'll just log a warning instead of rejecting the promise. This should be super rare anyways.
            */
-          this.log.warn('Queue item completed without output node completion event');
           // reject(new Error('Queue item completed without output node completion event'));
-        } else if (event.status === 'failed') {
+          this.log.warn('Queue item completed without output node completion event');
+          return;
+        }
+
+        // event.status is 'failed', 'canceled' - something has gone awry
+        _clearTimeout();
+        clearListeners();
+
+        if (event.status === 'failed') {
           // We expect the event to have error details, but technically it's possible that it doesn't
           const { error_type, error_message, error_traceback } = event;
           if (error_type && error_message && error_traceback) {
