@@ -33,7 +33,7 @@ const GalleryPanelContent = () => {
     () => ({
       id: 'boards-list-panel',
       minSize: 128,
-      defaultSize: 208,
+      defaultSize: 256,
       imperativePanelGroupRef,
       panelGroupDirection: 'vertical',
     }),
