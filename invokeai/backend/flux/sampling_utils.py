@@ -92,7 +92,9 @@ def clip_timestep_schedule(timesteps: list[float], denoising_start: float, denoi
     t_start_idx = _find_last_index_ge_val(timesteps, t_start_val)
     t_end_idx = _find_last_index_ge_val(timesteps, t_end_val)
 
-    clipped_timesteps = timesteps[t_start_idx : t_end_idx + 1]
+    # TODO(ryand): Make fractional cutoffs optional and apply to both the start and end.
+    clipped_timesteps = timesteps[t_start_idx + 1 : t_end_idx + 1]
+    clipped_timesteps = [t_start_val] + clipped_timesteps
 
     return clipped_timesteps
 

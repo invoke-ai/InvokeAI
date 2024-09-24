@@ -143,7 +143,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         # Clip the timesteps schedule based on denoising_start and denoising_end.
-        timesteps = clip_timestep_schedule(timesteps, self.denoising_start, self.denoising_end)
+        # HACK(ryand): This should be applied in the frontend.
+        denoising_start = 1.0 - (1.0 - self.denoising_start) ** 0.2
+        timesteps = clip_timestep_schedule(timesteps, denoising_start, self.denoising_end)
 
         # Prepare input latent image.
         if init_latents is not None:
@@ -193,7 +195,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             traj_guidance_extension = TrajectoryGuidanceExtension(
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,
-                trajectory_guidance_strength=self.trajectory_guidance_strength,
+                # HACK(ryand): This should not be hardcoded.
+                trajectory_guidance_strength=0,
             )
 
         with (
