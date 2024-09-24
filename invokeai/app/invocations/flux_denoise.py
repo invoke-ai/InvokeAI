@@ -43,7 +43,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="2.1.0",
+    version="3.0.0",
     classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -68,12 +68,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.denoising_start,
     )
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
-    trajectory_guidance_strength: float = InputField(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        description="Value indicating how strongly to guide the denoising process towards the initial latents (during image-to-image). Range [0, 1]. A value of 0.0 is equivalent to vanilla image-to-image. A value of 1.0 will guide the denoising process very close to the original latents.",
-    )
     transformer: TransformerField = InputField(
         description=FieldDescriptions.flux_model,
         input=Input.Connection,
@@ -193,7 +187,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             traj_guidance_extension = TrajectoryGuidanceExtension(
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,
-                trajectory_guidance_strength=self.trajectory_guidance_strength,
             )
 
         with (
