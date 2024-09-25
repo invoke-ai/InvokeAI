@@ -4345,7 +4345,7 @@ export type components = {
         };
         /**
          * Core Metadata
-         * @description Collects core generation metadata into a MetadataField
+         * @description Used internally by Invoke to collect metadata for generations.
          */
         CoreMetadataInvocation: {
             /**
@@ -6340,12 +6340,6 @@ export type components = {
              * @default 1
              */
             denoising_end?: number;
-            /**
-             * Trajectory Guidance Strength
-             * @description Value indicating how strongly to guide the denoising process towards the initial latents (during image-to-image). Range [0, 1]. A value of 0.0 is equivalent to vanilla image-to-image. A value of 1.0 will guide the denoising process very close to the original latents.
-             * @default 0
-             */
-            trajectory_guidance_strength?: number;
             /**
              * Transformer
              * @description Flux model (Transformer) to load
