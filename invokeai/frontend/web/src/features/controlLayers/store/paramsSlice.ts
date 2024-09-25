@@ -86,7 +86,7 @@ const initialState: ParamsState = {
   img2imgStrength: 0.75,
   optimizedDenoisingEnabled: true,
   iterations: 1,
-  scheduler: 'euler',
+  scheduler: 'dpmpp_3m_k',
   seed: 0,
   shouldRandomizeSeed: true,
   steps: 30,
