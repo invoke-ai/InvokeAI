@@ -10,11 +10,14 @@ import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageVi
 import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
+import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import { $workflowLibraryModal } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getImageDTO, getImageMetadata } from 'services/api/endpoints/images';
+import { getStylePreset } from 'services/api/endpoints/stylePresets';
 
 type _StudioInitAction<T extends string, U> = { type: T; data: U };
 
@@ -36,19 +39,20 @@ export type StudioInitAction =
 
 export const useStudioInitAction = (action?: StudioInitAction) => {
   useAssertSingleton('useStudioInitAction');
+  const { t } = useTranslation();
   const didUseRef = useRef(false);
   const store = useAppStore();
   const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
 
-  /**
-   * Sends the image to the canvas.
-   */
   const handleSendToCanvas = useCallback(
     async (imageName: string) => {
       // Try to the image DTO
       const getImageDTOResult = await withResultAsync(() => getImageDTO(imageName));
       if (getImageDTOResult.isErr()) {
-        // TODO(psyche): show a toast
+        toast({
+          title: t('toast.unableToLoadImage'),
+          status: 'error',
+        });
         return;
       }
       const imageDTO = getImageDTOResult.value;
@@ -62,72 +66,95 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       store.dispatch(setActiveTab('canvas'));
       store.dispatch(sentImageToCanvas());
       $imageViewer.set(false);
-      // TODO(psyche): show a toast
+      toast({
+        title: t('toast.sentToCanvas'),
+        status: 'info',
+      });
     },
-    [store]
+    [store, t]
   );
 
   const handleUseAllMetadata = useCallback(
     async (imageName: string) => {
       const getImageMetadataResult = await withResultAsync(() => getImageMetadata(imageName));
       if (getImageMetadataResult.isErr()) {
-        // TODO(psyche): show a toast
+        toast({
+          title: t('toast.unableToLoadImageMetadata'),
+          status: 'error',
+        });
         return;
       }
       const metadata = getImageMetadataResult.value;
-      parseAndRecallAllMetadata(metadata, true); // this shows a toast
+      // This shows a toast
+      parseAndRecallAllMetadata(metadata, true);
       store.dispatch(setActiveTab('canvas'));
     },
-    [store]
+    [store, t]
   );
 
   const handleLoadWorkflow = useCallback(
     (workflowId: string) => {
+      // This shows a toast
       getAndLoadWorkflow(workflowId);
       store.dispatch(setActiveTab('workflows'));
-      // TODO(psyche): show a toast
     },
     [getAndLoadWorkflow, store]
   );
 
   const handleSelectStylePreset = useCallback(
-    (stylePresetId: string) => {
+    async (stylePresetId: string) => {
+      const getStylePresetResult = await withResultAsync(() => getStylePreset(stylePresetId));
+      if (getStylePresetResult.isErr()) {
+        toast({
+          title: t('toast.unableToLoadStylePreset'),
+          status: 'error',
+        });
+        return;
+      }
       store.dispatch(activeStylePresetIdChanged(stylePresetId));
       store.dispatch(setActiveTab('canvas'));
-      // TODO(psyche): show a toast
+      toast({
+        title: t('toast.stylePresetLoaded'),
+        status: 'info',
+      });
     },
-    [store]
+    [store, t]
   );
 
   const handleGoToDestination = useCallback(
     (destination: StudioDestinationAction['data']['destination']) => {
       switch (destination) {
         case 'generation':
+          // Go to the canvas tab, open the image viewer, and enable send-to-gallery mode
           store.dispatch(setActiveTab('canvas'));
           store.dispatch(settingsSendToCanvasChanged(false));
           $imageViewer.set(true);
           break;
         case 'canvas':
+          // Go to the canvas tab, close the image viewer, and disable send-to-gallery mode
           store.dispatch(setActiveTab('canvas'));
           store.dispatch(settingsSendToCanvasChanged(true));
           $imageViewer.set(false);
           break;
         case 'workflows':
+          // Go to the workflows tab
           store.dispatch(setActiveTab('workflows'));
           break;
         case 'upscaling':
+          // Go to the upscaling tab
           store.dispatch(setActiveTab('upscaling'));
           break;
         case 'viewAllWorkflows':
+          // Go to the workflows tab and open the workflow library modal
           store.dispatch(setActiveTab('workflows'));
           $workflowLibraryModal.set(true);
           break;
         case 'viewAllStylePresets':
+          // Go to the canvas tab and open the style presets menu
           store.dispatch(setActiveTab('canvas'));
           $isStylePresetsMenuOpen.set(true);
           break;
       }
-      // TODO(psyche): show a toast?
     },
     [store]
   );
