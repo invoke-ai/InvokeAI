@@ -59,6 +59,9 @@ class TrajectoryGuidanceExtension:
         #
         # We experimented with a number of related guidance strategies, but not exhaustively. It's entirely possible
         # that there's a much better way to do this.
+        #
+        # Update: This decision was made when we were relying more heavily on this guidance strategy. Now that it is
+        # only really applied to the inpaint gradient regions, this decision could be re-visited.
 
         # Calculate noise guidance
         # What noise should the model have predicted at this timestep to step towards self._init_latents?
