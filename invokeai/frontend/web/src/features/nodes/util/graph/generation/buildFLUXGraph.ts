@@ -128,7 +128,7 @@ export const buildFLUXGraph = async (
     // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
     // more user-friendly for FLUX. Without this, most of the 'change' is concentrated in the high denoise strength
     // range (>0.9).
-    denoisingStart = 1 - (img2imgStrength ** 0.2);
+    denoisingStart = 1 - img2imgStrength ** 0.2;
   } else {
     denoisingStart = 1 - img2imgStrength;
   }
