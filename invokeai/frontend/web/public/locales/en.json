@@ -662,7 +662,8 @@
         "Threshold": "Noise Threshold",
         "vae": "VAE",
         "width": "Width",
-        "workflow": "Workflow"
+        "workflow": "Workflow",
+        "canvasV2Metadata": "Canvas"
     },
     "modelManager": {
         "active": "active",
