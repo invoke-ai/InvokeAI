@@ -37,16 +37,27 @@ export type StudioInitAction =
   | UseAllParametersAction
   | StudioDestinationAction;
 
+/**
+ * A hook that performs an action when the studio is initialized. This is useful for deep linking into the studio.
+ *
+ * The action is performed only once, when the hook is first run.
+ *
+ * In this hook, we prefer to use imperative APIs over hooks to avoid re-rendering the parent component. For example:
+ * - Use `getImageDTO` helper instead of `useGetImageDTO`
+ * - Usee the `$imageViewer` atom instead of `useImageViewer`
+ */
 export const useStudioInitAction = (action?: StudioInitAction) => {
   useAssertSingleton('useStudioInitAction');
   const { t } = useTranslation();
-  const didUseRef = useRef(false);
+  // Use a ref to ensure that we only perform the action once
+  const didInit = useRef(false);
   const store = useAppStore();
   const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
 
   const handleSendToCanvas = useCallback(
     async (imageName: string) => {
-      // Try to the image DTO
+      // Try to the image DTO - use an imperative helper, rather than `useGetImageDTO`, so that we aren't re-rendering
+      // the parent of this hook whenever the image name changes
       const getImageDTOResult = await withResultAsync(() => getImageDTO(imageName));
       if (getImageDTOResult.isErr()) {
         toast({
@@ -76,6 +87,8 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
 
   const handleUseAllMetadata = useCallback(
     async (imageName: string) => {
+      // Try to the image metadata - use an imperative helper, rather than `useGetImageMetadata`, so that we aren't
+      // re-rendering the parent of this hook whenever the image name changes
       const getImageMetadataResult = await withResultAsync(() => getImageMetadata(imageName));
       if (getImageMetadataResult.isErr()) {
         toast({
@@ -160,11 +173,11 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
   );
 
   useEffect(() => {
-    if (didUseRef.current || !action) {
+    if (didInit.current || !action) {
       return;
     }
 
-    didUseRef.current = true;
+    didInit.current = true;
 
     switch (action.type) {
       case 'loadWorkflow':
