@@ -1,7 +1,7 @@
 import 'i18n';
 
 import type { Middleware } from '@reduxjs/toolkit';
-import type { StudioDestination } from 'app/hooks/useHandleStudioDestination';
+import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
@@ -19,7 +19,6 @@ import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
 import AppDndContext from 'features/dnd/components/AppDndContext';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
-import type { UsePreselectedImageArg } from 'features/parameters/hooks/usePreselectedImage';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
@@ -41,10 +40,7 @@ interface Props extends PropsWithChildren {
   projectName?: string;
   projectUrl?: string;
   queueId?: string;
-  selectedImage?: UsePreselectedImageArg;
-  selectedWorkflowId?: string;
-  selectedStylePresetId?: string;
-  studioDestination?: StudioDestination;
+  studioInitAction?: StudioInitAction;
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
@@ -63,10 +59,7 @@ const InvokeAIUI = ({
   projectName,
   projectUrl,
   queueId,
-  selectedImage,
-  selectedWorkflowId,
-  selectedStylePresetId,
-  studioDestination,
+  studioInitAction,
   customStarUi,
   socketOptions,
   isDebugging = false,
@@ -223,13 +216,7 @@ const InvokeAIUI = ({
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
-              <App
-                config={config}
-                selectedImage={selectedImage}
-                selectedWorkflowId={selectedWorkflowId}
-                selectedStylePresetId={selectedStylePresetId}
-                studioDestination={studioDestination}
-              />
+              <App config={config} studioInitAction={studioInitAction} />
             </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>
