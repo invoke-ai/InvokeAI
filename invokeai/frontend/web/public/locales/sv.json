@@ -13,7 +13,6 @@
         "githubLabel": "Github",
         "discordLabel": "Discord",
         "settingsLabel": "Inställningar",
-        "unifiedCanvas": "Förenad kanvas",
         "upload": "Ladda upp",
         "cancel": "Avbryt",
         "accept": "Acceptera",
@@ -29,7 +28,6 @@
     },
     "gallery": {
         "galleryImageSize": "Bildstorlek",
-        "loadMore": "Ladda mer",
         "gallerySettings": "Galleriinställningar",
         "noImagesInGallery": "Inga bilder i galleriet",
         "autoSwitchNewImages": "Ändra automatiskt till nya bilder"
