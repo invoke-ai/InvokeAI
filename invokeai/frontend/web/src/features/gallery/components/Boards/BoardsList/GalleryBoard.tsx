@@ -128,7 +128,6 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               coverImageName={board.cover_image_name}
             />
           }
-          openDelay={500}
           placement="left"
           closeOnScroll
         >
