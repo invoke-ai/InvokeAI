@@ -71,13 +71,14 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
           })
         );
       } else {
-        // Else just select the image
+        // Else just select the image, no need to switch boards
         dispatch(imageSelected(imageDTO));
+
         if (galleryView !== 'images') {
-          // We also need to update the gallery view to images
+          // We also need to update the gallery view to images. This also updates the offset.
           dispatch(galleryViewChanged('images'));
         } else if (offset > 0) {
-          // If we are not at the start of the gallery, reset the offset
+          // If we are not at the start of the gallery, reset the offset.
           dispatch(offsetChanged({ offset: 0 }));
         }
       }
