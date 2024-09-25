@@ -43,7 +43,7 @@ const initialConfigState: AppConfig = {
     boundingBoxHeight: { ...baseDimensionConfig },
     scaledBoundingBoxWidth: { ...baseDimensionConfig },
     scaledBoundingBoxHeight: { ...baseDimensionConfig },
-    scheduler: 'euler',
+    scheduler: 'dpmpp_3m_k',
     vaePrecision: 'fp32',
     steps: {
       initial: 30,

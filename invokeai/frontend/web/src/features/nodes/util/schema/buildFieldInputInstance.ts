@@ -13,7 +13,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   LoRAModelField: undefined,
   ModelIdentifierField: undefined,
   MainModelField: undefined,
-  SchedulerField: 'euler',
+  SchedulerField: 'dpmpp_3m_k',
   SDXLMainModelField: undefined,
   FluxMainModelField: undefined,
   SDXLRefinerModelField: undefined,
