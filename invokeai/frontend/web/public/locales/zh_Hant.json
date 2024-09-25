@@ -12,7 +12,6 @@
         "githubLabel": "GitHub",
         "hotkeysLabel": "快捷鍵",
         "languagePickerLabel": "語言",
-        "unifiedCanvas": "統一畫布",
         "cancel": "取消",
         "txt2img": "文字轉圖片",
         "controlNet": "ControlNet",
@@ -40,7 +39,6 @@
         "nextImage": "下一張圖片",
         "previousImage": "上一張圖片",
         "menu": "選單",
-        "loadMore": "載入更多",
         "about": "關於",
         "createIssue": "建立問題",
         "resetUI": "$t(accessibility.reset) 介面",
@@ -164,18 +162,6 @@
             "heading": "步數"
         }
     },
-    "unifiedCanvas": {
-        "undo": "復原",
-        "mask": "遮罩",
-        "eraser": "橡皮擦",
-        "antialiasing": "抗鋸齒",
-        "redo": "重做",
-        "layer": "圖層",
-        "accept": "接受",
-        "brush": "刷子",
-        "move": "移動",
-        "brushSize": "大小"
-    },
     "nodes": {
         "workflowName": "名稱",
         "notes": "註釋",
@@ -210,7 +196,6 @@
     "ui": {
         "tabs": {
             "models": "模型",
-            "queueTab": "$t(ui.tabs.queue) $t(common.tab)",
             "queue": "佇列"
         }
     },

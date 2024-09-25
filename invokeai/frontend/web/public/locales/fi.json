@@ -24,14 +24,12 @@
         "back": "Takaisin",
         "statusDisconnected": "Yhteys katkaistu",
         "loading": "Ladataan",
-        "txt2img": "Teksti kuvaksi",
-        "unifiedCanvas": "Yhdistetty kanvas"
+        "txt2img": "Teksti kuvaksi"
     },
     "gallery": {
         "galleryImageSize": "Kuvan koko",
         "gallerySettings": "Gallerian asetukset",
         "autoSwitchNewImages": "Vaihda uusiin kuviin automaattisesti",
-        "noImagesInGallery": "Ei kuvia galleriassa",
-        "loadMore": "Lataa lisää"
+        "noImagesInGallery": "Ei kuvia galleriassa"
     }
 }

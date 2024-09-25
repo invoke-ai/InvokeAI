@@ -11,7 +11,6 @@
         "mode": "Kip",
         "resetUI": "$t(accessibility.reset)Arayüz",
         "showGalleryPanel": "Galeri Panelini Göster",
-        "loadMore": "Daha Getir",
         "createIssue": "Sorun Bildir"
     },
     "common": {
@@ -26,7 +25,6 @@
         "linear": "Doğrusal",
         "nodes": "İş Akışı Düzenleyici",
         "postprocessing": "Rötuş",
-        "unifiedCanvas": "Tuval",
         "batch": "Toplu İş Yöneticisi",
         "accept": "Onayla",
         "cancel": "Vazgeç",
@@ -52,7 +50,6 @@
         "outpaint": "dışboyama",
         "outputs": "Çıktılar",
         "learnMore": "Bilgi Edin",
-        "nodeEditor": "Çizge Düzenleyici",
         "save": "Kaydet",
         "random": "Rastgele",
         "simple": "Basit",
@@ -206,11 +203,9 @@
         "starImage": "Yıldız Koy",
         "download": "İndir",
         "deleteSelection": "Seçileni Sil",
-        "problemDeletingImages": "Görsel Silmede Sorun",
         "featuresWillReset": "Bu görseli silerseniz, o özellikler resetlenecektir.",
         "noImageSelected": "Görsel Seçilmedi",
         "unstarImage": "Yıldızı Kaldır",
-        "problemDeletingImagesDesc": "Bir ya da daha çok görsel silinemedi",
         "gallerySettings": "Galeri Düzeni",
         "image": "görsel",
         "galleryImageSize": "Görsel Boyutu",
@@ -220,8 +215,6 @@
         "currentlyInUse": "Bu görsel şurada kullanımda:",
         "deleteImage_one": "Görseli Sil",
         "deleteImage_other": "",
-        "loadMore": "Daha Getir",
-        "setCurrentImage": "Çalışma Görseli Yap",
         "unableToLoad": "Galeri Yüklenemedi",
         "downloadSelection": "Seçileni İndir",
         "dropOrUpload": "$t(gallery.drop) ya da Yükle",
@@ -242,10 +235,6 @@
         "noHotkeysFound": "Kısayol Tuşu Bulanamadı",
         "searchHotkeys": "Kısayol Tuşlarında Ara",
         "clearSearch": "Aramayı Sil"
-    },
-    "unifiedCanvas": {
-        "accept": "Onayla",
-        "clearCanvasHistoryMessage": "Tuval geçmişini silmek tuvale dokunmaz, ancak yineleme ve geri alma geçmişini geri dönülemez bir biçimde siler."
     },
     "nodes": {
         "unableToValidateWorkflow": "İş Akışı Doğrulanamadı",
@@ -303,15 +292,9 @@
         "workflowSaved": "İş Akışı Kaydedildi"
     },
     "toast": {
-        "problemDownloadingCanvasDesc": "Taban katman indirilemedi",
-        "problemSavingMaskDesc": "Maske kaydedilemedi",
-        "problemSavingCanvasDesc": "Taban katman kaydedilemedi",
         "problemRetrievingWorkflow": "İş Akışını Getirmede Sorun",
         "workflowDeleted": "İş Akışı Silindi",
         "loadedWithWarnings": "İş Akışı Yüklendi Ancak Uyarılar Var",
-        "problemImportingMaskDesc": "Maske aktarılamadı",
-        "problemMergingCanvasDesc": "Taban katman aktarılamadı",
-        "problemCopyingCanvasDesc": "Taban katman aktarılamadı",
         "workflowLoaded": "İş Akışı Yüklendi",
         "problemDeletingWorkflow": "İş Akışını Silmede Sorun"
     },
@@ -319,7 +302,6 @@
         "invoke": {
             "noPrompts": "İstem oluşturulmadı",
             "noModelSelected": "Model seçilmedi",
-            "incompatibleBaseModelForControlAdapter": "{{number}}. yönetim aracı, ana model ile uyumlu değil.",
             "systemDisconnected": "Sistem bağlantısı kesildi",
             "invoke": "Invoke"
         },
@@ -385,9 +367,7 @@
         "vaePrecision": "VAE Kesinliği",
         "convertToDiffusersHelpText6": "Bu modeli dönüştürmek istiyor musunuz?",
         "deleteMsg1": "Bu modeli InvokeAI'dan silmek istediğinize emin misiniz?",
-        "modelSyncFailed": "Modeller Senkronize Edilemedi",
         "settings": "Seçenekler",
-        "v2_768": "v2 (768pks)",
         "vae": "VAE",
         "width": "En",
         "delete": "Sil",
@@ -410,22 +390,15 @@
         "deleteMsg2": "Model InvokeAI ana klasöründeyse bilgisayarınızdan silinir, bu klasör dışındaysa bilgisayarınızdan silinmeyecektir.",
         "load": "Yükle",
         "modelDeleteFailed": "Model kaldırılamadı",
-        "modelsSynced": "Modeller Senkronize Edildi",
         "noModelSelected": "Model Seçilmedi",
         "predictionType": "Saptama Türü",
         "selectModel": "Model Seç",
-        "v2_base": "v2 (512pks)",
         "modelConversionFailed": "Model Dönüşümü Başarısız",
         "modelConverted": "Model Dönüştürüldü",
         "description": "Tanım"
     },
-    "dynamicPrompts": {
-        "promptsWithCount_one": "{{count}} İstem",
-        "promptsWithCount_other": "{{count}} İstem"
-    },
     "models": {
         "addLora": "LoRA Ekle",
-        "esrganModel": "ESRGAN Modeli",
         "defaultVAE": "Varsayılan VAE",
         "lora": "LoRA",
         "noModelsAvailable": "Model yok",
