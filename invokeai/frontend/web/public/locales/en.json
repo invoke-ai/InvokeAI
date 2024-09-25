@@ -1012,7 +1012,7 @@
         "strength": "Strength",
         "symmetry": "Symmetry",
         "tileSize": "Tile Size",
-        "optimizedInpainting": "Optimized Inpainting",
+        "optimizedImageToImage": "Optimized Image-to-Image",
         "type": "Type",
         "postProcessing": "Post-Processing (Shift + U)",
         "processImage": "Process Image",
@@ -1489,9 +1489,9 @@
             ]
         },
         "optimizedDenoising": {
-            "heading": "Optimized Inpainting",
+            "heading": "Optimized Image-to-Image",
             "paragraphs": [
-                "Enable optimized denoising for enhanced inpainting transformations with Flux models. This setting improves detail and clarity during generation, but may be turned off to preserve more of your original image. This setting is still being tuned and is in beta status."
+                "Enable optimized image-to-image for enhanced image-to-image and inpainting transformations with Flux models. This setting improves detail and clarity during generation, but may be turned off to preserve more of your original image. This setting is still being tuned and is in beta status."
             ]
         }
     },
