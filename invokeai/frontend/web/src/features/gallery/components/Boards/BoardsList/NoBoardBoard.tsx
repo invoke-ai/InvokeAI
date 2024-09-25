@@ -60,7 +60,6 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
           label={
             <BoardTooltip imageCount={data?.image_count ?? 0} assetCount={data?.asset_count ?? 0} isArchived={false} />
           }
-          openDelay={500}
           placement="left"
           closeOnScroll
         >
