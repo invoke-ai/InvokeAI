@@ -14,9 +14,9 @@ const ParamCanvasCoherenceMode = () => {
 
   const options = useMemo<ComboboxOption[]>(
     () => [
-      { label: t('unifiedCanvas.coherenceModeGaussianBlur'), value: 'Gaussian Blur' },
-      { label: t('unifiedCanvas.coherenceModeBoxBlur'), value: 'Box Blur' },
-      { label: t('unifiedCanvas.coherenceModeStaged'), value: 'Staged' },
+      { label: t('parameters.gaussianBlur'), value: 'Gaussian Blur' },
+      { label: t('parameters.boxBlur'), value: 'Box Blur' },
+      { label: t('parameters.staged'), value: 'Staged' },
     ],
     [t]
   );

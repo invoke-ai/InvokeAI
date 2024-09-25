@@ -3,6 +3,7 @@
 # Note: Must be run from invokeai/frontend/web/scripts directory
 #
 # After running the script, open `en.json` and check for empty objects (`{}`) and remove them manually.
+# Also, the script does not handle keys with underscores. They need to be checked manually.
 
 import json
 import os

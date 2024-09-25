@@ -26,7 +26,7 @@ export const CanvasSettingsInvertScrollCheckbox = memo(() => {
   );
   return (
     <FormControl w="full">
-      <FormLabel flexGrow={1}>{t('unifiedCanvas.invertBrushSizeScrollDirection')}</FormLabel>
+      <FormLabel flexGrow={1}>{t('controlLayers.settings.invertBrushSizeScrollDirection')}</FormLabel>
       <Checkbox isChecked={invertScrollForToolWidth} onChange={onChange} />
     </FormControl>
   );
