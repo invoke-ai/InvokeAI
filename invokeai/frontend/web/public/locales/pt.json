@@ -169,10 +169,28 @@
     },
     "accessibility": {
         "invokeProgressBar": "Invocar barra de progresso",
-        "reset": "Repôr",
+        "reset": "Reiniciar",
         "nextImage": "Próxima imagem",
         "showOptionsPanel": "Mostrar painel de opções",
         "uploadImage": "Enviar imagem",
-        "previousImage": "Imagem anterior"
+        "previousImage": "Imagem Anterior",
+        "menu": "Menu",
+        "about": "Sobre",
+        "resetUI": "$t(accessibility.reset)UI",
+        "createIssue": "Reportar Problema",
+        "submitSupportTicket": "Submeter um ticket de Suporte",
+        "mode": "Modo",
+        "showGalleryPanel": "Mostrar Painel de Galeria",
+        "loadMore": "Carregar Mais"
+    },
+    "boards": {
+        "selectedForAutoAdd": "Selecionado para Auto-Adicionar",
+        "addBoard": "Adicionar Quadro",
+        "addPrivateBoard": "Adicionar Quadro privado",
+        "addSharedBoard": "Adicionar quadro Compartilhado",
+        "boards": "Quadros",
+        "autoAddBoard": "Auto-adicao de Quadro",
+        "archiveBoard": "Arquivar Quadro",
+        "archived": "Arquivado"
     }
 }
