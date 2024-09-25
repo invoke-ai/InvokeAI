@@ -119,7 +119,18 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   return (
     <BoardContextMenu board={board}>
       {(ref) => (
-        <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll p={2}>
+        <Tooltip
+          label={
+            <BoardTooltip
+              imageCount={board.image_count}
+              assetCount={board.asset_count}
+              isArchived={board.archived}
+              coverImageName={board.cover_image_name}
+            />
+          }
+          placement="left"
+          closeOnScroll
+        >
           <Flex
             position="relative"
             ref={ref}
@@ -167,7 +178,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
             </Editable>
             {autoAddBoardId === board.board_id && !editingDisclosure.isOpen && <AutoAddBadge />}
             {board.archived && !editingDisclosure.isOpen && <Icon as={PiArchiveBold} fill="base.300" />}
-            {!editingDisclosure.isOpen && <Text variant="subtext">{board.image_count}</Text>}
+            {!editingDisclosure.isOpen && <Text variant="subtext">{board.image_count + board.asset_count}</Text>}
 
             <IAIDroppable data={droppableData} dropLabel={t('unifiedCanvas.move')} />
           </Flex>

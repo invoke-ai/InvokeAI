@@ -14,7 +14,7 @@ import {
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
+import { useGetUncategorizedImageCountsQuery } from 'services/api/endpoints/boards';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 interface Props {
@@ -27,11 +27,7 @@ const _hover: SystemStyleObject = {
 
 const NoBoardBoard = memo(({ isSelected }: Props) => {
   const dispatch = useAppDispatch();
-  const { imagesTotal } = useGetBoardImagesTotalQuery('none', {
-    selectFromResult: ({ data }) => {
-      return { imagesTotal: data?.total ?? 0 };
-    },
-  });
+  const { data } = useGetUncategorizedImageCountsQuery();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const boardSearchText = useAppSelector(selectBoardSearchText);
@@ -60,7 +56,13 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   return (
     <NoBoardBoardContextMenu>
       {(ref) => (
-        <Tooltip label={<BoardTooltip board={null} />} openDelay={1000} placement="left" closeOnScroll>
+        <Tooltip
+          label={
+            <BoardTooltip imageCount={data?.image_count ?? 0} assetCount={data?.asset_count ?? 0} isArchived={false} />
+          }
+          placement="left"
+          closeOnScroll
+        >
           <Flex
             position="relative"
             ref={ref}
@@ -91,7 +93,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               {boardName}
             </Text>
             {autoAddBoardId === 'none' && <AutoAddBadge />}
-            <Text variant="subtext">{imagesTotal}</Text>
+            <Text variant="subtext">{(data?.image_count ?? 0) + (data?.asset_count ?? 0)}</Text>
             <IAIDroppable data={droppableData} dropLabel={t('unifiedCanvas.move')} />
           </Flex>
         </Tooltip>

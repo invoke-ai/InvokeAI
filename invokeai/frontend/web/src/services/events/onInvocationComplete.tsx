@@ -6,7 +6,6 @@ import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagi
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
@@ -30,13 +29,6 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
     if (imageDTO.is_intermediate) {
       return;
     }
-
-    // update the total images for the board
-    dispatch(
-      boardsApi.util.updateQueryData('getBoardImagesTotal', imageDTO.board_id ?? 'none', (draft) => {
-        draft.total += 1;
-      })
-    );
 
     dispatch(
       imagesApi.util.invalidateTags([

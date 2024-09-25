@@ -785,6 +785,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/boards/uncategorized/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Uncategorized Image Counts
+         * @description Gets count of images and assets for uncategorized images (images with no board assocation)
+         */
+        get: operations["get_uncategorized_image_counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/board_images/": {
         parameters: {
             query?: never;
@@ -1973,7 +1993,7 @@ export type components = {
         };
         /**
          * BoardDTO
-         * @description Deserialized board record with cover image URL and image count.
+         * @description Deserialized board record.
          */
         BoardDTO: {
             /**
@@ -2003,9 +2023,9 @@ export type components = {
             deleted_at?: string | null;
             /**
              * Cover Image Name
-             * @description The name of the board's cover image.
+             * @description The name of the cover image of the board.
              */
-            cover_image_name: string | null;
+            cover_image_name?: string | null;
             /**
              * Archived
              * @description Whether or not the board is archived.
@@ -2021,6 +2041,11 @@ export type components = {
              * @description The number of images in the board.
              */
             image_count: number;
+            /**
+             * Asset Count
+             * @description The number of assets in the board.
+             */
+            asset_count: number;
         };
         /**
          * BoardField
@@ -4345,7 +4370,7 @@ export type components = {
         };
         /**
          * Core Metadata
-         * @description Collects core generation metadata into a MetadataField
+         * @description Used internally by Invoke to collect metadata for generations.
          */
         CoreMetadataInvocation: {
             /**
@@ -16391,6 +16416,19 @@ export type components = {
              */
             type: "url";
         };
+        /** UncategorizedImageCounts */
+        UncategorizedImageCounts: {
+            /**
+             * Image Count
+             * @description The number of uncategorized images.
+             */
+            image_count: number;
+            /**
+             * Asset Count
+             * @description The number of uncategorized assets.
+             */
+            asset_count: number;
+        };
         /**
          * Unsharp Mask
          * @description Applies an unsharp mask filter to an image
@@ -18841,6 +18879,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_uncategorized_image_counts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UncategorizedImageCounts"];
                 };
             };
         };

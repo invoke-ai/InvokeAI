@@ -1,27 +1,23 @@
 import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetBoardAssetsTotalQuery, useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import type { BoardDTO } from 'services/api/types';
 
 type Props = {
-  board: BoardDTO | null;
+  imageCount: number;
+  assetCount: number;
+  isArchived: boolean;
+  coverImageName?: string | null;
 };
 
-export const BoardTooltip = ({ board }: Props) => {
+export const BoardTooltip = ({ imageCount, assetCount, isArchived, coverImageName }: Props) => {
   const { t } = useTranslation();
-  const { imagesTotal } = useGetBoardImagesTotalQuery(board?.board_id || 'none', {
-    selectFromResult: ({ data }) => {
-      return { imagesTotal: data?.total ?? 0 };
-    },
-  });
-  const { assetsTotal } = useGetBoardAssetsTotalQuery(board?.board_id || 'none', {
-    selectFromResult: ({ data }) => {
-      return { assetsTotal: data?.total ?? 0 };
-    },
-  });
-  const { currentData: coverImage } = useGetImageDTOQuery(board?.cover_image_name ?? skipToken);
+  const { currentData: coverImage } = useGetImageDTOQuery(coverImageName ?? skipToken);
+
+  const totalString = useMemo(() => {
+    return `${t('boards.imagesWithCount', { count: imageCount })}, ${t('boards.assetsWithCount', { count: assetCount })}${isArchived ? ` (${t('boards.archived')})` : ''}`;
+  }, [assetCount, imageCount, isArchived, t]);
 
   return (
     <Flex flexDir="column" alignItems="center" gap={1}>
@@ -34,13 +30,11 @@ export const BoardTooltip = ({ board }: Props) => {
           aspectRatio="1/1"
           borderRadius="base"
           borderBottomRadius="lg"
+          mt={1}
         />
       )}
       <Flex flexDir="column" alignItems="center">
-        <Text noOfLines={1}>
-          {t('boards.imagesWithCount', { count: imagesTotal })}, {t('boards.assetsWithCount', { count: assetsTotal })}
-        </Text>
-        {board?.archived && <Text>({t('boards.archived')})</Text>}
+        <Text noOfLines={1}>{totalString}</Text>
       </Flex>
     </Flex>
   );
