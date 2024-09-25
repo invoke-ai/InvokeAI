@@ -51,7 +51,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
       ])
     );
 
-    const { shouldAutoSwitch, selectedBoardId } = getState().gallery;
+    const { shouldAutoSwitch, selectedBoardId, galleryView, offset } = getState().gallery;
 
     // If auto-switch is enabled, select the new image
     if (shouldAutoSwitch) {
@@ -73,11 +73,14 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
       } else {
         // Else just select the image
         dispatch(imageSelected(imageDTO));
+        if (galleryView !== 'images') {
+          // We also need to update the gallery view to images
+          dispatch(galleryViewChanged('images'));
+        } else if (offset > 0) {
+          // If we are not at the start of the gallery, reset the offset
+          dispatch(offsetChanged({ offset: 0 }));
+        }
       }
-
-      // We also need to update the gallery view to images and reset the offset to 0
-      dispatch(galleryViewChanged('images'));
-      dispatch(offsetChanged({ offset: 0 }));
     }
   };
 
