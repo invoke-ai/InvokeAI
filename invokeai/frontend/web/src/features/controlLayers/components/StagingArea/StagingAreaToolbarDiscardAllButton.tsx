@@ -15,8 +15,8 @@ export const StagingAreaToolbarDiscardAllButton = memo(() => {
 
   return (
     <IconButton
-      tooltip={`${t('unifiedCanvas.discardAll')} (Esc)`}
-      aria-label={t('unifiedCanvas.discardAll')}
+      tooltip={`${t('controlLayers.stagingArea.discardAll')} (Esc)`}
+      aria-label={t('controlLayers.stagingArea.discardAll')}
       icon={<PiTrashSimpleBold />}
       onClick={discardAll}
       colorScheme="error"

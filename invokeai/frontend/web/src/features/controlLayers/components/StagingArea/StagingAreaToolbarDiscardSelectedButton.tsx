@@ -32,8 +32,8 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(() => {
 
   return (
     <IconButton
-      tooltip={`${t('unifiedCanvas.discardCurrent')}`}
-      aria-label={t('unifiedCanvas.discardCurrent')}
+      tooltip={t('controlLayers.stagingArea.discard')}
+      aria-label={t('controlLayers.stagingArea.discard')}
       icon={<PiXBold />}
       onClick={discardSelected}
       colorScheme="invokeBlue"
