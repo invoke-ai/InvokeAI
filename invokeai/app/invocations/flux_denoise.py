@@ -194,6 +194,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,
                 trajectory_guidance_strength=self.trajectory_guidance_strength,
+                noise=noise,
             )
 
         with (
