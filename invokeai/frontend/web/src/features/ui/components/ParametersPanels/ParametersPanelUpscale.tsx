@@ -7,7 +7,7 @@ import { GenerationSettingsAccordion } from 'features/settingsAccordions/compone
 import { UpscaleSettingsAccordion } from 'features/settingsAccordions/components/UpscaleSettingsAccordion/UpscaleSettingsAccordion';
 import { StylePresetMenu } from 'features/stylePresets/components/StylePresetMenu';
 import { StylePresetMenuTrigger } from 'features/stylePresets/components/StylePresetMenuTrigger';
-import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
+import { $isStylePresetsMenuOpen } from 'features/stylePresets/store/stylePresetSlice';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
@@ -18,14 +18,14 @@ const overlayScrollbarsStyles: CSSProperties = {
 };
 
 const ParametersPanelUpscale = () => {
-  const isMenuOpen = useStore($isMenuOpen);
+  const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
   return (
     <Flex w="full" h="full" flexDir="column" gap={2}>
       <StylePresetMenuTrigger />
       <Flex w="full" h="full" position="relative">
         <Box position="absolute" top={0} left={0} right={0} bottom={0}>
-          {isMenuOpen && (
+          {isStylePresetsMenuOpen && (
             <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
               <Flex gap={2} flexDirection="column" h="full" w="full">
                 <StylePresetMenu />

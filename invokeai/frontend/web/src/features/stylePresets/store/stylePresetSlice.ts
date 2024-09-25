@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { atom } from 'nanostores';
 import { stylePresetsApi } from 'services/api/endpoints/stylePresets';
 
 import type { StylePresetState } from './types';
@@ -73,3 +74,8 @@ export const selectStylePresetActivePresetId = createStylePresetSelector(
 );
 export const selectStylePresetViewMode = createStylePresetSelector((stylePreset) => stylePreset.viewMode);
 export const selectStylePresetSearchTerm = createStylePresetSelector((stylePreset) => stylePreset.searchTerm);
+
+/**
+ * Tracks whether or not the style preset menu is open.
+ */
+export const $isStylePresetsMenuOpen = atom<boolean>(false);
