@@ -1,6 +1,6 @@
 import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
-import type { StudioDestination } from 'app/hooks/useHandleStudioDestination';
-import { useHandleStudioDestination } from 'app/hooks/useHandleStudioDestination';
+import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
+import { useStudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
@@ -18,12 +18,10 @@ import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModa
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
-import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
-import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
@@ -33,28 +31,15 @@ import { useGetOpenAPISchemaQuery } from 'services/api/endpoints/appInfo';
 import { useSocketIO } from 'services/events/useSocketIO';
 
 import AppErrorBoundaryFallback from './AppErrorBoundaryFallback';
-import PreselectedImage from './PreselectedImage';
 
 const DEFAULT_CONFIG = {};
 
 interface Props {
   config?: PartialAppConfig;
-  selectedImage?: {
-    imageName: string;
-    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
-  };
-  selectedWorkflowId?: string;
-  selectedStylePresetId?: string;
-  studioDestination?: StudioDestination;
+  studioInitAction?: StudioInitAction;
 }
 
-const App = ({
-  config = DEFAULT_CONFIG,
-  selectedImage,
-  selectedWorkflowId,
-  selectedStylePresetId,
-  studioDestination,
-}: Props) => {
+const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
   const language = useAppSelector(selectLanguage);
   const logger = useLogger('system');
   const dispatch = useAppDispatch();
@@ -65,8 +50,6 @@ const App = ({
   useGlobalModifiersInit();
   useGlobalHotkeys();
   useGetOpenAPISchemaQuery();
-
-  const handleStudioDestination = useHandleStudioDestination();
 
   const { dropzone, isHandlingUpload, setIsHandlingUpload } = useFullscreenDropzone();
 
@@ -87,30 +70,11 @@ const App = ({
     }
   }, [dispatch, config, logger]);
 
-  const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow();
-
-  useEffect(() => {
-    if (selectedWorkflowId) {
-      getAndLoadWorkflow(selectedWorkflowId);
-    }
-  }, [selectedWorkflowId, getAndLoadWorkflow]);
-
-  useEffect(() => {
-    if (selectedStylePresetId) {
-      dispatch(activeStylePresetIdChanged(selectedStylePresetId));
-    }
-  }, [dispatch, selectedStylePresetId]);
-
-  useEffect(() => {
-    if (studioDestination) {
-      handleStudioDestination(studioDestination);
-    }
-  }, [handleStudioDestination, studioDestination]);
-
   useEffect(() => {
     dispatch(appStarted());
   }, [dispatch]);
 
+  useStudioInitAction(studioInitAction);
   useStarterModelsToast();
   useSyncQueueStatus();
   useScopeFocusWatcher();
@@ -138,7 +102,6 @@ const App = ({
       <DynamicPromptsModal />
       <StylePresetModal />
       <ClearQueueConfirmationsAlertDialog />
-      <PreselectedImage selectedImage={selectedImage} />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
     </ErrorBoundary>

@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
+import { $isStylePresetsMenuOpen } from 'features/stylePresets/store/stylePresetSlice';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
@@ -13,11 +13,11 @@ const _hover: SystemStyleObject = {
 };
 
 export const StylePresetMenuTrigger = () => {
-  const isMenuOpen = useStore($isMenuOpen);
+  const isMenuOpen = useStore($isStylePresetsMenuOpen);
   const { t } = useTranslation();
 
   const handleToggle = useCallback(() => {
-    $isMenuOpen.set(!isMenuOpen);
+    $isStylePresetsMenuOpen.set(!isMenuOpen);
   }, [isMenuOpen]);
 
   return (

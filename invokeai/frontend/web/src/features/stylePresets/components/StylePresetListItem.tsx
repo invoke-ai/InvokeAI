@@ -1,8 +1,8 @@
 import { Badge, ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $isMenuOpen } from 'features/stylePresets/store/isMenuOpen';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import {
+  $isStylePresetsMenuOpen,
   activeStylePresetIdChanged,
   selectStylePresetActivePresetId,
 } from 'features/stylePresets/store/stylePresetSlice';
@@ -46,7 +46,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
 
   const handleClickApply = useCallback(() => {
     dispatch(activeStylePresetIdChanged(preset.id));
-    $isMenuOpen.set(false);
+    $isStylePresetsMenuOpen.set(false);
   }, [dispatch, preset.id]);
 
   const handleClickDelete = useCallback(

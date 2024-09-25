@@ -1,3 +1,5 @@
+import type { StartQueryActionCreatorOptions } from '@reduxjs/toolkit/dist/query/core/buildInitiate';
+import { getStore } from 'app/store/nanostores/store';
 import type { paths } from 'services/api/schema';
 import type { S } from 'services/api/types';
 
@@ -127,3 +129,21 @@ export const {
   useLazyExportStylePresetsQuery,
   useImportStylePresetsMutation,
 } = stylePresetsApi;
+
+/**
+ * Imperative RTKQ helper to fetch a style preset.
+ * @param style_preset_id The id of the style preset to fetch
+ * @param options The options for the query. By default, the query will not subscribe to the store.
+ * @raises Error if the style preset is not found or there is an error fetching the style preset
+ */
+export const getStylePreset = (
+  style_preset_id: string,
+  options?: StartQueryActionCreatorOptions
+): Promise<S['StylePresetRecordWithImage']> => {
+  const _options = {
+    subscribe: false,
+    ...options,
+  };
+  const req = getStore().dispatch(stylePresetsApi.endpoints.getStylePreset.initiate(style_preset_id, _options));
+  return req.unwrap();
+};

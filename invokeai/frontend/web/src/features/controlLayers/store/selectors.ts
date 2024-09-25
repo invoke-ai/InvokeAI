@@ -151,6 +151,14 @@ export function selectEntity<T extends CanvasEntityIdentifier>(
   return entity as Extract<CanvasEntityState, T>;
 }
 
+export const selectRasterLayerEntities = createSelector(selectCanvasSlice, (canvas) => canvas.rasterLayers.entities);
+export const selectControlLayerEntities = createSelector(selectCanvasSlice, (canvas) => canvas.controlLayers.entities);
+export const selectInpaintMaskEntities = createSelector(selectCanvasSlice, (canvas) => canvas.inpaintMasks.entities);
+export const selectRegionalGuidanceEntities = createSelector(
+  selectCanvasSlice,
+  (canvas) => canvas.regionalGuidance.entities
+);
+
 /**
  * Selected an entity from the canvas slice. If the entity is not found, an error is thrown.
  * Wrapper around {@link selectEntity}.

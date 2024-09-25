@@ -27,7 +27,9 @@ import type { ImageDTO } from 'services/api/types';
  * TODO(psyche): Figure out a better way to do handle this...
  */
 let didCloseImageViewer = false;
-const [useImageViewerState, $imageViewerState] = buildUseBoolean(true);
+const api = buildUseBoolean(true);
+const useImageViewerState = api[0];
+export const $imageViewer = api[1];
 
 export const useImageViewer = () => {
   const dispatch = useAppDispatch();
@@ -54,7 +56,7 @@ export const useImageViewer = () => {
     open: imageViewerState.setTrue,
     close,
     toggle: imageViewerState.toggle,
-    $state: $imageViewerState,
+    $state: $imageViewer,
     openImageInViewer,
   };
 };

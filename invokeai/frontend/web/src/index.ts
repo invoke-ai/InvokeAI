@@ -1,4 +1,5 @@
 export { default as InvokeAIUI } from './app/components/InvokeAIUI';
+export type { StudioInitAction } from './app/hooks/useStudioInitAction';
 export type { PartialAppConfig } from './app/types/invokeai';
 export { default as ParamMainModelSelect } from './features/parameters/components/MainModel/ParamMainModelSelect';
 export { default as HotkeysModal } from './features/system/components/HotkeysModal/HotkeysModal';
