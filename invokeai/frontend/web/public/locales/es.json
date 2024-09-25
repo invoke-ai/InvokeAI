@@ -67,7 +67,6 @@
         "red": "Rojo",
         "alpha": "Transparencia",
         "outputs": "Salidas",
-        "editing": "Editando",
         "learnMore": "Aprende más",
         "enabled": "Activado",
         "disabled": "Desactivado",
@@ -76,8 +75,7 @@
         "created": "Creado",
         "save": "Guardar",
         "unknownError": "Error Desconocido",
-        "blue": "Azul",
-        "viewingDesc": "Revisar imágenes en una vista de galería grande"
+        "blue": "Azul"
     },
     "gallery": {
         "galleryImageSize": "Tamaño de la imagen",
@@ -91,206 +89,6 @@
         "deleteImagePermanent": "Las imágenes eliminadas no se pueden restaurar.",
         "assets": "Activos",
         "autoAssignBoardOnClick": "Asignación automática de tableros al hacer clic"
-    },
-    "hotkeys": {
-        "keyboardShortcuts": "Atajos de teclado",
-        "appHotkeys": "Atajos de aplicación",
-        "generalHotkeys": "Atajos generales",
-        "galleryHotkeys": "Atajos de galería",
-        "unifiedCanvasHotkeys": "Atajos de lienzo unificado",
-        "invoke": {
-            "title": "Invocar",
-            "desc": "Generar una imagen"
-        },
-        "cancel": {
-            "title": "Cancelar",
-            "desc": "Cancelar el proceso de generación de imagen"
-        },
-        "focusPrompt": {
-            "title": "Mover foco a Entrada de texto",
-            "desc": "Mover foco hacia el campo de texto de la Entrada"
-        },
-        "toggleOptions": {
-            "title": "Alternar opciones",
-            "desc": "Mostar y ocultar el panel de opciones"
-        },
-        "pinOptions": {
-            "title": "Fijar opciones",
-            "desc": "Fijar el panel de opciones"
-        },
-        "toggleGallery": {
-            "title": "Alternar galería",
-            "desc": "Mostar y ocultar la galería de imágenes"
-        },
-        "maximizeWorkSpace": {
-            "title": "Maximizar espacio de trabajo",
-            "desc": "Cerrar otros páneles y maximizar el espacio de trabajo"
-        },
-        "changeTabs": {
-            "title": "Cambiar",
-            "desc": "Cambiar entre áreas de trabajo"
-        },
-        "consoleToggle": {
-            "title": "Alternar consola",
-            "desc": "Mostar y ocultar la consola"
-        },
-        "setPrompt": {
-            "title": "Establecer Entrada",
-            "desc": "Usar el texto de entrada de la imagen actual"
-        },
-        "setSeed": {
-            "title": "Establecer semilla",
-            "desc": "Usar la semilla de la imagen actual"
-        },
-        "setParameters": {
-            "title": "Establecer parámetros",
-            "desc": "Usar todos los parámetros de la imagen actual"
-        },
-        "restoreFaces": {
-            "title": "Restaurar rostros",
-            "desc": "Restaurar rostros en la imagen actual"
-        },
-        "showInfo": {
-            "title": "Mostrar información",
-            "desc": "Mostar metadatos de la imagen actual"
-        },
-        "sendToImageToImage": {
-            "title": "Enviar hacia Imagen a Imagen",
-            "desc": "Enviar imagen actual hacia Imagen a Imagen"
-        },
-        "deleteImage": {
-            "title": "Eliminar imagen",
-            "desc": "Eliminar imagen actual"
-        },
-        "closePanels": {
-            "title": "Cerrar páneles",
-            "desc": "Cerrar los páneles abiertos"
-        },
-        "previousImage": {
-            "title": "Imagen anterior",
-            "desc": "Muetra la imagen anterior en la galería"
-        },
-        "nextImage": {
-            "title": "Imagen siguiente",
-            "desc": "Muetra la imagen siguiente en la galería"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "Aumentar imagen en galería",
-            "desc": "Aumenta el tamaño de las miniaturas de la galería"
-        },
-        "decreaseGalleryThumbSize": {
-            "title": "Reducir imagen en galería",
-            "desc": "Reduce el tamaño de las miniaturas de la galería"
-        },
-        "selectBrush": {
-            "title": "Seleccionar pincel",
-            "desc": "Selecciona el pincel en el lienzo"
-        },
-        "selectEraser": {
-            "title": "Seleccionar borrador",
-            "desc": "Selecciona el borrador en el lienzo"
-        },
-        "decreaseBrushSize": {
-            "title": "Disminuir tamaño de herramienta",
-            "desc": "Disminuye el tamaño del pincel/borrador en el lienzo"
-        },
-        "increaseBrushSize": {
-            "title": "Aumentar tamaño del pincel",
-            "desc": "Aumenta el tamaño del pincel en el lienzo"
-        },
-        "decreaseBrushOpacity": {
-            "title": "Disminuir opacidad del pincel",
-            "desc": "Disminuye la opacidad del pincel en el lienzo"
-        },
-        "increaseBrushOpacity": {
-            "title": "Aumentar opacidad del pincel",
-            "desc": "Aumenta la opacidad del pincel en el lienzo"
-        },
-        "moveTool": {
-            "title": "Herramienta de movimiento",
-            "desc": "Permite navegar por el lienzo"
-        },
-        "fillBoundingBox": {
-            "title": "Rellenar Caja contenedora",
-            "desc": "Rellena la caja contenedora con el color seleccionado"
-        },
-        "eraseBoundingBox": {
-            "title": "Borrar Caja contenedora",
-            "desc": "Borra el contenido dentro de la caja contenedora"
-        },
-        "colorPicker": {
-            "title": "Selector de color",
-            "desc": "Selecciona un color del lienzo"
-        },
-        "toggleSnap": {
-            "title": "Alternar ajuste de cuadrícula",
-            "desc": "Activa o desactiva el ajuste automático a la cuadrícula"
-        },
-        "quickToggleMove": {
-            "title": "Alternar movimiento rápido",
-            "desc": "Activa momentáneamente la herramienta de movimiento"
-        },
-        "toggleLayer": {
-            "title": "Alternar capa",
-            "desc": "Alterna entre las capas de máscara y base"
-        },
-        "clearMask": {
-            "title": "Limpiar máscara",
-            "desc": "Limpia toda la máscara actual"
-        },
-        "hideMask": {
-            "title": "Ocultar máscara",
-            "desc": "Oculta o muetre la máscara actual"
-        },
-        "showHideBoundingBox": {
-            "title": "Alternar caja contenedora",
-            "desc": "Muestra u oculta la caja contenedora"
-        },
-        "mergeVisible": {
-            "title": "Consolida capas visibles",
-            "desc": "Consolida todas las capas visibles en una sola"
-        },
-        "saveToGallery": {
-            "title": "Guardar en galería",
-            "desc": "Guardar la imagen actual del lienzo en la galería"
-        },
-        "copyToClipboard": {
-            "title": "Copiar al portapapeles",
-            "desc": "Copiar el lienzo actual al portapapeles"
-        },
-        "downloadImage": {
-            "title": "Descargar imagen",
-            "desc": "Descargar la imagen actual del lienzo"
-        },
-        "undoStroke": {
-            "title": "Deshar trazo",
-            "desc": "Desahacer el último trazo del pincel"
-        },
-        "redoStroke": {
-            "title": "Rehacer trazo",
-            "desc": "Rehacer el último trazo del pincel"
-        },
-        "resetView": {
-            "title": "Restablecer vista",
-            "desc": "Restablecer la vista del lienzo"
-        },
-        "previousStagingImage": {
-            "title": "Imagen anterior",
-            "desc": "Imagen anterior en el área de preparación"
-        },
-        "nextStagingImage": {
-            "title": "Imagen siguiente",
-            "desc": "Siguiente imagen en el área de preparación"
-        },
-        "acceptStagingImage": {
-            "title": "Aceptar imagen",
-            "desc": "Aceptar la imagen actual en el área de preparación"
-        },
-        "addNodes": {
-            "title": "Añadir Nodos",
-            "desc": "Abre el menú para añadir nodos"
-        },
-        "nodesHotkeys": "Teclas de acceso rápido a los nodos"
     },
     "modelManager": {
         "modelManager": "Gestor de Modelos",
@@ -362,8 +160,6 @@
         "scaledHeight": "Alto escalado",
         "infillMethod": "Método de relleno",
         "tileSize": "Tamaño del mosaico",
-        "sendToImg2Img": "Enviar a Imagen a Imagen",
-        "sendToUnifiedCanvas": "Enviar a Lienzo Unificado",
         "downloadImage": "Descargar imagen",
         "usePrompt": "Usar Entrada",
         "useSeed": "Usar Semilla",
@@ -389,7 +185,6 @@
         "models": "Modelos",
         "displayInProgress": "Mostrar las imágenes del progreso",
         "confirmOnDelete": "Confirmar antes de eliminar",
-        "enableImageDebugging": "Habilitar depuración de imágenes",
         "resetWebUI": "Restablecer interfaz web",
         "resetWebUIDesc1": "Al restablecer la interfaz web, solo se restablece la caché local del navegador de sus imágenes y la configuración guardada. No se elimina ninguna imagen de su disco duro.",
         "resetWebUIDesc2": "Si las imágenes no se muestran en la galería o algo más no funciona, intente restablecer antes de reportar un incidente en GitHub.",
@@ -413,8 +208,6 @@
         "imageCopied": "Imágen copiada",
         "imageNotLoadedDesc": "No se pudo encontrar la imagen",
         "canvasMerged": "Lienzo consolidado",
-        "sentToImageToImage": "Enviar hacia Imagen a Imagen",
-        "sentToUnifiedCanvas": "Enviar hacia Lienzo Consolidado",
         "parametersNotSet": "Parámetros no recuperados",
         "metadataLoadFailed": "Error al cargar metadatos",
         "serverError": "Error en el servidor",
@@ -589,32 +382,6 @@
             "canvasTab": "$t(ui.tabs.canvas) $t(common.tab)",
             "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)"
         }
-    },
-    "controlLayers": {
-        "layers_one": "Capa",
-        "layers_many": "Capas",
-        "layers_other": "Capas"
-    },
-    "controlnet": {
-        "crop": "Cortar",
-        "delete": "Eliminar",
-        "depthAnythingDescription": "Generación de mapa de profundidad usando la técnica de Depth Anything",
-        "duplicate": "Duplicar",
-        "colorMapDescription": "Genera un mapa de color desde la imagen",
-        "depthMidasDescription": "Crea un mapa de profundidad con Midas",
-        "balanced": "Equilibrado",
-        "beginEndStepPercent": "Inicio / Final Porcentaje de pasos",
-        "detectResolution": "Detectar resolución",
-        "beginEndStepPercentShort": "Inicio / Final %",
-        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
-        "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
-        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
-        "addControlNet": "Añadir $t(common.controlNet)",
-        "addIPAdapter": "Añadir $t(common.ipAdapter)",
-        "controlAdapter_one": "Adaptador de control",
-        "controlAdapter_many": "Adaptadores de control",
-        "controlAdapter_other": "Adaptadores de control",
-        "addT2IAdapter": "Añadir $t(common.t2iAdapter)"
     },
     "queue": {
         "back": "Atrás",

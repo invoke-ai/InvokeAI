@@ -76,10 +76,6 @@
         "or": "of",
         "updated": "Bijgewerkt",
         "outpaint": "outpainten",
-        "viewing": "Bekijken",
-        "viewingDesc": "Beoordeel afbeelding in een grote galerijweergave",
-        "editing": "Bewerken",
-        "editingDesc": "Bewerk op het canvas Stuurlagen",
         "ai": "ai",
         "inpaint": "inpainten",
         "unknown": "Onbekend",
@@ -108,206 +104,6 @@
         "copy": "Kopieer",
         "download": "Download",
         "setCurrentImage": "Stel in als huidige afbeelding"
-    },
-    "hotkeys": {
-        "keyboardShortcuts": "Sneltoetsen",
-        "appHotkeys": "Appsneltoetsen",
-        "generalHotkeys": "Algemene sneltoetsen",
-        "galleryHotkeys": "Sneltoetsen galerij",
-        "unifiedCanvasHotkeys": "Sneltoetsen centraal canvas",
-        "invoke": {
-            "title": "Genereer",
-            "desc": "Genereert een afbeelding"
-        },
-        "cancel": {
-            "title": "Annuleer",
-            "desc": "Annuleert het genereren van een afbeelding"
-        },
-        "focusPrompt": {
-            "title": "Focus op invoer",
-            "desc": "Legt de focus op het invoertekstvak"
-        },
-        "toggleOptions": {
-            "title": "Open/sluit Opties",
-            "desc": "Opent of sluit het deelscherm Opties"
-        },
-        "pinOptions": {
-            "title": "Zet Opties vast",
-            "desc": "Zet het deelscherm Opties vast"
-        },
-        "toggleGallery": {
-            "title": "Zet Galerij vast",
-            "desc": "Opent of sluit het deelscherm Galerij"
-        },
-        "maximizeWorkSpace": {
-            "title": "Maximaliseer werkgebied",
-            "desc": "Sluit deelschermen en maximaliseer het werkgebied"
-        },
-        "changeTabs": {
-            "title": "Wissel van tabblad",
-            "desc": "Wissel naar een ander werkgebied"
-        },
-        "consoleToggle": {
-            "title": "Open/sluit console",
-            "desc": "Opent of sluit de console"
-        },
-        "setPrompt": {
-            "title": "Stel invoertekst in",
-            "desc": "Gebruikt de invoertekst van de huidige afbeelding"
-        },
-        "setSeed": {
-            "title": "Stel seed in",
-            "desc": "Gebruikt de seed van de huidige afbeelding"
-        },
-        "setParameters": {
-            "title": "Stel parameters in",
-            "desc": "Gebruikt alle parameters van de huidige afbeelding"
-        },
-        "restoreFaces": {
-            "title": "Herstel gezichten",
-            "desc": "Herstelt de huidige afbeelding"
-        },
-        "showInfo": {
-            "title": "Toon info",
-            "desc": "Toont de metagegevens van de huidige afbeelding"
-        },
-        "sendToImageToImage": {
-            "title": "Stuur naar Afbeelding naar afbeelding",
-            "desc": "Stuurt de huidige afbeelding naar Afbeelding naar afbeelding"
-        },
-        "deleteImage": {
-            "title": "Verwijder afbeelding",
-            "desc": "Verwijdert de huidige afbeelding"
-        },
-        "closePanels": {
-            "title": "Sluit deelschermen",
-            "desc": "Sluit geopende deelschermen"
-        },
-        "previousImage": {
-            "title": "Vorige afbeelding",
-            "desc": "Toont de vorige afbeelding in de galerij"
-        },
-        "nextImage": {
-            "title": "Volgende afbeelding",
-            "desc": "Toont de volgende afbeelding in de galerij"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "Vergroot afbeeldingsgrootte galerij",
-            "desc": "Vergroot de grootte van de galerijminiaturen"
-        },
-        "decreaseGalleryThumbSize": {
-            "title": "Verklein afbeeldingsgrootte galerij",
-            "desc": "Verkleint de grootte van de galerijminiaturen"
-        },
-        "selectBrush": {
-            "title": "Kies penseel",
-            "desc": "Kiest de penseel op het canvas"
-        },
-        "selectEraser": {
-            "title": "Kies gum",
-            "desc": "Kiest de gum op het canvas"
-        },
-        "decreaseBrushSize": {
-            "title": "Verklein penseelgrootte",
-            "desc": "Verkleint de grootte van het penseel/gum op het canvas"
-        },
-        "increaseBrushSize": {
-            "title": "Vergroot penseelgrootte",
-            "desc": "Vergroot de grootte van het penseel/gum op het canvas"
-        },
-        "decreaseBrushOpacity": {
-            "title": "Verlaag ondoorzichtigheid penseel",
-            "desc": "Verlaagt de ondoorzichtigheid van de penseel op het canvas"
-        },
-        "increaseBrushOpacity": {
-            "title": "Verhoog ondoorzichtigheid penseel",
-            "desc": "Verhoogt de ondoorzichtigheid van de penseel op het canvas"
-        },
-        "moveTool": {
-            "title": "Verplaats canvas",
-            "desc": "Maakt canvasnavigatie mogelijk"
-        },
-        "fillBoundingBox": {
-            "title": "Vul tekenvak",
-            "desc": "Vult het tekenvak met de penseelkleur"
-        },
-        "eraseBoundingBox": {
-            "title": "Wis tekenvak",
-            "desc": "Wist het gebied van het tekenvak"
-        },
-        "colorPicker": {
-            "title": "Kleurkiezer",
-            "desc": "Opent de kleurkiezer op het canvas"
-        },
-        "toggleSnap": {
-            "title": "Zet uitlijnen aan/uit",
-            "desc": "Zet uitlijnen op raster aan/uit"
-        },
-        "quickToggleMove": {
-            "title": "Verplaats canvas even",
-            "desc": "Verplaats kortstondig het canvas"
-        },
-        "toggleLayer": {
-            "title": "Zet laag aan/uit",
-            "desc": "Wisselt tussen de masker- en basislaag"
-        },
-        "clearMask": {
-            "title": "Wis masker",
-            "desc": "Wist het volledig masker"
-        },
-        "hideMask": {
-            "title": "Toon/verberg masker",
-            "desc": "Toont of verbegt het masker"
-        },
-        "showHideBoundingBox": {
-            "title": "Toon/verberg tekenvak",
-            "desc": "Wisselt de zichtbaarheid van het tekenvak"
-        },
-        "mergeVisible": {
-            "title": "Voeg lagen samen",
-            "desc": "Voegt alle zichtbare lagen op het canvas samen"
-        },
-        "saveToGallery": {
-            "title": "Bewaar in galerij",
-            "desc": "Bewaart het huidige canvas in de galerij"
-        },
-        "copyToClipboard": {
-            "title": "Kopieer naar klembord",
-            "desc": "Kopieert het huidige canvas op het klembord"
-        },
-        "downloadImage": {
-            "title": "Download afbeelding",
-            "desc": "Downloadt het huidige canvas"
-        },
-        "undoStroke": {
-            "title": "Maak streek ongedaan",
-            "desc": "Maakt een penseelstreek ongedaan"
-        },
-        "redoStroke": {
-            "title": "Herhaal streek",
-            "desc": "Voert een ongedaan gemaakte penseelstreek opnieuw uit"
-        },
-        "resetView": {
-            "title": "Herstel weergave",
-            "desc": "Herstelt de canvasweergave"
-        },
-        "previousStagingImage": {
-            "title": "Vorige sessie-afbeelding",
-            "desc": "Bladert terug naar de vorige afbeelding in het sessiegebied"
-        },
-        "nextStagingImage": {
-            "title": "Volgende sessie-afbeelding",
-            "desc": "Bladert vooruit naar de volgende afbeelding in het sessiegebied"
-        },
-        "acceptStagingImage": {
-            "title": "Accepteer sessie-afbeelding",
-            "desc": "Accepteert de huidige sessie-afbeelding"
-        },
-        "addNodes": {
-            "title": "Voeg knooppunten toe",
-            "desc": "Opent het menu Voeg knooppunt toe"
-        },
-        "nodesHotkeys": "Sneltoetsen knooppunten"
     },
     "modelManager": {
         "modelManager": "Modelonderhoud",
@@ -414,8 +210,6 @@
         "scaledHeight": "Geschaalde H",
         "infillMethod": "Infill-methode",
         "tileSize": "Grootte tegel",
-        "sendToImg2Img": "Stuur naar Afbeelding naar afbeelding",
-        "sendToUnifiedCanvas": "Stuur naar Centraal canvas",
         "downloadImage": "Download afbeelding",
         "usePrompt": "Hergebruik invoertekst",
         "useSeed": "Hergebruik seed",
@@ -461,7 +255,6 @@
                 "ipAdapterNoImageSelected": "geen afbeelding voor IP-adapter geselecteerd",
                 "rgNoRegion": "geen gebied geselecteerd",
                 "rgNoPromptsOrIPAdapters": "geen tekstprompts of IP-adapters",
-                "t2iAdapterIncompatibleDimensions": "T2I-adapter vereist een afbeelding met afmetingen met een veelvoud van 64",
                 "ipAdapterNoModelSelected": "geen IP-adapter geselecteerd"
             },
             "imageNotProcessedForControlAdapter": "De afbeelding van controle-adapter #{{number}} is niet verwerkt"
@@ -495,7 +288,6 @@
         "models": "Modellen",
         "displayInProgress": "Toon voortgangsafbeeldingen",
         "confirmOnDelete": "Bevestig bij verwijderen",
-        "enableImageDebugging": "Schakel foutopsporing afbeelding in",
         "resetWebUI": "Herstel web-UI",
         "resetWebUIDesc1": "Herstel web-UI herstelt alleen de lokale afbeeldingscache en de onthouden instellingen van je browser. Het verwijdert geen afbeeldingen van schijf.",
         "resetWebUIDesc2": "Als afbeeldingen niet getoond worden in de galerij of iets anders werkt niet, probeer dan eerst deze herstelfunctie voordat je een fout aanmeldt op GitHub.",
@@ -528,8 +320,6 @@
         "imageCopied": "Afbeelding gekopieerd",
         "imageNotLoadedDesc": "Geen afbeeldingen gevonden",
         "canvasMerged": "Canvas samengevoegd",
-        "sentToImageToImage": "Gestuurd naar Afbeelding naar afbeelding",
-        "sentToUnifiedCanvas": "Gestuurd naar Centraal canvas",
         "parametersNotSet": "Parameters niet ingesteld",
         "metadataLoadFailed": "Fout bij laden metagegevens",
         "serverError": "Serverfout",
@@ -790,100 +580,6 @@
         "noFieldsViewMode": "Deze werkstroom heeft geen geselecteerde velden om te tonen. Bekijk de volledige werkstroom om de waarden te configureren.",
         "unableToUpdateNodes_one": "Fout bij bijwerken van {{count}} knooppunt",
         "unableToUpdateNodes_other": "Fout bij bijwerken van {{count}} knooppunten"
-    },
-    "controlnet": {
-        "amult": "a_mult",
-        "resize": "Schaal",
-        "showAdvanced": "Toon uitgebreide opties",
-        "contentShuffleDescription": "Verschuift het materiaal in de afbeelding",
-        "bgth": "bg_th",
-        "addT2IAdapter": "Voeg $t(common.t2iAdapter) toe",
-        "pidi": "PIDI",
-        "importImageFromCanvas": "Importeer afbeelding uit canvas",
-        "lineartDescription": "Zet afbeelding om naar line-art",
-        "normalBae": "Normale BAE",
-        "importMaskFromCanvas": "Importeer masker uit canvas",
-        "hed": "HED",
-        "hideAdvanced": "Verberg uitgebreid",
-        "contentShuffle": "Verschuif materiaal",
-        "resetControlImage": "Herstel controle-afbeelding",
-        "beginEndStepPercent": "Percentage begin-/eindstap",
-        "mlsdDescription": "Minimalistische herkenning lijnsegmenten",
-        "duplicate": "Maak kopie",
-        "balanced": "Gebalanceerd",
-        "f": "F",
-        "h": "H",
-        "prompt": "Prompt",
-        "depthMidasDescription": "Genereer diepteblad via Midas",
-        "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
-        "control": "Controle",
-        "resizeMode": "Modus schaling",
-        "coarse": "Grof",
-        "weight": "Gewicht",
-        "selectModel": "Kies een model",
-        "crop": "Snij bij",
-        "depthMidas": "Diepte (Midas)",
-        "w": "B",
-        "processor": "Verwerker",
-        "addControlNet": "Voeg $t(common.controlNet) toe",
-        "none": "Geen",
-        "detectResolution": "Herken resolutie",
-        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
-        "pidiDescription": "PIDI-afbeeldingsverwerking",
-        "mediapipeFace": "Mediapipe - Gezicht",
-        "mlsd": "M-LSD",
-        "controlMode": "Controlemodus",
-        "fill": "Vul",
-        "cannyDescription": "Herkenning Canny-rand",
-        "addIPAdapter": "Voeg $t(common.ipAdapter) toe",
-        "lineart": "Line-art",
-        "colorMapDescription": "Genereert een kleurenblad van de afbeelding",
-        "lineartAnimeDescription": "Lineartverwerking in anime-stijl",
-        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
-        "minConfidence": "Min. vertrouwensniveau",
-        "imageResolution": "Resolutie afbeelding",
-        "megaControl": "Zeer veel controle",
-        "depthZoe": "Diepte (Zoe)",
-        "colorMap": "Kleur",
-        "lowThreshold": "Lage drempelwaarde",
-        "autoConfigure": "Configureer verwerker automatisch",
-        "highThreshold": "Hoge drempelwaarde",
-        "normalBaeDescription": "Normale BAE-verwerking",
-        "noneDescription": "Geen verwerking toegepast",
-        "saveControlImage": "Bewaar controle-afbeelding",
-        "toggleControlNet": "Zet deze ControlNet aan/uit",
-        "delete": "Verwijder",
-        "controlAdapter_one": "Control-adapter",
-        "controlAdapter_other": "Control-adapters",
-        "safe": "Veilig",
-        "colorMapTileSize": "Grootte tegel",
-        "lineartAnime": "Line-art voor anime",
-        "mediapipeFaceDescription": "Gezichtsherkenning met Mediapipe",
-        "canny": "Canny",
-        "depthZoeDescription": "Genereer diepteblad via Zoe",
-        "hedDescription": "Herkenning van holistisch-geneste randen",
-        "setControlImageDimensions": "Kopieer grootte naar B/H (optimaliseer voor model)",
-        "scribble": "Krabbel",
-        "maxFaces": "Max. gezichten",
-        "dwOpenpose": "DW Openpose",
-        "depthAnything": "Depth Anything",
-        "base": "Basis",
-        "hands": "Handen",
-        "selectCLIPVisionModel": "Selecteer een CLIP Vision-model",
-        "modelSize": "Modelgrootte",
-        "small": "Klein",
-        "large": "Groot",
-        "resizeSimple": "Wijzig grootte (eenvoudig)",
-        "beginEndStepPercentShort": "Begin-/eind-%",
-        "depthAnythingDescription": "Genereren dieptekaart d.m.v. de techniek Depth Anything",
-        "face": "Gezicht",
-        "body": "Lichaam",
-        "dwOpenposeDescription": "Schatting menselijke pose d.m.v. DW Openpose",
-        "ipAdapterMethod": "Methode",
-        "full": "Volledig",
-        "style": "Alleen stijl",
-        "composition": "Alleen samenstelling",
-        "setControlImageDimensionsForce": "Kopieer grootte naar B/H (negeer model)"
     },
     "dynamicPrompts": {
         "seedBehaviour": {

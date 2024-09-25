@@ -33,19 +33,5 @@
         "autoSwitchNewImages": "Vaihda uusiin kuviin automaattisesti",
         "noImagesInGallery": "Ei kuvia galleriassa",
         "loadMore": "Lataa lisää"
-    },
-    "hotkeys": {
-        "keyboardShortcuts": "näppäimistön pikavalinnat",
-        "appHotkeys": "Sovelluksen pikanäppäimet",
-        "generalHotkeys": "Yleiset pikanäppäimet",
-        "galleryHotkeys": "Gallerian pikanäppäimet",
-        "unifiedCanvasHotkeys": "Yhdistetyn kanvaan pikanäppäimet",
-        "cancel": {
-            "desc": "Peruuta kuvan luominen",
-            "title": "Peruuta"
-        },
-        "invoke": {
-            "desc": "Luo kuva"
-        }
     }
 }

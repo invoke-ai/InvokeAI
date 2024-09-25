@@ -84,10 +84,6 @@
         "editor": "Редактор",
         "goTo": "Перейти к",
         "tab": "Вкладка",
-        "viewing": "Просмотр",
-        "editing": "Редактирование",
-        "viewingDesc": "Просмотр изображений в режиме большой галереи",
-        "editingDesc": "Редактировать на холсте слоёв управления",
         "enabled": "Включено",
         "disabled": "Отключено",
         "comparingDesc": "Сравнение двух изображений",
@@ -161,231 +157,9 @@
         "jump": "Пыгнуть"
     },
     "hotkeys": {
-        "keyboardShortcuts": "Горячие клавиши",
-        "appHotkeys": "Приложение",
-        "generalHotkeys": "Общее",
-        "galleryHotkeys": "Галлерея",
-        "unifiedCanvasHotkeys": "Единый холст",
-        "invoke": {
-            "title": "Invoke",
-            "desc": "Сгенерировать изображение"
-        },
-        "cancel": {
-            "title": "Отменить",
-            "desc": "Отменить текущий элемент"
-        },
-        "focusPrompt": {
-            "title": "Переключиться на ввод запроса",
-            "desc": "Переключение на область ввода запроса"
-        },
-        "toggleOptions": {
-            "title": "Показать/скрыть параметры",
-            "desc": "Открывать и закрывать панель параметров"
-        },
-        "pinOptions": {
-            "title": "Закрепить параметры",
-            "desc": "Закрепить панель параметров"
-        },
-        "toggleGallery": {
-            "title": "Показать галерею",
-            "desc": "Открывать и закрывать ящик галереи"
-        },
-        "maximizeWorkSpace": {
-            "title": "Максимизировать рабочее пространство",
-            "desc": "Скрыть панели и максимизировать рабочую область"
-        },
-        "changeTabs": {
-            "title": "Переключить вкладку",
-            "desc": "Переключиться на другую рабочую область"
-        },
-        "consoleToggle": {
-            "title": "Показать консоль",
-            "desc": "Открывать и закрывать консоль"
-        },
-        "setPrompt": {
-            "title": "Использовать запрос",
-            "desc": "Использовать запрос из текущего изображения"
-        },
-        "setSeed": {
-            "title": "Использовать сид",
-            "desc": "Использовать сид текущего изображения"
-        },
-        "setParameters": {
-            "title": "Использовать все параметры",
-            "desc": "Использовать все параметры текущего изображения"
-        },
-        "restoreFaces": {
-            "title": "Восстановить лица",
-            "desc": "Восстановить лица на текущем изображении"
-        },
-        "showInfo": {
-            "title": "Показать метаданные",
-            "desc": "Показать метаданные из текущего изображения"
-        },
-        "sendToImageToImage": {
-            "title": "Отправить в img2img",
-            "desc": "Отправить текущее изображение в Image To Image"
-        },
-        "deleteImage": {
-            "title": "Удалить изображение",
-            "desc": "Удалить текущее изображение"
-        },
-        "closePanels": {
-            "title": "Закрыть панели",
-            "desc": "Закрывает открытые панели"
-        },
-        "previousImage": {
-            "title": "Предыдущее изображение",
-            "desc": "Отображать предыдущее изображение в галерее"
-        },
-        "nextImage": {
-            "title": "Следующее изображение",
-            "desc": "Отображение следующего изображения в галерее"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "Увеличить размер миниатюр галереи",
-            "desc": "Увеличивает размер миниатюр галереи"
-        },
-        "decreaseGalleryThumbSize": {
-            "title": "Уменьшает размер миниатюр галереи",
-            "desc": "Уменьшает размер миниатюр галереи"
-        },
-        "selectBrush": {
-            "title": "Выбрать кисть",
-            "desc": "Выбирает кисть для холста"
-        },
-        "selectEraser": {
-            "title": "Выбрать ластик",
-            "desc": "Выбирает ластик для холста"
-        },
-        "decreaseBrushSize": {
-            "title": "Уменьшить размер кисти",
-            "desc": "Уменьшает размер кисти/ластика холста"
-        },
-        "increaseBrushSize": {
-            "title": "Увеличить размер кисти",
-            "desc": "Увеличивает размер кисти/ластика холста"
-        },
-        "decreaseBrushOpacity": {
-            "title": "Уменьшить непрозрачность кисти",
-            "desc": "Уменьшает непрозрачность кисти холста"
-        },
-        "increaseBrushOpacity": {
-            "title": "Увеличить непрозрачность кисти",
-            "desc": "Увеличивает непрозрачность кисти холста"
-        },
-        "moveTool": {
-            "title": "Инструмент перемещения",
-            "desc": "Позволяет перемещаться по холсту"
-        },
-        "fillBoundingBox": {
-            "title": "Заполнить ограничивающую рамку",
-            "desc": "Заполняет ограничивающую рамку цветом кисти"
-        },
-        "eraseBoundingBox": {
-            "title": "Стереть ограничивающую рамку",
-            "desc": "Стирает область ограничивающей рамки"
-        },
-        "colorPicker": {
-            "title": "Выбрать цвет",
-            "desc": "Выбирает средство выбора цвета холста"
-        },
-        "toggleSnap": {
-            "title": "Включить привязку",
-            "desc": "Включает/выключает привязку к сетке"
-        },
-        "quickToggleMove": {
-            "title": "Быстрое переключение перемещения",
-            "desc": "Временно переключает режим перемещения"
-        },
-        "toggleLayer": {
-            "title": "Переключить слой",
-            "desc": "Переключение маски/базового слоя"
-        },
-        "clearMask": {
-            "title": "Очистить маску",
-            "desc": "Очистить всю маску"
-        },
-        "hideMask": {
-            "title": "Скрыть маску",
-            "desc": "Скрывает/показывает маску"
-        },
-        "showHideBoundingBox": {
-            "title": "Показать/скрыть ограничивающую рамку",
-            "desc": "Переключить видимость ограничивающей рамки"
-        },
-        "mergeVisible": {
-            "title": "Объединить видимые",
-            "desc": "Объединить все видимые слои холста"
-        },
-        "saveToGallery": {
-            "title": "Сохранить в галерею",
-            "desc": "Сохранить текущий холст в галерею"
-        },
-        "copyToClipboard": {
-            "title": "Копировать в буфер обмена",
-            "desc": "Копировать текущий холст в буфер обмена"
-        },
-        "downloadImage": {
-            "title": "Скачать изображение",
-            "desc": "Скачать содержимое холста"
-        },
-        "undoStroke": {
-            "title": "Отменить кисть",
-            "desc": "Отменить мазок кисти"
-        },
-        "redoStroke": {
-            "title": "Повторить кисть",
-            "desc": "Повторить мазок кисти"
-        },
-        "resetView": {
-            "title": "Вид по умолчанию",
-            "desc": "Сбросить вид холста"
-        },
-        "previousStagingImage": {
-            "title": "Предыдущее изображение",
-            "desc": "Предыдущая область изображения"
-        },
-        "nextStagingImage": {
-            "title": "Следующее изображение",
-            "desc": "Следующая область изображения"
-        },
-        "acceptStagingImage": {
-            "title": "Принять изображение",
-            "desc": "Принять текущее изображение"
-        },
-        "addNodes": {
-            "desc": "Открывает меню добавления узла",
-            "title": "Добавление узлов"
-        },
-        "nodesHotkeys": "Узлы",
-        "cancelAndClear": {
-            "desc": "Отмена текущего элемента очереди и очистка всех ожидающих элементов",
-            "title": "Отменить и очистить"
-        },
-        "resetOptionsAndGallery": {
-            "title": "Сброс настроек и галереи",
-            "desc": "Сброс панелей галереи и настроек"
-        },
         "searchHotkeys": "Поиск горячих клавиш",
         "noHotkeysFound": "Горячие клавиши не найдены",
-        "toggleOptionsAndGallery": {
-            "desc": "Открытие и закрытие панели опций и галереи",
-            "title": "Переключить опции и галерею"
-        },
-        "clearSearch": "Очистить поиск",
-        "remixImage": {
-            "desc": "Используйте все параметры, кроме сида из текущего изображения",
-            "title": "Ремикс изображения"
-        },
-        "toggleViewer": {
-            "title": "Переключить просмотр изображений",
-            "desc": "Переключение между средством просмотра изображений и рабочей областью для текущей вкладки."
-        },
-        "postProcess": {
-            "desc": "Обработайте текущее изображение с помощью выбранной модели постобработки",
-            "title": "Обработать изображение"
-        }
+        "clearSearch": "Очистить поиск"
     },
     "modelManager": {
         "modelManager": "Менеджер моделей",
@@ -524,8 +298,6 @@
         "scaledHeight": "Масштаб В",
         "infillMethod": "Способ заполнения",
         "tileSize": "Размер области",
-        "sendToImg2Img": "Отправить в img2img",
-        "sendToUnifiedCanvas": "Отправить на Единый холст",
         "downloadImage": "Скачать",
         "usePrompt": "Использовать запрос",
         "useSeed": "Использовать сид",
@@ -572,7 +344,6 @@
                 "rgNoRegion": "регион не выбран",
                 "rgNoPromptsOrIPAdapters": "нет текстовых запросов или IP-адаптеров",
                 "ipAdapterIncompatibleBaseModel": "несовместимая базовая модель IP-адаптера",
-                "t2iAdapterIncompatibleDimensions": "Адаптер T2I требует, чтобы размеры изображения были кратны {{multiple}}",
                 "ipAdapterNoImageSelected": "изображение IP-адаптера не выбрано"
             }
         },
@@ -608,7 +379,6 @@
         "models": "Модели",
         "displayInProgress": "Показывать процесс генерации",
         "confirmOnDelete": "Подтверждать удаление",
-        "enableImageDebugging": "Включить отладку",
         "resetWebUI": "Сброс настроек веб-интерфейса",
         "resetWebUIDesc1": "Сброс настроек веб-интерфейса удаляет только локальный кэш браузера с вашими изображениями и настройками. Он не удаляет изображения с диска.",
         "resetWebUIDesc2": "Если изображения не отображаются в галерее или не работает что-то еще, пожалуйста, попробуйте сбросить настройки, прежде чем сообщать о проблеме на GitHub.",
@@ -645,8 +415,6 @@
         "imageCopied": "Изображение скопировано",
         "imageNotLoadedDesc": "Не удалось найти изображение",
         "canvasMerged": "Холст объединен",
-        "sentToImageToImage": "Отправить в img2img",
-        "sentToUnifiedCanvas": "Отправлено на Единый холст",
         "parametersNotSet": "Параметры не заданы",
         "metadataLoadFailed": "Не удалось загрузить метаданные",
         "serverError": "Ошибка сервера",
@@ -940,102 +708,6 @@
         "imageAccessError": "Невозможно найти изображение {{image_name}}, сбрасываем на значение по умолчанию",
         "boardAccessError": "Невозможно найти доску {{board_id}}, сбрасываем на значение по умолчанию",
         "modelAccessError": "Невозможно найти модель {{key}}, сброс на модель по умолчанию"
-    },
-    "controlnet": {
-        "amult": "a_mult",
-        "contentShuffleDescription": "Перетасовывает содержимое изображения",
-        "bgth": "bg_th",
-        "contentShuffle": "Перетасовка содержимого",
-        "beginEndStepPercent": "Процент начала/конца шага",
-        "duplicate": "Дублировать",
-        "balanced": "Сбалансированный",
-        "f": "F",
-        "depthMidasDescription": "Генерация карты глубины с использованием Midas",
-        "control": "Контроль",
-        "coarse": "Грубость обработки",
-        "crop": "Обрезка",
-        "depthMidas": "Глубина (Midas)",
-        "detectResolution": "Определить разрешение",
-        "controlMode": "Режим контроля",
-        "cannyDescription": "Детектор границ Canny",
-        "depthZoe": "Глубина (Zoe)",
-        "autoConfigure": "Автонастройка процессора",
-        "delete": "Удалить",
-        "canny": "Canny",
-        "depthZoeDescription": "Генерация карты глубины с использованием Zoe",
-        "resize": "Изменить размер",
-        "showAdvanced": "Показать расширенные",
-        "addT2IAdapter": "Добавить $t(common.t2iAdapter)",
-        "importImageFromCanvas": "Импортировать изображение с холста",
-        "lineartDescription": "Конвертация изображения в контурный рисунок",
-        "normalBae": "Обычный BAE",
-        "importMaskFromCanvas": "Импортировать маску с холста",
-        "hideAdvanced": "Скрыть расширенные",
-        "resetControlImage": "Сбросить контрольное изображение",
-        "prompt": "Запрос",
-        "controlnet": "$t(controlnet.controlAdapter_one) №{{number}} $t(common.controlNet)",
-        "resizeMode": "Режим изменения размера",
-        "weight": "Вес",
-        "selectModel": "Выберите модель",
-        "w": "В",
-        "processor": "Процессор",
-        "addControlNet": "Добавить $t(common.controlNet)",
-        "none": "ничего",
-        "ip_adapter": "$t(controlnet.controlAdapter_one) №{{number}} $t(common.ipAdapter)",
-        "pidiDescription": "PIDI-обработка изображений",
-        "mediapipeFace": "Лицо Mediapipe",
-        "fill": "Заполнить",
-        "addIPAdapter": "Добавить $t(common.ipAdapter)",
-        "lineart": "Контурный рисунок",
-        "colorMapDescription": "Создает карту цветов из изображения",
-        "lineartAnimeDescription": "Создание контурных рисунков в стиле аниме",
-        "t2i_adapter": "$t(controlnet.controlAdapter_one) №{{number}} $t(common.t2iAdapter)",
-        "minConfidence": "Минимальная уверенность",
-        "imageResolution": "Разрешение изображения",
-        "colorMap": "Цвет",
-        "lowThreshold": "Низкий порог",
-        "highThreshold": "Высокий порог",
-        "normalBaeDescription": "Обычная обработка BAE",
-        "noneDescription": "Обработка не применяется",
-        "saveControlImage": "Сохранить контрольное изображение",
-        "toggleControlNet": "Переключить эту ControlNet",
-        "controlAdapter_one": "Адаптер контроля",
-        "controlAdapter_few": "Адаптера контроля",
-        "controlAdapter_many": "Адаптеров контроля",
-        "safe": "Безопасный",
-        "colorMapTileSize": "Размер плитки",
-        "lineartAnime": "Контурный рисунок в стиле аниме",
-        "mediapipeFaceDescription": "Обнаружение лиц с помощью Mediapipe",
-        "hedDescription": "Целостное обнаружение границ",
-        "setControlImageDimensions": "Скопируйте размер в Ш/В (оптимизируйте для модели)",
-        "scribble": "Штрихи",
-        "maxFaces": "Макс Лица",
-        "mlsdDescription": "Минималистичный детектор отрезков линии",
-        "resizeSimple": "Изменить размер (простой)",
-        "megaControl": "Mega контроль",
-        "base": "Базовый",
-        "depthAnything": "Глубина всего",
-        "depthAnythingDescription": "Создание карты глубины с использованием метода Depth Anything",
-        "face": "Лицо",
-        "dwOpenposeDescription": "Оценка позы человека с помощью DW Openpose",
-        "large": "Большой",
-        "modelSize": "Размер модели",
-        "small": "Маленький",
-        "body": "Тело",
-        "hands": "Руки",
-        "selectCLIPVisionModel": "Выбрать модель CLIP Vision",
-        "ipAdapterMethod": "Метод",
-        "full": "Всё",
-        "mlsd": "M-LSD",
-        "h": "H",
-        "style": "Только стиль",
-        "dwOpenpose": "DW Openpose",
-        "pidi": "PIDI",
-        "composition": "Только композиция",
-        "hed": "HED",
-        "beginEndStepPercentShort": "Начало/конец %",
-        "setControlImageDimensionsForce": "Скопируйте размер в Ш/В (игнорируйте модель)",
-        "depthAnythingSmallV2": "Small V2"
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
@@ -1704,29 +1376,18 @@
         "resetRegion": "Сбросить регион",
         "debugLayers": "Слои отладки",
         "rectangle": "Прямоугольник",
-        "maskPreviewColor": "Цвет предпросмотра маски",
         "addNegativePrompt": "Добавить $t(common.negativePrompt)",
         "regionalGuidance": "Региональная точность",
         "opacity": "Непрозрачность",
-        "globalControlAdapter": "Глобальный $t(controlnet.controlAdapter_one)",
-        "globalControlAdapterLayer": "Глобальный $t(controlnet.controlAdapter_one) $t(unifiedCanvas.layer)",
-        "globalIPAdapter": "Глобальный $t(common.ipAdapter)",
-        "globalIPAdapterLayer": "Глобальный $t(common.ipAdapter) $t(unifiedCanvas.layer)",
         "opacityFilter": "Фильтр непрозрачности",
         "deleteAll": "Удалить всё",
         "addLayer": "Добавить слой",
         "moveToFront": "На передний план",
         "addPositivePrompt": "Добавить $t(common.positivePrompt)",
-        "addIPAdapter": "Добавить $t(common.ipAdapter)",
         "regionalGuidanceLayer": "$t(controlLayers.regionalGuidance) $t(unifiedCanvas.layer)",
         "resetProcessor": "Сброс процессора по умолчанию",
         "clearProcessor": "Чистый процессор",
-        "globalInitialImage": "Глобальное исходное изображение",
-        "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) $t(unifiedCanvas.layer)",
-        "noLayersAdded": "Без слоев",
-        "layers_one": "Слой",
-        "layers_few": "Слоя",
-        "layers_many": "Слоев"
+        "noLayersAdded": "Без слоев"
     },
     "ui": {
         "tabs": {

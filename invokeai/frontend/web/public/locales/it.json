@@ -82,10 +82,6 @@
         "goTo": "Vai a",
         "editor": "Editor",
         "tab": "Scheda",
-        "viewing": "Visualizza",
-        "viewingDesc": "Rivedi le immagini in un'ampia vista della galleria",
-        "editing": "Modifica",
-        "editingDesc": "Modifica nell'area Livelli di controllo",
         "enabled": "Abilitato",
         "disabled": "Disabilitato",
         "comparingDesc": "Confronta due immagini",
@@ -159,231 +155,9 @@
         "jump": "Salta"
     },
     "hotkeys": {
-        "keyboardShortcuts": "Tasti di scelta rapida",
-        "appHotkeys": "Applicazione",
-        "generalHotkeys": "Generale",
-        "galleryHotkeys": "Galleria",
-        "unifiedCanvasHotkeys": "Tela",
-        "invoke": {
-            "title": "Invoke",
-            "desc": "Genera un'immagine"
-        },
-        "cancel": {
-            "title": "Annulla",
-            "desc": "Annulla l'elemento della coda corrente"
-        },
-        "focusPrompt": {
-            "title": "Metti a fuoco il Prompt",
-            "desc": "Mette a fuoco l'area di immissione del prompt"
-        },
-        "toggleOptions": {
-            "title": "Attiva/disattiva le opzioni",
-            "desc": "Apre e chiude il pannello delle opzioni"
-        },
-        "pinOptions": {
-            "title": "Fissa le opzioni",
-            "desc": "Fissa il pannello delle opzioni"
-        },
-        "toggleGallery": {
-            "title": "Attiva/disattiva galleria",
-            "desc": "Apre e chiude il pannello della galleria"
-        },
-        "maximizeWorkSpace": {
-            "title": "Massimizza lo spazio di lavoro",
-            "desc": "Chiude i pannelli e massimizza l'area di lavoro"
-        },
-        "changeTabs": {
-            "title": "Cambia scheda",
-            "desc": "Passa a un'altra area di lavoro"
-        },
-        "consoleToggle": {
-            "title": "Attiva/disattiva console",
-            "desc": "Apre e chiude la console"
-        },
-        "setPrompt": {
-            "title": "Imposta Prompt",
-            "desc": "Usa il prompt dell'immagine corrente"
-        },
-        "setSeed": {
-            "title": "Imposta seme",
-            "desc": "Usa il seme dell'immagine corrente"
-        },
-        "setParameters": {
-            "title": "Imposta parametri",
-            "desc": "Utilizza tutti i parametri dell'immagine corrente"
-        },
-        "restoreFaces": {
-            "title": "Restaura volti",
-            "desc": "Restaura l'immagine corrente"
-        },
-        "showInfo": {
-            "title": "Mostra informazioni",
-            "desc": "Mostra le informazioni sui metadati dell'immagine corrente"
-        },
-        "sendToImageToImage": {
-            "title": "Invia a Generazione da immagine",
-            "desc": "Invia l'immagine corrente a Generazione da immagine"
-        },
-        "deleteImage": {
-            "title": "Elimina immagine",
-            "desc": "Elimina l'immagine corrente"
-        },
-        "closePanels": {
-            "title": "Chiudi pannelli",
-            "desc": "Chiude i pannelli aperti"
-        },
-        "previousImage": {
-            "title": "Immagine precedente",
-            "desc": "Visualizza l'immagine precedente nella galleria"
-        },
-        "nextImage": {
-            "title": "Immagine successiva",
-            "desc": "Visualizza l'immagine successiva nella galleria"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "Aumenta dimensione immagini nella galleria",
-            "desc": "Aumenta la dimensione delle miniature della galleria"
-        },
-        "decreaseGalleryThumbSize": {
-            "title": "Riduci dimensione immagini nella galleria",
-            "desc": "Riduce le dimensioni delle miniature della galleria"
-        },
-        "selectBrush": {
-            "title": "Seleziona Pennello",
-            "desc": "Seleziona il pennello della tela"
-        },
-        "selectEraser": {
-            "title": "Seleziona Cancellino",
-            "desc": "Seleziona il cancellino della tela"
-        },
-        "decreaseBrushSize": {
-            "title": "Riduci la dimensione del pennello",
-            "desc": "Riduce la dimensione del pennello/cancellino della tela"
-        },
-        "increaseBrushSize": {
-            "title": "Aumenta la dimensione del pennello",
-            "desc": "Aumenta la dimensione del pennello/cancellino della tela"
-        },
-        "decreaseBrushOpacity": {
-            "title": "Riduci l'opacità del pennello",
-            "desc": "Diminuisce l'opacità del pennello della tela"
-        },
-        "increaseBrushOpacity": {
-            "title": "Aumenta l'opacità del pennello",
-            "desc": "Aumenta l'opacità del pennello della tela"
-        },
-        "moveTool": {
-            "title": "Strumento Sposta",
-            "desc": "Consente la navigazione nella tela"
-        },
-        "fillBoundingBox": {
-            "title": "Riempi riquadro di selezione",
-            "desc": "Riempie il riquadro di selezione con il colore del pennello"
-        },
-        "eraseBoundingBox": {
-            "title": "Cancella riquadro di selezione",
-            "desc": "Cancella l'area del riquadro di selezione"
-        },
-        "colorPicker": {
-            "title": "Seleziona Selettore colore",
-            "desc": "Seleziona il selettore colore della tela"
-        },
-        "toggleSnap": {
-            "title": "Attiva/disattiva Aggancia",
-            "desc": "Attiva/disattiva Aggancia alla griglia"
-        },
-        "quickToggleMove": {
-            "title": "Attiva/disattiva Sposta rapido",
-            "desc": "Attiva/disattiva temporaneamente la modalità Sposta"
-        },
-        "toggleLayer": {
-            "title": "Attiva/disattiva livello",
-            "desc": "Attiva/disattiva la selezione del livello base/maschera"
-        },
-        "clearMask": {
-            "title": "Cancella maschera",
-            "desc": "Cancella l'intera maschera"
-        },
-        "hideMask": {
-            "title": "Nascondi maschera",
-            "desc": "Nasconde e mostra la maschera"
-        },
-        "showHideBoundingBox": {
-            "title": "Mostra/Nascondi riquadro di selezione",
-            "desc": "Attiva/disattiva la visibilità del riquadro di selezione"
-        },
-        "mergeVisible": {
-            "title": "Fondi il visibile",
-            "desc": "Fonde tutti gli strati visibili della tela"
-        },
-        "saveToGallery": {
-            "title": "Salva nella galleria",
-            "desc": "Salva la tela corrente nella galleria"
-        },
-        "copyToClipboard": {
-            "title": "Copia negli appunti",
-            "desc": "Copia la tela corrente negli appunti"
-        },
-        "downloadImage": {
-            "title": "Scarica l'immagine",
-            "desc": "Scarica la tela corrente"
-        },
-        "undoStroke": {
-            "title": "Annulla tratto",
-            "desc": "Annulla una pennellata"
-        },
-        "redoStroke": {
-            "title": "Ripeti tratto",
-            "desc": "Ripeti una pennellata"
-        },
-        "resetView": {
-            "title": "Reimposta vista",
-            "desc": "Ripristina la visualizzazione della tela"
-        },
-        "previousStagingImage": {
-            "title": "Immagine della sessione precedente",
-            "desc": "Immagine dell'area della sessione precedente"
-        },
-        "nextStagingImage": {
-            "title": "Immagine della sessione successivo",
-            "desc": "Immagine dell'area della sessione successiva"
-        },
-        "acceptStagingImage": {
-            "title": "Accetta l'immagine della sessione",
-            "desc": "Accetta l'immagine dell'area della sessione corrente"
-        },
-        "nodesHotkeys": "Nodi",
-        "addNodes": {
-            "title": "Aggiungi Nodi",
-            "desc": "Apre il menu Aggiungi Nodi"
-        },
-        "cancelAndClear": {
-            "desc": "Annulla l'elemento della coda corrente e cancella tutti gli elementi in sospeso",
-            "title": "Annulla e cancella"
-        },
-        "resetOptionsAndGallery": {
-            "title": "Ripristina le opzioni e la galleria",
-            "desc": "Reimposta i pannelli delle opzioni e della galleria"
-        },
         "searchHotkeys": "Cerca tasti di scelta rapida",
         "noHotkeysFound": "Nessun tasto di scelta rapida trovato",
-        "toggleOptionsAndGallery": {
-            "desc": "Apre e chiude le opzioni e i pannelli della galleria",
-            "title": "Attiva/disattiva le opzioni e la galleria"
-        },
-        "clearSearch": "Cancella ricerca",
-        "remixImage": {
-            "desc": "Utilizza tutti i parametri tranne il seme dell'immagine corrente",
-            "title": "Remixa l'immagine"
-        },
-        "toggleViewer": {
-            "title": "Attiva/disattiva il visualizzatore di immagini",
-            "desc": "Passa dal visualizzatore immagini all'area di lavoro per la scheda corrente."
-        },
-        "postProcess": {
-            "desc": "Elabora l'immagine corrente utilizzando il modello di post-elaborazione selezionato",
-            "title": "Elabora immagine"
-        }
+        "clearSearch": "Cancella ricerca"
     },
     "modelManager": {
         "modelManager": "Gestione Modelli",
@@ -520,8 +294,6 @@
         "scaledHeight": "Altezza ridimensionata",
         "infillMethod": "Metodo di riempimento",
         "tileSize": "Dimensione piastrella",
-        "sendToImg2Img": "Invia a Generazione da immagine",
-        "sendToUnifiedCanvas": "Invia alla Tela",
         "downloadImage": "Scarica l'immagine",
         "usePrompt": "Usa Prompt",
         "useSeed": "Usa Seme",
@@ -561,7 +333,6 @@
             "imageNotProcessedForControlAdapter": "L'immagine dell'adattatore di controllo #{{number}} non è stata elaborata",
             "layer": {
                 "initialImageNoImageSelected": "Nessuna immagine iniziale selezionata",
-                "t2iAdapterIncompatibleDimensions": "L'adattatore T2I richiede che la dimensione dell'immagine sia un multiplo di {{multiple}}",
                 "controlAdapterNoModelSelected": "Nessun modello di adattatore di controllo selezionato",
                 "controlAdapterIncompatibleBaseModel": "Il modello base dell'adattatore di controllo non è compatibile",
                 "controlAdapterNoImageSelected": "Nessuna immagine dell'adattatore di controllo selezionata",
@@ -602,7 +373,6 @@
         "models": "Modelli",
         "displayInProgress": "Visualizza le immagini di avanzamento",
         "confirmOnDelete": "Conferma l'eliminazione",
-        "enableImageDebugging": "Abilita il debug dell'immagine",
         "resetWebUI": "Reimposta l'interfaccia utente Web",
         "resetWebUIDesc1": "Il ripristino dell'interfaccia utente Web reimposta solo la cache locale del browser delle immagini e le impostazioni memorizzate. Non cancella alcuna immagine dal disco.",
         "resetWebUIDesc2": "Se le immagini non vengono visualizzate nella galleria o qualcos'altro non funziona, prova a reimpostare prima di segnalare un problema su GitHub.",
@@ -639,8 +409,6 @@
         "imageCopied": "Immagine copiata",
         "imageNotLoadedDesc": "Impossibile trovare l'immagine",
         "canvasMerged": "Tela unita",
-        "sentToImageToImage": "Inviato a Generazione da immagine",
-        "sentToUnifiedCanvas": "Inviato alla Tela",
         "parametersNotSet": "Parametri non richiamati",
         "metadataLoadFailed": "Impossibile caricare i metadati",
         "serverError": "Errore del Server",
@@ -978,93 +746,6 @@
         "hideBoards": "Nascondi bacheche",
         "viewBoards": "Visualizza bacheche",
         "deletedPrivateBoardsCannotbeRestored": "Le bacheche cancellate non possono essere ripristinate. Selezionando 'Cancella solo bacheca', le immagini verranno spostate nella bacheca \"Non categorizzato\" privata dell'autore dell'immagine."
-    },
-    "controlnet": {
-        "contentShuffleDescription": "Rimescola il contenuto di un'immagine",
-        "contentShuffle": "Rimescola contenuto",
-        "beginEndStepPercent": "Percentuale passi Inizio / Fine",
-        "duplicate": "Duplica",
-        "balanced": "Bilanciato",
-        "depthMidasDescription": "Generazione di mappe di profondità usando Midas",
-        "control": "Controllo",
-        "crop": "Ritaglia",
-        "depthMidas": "Profondità (Midas)",
-        "detectResolution": "Rileva la risoluzione",
-        "controlMode": "Modalità di controllo",
-        "cannyDescription": "Canny rilevamento bordi",
-        "depthZoe": "Profondità (Zoe)",
-        "autoConfigure": "Configura automaticamente il processore",
-        "delete": "Elimina",
-        "depthZoeDescription": "Generazione di mappe di profondità usando Zoe",
-        "resize": "Ridimensiona",
-        "showAdvanced": "Mostra opzioni Avanzate",
-        "bgth": "Soglia rimozione sfondo",
-        "importImageFromCanvas": "Importa immagine dalla Tela",
-        "lineartDescription": "Converte l'immagine in linea",
-        "importMaskFromCanvas": "Importa maschera dalla Tela",
-        "hideAdvanced": "Nascondi opzioni avanzate",
-        "resetControlImage": "Reimposta immagine di controllo",
-        "f": "F",
-        "h": "A",
-        "prompt": "Prompt",
-        "resizeMode": "Ridimensionamento",
-        "weight": "Peso",
-        "selectModel": "Seleziona un modello",
-        "w": "L",
-        "processor": "Processore",
-        "none": "Nessuno",
-        "pidiDescription": "Elaborazione immagini PIDI",
-        "fill": "Riempie",
-        "colorMapDescription": "Genera una mappa dei colori dall'immagine",
-        "lineartAnimeDescription": "Elaborazione linea in stile anime",
-        "imageResolution": "Risoluzione dell'immagine",
-        "colorMap": "Colore",
-        "lowThreshold": "Soglia inferiore",
-        "highThreshold": "Soglia superiore",
-        "normalBaeDescription": "Elaborazione BAE normale",
-        "noneDescription": "Nessuna elaborazione applicata",
-        "saveControlImage": "Salva immagine di controllo",
-        "toggleControlNet": "Attiva/disattiva questo ControlNet",
-        "safe": "Sicuro",
-        "colorMapTileSize": "Dimensione piastrella",
-        "mediapipeFaceDescription": "Rilevamento dei volti tramite Mediapipe",
-        "hedDescription": "Rilevamento dei bordi nidificati olisticamente",
-        "setControlImageDimensions": "Copia le dimensioni in L/A (ottimizza per il modello)",
-        "maxFaces": "Numero massimo di volti",
-        "addT2IAdapter": "Aggiungi $t(common.t2iAdapter)",
-        "addControlNet": "Aggiungi $t(common.controlNet)",
-        "addIPAdapter": "Aggiungi $t(common.ipAdapter)",
-        "controlAdapter_one": "Adattatore di Controllo",
-        "controlAdapter_many": "Adattatori di Controllo",
-        "controlAdapter_other": "Adattatori di Controllo",
-        "megaControl": "Mega ControlNet",
-        "minConfidence": "Confidenza minima",
-        "scribble": "Scarabocchio",
-        "amult": "Angolo di illuminazione",
-        "coarse": "Grossolano",
-        "resizeSimple": "Ridimensiona (semplice)",
-        "large": "Grande",
-        "small": "Piccolo",
-        "depthAnythingDescription": "Generazione di mappe di profondità utilizzando la tecnica Depth Anything",
-        "modelSize": "Dimensioni del modello",
-        "dwOpenposeDescription": "Stima della posa umana utilizzando DW Openpose",
-        "face": "Viso",
-        "body": "Corpo",
-        "hands": "Mani",
-        "lineartAnime": "Linea Anime",
-        "base": "Base",
-        "lineart": "Linea",
-        "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
-        "mediapipeFace": "Mediapipe Volto",
-        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
-        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
-        "selectCLIPVisionModel": "Seleziona un modello CLIP Vision",
-        "ipAdapterMethod": "Metodo",
-        "full": "Completo",
-        "composition": "Solo la composizione",
-        "style": "Solo lo stile",
-        "beginEndStepPercentShort": "Inizio/Fine %",
-        "setControlImageDimensionsForce": "Copia le dimensioni in L/A (ignora il modello)"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1688,27 +1369,16 @@
         "deletePrompt": "Cancella il prompt",
         "debugLayers": "Debug dei Livelli",
         "rectangle": "Rettangolo",
-        "maskPreviewColor": "Colore anteprima maschera",
         "addPositivePrompt": "Aggiungi $t(common.positivePrompt)",
         "addNegativePrompt": "Aggiungi $t(common.negativePrompt)",
-        "addIPAdapter": "Aggiungi $t(common.ipAdapter)",
         "regionalGuidance": "Guida regionale",
         "regionalGuidanceLayer": "$t(unifiedCanvas.layer) $t(controlLayers.regionalGuidance)",
         "opacity": "Opacità",
-        "globalControlAdapter": "$t(controlnet.controlAdapter_one) Globale",
-        "globalControlAdapterLayer": "$t(controlnet.controlAdapter_one) - $t(unifiedCanvas.layer) Globale",
-        "globalIPAdapter": "$t(common.ipAdapter) Globale",
-        "globalIPAdapterLayer": "$t(common.ipAdapter) - $t(unifiedCanvas.layer) Globale",
-        "globalInitialImage": "Immagine iniziale",
-        "globalInitialImageLayer": "$t(controlLayers.globalInitialImage) - $t(unifiedCanvas.layer) Globale",
         "clearProcessor": "Cancella processore",
         "resetProcessor": "Ripristina il processore alle impostazioni predefinite",
         "noLayersAdded": "Nessun livello aggiunto",
         "resetRegion": "Reimposta la regione",
-        "controlLayers": "Livelli di controllo",
-        "layers_one": "Livello",
-        "layers_many": "Livelli",
-        "layers_other": "Livelli"
+        "controlLayers": "Livelli di controllo"
     },
     "ui": {
         "tabs": {
