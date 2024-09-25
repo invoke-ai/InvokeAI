@@ -1,8 +1,8 @@
 import { Badge, ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $isStylePresetsMenuOpen } from '../store/stylePresetSlice';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
 import {
+  $isStylePresetsMenuOpen,
   activeStylePresetIdChanged,
   selectStylePresetActivePresetId,
 } from 'features/stylePresets/store/stylePresetSlice';
