@@ -1496,6 +1496,9 @@
         }
     },
     "workflows": {
+        "defaultWorkflows": "Default Workflows",
+        "userWorkflows": "User Workflows",
+        "projectWorkflows": "Project Workflows",
         "ascending": "Ascending",
         "created": "Created",
         "descending": "Descending",
