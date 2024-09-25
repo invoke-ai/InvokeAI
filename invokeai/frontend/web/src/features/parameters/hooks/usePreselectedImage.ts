@@ -1,5 +1,5 @@
-import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { withResultAsync } from 'common/util/result';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { settingsSendToCanvasChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
@@ -11,93 +11,71 @@ import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
 import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetImageDTOQuery, useGetImageMetadataQuery } from 'services/api/endpoints/images';
+import { getImageDTO, getImageMetadata } from 'services/api/endpoints/images';
 
-export const usePreselectedImage = (selectedImage?: {
-  imageName: string;
-  action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
-}) => {
-  const [isInit, setIsInit] = useState(false);
+export type UsePreselectedImageArg = { imageName: string; action: 'sendToCanvas' | 'useAllParameters' };
+
+export const usePreselectedImage = (arg?: UsePreselectedImageArg) => {
+  const didUseRef = useRef(false);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const bboxRect = useAppSelector(selectBboxRect);
   const imageViewer = useImageViewer();
-  const { currentData: selectedImageDto } = useGetImageDTOQuery(selectedImage?.imageName ?? skipToken);
 
-  const { currentData: selectedImageMetadata } = useGetImageMetadataQuery(selectedImage?.imageName ?? skipToken);
-
-  const handleSendToCanvas = useCallback(() => {
-    if (isInit) {
-      return;
-    }
-    if (selectedImageDto) {
-      const imageObject = imageDTOToImageObject(selectedImageDto);
-      const overrides: Partial<CanvasRasterLayerState> = {
-        position: { x: bboxRect.x, y: bboxRect.y },
-        objects: [imageObject],
-      };
-      dispatch(sentImageToCanvas());
-      dispatch(rasterLayerAdded({ overrides, isSelected: true }));
-      dispatch(setActiveTab('canvas'));
-      dispatch(settingsSendToCanvasChanged(true));
-      imageViewer.close();
-      toast({
-        id: 'SENT_TO_CANVAS',
-        title: t('toast.sentToUnifiedCanvas'),
-        status: 'info',
-      });
-      setIsInit(true);
-    }
-  }, [selectedImageDto, dispatch, bboxRect, imageViewer, isInit, t]);
-
-  const handleSendToImg2Img = useCallback(() => {
-    if (isInit) {
-      return;
-    }
-    if (selectedImageDto) {
-      const imageObject = imageDTOToImageObject(selectedImageDto);
+  const handleSendToCanvas = useCallback(
+    async (imageName: string) => {
+      const getImageDTOResult = await withResultAsync(() => getImageDTO(imageName));
+      if (getImageDTOResult.isErr()) {
+        toast({
+          id: 'SENT_TO_CANVAS',
+          title: t('toast.sentToUnifiedCanvas'),
+          status: 'info',
+        });
+        return;
+      }
+      const imageDTO = getImageDTOResult.value;
+      const imageObject = imageDTOToImageObject(imageDTO);
       const overrides: Partial<CanvasRasterLayerState> = {
         position: { x: bboxRect.x, y: bboxRect.y },
         objects: [imageObject],
       };
       dispatch(canvasReset());
       dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+      dispatch(settingsSendToCanvasChanged(true));
       dispatch(setActiveTab('canvas'));
-      dispatch(settingsSendToCanvasChanged(false));
+      dispatch(sentImageToCanvas());
       imageViewer.close();
       toast({
         id: 'SENT_TO_CANVAS',
-        title: t('toast.sentToCanvas'),
-        status: 'success',
+        title: t('toast.sentToUnifiedCanvas'),
+        status: 'info',
       });
-    }
-  }, [bboxRect.x, bboxRect.y, dispatch, selectedImageDto, imageViewer, t, isInit]);
+    },
+    [dispatch, bboxRect, imageViewer, t]
+  );
 
-  const handleUseAllMetadata = useCallback(() => {
-    if (selectedImageMetadata) {
-      parseAndRecallAllMetadata(selectedImageMetadata, true);
+  const handleUseAllMetadata = useCallback(async (imageName: string) => {
+    const getImageMetadataResult = await withResultAsync(() => getImageMetadata(imageName));
+    if (getImageMetadataResult.isErr()) {
+      return;
     }
-  }, [selectedImageMetadata]);
-
-  useEffect(() => {
-    if (selectedImage && selectedImage.action === 'sendToCanvas') {
-      handleSendToCanvas();
-    }
-  }, [selectedImage, handleSendToCanvas]);
+    const metadata = getImageMetadataResult.value;
+    parseAndRecallAllMetadata(metadata, true);
+  }, []);
 
   useEffect(() => {
-    if (selectedImage && selectedImage.action === 'sendToImg2Img') {
-      handleSendToImg2Img();
+    if (didUseRef.current || !arg) {
+      return;
     }
-  }, [selectedImage, handleSendToImg2Img]);
 
-  useEffect(() => {
-    if (selectedImage && selectedImage.action === 'useAllParameters') {
-      handleUseAllMetadata();
+    didUseRef.current = true;
+
+    if (arg.action === 'sendToCanvas') {
+      handleSendToCanvas(arg.imageName);
+    } else if (arg.action === 'useAllParameters') {
+      handleUseAllMetadata(arg.imageName);
     }
-  }, [selectedImage, handleUseAllMetadata]);
-
-  return { handleSendToCanvas, handleSendToImg2Img, handleUseAllMetadata };
+  }, [handleSendToCanvas, handleUseAllMetadata, arg]);
 };

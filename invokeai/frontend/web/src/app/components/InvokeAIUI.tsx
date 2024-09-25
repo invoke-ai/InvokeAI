@@ -19,6 +19,7 @@ import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
 import AppDndContext from 'features/dnd/components/AppDndContext';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
+import type { UsePreselectedImageArg } from 'features/parameters/hooks/usePreselectedImage';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
@@ -40,10 +41,7 @@ interface Props extends PropsWithChildren {
   projectName?: string;
   projectUrl?: string;
   queueId?: string;
-  selectedImage?: {
-    imageName: string;
-    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
-  };
+  selectedImage?: UsePreselectedImageArg;
   selectedWorkflowId?: string;
   selectedStylePresetId?: string;
   studioDestination?: StudioDestination;

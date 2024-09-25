@@ -16,6 +16,7 @@ import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageMo
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
+import type { UsePreselectedImageArg } from 'features/parameters/hooks/usePreselectedImage';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import { activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
@@ -39,10 +40,7 @@ const DEFAULT_CONFIG = {};
 
 interface Props {
   config?: PartialAppConfig;
-  selectedImage?: {
-    imageName: string;
-    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
-  };
+  selectedImage?: UsePreselectedImageArg;
   selectedWorkflowId?: string;
   selectedStylePresetId?: string;
   studioDestination?: StudioDestination;

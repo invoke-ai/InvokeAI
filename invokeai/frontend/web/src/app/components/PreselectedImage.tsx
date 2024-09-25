@@ -1,11 +1,9 @@
+import type { UsePreselectedImageArg } from 'features/parameters/hooks/usePreselectedImage';
 import { usePreselectedImage } from 'features/parameters/hooks/usePreselectedImage';
 import { memo } from 'react';
 
 type Props = {
-  selectedImage?: {
-    imageName: string;
-    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
-  };
+  selectedImage?: UsePreselectedImageArg;
 };
 
 const PreselectedImage = (props: Props) => {
