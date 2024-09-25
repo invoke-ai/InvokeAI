@@ -171,6 +171,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     const cursorPos = this.$cursorPos.get();
     const tool = this.$tool.get();
     const isFiltering = this.manager.stateApi.$isFiltering.get();
+    const isStaging = this.manager.stagingArea.$isStaging.get();
 
     const isDrawable =
       !!selectedEntity &&
@@ -182,7 +183,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     stage.setIsDraggable(tool === 'view');
 
-    if (!cursorPos || renderedEntityCount === 0 || isFiltering) {
+    if (!cursorPos || renderedEntityCount === 0 || isFiltering || isStaging) {
       // We can bail early if the mouse isn't over the stage or there are no layers
       this.konva.group.visible(false);
     } else {
