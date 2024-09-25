@@ -37,8 +37,8 @@ export const StagingAreaToolbarPrevButton = memo(() => {
 
   return (
     <IconButton
-      tooltip={`${t('unifiedCanvas.previous')} (Left)`}
-      aria-label={`${t('unifiedCanvas.previous')} (Left)`}
+      tooltip={`${t('controlLayers.stagingArea.previous')} (Left)`}
+      aria-label={`${t('controlLayers.stagingArea.previous')} (Left)`}
       icon={<PiArrowLeftBold />}
       onClick={selectPrev}
       colorScheme="invokeBlue"

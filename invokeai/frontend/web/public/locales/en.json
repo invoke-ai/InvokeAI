@@ -335,7 +335,8 @@
         "compareHelp3": "Press <Kbd>C</Kbd> to swap the compared images.",
         "compareHelp4": "Press <Kbd>Z</Kbd> or <Kbd>Esc</Kbd> to exit.",
         "openViewer": "Open Viewer",
-        "closeViewer": "Close Viewer"
+        "closeViewer": "Close Viewer",
+        "move": "Move"
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
@@ -1024,7 +1025,10 @@
         "remixImage": "Remix Image",
         "usePrompt": "Use Prompt",
         "useSeed": "Use Seed",
-        "width": "Width"
+        "width": "Width",
+        "gaussianBlur": "Gaussian Blur",
+        "boxBlur": "Box Blur",
+        "staged": "Staged"
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Show Dynamic Prompts",
@@ -1488,34 +1492,6 @@
             ]
         }
     },
-    "unifiedCanvas": {
-        "accept": "Accept",
-        "base": "Base",
-        "brush": "Brush",
-        "canvasSettings": "Canvas Settings",
-        "clearHistory": "Clear History",
-        "coherenceModeGaussianBlur": "Gaussian Blur",
-        "coherenceModeBoxBlur": "Box Blur",
-        "coherenceModeStaged": "Staged",
-        "colorPicker": "Color Picker",
-        "copyToClipboard": "Copy to Clipboard",
-        "discardAll": "Discard All & Cancel Pending Generations",
-        "discardCurrent": "Discard Current",
-        "eraser": "Eraser",
-        "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
-        "layer": "Layer",
-        "mask": "Mask",
-        "mergeVisible": "Merge Visible",
-        "move": "Move",
-        "next": "Next",
-        "previous": "Previous",
-        "redo": "Redo",
-        "saveToGallery": "Save To Gallery",
-        "showResultsOn": "Show Results (On)",
-        "showResultsOff": "Show Results (Off)",
-        "snapToGrid": "Snap to Grid",
-        "undo": "Undo"
-    },
     "workflows": {
         "ascending": "Ascending",
         "created": "Created",
@@ -1816,7 +1792,8 @@
             "isolatedPreview": "Isolated Preview",
             "isolatedStagingPreview": "Isolated Staging Preview",
             "isolatedFilteringPreview": "Isolated Filtering Preview",
-            "isolatedTransformingPreview": "Isolated Transforming Preview"
+            "isolatedTransformingPreview": "Isolated Transforming Preview",
+            "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size"
         },
         "HUD": {
             "bbox": "Bbox",
@@ -1839,6 +1816,16 @@
             "newRegionalReferenceImage": "New Regional Reference Image",
             "newControlLayer": "New Control Layer",
             "newRasterLayer": "New Raster Layer"
+        },
+        "stagingArea": {
+            "accept": "Accept",
+            "discardAll": "Discard All",
+            "discard": "Discard",
+            "previous": "Previous",
+            "next": "Next",
+            "saveToGallery": "Save To Gallery",
+            "showResultsOn": "Showing Results",
+            "showResultsOff": "Hiding Results"
         }
     },
     "upscaling": {

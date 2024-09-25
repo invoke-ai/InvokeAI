@@ -37,8 +37,8 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
 
   return (
     <IconButton
-      tooltip={t('unifiedCanvas.saveToGallery')}
-      aria-label={t('unifiedCanvas.saveToGallery')}
+      tooltip={t('controlLayers.stagingArea.saveToGallery')}
+      aria-label={t('controlLayers.stagingArea.saveToGallery')}
       icon={<PiFloppyDiskBold />}
       onClick={saveSelectedImageToGallery}
       colorScheme="invokeBlue"

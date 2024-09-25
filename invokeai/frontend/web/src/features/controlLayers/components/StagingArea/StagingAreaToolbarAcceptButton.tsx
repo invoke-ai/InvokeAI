@@ -57,8 +57,8 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
 
   return (
     <IconButton
-      tooltip={`${t('unifiedCanvas.accept')} (Enter)`}
-      aria-label={`${t('unifiedCanvas.accept')} (Enter)`}
+      tooltip={`${t('common.accept')} (Enter)`}
+      aria-label={`${t('common.accept')} (Enter)`}
       icon={<PiCheckBold />}
       onClick={acceptSelected}
       colorScheme="invokeBlue"

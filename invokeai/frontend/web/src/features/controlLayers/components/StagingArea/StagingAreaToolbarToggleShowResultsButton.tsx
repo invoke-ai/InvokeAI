@@ -17,8 +17,8 @@ export const StagingAreaToolbarToggleShowResultsButton = memo(() => {
 
   return (
     <IconButton
-      tooltip={shouldShowStagedImage ? t('unifiedCanvas.showResultsOn') : t('unifiedCanvas.showResultsOff')}
-      aria-label={shouldShowStagedImage ? t('unifiedCanvas.showResultsOn') : t('unifiedCanvas.showResultsOff')}
+      tooltip={shouldShowStagedImage ? t('controlLayers.stagingArea.showResultsOn') : t('controlLayers.stagingArea.showResultsOff')}
+      aria-label={shouldShowStagedImage ? t('controlLayers.stagingArea.showResultsOn') : t('controlLayers.stagingArea.showResultsOff')}
       data-alert={!shouldShowStagedImage}
       icon={shouldShowStagedImage ? <PiEyeBold /> : <PiEyeSlashBold />}
       onClick={toggleShowResults}
