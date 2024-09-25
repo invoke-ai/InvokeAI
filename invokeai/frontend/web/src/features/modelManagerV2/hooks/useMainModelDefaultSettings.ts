@@ -42,7 +42,7 @@ export const useMainModelDefaultSettings = (modelConfig: MainModelConfig) => {
       },
       scheduler: {
         isEnabled: !isNil(modelConfig?.default_settings?.scheduler),
-        value: modelConfig?.default_settings?.scheduler || initialScheduler || 'euler',
+        value: modelConfig?.default_settings?.scheduler || initialScheduler || 'dpmpp_3m_k',
       },
       steps: {
         isEnabled: !isNil(modelConfig?.default_settings?.steps),
