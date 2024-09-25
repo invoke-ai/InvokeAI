@@ -161,10 +161,6 @@ const GalleryImageContent = memo(({ index, imageDTO }: GalleryImageContentProps)
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
 
-  if (!imageDTO) {
-    return <IAIFillSkeleton />;
-  }
-
   return (
     <Box w="full" h="full" className={GALLERY_IMAGE_CLASS_NAME} data-testid={dataTestId} sx={boxSx}>
       <Flex
@@ -228,7 +224,7 @@ const GalleryImageContent = memo(({ index, imageDTO }: GalleryImageContentProps)
 
 GalleryImageContent.displayName = 'GalleryImageContent';
 
-const DeleteIcon = ({ imageDTO }: { imageDTO: ImageDTO }) => {
+const DeleteIcon = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -257,9 +253,9 @@ const DeleteIcon = ({ imageDTO }: { imageDTO: ImageDTO }) => {
       insetInlineEnd={2}
     />
   );
-};
+});
 
-const OpenInViewerIconButton = ({ imageDTO }: { imageDTO: ImageDTO }) => {
+const OpenInViewerIconButton = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const imageViewer = useImageViewer();
   const { t } = useTranslation();
 
@@ -277,4 +273,4 @@ const OpenInViewerIconButton = ({ imageDTO }: { imageDTO: ImageDTO }) => {
       insetInlineStart={2}
     />
   );
-};
+});

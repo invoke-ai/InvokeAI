@@ -14,6 +14,16 @@ import type { ImageDTO } from 'services/api/types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TableVirtuosoScrollerRef = (ref: HTMLElement | Window | null) => any;
 
+const selectors = new Map<string, ReturnType<typeof imagesApi.endpoints.getImageDTO.select>>();
+const getSelector = (name: string) => {
+  let selector = selectors.get(name);
+  if (!selector) {
+    selector = imagesApi.endpoints.getImageDTO.select(name);
+    selectors.set(name, selector);
+  }
+  return selector;
+};
+
 export const GalleryImageListExperiment = memo(() => {
   const store = useAppStore();
   const { data } = useGetImageNamesQuery({ starred_first: false });
@@ -35,10 +45,10 @@ export const GalleryImageListExperiment = memo(() => {
       if (imageNames) {
         // optimisation: we may have already loaded some of these images, so filter out the ones we already have
         const imageNamesToFetch: string[] = [];
+        const state = store.getState();
         for (const name of imageNames) {
           // check if we have this image cached already
-          const { data } = imagesApi.endpoints.getImageDTO.select(name)(store.getState());
-          if (!data) {
+          if (!getSelector(name)(state).data) {
             // nope, we need to fetch it
             imageNamesToFetch.push(name);
           }
@@ -89,7 +99,7 @@ export const GalleryImageListExperiment = memo(() => {
         components={components}
         itemContent={itemContent}
         rangeChanged={debouncedOnRangeChanged}
-        overscan={10}
+        overscan={50}
         // increases teh virual viewport by 200px in each direction, so we fetch a few more images than required
         scrollerRef={setScroller as TableVirtuosoScrollerRef}
       />
@@ -115,7 +125,7 @@ const useGetImageDTOCache = (imageName: string): ImageDTO | undefined => {
 const HEIGHT = 24;
 
 const ListItem = ({ index, data }: { index: number; data: string }) => {
-  const imageDTO = useGetImageDTOCache(data);
+  const imageDTO = useAppSelector(getSelector(data)).data;
 
   if (!imageDTO) {
     return <Skeleton w="full" h={HEIGHT} />;
