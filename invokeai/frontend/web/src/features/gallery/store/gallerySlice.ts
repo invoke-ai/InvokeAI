@@ -53,7 +53,7 @@ export const gallerySlice = createSlice({
       }
 
       // If the selected image is different from the current selection, clear the selection and select the new image
-      if (isEqual(state.selection[0], selectedImage)) {
+      if (!isEqual(state.selection[0], selectedImage)) {
         state.selection = [selectedImage];
         return;
       }
