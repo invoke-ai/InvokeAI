@@ -101,7 +101,7 @@ export const usePanel = (arg: UsePanelOptions): UsePanelReturn => {
         arg.panelGroupDirection
       );
 
-      if (minSizePct > 100) {
+      if (!minSizePct || minSizePct > 100 || !defaultSizePct || defaultSizePct > 100) {
         // This can happen when the panel is hidden
         return;
       }
@@ -243,6 +243,11 @@ const getSizeAsPercentage = (
   // The available space is the width/height of the panel group...
   let availableSpace =
     panelGroupDirection === 'horizontal' ? panelGroupElement.offsetWidth : panelGroupElement.offsetHeight;
+
+  if (!availableSpace) {
+    // No available space, size is 0
+    return 0;
+  }
 
   // ...minus the width/height of the resize handles
   getResizeHandleElementsForGroup(id).forEach((el) => {
