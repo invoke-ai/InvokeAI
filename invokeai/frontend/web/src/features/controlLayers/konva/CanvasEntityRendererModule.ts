@@ -1,8 +1,21 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { type CanvasState, getEntityIdentifier } from 'features/controlLayers/store/types';
+import {
+  selectCanvasSlice,
+  selectControlLayerEntities,
+  selectInpaintMaskEntities,
+  selectRasterLayerEntities,
+  selectRegionalGuidanceEntities,
+} from 'features/controlLayers/store/selectors';
+import type {
+  CanvasControlLayerState,
+  CanvasInpaintMaskState,
+  CanvasRasterLayerState,
+  CanvasRegionalGuidanceState,
+  CanvasState,
+} from 'features/controlLayers/store/types';
+import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import type { Logger } from 'roarr';
 
 export class CanvasEntityRendererModule extends CanvasModuleBase {
@@ -25,62 +38,66 @@ export class CanvasEntityRendererModule extends CanvasModuleBase {
 
     this.log.debug('Creating module');
 
-    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.render));
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectRasterLayerEntities, this.createNewRasterLayers)
+    );
+
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectControlLayerEntities, this.createNewControlLayers)
+    );
+
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectInpaintMaskEntities, this.createNewInpaintMasks)
+    );
+
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectRegionalGuidanceEntities, this.createNewRegionalGuidance)
+    );
+
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.arrangeEntities));
   }
 
   initialize = () => {
     this.log.debug('Initializing module');
-    this.render(this.manager.stateApi.runSelector(selectCanvasSlice), null);
+    this.createNewRasterLayers(this.manager.stateApi.runSelector(selectRasterLayerEntities));
+    this.createNewControlLayers(this.manager.stateApi.runSelector(selectControlLayerEntities));
+    this.createNewRegionalGuidance(this.manager.stateApi.runSelector(selectRegionalGuidanceEntities));
+    this.createNewInpaintMasks(this.manager.stateApi.runSelector(selectInpaintMaskEntities));
+    this.arrangeEntities(this.manager.stateApi.runSelector(selectCanvasSlice), null);
   };
 
-  render = async (state: CanvasState, prevState: CanvasState | null) => {
-    await this.createNewRasterLayers(state, prevState);
-    await this.createNewControlLayers(state, prevState);
-    await this.createNewRegionalGuidance(state, prevState);
-    await this.createNewInpaintMasks(state, prevState);
-    this.arrangeEntities(state, prevState);
-  };
-
-  createNewRasterLayers = async (state: CanvasState, prevState: CanvasState | null) => {
-    if (!prevState || state.rasterLayers.entities !== prevState.rasterLayers.entities) {
-      for (const entityState of state.rasterLayers.entities) {
-        if (!this.manager.adapters.rasterLayers.has(entityState.id)) {
-          const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
-          await adapter.initialize();
-        }
+  createNewRasterLayers = (entities: CanvasRasterLayerState[]) => {
+    for (const entityState of entities) {
+      if (!this.manager.adapters.rasterLayers.has(entityState.id)) {
+        const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
+        adapter.initialize();
       }
     }
   };
 
-  createNewControlLayers = async (state: CanvasState, prevState: CanvasState | null) => {
-    if (!prevState || state.controlLayers.entities !== prevState.controlLayers.entities) {
-      for (const entityState of state.controlLayers.entities) {
-        if (!this.manager.adapters.controlLayers.has(entityState.id)) {
-          const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
-          await adapter.initialize();
-        }
+  createNewControlLayers = (entities: CanvasControlLayerState[]) => {
+    for (const entityState of entities) {
+      if (!this.manager.adapters.controlLayers.has(entityState.id)) {
+        const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
+        adapter.initialize();
       }
     }
   };
 
-  createNewRegionalGuidance = async (state: CanvasState, prevState: CanvasState | null) => {
-    if (!prevState || state.regionalGuidance.entities !== prevState.regionalGuidance.entities) {
-      for (const entityState of state.regionalGuidance.entities) {
-        if (!this.manager.adapters.regionMasks.has(entityState.id)) {
-          const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
-          await adapter.initialize();
-        }
+  createNewRegionalGuidance = (entities: CanvasRegionalGuidanceState[]) => {
+    for (const entityState of entities) {
+      if (!this.manager.adapters.regionMasks.has(entityState.id)) {
+        const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
+        adapter.initialize();
       }
     }
   };
 
-  createNewInpaintMasks = async (state: CanvasState, prevState: CanvasState | null) => {
-    if (!prevState || state.inpaintMasks.entities !== prevState.inpaintMasks.entities) {
-      for (const entityState of state.inpaintMasks.entities) {
-        if (!this.manager.adapters.inpaintMasks.has(entityState.id)) {
-          const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
-          await adapter.initialize();
-        }
+  createNewInpaintMasks = (entities: CanvasInpaintMaskState[]) => {
+    for (const entityState of entities) {
+      if (!this.manager.adapters.inpaintMasks.has(entityState.id)) {
+        const adapter = this.manager.createAdapter(getEntityIdentifier(entityState));
+        adapter.initialize();
       }
     }
   };
