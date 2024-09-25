@@ -20,6 +20,7 @@ from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.denoise import denoise
+from invokeai.backend.flux.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
     clip_timestep_schedule_fractional,
@@ -29,7 +30,6 @@ from invokeai.backend.flux.sampling_utils import (
     pack,
     unpack,
 )
-from invokeai.backend.flux.trajectory_guidance_extension import TrajectoryGuidanceExtension
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.lora.lora_patcher import LoRAPatcher
 from invokeai.backend.model_manager.config import ModelFormat
@@ -181,12 +181,14 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Now that we have 'packed' the latent tensors, verify that we calculated the image_seq_len correctly.
         assert image_seq_len == x.shape[1]
 
-        # Prepare trajectory guidance extension.
-        traj_guidance_extension: TrajectoryGuidanceExtension | None = None
-        if init_latents is not None:
-            traj_guidance_extension = TrajectoryGuidanceExtension(
+        # Prepare inpaint extension.
+        inpaint_extension: InpaintExtension | None = None
+        if inpaint_mask is not None:
+            assert init_latents is not None
+            inpaint_extension = InpaintExtension(
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,
+                noise=noise,
             )
 
         with (
@@ -234,7 +236,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 timesteps=timesteps,
                 step_callback=self._build_step_callback(context),
                 guidance=self.guidance,
-                traj_guidance_extension=traj_guidance_extension,
+                inpaint_extension=inpaint_extension,
             )
 
         x = unpack(x.float(), self.height, self.width)
