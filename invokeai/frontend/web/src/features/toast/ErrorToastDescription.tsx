@@ -36,7 +36,11 @@ export default function ErrorToastDescription({ errorType, errorMessage, session
   }, [errorMessage, errorType, isLocal, t]);
   return (
     <Flex flexDir="column">
-      {description && <Text fontSize="md">{description}</Text>}
+      {description && (
+        <Text noOfLines={4} fontSize="md">
+          {description}
+        </Text>
+      )}
       {!isLocal && (
         <Flex gap="2" alignItems="center">
           <Text fontSize="sm" fontStyle="italic">
