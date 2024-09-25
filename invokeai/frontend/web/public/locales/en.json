@@ -1491,7 +1491,7 @@
         "optimizedDenoising": {
             "heading": "Optimized Image-to-Image",
             "paragraphs": [
-                "Enable optimized image-to-image for enhanced image-to-image and inpainting transformations with Flux models. This setting improves detail and clarity during generation, but may be turned off to preserve more of your original image. This setting is still being tuned and is in beta status."
+                "Enable 'Optimized Image-to-Image' for a more gradual Denoise Strength scale for image-to-image and inpainting transformations with Flux models. This setting improves the ability to control the amount of change applied to an image, but may be turned off if you prefer to use the standard Denoise Strength scale. This setting is still being tuned and is in beta status."
             ]
         }
     },
