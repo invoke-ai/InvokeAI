@@ -77,15 +77,6 @@
             "options": "$t(accordions.advanced.title) 選項"
         }
     },
-    "hotkeys": {
-        "nodesHotkeys": "節點",
-        "cancel": {
-            "title": "取消"
-        },
-        "generalHotkeys": "一般",
-        "keyboardShortcuts": "快捷鍵",
-        "appHotkeys": "應用程式"
-    },
     "modelManager": {
         "advanced": "進階",
         "allModels": "全部模型",
@@ -109,23 +100,6 @@
         "search": "搜尋",
         "vae": "VAE",
         "settings": "設定"
-    },
-    "controlnet": {
-        "mlsd": "M-LSD",
-        "canny": "Canny",
-        "duplicate": "重複",
-        "none": "無",
-        "pidi": "PIDI",
-        "h": "H",
-        "balanced": "平衡",
-        "crop": "裁切",
-        "processor": "處理器",
-        "control": "控制",
-        "f": "F",
-        "lineart": "線條藝術",
-        "w": "W",
-        "hed": "HED",
-        "delete": "刪除"
     },
     "queue": {
         "queue": "佇列",
