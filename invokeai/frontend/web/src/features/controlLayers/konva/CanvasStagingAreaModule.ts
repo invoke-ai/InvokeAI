@@ -62,6 +62,7 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
   initialize = () => {
     this.log.debug('Initializing module');
     this.render();
+    this.$isStaging.set(this.manager.stateApi.runSelector(selectIsStaging));
   };
 
   render = async () => {
