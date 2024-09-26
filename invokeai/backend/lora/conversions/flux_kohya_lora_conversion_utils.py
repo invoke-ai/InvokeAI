@@ -1,4 +1,3 @@
-import itertools
 import re
 from typing import Any, Dict, TypeVar
 
@@ -22,6 +21,11 @@ FLUX_KOHYA_TRANSFORMER_KEY_REGEX = (
 #   lora_te1_text_model_encoder_layers_0_mlp_fc1.lora_down.weight
 #   lora_te1_text_model_encoder_layers_0_mlp_fc1.lora_up.weight
 FLUX_KOHYA_T5_KEY_REGEX = r"lora_te1_text_model_encoder_layers_(\d+)_(mlp|self_attn)_(\w+)\.?.*"
+
+
+# Prefixes used to distinguish between transformer and T5 keys in the InvokeAI LoRA format.
+FLUX_KOHYA_TRANFORMER_PREFIX = "lora_transformer-"
+FLUX_KOHYA_T5_PREFIX = "lora_t5-"
 
 
 def is_state_dict_likely_in_flux_kohya_format(state_dict: Dict[str, Any]) -> bool:
@@ -61,8 +65,10 @@ def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -
 
     # Create LoRA layers.
     layers: dict[str, AnyLoRALayer] = {}
-    for layer_key, layer_state_dict in itertools.chain(transformer_grouped_sd.items(), t5_grouped_sd.items()):
-        layers[layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
+    for layer_key, layer_state_dict in transformer_grouped_sd.items():
+        layers[FLUX_KOHYA_TRANFORMER_PREFIX + layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
+    for layer_key, layer_state_dict in t5_grouped_sd.items():
+        layers[FLUX_KOHYA_T5_PREFIX + layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
 
     # Create and return the LoRAModelRaw.
     return LoRAModelRaw(layers=layers)
