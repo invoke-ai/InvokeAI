@@ -5,6 +5,8 @@ import torch
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.util import params
 from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import (
+    FLUX_KOHYA_T5_PREFIX,
+    FLUX_KOHYA_TRANFORMER_PREFIX,
     _convert_flux_transformer_kohya_state_dict_to_invoke_format,
     is_state_dict_likely_in_flux_kohya_format,
     lora_model_from_flux_kohya_state_dict,
@@ -92,9 +94,9 @@ def test_lora_model_from_flux_kohya_state_dict(sd_keys: list[str]):
     # Prepare expected layer keys.
     expected_layer_keys: set[str] = set()
     for k in sd_keys:
-        # Remove prefixes.
-        k = k.replace("lora_unet_", "")
-        k = k.replace("lora_te1_", "")
+        # Replace prefixes.
+        k = k.replace("lora_unet_", FLUX_KOHYA_TRANFORMER_PREFIX)
+        k = k.replace("lora_te1_", FLUX_KOHYA_T5_PREFIX)
         # Remove suffixes.
         k = k.replace(".lora_up.weight", "")
         k = k.replace(".lora_down.weight", "")
