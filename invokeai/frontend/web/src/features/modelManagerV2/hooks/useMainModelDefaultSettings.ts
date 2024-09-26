@@ -7,6 +7,7 @@ import type { MainModelConfig } from 'services/api/types';
 
 const initialStatesSelector = createMemoizedSelector(selectConfigSlice, (config) => {
   const { steps, guidance, scheduler, cfgRescaleMultiplier, vaePrecision, width, height } = config.sd;
+  const { guidance: fluxGuidance } = config.flux;
 
   return {
     initialSteps: steps.initial,
@@ -16,6 +17,7 @@ const initialStatesSelector = createMemoizedSelector(selectConfigSlice, (config)
     initialVaePrecision: vaePrecision,
     initialWidth: width.initial,
     initialHeight: height.initial,
+    initialGuidance: fluxGuidance.initial,
   };
 });
 
@@ -28,6 +30,7 @@ export const useMainModelDefaultSettings = (modelConfig: MainModelConfig) => {
     initialVaePrecision,
     initialWidth,
     initialHeight,
+    initialGuidance,
   } = useAppSelector(initialStatesSelector);
 
   const defaultSettingsDefaults = useMemo(() => {
@@ -64,6 +67,10 @@ export const useMainModelDefaultSettings = (modelConfig: MainModelConfig) => {
         isEnabled: !isNil(modelConfig?.default_settings?.height),
         value: modelConfig?.default_settings?.height || initialHeight,
       },
+      guidance: {
+        isEnabled: !isNil(modelConfig?.default_settings?.guidance),
+        value: modelConfig?.default_settings?.guidance || initialGuidance,
+      },
     };
   }, [
     modelConfig,
@@ -74,6 +81,7 @@ export const useMainModelDefaultSettings = (modelConfig: MainModelConfig) => {
     initialCfgRescaleMultiplier,
     initialWidth,
     initialHeight,
+    initialGuidance,
   ]);
 
   return defaultSettingsDefaults;

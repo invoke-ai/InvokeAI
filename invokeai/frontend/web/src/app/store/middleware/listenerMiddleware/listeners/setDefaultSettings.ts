@@ -4,6 +4,7 @@ import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaS
 import {
   setCfgRescaleMultiplier,
   setCfgScale,
+  setGuidance,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
@@ -13,6 +14,7 @@ import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
+  isParameterGuidance,
   isParameterHeight,
   isParameterPrecision,
   isParameterScheduler,
@@ -49,7 +51,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
       }
 
       if (isNonRefinerMainModelConfig(modelConfig) && modelConfig.default_settings) {
-        const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler, width, height } =
+        const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler, width, height, guidance } =
           modelConfig.default_settings;
 
         if (vae) {
@@ -70,6 +72,12 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         if (vae_precision) {
           if (isParameterPrecision(vae_precision)) {
             dispatch(vaePrecisionChanged(vae_precision));
+          }
+        }
+
+        if (guidance) {
+          if (isParameterGuidance(guidance)) {
+            dispatch(setGuidance(guidance));
           }
         }
 

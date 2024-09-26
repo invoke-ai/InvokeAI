@@ -11037,6 +11037,11 @@ export type components = {
              * @description Default height for this model
              */
             height?: number | null;
+            /**
+             * Guidance
+             * @description Default Guidance for this model
+             */
+            guidance?: number | null;
         };
         /**
          * Main Model
