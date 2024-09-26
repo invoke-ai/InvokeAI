@@ -1,7 +1,7 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { INTERACTION_SCOPES, useScopeImperativeApi, useScopeOnFocus } from 'common/hooks/interactionScopes';
+import { $focusedRegion, FOCUS_REGIONS, useFocusRegion } from 'common/hooks/interactionScopes';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
@@ -89,9 +89,8 @@ export const Flow = memo(() => {
   const cancelConnection = useReactFlowStore(selectCancelConnection);
   const updateNodeInternals = useUpdateNodeInternals();
   const store = useAppStore();
-  const isWorkflowsActive = useStore(INTERACTION_SCOPES.workflows.$isActive);
-  const workflowsScopeApi = useScopeImperativeApi('workflows');
-  useScopeOnFocus('workflows', flowWrapper);
+  const isWorkflowsActive = useStore(FOCUS_REGIONS.workflows.$isFocused);
+  useFocusRegion('workflows', flowWrapper);
 
   useWorkflowWatcher();
   useSyncExecutionState();
@@ -129,8 +128,8 @@ export const Flow = memo(() => {
   const { onCloseGlobal } = useGlobalMenuClose();
   const handlePaneClick = useCallback(() => {
     onCloseGlobal();
-    workflowsScopeApi.add();
-  }, [onCloseGlobal, workflowsScopeApi]);
+    $focusedRegion.set('workflows');
+  }, [onCloseGlobal]);
 
   const onInit: OnInit = useCallback((flow) => {
     $flow.set(flow);

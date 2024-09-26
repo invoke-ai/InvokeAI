@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
+import { FOCUS_REGIONS } from 'common/hooks/interactionScopes';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -11,7 +11,7 @@ import { PiArrowsOutBold } from 'react-icons/pi';
 export const CanvasToolbarResetViewButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
-  const isCanvasActive = useStore(INTERACTION_SCOPES.canvas.$isActive);
+  const isCanvasActive = useStore(FOCUS_REGIONS.canvas.$isFocused);
   const imageViewer = useImageViewer();
 
   useRegisteredHotkeys({

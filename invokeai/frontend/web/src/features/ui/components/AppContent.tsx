@@ -1,6 +1,5 @@
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { CanvasMainPanelContent } from 'features/controlLayers/components/CanvasMainPanelContent';
 import { CanvasRightPanel } from 'features/controlLayers/components/CanvasRightPanel';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
@@ -40,9 +39,6 @@ const onLeftPanelCollapse = (isCollapsed: boolean) => $isLeftPanelOpen.set(!isCo
 const onRightPanelCollapse = (isCollapsed: boolean) => $isRightPanelOpen.set(!isCollapsed);
 
 export const AppContent = memo(() => {
-  const ref = useRef<HTMLDivElement>(null);
-  useScopeOnFocus('gallery', ref);
-
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
 
   const withLeftPanel = useAppSelector(selectWithLeftPanel);
@@ -119,7 +115,7 @@ export const AppContent = memo(() => {
   });
 
   return (
-    <Flex ref={ref} id="invoke-app-tabs" w="full" h="full" gap={4} p={4}>
+    <Flex id="invoke-app-tabs" w="full" h="full" gap={4} p={4}>
       <VerticalNavBar />
       <Flex position="relative" w="full" h="full" gap={4} minW={0}>
         <PanelGroup

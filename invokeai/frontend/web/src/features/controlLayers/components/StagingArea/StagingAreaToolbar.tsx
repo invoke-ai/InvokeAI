@@ -1,5 +1,5 @@
 import { ButtonGroup } from '@invoke-ai/ui-library';
-import { useScopeOnMount } from 'common/hooks/interactionScopes';
+import { useFocusRegionOnMount } from 'common/hooks/interactionScopes';
 import { StagingAreaToolbarAcceptButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarAcceptButton';
 import { StagingAreaToolbarDiscardAllButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarDiscardAllButton';
 import { StagingAreaToolbarDiscardSelectedButton } from 'features/controlLayers/components/StagingArea/StagingAreaToolbarDiscardSelectedButton';
@@ -11,7 +11,7 @@ import { StagingAreaToolbarToggleShowResultsButton } from 'features/controlLayer
 import { memo } from 'react';
 
 export const StagingAreaToolbar = memo(() => {
-  useScopeOnMount('stagingArea');
+  useFocusRegionOnMount('stagingArea');
 
   return (
     <>

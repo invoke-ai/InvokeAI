@@ -1,6 +1,6 @@
 import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useScopeOnFocus, useScopeOnMount } from 'common/hooks/interactionScopes';
+import { useFocusRegion, useFocusRegionOnMount } from 'common/hooks/interactionScopes';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
@@ -10,7 +10,7 @@ import { ImageComparisonDroppable } from 'features/gallery/components/ImageViewe
 import { ViewerToolbar } from 'features/gallery/components/ImageViewer/ViewerToolbar';
 import { selectHasImageToCompare } from 'features/gallery/store/gallerySelectors';
 import type { ReactNode } from 'react';
-import { memo, useEffect, useRef } from 'react';
+import { memo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
@@ -27,12 +27,8 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
   const hasImageToCompare = useAppSelector(selectHasImageToCompare);
   const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
   const ref = useRef<HTMLDivElement>(null);
-  useScopeOnFocus('imageViewer', ref);
-  useScopeOnMount('imageViewer');
-
-  useEffect(() => {
-    ref?.current?.focus();
-  }, []);
+  useFocusRegion('imageViewer', ref);
+  useFocusRegionOnMount('imageViewer');
 
   return (
     <Flex

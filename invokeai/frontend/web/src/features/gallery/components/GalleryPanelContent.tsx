@@ -1,6 +1,6 @@
 import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useScopeOnFocus } from 'common/hooks/interactionScopes';
+import { useFocusRegion } from 'common/hooks/interactionScopes';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
@@ -26,8 +26,8 @@ const GalleryPanelContent = () => {
   const dispatch = useAppDispatch();
   const boardSearchDisclosure = useDisclosure({ defaultIsOpen: !!boardSearchText.length });
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
-  const ref = useRef<HTMLDivElement>(null);
-  useScopeOnFocus('gallery', ref);
+  const galleryPanelFocusRef = useRef<HTMLDivElement>(null);
+  useFocusRegion('galleryPanel', galleryPanelFocusRef);
 
   const boardsListPanelOptions = useMemo<UsePanelOptions>(
     () => ({
@@ -50,7 +50,7 @@ const GalleryPanelContent = () => {
   }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
   return (
-    <Flex ref={ref} position="relative" flexDirection="column" h="full" w="full" tabIndex={-1}>
+    <Flex ref={galleryPanelFocusRef} position="relative" flexDirection="column" h="full" w="full" tabIndex={-1}>
       <Flex alignItems="center" w="full">
         <Flex w="25%">
           <Button

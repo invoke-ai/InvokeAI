@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { adHocPostProcessingRequested } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
+import { FOCUS_REGIONS } from 'common/hooks/interactionScopes';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { DeleteImageButton } from 'features/deleteImageModal/components/DeleteImageButton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
@@ -45,7 +45,7 @@ const CurrentImageButtons = () => {
   const isUpscalingEnabled = useFeatureStatus('upscaling');
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
-  const isImageViewerActive = useStore(INTERACTION_SCOPES.imageViewer.$isActive);
+  const isImageViewerActive = useStore(FOCUS_REGIONS.imageViewer.$isFocused);
   const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
 
   const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =

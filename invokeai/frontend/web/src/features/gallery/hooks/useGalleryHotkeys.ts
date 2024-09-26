@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $activeScopes, INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
+import { $focusedRegion, FOCUS_REGIONS } from 'common/hooks/interactionScopes';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { $canvasRightPanelTab } from 'features/controlLayers/store/ephemeral';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
@@ -9,20 +9,8 @@ import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPaginatio
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { $isRightPanelOpen } from 'features/ui/store/uiSlice';
-import { computed } from 'nanostores';
 import { useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
-
-const $leftRightHotkeysEnabled = computed($activeScopes, (activeScopes) => {
-  // The left and right hotkeys can be used when the gallery is focused and the canvas is not focused, OR when the image viewer is focused.
-  return !activeScopes.has('canvas') || activeScopes.has('imageViewer');
-});
-
-const $upDownHotkeysEnabled = computed([$activeScopes, $isRightPanelOpen], (activeScopes, isGalleryPanelOpen) => {
-  // The up and down hotkeys can be used when the gallery is focused and the canvas is not focused, and the gallery panel is open.
-  return !activeScopes.has('canvas') && isGalleryPanelOpen;
-});
 
 /**
  * Registers gallery hotkeys. This hook is a singleton.
@@ -34,11 +22,10 @@ export const useGalleryHotkeys = () => {
   const selection = useAppSelector((s) => s.gallery.selection);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const queryResult = useListImagesQuery(queryArgs);
-  const leftRightHotkeysEnabled = useStore($leftRightHotkeysEnabled);
-  const upDownHotkeysEnabled = useStore($upDownHotkeysEnabled);
   const canvasRightPanelTab = useStore($canvasRightPanelTab);
   const appTab = useAppSelector(selectActiveTab);
-  const isWorkflowsScopeActive = useStore(INTERACTION_SCOPES.workflows.$isActive);
+  const isWorkflowsScopeActive = useStore(FOCUS_REGIONS.workflows.$isFocused);
+  const focusedRegion = useStore($focusedRegion);
 
   // When we are on the canvas tab, we need to disable the delete hotkey when the user is focused on the layers tab in
   // the right hand panel, because the same hotkey is used to delete layers.
@@ -70,15 +57,8 @@ export const useGalleryHotkeys = () => {
       }
       handleLeftImage(false);
     },
-    options: { preventDefault: true, enabled: leftRightHotkeysEnabled },
-    dependencies: [
-      handleLeftImage,
-      isOnFirstImageOfView,
-      goPrev,
-      isPrevEnabled,
-      queryResult.isFetching,
-      leftRightHotkeysEnabled,
-    ],
+    options: { preventDefault: true, enabled: focusedRegion === 'galleryPanel' || focusedRegion === 'imageViewer' },
+    dependencies: [handleLeftImage, isOnFirstImageOfView, goPrev, isPrevEnabled, queryResult.isFetching, focusedRegion],
   });
 
   useRegisteredHotkeys({
@@ -93,15 +73,8 @@ export const useGalleryHotkeys = () => {
         handleRightImage(false);
       }
     },
-    options: { preventDefault: true, enabled: leftRightHotkeysEnabled },
-    dependencies: [
-      isOnLastImageOfView,
-      goNext,
-      isNextEnabled,
-      queryResult.isFetching,
-      handleRightImage,
-      leftRightHotkeysEnabled,
-    ],
+    options: { preventDefault: true, enabled: focusedRegion === 'galleryPanel' || focusedRegion === 'imageViewer' },
+    dependencies: [isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage, focusedRegion],
   });
 
   useRegisteredHotkeys({
@@ -114,8 +87,8 @@ export const useGalleryHotkeys = () => {
       }
       handleUpImage(false);
     },
-    options: { preventDefault: true, enabled: upDownHotkeysEnabled },
-    dependencies: [handleUpImage, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching, upDownHotkeysEnabled],
+    options: { preventDefault: true, enabled: focusedRegion === 'galleryPanel' },
+    dependencies: [handleUpImage, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching, focusedRegion],
   });
 
   useRegisteredHotkeys({
@@ -128,8 +101,8 @@ export const useGalleryHotkeys = () => {
       }
       handleDownImage(false);
     },
-    options: { preventDefault: true, enabled: upDownHotkeysEnabled },
-    dependencies: [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage, upDownHotkeysEnabled],
+    options: { preventDefault: true, enabled: focusedRegion === 'galleryPanel' },
+    dependencies: [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage, focusedRegion],
   });
 
   useRegisteredHotkeys({
@@ -142,15 +115,8 @@ export const useGalleryHotkeys = () => {
       }
       handleLeftImage(true);
     },
-    options: { preventDefault: true, enabled: leftRightHotkeysEnabled },
-    dependencies: [
-      handleLeftImage,
-      isOnFirstImageOfView,
-      goPrev,
-      isPrevEnabled,
-      queryResult.isFetching,
-      leftRightHotkeysEnabled,
-    ],
+    options: { preventDefault: true, enabled: focusedRegion === 'galleryPanel' || focusedRegion === 'imageViewer' },
+    dependencies: [handleLeftImage, isOnFirstImageOfView, goPrev, isPrevEnabled, queryResult.isFetching, focusedRegion],
   });
 
   useRegisteredHotkeys({
@@ -165,15 +131,8 @@ export const useGalleryHotkeys = () => {
         handleRightImage(true);
       }
     },
-    options: { preventDefault: true, enabled: leftRightHotkeysEnabled },
-    dependencies: [
-      isOnLastImageOfView,
-      goNext,
-      isNextEnabled,
-      queryResult.isFetching,
-      handleRightImage,
-      leftRightHotkeysEnabled,
-    ],
+    options: { preventDefault: true, enabled: focusedRegion === 'galleryPanel' || focusedRegion === 'imageViewer' },
+    dependencies: [isOnLastImageOfView, goNext, isNextEnabled, queryResult.isFetching, handleRightImage, focusedRegion],
   });
 
   useRegisteredHotkeys({
@@ -186,8 +145,8 @@ export const useGalleryHotkeys = () => {
       }
       handleUpImage(true);
     },
-    options: { preventDefault: true, enabled: upDownHotkeysEnabled },
-    dependencies: [handleUpImage, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching, upDownHotkeysEnabled],
+    options: { preventDefault: true, enabled: focusedRegion === 'galleryPanel' },
+    dependencies: [handleUpImage, isOnFirstRow, goPrev, isPrevEnabled, queryResult.isFetching, focusedRegion],
   });
 
   useRegisteredHotkeys({
@@ -200,8 +159,8 @@ export const useGalleryHotkeys = () => {
       }
       handleDownImage(true);
     },
-    options: { preventDefault: true, enabled: upDownHotkeysEnabled },
-    dependencies: [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage, upDownHotkeysEnabled],
+    options: { preventDefault: true, enabled: focusedRegion === 'galleryPanel' },
+    dependencies: [isOnLastRow, goNext, isNextEnabled, queryResult.isFetching, handleDownImage, focusedRegion],
   });
 
   useRegisteredHotkeys({
@@ -213,7 +172,12 @@ export const useGalleryHotkeys = () => {
       }
       dispatch(imagesToDeleteSelected(selection));
     },
-    options: { enabled: leftRightHotkeysEnabled && isDeleteEnabledByTab && !isWorkflowsScopeActive },
-    dependencies: [leftRightHotkeysEnabled, isDeleteEnabledByTab, selection, isWorkflowsScopeActive],
+    options: {
+      enabled:
+        (focusedRegion === 'galleryPanel' || focusedRegion === 'imageViewer') &&
+        isDeleteEnabledByTab &&
+        !isWorkflowsScopeActive,
+    },
+    dependencies: [focusedRegion, isDeleteEnabledByTab, selection, isWorkflowsScopeActive],
   });
 };

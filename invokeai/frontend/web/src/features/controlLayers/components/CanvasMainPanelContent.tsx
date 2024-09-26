@@ -1,6 +1,6 @@
 import { ContextMenu, Flex, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useScopeOnFocus } from 'common/hooks/interactionScopes';
+import { useFocusRegion } from 'common/hooks/interactionScopes';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
 import { CanvasAlertsSendingToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
@@ -35,7 +35,7 @@ export const CanvasMainPanelContent = memo(() => {
     );
   }, []);
 
-  useScopeOnFocus('canvas', ref);
+  useFocusRegion('canvas', ref);
 
   return (
     <Flex

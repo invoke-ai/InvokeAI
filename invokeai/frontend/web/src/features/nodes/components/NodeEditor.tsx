@@ -2,7 +2,7 @@ import 'reactflow/dist/style.css';
 
 import { Flex } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { useScopeOnFocus } from 'common/hooks/interactionScopes';
+import { useFocusRegion } from 'common/hooks/interactionScopes';
 import { AddNodeCmdk } from 'features/nodes/components/flow/AddNodeCmdk/AddNodeCmdk';
 import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
 import WorkflowEditorSettings from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
@@ -21,7 +21,7 @@ const NodeEditor = () => {
   const { data, isLoading } = useGetOpenAPISchemaQuery();
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
-  useScopeOnFocus('workflows', ref);
+  useFocusRegion('workflows', ref);
 
   return (
     <Flex

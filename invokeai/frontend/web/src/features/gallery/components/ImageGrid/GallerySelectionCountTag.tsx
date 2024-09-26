@@ -1,25 +1,19 @@
 import { Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $activeScopes } from 'common/hooks/interactionScopes';
+import { FOCUS_REGIONS } from 'common/hooks/interactionScopes';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { $isRightPanelOpen } from 'features/ui/store/uiSlice';
-import { computed } from 'nanostores';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const $isSelectAllEnabled = computed([$activeScopes, $isRightPanelOpen], (activeScopes, isGalleryPanelOpen) => {
-  return activeScopes.has('gallery') && !activeScopes.has('workflows') && isGalleryPanelOpen;
-});
 
 export const GallerySelectionCountTag = () => {
   const dispatch = useAppDispatch();
   const { selection } = useAppSelector((s) => s.gallery);
   const { t } = useTranslation();
   const { imageDTOs } = useGalleryImages();
-  const isSelectAllEnabled = useStore($isSelectAllEnabled);
+  const isFocusedOnGallery = useStore(FOCUS_REGIONS.galleryPanel.$isFocused);
 
   const onClearSelection = useCallback(() => {
     const firstImage = selection[0];
@@ -36,16 +30,16 @@ export const GallerySelectionCountTag = () => {
     id: 'selectAllOnPage',
     category: 'gallery',
     callback: onSelectPage,
-    options: { preventDefault: true, enabled: isSelectAllEnabled },
-    dependencies: [onSelectPage, isSelectAllEnabled],
+    options: { preventDefault: true, enabled: isFocusedOnGallery },
+    dependencies: [onSelectPage, isFocusedOnGallery],
   });
 
   useRegisteredHotkeys({
     id: 'clearSelection',
     category: 'gallery',
     callback: onClearSelection,
-    options: { enabled: selection.length > 0 && isSelectAllEnabled },
-    dependencies: [onClearSelection, selection, isSelectAllEnabled],
+    options: { enabled: selection.length > 0 && isFocusedOnGallery },
+    dependencies: [onClearSelection, selection, isFocusedOnGallery],
   });
 
   if (selection.length <= 1) {
