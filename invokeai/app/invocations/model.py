@@ -75,6 +75,7 @@ class TransformerField(BaseModel):
 class T5EncoderField(BaseModel):
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
 
 
 class VAEField(BaseModel):
@@ -205,7 +206,7 @@ class FluxModelLoaderInvocation(BaseInvocation):
         return FluxModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),
             clip=CLIPField(tokenizer=tokenizer, text_encoder=clip_encoder, loras=[], skipped_layers=0),
-            t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder),
+            t5_encoder=T5EncoderField(tokenizer=tokenizer2, text_encoder=t5_encoder, loras=[]),
             vae=VAEField(vae=vae),
             max_seq_len=max_seq_lengths[transformer_config.config_path],
         )
