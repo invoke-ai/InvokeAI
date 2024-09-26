@@ -18,6 +18,7 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { useGetAndLoadEmbeddedWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadEmbeddedWorkflow';
 import { size } from 'lodash-es';
+import { computed } from 'nanostores';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -32,6 +33,13 @@ import {
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import { $isConnected, $progressImage } from 'services/events/stores';
 
+const $imageViewerOrGalleryIsFocused = computed(
+  [FOCUS_REGIONS.$imageViewer, FOCUS_REGIONS.$galleryPanel],
+  (imageViewer, galleryPanel) => {
+    return imageViewer.isFocused || galleryPanel.isFocused;
+  }
+);
+
 const CurrentImageButtons = () => {
   const dispatch = useAppDispatch();
   const isConnected = useStore($isConnected);
@@ -45,7 +53,7 @@ const CurrentImageButtons = () => {
   const isUpscalingEnabled = useFeatureStatus('upscaling');
   const isQueueMutationInProgress = useIsQueueMutationInProgress();
   const { t } = useTranslation();
-  const isImageViewerActive = useStore(FOCUS_REGIONS.imageViewer.$isFocused);
+  const imageViewerFocus = useStore($imageViewerOrGalleryIsFocused);
   const { currentData: imageDTO } = useGetImageDTOQuery(lastSelectedImage?.image_name ?? skipToken);
 
   const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, isLoadingMetadata } =
@@ -84,50 +92,50 @@ const CurrentImageButtons = () => {
     id: 'loadWorkflow',
     category: 'viewer',
     callback: handleLoadWorkflow,
-    options: { enabled: isImageViewerActive },
-    dependencies: [handleLoadWorkflow, isImageViewerActive],
+    options: { enabled: imageViewerFocus },
+    dependencies: [handleLoadWorkflow, imageViewerFocus],
   });
   useRegisteredHotkeys({
     id: 'recallAll',
     category: 'viewer',
     callback: recallAll,
-    options: { enabled: isImageViewerActive },
-    dependencies: [recallAll, isImageViewerActive],
+    options: { enabled: imageViewerFocus },
+    dependencies: [recallAll, imageViewerFocus],
   });
   useRegisteredHotkeys({
     id: 'recallSeed',
     category: 'viewer',
     callback: recallSeed,
-    options: { enabled: isImageViewerActive },
-    dependencies: [recallSeed, isImageViewerActive],
+    options: { enabled: imageViewerFocus },
+    dependencies: [recallSeed, imageViewerFocus],
   });
   useRegisteredHotkeys({
     id: 'recallPrompts',
     category: 'viewer',
     callback: recallPrompts,
-    options: { enabled: isImageViewerActive },
-    dependencies: [recallPrompts, isImageViewerActive],
+    options: { enabled: imageViewerFocus },
+    dependencies: [recallPrompts, imageViewerFocus],
   });
   useRegisteredHotkeys({
     id: 'remix',
     category: 'viewer',
     callback: remix,
-    options: { enabled: isImageViewerActive },
-    dependencies: [remix, isImageViewerActive],
+    options: { enabled: imageViewerFocus },
+    dependencies: [remix, imageViewerFocus],
   });
   useRegisteredHotkeys({
     id: 'useSize',
     category: 'viewer',
     callback: handleUseSize,
-    options: { enabled: isImageViewerActive },
-    dependencies: [handleUseSize, isImageViewerActive],
+    options: { enabled: imageViewerFocus },
+    dependencies: [handleUseSize, imageViewerFocus],
   });
   useRegisteredHotkeys({
     id: 'runPostprocessing',
     category: 'viewer',
     callback: handleClickUpscale,
-    options: { enabled: Boolean(isUpscalingEnabled && isImageViewerActive && isConnected) },
-    dependencies: [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected, isImageViewerActive],
+    options: { enabled: Boolean(isUpscalingEnabled && imageViewerFocus && isConnected) },
+    dependencies: [isUpscalingEnabled, imageDTO, shouldDisableToolbarButtons, isConnected, imageViewerFocus],
   });
 
   return (

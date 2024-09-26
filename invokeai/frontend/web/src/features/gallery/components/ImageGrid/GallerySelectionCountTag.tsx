@@ -13,7 +13,7 @@ export const GallerySelectionCountTag = () => {
   const { selection } = useAppSelector((s) => s.gallery);
   const { t } = useTranslation();
   const { imageDTOs } = useGalleryImages();
-  const isFocusedOnGallery = useStore(FOCUS_REGIONS.galleryPanel.$isFocused);
+  const galleryPanelFocus = useStore(FOCUS_REGIONS.$galleryPanel);
 
   const onClearSelection = useCallback(() => {
     const firstImage = selection[0];
@@ -30,16 +30,16 @@ export const GallerySelectionCountTag = () => {
     id: 'selectAllOnPage',
     category: 'gallery',
     callback: onSelectPage,
-    options: { preventDefault: true, enabled: isFocusedOnGallery },
-    dependencies: [onSelectPage, isFocusedOnGallery],
+    options: { preventDefault: true, enabled: galleryPanelFocus.isFocused },
+    dependencies: [onSelectPage, galleryPanelFocus],
   });
 
   useRegisteredHotkeys({
     id: 'clearSelection',
     category: 'gallery',
     callback: onClearSelection,
-    options: { enabled: selection.length > 0 && isFocusedOnGallery },
-    dependencies: [onClearSelection, selection, isFocusedOnGallery],
+    options: { enabled: selection.length > 0 && galleryPanelFocus.isFocused },
+    dependencies: [onClearSelection, selection, galleryPanelFocus],
   });
 
   if (selection.length <= 1) {

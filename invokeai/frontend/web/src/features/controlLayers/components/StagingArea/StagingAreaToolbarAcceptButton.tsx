@@ -25,7 +25,7 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const imageCount = useAppSelector(selectImageCount);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
-  const isCanvasActive = useStore(FOCUS_REGIONS.canvas.$isFocused);
+  const canvasFocus = useStore(FOCUS_REGIONS.$canvas);
 
   const { t } = useTranslation();
 
@@ -50,9 +50,9 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
     acceptSelected,
     {
       preventDefault: true,
-      enabled: isCanvasActive && shouldShowStagedImage && imageCount > 1,
+      enabled: canvasFocus.isFocused && shouldShowStagedImage && imageCount > 1,
     },
-    [isCanvasActive, shouldShowStagedImage, imageCount]
+    [canvasFocus, shouldShowStagedImage, imageCount]
   );
 
   return (

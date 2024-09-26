@@ -24,7 +24,7 @@ export const useGalleryHotkeys = () => {
   const queryResult = useListImagesQuery(queryArgs);
   const canvasRightPanelTab = useStore($canvasRightPanelTab);
   const appTab = useAppSelector(selectActiveTab);
-  const isWorkflowsScopeActive = useStore(FOCUS_REGIONS.workflows.$isFocused);
+  const workflowsFocus = useStore(FOCUS_REGIONS.$workflows);
   const focusedRegion = useStore($focusedRegion);
 
   // When we are on the canvas tab, we need to disable the delete hotkey when the user is focused on the layers tab in
@@ -176,8 +176,8 @@ export const useGalleryHotkeys = () => {
       enabled:
         (focusedRegion === 'galleryPanel' || focusedRegion === 'imageViewer') &&
         isDeleteEnabledByTab &&
-        !isWorkflowsScopeActive,
+        !workflowsFocus.isFocused,
     },
-    dependencies: [focusedRegion, isDeleteEnabledByTab, selection, isWorkflowsScopeActive],
+    dependencies: [focusedRegion, isDeleteEnabledByTab, selection, workflowsFocus],
   });
 };

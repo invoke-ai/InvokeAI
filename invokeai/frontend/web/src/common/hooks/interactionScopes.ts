@@ -1,84 +1,94 @@
 import { logger } from 'app/logging/logger';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { objectKeys } from 'common/util/objectKeys';
 import type { Atom } from 'nanostores';
-import { atom, computed } from 'nanostores';
+import { computed, deepMap } from 'nanostores';
 import type { RefObject } from 'react';
 import { useEffect } from 'react';
 
 const log = logger('system');
 
-const _FOCUS_REGIONS = ['galleryPanel', 'layersPanel', 'canvas', 'stagingArea', 'workflows', 'imageViewer'] as const;
+const REGION_NAMES = ['galleryPanel', 'layersPanel', 'canvas', 'workflows', 'imageViewer'] as const;
 
-type FocusRegion = (typeof _FOCUS_REGIONS)[number];
-
-// type FocusRegionData2 = { name: FocusRegion; focused: boolean; mounted: boolean; targets: Set<HTMLElement> };
-// const initialData = _FOCUS_REGIONS.reduce(
-//   (regionData, region) => {
-//     regionData[region] = { name: region, focused: false, mounted: false, targets: new Set() };
-//     return regionData;
-//   },
-//   {} as Record<FocusRegion, FocusRegionData2>
-// );
-
-// export const $regions = deepMap<Record<FocusRegion, FocusRegionData2>>(initialData);
-
-export const $focusedRegion = atom<FocusRegion | null>(null);
-type FocusRegionData = {
-  targets: Set<HTMLElement>;
-  $isFocused: Atom<boolean>;
+type FocusRegionName = (typeof REGION_NAMES)[number];
+type FocusRegionData = { name: FocusRegionName; mounted: number; targets: Set<HTMLElement> };
+type FocusRegionState = {
+  focusedRegion: FocusRegionName | null;
+  regions: Record<FocusRegionName, FocusRegionData>;
 };
 
-export const FOCUS_REGIONS: Record<FocusRegion, FocusRegionData> = _FOCUS_REGIONS.reduce(
-  (acc, region) => {
-    acc[region] = {
-      targets: new Set(),
-      $isFocused: computed($focusedRegion, (focusedRegion) => focusedRegion === region),
-    };
-    return acc;
+const initialData = REGION_NAMES.reduce(
+  (state, region) => {
+    state.regions[region] = { name: region, mounted: 0, targets: new Set() };
+    return state;
   },
-  {} as Record<FocusRegion, FocusRegionData>
+  {
+    focusedRegion: null,
+    regions: {},
+  } as FocusRegionState
 );
 
-export const setFocus = (region: FocusRegion | null) => {
-  $focusedRegion.set(region);
-  log.trace(`Focus changed: ${$focusedRegion.get()}`);
+const $focusRegionState = deepMap<FocusRegionState>(initialData);
+export const $focusedRegion = computed($focusRegionState, (regions) => regions.focusedRegion);
+export const FOCUS_REGIONS = REGION_NAMES.reduce(
+  (acc, region) => {
+    acc[`$${region}`] = computed($focusRegionState, (state) => ({
+      isFocused: state.focusedRegion === region,
+      isMounted: state.regions[region].mounted > 0,
+    }));
+    return acc;
+  },
+  {} as Record<`$${FocusRegionName}`, Atom<{ isFocused: boolean; isMounted: boolean }>>
+);
+
+export const setFocus = (region: FocusRegionName | null) => {
+  $focusRegionState.setKey('focusedRegion', region);
+  log.trace(`Focus changed: ${region}`);
 };
 
-export const useFocusRegion = (region: FocusRegion, ref: RefObject<HTMLElement>) => {
+export const useFocusRegion = (region: FocusRegionName, ref: RefObject<HTMLElement>) => {
   useEffect(() => {
     if (!ref.current) {
       return;
     }
 
     const element = ref.current;
-    FOCUS_REGIONS[region].targets.add(element);
+
+    const regionData = $focusRegionState.get().regions[region];
+
+    const targets = new Set(regionData.targets);
+    targets.add(element);
+    $focusRegionState.setKey(`regions.${region}.targets`, targets);
 
     return () => {
-      FOCUS_REGIONS[region].targets.delete(element);
+      const regionData = $focusRegionState.get().regions[region];
+      const targets = new Set(regionData.targets);
+      targets.delete(element);
+      $focusRegionState.setKey(`regions.${region}.targets`, targets);
     };
   }, [ref, region]);
 };
 
-type UseFocusRegionOnMountOptions = {
-  mount?: boolean;
-  unmount?: boolean;
-};
-
-export const useFocusRegionOnMount = (region: FocusRegion, options?: UseFocusRegionOnMountOptions) => {
+export const useFocusRegionOnMount = (region: FocusRegionName) => {
   useEffect(() => {
-    const { mount, unmount } = { mount: true, unmount: true, ...options };
-
-    if (mount) {
-      setFocus(region);
-    }
+    const mounted = $focusRegionState.get().regions[region].mounted + 1;
+    $focusRegionState.setKey(`regions.${region}.mounted`, mounted);
+    setFocus(region);
+    log.trace(`Focus region ${region} mounted, count: ${mounted}`);
 
     return () => {
-      if (unmount && $focusedRegion.get() === region) {
+      let mounted = $focusRegionState.get().regions[region].mounted - 1;
+      if (mounted < 0) {
+        log.warn(`Focus region ${region} mounted count is negative: ${mounted}!`);
+        mounted = 0;
+      } else {
+        log.trace(`Focus region ${region} unmounted, count: ${mounted}`);
+      }
+      $focusRegionState.setKey(`regions.${region}.mounted`, mounted);
+      if (mounted === 0) {
         setFocus(null);
       }
     };
-  }, [options, region]);
+  }, [region]);
 };
 
 const onFocus = (_: FocusEvent) => {
@@ -87,32 +97,38 @@ const onFocus = (_: FocusEvent) => {
     return;
   }
 
-  const regionCandidates: { region: FocusRegion; element: HTMLElement }[] = [];
+  const regionCandidates: { region: FocusRegionName; element: HTMLElement }[] = [];
 
-  for (const region of objectKeys(FOCUS_REGIONS)) {
-    for (const element of FOCUS_REGIONS[region].targets) {
+  const state = $focusRegionState.get();
+  for (const regionData of Object.values(state.regions)) {
+    for (const element of regionData.targets) {
       if (element.contains(activeElement)) {
-        regionCandidates.push({ region, element });
+        regionCandidates.push({ region: regionData.name, element });
       }
     }
   }
 
-  let focusedRegion: FocusRegion | null = null;
+  if (regionCandidates.length === 0) {
+    return;
+  }
 
-  if (regionCandidates.length !== 0) {
-    // Sort by the shallowest element
-    regionCandidates.sort((a, b) => {
-      if (b.element.contains(a.element)) {
-        return -1;
-      }
-      if (a.element.contains(b.element)) {
-        return 1;
-      }
-      return 0;
-    });
+  // Sort by the shallowest element
+  regionCandidates.sort((a, b) => {
+    if (b.element.contains(a.element)) {
+      return -1;
+    }
+    if (a.element.contains(b.element)) {
+      return 1;
+    }
+    return 0;
+  });
 
-    // Set the region of the deepest element
-    focusedRegion = regionCandidates[0]?.region ?? null;
+  // Set the region of the deepest element
+  const focusedRegion = regionCandidates[0]?.region;
+
+  if (!focusedRegion) {
+    log.warn('No focused region found');
+    return;
   }
 
   setFocus(focusedRegion);
