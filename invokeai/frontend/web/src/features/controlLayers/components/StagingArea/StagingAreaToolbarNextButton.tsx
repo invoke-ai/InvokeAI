@@ -17,7 +17,7 @@ export const StagingAreaToolbarNextButton = memo(() => {
   const canvasManager = useCanvasManager();
   const imageCount = useAppSelector(selectImageCount);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
-  const isCanvasActive = useStore(FOCUS_REGIONS.canvas.$isFocused);
+  const canvasScope = useStore(FOCUS_REGIONS.$canvas);
 
   const { t } = useTranslation();
 
@@ -30,9 +30,9 @@ export const StagingAreaToolbarNextButton = memo(() => {
     selectNext,
     {
       preventDefault: true,
-      enabled: isCanvasActive && shouldShowStagedImage && imageCount > 1,
+      enabled: canvasScope.isFocused && shouldShowStagedImage && imageCount > 1,
     },
-    [isCanvasActive, shouldShowStagedImage, imageCount]
+    [canvasScope, shouldShowStagedImage, imageCount]
   );
 
   return (

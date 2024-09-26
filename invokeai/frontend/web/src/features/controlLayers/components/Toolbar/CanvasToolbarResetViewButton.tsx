@@ -11,50 +11,50 @@ import { PiArrowsOutBold } from 'react-icons/pi';
 export const CanvasToolbarResetViewButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
-  const isCanvasActive = useStore(FOCUS_REGIONS.canvas.$isFocused);
+  const canvasScope = useStore(FOCUS_REGIONS.$canvas);
   const imageViewer = useImageViewer();
 
   useRegisteredHotkeys({
     id: 'fitLayersToCanvas',
     category: 'canvas',
     callback: canvasManager.stage.fitLayersToStage,
-    options: { enabled: isCanvasActive && !imageViewer.isOpen, preventDefault: true },
-    dependencies: [isCanvasActive, imageViewer.isOpen],
+    options: { enabled: canvasScope.isFocused && !imageViewer.isOpen, preventDefault: true },
+    dependencies: [canvasScope, imageViewer.isOpen],
   });
   useRegisteredHotkeys({
     id: 'fitBboxToCanvas',
     category: 'canvas',
     callback: canvasManager.stage.fitBboxToStage,
-    options: { enabled: isCanvasActive && !imageViewer.isOpen, preventDefault: true },
-    dependencies: [isCanvasActive, imageViewer.isOpen],
+    options: { enabled: canvasScope.isFocused && !imageViewer.isOpen, preventDefault: true },
+    dependencies: [canvasScope, imageViewer.isOpen],
   });
   useRegisteredHotkeys({
     id: 'setZoomTo100Percent',
     category: 'canvas',
     callback: () => canvasManager.stage.setScale(1),
-    options: { enabled: isCanvasActive && !imageViewer.isOpen, preventDefault: true },
-    dependencies: [isCanvasActive, imageViewer.isOpen],
+    options: { enabled: canvasScope.isFocused && !imageViewer.isOpen, preventDefault: true },
+    dependencies: [canvasScope, imageViewer.isOpen],
   });
   useRegisteredHotkeys({
     id: 'setZoomTo200Percent',
     category: 'canvas',
     callback: () => canvasManager.stage.setScale(2),
-    options: { enabled: isCanvasActive && !imageViewer.isOpen, preventDefault: true },
-    dependencies: [isCanvasActive, imageViewer.isOpen],
+    options: { enabled: canvasScope.isFocused && !imageViewer.isOpen, preventDefault: true },
+    dependencies: [canvasScope, imageViewer.isOpen],
   });
   useRegisteredHotkeys({
     id: 'setZoomTo400Percent',
     category: 'canvas',
     callback: () => canvasManager.stage.setScale(4),
-    options: { enabled: isCanvasActive && !imageViewer.isOpen, preventDefault: true },
-    dependencies: [isCanvasActive, imageViewer.isOpen],
+    options: { enabled: canvasScope.isFocused && !imageViewer.isOpen, preventDefault: true },
+    dependencies: [canvasScope, imageViewer.isOpen],
   });
   useRegisteredHotkeys({
     id: 'setZoomTo800Percent',
     category: 'canvas',
     callback: () => canvasManager.stage.setScale(8),
-    options: { enabled: isCanvasActive && !imageViewer.isOpen, preventDefault: true },
-    dependencies: [isCanvasActive, imageViewer.isOpen],
+    options: { enabled: canvasScope.isFocused && !imageViewer.isOpen, preventDefault: true },
+    dependencies: [canvasScope, imageViewer.isOpen],
   });
 
   return (

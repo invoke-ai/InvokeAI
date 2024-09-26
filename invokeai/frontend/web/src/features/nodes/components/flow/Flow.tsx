@@ -1,7 +1,7 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { $focusedRegion, FOCUS_REGIONS, useFocusRegion } from 'common/hooks/interactionScopes';
+import { FOCUS_REGIONS, useFocusRegion } from 'common/hooks/interactionScopes';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
@@ -89,7 +89,7 @@ export const Flow = memo(() => {
   const cancelConnection = useReactFlowStore(selectCancelConnection);
   const updateNodeInternals = useUpdateNodeInternals();
   const store = useAppStore();
-  const isWorkflowsActive = useStore(FOCUS_REGIONS.workflows.$isFocused);
+  const workflowsFocus = useStore(FOCUS_REGIONS.$workflows);
   useFocusRegion('workflows', flowWrapper);
 
   useWorkflowWatcher();
@@ -128,7 +128,6 @@ export const Flow = memo(() => {
   const { onCloseGlobal } = useGlobalMenuClose();
   const handlePaneClick = useCallback(() => {
     onCloseGlobal();
-    $focusedRegion.set('workflows');
   }, [onCloseGlobal]);
 
   const onInit: OnInit = useCallback((flow) => {
@@ -244,8 +243,8 @@ export const Flow = memo(() => {
     id: 'selectAll',
     category: 'workflows',
     callback: selectAll,
-    options: { enabled: isWorkflowsActive, preventDefault: true },
-    dependencies: [selectAll, isWorkflowsActive],
+    options: { enabled: workflowsFocus.isFocused, preventDefault: true },
+    dependencies: [selectAll, workflowsFocus],
   });
 
   useRegisteredHotkeys({
@@ -318,8 +317,8 @@ export const Flow = memo(() => {
     id: 'deleteSelection',
     category: 'workflows',
     callback: deleteSelection,
-    options: { preventDefault: true, enabled: isWorkflowsActive },
-    dependencies: [deleteSelection, isWorkflowsActive],
+    options: { preventDefault: true, enabled: workflowsFocus.isFocused },
+    dependencies: [deleteSelection, workflowsFocus],
   });
 
   return (
