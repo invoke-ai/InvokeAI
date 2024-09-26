@@ -32,8 +32,8 @@ const GalleryPanelContent = () => {
   const boardsListPanelOptions = useMemo<UsePanelOptions>(
     () => ({
       id: 'boards-list-panel',
-      minSize: 128,
-      defaultSize: 256,
+      minSizePx: 128,
+      defaultSizePx: 256,
       imperativePanelGroupRef,
       panelGroupDirection: 'vertical',
     }),

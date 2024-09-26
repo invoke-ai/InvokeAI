@@ -49,8 +49,8 @@ export const AppContent = memo(() => {
   const leftPanelUsePanelOptions = useMemo<UsePanelOptions>(
     () => ({
       id: 'left-panel',
-      minSize: LEFT_PANEL_MIN_SIZE_PX,
-      defaultSize: LEFT_PANEL_MIN_SIZE_PX,
+      minSizePx: LEFT_PANEL_MIN_SIZE_PX,
+      defaultSizePx: LEFT_PANEL_MIN_SIZE_PX,
       imperativePanelGroupRef,
       panelGroupDirection: 'horizontal',
       onCollapse: onLeftPanelCollapse,
@@ -70,8 +70,8 @@ export const AppContent = memo(() => {
   const rightPanelUsePanelOptions = useMemo<UsePanelOptions>(
     () => ({
       id: 'right-panel',
-      minSize: RIGHT_PANEL_MIN_SIZE_PX,
-      defaultSize: RIGHT_PANEL_MIN_SIZE_PX,
+      minSizePx: RIGHT_PANEL_MIN_SIZE_PX,
+      defaultSizePx: RIGHT_PANEL_MIN_SIZE_PX,
       imperativePanelGroupRef,
       panelGroupDirection: 'horizontal',
       onCollapse: onRightPanelCollapse,
