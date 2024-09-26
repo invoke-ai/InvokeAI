@@ -1,158 +1,130 @@
 import { logger } from 'app/logging/logger';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { objectKeys } from 'common/util/objectKeys';
-import { isEqual } from 'lodash-es';
 import type { Atom } from 'nanostores';
 import { atom, computed } from 'nanostores';
 import type { RefObject } from 'react';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 
 const log = logger('system');
 
-const _INTERACTION_SCOPES = ['gallery', 'canvas', 'stagingArea', 'workflows', 'imageViewer'] as const;
+const _FOCUS_REGIONS = ['galleryPanel', 'layersPanel', 'canvas', 'stagingArea', 'workflows', 'imageViewer'] as const;
 
-type InteractionScope = (typeof _INTERACTION_SCOPES)[number];
+type FocusRegion = (typeof _FOCUS_REGIONS)[number];
 
-export const $activeScopes = atom<Set<InteractionScope>>(new Set());
+// type FocusRegionData2 = { name: FocusRegion; focused: boolean; mounted: boolean; targets: Set<HTMLElement> };
+// const initialData = _FOCUS_REGIONS.reduce(
+//   (regionData, region) => {
+//     regionData[region] = { name: region, focused: false, mounted: false, targets: new Set() };
+//     return regionData;
+//   },
+//   {} as Record<FocusRegion, FocusRegionData2>
+// );
 
-type InteractionScopeData = {
+// export const $regions = deepMap<Record<FocusRegion, FocusRegionData2>>(initialData);
+
+export const $focusedRegion = atom<FocusRegion | null>(null);
+type FocusRegionData = {
   targets: Set<HTMLElement>;
-  $isActive: Atom<boolean>;
+  $isFocused: Atom<boolean>;
 };
 
-export const INTERACTION_SCOPES: Record<InteractionScope, InteractionScopeData> = _INTERACTION_SCOPES.reduce(
+export const FOCUS_REGIONS: Record<FocusRegion, FocusRegionData> = _FOCUS_REGIONS.reduce(
   (acc, region) => {
     acc[region] = {
       targets: new Set(),
-      $isActive: computed($activeScopes, (activeScopes) => activeScopes.has(region)),
+      $isFocused: computed($focusedRegion, (focusedRegion) => focusedRegion === region),
     };
     return acc;
   },
-  {} as Record<InteractionScope, InteractionScopeData>
+  {} as Record<FocusRegion, FocusRegionData>
 );
 
-const formatScopes = (interactionScopes: Set<InteractionScope>) => {
-  if (interactionScopes.size === 0) {
-    return 'none';
-  }
-  return Array.from(interactionScopes).join(', ');
+export const setFocus = (region: FocusRegion | null) => {
+  $focusedRegion.set(region);
+  log.trace(`Focus changed: ${$focusedRegion.get()}`);
 };
 
-export const addScope = (scope: InteractionScope) => {
-  const currentScopes = $activeScopes.get();
-  if (currentScopes.has(scope)) {
-    return;
-  }
-  const newScopes = new Set(currentScopes);
-  newScopes.add(scope);
-  $activeScopes.set(newScopes);
-  log.trace(`Added scope ${scope}: ${formatScopes($activeScopes.get())}`);
-};
-
-export const removeScope = (scope: InteractionScope) => {
-  const currentScopes = $activeScopes.get();
-  if (!currentScopes.has(scope)) {
-    return;
-  }
-  const newScopes = new Set(currentScopes);
-  newScopes.delete(scope);
-  $activeScopes.set(newScopes);
-  log.trace(`Removed scope ${scope}: ${formatScopes($activeScopes.get())}`);
-};
-
-export const setScopes = (scopes: InteractionScope[]) => {
-  const newScopes = new Set(scopes);
-  $activeScopes.set(newScopes);
-  log.trace(`Set scopes: ${formatScopes($activeScopes.get())}`);
-};
-
-export const useScopeOnFocus = (scope: InteractionScope, ref: RefObject<HTMLElement>) => {
+export const useFocusRegion = (region: FocusRegion, ref: RefObject<HTMLElement>) => {
   useEffect(() => {
-    const element = ref.current;
-
-    if (!element) {
+    if (!ref.current) {
       return;
     }
 
-    INTERACTION_SCOPES[scope].targets.add(element);
+    const element = ref.current;
+    FOCUS_REGIONS[region].targets.add(element);
 
     return () => {
-      INTERACTION_SCOPES[scope].targets.delete(element);
+      FOCUS_REGIONS[region].targets.delete(element);
     };
-  }, [ref, scope]);
+  }, [ref, region]);
 };
 
-type UseScopeOnMountOptions = {
+type UseFocusRegionOnMountOptions = {
   mount?: boolean;
   unmount?: boolean;
 };
 
-const defaultUseScopeOnMountOptions: UseScopeOnMountOptions = {
-  mount: true,
-  unmount: true,
-};
-
-export const useScopeOnMount = (scope: InteractionScope, options?: UseScopeOnMountOptions) => {
+export const useFocusRegionOnMount = (region: FocusRegion, options?: UseFocusRegionOnMountOptions) => {
   useEffect(() => {
-    const { mount, unmount } = { ...defaultUseScopeOnMountOptions, ...options };
+    const { mount, unmount } = { mount: true, unmount: true, ...options };
 
     if (mount) {
-      addScope(scope);
+      setFocus(region);
     }
 
     return () => {
-      if (unmount) {
-        removeScope(scope);
+      if (unmount && $focusedRegion.get() === region) {
+        setFocus(null);
       }
     };
-  }, [options, scope]);
+  }, [options, region]);
 };
 
-export const useScopeImperativeApi = (scope: InteractionScope) => {
-  const api = useMemo(() => {
-    return {
-      add: () => {
-        addScope(scope);
-      },
-      remove: () => {
-        removeScope(scope);
-      },
-    };
-  }, [scope]);
-
-  return api;
-};
-
-const handleFocusEvent = (_event: FocusEvent) => {
+const onFocus = (_: FocusEvent) => {
   const activeElement = document.activeElement;
   if (!(activeElement instanceof HTMLElement)) {
     return;
   }
 
-  const newActiveScopes = new Set<InteractionScope>();
+  const regionCandidates: { region: FocusRegion; element: HTMLElement }[] = [];
 
-  for (const scope of objectKeys(INTERACTION_SCOPES)) {
-    for (const element of INTERACTION_SCOPES[scope].targets) {
+  for (const region of objectKeys(FOCUS_REGIONS)) {
+    for (const element of FOCUS_REGIONS[region].targets) {
       if (element.contains(activeElement)) {
-        newActiveScopes.add(scope);
+        regionCandidates.push({ region, element });
       }
     }
   }
 
-  const oldActiveScopes = $activeScopes.get();
-  if (!isEqual(oldActiveScopes, newActiveScopes)) {
-    $activeScopes.set(newActiveScopes);
-    log.trace(`Scopes changed: ${formatScopes($activeScopes.get())}`);
+  let focusedRegion: FocusRegion | null = null;
+
+  if (regionCandidates.length !== 0) {
+    // Sort by the shallowest element
+    regionCandidates.sort((a, b) => {
+      if (b.element.contains(a.element)) {
+        return -1;
+      }
+      if (a.element.contains(b.element)) {
+        return 1;
+      }
+      return 0;
+    });
+
+    // Set the region of the deepest element
+    focusedRegion = regionCandidates[0]?.region ?? null;
   }
+
+  setFocus(focusedRegion);
 };
 
-export const useScopeFocusWatcher = () => {
-  useAssertSingleton('useScopeFocusWatcher');
+export const useFocusRegionWatcher = () => {
+  useAssertSingleton('useFocusRegionWatcher');
 
   useEffect(() => {
-    window.addEventListener('focus', handleFocusEvent, true);
+    window.addEventListener('focus', onFocus, { capture: true });
     return () => {
-      window.removeEventListener('focus', handleFocusEvent, true);
+      window.removeEventListener('focus', onFocus, { capture: true });
     };
   }, []);
 };

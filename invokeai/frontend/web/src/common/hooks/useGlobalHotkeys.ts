@@ -1,5 +1,4 @@
 import { useAppDispatch } from 'app/store/storeHooks';
-import { addScope, removeScope, setScopes } from 'common/hooks/interactionScopes';
 import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
@@ -71,8 +70,6 @@ export const useGlobalHotkeys = () => {
     category: 'app',
     callback: () => {
       dispatch(setActiveTab('canvas'));
-      addScope('canvas');
-      removeScope('workflows');
     },
     dependencies: [dispatch],
   });
@@ -82,8 +79,6 @@ export const useGlobalHotkeys = () => {
     category: 'app',
     callback: () => {
       dispatch(setActiveTab('upscaling'));
-      removeScope('canvas');
-      removeScope('workflows');
     },
     dependencies: [dispatch],
   });
@@ -93,8 +88,6 @@ export const useGlobalHotkeys = () => {
     category: 'app',
     callback: () => {
       dispatch(setActiveTab('workflows'));
-      removeScope('canvas');
-      addScope('workflows');
     },
     dependencies: [dispatch],
   });
@@ -104,7 +97,6 @@ export const useGlobalHotkeys = () => {
     category: 'app',
     callback: () => {
       dispatch(setActiveTab('models'));
-      setScopes([]);
     },
     options: {
       enabled: isModelManagerEnabled,
@@ -117,7 +109,6 @@ export const useGlobalHotkeys = () => {
     category: 'app',
     callback: () => {
       dispatch(setActiveTab('queue'));
-      setScopes([]);
     },
     dependencies: [dispatch, isModelManagerEnabled],
   });
