@@ -59,6 +59,8 @@ export const isParameterCFGScale = (val: unknown): val is ParameterCFGScale =>
 // #region Guidance parameter
 const zParameterGuidance = z.number().min(1);
 export type ParameterGuidance = z.infer<typeof zParameterGuidance>;
+export const isParameterGuidance = (val: unknown): val is ParameterGuidance =>
+  zParameterGuidance.safeParse(val).success;
 // #endregion
 
 // #region CFG Rescale Multiplier
