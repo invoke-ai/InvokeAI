@@ -236,17 +236,9 @@ class FluxGGUFCheckpointModel(ModelLoader):
         with SilenceWarnings():
             # Load the state dict and patcher
             sd = gguf_sd_loader(model_path)
-            # Initialize the model
             model = Flux(params[config.config_path])
 
-            # Calculate new state dictionary size and make room in the cache
-            new_sd_size = sum([ten.nelement() * torch.bfloat16.itemsize for ten in sd.values()])
-            self._ram_cache.make_room(new_sd_size)
-
-            # Load the state dict into the model
-            model.load_state_dict(sd, assign=True)
-
-        # Return the model after patching
+        model.load_state_dict(sd, assign=True)
         return model
 
 
