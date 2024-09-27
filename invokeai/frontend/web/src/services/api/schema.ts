@@ -6397,7 +6397,7 @@ export type components = {
         };
         /**
          * FLUX LoRA
-         * @description Apply a LoRA model to a FLUX transformer and/or T5 encoder.
+         * @description Apply a LoRA model to a FLUX transformer and/or text encoder.
          */
         FluxLoRALoaderInvocation: {
             /**

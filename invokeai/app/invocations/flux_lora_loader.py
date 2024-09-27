@@ -32,7 +32,7 @@ class FluxLoRALoaderOutput(BaseInvocationOutput):
     classification=Classification.Prototype,
 )
 class FluxLoRALoaderInvocation(BaseInvocation):
-    """Apply a LoRA model to a FLUX transformer and/or T5 encoder."""
+    """Apply a LoRA model to a FLUX transformer and/or text encoder."""
 
     lora: ModelIdentifierField = InputField(
         description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
