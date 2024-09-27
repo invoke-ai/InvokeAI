@@ -20,16 +20,16 @@ from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.denoise import denoise
+from invokeai.backend.flux.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
-    clip_timestep_schedule,
+    clip_timestep_schedule_fractional,
     generate_img_ids,
     get_noise,
     get_schedule,
     pack,
     unpack,
 )
-from invokeai.backend.flux.trajectory_guidance_extension import TrajectoryGuidanceExtension
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.lora.lora_patcher import LoRAPatcher
 from invokeai.backend.model_manager.config import ModelFormat
@@ -43,7 +43,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="2.1.0",
+    version="3.0.0",
     classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -68,12 +68,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.denoising_start,
     )
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
-    trajectory_guidance_strength: float = InputField(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        description="Value indicating how strongly to guide the denoising process towards the initial latents (during image-to-image). Range [0, 1]. A value of 0.0 is equivalent to vanilla image-to-image. A value of 1.0 will guide the denoising process very close to the original latents.",
-    )
     transformer: TransformerField = InputField(
         description=FieldDescriptions.flux_model,
         input=Input.Connection,
@@ -143,7 +137,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         # Clip the timesteps schedule based on denoising_start and denoising_end.
-        timesteps = clip_timestep_schedule(timesteps, self.denoising_start, self.denoising_end)
+        timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
 
         # Prepare input latent image.
         if init_latents is not None:
@@ -187,13 +181,14 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Now that we have 'packed' the latent tensors, verify that we calculated the image_seq_len correctly.
         assert image_seq_len == x.shape[1]
 
-        # Prepare trajectory guidance extension.
-        traj_guidance_extension: TrajectoryGuidanceExtension | None = None
-        if init_latents is not None:
-            traj_guidance_extension = TrajectoryGuidanceExtension(
+        # Prepare inpaint extension.
+        inpaint_extension: InpaintExtension | None = None
+        if inpaint_mask is not None:
+            assert init_latents is not None
+            inpaint_extension = InpaintExtension(
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,
-                trajectory_guidance_strength=self.trajectory_guidance_strength,
+                noise=noise,
             )
 
         with (
@@ -241,7 +236,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 timesteps=timesteps,
                 step_callback=self._build_step_callback(context),
                 guidance=self.guidance,
-                traj_guidance_extension=traj_guidance_extension,
+                inpaint_extension=inpaint_extension,
             )
 
         x = unpack(x.float(), self.height, self.width)

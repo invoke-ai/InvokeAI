@@ -34,12 +34,12 @@
   },
   "nodes": [
     {
-      "id": "4ecda92d-ee0e-45ca-aa35-6e9410ac39b9",
+      "id": "0940bc54-21fb-4346-bc68-fca5724c2747",
       "type": "invocation",
       "data": {
-        "id": "4ecda92d-ee0e-45ca-aa35-6e9410ac39b9",
+        "id": "0940bc54-21fb-4346-bc68-fca5724c2747",
         "type": "flux_denoise",
-        "version": "2.1.0",
+        "version": "3.0.0",
         "label": "",
         "notes": "",
         "isOpen": true,
@@ -61,7 +61,7 @@
           },
           "denoise_mask": {
             "name": "denoise_mask",
-            "label": ""
+            "label": "Denoise Mask"
           },
           "denoising_start": {
             "name": "denoising_start",
@@ -72,11 +72,6 @@
             "name": "denoising_end",
             "label": "",
             "value": 1
-          },
-          "trajectory_guidance_strength": {
-            "name": "trajectory_guidance_strength",
-            "label": "",
-            "value": 0
           },
           "transformer": {
             "name": "transformer",
@@ -114,8 +109,8 @@
         }
       },
       "position": {
-        "x": 1161.0101524413685,
-        "y": -223.33548695623742
+        "x": 1180.8001377784371,
+        "y": -219.96908055568326
       }
     },
     {
@@ -169,14 +164,7 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "",
-            "value": {
-              "key": "b4990a6c-0899-48e9-969b-d6f3801acc6a",
-              "hash": "random:aad8f7bc19ce76541dfb394b62a30f77722542b66e48064a9f25453263b45fba",
-              "name": "FLUX Dev (Quantized)_2",
-              "base": "flux",
-              "type": "main"
-            }
+            "label": ""
           },
           "t5_encoder_model": {
             "name": "t5_encoder_model",
@@ -289,36 +277,36 @@
   ],
   "edges": [
     {
-      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90transformer-4ecda92d-ee0e-45ca-aa35-6e9410ac39b9transformer",
+      "id": "reactflow__edge-0940bc54-21fb-4346-bc68-fca5724c2747latents-7e5172eb-48c1-44db-a770-8fd83e1435d1latents",
       "type": "default",
-      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
-      "target": "4ecda92d-ee0e-45ca-aa35-6e9410ac39b9",
-      "sourceHandle": "transformer",
-      "targetHandle": "transformer"
+      "source": "0940bc54-21fb-4346-bc68-fca5724c2747",
+      "target": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
+      "sourceHandle": "latents",
+      "targetHandle": "latents"
     },
     {
-      "id": "reactflow__edge-01f674f8-b3d1-4df1-acac-6cb8e0bfb63cconditioning-4ecda92d-ee0e-45ca-aa35-6e9410ac39b9positive_text_conditioning",
-      "type": "default",
-      "source": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
-      "target": "4ecda92d-ee0e-45ca-aa35-6e9410ac39b9",
-      "sourceHandle": "conditioning",
-      "targetHandle": "positive_text_conditioning"
-    },
-    {
-      "id": "reactflow__edge-4754c534-a5f3-4ad0-9382-7887985e668cvalue-4ecda92d-ee0e-45ca-aa35-6e9410ac39b9seed",
+      "id": "reactflow__edge-4754c534-a5f3-4ad0-9382-7887985e668cvalue-0940bc54-21fb-4346-bc68-fca5724c2747seed",
       "type": "default",
       "source": "4754c534-a5f3-4ad0-9382-7887985e668c",
-      "target": "4ecda92d-ee0e-45ca-aa35-6e9410ac39b9",
+      "target": "0940bc54-21fb-4346-bc68-fca5724c2747",
       "sourceHandle": "value",
       "targetHandle": "seed"
     },
     {
-      "id": "reactflow__edge-4ecda92d-ee0e-45ca-aa35-6e9410ac39b9latents-7e5172eb-48c1-44db-a770-8fd83e1435d1latents",
+      "id": "reactflow__edge-01f674f8-b3d1-4df1-acac-6cb8e0bfb63cconditioning-0940bc54-21fb-4346-bc68-fca5724c2747positive_text_conditioning",
       "type": "default",
-      "source": "4ecda92d-ee0e-45ca-aa35-6e9410ac39b9",
-      "target": "7e5172eb-48c1-44db-a770-8fd83e1435d1",
-      "sourceHandle": "latents",
-      "targetHandle": "latents"
+      "source": "01f674f8-b3d1-4df1-acac-6cb8e0bfb63c",
+      "target": "0940bc54-21fb-4346-bc68-fca5724c2747",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_text_conditioning"
+    },
+    {
+      "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90transformer-0940bc54-21fb-4346-bc68-fca5724c2747transformer",
+      "type": "default",
+      "source": "f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90",
+      "target": "0940bc54-21fb-4346-bc68-fca5724c2747",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
     },
     {
       "id": "reactflow__edge-f8d9d7c8-9ed7-4bd7-9e42-ab0e89bfac90vae-7e5172eb-48c1-44db-a770-8fd83e1435d1vae",
