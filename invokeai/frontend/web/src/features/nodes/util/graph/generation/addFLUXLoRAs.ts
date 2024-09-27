@@ -9,7 +9,7 @@ export const addFLUXLoRAs = (
   g: Graph,
   denoise: Invocation<'flux_denoise'>,
   modelLoader: Invocation<'flux_model_loader'>,
-  fluxTextEncoder: Invocation<'flux_text_encoder'>,
+  fluxTextEncoder: Invocation<'flux_text_encoder'>
 ): void => {
   const enabledLoRAs = state.loras.loras.filter((l) => l.isEnabled && l.model.base === 'flux');
   const loraCount = enabledLoRAs.length;
@@ -37,7 +37,7 @@ export const addFLUXLoRAs = (
   g.addEdge(modelLoader, 'clip', loraCollectionLoader, 'clip');
   // Reroute model connections through the LoRA collection loader
   g.deleteEdgesTo(denoise, ['transformer']);
-  g.deleteEdgesTo(fluxTextEncoder, ['clip'])
+  g.deleteEdgesTo(fluxTextEncoder, ['clip']);
   g.addEdge(loraCollectionLoader, 'transformer', denoise, 'transformer');
   g.addEdge(loraCollectionLoader, 'clip', fluxTextEncoder, 'clip');
 
