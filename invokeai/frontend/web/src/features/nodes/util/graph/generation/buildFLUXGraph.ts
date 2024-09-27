@@ -19,7 +19,6 @@ import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
-
 const log = logger('system');
 
 export const buildFLUXGraph = async (
