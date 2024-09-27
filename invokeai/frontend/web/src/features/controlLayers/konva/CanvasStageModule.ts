@@ -137,16 +137,27 @@ export class CanvasStageModule extends CanvasModuleBase {
     }
   };
 
-  // KISS method to drag the stage around
-  // TODO: Thoroughly check edge cases
+  // This approach deals with issue when children of stage (e.g. layers, shapes
+  // rects and bbox) react to dragging events, thus making stage inconsistent
+  // up till a moments when while being dragged around, they can become
+  // misaligned relative to each other and bbox.
+  //
+  // This is why we are momentary making them non-draggable at the mmb drag
+  // start and reverting them their status when drag stops.
 
   /**
    * Puts stage into dragging state
    * @param event MouseEvent with evt.button
    */
   mmbStartPanning = (event: KonvaEventObject<MouseEvent>) => {
-    if (event.evt && event.evt.button === 1) {
+    if (event.evt && event.evt.button === 1 && !this.mmbPanningInProgress) {
       this.mmbPanningInProgress = true;
+      this.konva.stage.getChildren().forEach(layer => {
+        layer.getChildren().forEach(child => {
+          child.draggable(false);
+        });
+      });
+
       this.konva.stage.startDrag(event); // Forcefully start canvas drag
     }
   };
@@ -158,7 +169,13 @@ export class CanvasStageModule extends CanvasModuleBase {
   mmbStopPanning = (event: KonvaEventObject<MouseEvent>) => {
     if (event.evt && event.evt.button === 1 && this.mmbPanningInProgress) {
       this.mmbPanningInProgress = false;
-      this.konva.stage.stopDrag(event); // stop any canvas dragging
+      this.konva.stage.getChildren().forEach(layer => {
+        layer.getChildren().forEach(child => {
+          child.draggable(true);
+        });
+      });
+
+      this.konva.stage.stopDrag(event);
     }
   };
 
