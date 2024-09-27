@@ -34,8 +34,8 @@ export const CanvasHUDItemScaledBbox = memo(() => {
           {/* GPU stats without div wrapping */}
           {systemStats.gpu_usage?.map((gpu) => (
             <Fragment key={gpu.id}>
-              <CanvasHUDItem label={`GPU Usage`} value={`${gpu.load.toFixed(2)}%`} />
-              <CanvasHUDItem label={`GPU Memory`} value={`${gpu.memory} MB`} />
+              <CanvasHUDItem label="GPU Usage" value={`${gpu.load.toFixed(2)}%`} />
+              <CanvasHUDItem label="GPU Memory" value={`${gpu.memory} MB`} />
             </Fragment>
           ))}
         </>
