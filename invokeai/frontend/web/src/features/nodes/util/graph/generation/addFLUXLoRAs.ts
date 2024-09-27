@@ -8,7 +8,8 @@ export const addFLUXLoRAs = (
   state: RootState,
   g: Graph,
   denoise: Invocation<'flux_denoise'>,
-  modelLoader: Invocation<'flux_model_loader'>
+  modelLoader: Invocation<'flux_model_loader'>,
+  fluxTextEncoder: Invocation<'flux_text_encoder'>,
 ): void => {
   const enabledLoRAs = state.loras.loras.filter((l) => l.isEnabled && l.model.base === 'flux');
   const loraCount = enabledLoRAs.length;
@@ -20,7 +21,7 @@ export const addFLUXLoRAs = (
   const loraMetadata: S['LoRAMetadataField'][] = [];
 
   // We will collect LoRAs into a single collection node, then pass them to the LoRA collection loader, which applies
-  // each LoRA to the UNet and CLIP.
+  // each LoRA to the transformer and text encoders.
   const loraCollector = g.addNode({
     id: getPrefixedId('lora_collector'),
     type: 'collect',
@@ -33,10 +34,12 @@ export const addFLUXLoRAs = (
   g.addEdge(loraCollector, 'collection', loraCollectionLoader, 'loras');
   // Use model loader as transformer input
   g.addEdge(modelLoader, 'transformer', loraCollectionLoader, 'transformer');
-  // Reroute transformer connections through the LoRA collection loader
+  g.addEdge(modelLoader, 'clip', loraCollectionLoader, 'clip');
+  // Reroute model connections through the LoRA collection loader
   g.deleteEdgesTo(denoise, ['transformer']);
-
+  g.deleteEdgesTo(fluxTextEncoder, ['clip'])
   g.addEdge(loraCollectionLoader, 'transformer', denoise, 'transformer');
+  g.addEdge(loraCollectionLoader, 'clip', fluxTextEncoder, 'clip');
 
   for (const lora of enabledLoRAs) {
     const { weight } = lora;
