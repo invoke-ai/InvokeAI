@@ -1,4 +1,4 @@
-# A sample state dict in the Kohya FLUX LoRA format that patches both the transformer and T5 text encoder.
+# A sample state dict in the Kohya FLUX LoRA format that patches both the transformer and CLIP text encoder.
 # These keys are based on the LoRA model here:
 # https://huggingface.co/cocktailpeanut/optimus
 state_dict_keys = [
