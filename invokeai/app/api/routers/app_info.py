@@ -16,6 +16,7 @@ from invokeai.app.services.invocation_cache.invocation_cache_common import Invoc
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.util.logging import logging
 from invokeai.version import __version__
+from invokeai.app.services.system_stats.system_stats import SystemStats, get_system_stats
 
 
 class LogLevel(int, Enum):
@@ -182,3 +183,12 @@ async def disable_invocation_cache() -> None:
 async def get_invocation_cache_status() -> InvocationCacheStatus:
     """Clears the invocation cache"""
     return ApiDependencies.invoker.services.invocation_cache.get_status()
+
+@app_router.get(
+        "/system-stats",
+        operation_id="get_system_stats",
+        status_code=200, response_model=SystemStats
+)
+async def get_stats() -> SystemStats:
+    stats = get_system_stats()
+    return SystemStats(**stats)
