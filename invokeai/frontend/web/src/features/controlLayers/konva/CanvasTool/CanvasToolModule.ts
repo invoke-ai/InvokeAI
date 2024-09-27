@@ -7,6 +7,7 @@ import {
   alignCoordForTool,
   calculateNewBrushSizeFromWheelDelta,
   floorCoord,
+  getIsMiddleMouseDown,
   getIsPrimaryMouseDown,
   getLastPointOfLastLine,
   getLastPointOfLine,
@@ -68,6 +69,10 @@ export class CanvasToolModule extends CanvasModuleBase {
    * Whether the mouse is currently down.
    */
   $isMouseDown = atom<boolean>(false);
+  /**
+   * Whether specifically the middle mouse button is currently down.
+   */
+  $isMiddleMouseDown = atom<boolean>(false);
   /**
    * The last cursor position.
    */
@@ -264,6 +269,10 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.stage.on('mouseleave', this.onStageMouseLeave);
     this.konva.stage.on('wheel', this.onStageMouseWheel);
 
+    // Additional listeners for middle mouse dragging switch
+    this.konva.stage.on('mousedown', this.onStageMiddleMouseDown);
+    this.konva.stage.on('mouseup', this.onStageMiddleMouseUp);
+
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('pointerup', this.onWindowPointerUp);
@@ -275,6 +284,10 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.konva.stage.off('mouseup', this.onStageMouseUp);
       this.konva.stage.off('mousemove', this.onStageMouseMove);
       this.konva.stage.off('mouseleave', this.onStageMouseLeave);
+
+      // Cleanup middle mouse button event listeners
+      this.konva.stage.off('mousedown', this.onStageMiddleMouseDown);
+      this.konva.stage.off('mouseup', this.onStageMiddleMouseUp);
 
       this.konva.stage.off('wheel', this.onStageMouseWheel);
       window.removeEventListener('keydown', this.onKeyDown);
@@ -357,24 +370,31 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     this.$isMouseDown.set(getIsPrimaryMouseDown(e));
+    this.$isMiddleMouseDown.set(getIsMiddleMouseDown(e));
     const cursorPos = this.syncLastCursorPos();
 
     try {
       const tool = this.$tool.get();
       const settings = this.manager.stateApi.getSettings();
+      const isMouseDown = this.$isMouseDown.get();
+      const isMiddleMouseDown = this.$isMiddleMouseDown.get();
+      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+
+      if (
+        !cursorPos
+        || !isMouseDown
+        || !selectedEntity?.state.isEnabled
+        || selectedEntity?.state.isLocked
+        || isMiddleMouseDown
+      ) {
+        return;
+      }
 
       if (tool === 'colorPicker') {
         const color = this.getColorUnderCursor();
         if (color) {
           this.manager.stateApi.setColor({ ...settings.color, ...color });
         }
-        return;
-      }
-
-      const isMouseDown = this.$isMouseDown.get();
-      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-
-      if (!cursorPos || !isMouseDown || !selectedEntity?.state.isEnabled || selectedEntity?.state.isLocked) {
         return;
       }
 
@@ -476,6 +496,8 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     try {
       this.$isMouseDown.set(false);
+      this.$isMiddleMouseDown.set(false);
+
       const cursorPos = this.syncLastCursorPos();
       if (!cursorPos) {
         return;
@@ -643,6 +665,29 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     this.render();
+  };
+
+  onStageMiddleMouseDown = (e: KonvaEventObject<MouseEvent>) => {
+    if (e.evt.button === 1) {
+      e.evt.preventDefault();
+      if (this.$toolBuffer.get() === null) {
+          this.$toolBuffer.set(this.$tool.get());
+          this.$tool.set('view');
+      }
+      this.manager.stage.mmbStartPanning(e);
+    }
+  };
+
+  onStageMiddleMouseUp = (e: KonvaEventObject<MouseEvent>) => {
+    if (e.evt.button === 1) {
+      e.evt.preventDefault();
+      const bufferedTool = this.$toolBuffer.get();
+      if (bufferedTool !== null) {
+          this.$tool.set(bufferedTool);
+          this.$toolBuffer.set(null);
+      }
+      this.manager.stage.mmbStopPanning(e);
+    }
   };
 
   /**

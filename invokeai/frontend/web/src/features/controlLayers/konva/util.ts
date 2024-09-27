@@ -160,6 +160,10 @@ export function getIsPrimaryMouseDown(e: KonvaEventObject<MouseEvent>) {
   return e.evt.buttons === 1;
 }
 
+export function getIsMiddleMouseDown(e: KonvaEventObject<MouseEvent>) {
+  return e.evt.button === 1;
+}
+
 /**
  * Calculates the new brush size based on the current brush size and the wheel delta from a mouse wheel event.
  * @param brushSize The current brush size

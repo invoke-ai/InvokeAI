@@ -59,6 +59,7 @@ export class CanvasStageModule extends CanvasModuleBase {
 
   subscriptions = new Set<() => void>();
   resizeObserver: ResizeObserver | null = null;
+  mmbPanningInProgress: boolean;
 
   constructor(container: HTMLDivElement, manager: CanvasManager) {
     super();
@@ -67,6 +68,7 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.manager = manager;
     this.path = this.manager.buildPath(this);
     this.log = this.manager.buildLogger(this);
+    this.mmbPanningInProgress = false;
 
     this.log.debug('Creating module');
 
@@ -132,6 +134,31 @@ export class CanvasStageModule extends CanvasModuleBase {
 
     if (shouldFitLayersAfterFittingStage) {
       this.fitLayersToStage();
+    }
+  };
+
+  // KISS method to drag the stage around
+  // TODO: Thoroughly check edge cases
+
+  /**
+   * Puts stage into dragging state
+   * @param event MouseEvent with evt.button
+   */
+  mmbStartPanning = (event: KonvaEventObject<MouseEvent>) => {
+    if (event.evt && event.evt.button === 1) {
+      this.mmbPanningInProgress = true;
+      this.konva.stage.startDrag(event); // Forcefully start canvas drag
+    }
+  };
+
+  /**
+   * Exits dragging state, flipping a boolean member of the class and syncing stage attributes one last time
+   * @param event MouseEvent with evt.button
+   */
+  mmbStopPanning = (event: KonvaEventObject<MouseEvent>) => {
+    if (event.evt && event.evt.button === 1 && this.mmbPanningInProgress) {
+      this.mmbPanningInProgress = false;
+      this.konva.stage.stopDrag(event); // stop any canvas dragging
     }
   };
 
