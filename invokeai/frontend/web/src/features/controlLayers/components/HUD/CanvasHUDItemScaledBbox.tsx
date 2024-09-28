@@ -25,13 +25,12 @@ export const CanvasHUDItemScaledBbox = memo(() => {
         />
       )}
 
-      {/* Always display system stats (CPU, RAM, GPU) */}
+      {/* For Testing Always display system stats (CPU, RAM, GPU) */}
       {systemStats && (
         <>
           <CanvasHUDItem label={t('controlLayers.HUD.cpuUsage')} value={`${systemStats.cpu_usage}%`} />
           <CanvasHUDItem label={t('controlLayers.HUD.ramUsage')} value={`${systemStats.ram_usage}%`} />
           
-          {/* GPU stats without div wrapping */}
           {systemStats.gpu_usage?.map((gpu) => (
             <Fragment key={gpu.id}>
               <CanvasHUDItem label={t('controlLayers.HUD.gpuUsage')} value={`${gpu.load.toFixed(2)}%`} />
