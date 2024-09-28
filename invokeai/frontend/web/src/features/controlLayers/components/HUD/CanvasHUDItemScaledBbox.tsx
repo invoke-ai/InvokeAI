@@ -1,7 +1,7 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasHUDItem } from 'features/controlLayers/components/HUD/CanvasHUDItem';
 import { selectScaledSize, selectScaleMethod } from 'features/controlLayers/store/selectors';
-import { memo, Fragment} from 'react';
+import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetSystemStatsQuery } from 'services/api/endpoints/appInfo';
 
@@ -28,14 +28,14 @@ export const CanvasHUDItemScaledBbox = memo(() => {
       {/* Always display system stats (CPU, RAM, GPU) */}
       {systemStats && (
         <>
-          <CanvasHUDItem label="CPU Usage" value={`${systemStats.cpu_usage}%`} />
-          <CanvasHUDItem label="RAM Usage" value={`${systemStats.ram_usage}%`} />
+          <CanvasHUDItem label={t('controlLayers.HUD.cpuUsage')} value={`${systemStats.cpu_usage}%`} />
+          <CanvasHUDItem label={t('controlLayers.HUD.ramUsage')} value={`${systemStats.ram_usage}%`} />
           
           {/* GPU stats without div wrapping */}
           {systemStats.gpu_usage?.map((gpu) => (
             <Fragment key={gpu.id}>
-              <CanvasHUDItem label="GPU Usage" value={`${gpu.load.toFixed(2)}%`} />
-              <CanvasHUDItem label="GPU Memory" value={`${gpu.memory} MB`} />
+              <CanvasHUDItem label={t('controlLayers.HUD.gpuUsage')} value={`${gpu.load.toFixed(2)}%`} />
+              <CanvasHUDItem label={t('controlLayers.HUD.gpuRamUsage')} value={`${gpu.memory} MB`} />
             </Fragment>
           ))}
         </>
