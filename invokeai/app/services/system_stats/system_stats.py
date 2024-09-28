@@ -2,7 +2,6 @@ import platform
 import subprocess
 from typing import List, Optional
 
-import GPUtil
 import psutil
 from pydantic import BaseModel
 
@@ -20,19 +19,33 @@ class SystemStats(BaseModel):
     gpu_usage: Optional[List[GPUStat]]
 
 
-# Function to fetch NVIDIA GPU stats (using GPUtil)
+# Function to fetch NVIDIA GPU stats (using nvidia-smi)
 def get_nvidia_stats() -> Optional[List[GPUStat]]:
-    gpus = GPUtil.getGPUs()
-    gpu_usage = [
-        GPUStat(
-            id=gpu.id,
-            load=gpu.load * 100,
-            memory=gpu.memoryUsed,
-            memory_total=gpu.memoryTotal,
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=index,utilization.gpu,memory.used,memory.total",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
         )
-        for gpu in gpus
-    ]
-    return gpu_usage if gpu_usage else None
+        output_lines = result.stdout.splitlines()
+
+        gpu_usage = []
+        for line in output_lines:
+            parts = line.split(", ")
+            if len(parts) == 4:
+                gpu_id = int(parts[0])
+                load = float(parts[1])
+                memory_used = float(parts[2])
+                memory_total = float(parts[3])
+                gpu_usage.append(GPUStat(id=gpu_id, load=load, memory=memory_used, memory_total=memory_total))
+        return gpu_usage if gpu_usage else None
+    except Exception as e:
+        print(f"Error fetching NVIDIA GPU stats: {e}")
+        return None
 
 
 # Function to fetch AMD GPU stats (using rocm-smi, needs testing/fixing by someone with AMD gpu)
@@ -57,7 +70,7 @@ def get_amd_stats() -> Optional[List[GPUStat]]:
         return None
 
 
-# Placeholder Function to fetch Mac MPS GPU stats (Needs Someone with Mac Knowleadge)
+# Function to fetch Mac MPS GPU stats (placeholder, needs someone with Mac knowledge)
 def get_mps_stats() -> Optional[List[GPUStat]]:
     try:
         # Using ioreg to get MPS stats on macOS
@@ -68,8 +81,8 @@ def get_mps_stats() -> Optional[List[GPUStat]]:
         for line in output_lines:
             if "AppleGPU" in line:  # Adjust this condition based on actual output format
                 # Extract actual values from the output line
-                # This is a placeholder for parsing; adjust based on ioreg output structure
-                gpu_id = len(gpu_usage)  # Just an incremental ID
+                # Placeholder logic for parsing; needs to be implemented based on actual ioreg output
+                gpu_id = len(gpu_usage)  # Incremental ID
                 load = 60.0  # Replace with actual load parsing logic
                 memory_used = 8192  # Replace with actual memory parsing logic
                 memory_total = 16384  # Replace with actual total memory parsing logic
@@ -82,8 +95,7 @@ def get_mps_stats() -> Optional[List[GPUStat]]:
 
 def get_system_stats() -> SystemStats:
     cpu_usage = psutil.cpu_percent(interval=1)
-
-    ram_usage = psutil.virtual_memory().used / (1024**2)
+    ram_usage = psutil.virtual_memory().used / (1024**2)  # Convert bytes to MB
 
     gpu_usage = None
     system_type = platform.system()
