@@ -185,11 +185,8 @@ async def get_invocation_cache_status() -> InvocationCacheStatus:
     """Clears the invocation cache"""
     return ApiDependencies.invoker.services.invocation_cache.get_status()
 
-@app_router.get(
-        "/system-stats",
-        operation_id="get_system_stats",
-        status_code=200, response_model=SystemStats
-)
+
+@app_router.get("/system-stats", operation_id="get_system_stats", status_code=200, response_model=SystemStats)
 async def get_stats() -> SystemStats:
     stats = get_system_stats()
     return SystemStats(**stats)
