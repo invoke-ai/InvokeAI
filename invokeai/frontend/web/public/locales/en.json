@@ -1028,6 +1028,7 @@
         "gaussianBlur": "Gaussian Blur",
         "boxBlur": "Box Blur",
         "staged": "Staged"
+
     },
     "dynamicPrompts": {
         "showDynamicPrompts": "Show Dynamic Prompts",
@@ -1802,6 +1803,10 @@
         "HUD": {
             "bbox": "Bbox",
             "scaledBbox": "Scaled Bbox",
+            "cpuUsage": "CPU Usage",
+            "ramUsage": "RAM Usage",
+            "gpuUsage": "GPU Usage",
+            "gpuRamUsage": "GPU Ram",
             "entityStatus": {
                 "isFiltering": "{{title}} is filtering",
                 "isTransforming": "{{title}} is transforming",
