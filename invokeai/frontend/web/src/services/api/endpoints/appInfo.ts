@@ -19,6 +19,20 @@ interface SystemStats {
   gpu_usage: GPUStat[];
 }
 
+// Define the shape of the system stats response
+interface GPUStat {
+  id: number;
+  load: number;
+  memory: number;
+  memory_total: number;
+}
+
+interface SystemStats {
+  cpu_usage: number;
+  ram_usage: number;
+  gpu_usage: GPUStat[];
+}
+
 /**
  * Builds an endpoint URL for the app router
  * @example
