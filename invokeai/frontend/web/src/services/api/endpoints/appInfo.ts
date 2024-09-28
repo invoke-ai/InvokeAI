@@ -5,6 +5,34 @@ import type { AppConfig, AppDependencyVersions, AppVersion } from 'services/api/
 
 import { api, buildV1Url } from '..';
 
+// Define the shape of the system stats response
+interface GPUStat {
+  id: number;
+  load: number;
+  memory: number;
+  memory_total: number;
+}
+
+interface SystemStats {
+  cpu_usage: number;
+  ram_usage: number;
+  gpu_usage: GPUStat[];
+}
+
+// Define the shape of the system stats response
+interface GPUStat {
+  id: number;
+  load: number;
+  memory: number;
+  memory_total: number;
+}
+
+interface SystemStats {
+  cpu_usage: number;
+  ram_usage: number;
+  gpu_usage: GPUStat[];
+}
+
 /**
  * Builds an endpoint URL for the app router
  * @example
@@ -75,6 +103,15 @@ export const appInfoApi = api.injectEndpoints({
       },
       providesTags: ['Schema'],
     }),
+
+    // New query for system stats
+    getSystemStats: build.query<SystemStats, void>({
+      query: () => ({
+        url: buildAppInfoUrl('system-stats'),
+        method: 'GET',
+      }),
+      providesTags: ['FetchOnReconnect'],
+    }),
   }),
 });
 
@@ -88,4 +125,5 @@ export const {
   useGetInvocationCacheStatusQuery,
   useGetOpenAPISchemaQuery,
   useLazyGetOpenAPISchemaQuery,
+  useGetSystemStatsQuery, // Export the system stats hook
 } = appInfoApi;
