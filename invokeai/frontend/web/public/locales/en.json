@@ -1805,7 +1805,7 @@
             "cpuUsage": "CPU Usage",
             "ramUsage": "RAM Usage",
             "gpuUsage": "GPU Usage",
-            "gpuRamUsage": "GPU Ram",
+            "gpuRamUsage": "GPU Ram Usage",
             "entityStatus": {
                 "isFiltering": "{{title}} is filtering",
                 "isTransforming": "{{title}} is transforming",

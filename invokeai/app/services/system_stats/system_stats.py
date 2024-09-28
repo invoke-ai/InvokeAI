@@ -1,7 +1,8 @@
-import psutil
-import GPUtil
-from pydantic import BaseModel
 from typing import List
+
+import GPUtil
+import psutil
+from pydantic import BaseModel
 
 
 # Pydantic Models for System Stats
