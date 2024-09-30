@@ -239,7 +239,7 @@ export type PostUploadAction =
   | ReplaceLayerWithImagePostUploadAction;
 
 // System Stats
-export interface GPUStat {
+interface GPUStat {
   id: number;
   load: number;
   memory: number;
