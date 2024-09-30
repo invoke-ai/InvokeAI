@@ -11,7 +11,7 @@ import { PiFlowArrowBold } from 'react-icons/pi';
 export const ImageMenuItemLoadWorkflow = memo(() => {
   const { t } = useTranslation();
   const imageDTO = useImageDTOContext();
-  const { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult } = useGetAndLoadEmbeddedWorkflow({});
+  const [getAndLoadEmbeddedWorkflow, { isLoading }] = useGetAndLoadEmbeddedWorkflow();
   const hasTemplates = useStore($hasTemplates);
 
   const onClick = useCallback(() => {
@@ -20,7 +20,7 @@ export const ImageMenuItemLoadWorkflow = memo(() => {
 
   return (
     <MenuItem
-      icon={getAndLoadEmbeddedWorkflowResult.isLoading ? <SpinnerIcon /> : <PiFlowArrowBold />}
+      icon={isLoading ? <SpinnerIcon /> : <PiFlowArrowBold />}
       onClickCapture={onClick}
       isDisabled={!imageDTO.has_workflow || !hasTemplates}
     >
