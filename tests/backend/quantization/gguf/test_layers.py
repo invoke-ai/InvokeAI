@@ -70,15 +70,17 @@ def test_gguf_patcher_unpatch_restores_behavior():
     with pytest.raises(Exception):  # noqa: B017
         model.load_state_dict(quantized_sd)
 
+    original_linear = nn.Linear
     with TestGGUFPatcher.wrap():
         patched_model = DummyModule(device=device, dtype=dtype)
         patched_model.load_state_dict(quantized_sd)
         # Will raise if patch is not applied
         patched_model(input_tensor)
+        assert isinstance(nn.Linear(4, 8), TestGGUFPatcher.Linear)
 
     # Ensure nn.Linear is restored
     assert nn.Linear is not TestGGUFPatcher.Linear
-    assert isinstance(nn.Linear(4, 8), nn.Linear)
+    assert isinstance(nn.Linear(4, 8), original_linear)
 
 
 # Test that the patched Linear layer behaves as expected

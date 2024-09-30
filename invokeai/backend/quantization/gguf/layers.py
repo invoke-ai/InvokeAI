@@ -1,33 +1,61 @@
 # Largely based on https://github.com/city96/ComfyUI-GGUF
 
-from typing import Optional, Union
+from typing import List, Optional, Union, Callable
 
 import gguf
-from torch import Tensor, device, dtype, float32, nn, zeros_like
+import torch
 
 from invokeai.backend.quantization.gguf.utils import dequantize_tensor, is_quantized
 
-PATCH_TYPES = Union[list[Tensor], tuple[Tensor]]
+PATCH_TYPES = Union[list[torch.Tensor], tuple[torch.Tensor]]
 
 
-class GGUFTensor(Tensor):
+class GGUFTensor(torch.Tensor):
     """
-    Main tensor-like class for storing quantized weights
+    Main tensor-like class for storing quantized weights.
+    Inherits from torch.Tensor and adds additional attributes.
     """
 
-    def __init__(self, *args, tensor_type, tensor_shape, patches=None, **kwargs):
-        super().__init__()
-        self.tensor_type = tensor_type
-        self.tensor_shape = tensor_shape
-        self.patches = patches or []
+    tensor_type: Union[torch.dtype, gguf.GGMLQuantizationType, None]
+    tensor_shape: torch.Size
+    patches: List[Callable[[torch.Tensor], torch.Tensor]]
 
-    def __new__(cls, *args, tensor_type, tensor_shape, patches=None, **kwargs):
-        return super().__new__(cls, *args, **kwargs)
+    def __new__(
+        cls,
+        data,
+        tensor_type: Union[torch.dtype, gguf.GGMLQuantizationType],
+        tensor_shape: torch.Size,
+        patches: Optional[List[Callable[[torch.Tensor], torch.Tensor]]] = None,
+        **kwargs
+    ):
+        # Create a new tensor instance using the superclass method
+        if isinstance(data, torch.Tensor):
+            tensor = data.as_subclass(cls)
+        else:
+            tensor = torch.tensor(data, **kwargs).as_subclass(cls)
+        # Set the additional attributes
+        tensor.tensor_type = tensor_type
+        tensor.tensor_shape = tensor_shape
+        tensor.patches = patches or []
+        return tensor
+
+    def __init__(
+        self,
+        data,
+        tensor_type: Union[torch.dtype, gguf.GGMLQuantizationType],
+        tensor_shape: torch.Size,
+        patches: Optional[List[Callable[[torch.Tensor], torch.Tensor]]] = None,
+        **kwargs
+    ):
+        # __init__ is not called for torch.Tensor subclasses
+        pass
 
     def to(self, *args, **kwargs):
+        # Create a new tensor with the desired type/device and copy attributes
         new = super().to(*args, **kwargs)
-        new.tensor_type = getattr(self, "tensor_type", None)
-        new.tensor_shape = getattr(self, "tensor_shape", new.data.shape)
+        new = new.as_subclass(GGUFTensor)
+        new.tensor_type = getattr(self, "tensor_type", self.dtype)
+        new.tensor_shape = getattr(self, "tensor_shape", self.size())
         new.patches = getattr(self, "patches", []).copy()
         return new
 
@@ -38,18 +66,25 @@ class GGUFTensor(Tensor):
         return self
 
     def copy_(self, *args, **kwargs):
-        # fixes .weight.copy_ in comfy/clip_model/CLIPTextModel
+        # Attempt to copy data into the tensor; handle exceptions gracefully
         try:
-            return super().copy_(*args, **kwargs)
+            new = super().copy_(*args, **kwargs)
+            new = new.as_subclass(GGUFTensor)
+            new.tensor_type = getattr(self, "tensor_type", self.dtype)
+            new.tensor_shape = getattr(self, "tensor_shape", self.size())
+            new.patches = getattr(self, "patches", []).copy()
+            return new
         except Exception as e:
-            print(f"ignoring 'copy_' on tensor: {e}")
+            print(f"Ignoring 'copy_' on tensor: {e}")
 
-    def __deepcopy__(self, *args, **kwargs):
-        # Intel Arc fix, ref#50
-        new = super().__deepcopy__(*args, **kwargs)
-        new.tensor_type = getattr(self, "tensor_type", None)
-        new.tensor_shape = getattr(self, "tensor_shape", new.data.shape)
-        new.patches = getattr(self, "patches", []).copy()
+    def __deepcopy__(self, memo):
+        # Create a deep copy of the tensor and copy attributes
+        new = super().__deepcopy__(memo)
+        if isinstance(new, torch.Tensor):
+            new = new.as_subclass(GGUFTensor)
+            new.tensor_type = getattr(self, "tensor_type", self.dtype)
+            new.tensor_shape = getattr(self, "tensor_shape", self.size())
+            new.patches = getattr(self, "patches", []).copy()
         return new
 
     @property
@@ -59,7 +94,7 @@ class GGUFTensor(Tensor):
         return self.tensor_shape
 
 
-class GGUFLayer(nn.Module):
+class GGUFLayer(torch.nn.Module):
     """
     This (should) be responsible for de-quantizing on the fly
     """
@@ -68,12 +103,14 @@ class GGUFLayer(nn.Module):
     patch_dtype = None
     torch_compatible_tensor_types = {None, gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16}
 
-    def is_ggml_quantized(self, *, weight: Optional[Tensor] = None, bias: Optional[Tensor] = None):
-        if weight is None or bias is None:
-            return False
-        return is_quantized(weight) or is_quantized(bias)
+    def is_ggml_quantized(self, *, weight: Optional[torch.Tensor] = None, bias: Optional[torch.Tensor] = None):
+        weight = weight if weight != None else self.weight
+        bias = bias if bias != None else self.bias
+        weight_quantized = is_quantized(weight)
+        bias_quantized = is_quantized(bias)
+        return weight_quantized or bias_quantized
 
-    def _load_from_state_dict(self, state_dict: dict[str, Tensor], prefix: str, *args, **kwargs):
+    def _load_from_state_dict(self, state_dict: dict[str, torch.Tensor], prefix: str, *args, **kwargs):
         weight, bias = state_dict.get(f"{prefix}weight", None), state_dict.get(f"{prefix}bias", None)
         if self.is_ggml_quantized(weight=weight, bias=bias):
             return self.ggml_load_from_state_dict(state_dict, prefix, *args, **kwargs)
@@ -81,7 +118,7 @@ class GGUFLayer(nn.Module):
 
     def ggml_load_from_state_dict(
         self,
-        state_dict: dict[str, Tensor],
+        state_dict: dict[str, torch.Tensor],
         prefix: str,
         local_metadata,
         strict,
@@ -91,27 +128,13 @@ class GGUFLayer(nn.Module):
     ):
         for k, v in state_dict.items():
             if k.endswith("weight"):
-                self.weight = nn.Parameter(v, requires_grad=False)
+                self.weight = torch.nn.Parameter(v, requires_grad=False)
             elif k.endswith("bias") and v is not None:
-                self.bias = nn.Parameter(v, requires_grad=False)
+                self.bias = torch.nn.Parameter(v, requires_grad=False)
             else:
                 missing_keys.append(k)
 
-    def _save_to_state_dict(self, *args, **kwargs):
-        if self.is_ggml_quantized():
-            return self.ggml_save_to_state_dict(*args, **kwargs)
-        return super()._save_to_state_dict(*args, **kwargs)
-
-    def ggml_save_to_state_dict(self, destination: dict[str, Tensor], prefix: str):
-        # This is a fake state dict for vram estimation
-        weight = zeros_like(self.weight, device=device("meta"))
-        destination[prefix + "weight"] = weight
-        if self.bias is not None:
-            bias = zeros_like(self.bias, device=device("meta"))
-            destination[prefix + "bias"] = bias
-        return
-
-    def get_weight(self, tensor: Optional[Tensor], dtype: dtype):
+    def get_weight(self, tensor: Optional[torch.Tensor], dtype: torch.dtype):
         if tensor is None:
             return
 
@@ -125,13 +148,13 @@ class GGUFLayer(nn.Module):
 
     def cast_bias_weight(
         self,
-        input: Tensor,
-        dtype: Optional[dtype] = None,
-        device: Optional[device] = None,
-        bias_dtype: Optional[dtype] = None,
-    ) -> tuple[Tensor, Tensor]:
+        input: torch.Tensor,
+        dtype: Optional[torch.dtype] = None,
+        device: Optional[torch.device] = None,
+        bias_dtype: Optional[torch.dtype] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         if dtype is None:
-            dtype = getattr(input, "dtype", float32)
+            dtype = getattr(input, "dtype", torch.float32)
             if dtype is None:
                 raise ValueError("dtype is required")
         if bias_dtype is None:
