@@ -37,7 +37,6 @@ from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
-from invokeai.backend.quantization.gguf.torch_patcher import GGUFPatcher
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 try:
@@ -234,7 +233,7 @@ class FluxGGUFCheckpointModel(ModelLoader):
         assert isinstance(config, MainGGUFCheckpointConfig)
         model_path = Path(config.path)
 
-        with SilenceWarnings(), GGUFPatcher().wrap():
+        with SilenceWarnings():
             # Load the state dict and patcher
             sd = gguf_sd_loader(model_path)
             # Initialize the model
