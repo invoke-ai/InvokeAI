@@ -4,22 +4,15 @@ import { useIsRegionFocused } from 'common/hooks/interactionScopes';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ImageDTO } from 'services/api/types';
 
-export const GallerySelectionCountTag = () => {
+export const GallerySelectionCountTag = memo(() => {
   const dispatch = useAppDispatch();
   const { selection } = useAppSelector((s) => s.gallery);
-  const { t } = useTranslation();
   const { imageDTOs } = useGalleryImages();
   const isGalleryFocused = useIsRegionFocused('gallery');
-
-  const onClearSelection = useCallback(() => {
-    const firstImage = selection[0];
-    if (firstImage) {
-      dispatch(selectionChanged([firstImage]));
-    }
-  }, [dispatch, selection]);
 
   const onSelectPage = useCallback(() => {
     dispatch(selectionChanged([...selection, ...imageDTOs]));
@@ -33,6 +26,28 @@ export const GallerySelectionCountTag = () => {
     dependencies: [onSelectPage, isGalleryFocused],
   });
 
+  if (selection.length <= 1) {
+    return null;
+  }
+
+  return <GallerySelectionCountTagContent selection={selection} />;
+});
+
+GallerySelectionCountTag.displayName = 'GallerySelectionCountTag';
+
+const GallerySelectionCountTagContent = memo(({ selection }: { selection: ImageDTO[] }) => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+
+  const isGalleryFocused = useIsRegionFocused('gallery');
+
+  const onClearSelection = useCallback(() => {
+    const firstImage = selection[0];
+    if (firstImage) {
+      dispatch(selectionChanged([firstImage]));
+    }
+  }, [dispatch, selection]);
+
   useRegisteredHotkeys({
     id: 'clearSelection',
     category: 'gallery',
@@ -40,10 +55,6 @@ export const GallerySelectionCountTag = () => {
     options: { enabled: selection.length > 0 && isGalleryFocused },
     dependencies: [onClearSelection, selection, isGalleryFocused],
   });
-
-  if (selection.length <= 1) {
-    return null;
-  }
 
   return (
     <Tag
@@ -65,4 +76,6 @@ export const GallerySelectionCountTag = () => {
       <TagCloseButton onClick={onClearSelection} />
     </Tag>
   );
-};
+});
+
+GallerySelectionCountTagContent.displayName = 'GallerySelectionCountTagContent';
