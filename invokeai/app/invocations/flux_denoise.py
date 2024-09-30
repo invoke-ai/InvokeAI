@@ -213,7 +213,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         cached_weights=cached_weights,
                     )
                 )
-            elif config.format in [ModelFormat.BnbQuantizedLlmInt8b, ModelFormat.BnbQuantizednf4b]:
+            elif config.format in [ModelFormat.BnbQuantizedLlmInt8b, ModelFormat.BnbQuantizednf4b, ModelFormat.GGUFQuantized]:
                 # The model is quantized, so apply the LoRA weights as sidecar layers. This results in slower inference,
                 # than directly patching the weights, but is agnostic to the quantization format.
                 exit_stack.enter_context(

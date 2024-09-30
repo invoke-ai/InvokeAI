@@ -9,6 +9,7 @@ from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.layers import GGUFTensor
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 
+TORCH_COMPATIBLE_QTYPES={gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16}
 
 def gguf_sd_loader(path: Path) -> dict[str, GGUFTensor]:
     reader = gguf.GGUFReader(path)
