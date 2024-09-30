@@ -1,3 +1,4 @@
+import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import type { Atom } from 'nanostores';
@@ -7,10 +8,10 @@ import { useEffect } from 'react';
 
 const log = logger('system');
 
-const REGION_NAMES = ['galleryPanel', 'layersPanel', 'canvas', 'workflows', 'imageViewer'] as const;
+const REGION_NAMES = ['gallery', 'layers', 'canvas', 'workflows', 'viewer', 'settings'] as const;
 
 type FocusRegionName = (typeof REGION_NAMES)[number];
-type FocusRegionData = { name: FocusRegionName; mounted: number; targets: Set<HTMLElement> };
+type FocusRegionData = { name: FocusRegionName; targets: Set<HTMLElement> };
 type FocusRegionState = {
   focusedRegion: FocusRegionName | null;
   regions: Record<FocusRegionName, FocusRegionData>;
@@ -18,7 +19,7 @@ type FocusRegionState = {
 
 const initialData = REGION_NAMES.reduce(
   (state, region) => {
-    state.regions[region] = { name: region, mounted: 0, targets: new Set() };
+    state.regions[region] = { name: region, targets: new Set() };
     return state;
   },
   {
@@ -31,25 +32,32 @@ const $focusRegionState = deepMap<FocusRegionState>(initialData);
 export const $focusedRegion = computed($focusRegionState, (regions) => regions.focusedRegion);
 export const FOCUS_REGIONS = REGION_NAMES.reduce(
   (acc, region) => {
-    acc[`$${region}`] = computed($focusRegionState, (state) => ({
-      isFocused: state.focusedRegion === region,
-      isMounted: state.regions[region].mounted > 0,
-    }));
+    acc[`$${region}`] = computed($focusRegionState, (state) => state.focusedRegion === region);
     return acc;
   },
-  {} as Record<`$${FocusRegionName}`, Atom<{ isFocused: boolean; isMounted: boolean }>>
+  {} as Record<`$${FocusRegionName}`, Atom<boolean>>
 );
 
-export const setFocus = (region: FocusRegionName | null) => {
+const setFocus = (region: FocusRegionName | null) => {
   $focusRegionState.setKey('focusedRegion', region);
   log.trace(`Focus changed: ${region}`);
 };
 
-export const useFocusRegion = (region: FocusRegionName, ref: RefObject<HTMLElement>) => {
+type UseFocusRegionOptions = {
+  focusOnMount?: boolean;
+};
+
+export const useFocusRegion = (
+  region: FocusRegionName,
+  ref: RefObject<HTMLElement>,
+  options?: UseFocusRegionOptions
+) => {
   useEffect(() => {
     if (!ref.current) {
       return;
     }
+
+    const { focusOnMount = false } = { focusOnMount: false, ...options };
 
     const element = ref.current;
 
@@ -59,36 +67,25 @@ export const useFocusRegion = (region: FocusRegionName, ref: RefObject<HTMLEleme
     targets.add(element);
     $focusRegionState.setKey(`regions.${region}.targets`, targets);
 
+    if (focusOnMount) {
+      setFocus(region);
+    }
+
     return () => {
       const regionData = $focusRegionState.get().regions[region];
       const targets = new Set(regionData.targets);
       targets.delete(element);
       $focusRegionState.setKey(`regions.${region}.targets`, targets);
-    };
-  }, [ref, region]);
-};
 
-export const useFocusRegionOnMount = (region: FocusRegionName) => {
-  useEffect(() => {
-    const mounted = $focusRegionState.get().regions[region].mounted + 1;
-    $focusRegionState.setKey(`regions.${region}.mounted`, mounted);
-    setFocus(region);
-    log.trace(`Focus region ${region} mounted, count: ${mounted}`);
-
-    return () => {
-      let mounted = $focusRegionState.get().regions[region].mounted - 1;
-      if (mounted < 0) {
-        log.warn(`Focus region ${region} mounted count is negative: ${mounted}!`);
-        mounted = 0;
-      } else {
-        log.trace(`Focus region ${region} unmounted, count: ${mounted}`);
-      }
-      $focusRegionState.setKey(`regions.${region}.mounted`, mounted);
-      if (mounted === 0) {
+      if (targets.size === 0 && $focusRegionState.get().focusedRegion === region) {
         setFocus(null);
       }
     };
-  }, [region]);
+  }, [options, ref, region]);
+};
+
+export const useIsRegionFocused = (region: FocusRegionName) => {
+  return useStore(FOCUS_REGIONS[`$${region}`]);
 };
 
 const onFocus = (_: FocusEvent) => {

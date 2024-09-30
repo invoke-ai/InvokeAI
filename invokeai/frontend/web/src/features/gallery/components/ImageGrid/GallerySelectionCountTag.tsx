@@ -1,7 +1,6 @@
 import { Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { FOCUS_REGIONS } from 'common/hooks/interactionScopes';
+import { useIsRegionFocused } from 'common/hooks/interactionScopes';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -13,7 +12,7 @@ export const GallerySelectionCountTag = () => {
   const { selection } = useAppSelector((s) => s.gallery);
   const { t } = useTranslation();
   const { imageDTOs } = useGalleryImages();
-  const galleryPanelFocus = useStore(FOCUS_REGIONS.$galleryPanel);
+  const isGalleryFocused = useIsRegionFocused('gallery');
 
   const onClearSelection = useCallback(() => {
     const firstImage = selection[0];
@@ -30,16 +29,16 @@ export const GallerySelectionCountTag = () => {
     id: 'selectAllOnPage',
     category: 'gallery',
     callback: onSelectPage,
-    options: { preventDefault: true, enabled: galleryPanelFocus.isFocused },
-    dependencies: [onSelectPage, galleryPanelFocus],
+    options: { preventDefault: true, enabled: isGalleryFocused },
+    dependencies: [onSelectPage, isGalleryFocused],
   });
 
   useRegisteredHotkeys({
     id: 'clearSelection',
     category: 'gallery',
     callback: onClearSelection,
-    options: { enabled: selection.length > 0 && galleryPanelFocus.isFocused },
-    dependencies: [onClearSelection, selection, galleryPanelFocus],
+    options: { enabled: selection.length > 0 && isGalleryFocused },
+    dependencies: [onClearSelection, selection, isGalleryFocused],
   });
 
   if (selection.length <= 1) {
