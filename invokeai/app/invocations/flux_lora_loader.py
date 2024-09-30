@@ -8,7 +8,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
-from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, TransformerField
+from invokeai.app.invocations.model import CLIPField, LoRAField, ModelIdentifierField, TransformerField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import BaseModelType
 
@@ -20,6 +20,7 @@ class FluxLoRALoaderOutput(BaseInvocationOutput):
     transformer: Optional[TransformerField] = OutputField(
         default=None, description=FieldDescriptions.transformer, title="FLUX Transformer"
     )
+    clip: Optional[CLIPField] = OutputField(default=None, description=FieldDescriptions.clip, title="CLIP")
 
 
 @invocation(
@@ -27,20 +28,27 @@ class FluxLoRALoaderOutput(BaseInvocationOutput):
     title="FLUX LoRA",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class FluxLoRALoaderInvocation(BaseInvocation):
-    """Apply a LoRA model to a FLUX transformer."""
+    """Apply a LoRA model to a FLUX transformer and/or text encoder."""
 
     lora: ModelIdentifierField = InputField(
         description=FieldDescriptions.lora_model, title="LoRA", ui_type=UIType.LoRAModel
     )
     weight: float = InputField(default=0.75, description=FieldDescriptions.lora_weight)
-    transformer: TransformerField = InputField(
+    transformer: TransformerField | None = InputField(
+        default=None,
         description=FieldDescriptions.transformer,
         input=Input.Connection,
         title="FLUX Transformer",
+    )
+    clip: CLIPField | None = InputField(
+        default=None,
+        title="CLIP",
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
     )
 
     def invoke(self, context: InvocationContext) -> FluxLoRALoaderOutput:
@@ -49,18 +57,33 @@ class FluxLoRALoaderInvocation(BaseInvocation):
         if not context.models.exists(lora_key):
             raise ValueError(f"Unknown lora: {lora_key}!")
 
-        if any(lora.lora.key == lora_key for lora in self.transformer.loras):
+        # Check for existing LoRAs with the same key.
+        if self.transformer and any(lora.lora.key == lora_key for lora in self.transformer.loras):
             raise ValueError(f'LoRA "{lora_key}" already applied to transformer.')
+        if self.clip and any(lora.lora.key == lora_key for lora in self.clip.loras):
+            raise ValueError(f'LoRA "{lora_key}" already applied to CLIP encoder.')
 
-        transformer = self.transformer.model_copy(deep=True)
-        transformer.loras.append(
-            LoRAField(
-                lora=self.lora,
-                weight=self.weight,
+        output = FluxLoRALoaderOutput()
+
+        # Attach LoRA layers to the models.
+        if self.transformer is not None:
+            output.transformer = self.transformer.model_copy(deep=True)
+            output.transformer.loras.append(
+                LoRAField(
+                    lora=self.lora,
+                    weight=self.weight,
+                )
             )
-        )
+        if self.clip is not None:
+            output.clip = self.clip.model_copy(deep=True)
+            output.clip.loras.append(
+                LoRAField(
+                    lora=self.lora,
+                    weight=self.weight,
+                )
+            )
 
-        return FluxLoRALoaderOutput(transformer=transformer)
+        return output
 
 
 @invocation(
@@ -68,7 +91,7 @@ class FluxLoRALoaderInvocation(BaseInvocation):
     title="FLUX LoRA Collection Loader",
     tags=["lora", "model", "flux"],
     category="model",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class FLUXLoRACollectionLoader(BaseInvocation):
@@ -83,6 +106,12 @@ class FLUXLoRACollectionLoader(BaseInvocation):
         description=FieldDescriptions.transformer,
         input=Input.Connection,
         title="Transformer",
+    )
+    clip: CLIPField | None = InputField(
+        default=None,
+        title="CLIP",
+        description=FieldDescriptions.clip,
+        input=Input.Connection,
     )
 
     def invoke(self, context: InvocationContext) -> FluxLoRALoaderOutput:
@@ -105,5 +134,10 @@ class FLUXLoRACollectionLoader(BaseInvocation):
                 if output.transformer is None:
                     output.transformer = self.transformer.model_copy(deep=True)
                 output.transformer.loras.append(lora)
+
+            if self.clip is not None:
+                if output.clip is None:
+                    output.clip = self.clip.model_copy(deep=True)
+                output.clip.loras.append(lora)
 
         return output

@@ -6,6 +6,7 @@ import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSe
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -17,8 +18,6 @@ import { getBoardField, getPresetModifiedPrompts, getSizes } from 'features/node
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
-
-import { addFLUXLoRAs } from './addFLUXLoRAs';
 
 const log = logger('system');
 
@@ -96,11 +95,11 @@ export const buildFLUXGraph = async (
   g.addEdge(modelLoader, 'transformer', noise, 'transformer');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
-  addFLUXLoRAs(state, g, noise, modelLoader);
-
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
   g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
   g.addEdge(modelLoader, 'max_seq_len', posCond, 't5_max_seq_len');
+
+  addFLUXLoRAs(state, g, noise, modelLoader, posCond);
 
   g.addEdge(posCond, 'conditioning', noise, 'positive_text_conditioning');
 

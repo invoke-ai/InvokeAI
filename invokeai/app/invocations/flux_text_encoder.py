@@ -1,4 +1,5 @@
-from typing import Literal
+from contextlib import ExitStack
+from typing import Iterator, Literal, Tuple
 
 import torch
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
@@ -9,6 +10,10 @@ from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.conditioner import HFEncoder
+from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import FLUX_KOHYA_CLIP_PREFIX
+from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
+from invokeai.backend.lora.lora_patcher import LoRAPatcher
+from invokeai.backend.model_manager.config import ModelFormat
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
 
 
@@ -17,7 +22,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
     title="FLUX Text Encoding",
     tags=["prompt", "conditioning", "flux"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class FluxTextEncoderInvocation(BaseInvocation):
@@ -78,11 +83,31 @@ class FluxTextEncoderInvocation(BaseInvocation):
         prompt = [self.prompt]
 
         with (
-            clip_text_encoder_info as clip_text_encoder,
+            clip_text_encoder_info.model_on_device() as (cached_weights, clip_text_encoder),
             clip_tokenizer_info as clip_tokenizer,
+            ExitStack() as exit_stack,
         ):
             assert isinstance(clip_text_encoder, CLIPTextModel)
             assert isinstance(clip_tokenizer, CLIPTokenizer)
+
+            clip_text_encoder_config = clip_text_encoder_info.config
+            assert clip_text_encoder_config is not None
+
+            # Apply LoRA models to the CLIP encoder.
+            # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
+            if clip_text_encoder_config.format in [ModelFormat.Diffusers]:
+                # The model is non-quantized, so we can apply the LoRA weights directly into the model.
+                exit_stack.enter_context(
+                    LoRAPatcher.apply_lora_patches(
+                        model=clip_text_encoder,
+                        patches=self._clip_lora_iterator(context),
+                        prefix=FLUX_KOHYA_CLIP_PREFIX,
+                        cached_weights=cached_weights,
+                    )
+                )
+            else:
+                # There are currently no supported CLIP quantized models. Add support here if needed.
+                raise ValueError(f"Unsupported model format: {clip_text_encoder_config.format}")
 
             clip_encoder = HFEncoder(clip_text_encoder, clip_tokenizer, True, 77)
 
@@ -90,3 +115,10 @@ class FluxTextEncoderInvocation(BaseInvocation):
 
         assert isinstance(pooled_prompt_embeds, torch.Tensor)
         return pooled_prompt_embeds
+
+    def _clip_lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
+        for lora in self.clip.loras:
+            lora_info = context.models.load(lora.lora)
+            assert isinstance(lora_info.model, LoRAModelRaw)
+            yield (lora_info.model, lora.weight)
+            del lora_info
