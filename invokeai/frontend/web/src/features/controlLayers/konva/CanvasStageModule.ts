@@ -152,6 +152,11 @@ export class CanvasStageModule extends CanvasModuleBase {
   mmbStartPanning = (event: KonvaEventObject<MouseEvent>) => {
     if (event.evt && event.evt.button === 1 && !this.mmbPanningInProgress) {
       this.mmbPanningInProgress = true;
+
+      // Stop dragging for bbox and layers
+      this.manager.bbox.konva.proxyRect.draggable(false);
+
+      // Stop dragging for other possible children layers
       this.konva.stage.getChildren().forEach(layer => {
         layer.getChildren().forEach(child => {
           child.draggable(false);
@@ -163,12 +168,17 @@ export class CanvasStageModule extends CanvasModuleBase {
   };
 
   /**
-   * Exits dragging state, flipping a boolean member of the class and syncing stage attributes one last time
+   * Exits stage dragging state
    * @param event MouseEvent with evt.button
    */
   mmbStopPanning = (event: KonvaEventObject<MouseEvent>) => {
     if (event.evt && event.evt.button === 1 && this.mmbPanningInProgress) {
       this.mmbPanningInProgress = false;
+
+      // Re-enable dragging for bbox and layers
+      this.manager.bbox.konva.proxyRect.draggable(true);
+
+      // Re-enable dragging for other layers
       this.konva.stage.getChildren().forEach(layer => {
         layer.getChildren().forEach(child => {
           child.draggable(true);
