@@ -31,7 +31,7 @@ from invokeai.backend.model_manager.config import (
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
 from invokeai.backend.quantization.gguf.layers import GGUFTensor
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.gguf.loaders import load_gguf_sd
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
@@ -412,7 +412,7 @@ class ModelProbe(object):
                 assert isinstance(model, dict)
                 return model
             elif model_path.suffix.endswith(".gguf"):
-                return gguf_sd_loader(model_path)
+                return load_gguf_sd(model_path)
             else:
                 return safetensors.torch.load_file(model_path)
 

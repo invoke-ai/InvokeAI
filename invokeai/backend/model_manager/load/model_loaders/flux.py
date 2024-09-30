@@ -237,8 +237,7 @@ class FluxGGUFCheckpointModel(ModelLoader):
             # Load the state dict and patcher
             sd = gguf_sd_loader(model_path)
             model = Flux(params[config.config_path])
-
-        model.load_state_dict(sd, assign=True)
+            model.load_state_dict(sd, assign=True)
         return model
 
 

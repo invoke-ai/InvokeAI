@@ -11,16 +11,6 @@ TORCH_COMPATIBLE_QTYPES = {None, gguf.GGMLQuantizationType.F32, gguf.GGMLQuantiz
 QK_K = 256
 K_SCALE_SIZE = 12
 
-MODEL_DETECTION = (
-    (
-        "flux",
-        (
-            ("transformer_blocks.0.attn.norm_added_k.weight",),
-            ("double_blocks.0.img_attn.proj.weight",),
-        ),
-    ),
-)
-
 
 def get_scale_min(scales: torch.Tensor):
     n_blocks = scales.shape[0]
@@ -298,6 +288,8 @@ def dequantize_tensor(
         return tensor.to(dtype)
     elif qtype in DEQUANTIZE_FUNCTIONS:
         dequant_dtype = dtype if dequant_dtype == "target" else dequant_dtype
+        if not (dequant_dtype == None or isinstance(dequant_dtype, torch.dtype)):
+            raise ValueError("dequant_dtype must be a torch.dtype")
         return dequantize(tensor.data, qtype, oshape, dtype=dequant_dtype).to(dtype)
     else:
         new = gguf.quants.dequantize(tensor.cpu().numpy(), qtype)
@@ -333,29 +325,3 @@ def split_block_dims(blocks: torch.Tensor, *args):
 
 
 PATCH_TYPES = Union[torch.Tensor, list[torch.Tensor], tuple[torch.Tensor]]
-
-
-def move_patch_to_device(item: PATCH_TYPES, device: torch.device) -> PATCH_TYPES:
-    if isinstance(item, torch.Tensor):
-        return item.to(device, non_blocking=True)
-    elif isinstance(item, tuple):
-        if len(item) == 0:
-            return item
-        if not isinstance(item[0], torch.Tensor):
-            raise ValueError("Invalid item")
-        return tuple(move_patch_to_device(x, device) for x in item)
-    elif isinstance(item, list):
-        if len(item) == 0:
-            return item
-        if not isinstance(item[0], torch.Tensor):
-            raise ValueError("Invalid item")
-        return [move_patch_to_device(x, device) for x in item]
-
-
-def detect_arch(state_dict: dict[str, torch.Tensor]):
-    for arch, match_lists in MODEL_DETECTION:
-        for match_list in match_lists:
-            if all(key in state_dict for key in match_list):
-                return arch
-    breakpoint()
-    raise ValueError("Unknown model architecture!")
