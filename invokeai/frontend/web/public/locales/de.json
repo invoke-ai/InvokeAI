@@ -186,10 +186,12 @@
                 "title": "Werkzeugbreite erhöhen"
             },
             "selectColorPickerTool": {
-                "title": "Farbwähler-Werkzeug"
+                "title": "Farbwähler-Werkzeug",
+                "desc": "Farbwähler-Werkzeug auswählen."
             },
             "selectEraserTool": {
-                "title": "Radiergummi-Werkzeug"
+                "title": "Radiergummi-Werkzeug",
+                "desc": "Radiergummi-Werkzeug auswählen."
             },
             "fitLayersToCanvas": {
                 "title": "Ebenen an die Leinwand anpassen"
@@ -201,34 +203,51 @@
                 "title": "Umwandeln"
             },
             "setZoomTo100Percent": {
-                "title": "Auf 100 % zoomen"
+                "title": "Auf 100 % zoomen",
+                "desc": "Leinwand-Zoom auf 100 % setzen."
             },
             "setZoomTo200Percent": {
-                "title": "Auf 200 % zoomen"
+                "title": "Auf 200 % zoomen",
+                "desc": "Leinwand-Zoom auf 200 % setzen."
             },
             "setZoomTo400Percent": {
-                "title": "Auf 400 % zoomen"
+                "title": "Auf 400 % zoomen",
+                "desc": "Leinwand-Zoom auf 400 % setzen."
             },
             "setZoomTo800Percent": {
-                "title": "Auf 800 % zoomen"
+                "title": "Auf 800 % zoomen",
+                "desc": "Leinwand-Zoom auf 800 % setzen."
             },
             "deleteSelected": {
-                "title": "Ebene löschen"
+                "title": "Ebene löschen",
+                "desc": "Ausgewählte Ebene löschen."
             },
             "undo": {
-                "title": "Rückgängig"
+                "title": "Rückgängig",
+                "desc": "Letzte Leinwand-Aktion rückgängig machen."
             },
             "redo": {
-                "title": "Wiederholen"
+                "title": "Wiederholen",
+                "desc": "Letzte Leinwand-Aktion wiederholen."
             },
             "nextEntity": {
-                "title": "Nächste Ebene"
+                "title": "Nächste Ebene",
+                "desc": "Nächste Ebene in der Liste auswählen."
             },
             "resetSelected": {
                 "title": "Ebene zurücksetzen"
             },
             "prevEntity": {
-                "title": "Vorherige Ebene"
+                "title": "Vorherige Ebene",
+                "desc": "Vorherige Ebene in der Liste auswählen."
+            },
+            "selectMoveTool": {
+                "title": "Verschieben-Werkzeug",
+                "desc": "Verschieben-Werkzeug auswählen."
+            },
+            "selectRectTool": {
+                "title": "Rechteck-Werkzeug",
+                "desc": "Rechteck-Werkzeug auswählen."
             }
         },
         "viewer": {
@@ -353,7 +372,8 @@
                 "title": "Wiederholen"
             },
             "copySelection": {
-                "title": "Kopieren"
+                "title": "Kopieren",
+                "desc": "Ausgewählte Knoten und Kanten kopieren."
             },
             "title": "Arbeitsabläufe",
             "addNode": {
