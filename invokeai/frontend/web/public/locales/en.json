@@ -1674,6 +1674,8 @@
         "negativePrompt": "Negative Prompt",
         "beginEndStepPercentShort": "Begin/End %",
         "weight": "Weight",
+        "newGallerySession": "New Gallery Session",
+        "newCanvasSession": "New Canvas Session",
         "controlMode": {
             "controlMode": "Control Mode",
             "balanced": "Balanced",
