@@ -83,7 +83,17 @@
         "tab": "Вкладка",
         "enabled": "Включено",
         "disabled": "Отключено",
-        "dontShowMeThese": "Не показывай мне это"
+        "dontShowMeThese": "Не показывай мне это",
+        "apply": "Применить",
+        "loadingImage": "Загрузка изображения",
+        "off": "Выкл",
+        "openInViewer": "Открыть в просмотрщике",
+        "edit": "Редактировать",
+        "view": "Просмотреть",
+        "placeholderSelectAModel": "Выбрать модель",
+        "reset": "Сброс",
+        "none": "Ничего",
+        "new": "Новый"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
@@ -138,17 +148,123 @@
         "selectAllOnPage": "Выбрать все на странице",
         "showArchivedBoards": "Показать архивированные доски",
         "searchImages": "Поиск по метаданным",
-        "displayBoardSearch": "Отобразить поиск досок",
-        "displaySearch": "Отобразить поиск",
+        "displayBoardSearch": "Поиск доски",
+        "displaySearch": "Поиск изображений",
         "exitBoardSearch": "Выйти из поиска досок",
         "go": "Перейти",
-        "exitSearch": "Выйти из поиска",
-        "jump": "Пыгнуть"
+        "exitSearch": "Выйти из поиска изображений",
+        "jump": "Пыгнуть",
+        "move": "Двигать",
+        "gallery": "Галерея",
+        "openViewer": "Открыть просмотрщик",
+        "closeViewer": "Закрыть просмотрщик"
     },
     "hotkeys": {
         "searchHotkeys": "Поиск горячих клавиш",
         "noHotkeysFound": "Горячие клавиши не найдены",
-        "clearSearch": "Очистить поиск"
+        "clearSearch": "Очистить поиск",
+        "app": {
+            "title": "Приложение",
+            "invoke": {
+                "desc": "Добавить генерацию в конец очереди.",
+                "title": "Сгенерировать"
+            },
+            "clearQueue": {
+                "title": "Очистить очередь",
+                "desc": "Отмена и очистка всех элементов очереди."
+            },
+            "selectCanvasTab": {
+                "title": "Выбрать вкладку Холст",
+                "desc": "Выбирает вкладку Холст."
+            },
+            "selectUpscalingTab": {
+                "title": "Выбрать вкладку Увеличение",
+                "desc": "Выбирает вкладку увеличения."
+            },
+            "selectWorkflowsTab": {
+                "title": "Выбрать вкладку Рабочие Процессы",
+                "desc": "Выбирает вкладку рабочих процессов."
+            },
+            "focusPrompt": {
+                "title": "Сфокусироваться на запросе",
+                "desc": "Перемещает фокус курсора на положительный запрос."
+            },
+            "toggleLeftPanel": {
+                "title": "Переключить левую панель",
+                "desc": "Показывает или скрывает левую панель."
+            },
+            "resetPanelLayout": {
+                "desc": "Верните левую и правую панели к размерам и расположению по умолчанию.",
+                "title": "Сброс расположения панелей"
+            },
+            "invokeFront": {
+                "title": "Сгенерировать (вперед)",
+                "desc": "Добавьте генерацию вперед очереди."
+            },
+            "cancelQueueItem": {
+                "title": "Отмена",
+                "desc": "Отмена текущего обрабатываемого элемента очереди."
+            },
+            "selectModelsTab": {
+                "desc": "Выбирает вкладку моделей.",
+                "title": "Выбрать вкладку Модели"
+            },
+            "selectQueueTab": {
+                "title": "Выбрать вкладку Очередь",
+                "desc": "Выбирает вкладку очереди."
+            },
+            "togglePanels": {
+                "title": "Переключить панели",
+                "desc": "Показать или скрыть одновременно левую и правую панели."
+            },
+            "toggleRightPanel": {
+                "title": "Переключить правую панель",
+                "desc": "Показывает или скрывает правую панель."
+            }
+        },
+        "canvas": {
+            "title": "Холст",
+            "selectBrushTool": {
+                "title": "Инструмент кисть",
+                "desc": "Выбирает кисть."
+            }
+        },
+        "hotkeys": "Горячие клавиши",
+        "workflows": {
+            "undo": {
+                "title": "Отмена",
+                "desc": "Отменить последнее действие в рабочем процессе."
+            },
+            "deleteSelection": {
+                "desc": "Удалить выделенные узлы и ребра."
+            },
+            "redo": {
+                "title": "Вернуть",
+                "desc": "Вернуть последнее действие в рабочем процессе."
+            }
+        },
+        "viewer": {
+            "nextComparisonMode": {
+                "title": "Следующий режим сравнения",
+                "desc": "Циклическое переключение режимов сравнения."
+            },
+            "loadWorkflow": {
+                "desc": "Загрузить сохраненный рабочий процесс текущего изображения (если он есть).",
+                "title": "Загрузить рабочий процесс"
+            },
+            "recallAll": {
+                "desc": "Восстановить все метаданные текущего изображения.",
+                "title": "Восстановить все метаданные"
+            },
+            "swapImages": {
+                "desc": "Поменять местами сравниваемые изображения."
+            },
+            "title": "Просмотрщик изображений",
+            "toggleViewer": {
+                "title": "Открыть/закрыть просмотрщик",
+                "desc": "Показать или скрыть просмотрщик изображений. Доступно только на вкладке «Холст»."
+            }
+        }
     },
     "modelManager": {
         "modelManager": "Менеджер моделей",
@@ -254,7 +370,9 @@
         "noModelsInstalledDesc1": "Установите модели с помощью",
         "noMatchingModels": "Нет подходящих моделей",
         "ipAdapters": "IP адаптеры",
-        "starterModelsInModelManager": "Стартовые модели можно найти в Менеджере моделей"
+        "starterModelsInModelManager": "Стартовые модели можно найти в Менеджере моделей",
+        "learnMoreAboutSupportedModels": "Подробнее о поддерживаемых моделях",
+        "t5Encoder": "T5 энкодер"
     },
     "parameters": {
         "images": "Изображения",
@@ -289,8 +407,8 @@
         "symmetry": "Симметрия",
         "denoisingStrength": "Сила зашумления",
         "copyImage": "Скопировать изображение",
-        "seamlessXAxis": "Бесшовность по оси X",
-        "seamlessYAxis": "Бесшовность по оси Y",
+        "seamlessXAxis": "Бесшовная ось X",
+        "seamlessYAxis": "Бесшовная ось Y",
         "scheduler": "Планировщик",
         "positivePromptPlaceholder": "Запрос",
         "negativePromptPlaceholder": "Исключающий запрос",
@@ -315,7 +433,18 @@
                 "rgNoPromptsOrIPAdapters": "нет текстовых запросов или IP-адаптеров",
                 "ipAdapterIncompatibleBaseModel": "несовместимая базовая модель IP-адаптера",
                 "ipAdapterNoImageSelected": "изображение IP-адаптера не выбрано"
-            }
+            },
+            "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), ширина bbox {{width}}",
+            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), высота bbox {{height}}",
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), масштабированная высота bbox {{height}}",
+            "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16) масштабированная ширина bbox {{width}}",
+            "noFLUXVAEModelSelected": "Для генерации FLUX не выбрана модель VAE",
+            "noT5EncoderModelSelected": "Для генерации FLUX не выбрана модель T5 энкодера",
+            "canvasIsFiltering": "Холст фильтруется",
+            "canvasIsTransforming": "Холст трансформируется",
+            "noCLIPEmbedModelSelected": "Для генерации FLUX не выбрана модель CLIP Embed",
+            "canvasIsRasterizing": "Холст растрируется",
+            "canvasIsCompositing": "Холст составляется"
         },
         "cfgRescaleMultiplier": "Множитель масштабирования CFG",
         "patchmatchDownScaleSize": "уменьшить",
@@ -336,7 +465,12 @@
         "infillColorValue": "Цвет заливки",
         "postProcessing": "Постобработка (Shift + U)",
         "processImage": "Обработка изображения",
-        "sendToUpscale": "Отправить на увеличение"
+        "sendToUpscale": "Отправить на увеличение",
+        "gaussianBlur": "Размытие по Гауссу",
+        "staged": "Инсценировка",
+        "optimizedImageToImage": "Оптимизированное img2img",
+        "sendToCanvas": "Отправить на холст",
+        "guidance": "Точность"
     },
     "settings": {
         "models": "Модели",
@@ -413,7 +547,20 @@
         "outOfMemoryErrorDesc": "Ваши текущие настройки генерации превышают возможности системы. Пожалуйста, измените настройки и повторите попытку.",
         "somethingWentWrong": "Что-то пошло не так",
         "importFailed": "Импорт неудачен",
-        "importSuccessful": "Импорт успешен"
+        "importSuccessful": "Импорт успешен",
+        "problemSavingLayer": "Не удалось сохранить слой",
+        "sentToCanvas": "Отправить на холст",
+        "unableToLoadImage": "Невозможно загрузить изображение",
+        "unableToLoadImageMetadata": "Невозможно загрузить метаданные изображения",
+        "imageSaved": "Изображение сохранено",
+        "stylePresetLoaded": "Предустановка стиля загружена",
+        "imageNotLoadedDesc": "Не удалось найти изображение",
+        "imageSavingFailed": "Не удалось сохранить изображение",
+        "problemCopyingLayer": "Не удалось скопировать слой",
+        "unableToLoadStylePreset": "Невозможно загрузить предустановку стиля",
+        "layerCopiedToClipboard": "Слой скопирован в буфер обмена",
+        "sentToUpscale": "Отправить на увеличение",
+        "layerSavedToAssets": "Слой сохранен в активах"
     },
     "accessibility": {
         "uploadImage": "Загрузить изображение",
@@ -565,7 +712,8 @@
         "noGraph": "Нет графика",
         "imageAccessError": "Невозможно найти изображение {{image_name}}, сбрасываем на значение по умолчанию",
         "boardAccessError": "Невозможно найти доску {{board_id}}, сбрасываем на значение по умолчанию",
-        "modelAccessError": "Невозможно найти модель {{key}}, сброс на модель по умолчанию"
+        "modelAccessError": "Невозможно найти модель {{key}}, сброс на модель по умолчанию",
+        "saveToGallery": "Сохранить в галерею"
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
@@ -990,6 +1138,25 @@
             "paragraphs": [
                 "Модель увеличения масштаба масштабирует изображение до выходного размера перед добавлением деталей. Можно использовать любую поддерживаемую модель масштабирования, но некоторые из них специализированы для различных видов изображений, например фотографий или линейных рисунков."
             ]
+        },
+        "fluxDevLicense": {
+            "heading": "Некоммерческая лицензия",
+            "paragraphs": [
+                "Модели FLUX.1 [dev] лицензируются по некоммерческой лицензии FLUX [dev]. Чтобы использовать этот тип модели в коммерческих целях в Invoke, посетите наш веб-сайт, чтобы узнать больше."
+            ]
+        },
+        "optimizedDenoising": {
+            "heading": "Оптимизированный img2img",
+            "paragraphs": [
+                "Включите опцию «Оптимизированный img2img», чтобы получить более плавную шкалу Denoise Strength для img2img и перерисовки с моделями Flux. Эта настройка улучшает возможность контролировать степень изменения изображения, но может быть отключена, если вы предпочитаете использовать стандартную шкалу Denoise Strength. Эта настройка все еще находится в стадии настройки и в настоящее время имеет статус бета-версии."
+            ]
+        },
+        "paramGuidance": {
+            "paragraphs": [
+                "Контролирует, насколько сильно запрос влияет на процесс генерации.",
+                "Высокие значения точности могут привести к перенасыщению, а высокие или низкие значения точности могут привести к искажению результатов генерации. Точность применима только к моделям FLUX DEV."
+            ],
+            "heading": "Точность"
         }
     },
     "metadata": {
@@ -1020,7 +1187,8 @@
         "parsingFailed": "Не удалось выполнить синтаксический анализ",
         "recallParameter": "Отозвать {{label}}",
         "allPrompts": "Все запросы",
-        "imageDimensions": "Размеры изображения"
+        "imageDimensions": "Размеры изображения",
+        "canvasV2Metadata": "Холст"
     },
     "queue": {
         "status": "Статус",
@@ -1049,7 +1217,7 @@
         "graphQueued": "График поставлен в очередь",
         "queue": "Очередь",
         "batch": "Пакет",
-        "clearQueueAlertDialog": "Очистка очереди немедленно отменяет все элементы обработки и полностью очищает очередь.",
+        "clearQueueAlertDialog": "Очистка очереди немедленно отменяет все элементы обработки и полностью очищает очередь. Ожидающие фильтры будут отменены.",
         "pending": "В ожидании",
         "completedIn": "Завершено за",
         "resumeFailed": "Проблема с возобновлением рендеринга",
@@ -1088,7 +1256,15 @@
         "iterations_many": "Итераций",
         "generations_one": "Генерация",
         "generations_few": "Генерации",
-        "generations_many": "Генераций"
+        "generations_many": "Генераций",
+        "other": "Другое",
+        "gallery": "Галерея",
+        "upscaling": "Увеличение",
+        "canvas": "Холст",
+        "generation": "Генерация",
+        "workflows": "Рабочие процессы",
+        "origin": "Источник",
+        "destination": "Назначение"
     },
     "sdxl": {
         "refinerStart": "Запуск доработчика",
@@ -1158,7 +1334,10 @@
         "loadWorkflow": "Рабочий процесс $t(common.load)",
         "convertGraph": "Конвертировать график",
         "loadFromGraph": "Загрузка рабочего процесса из графика",
-        "autoLayout": "Автоматическое расположение"
+        "autoLayout": "Автоматическое расположение",
+        "userWorkflows": "Пользовательские рабочие процессы",
+        "projectWorkflows": "Рабочие процессы проекта",
+        "defaultWorkflows": "Стандартные рабочие процессы"
     },
     "hrf": {
         "enableHrf": "Включить исправление высокого разрешения",
@@ -1220,7 +1399,39 @@
         "opacity": "Непрозрачность",
         "addLayer": "Добавить слой",
         "moveToFront": "На передний план",
-        "addPositivePrompt": "Добавить $t(common.positivePrompt)"
+        "addPositivePrompt": "Добавить $t(common.positivePrompt)",
+        "regional": "Региональный",
+        "bookmark": "Закладка для быстрого переключения",
+        "fitBboxToLayers": "Подогнать Bbox к слоям",
+        "mergeVisibleOk": "Объединенные видимые слои",
+        "mergeVisibleError": "Ошибка объединения видимых слоев",
+        "clearHistory": "Очистить историю",
+        "mergeVisible": "Объединить видимые",
+        "removeBookmark": "Удалить закладку",
+        "saveLayerToAssets": "Сохранить слой в активы",
+        "clearCaches": "Очистить кэши",
+        "recalculateRects": "Пересчитать прямоугольники",
+        "saveBboxToGallery": "Сохранить Bbox в галерею",
+        "resetCanvas": "Сбросить холст",
+        "canvas": "Холст",
+        "global": "Глобальный",
+        "newGlobalReferenceImageError": "Проблема с созданием глобального эталонного изображения",
+        "newRegionalReferenceImageOk": "Создано региональное эталонное изображение",
+        "newRegionalReferenceImageError": "Проблема создания регионального эталонного изображения",
+        "newControlLayerOk": "Создан слой управления",
+        "newControlLayerError": "Ошибка создания слоя управления",
+        "newRasterLayerOk": "Создан растровый слой",
+        "newRasterLayerError": "Ошибка создания растрового слоя",
+        "newGlobalReferenceImageOk": "Создано глобальное эталонное изображение",
+        "bboxOverlay": "Показать наложение Bbox",
+        "saveCanvasToGallery": "Сохранить холст в галерею",
+        "pullBboxIntoReferenceImageOk": "Bbox перенесен в эталонное изображение",
+        "pullBboxIntoReferenceImageError": "Ошибка переноса BBox в эталонное изображение",
+        "regionIsEmpty": "Выбранный регион пуст",
+        "savedToGalleryOk": "Сохранено в галерею",
+        "savedToGalleryError": "Ошибка сохранения в галерею",
+        "pullBboxIntoLayerOk": "Bbox перенесен в слой",
+        "pullBboxIntoLayerError": "Проблема с переносом BBox в слой"
     },
     "ui": {
         "tabs": {
