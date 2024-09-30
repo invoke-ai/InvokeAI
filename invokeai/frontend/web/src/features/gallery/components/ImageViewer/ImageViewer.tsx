@@ -1,6 +1,6 @@
 import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useFocusRegion, useFocusRegionOnMount } from 'common/hooks/interactionScopes';
+import { useFocusRegion } from 'common/hooks/interactionScopes';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
@@ -22,13 +22,16 @@ type Props = {
   closeButton?: ReactNode;
 };
 
+const useFocusRegionOptions = {
+  focusOnMount: true,
+};
+
 export const ImageViewer = memo(({ closeButton }: Props) => {
   useAssertSingleton('ImageViewer');
   const hasImageToCompare = useAppSelector(selectHasImageToCompare);
   const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
   const ref = useRef<HTMLDivElement>(null);
-  useFocusRegion('imageViewer', ref);
-  useFocusRegionOnMount('imageViewer');
+  useFocusRegion('viewer', ref, useFocusRegionOptions);
 
   return (
     <Flex

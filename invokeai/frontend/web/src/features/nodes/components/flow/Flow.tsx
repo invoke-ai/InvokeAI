@@ -1,7 +1,7 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { FOCUS_REGIONS, useFocusRegion } from 'common/hooks/interactionScopes';
+import { useFocusRegion, useIsRegionFocused } from 'common/hooks/interactionScopes';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
@@ -89,7 +89,7 @@ export const Flow = memo(() => {
   const cancelConnection = useReactFlowStore(selectCancelConnection);
   const updateNodeInternals = useUpdateNodeInternals();
   const store = useAppStore();
-  const workflowsFocus = useStore(FOCUS_REGIONS.$workflows);
+  const isWorkflowsFocused = useIsRegionFocused('workflows');
   useFocusRegion('workflows', flowWrapper);
 
   useWorkflowWatcher();
@@ -243,8 +243,8 @@ export const Flow = memo(() => {
     id: 'selectAll',
     category: 'workflows',
     callback: selectAll,
-    options: { enabled: workflowsFocus.isFocused, preventDefault: true },
-    dependencies: [selectAll, workflowsFocus],
+    options: { enabled: isWorkflowsFocused, preventDefault: true },
+    dependencies: [selectAll, isWorkflowsFocused],
   });
 
   useRegisteredHotkeys({
@@ -317,8 +317,8 @@ export const Flow = memo(() => {
     id: 'deleteSelection',
     category: 'workflows',
     callback: deleteSelection,
-    options: { preventDefault: true, enabled: workflowsFocus.isFocused },
-    dependencies: [deleteSelection, workflowsFocus],
+    options: { preventDefault: true, enabled: isWorkflowsFocused },
+    dependencies: [deleteSelection, isWorkflowsFocused],
   });
 
   return (

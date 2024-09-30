@@ -27,7 +27,7 @@ const GalleryPanelContent = () => {
   const boardSearchDisclosure = useDisclosure({ defaultIsOpen: !!boardSearchText.length });
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const galleryPanelFocusRef = useRef<HTMLDivElement>(null);
-  useFocusRegion('galleryPanel', galleryPanelFocusRef);
+  useFocusRegion('gallery', galleryPanelFocusRef);
 
   const boardsListPanelOptions = useMemo<UsePanelOptions>(
     () => ({

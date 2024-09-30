@@ -10,7 +10,7 @@ import { memo, useRef } from 'react';
 export const CanvasLayersPanelContent = memo(() => {
   const hasEntities = useAppSelector(selectHasEntities);
   const layersPanelFocusRef = useRef<HTMLDivElement>(null);
-  useFocusRegion('layersPanel', layersPanelFocusRef);
+  useFocusRegion('layers', layersPanelFocusRef);
 
   return (
     <Flex ref={layersPanelFocusRef} flexDir="column" gap={2} w="full" h="full">

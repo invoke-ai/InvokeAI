@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { FOCUS_REGIONS } from 'common/hooks/interactionScopes';
+import { useIsRegionFocused } from 'common/hooks/interactionScopes';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import {
   selectImageCount,
@@ -17,7 +17,7 @@ export const StagingAreaToolbarPrevButton = memo(() => {
   const canvasManager = useCanvasManager();
   const imageCount = useAppSelector(selectImageCount);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
-  const canvasScope = useStore(FOCUS_REGIONS.$canvas);
+  const isCanvasFocused = useIsRegionFocused('canvas');
 
   const { t } = useTranslation();
 
@@ -30,9 +30,9 @@ export const StagingAreaToolbarPrevButton = memo(() => {
     selectPrev,
     {
       preventDefault: true,
-      enabled: canvasScope.isFocused && shouldShowStagedImage && imageCount > 1,
+      enabled: isCanvasFocused && shouldShowStagedImage && imageCount > 1,
     },
-    [canvasScope, shouldShowStagedImage, imageCount]
+    [isCanvasFocused, shouldShowStagedImage, imageCount]
   );
 
   return (
