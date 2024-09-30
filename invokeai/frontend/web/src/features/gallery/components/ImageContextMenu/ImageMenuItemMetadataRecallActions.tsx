@@ -1,5 +1,4 @@
 import { MenuItem } from '@invoke-ai/ui-library';
-import { SpinnerIcon } from 'features/gallery/components/ImageContextMenu/SpinnerIcon';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { memo } from 'react';
@@ -16,53 +15,24 @@ export const ImageMenuItemMetadataRecallActions = memo(() => {
   const { t } = useTranslation();
   const imageDTO = useImageDTOContext();
 
-  const {
-    recallAll,
-    remix,
-    recallSeed,
-    recallPrompts,
-    hasMetadata,
-    hasSeed,
-    hasPrompts,
-    isLoadingMetadata,
-    createAsPreset,
-  } = useImageActions(imageDTO?.image_name);
+  const { recallAll, remix, recallSeed, recallPrompts, hasMetadata, hasSeed, hasPrompts, createAsPreset } =
+    useImageActions(imageDTO);
 
   return (
     <>
-      <MenuItem
-        icon={isLoadingMetadata ? <SpinnerIcon /> : <PiArrowsCounterClockwiseBold />}
-        onClickCapture={remix}
-        isDisabled={isLoadingMetadata || !hasMetadata}
-      >
+      <MenuItem icon={<PiArrowsCounterClockwiseBold />} onClickCapture={remix} isDisabled={!hasMetadata}>
         {t('parameters.remixImage')}
       </MenuItem>
-      <MenuItem
-        icon={isLoadingMetadata ? <SpinnerIcon /> : <PiQuotesBold />}
-        onClickCapture={recallPrompts}
-        isDisabled={isLoadingMetadata || !hasPrompts}
-      >
+      <MenuItem icon={<PiQuotesBold />} onClickCapture={recallPrompts} isDisabled={!hasPrompts}>
         {t('parameters.usePrompt')}
       </MenuItem>
-      <MenuItem
-        icon={isLoadingMetadata ? <SpinnerIcon /> : <PiPlantBold />}
-        onClickCapture={recallSeed}
-        isDisabled={isLoadingMetadata || !hasSeed}
-      >
+      <MenuItem icon={<PiPlantBold />} onClickCapture={recallSeed} isDisabled={!hasSeed}>
         {t('parameters.useSeed')}
       </MenuItem>
-      <MenuItem
-        icon={isLoadingMetadata ? <SpinnerIcon /> : <PiAsteriskBold />}
-        onClickCapture={recallAll}
-        isDisabled={isLoadingMetadata || !hasMetadata}
-      >
+      <MenuItem icon={<PiAsteriskBold />} onClickCapture={recallAll} isDisabled={!hasMetadata}>
         {t('parameters.useAll')}
       </MenuItem>
-      <MenuItem
-        icon={isLoadingMetadata ? <SpinnerIcon /> : <PiPaintBrushBold />}
-        onClickCapture={createAsPreset}
-        isDisabled={isLoadingMetadata || !hasPrompts}
-      >
+      <MenuItem icon={<PiPaintBrushBold />} onClickCapture={createAsPreset} isDisabled={!hasPrompts}>
         {t('stylePresets.useForTemplate')}
       </MenuItem>
     </>

@@ -1,4 +1,5 @@
 import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
+import { GlobalImageHotkeys } from 'app/components/GlobalImageHotkeys';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useStudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
@@ -104,6 +105,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <ClearQueueConfirmationsAlertDialog />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
+      <GlobalImageHotkeys />
     </ErrorBoundary>
   );
 };
