@@ -188,9 +188,5 @@ async def get_invocation_cache_status() -> InvocationCacheStatus:
 @app_router.get("/system-stats", operation_id="get_system_stats", status_code=200, response_model=SystemStats)
 async def get_stats() -> SystemStats:
     """Fetches and returns the system statistics, including CPU, RAM, and GPU stats."""
-    try:
-        stats = get_system_stats()
-        return stats
-    except Exception as e:
-        print(f"Error fetching system stats: {e}")
-        return SystemStats(cpu_usage=0.0, ram_usage=0.0, gpu_usage=[])
+    stats = get_system_stats()
+    return stats
