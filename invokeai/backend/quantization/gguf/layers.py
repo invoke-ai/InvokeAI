@@ -1,6 +1,6 @@
 # Largely based on https://github.com/city96/ComfyUI-GGUF
 
-from typing import List, Optional, Union, Callable
+from typing import Callable, List, Optional, Union
 
 import gguf
 import torch
@@ -26,7 +26,7 @@ class GGUFTensor(torch.Tensor):
         tensor_type: Union[torch.dtype, gguf.GGMLQuantizationType],
         tensor_shape: torch.Size,
         patches: Optional[List[Callable[[torch.Tensor], torch.Tensor]]] = None,
-        **kwargs
+        **kwargs,
     ):
         # Create a new tensor instance using the superclass method
         if isinstance(data, torch.Tensor):
@@ -45,7 +45,7 @@ class GGUFTensor(torch.Tensor):
         tensor_type: Union[torch.dtype, gguf.GGMLQuantizationType],
         tensor_shape: torch.Size,
         patches: Optional[List[Callable[[torch.Tensor], torch.Tensor]]] = None,
-        **kwargs
+        **kwargs,
     ):
         # __init__ is not called for torch.Tensor subclasses
         pass
@@ -104,8 +104,8 @@ class GGUFLayer(torch.nn.Module):
     torch_compatible_tensor_types = {None, gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16}
 
     def is_ggml_quantized(self, *, weight: Optional[torch.Tensor] = None, bias: Optional[torch.Tensor] = None):
-        weight = weight if weight != None else self.weight
-        bias = bias if bias != None else self.bias
+        weight = weight if weight is not None else self.weight
+        bias = bias if bias is not None else self.bias
         weight_quantized = is_quantized(weight)
         bias_quantized = is_quantized(bias)
         return weight_quantized or bias_quantized
