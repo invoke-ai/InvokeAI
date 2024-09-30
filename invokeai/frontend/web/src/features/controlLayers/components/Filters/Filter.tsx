@@ -1,7 +1,7 @@
 import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/focus';
+import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { FilterSettings } from 'features/controlLayers/components/Filters/FilterSettings';
 import { FilterTypeSelect } from 'features/controlLayers/components/Filters/FilterTypeSelect';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -16,7 +16,7 @@ import {
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsCounterClockwiseBold, PiCheckBold, PiShootingStarBold, PiXBold } from 'react-icons/pi';
 
@@ -24,6 +24,9 @@ const FilterContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
     const { t } = useTranslation();
     const dispatch = useAppDispatch();
+    const ref = useRef<HTMLDivElement>(null);
+    useFocusRegion('canvas', ref, { focusOnMount: true });
+
     const config = useStore(adapter.filterer.$filterConfig);
     const isCanvasFocused = useIsRegionFocused('canvas');
     const isProcessing = useStore(adapter.filterer.$isProcessing);
@@ -74,6 +77,7 @@ const FilterContent = memo(
 
     return (
       <Flex
+        ref={ref}
         bg="base.800"
         borderRadius="base"
         p={4}

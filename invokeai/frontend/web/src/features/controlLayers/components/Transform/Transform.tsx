@@ -1,7 +1,7 @@
 import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/focus';
+import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import {
@@ -9,13 +9,15 @@ import {
   settingsIsolatedTransformingPreviewToggled,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsCounterClockwiseBold, PiArrowsOutBold, PiCheckBold, PiXBold } from 'react-icons/pi';
 
 const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusRegion('canvas', ref, { focusOnMount: true });
   const isCanvasFocused = useIsRegionFocused('canvas');
   const isProcessing = useStore(adapter.transformer.$isProcessing);
   const isolatedTransformingPreview = useAppSelector(selectIsolatedTransformingPreview);
@@ -41,6 +43,7 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
 
   return (
     <Flex
+      ref={ref}
       bg="base.800"
       borderRadius="base"
       p={4}
