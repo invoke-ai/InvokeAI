@@ -4,7 +4,7 @@ import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel
 import { ModelEditButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelEditButton';
 import { ModelHeader } from 'features/modelManagerV2/subpanels/ModelPanel/ModelHeader';
 import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/TriggerPhrases';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyModelConfig } from 'services/api/types';
 
@@ -17,6 +17,20 @@ type Props = {
 
 export const ModelView = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+  const withSettings = useMemo(() => {
+    if (modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner') {
+      return true;
+    }
+    if (modelConfig.type === 'controlnet' || modelConfig.type === 't2i_adapter') {
+      return true;
+    }
+    if (modelConfig.type === 'main' || modelConfig.type === 'lora') {
+      return true;
+    }
+
+    return false;
+  }, [modelConfig.base, modelConfig.type]);
+
   return (
     <Flex flexDir="column" gap={4}>
       <ModelHeader modelConfig={modelConfig}>
@@ -50,15 +64,19 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             )}
           </SimpleGrid>
         </Box>
-        <Box layerStyle="second" borderRadius="base" p={4}>
-          {modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner' && (
-            <MainModelDefaultSettings modelConfig={modelConfig} />
-          )}
-          {(modelConfig.type === 'controlnet' || modelConfig.type === 't2i_adapter') && (
-            <ControlNetOrT2IAdapterDefaultSettings modelConfig={modelConfig} />
-          )}
-          {(modelConfig.type === 'main' || modelConfig.type === 'lora') && <TriggerPhrases modelConfig={modelConfig} />}
-        </Box>
+        {withSettings && (
+          <Box layerStyle="second" borderRadius="base" p={4}>
+            {modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner' && (
+              <MainModelDefaultSettings modelConfig={modelConfig} />
+            )}
+            {(modelConfig.type === 'controlnet' || modelConfig.type === 't2i_adapter') && (
+              <ControlNetOrT2IAdapterDefaultSettings modelConfig={modelConfig} />
+            )}
+            {(modelConfig.type === 'main' || modelConfig.type === 'lora') && (
+              <TriggerPhrases modelConfig={modelConfig} />
+            )}
+          </Box>
+        )}
       </Flex>
     </Flex>
   );
