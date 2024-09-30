@@ -1,6 +1,6 @@
 import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useFocusRegion } from 'common/hooks/interactionScopes';
+import { useFocusRegion } from 'common/hooks/focus';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';

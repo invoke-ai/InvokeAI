@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/interactionScopes';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { $canvasRightPanelTab } from 'features/controlLayers/store/ephemeral';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';

@@ -1,7 +1,7 @@
 import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/interactionScopes';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { FilterSettings } from 'features/controlLayers/components/Filters/FilterSettings';
 import { FilterTypeSelect } from 'features/controlLayers/components/Filters/FilterTypeSelect';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';

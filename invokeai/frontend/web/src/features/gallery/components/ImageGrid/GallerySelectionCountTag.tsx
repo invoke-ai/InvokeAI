@@ -1,6 +1,6 @@
 import { Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/interactionScopes';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';

@@ -1,6 +1,6 @@
 import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useFocusRegion } from 'common/hooks/interactionScopes';
+import { useFocusRegion } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';

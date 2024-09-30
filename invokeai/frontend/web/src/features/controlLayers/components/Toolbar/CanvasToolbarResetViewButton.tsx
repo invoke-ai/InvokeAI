@@ -1,5 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useIsRegionFocused } from 'common/hooks/interactionScopes';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
