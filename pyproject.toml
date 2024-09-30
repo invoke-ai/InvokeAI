@@ -51,10 +51,10 @@ dependencies = [
   "sentencepiece==0.2.0",
   "spandrel==0.3.4",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
-  "torch==2.2.2",
+  "torch==2.4.1",
   "torchmetrics==0.11.4",
   "torchsde==0.2.6",
-  "torchvision==0.17.2",
+  "torchvision==0.19.1",
   "transformers==4.41.1",
 
   # Core application dependencies, pinned for reproducible builds.
