@@ -79,13 +79,12 @@ def get_mps_stats() -> Optional[List[GPUStat]]:
 
         gpu_usage = []
         for line in output_lines:
-            if "AppleGPU" in line:  # Adjust this condition based on actual output format
-                # Extract actual values from the output line
+            if "AppleGPU" in line:
                 # Placeholder logic for parsing; needs to be implemented based on actual ioreg output
-                gpu_id = len(gpu_usage)  # Incremental ID
-                load = 60.0  # Replace with actual load parsing logic
-                memory_used = 8192  # Replace with actual memory parsing logic
-                memory_total = 16384  # Replace with actual total memory parsing logic
+                gpu_id = len(gpu_usage)
+                load = 60.0
+                memory_used = 8192
+                memory_total = 16384
                 gpu_usage.append(GPUStat(id=gpu_id, load=load, memory=memory_used, memory_total=memory_total))
         return gpu_usage if gpu_usage else None
     except Exception as e:
@@ -95,7 +94,7 @@ def get_mps_stats() -> Optional[List[GPUStat]]:
 
 def get_system_stats() -> SystemStats:
     cpu_usage = psutil.cpu_percent(interval=1)
-    ram_usage = psutil.virtual_memory().used / (1024**2)  # Convert bytes to MB
+    ram_usage = psutil.virtual_memory().used / (1024**2)
 
     gpu_usage = None
     system_type = platform.system()

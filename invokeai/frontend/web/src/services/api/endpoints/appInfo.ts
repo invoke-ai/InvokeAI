@@ -1,22 +1,9 @@
 import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import type { paths } from 'services/api/schema';
-import type { AppConfig, AppDependencyVersions, AppVersion } from 'services/api/types';
+import type { AppConfig, AppDependencyVersions, AppVersion, SystemStats } from 'services/api/types';
 
 import { api, buildV1Url } from '..';
-
-interface GPUStat {
-  id: number;
-  load: number;
-  memory: number;
-  memory_total: number;
-}
-
-interface SystemStats {
-  cpu_usage: number;
-  ram_usage: number;
-  gpu_usage: GPUStat[];
-}
 
 /**
  * Builds an endpoint URL for the app router
