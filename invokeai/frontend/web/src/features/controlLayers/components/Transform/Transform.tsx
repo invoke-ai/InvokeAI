@@ -1,24 +1,43 @@
 import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useIsRegionFocused } from 'common/hooks/interactionScopes';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import {
   selectIsolatedTransformingPreview,
   settingsIsolatedTransformingPreviewToggled,
 } from 'features/controlLayers/store/canvasSettingsSlice';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsCounterClockwiseBold, PiArrowsOutBold, PiCheckBold, PiXBold } from 'react-icons/pi';
 
-const TransformBox = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
+const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const isCanvasFocused = useIsRegionFocused('canvas');
   const isProcessing = useStore(adapter.transformer.$isProcessing);
   const isolatedTransformingPreview = useAppSelector(selectIsolatedTransformingPreview);
   const onChangeIsolatedPreview = useCallback(() => {
     dispatch(settingsIsolatedTransformingPreviewToggled());
   }, [dispatch]);
+
+  useRegisteredHotkeys({
+    id: 'applyTransform',
+    category: 'canvas',
+    callback: adapter.transformer.applyTransform,
+    options: { enabled: !isProcessing && isCanvasFocused },
+    dependencies: [adapter.transformer, isProcessing, isCanvasFocused],
+  });
+
+  useRegisteredHotkeys({
+    id: 'cancelTransform',
+    category: 'canvas',
+    callback: adapter.transformer.stopTransform,
+    options: { enabled: !isProcessing && isCanvasFocused },
+    dependencies: [adapter.transformer, isProcessing, isCanvasFocused],
+  });
 
   return (
     <Flex
@@ -86,7 +105,7 @@ const TransformBox = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
   );
 });
 
-TransformBox.displayName = 'Transform';
+TransformContent.displayName = 'TransformContent';
 
 export const Transform = () => {
   const canvasManager = useCanvasManager();
@@ -96,5 +115,5 @@ export const Transform = () => {
     return null;
   }
 
-  return <TransformBox adapter={adapter} />;
+  return <TransformContent adapter={adapter} />;
 };

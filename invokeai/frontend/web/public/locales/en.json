@@ -503,6 +503,22 @@
             "transformSelected": {
                 "title": "Transform",
                 "desc": "Transform the selected layer."
+            },
+            "applyFilter": {
+                "title": "Apply Filter",
+                "desc": "Apply the pending filter to the selected layer."
+            },
+            "cancelFilter": {
+                "title": "Cancel Filter",
+                "desc": "Cancel the pending filter."
+            },
+            "applyTransform": {
+                "title": "Apply Transform",
+                "desc": "Apply the pending transform to the selected layer."
+            },
+            "cancelTransform": {
+                "title": "Cancel Transform",
+                "desc": "Cancel the pending transform."
             }
         },
         "workflows": {
