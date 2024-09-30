@@ -127,7 +127,7 @@
         "alwaysShowImageSizeBadge": "Zeige immer Bilder Größe Abzeichen",
         "selectForCompare": "Zum Vergleichen auswählen",
         "compareImage": "Bilder vergleichen",
-        "exitSearch": "Suche beenden",
+        "exitSearch": "Bildsuche beenden",
         "newestFirst": "Neueste zuerst",
         "oldestFirst": "Älteste zuerst",
         "openInViewer": "Im Viewer öffnen",
@@ -170,11 +170,86 @@
             "selectBboxTool": {
                 "title": "Bbox Werkzeug",
                 "desc": "Bbox Werkzeug auswählen."
+            },
+            "setFillToWhite": {
+                "title": "Farbe auf Weiß einstellen"
+            },
+            "title": "Leinwand",
+            "selectBrushTool": {
+                "title": "Pinselwerkzeug",
+                "desc": "Wählen Sie das Pinselwerkzeug aus."
+            },
+            "decrementToolWidth": {
+                "title": "Werkzeugbreite verringern"
+            },
+            "incrementToolWidth": {
+                "title": "Werkzeugbreite erhöhen"
+            },
+            "selectColorPickerTool": {
+                "title": "Farbwähler-Werkzeug"
+            },
+            "selectEraserTool": {
+                "title": "Radiergummi-Werkzeug"
+            },
+            "fitLayersToCanvas": {
+                "title": "Ebenen an die Leinwand anpassen"
+            },
+            "filterSelected": {
+                "title": "Filter"
+            },
+            "transformSelected": {
+                "title": "Umwandeln"
+            },
+            "setZoomTo100Percent": {
+                "title": "Auf 100 % zoomen"
+            },
+            "setZoomTo200Percent": {
+                "title": "Auf 200 % zoomen"
+            },
+            "setZoomTo400Percent": {
+                "title": "Auf 400 % zoomen"
+            },
+            "setZoomTo800Percent": {
+                "title": "Auf 800 % zoomen"
+            },
+            "deleteSelected": {
+                "title": "Ebene löschen"
+            },
+            "undo": {
+                "title": "Rückgängig"
+            },
+            "redo": {
+                "title": "Wiederholen"
+            },
+            "nextEntity": {
+                "title": "Nächste Ebene"
+            },
+            "resetSelected": {
+                "title": "Ebene zurücksetzen"
+            },
+            "prevEntity": {
+                "title": "Vorherige Ebene"
             }
         },
         "viewer": {
             "useSize": {
                 "desc": "Aktuelle Bildgröße als Bbox-Größe verwenden."
+            },
+            "title": "Bildbetrachter",
+            "toggleViewer": {
+                "title": "Bildbetrachter anzeigen/ausblenden"
+            },
+            "nextComparisonMode": {
+                "title": "Nächster Vergleichsmodus"
+            },
+            "swapImages": {
+                "title": "Vergleichsbilder tauschen"
+            },
+            "runPostprocessing": {
+                "title": "Nachbearbeitung ausführen"
+            },
+            "toggleMetadata": {
+                "title": "Metadaten anzeigen/ausblenden"
             }
         },
         "app": {
@@ -235,7 +310,68 @@
                 "title": "Seiten umschalten"
             }
         },
-        "hotkeys": "Tastaturbefehle"
+        "hotkeys": "Tastaturbefehle",
+        "gallery": {
+            "title": "Galerie",
+            "selectAllOnPage": {
+                "title": "Alle auf der Seite auswählen",
+                "desc": "Alle Bilder auf der aktuellen Seite auswählen."
+            },
+            "galleryNavRight": {
+                "title": "Nach rechts navigieren"
+            },
+            "galleryNavDownAlt": {
+                "title": "Nach unten navigieren (Bild vergleichen)"
+            },
+            "galleryNavUp": {
+                "title": "Nach oben navigieren"
+            },
+            "galleryNavDown": {
+                "title": "Nach unten navigieren"
+            },
+            "galleryNavLeft": {
+                "title": "Nach links navigieren"
+            },
+            "galleryNavUpAlt": {
+                "title": "Nach oben navigieren (Bild vergleichen)"
+            },
+            "galleryNavRightAlt": {
+                "title": "Nach rechts navigieren (Bild vergleichen)"
+            },
+            "clearSelection": {
+                "title": "Auswahl aufheben"
+            },
+            "galleryNavLeftAlt": {
+                "title": "Nach links navigieren (Bild vergleichen)"
+            },
+            "deleteSelection": {
+                "title": "Löschen"
+            }
+        },
+        "workflows": {
+            "redo": {
+                "title": "Wiederholen"
+            },
+            "copySelection": {
+                "title": "Kopieren"
+            },
+            "title": "Arbeitsabläufe",
+            "addNode": {
+                "title": "Knoten hinzufügen"
+            },
+            "pasteSelection": {
+                "title": "Einfügen"
+            },
+            "selectAll": {
+                "title": "Alles auswählen"
+            },
+            "deleteSelection": {
+                "title": "Löschen"
+            },
+            "undo": {
+                "title": "Rückgängig"
+            }
+        }
     },
     "modelManager": {
         "modelUpdated": "Model aktualisiert",
@@ -273,7 +409,7 @@
         "baseModel": "Basis Modell",
         "convertToDiffusers": "Konvertiere zu Diffusers",
         "vae": "VAE",
-        "predictionType": "Vorhersagetyp (für Stable Diffusion 2.x-Modelle und gelegentliche Stable Diffusion 1.x-Modelle)",
+        "predictionType": "Vorhersagetyp",
         "selectModel": "Wählen Sie Modell aus",
         "repo_id": "Repo-ID",
         "modelDeleted": "Modell gelöscht",
@@ -296,7 +432,31 @@
         "deleteModelImage": "Lösche Model Bild",
         "huggingFaceRepoID": "HuggingFace Repo ID",
         "hfToken": "HuggingFace Schlüssel",
-        "huggingFacePlaceholder": "besitzer/model-name"
+        "huggingFacePlaceholder": "besitzer/model-name",
+        "modelSettings": "Modelleinstellungen",
+        "typePhraseHere": "Phrase hier eingeben",
+        "spandrelImageToImage": "Bild zu Bild (Spandrel)",
+        "starterModels": "Einstiegsmodelle",
+        "t5Encoder": "T5-Kodierer",
+        "useDefaultSettings": "Standardeinstellungen verwenden",
+        "uploadImage": "Bild hochladen",
+        "urlOrLocalPath": "URL oder lokaler Pfad",
+        "install": "Installieren",
+        "textualInversions": "Textuelle Inversionen",
+        "ipAdapters": "IP-Adapter",
+        "modelImageUpdated": "Modellbild aktualisiert",
+        "path": "Pfad",
+        "pathToConfig": "Pfad zur Konfiguration",
+        "scanPlaceholder": "Pfad zu einem lokalen Ordner",
+        "noMatchingModels": "Keine passenden Modelle",
+        "localOnly": "nur lokal",
+        "installAll": "Alles installieren",
+        "main": "Haupt",
+        "metadata": "Metadaten",
+        "modelImageDeleted": "Modellbild gelöscht",
+        "modelName": "Modellname",
+        "noModelsInstalled": "Keine Modelle installiert",
+        "source": "Quelle"
     },
     "parameters": {
         "images": "Bilder",
@@ -421,7 +581,7 @@
         "deleteBoardOnly": "Nur Ordner löschen",
         "deleteBoard": "Lösche Ordner",
         "deleteBoardAndImages": "Lösche Ordner und Bilder",
-        "deletedBoardsCannotbeRestored": "Gelöschte Ordner können nicht wiederhergestellt werden",
+        "deletedBoardsCannotbeRestored": "",
         "movingImagesToBoard_one": "Verschiebe {{count}} Bild in Ordner:",
         "movingImagesToBoard_other": "Verschiebe {{count}} Bilder in Ordner:",
         "selectedForAutoAdd": "Ausgewählt für Automatisches hinzufügen",
@@ -510,7 +670,7 @@
         "origin": "Ursprung",
         "destination": "Ziel",
         "upscaling": "Hochskalierung",
-        "canvas": "Zeichenfläche",
+        "canvas": "Leinwand",
         "prompts_one": "Prompt",
         "prompts_other": "Prompts"
     },
@@ -542,7 +702,8 @@
         "imageDimensions": "Bilder Auslösungen",
         "parameterSet": "Parameter {{parameter}} setzen",
         "recallParameter": "{{label}} Abrufen",
-        "parsingFailed": "Parsing Fehlgeschlagen"
+        "parsingFailed": "Parsing Fehlgeschlagen",
+        "canvasV2Metadata": "Leinwand"
     },
     "popovers": {
         "noiseUseCPU": {
@@ -690,6 +851,9 @@
             "paragraphs": [
                 "Die Skalierung steuert die Größe des Ausgabebildes und basiert auf einem Vielfachen der Auflösung des Originalbildes. So würde z. B. eine 2-fache Hochskalierung eines 1024x1024px Bildes eine 2048x2048px große Ausgabe erzeugen."
             ]
+        },
+        "ipAdapterMethod": {
+            "heading": "Methode"
         }
     },
     "invocationCache": {
@@ -723,7 +887,7 @@
         "cannotConnectToSelf": "Es kann keine Verbindung zu sich selbst hergestellt werden",
         "colorCodeEdges": "Farbkodierte Kanten",
         "addNodeToolTip": "Knoten hinzufügen (Umschalt+A, Leertaste)",
-        "collectionFieldType": "{{name}} Sammlung",
+        "collectionFieldType": "{{name}} (Sammlung)",
         "connectionWouldCreateCycle": "Verbindung würde einen Kreislauf/cycle schaffen",
         "inputMayOnlyHaveOneConnection": "Eingang darf nur eine Verbindung haben",
         "hideLegendNodes": "Feldtyp-Legende ausblenden",
@@ -787,7 +951,13 @@
         "enum": "Aufzählung",
         "fullyContainNodes": "Vollständig ausgewählte Nodes auswählen",
         "editMode": "Im Workflow-Editor bearbeiten",
-        "resetToDefaultValue": "Auf Standardwert zurücksetzen"
+        "resetToDefaultValue": "Auf Standardwert zurücksetzen",
+        "singleFieldType": "{{name}} (Einzeln)",
+        "collectionOrScalarFieldType": "{{name}} (Einzeln oder Sammlung)",
+        "missingFieldTemplate": "Fehlende Feldvorlage",
+        "missingNode": "Fehlender Aufrufknoten",
+        "missingInvocationTemplate": "Fehlende Aufrufvorlage",
+        "edit": "Bearbeiten"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
@@ -809,7 +979,8 @@
         "noLoRAsInstalled": "Keine LoRAs installiert",
         "addLora": "LoRA hinzufügen",
         "defaultVAE": "Standard VAE",
-        "lora": "LoRA"
+        "lora": "LoRA",
+        "concepts": "Konzepte"
     },
     "accordions": {
         "generation": {
@@ -877,7 +1048,7 @@
             "models": "Modelle",
             "upscaling": "Hochskalierung",
             "workflows": "Arbeitsabläufe",
-            "canvas": "Zeichenfläche"
+            "canvas": "Leinwand"
         }
     },
     "system": {
@@ -892,7 +1063,7 @@
             "generation": "Erstellung",
             "metadata": "Metadaten",
             "config": "Konfiguration",
-            "canvas": "Zeichenfläche"
+            "canvas": "Leinwand"
         },
         "logLevel": {
             "fatal": "Fatal",
