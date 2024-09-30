@@ -172,7 +172,8 @@
                 "desc": "Bbox Werkzeug auswählen."
             },
             "setFillToWhite": {
-                "title": "Farbe auf Weiß einstellen"
+                "title": "Farbe auf Weiß einstellen",
+                "desc": "Setzt die aktuelle Werkzeugfarbe auf weiß."
             },
             "title": "Leinwand",
             "selectBrushTool": {
@@ -180,10 +181,12 @@
                 "desc": "Wählen Sie das Pinselwerkzeug aus."
             },
             "decrementToolWidth": {
-                "title": "Werkzeugbreite verringern"
+                "title": "Werkzeugbreite verringern",
+                "desc": "Verringern Sie die Breite des Pinsels oder Radiergummis, je nachdem, welches ausgewählt ist."
             },
             "incrementToolWidth": {
-                "title": "Werkzeugbreite erhöhen"
+                "title": "Werkzeugbreite erhöhen",
+                "desc": "Vergrößern Sie die Breite des Pinsels oder Radiergummis, je nachdem, welches ausgewählt ist."
             },
             "selectColorPickerTool": {
                 "title": "Farbwähler-Werkzeug",
@@ -194,13 +197,16 @@
                 "desc": "Radiergummi-Werkzeug auswählen."
             },
             "fitLayersToCanvas": {
-                "title": "Ebenen an die Leinwand anpassen"
+                "title": "Ebenen an die Leinwand anpassen",
+                "desc": "Alle sichtbaren Ebenen in der Ansicht einpassen."
             },
             "filterSelected": {
-                "title": "Filter"
+                "title": "Filter",
+                "desc": "Gewählte Ebene filtern. Nur bei \"Raster\" und Kontroll-Ebenen."
             },
             "transformSelected": {
-                "title": "Umwandeln"
+                "title": "Umwandeln",
+                "desc": "Transformieren Sie die ausgewählte Ebene."
             },
             "setZoomTo100Percent": {
                 "title": "Auf 100 % zoomen",
@@ -224,18 +230,19 @@
             },
             "undo": {
                 "title": "Rückgängig",
-                "desc": "Letzte Leinwand-Aktion rückgängig machen."
+                "desc": "Letzte Aktion rückgängig machen."
             },
             "redo": {
                 "title": "Wiederholen",
-                "desc": "Letzte Leinwand-Aktion wiederholen."
+                "desc": "Letzte Aktion wiederholen."
             },
             "nextEntity": {
                 "title": "Nächste Ebene",
                 "desc": "Nächste Ebene in der Liste auswählen."
             },
             "resetSelected": {
-                "title": "Ebene zurücksetzen"
+                "title": "Ebene zurücksetzen",
+                "desc": "Ausgewählte Ebene zurücksetzen. Gilt nur für Malmaske bei \"Inpaint\" und \"Regionaler Führung\"."
             },
             "prevEntity": {
                 "title": "Vorherige Ebene",
@@ -248,27 +255,61 @@
             "selectRectTool": {
                 "title": "Rechteck-Werkzeug",
                 "desc": "Rechteck-Werkzeug auswählen."
+            },
+            "selectViewTool": {
+                "desc": "Wählen Sie das Ansichts-Tool.",
+                "title": "Ansichts-Tool"
+            },
+            "quickSwitch": {
+                "title": "Ebenen schnell umschalten",
+                "desc": "Wechseln Sie zwischen den beiden zuletzt gewählten Ebenen. Wenn eine Ebene mit einem Lesezeichen versehen ist, wird zwischen ihr und der letzten nicht markierten Ebene gewechselt."
             }
         },
         "viewer": {
             "useSize": {
-                "desc": "Aktuelle Bildgröße als Bbox-Größe verwenden."
+                "desc": "Aktuelle Bildgröße als Bbox-Größe verwenden.",
+                "title": "Maße übernehmen"
             },
             "title": "Bildbetrachter",
             "toggleViewer": {
-                "title": "Bildbetrachter anzeigen/ausblenden"
+                "title": "Bildbetrachter anzeigen/ausblenden",
+                "desc": "Zeigen oder verbergen Sie den Bildbetrachter. Nur auf der Arbeitsflächen-Registerkarte."
             },
             "nextComparisonMode": {
-                "title": "Nächster Vergleichsmodus"
+                "title": "Nächster Vergleichsmodus",
+                "desc": "Alle Vergleichsmodi durchlaufen."
             },
             "swapImages": {
-                "title": "Vergleichsbilder tauschen"
+                "title": "Vergleichsbilder tauschen",
+                "desc": "Vergleichs-Bilder tauschen."
             },
             "runPostprocessing": {
-                "title": "Nachbearbeitung ausführen"
+                "title": "Nachbearbeitung ausführen",
+                "desc": "Ausgewählte Nachbearbeitung/en auf aktuelles Bild anwenden."
             },
             "toggleMetadata": {
-                "title": "Metadaten anzeigen/ausblenden"
+                "title": "Metadaten anzeigen/ausblenden",
+                "desc": "Zeigen oder verbergen der Metadaten des Bildes."
+            },
+            "recallPrompts": {
+                "title": "Prompts abrufen",
+                "desc": "Rufen Sie die positiven und negativen Prompts für das aktuelle Bild ab."
+            },
+            "recallSeed": {
+                "desc": "Seed für aktuelles Bild abrufen.",
+                "title": "Seed abrufen"
+            },
+            "loadWorkflow": {
+                "title": "Lade Arbeitsablauf/Workflow",
+                "desc": "Laden Sie den gespeicherten Workflow des aktuellen Bildes (falls es einen hat)."
+            },
+            "recallAll": {
+                "title": "Alle Metadaten abrufen",
+                "desc": "Alle Metadaten für das aktuelle Bild abrufen."
+            },
+            "remix": {
+                "desc": "Rufen Sie alle Metadaten außer dem Seed für das aktuelle Bild ab.",
+                "title": "Remixen"
             }
         },
         "app": {
@@ -326,7 +367,8 @@
             },
             "title": "Anwendung",
             "togglePanels": {
-                "title": "Seiten umschalten"
+                "title": "Seiten umschalten",
+                "desc": "Zeigen oder verbergen Sie beide Panels auf einmal."
             }
         },
         "hotkeys": "Tastaturbefehle",
@@ -337,39 +379,50 @@
                 "desc": "Alle Bilder auf der aktuellen Seite auswählen."
             },
             "galleryNavRight": {
-                "title": "Nach rechts navigieren"
+                "title": "Nach rechts navigieren",
+                "desc": "Navigieren Sie im Galerieraster nach rechts, und wählen Sie das Bild aus. Wenn es sich um das letzte Bild in der Reihe handelt, gehen Sie zur nächsten Reihe. Wenn Sie sich beim letzten Bild der Seite befinden, gehen Sie zur nächsten Seite."
             },
             "galleryNavDownAlt": {
-                "title": "Nach unten navigieren (Bild vergleichen)"
+                "title": "Nach unten navigieren (Bild vergleichen)",
+                "desc": "Wie \"Abwärts navigieren\", wählt aber das Vergleichsbild aus und öffnet den Vergleichsmodus, falls er nicht bereits geöffnet ist."
             },
             "galleryNavUp": {
-                "title": "Nach oben navigieren"
+                "title": "Nach oben navigieren",
+                "desc": "Navigieren Sie im Galerieraster nach oben, und wählen Sie das Bild aus. Wenn Sie sich oben auf der Seite befinden, gehen Sie zur vorherigen Seite."
             },
             "galleryNavDown": {
-                "title": "Nach unten navigieren"
+                "title": "Nach unten navigieren",
+                "desc": "Navigieren Sie im Galerieraster nach unten, und wählen Sie das Bild aus. Wenn Sie sich am Ende der Seite befinden, gehen Sie zur nächsten Seite."
             },
             "galleryNavLeft": {
-                "title": "Nach links navigieren"
+                "title": "Nach links navigieren",
+                "desc": "Navigieren Sie im Galerieraster nach links, und wählen Sie das Bild aus. Wenn Sie sich im ersten Bild der Reihe befinden, gehen Sie zur vorherigen Reihe. Wenn Sie sich beim ersten Bild der Seite befinden, gehen Sie zur vorherigen Seite."
             },
             "galleryNavUpAlt": {
-                "title": "Nach oben navigieren (Bild vergleichen)"
+                "title": "Nach oben navigieren (Bild vergleichen)",
+                "desc": "Wie „Nach oben navigieren“, wählt aber das Vergleichsbild aus und öffnet den Vergleichsmodus, falls er nicht bereits geöffnet ist."
             },
             "galleryNavRightAlt": {
-                "title": "Nach rechts navigieren (Bild vergleichen)"
+                "title": "Nach rechts navigieren (Bild vergleichen)",
+                "desc": "Wie \"Navigieren nach rechts\", wählt aber das Vergleichsbild aus und öffnet den Vergleichsmodus, falls er nicht bereits geöffnet ist."
             },
             "clearSelection": {
-                "title": "Auswahl aufheben"
+                "title": "Auswahl aufheben",
+                "desc": "Aktuelle Auswahl aufheben, falls vorhanden."
             },
             "galleryNavLeftAlt": {
-                "title": "Nach links navigieren (Bild vergleichen)"
+                "title": "Nach links navigieren (Bild vergleichen)",
+                "desc": "Wie „Nach links navigieren“, wählt aber das Vergleichsbild aus und öffnet den Vergleichsmodus, falls er nicht bereits geöffnet ist."
             },
             "deleteSelection": {
-                "title": "Löschen"
+                "title": "Löschen",
+                "desc": "Alle ausgewählten Bilder löschen. Standardmäßig werden Sie aufgefordert, den Löschvorgang zu bestätigen. Wenn die Bilder derzeit in der App verwendet werden, werden Sie gewarnt."
             }
         },
         "workflows": {
             "redo": {
-                "title": "Wiederholen"
+                "title": "Wiederholen",
+                "desc": "Letzte Workflow-Aktion wiederherstellen."
             },
             "copySelection": {
                 "title": "Kopieren",
@@ -377,19 +430,28 @@
             },
             "title": "Arbeitsabläufe",
             "addNode": {
-                "title": "Knoten hinzufügen"
+                "title": "Knoten hinzufügen",
+                "desc": "Öffnen Sie das \"Knoten zufügen\"-Menü."
             },
             "pasteSelection": {
-                "title": "Einfügen"
+                "title": "Einfügen",
+                "desc": "Kopierte Knoten und Kanten einfügen."
             },
             "selectAll": {
-                "title": "Alles auswählen"
+                "title": "Alles auswählen",
+                "desc": "Alle Knoten und Kanten auswählen."
             },
             "deleteSelection": {
-                "title": "Löschen"
+                "title": "Löschen",
+                "desc": "Lösche ausgewählte Knoten und Kanten."
             },
             "undo": {
-                "title": "Rückgängig"
+                "title": "Rückgängig",
+                "desc": "Letzte Workflow-Aktion rückgängig machen."
+            },
+            "pasteSelectionWithEdges": {
+                "desc": "Kopierte Knoten, Kanten und alle mit den kopierten Knoten verbundenen Kanten einfügen.",
+                "title": "Einfügen mit Kanten"
             }
         }
     },
@@ -476,7 +538,28 @@
         "modelImageDeleted": "Modellbild gelöscht",
         "modelName": "Modellname",
         "noModelsInstalled": "Keine Modelle installiert",
-        "source": "Quelle"
+        "source": "Quelle",
+        "simpleModelPlaceholder": "URL oder Pfad zu einem lokalen Datei- oder Diffusers-Ordner",
+        "imageEncoderModelId": "Bild Encoder Modell ID",
+        "installRepo": "Repo installieren",
+        "huggingFaceHelper": "Wenn mehrere Modelle in diesem Repo gefunden werden, werden Sie aufgefordert, eines für die Installation auszuwählen.",
+        "inplaceInstall": "In-place-Installation",
+        "modelImageDeleteFailed": "Modellbild konnte nicht gelöscht werden",
+        "repoVariant": "Repo Variante",
+        "learnMoreAboutSupportedModels": "Erfahren Sie mehr über die Modelle, die wir unterstützen",
+        "clipEmbed": "CLIP einbetten",
+        "starterModelsInModelManager": "Modelle für Ihren Start finden Sie im Modell-Manager",
+        "noModelsInstalledDesc1": "Installiere Modelle mit dem",
+        "modelImageUpdateFailed": "Modellbild-Update fehlgeschlagen",
+        "prune": "Bereinigen",
+        "loraModels": "LoRAs",
+        "scanFolder": "Ordner scannen",
+        "installQueue": "Installations-Warteschlange",
+        "pruneTooltip": "Abgeschlossene Importe aus Warteschlange entfernen",
+        "scanResults": "Ergebnisse des Scans",
+        "urlOrLocalPathHelper": "URLs sollten auf eine einzelne Datei deuten. Lokale Pfade können zusätzlich auch auf einen Ordner für ein einzelnes Diffusers-Modell hinweisen.",
+        "inplaceInstallDesc": "Installieren Sie Modelle, ohne die Dateien zu kopieren. Wenn Sie das Modell verwenden, wird es direkt von seinem Speicherort geladen. Wenn deaktiviert, werden die Dateien während der Installation in das von Invoke verwaltete Modellverzeichnis kopiert.",
+        "scanFolderHelper": "Der Ordner wird rekursiv nach Modellen durchsucht. Dies kann bei sehr großen Ordnern etwas dauern."
     },
     "parameters": {
         "images": "Bilder",
