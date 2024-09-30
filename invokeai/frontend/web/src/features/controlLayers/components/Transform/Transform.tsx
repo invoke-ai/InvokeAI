@@ -1,7 +1,7 @@
 import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Switch } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/interactionScopes';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import {

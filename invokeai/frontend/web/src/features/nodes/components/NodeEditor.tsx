@@ -2,7 +2,7 @@ import 'reactflow/dist/style.css';
 
 import { Flex } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { useFocusRegion } from 'common/hooks/interactionScopes';
+import { useFocusRegion } from 'common/hooks/focus';
 import { AddNodeCmdk } from 'features/nodes/components/flow/AddNodeCmdk/AddNodeCmdk';
 import TopPanel from 'features/nodes/components/flow/panels/TopPanel/TopPanel';
 import WorkflowEditorSettings from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';

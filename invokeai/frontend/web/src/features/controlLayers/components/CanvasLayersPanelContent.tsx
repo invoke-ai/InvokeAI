@@ -1,6 +1,6 @@
 import { Divider, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useFocusRegion } from 'common/hooks/interactionScopes';
+import { useFocusRegion } from 'common/hooks/focus';
 import { CanvasAddEntityButtons } from 'features/controlLayers/components/CanvasAddEntityButtons';
 import { CanvasEntityList } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityList';
 import { EntityListSelectedEntityActionBar } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBar';

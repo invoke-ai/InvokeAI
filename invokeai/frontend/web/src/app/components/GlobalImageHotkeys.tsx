@@ -1,6 +1,6 @@
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useIsRegionFocused } from 'common/hooks/interactionScopes';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { useImageActions } from 'features/gallery/hooks/useImageActions';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
