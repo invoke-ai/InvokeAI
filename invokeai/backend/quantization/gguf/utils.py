@@ -288,7 +288,7 @@ def dequantize_tensor(
         return tensor.to(dtype)
     elif qtype in DEQUANTIZE_FUNCTIONS:
         dequant_dtype = dtype if dequant_dtype == "target" else dequant_dtype
-        if not (dequant_dtype == None or isinstance(dequant_dtype, torch.dtype)):
+        if not (dequant_dtype is None or isinstance(dequant_dtype, torch.dtype)):
             raise ValueError("dequant_dtype must be a torch.dtype")
         return dequantize(tensor.data, qtype, oshape, dtype=dequant_dtype).to(dtype)
     else:

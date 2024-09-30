@@ -1,7 +1,7 @@
 # Largely based on https://github.com/city96/ComfyUI-GGUF
 
 from contextlib import contextmanager
-from typing import Generator, Optional
+from typing import Any, Callable, Dict, Generator, Optional, Type
 
 import wrapt
 from torch import Tensor, bfloat16, dtype, float16, nn
@@ -14,40 +14,46 @@ class TorchPatcher:
     @contextmanager
     def wrap(cls) -> Generator[None, None, None]:
         # Dictionary to store original torch.nn classes for later restoration
-        original_classes = {}
+        original_classes: Dict[str, Type[Any]] = {}
         try:
-            # Iterate over _patcher's attributes and replace matching torch.nn classes
+            # Iterate over cls's attributes and replace matching torch.nn classes
             for attr_name in dir(cls):
                 if attr_name.startswith("__"):
                     continue
-                # Get the class from _patcher
-                patcher_class = getattr(cls, attr_name)
+                # Get the class from cls
+                patcher_class: Type[Any] = getattr(cls, attr_name)
 
                 # Check if torch.nn has a class with the same name
                 if hasattr(nn, attr_name):
                     # Get the original torch.nn class
-                    original_class = getattr(nn, attr_name)
-
-                    # Define a helper function to bind the current patcher_attr for each iteration
-                    def create_patch_function(patcher_attr):
-                        # Return a new patch_class function specific to this patcher_attr
-                        @wrapt.decorator
-                        def patch_class(wrapped, instance, args, kwargs):
-                            # Call the _patcher version of the class
-                            return patcher_attr(*args, **kwargs)
-
-                        return patch_class
+                    original_class: Type[Any] = getattr(nn, attr_name)
 
                     # Save the original class for restoration later
                     original_classes[attr_name] = original_class
 
                     # Apply the patch
-                    setattr(nn, attr_name, create_patch_function(patcher_class)(original_class))
+                    patched_class = cls.create_patch_function(patcher_class)(original_class)
+                    setattr(nn, attr_name, patched_class)
             yield
         finally:
             # Restore the original torch.nn classes
             for attr_name, original_class in original_classes.items():
                 setattr(nn, attr_name, original_class)
+
+    @staticmethod
+    def create_patch_function(patcher_attr: Type[Any]) -> Callable[[Type[Any]], Type[Any]]:
+        # Return a new patch_class function specific to this patcher_attr
+        @wrapt.decorator
+        def patch_class(
+            wrapped: Callable[..., Any],
+            instance: Any,
+            args: Any,
+            kwargs: Any,
+        ) -> Any:
+            # Call the patcher_attr version of the class
+            return patcher_attr(*args, **kwargs)
+
+        return patch_class
 
 
 class GGUFPatcher(TorchPatcher):
