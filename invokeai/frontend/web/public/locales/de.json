@@ -684,7 +684,6 @@
         "deleteBoardOnly": "Nur Ordner löschen",
         "deleteBoard": "Lösche Ordner",
         "deleteBoardAndImages": "Lösche Ordner und Bilder",
-        "deletedBoardsCannotbeRestored": "",
         "movingImagesToBoard_one": "Verschiebe {{count}} Bild in Ordner:",
         "movingImagesToBoard_other": "Verschiebe {{count}} Bilder in Ordner:",
         "selectedForAutoAdd": "Ausgewählt für Automatisches hinzufügen",
