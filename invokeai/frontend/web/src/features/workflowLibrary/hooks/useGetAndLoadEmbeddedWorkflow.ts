@@ -10,19 +10,10 @@ type UseGetAndLoadEmbeddedWorkflowOptions = {
   onError?: () => void;
 };
 
-type UseGetAndLoadEmbeddedWorkflowReturn = {
-  getAndLoadEmbeddedWorkflow: (imageName: string) => Promise<void>;
-  getAndLoadEmbeddedWorkflowResult: ReturnType<typeof useLazyGetImageWorkflowQuery>[1];
-};
-
-type UseGetAndLoadEmbeddedWorkflow = (
-  options?: UseGetAndLoadEmbeddedWorkflowOptions
-) => UseGetAndLoadEmbeddedWorkflowReturn;
-
-export const useGetAndLoadEmbeddedWorkflow: UseGetAndLoadEmbeddedWorkflow = (options) => {
+export const useGetAndLoadEmbeddedWorkflow = (options?: UseGetAndLoadEmbeddedWorkflowOptions) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const [_getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult] = useLazyGetImageWorkflowQuery();
+  const [_getAndLoadEmbeddedWorkflow, result] = useLazyGetImageWorkflowQuery();
   const getAndLoadEmbeddedWorkflow = useCallback(
     async (imageName: string) => {
       try {
@@ -50,5 +41,5 @@ export const useGetAndLoadEmbeddedWorkflow: UseGetAndLoadEmbeddedWorkflow = (opt
     [_getAndLoadEmbeddedWorkflow, dispatch, options, t]
   );
 
-  return { getAndLoadEmbeddedWorkflow, getAndLoadEmbeddedWorkflowResult };
+  return [getAndLoadEmbeddedWorkflow, result] as const;
 };

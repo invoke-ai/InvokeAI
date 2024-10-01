@@ -5708,6 +5708,12 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"] | null;
             /**
+             * CLIP
+             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+             * @default null
+             */
+            clip?: components["schemas"]["CLIPField"] | null;
+            /**
              * type
              * @default flux_lora_collection_loader
              * @constant
@@ -6391,7 +6397,7 @@ export type components = {
         };
         /**
          * FLUX LoRA
-         * @description Apply a LoRA model to a FLUX transformer.
+         * @description Apply a LoRA model to a FLUX transformer and/or text encoder.
          */
         FluxLoRALoaderInvocation: {
             /**
@@ -6428,7 +6434,13 @@ export type components = {
              * @description Transformer
              * @default null
              */
-            transformer?: components["schemas"]["TransformerField"];
+            transformer?: components["schemas"]["TransformerField"] | null;
+            /**
+             * CLIP
+             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+             * @default null
+             */
+            clip?: components["schemas"]["CLIPField"] | null;
             /**
              * type
              * @default flux_lora_loader
@@ -6448,6 +6460,12 @@ export type components = {
              * @default null
              */
             transformer: components["schemas"]["TransformerField"] | null;
+            /**
+             * CLIP
+             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+             * @default null
+             */
+            clip: components["schemas"]["CLIPField"] | null;
             /**
              * type
              * @default flux_lora_loader_output
@@ -11019,6 +11037,11 @@ export type components = {
              * @description Default height for this model
              */
             height?: number | null;
+            /**
+             * Guidance
+             * @description Default Guidance for this model
+             */
+            guidance?: number | null;
         };
         /**
          * Main Model

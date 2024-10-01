@@ -22,6 +22,7 @@ export const ModelTypeFilter = memo(() => {
       t5_encoder: t('modelManager.t5Encoder'),
       clip_embed: t('modelManager.clipEmbed'),
       ip_adapter: t('common.ipAdapter'),
+      clip_vision: 'CLIP Vision',
       spandrel_image_to_image: t('modelManager.spandrelImageToImage'),
     }),
     [t]

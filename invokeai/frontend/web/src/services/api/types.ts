@@ -99,6 +99,10 @@ export const isIPAdapterModelConfig = (config: AnyModelConfig): config is IPAdap
   return config.type === 'ip_adapter';
 };
 
+export const isCLIPVisionModelConfig = (config: AnyModelConfig): config is CLIPVisionDiffusersConfig => {
+  return config.type === 'clip_vision';
+};
+
 export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {
   return config.type === 't2i_adapter';
 };

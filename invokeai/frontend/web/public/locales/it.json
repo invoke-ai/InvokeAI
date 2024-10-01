@@ -81,7 +81,17 @@
         "tab": "Scheda",
         "enabled": "Abilitato",
         "disabled": "Disabilitato",
-        "dontShowMeThese": "Non mostrare più"
+        "dontShowMeThese": "Non mostrare più",
+        "openInViewer": "Apri nel visualizzatore",
+        "apply": "Applica",
+        "loadingImage": "Caricamento immagine",
+        "off": "Disattivato",
+        "edit": "Modifica",
+        "placeholderSelectAModel": "Seleziona un modello",
+        "reset": "Reimposta",
+        "none": "Niente",
+        "new": "Nuovo",
+        "view": "Vista"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -135,18 +145,313 @@
         "showStarredImagesFirst": "Mostra prima le immagini contrassegnate",
         "showArchivedBoards": "Mostra le bacheche archiviate",
         "searchImages": "Ricerca per metadati",
-        "displayBoardSearch": "Mostra la ricerca nelle Bacheche",
-        "displaySearch": "Mostra la ricerca",
+        "displayBoardSearch": "Ricerca nella Bacheca",
+        "displaySearch": "Ricerca immagine",
         "selectAllOnPage": "Seleziona tutto nella pagina",
         "exitBoardSearch": "Esci da Ricerca bacheca",
-        "exitSearch": "Esci dalla ricerca",
+        "exitSearch": "Esci dalla ricerca immagini",
         "go": "Vai",
-        "jump": "Salta"
+        "jump": "Salta",
+        "move": "Sposta",
+        "gallery": "Galleria",
+        "openViewer": "Apri visualizzatore",
+        "closeViewer": "Chiudi visualizzatore"
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
         "noHotkeysFound": "Nessun tasto di scelta rapida trovato",
-        "clearSearch": "Cancella ricerca"
+        "clearSearch": "Cancella ricerca",
+        "app": {
+            "selectCanvasTab": {
+                "title": "Seleziona la scheda Tela",
+                "desc": "Seleziona la scheda Tela."
+            },
+            "title": "Applicazione",
+            "invoke": {
+                "desc": "Metti in coda una generazione, aggiungendola alla fine della coda."
+            },
+            "invokeFront": {
+                "title": "Invoke (Fronte)",
+                "desc": "Metti in coda una generazione, aggiungendola all'inizio della coda."
+            },
+            "cancelQueueItem": {
+                "desc": "Annulla l'elemento della coda in elaborazione.",
+                "title": "Annulla"
+            },
+            "clearQueue": {
+                "title": "Cancella la coda",
+                "desc": "Annulla e cancella tutti gli elementi in coda."
+            },
+            "selectUpscalingTab": {
+                "title": "Seleziona la scheda Amplia",
+                "desc": "Seleziona la scheda Amplia."
+            },
+            "selectModelsTab": {
+                "title": "Seleziona la scheda Modelli",
+                "desc": "Seleziona la scheda Modelli."
+            },
+            "selectQueueTab": {
+                "title": "Seleziona la scheda della Coda",
+                "desc": "Seleziona la scheda della Coda."
+            },
+            "selectWorkflowsTab": {
+                "desc": "Seleziona la scheda dei Flussi di lavoro.",
+                "title": "Seleziona la scheda dei Flussi di lavoro"
+            },
+            "focusPrompt": {
+                "title": "Seleziona il Prompt",
+                "desc": "Sposta il cursore sul prompt positivo."
+            },
+            "toggleLeftPanel": {
+                "title": "Attiva/disattiva il pannello sinistro",
+                "desc": "Attiva/disattiva il pannello sinistro."
+            },
+            "toggleRightPanel": {
+                "title": "Attiva/disattiva il pannello destro",
+                "desc": "Attiva/disattiva il pannello destro."
+            },
+            "resetPanelLayout": {
+                "title": "Ripristina il layout del pannello",
+                "desc": "Ripristina le dimensioni e il layout predefiniti dei pannelli sinistro e destro."
+            },
+            "togglePanels": {
+                "title": "Attiva/disattiva i pannelli",
+                "desc": "Mostra o nascondi contemporaneamente i pannelli sinistro e destro."
+            }
+        },
+        "hotkeys": "Tasti di scelta rapida",
+        "canvas": {
+            "transformSelected": {
+                "desc": "Trasforma il livello selezionato.",
+                "title": "Trasforma"
+            },
+            "fitBboxToCanvas": {
+                "desc": "Scala e posiziona la vista per adattarla al riquadro di delimitazione.",
+                "title": "Adatta il riquadro di delimitazione alla tela"
+            },
+            "redo": {
+                "title": "Ripeti",
+                "desc": "Ripeti l'ultima azione sulla tela."
+            },
+            "selectBrushTool": {
+                "title": "Strumento pennello",
+                "desc": "Seleziona lo strumento pennello."
+            },
+            "selectBboxTool": {
+                "title": "Strumento di selezione riquadro",
+                "desc": "Seleziona lo strumento riquadro di delimitazione."
+            },
+            "decrementToolWidth": {
+                "title": "Diminuisci la larghezza dello strumento",
+                "desc": "Diminuisce la larghezza dello strumento pennello o gomma, a seconda di quello selezionato."
+            },
+            "incrementToolWidth": {
+                "title": "Aumenta la larghezza dello strumento",
+                "desc": "Aumenta la larghezza dello strumento pennello o gomma, a seconda di quello selezionato."
+            },
+            "selectColorPickerTool": {
+                "title": "Strumento di selezione del colore",
+                "desc": "Seleziona lo strumento di selezione del colore."
+            },
+            "resetSelected": {
+                "title": "Reimposta il Livello",
+                "desc": "Reimposta il livello selezionato. Si applica solo alla Maschera Inpaint e alla Guida Regionale."
+            },
+            "undo": {
+                "title": "Annulla",
+                "desc": "Annulla l'ultima azione sulla tela."
+            },
+            "nextEntity": {
+                "title": "Livello successivo",
+                "desc": "Seleziona il livello successivo nell'elenco."
+            },
+            "filterSelected": {
+                "title": "Filtro",
+                "desc": "Filtra il livello selezionato. Applicabile solo ai livelli Raster e Controllo."
+            },
+            "setZoomTo100Percent": {
+                "title": "Zoom al 100%",
+                "desc": "Imposta l'ingrandimento della tela al 100%."
+            },
+            "setZoomTo200Percent": {
+                "title": "Zoom al 200%",
+                "desc": "Imposta l'ingrandimento della tela al 200%."
+            },
+            "setZoomTo400Percent": {
+                "title": "Zoom al 400%",
+                "desc": "Imposta l'ingrandimento della tela al 400%."
+            },
+            "setZoomTo800Percent": {
+                "title": "Zoom al 800%",
+                "desc": "Imposta l'ingrandimento della tela al 800%."
+            },
+            "quickSwitch": {
+                "title": "Cambio rapido livello",
+                "desc": "Passa tra gli ultimi due livelli selezionati. Se un livello è aggiunto ai segnalibri, passa sempre tra questo e l'ultimo livello non aggiunto ai segnalibri."
+            },
+            "deleteSelected": {
+                "title": "Elimina livello",
+                "desc": "Elimina il livello selezionato."
+            },
+            "prevEntity": {
+                "title": "Livello precedente",
+                "desc": "Seleziona il livello precedente nell'elenco."
+            },
+            "setFillToWhite": {
+                "title": "Imposta il colore su bianco",
+                "desc": "Imposta il colore dello strumento corrente su bianco."
+            },
+            "title": "Tela",
+            "selectMoveTool": {
+                "title": "Strumento Sposta",
+                "desc": "Seleziona lo strumento sposta."
+            },
+            "fitLayersToCanvas": {
+                "desc": "Scala e posiziona la vista per adattarla a tutti i livelli visibili.",
+                "title": "Adatta i livelli alla tela"
+            },
+            "selectEraserTool": {
+                "title": "Strumento gomma",
+                "desc": "Selezionare lo strumento gomma."
+            },
+            "selectRectTool": {
+                "title": "Strumento Rettangolo",
+                "desc": "Seleziona lo strumento rettangolo."
+            },
+            "selectViewTool": {
+                "title": "Strumento Visualizza",
+                "desc": "Seleziona lo strumento Visualizza."
+            }
+        },
+        "workflows": {
+            "addNode": {
+                "title": "Aggiungi nodo",
+                "desc": "Apri il menu aggiungi nodo."
+            },
+            "pasteSelectionWithEdges": {
+                "title": "Incolla con collegamenti",
+                "desc": "Incolla i nodi copiati, i collegamenti e tutti i collegamenti connessi ai nodi copiati."
+            },
+            "copySelection": {
+                "title": "Copia",
+                "desc": "Copia i nodi ed i collegamenti selezionati."
+            },
+            "pasteSelection": {
+                "title": "Incolla",
+                "desc": "Incolla i nodi ed i collegamenti copiati."
+            },
+            "deleteSelection": {
+                "title": "Elimina",
+                "desc": "Elimina i nodi ed i collegamenti selezionati."
+            },
+            "redo": {
+                "title": "Ripeti",
+                "desc": "Ripeti l'ultima azione del flusso di lavoro."
+            },
+            "selectAll": {
+                "desc": "Seleziona tutti i nodi ed i collegamenti.",
+                "title": "Seleziona tutto"
+            },
+            "undo": {
+                "desc": "Annulla l'ultima azione del flusso di lavoro.",
+                "title": "Annulla"
+            },
+            "title": "Flussi di lavoro"
+        },
+        "viewer": {
+            "nextComparisonMode": {
+                "title": "Modalità di confronto successiva",
+                "desc": "Scorri le modalità di confronto."
+            },
+            "recallPrompts": {
+                "title": "Richiama i Prompt",
+                "desc": "Richiama i prompt positivo e negativo per l'immagine corrente."
+            },
+            "remix": {
+                "title": "Remixa",
+                "desc": "Richiama tutti i metadati, ad eccezione del seme, per l'immagine corrente."
+            },
+            "useSize": {
+                "desc": "Utilizza la dimensione dell'immagine corrente come dimensione del riquadro di delimitazione.",
+                "title": "Usa Dimensioni"
+            },
+            "runPostprocessing": {
+                "title": "Esegui Post-elaborazione",
+                "desc": "Esegue la post-elaborazione selezionata sull'immagine corrente."
+            },
+            "title": "Visualizzatore immagini",
+            "toggleViewer": {
+                "title": "Mostra/Nascondi visualizzatore immagini",
+                "desc": "Mostra o nascondi il visualizzatore di immagini. Disponibile solo nella scheda Tela."
+            },
+            "loadWorkflow": {
+                "title": "Carica Flusso di lavoro",
+                "desc": "Carica il flusso di lavoro salvato dell'immagine corrente (se presente)."
+            },
+            "recallAll": {
+                "title": "Richiama tutti i metadati",
+                "desc": "Richiama tutti i metadati dell'immagine corrente."
+            },
+            "swapImages": {
+                "title": "Scambia le immagini di confronto",
+                "desc": "Scambia le immagini da confrontare."
+            },
+            "recallSeed": {
+                "title": "Richiama il seme",
+                "desc": "Richiama il seme per l'immagine corrente."
+            },
+            "toggleMetadata": {
+                "title": "Mostra/Nascondi metadati",
+                "desc": "Mostra o nasconde la sovrapposizione dei metadati dell'immagine corrente."
+            }
+        },
+        "gallery": {
+            "selectAllOnPage": {
+                "desc": "Seleziona tutte le immagini nella pagina corrente.",
+                "title": "Seleziona tutto nella pagina"
+            },
+            "galleryNavUp": {
+                "desc": "Naviga verso l'alto nella griglia della galleria, selezionando quell'immagine. Se sei in cima alla pagina, andrai alla pagina precedente.",
+                "title": "Naviga verso l'alto"
+            },
+            "galleryNavRight": {
+                "title": "Naviga a destra",
+                "desc": "Naviga a destra nella griglia della galleria, selezionando quell'immagine. Se sei all'ultima immagine della riga, andrai alla riga successiva. Se sei all'ultima immagine della pagina, andrai alla pagina successiva."
+            },
+            "galleryNavLeftAlt": {
+                "desc": "Uguale a Naviga a sinistra, ma seleziona l'immagine da confrontare, aprendo la modalità di confronto se non è già aperta.",
+                "title": "Naviga a sinistra (Confronta immagine)"
+            },
+            "deleteSelection": {
+                "title": "Elimina",
+                "desc": "Elimina tutte le immagini selezionate. Per impostazione predefinita, ti verrà chiesto di confermare l'eliminazione. Se le immagini sono attualmente in uso nell'applicazione, verrai avvisato."
+            },
+            "clearSelection": {
+                "title": "Cancella selezione",
+                "desc": "Cancella la selezione corrente, se presente."
+            },
+            "galleryNavRightAlt": {
+                "desc": "Uguale a Naviga a destra, ma seleziona l'immagine da confrontare, aprendo la modalità di confronto se non è già aperta.",
+                "title": "Naviga a destra (Confronta immagine)"
+            },
+            "galleryNavDownAlt": {
+                "title": "Naviga in basso (Confronta immagine)",
+                "desc": "Uguale a Naviga in basso, ma seleziona l'immagine da confrontare, aprendo la modalità di confronto se non è già aperta."
+            },
+            "title": "Galleria",
+            "galleryNavDown": {
+                "desc": "Naviga verso il basso nella griglia della galleria, selezionando quell'immagine. Se sei in fondo alla pagina, andrai alla pagina successiva.",
+                "title": "Naviga in basso"
+            },
+            "galleryNavLeft": {
+                "title": "Naviga a sinistra",
+                "desc": "Naviga a sinistra nella griglia della galleria, selezionando quell'immagine. Se sei alla prima immagine della riga, andrai alla riga precedente. Se sei alla prima immagine della pagina, andrai alla pagina precedente."
+            },
+            "galleryNavUpAlt": {
+                "desc": "Uguale a Naviga verso l'alto, ma seleziona l'immagine da confrontare, aprendo la modalità di confronto se non è già aperta.",
+                "title": "Naviga verso l'alto (Confronta immagine)"
+            }
+        }
     },
     "modelManager": {
         "modelManager": "Gestione Modelli",
@@ -250,7 +555,8 @@
         "ipAdapters": "Adattatori IP",
         "noMatchingModels": "Nessun modello corrispondente",
         "starterModelsInModelManager": "I modelli iniziali possono essere trovati in Gestione Modelli",
-        "spandrelImageToImage": "Immagine a immagine (Spandrel)"
+        "spandrelImageToImage": "Immagine a immagine (Spandrel)",
+        "learnMoreAboutSupportedModels": "Scopri di più sui modelli che supportiamo"
     },
     "parameters": {
         "images": "Immagini",
@@ -285,8 +591,8 @@
             "cancel": "Annulla"
         },
         "symmetry": "Simmetria",
-        "seamlessXAxis": "Piastrella senza giunte Asse X",
-        "seamlessYAxis": "Piastrella senza giunte Asse Y",
+        "seamlessXAxis": "Asse X senza giunte",
+        "seamlessYAxis": "Asse Y senza giunte",
         "scheduler": "Campionatore",
         "positivePromptPlaceholder": "Prompt Positivo",
         "negativePromptPlaceholder": "Prompt Negativo",
@@ -312,7 +618,14 @@
                 "ipAdapterNoImageSelected": "Nessuna immagine dell'adattatore IP selezionata",
                 "rgNoPromptsOrIPAdapters": "Nessun prompt o adattatore IP",
                 "rgNoRegion": "Nessuna regione selezionata"
-            }
+            },
+            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), altezza riquadro è {{height}}",
+            "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), larghezza riquadro è {{width}}",
+            "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), larghezza del riquadro scalato è {{width}}",
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), altezza del riquadro scalato è {{height}}",
+            "noT5EncoderModelSelected": "Nessun modello di encoder T5 selezionato per la generazione con FLUX",
+            "noCLIPEmbedModelSelected": "Nessun modello CLIP Embed selezionato per la generazione con FLUX",
+            "noFLUXVAEModelSelected": "Nessun modello VAE selezionato per la generazione con FLUX"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -330,7 +643,8 @@
         "infillColorValue": "Colore di riempimento",
         "processImage": "Elabora Immagine",
         "sendToUpscale": "Invia a Amplia",
-        "postProcessing": "Post-elaborazione (Shift + U)"
+        "postProcessing": "Post-elaborazione (Shift + U)",
+        "guidance": "Guida"
     },
     "settings": {
         "models": "Modelli",
@@ -559,7 +873,8 @@
         "singleFieldType": "{{name}} (Singola)",
         "imageAccessError": "Impossibile trovare l'immagine {{image_name}}, ripristino ai valori predefiniti",
         "boardAccessError": "Impossibile trovare la bacheca {{board_id}}, ripristino ai valori predefiniti",
-        "modelAccessError": "Impossibile trovare il modello {{key}}, ripristino ai valori predefiniti"
+        "modelAccessError": "Impossibile trovare il modello {{key}}, ripristino ai valori predefiniti",
+        "saveToGallery": "Salva nella Galleria"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -632,7 +947,7 @@
         "batchQueuedDesc_other": "Aggiunte {{count}} sessioni a {{direction}} della coda",
         "graphQueued": "Grafico in coda",
         "batch": "Lotto",
-        "clearQueueAlertDialog": "Lo svuotamento della coda annulla immediatamente tutti gli elementi in elaborazione e cancella completamente la coda.",
+        "clearQueueAlertDialog": "Lo svuotamento della coda annulla immediatamente tutti gli elementi in elaborazione e cancella completamente la coda. I filtri in sospeso verranno annullati.",
         "pending": "In attesa",
         "completedIn": "Completato in",
         "resumeFailed": "Problema nel riavvio dell'elaborazione",
@@ -671,7 +986,15 @@
         "prompts_other": "Prompt",
         "generations_one": "Generazione",
         "generations_many": "Generazioni",
-        "generations_other": "Generazioni"
+        "generations_other": "Generazioni",
+        "origin": "Origine",
+        "destination": "Destinazione",
+        "upscaling": "Ampliamento",
+        "canvas": "Tela",
+        "workflows": "Flussi di lavoro",
+        "generation": "Generazione",
+        "other": "Altro",
+        "gallery": "Galleria"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1127,7 +1450,8 @@
         "imageDimensions": "Dimensioni dell'immagine",
         "parameterSet": "Parametro {{parameter}} impostato",
         "parsingFailed": "Analisi non riuscita",
-        "recallParameter": "Richiama {{label}}"
+        "recallParameter": "Richiama {{label}}",
+        "canvasV2Metadata": "Tela"
     },
     "hrf": {
         "enableHrf": "Abilita Correzione Alta Risoluzione",
@@ -1208,8 +1532,8 @@
         "autoNegative": "Auto Negativo",
         "deletePrompt": "Cancella il prompt",
         "rectangle": "Rettangolo",
-        "addPositivePrompt": "Aggiungi $t(common.positivePrompt)",
-        "addNegativePrompt": "Aggiungi $t(common.negativePrompt)",
+        "addPositivePrompt": "Aggiungi $t(controlLayers.prompt)",
+        "addNegativePrompt": "Aggiungi $t(controlLayers.negativePrompt)",
         "regionalGuidance": "Guida regionale",
         "opacity": "Opacità"
     },

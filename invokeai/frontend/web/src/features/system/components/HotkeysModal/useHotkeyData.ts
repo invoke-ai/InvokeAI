@@ -115,6 +115,10 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('canvas', 'redo', ['mod+shift+z', 'mod+y']);
     addHotkey('canvas', 'nextEntity', ['alt+]']);
     addHotkey('canvas', 'prevEntity', ['alt+[']);
+    addHotkey('canvas', 'applyFilter', ['enter']);
+    addHotkey('canvas', 'cancelFilter', ['esc']);
+    addHotkey('canvas', 'applyTransform', ['enter']);
+    addHotkey('canvas', 'cancelTransform', ['esc']);
 
     // Workflows
     addHotkey('workflows', 'addNode', ['shift+a', 'space']);
