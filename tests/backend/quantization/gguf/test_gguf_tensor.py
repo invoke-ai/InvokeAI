@@ -14,4 +14,4 @@ def test_ggml_tensor():
     ggml_tensor = GGMLTensor(data, tensor_type, tensor_shape)
     ones = torch.ones([1], dtype=torch.float32)
 
-    x = ggml_tensor * ones
+    _ = ggml_tensor * ones
