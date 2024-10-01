@@ -95,6 +95,7 @@ export class CanvasStageModule extends CanvasModuleBase {
 
   initialize = () => {
     this.log.debug('Initializing module');
+    this.container.style.touchAction = 'none';
     this.konva.stage.container(this.container);
     this.setResizeObserver();
     this.fitStageToContainer();

@@ -257,20 +257,13 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   setEventListeners = (): (() => void) => {
-    // The default behavior of touch events is to scroll the page. This breaks drawing, so we need to prevent that
-    // behaviour for the stage (also prevents it for all stage children).
-    const preventDefault = (e: KonvaEventObject<MouseEvent | TouchEvent | PointerEvent>) => {
-      e.evt.preventDefault();
-    };
-    this.konva.stage.on('touchstart', preventDefault);
-    this.konva.stage.on('touchmove', preventDefault);
-    this.konva.stage.on('touchend', preventDefault);
-
     this.konva.stage.on('pointerenter', this.onStagePointerEnter);
     this.konva.stage.on('pointerdown', this.onStagePointerDown);
     this.konva.stage.on('pointerup', this.onStagePointerUp);
     this.konva.stage.on('pointermove', this.onStagePointerMove);
-    this.konva.stage.on('pointerleave', this.onStagePointerLeave);
+
+    // The Konva stage doesn't appear to handle pointerleave events, so we need to listen to the container instead
+    this.manager.stage.container.addEventListener('pointerleave', this.onStagePointerLeave);
 
     this.konva.stage.on('wheel', this.onStageMouseWheel);
 
@@ -280,15 +273,12 @@ export class CanvasToolModule extends CanvasModuleBase {
     window.addEventListener('blur', this.onWindowBlur);
 
     return () => {
-      this.konva.stage.off('touchstart', preventDefault);
-      this.konva.stage.off('touchmove', preventDefault);
-      this.konva.stage.off('touchend', preventDefault);
-
       this.konva.stage.off('pointerenter', this.onStagePointerEnter);
       this.konva.stage.off('pointerdown', this.onStagePointerDown);
       this.konva.stage.off('pointerup', this.onStagePointerUp);
       this.konva.stage.off('pointermove', this.onStagePointerMove);
-      this.konva.stage.off('pointerleave', this.onStagePointerLeave);
+
+      this.manager.stage.container.removeEventListener('pointerleave', this.onStagePointerLeave);
 
       this.konva.stage.off('wheel', this.onStageMouseWheel);
 
