@@ -1,4 +1,4 @@
-import { MenuItem } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
@@ -16,9 +16,14 @@ export const ImageMenuItemDelete = memo(() => {
   }, [dispatch, imageDTO]);
 
   return (
-    <MenuItem isDestructive icon={<PiTrashSimpleBold />} onClickCapture={onClick}>
-      {t('gallery.deleteImage', { count: 1 })}
-    </MenuItem>
+    <IconButton
+      icon={<PiTrashSimpleBold />}
+      onClickCapture={onClick}
+      aria-label={t('gallery.deleteImage', { count: 1 })}
+      tooltip={t('gallery.deleteImage', { count: 1 })}
+      variant="ghost"
+      colorScheme="red"
+    />
   );
 });
 
