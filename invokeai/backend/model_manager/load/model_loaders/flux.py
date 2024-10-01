@@ -37,6 +37,7 @@ from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 try:
@@ -234,11 +235,21 @@ class FluxGGUFCheckpointModel(ModelLoader):
         model_path = Path(config.path)
 
         with SilenceWarnings():
-            # Load the state dict and patcher
+            model = Flux(params[config.config_path])
+
             # HACK(ryand): We shouldn't be hard-coding the compute_dtype here.
             sd = gguf_sd_loader(model_path, compute_dtype=torch.bfloat16)
-            model = Flux(params[config.config_path])
-            model.load_state_dict(sd, assign=True)
+
+        # HACK(ryand): There are some broken GGUF models in circulation that have the wrong shape for img_in.weight.
+        # We override the shape here to fix the issue.
+        # Example model with this issue (Q4_K_M): https://civitai.com/models/705823/ggufk-flux-unchained-km-quants
+        img_in_weight = sd.get("img_in.weight", None)
+        if img_in_weight is not None and img_in_weight._ggml_quantization_type in TORCH_COMPATIBLE_QTYPES:
+            expected_img_in_weight_shape = model.img_in.weight.shape
+            img_in_weight.quantized_data = img_in_weight.quantized_data.view(expected_img_in_weight_shape)
+            img_in_weight.tensor_shape = expected_img_in_weight_shape
+
+        model.load_state_dict(sd, assign=True)
         return model
 
 
