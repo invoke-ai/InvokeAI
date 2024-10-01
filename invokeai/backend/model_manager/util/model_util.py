@@ -8,7 +8,7 @@ import safetensors
 import torch
 from picklescan.scanner import scan_file_path
 
-from invokeai.backend.quantization.gguf.loaders import load_gguf_sd
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 
 
 def _fast_safetensors_reader(path: str) -> Dict[str, torch.Tensor]:
@@ -57,7 +57,7 @@ def read_checkpoint_meta(path: Union[str, Path], scan: bool = False) -> Dict[str
             if scan_result.infected_files != 0:
                 raise Exception(f'The model file "{path}" is potentially infected by malware. Aborting import.')
         if str(path).endswith(".gguf"):
-            checkpoint = load_gguf_sd(Path(path))
+            checkpoint = gguf_sd_loader(Path(path))
         else:
             checkpoint = torch.load(path, map_location=torch.device("meta"))
     return checkpoint
