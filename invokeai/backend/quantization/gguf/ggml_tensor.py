@@ -1,3 +1,5 @@
+from typing import overload
+
 import gguf
 import torch
 
@@ -9,6 +11,10 @@ from invokeai.backend.quantization.gguf.utils import (
 
 
 def dequantize_and_run(func, args, kwargs):
+    """A helper function for running math ops on GGMLTensor inputs.
+
+    Dequantizes the inputs, and runs the function.
+    """
     # TODO(ryand): Use the highest input precision of non-quantized inputs instead of hardcoding torch.float32.
     dequantized_args = [
         a.get_dequantized_tensor(dtype=torch.bfloat16) if hasattr(a, "get_dequantized_tensor") else a for a in args
@@ -21,26 +27,42 @@ def dequantize_and_run(func, args, kwargs):
 
 
 def apply_to_quantized_tensor(func, args, kwargs):
+    """A helper function to apply a function to a quantized GGML tensor, and re-wrap the result in a GGMLTensor.
+
+    Assumes that the first argument is a GGMLTensor.
+    """
+    # We expect the first argument to be a GGMLTensor, and all other arguments to be non-GGMLTensors.
     ggml_tensor = args[0]
     assert isinstance(ggml_tensor, GGMLTensor)
+    assert all(not isinstance(a, GGMLTensor) for a in args[1:])
+    assert all(not isinstance(v, GGMLTensor) for v in kwargs.values())
+
     new_data = func(ggml_tensor._data, *args[1:], **kwargs)
     return GGMLTensor(new_data, ggml_tensor._ggml_quantization_type, ggml_tensor._tensor_shape)
 
 
 GGML_TENSOR_OP_TABLE = {
-    torch.ops.aten.detach.default: apply_to_quantized_tensor,
-    torch.ops.aten._to_copy.default: apply_to_quantized_tensor,
-    # --
-    torch.ops.aten.t.default: dequantize_and_run,
-    torch.ops.aten.addmm.default: dequantize_and_run,
-    torch.ops.aten.mul.Tensor: dequantize_and_run,
+    # Ops to run on the quantized tensor.
+    torch.ops.aten.detach.default: apply_to_quantized_tensor,  # pyright: ignore
+    torch.ops.aten._to_copy.default: apply_to_quantized_tensor,  # pyright: ignore
+    # Ops to run on dequantized tensors.
+    torch.ops.aten.t.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.addmm.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.mul.Tensor: dequantize_and_run,  # pyright: ignore
 }
 
 
 class GGMLTensor(torch.Tensor):
+    """A torch.Tensor sub-class holding a quantized GGML tensor.
+
+    The underlying tensor is quantized, but the GGMLTensor class provides a dequantized view of the tensor on-the-fly
+    when it is used in operations.
+    """
+
     @staticmethod
     def __new__(cls, data: torch.Tensor, ggml_quantization_type: gguf.GGMLQuantizationType, tensor_shape: torch.Size):
-        return torch.Tensor._make_wrapper_subclass(
+        # Type hinting is not supported for torch.Tensor._make_wrapper_subclass, so we ignore the errors.
+        return torch.Tensor._make_wrapper_subclass(  # pyright: ignore
             cls,
             data.shape,
             dtype=data.dtype,
@@ -56,18 +78,35 @@ class GGMLTensor(torch.Tensor):
         # The dequantized shape of the tensor.
         self._tensor_shape = tensor_shape
 
-    def __repr__(self):
+    def __repr__(self, *, tensor_contents=None):
         return f"GGMLTensor(type={self._ggml_quantization_type.name}, dequantized_shape=({self._tensor_shape})"
 
-    def size(self):
+    @overload
+    def size(self, dim: None = None) -> torch.Size: ...
+
+    @overload
+    def size(self, dim: int) -> int: ...
+
+    def size(self, dim: int | None = None):
+        """Return the size of the tensor after dequantization. I.e. the shape that will be used in any math ops."""
+        if dim is not None:
+            return self._tensor_shape[dim]
         return self._tensor_shape
 
     @property
-    def shape(self):
+    def shape(self) -> torch.Size:  # pyright: ignore[reportIncompatibleVariableOverride] pyright doesn't understand this for some reason.
+        """The shape of the tensor after dequantization. I.e. the shape that will be used in any math ops."""
         return self.size()
 
-    def requires_grad_(self, requires_grad: bool = True):
-        # TODO(ryand): Think about whether we should set requires_grad on the underlying tensor.
+    @property
+    def quantized_shape(self) -> torch.Size:
+        """The shape of the quantized tensor."""
+        return self._data.shape
+
+    def requires_grad_(self, mode: bool = True) -> torch.Tensor:
+        """The GGMLTensor class is currently only designed for inference (not training). Setting requires_grad to True
+        is not supported. This method is a no-op.
+        """
         return self
 
     def get_dequantized_tensor(self, dtype: torch.dtype):
@@ -92,4 +131,4 @@ class GGMLTensor(torch.Tensor):
     def __torch_dispatch__(cls, func, types, args, kwargs):
         if func in GGML_TENSOR_OP_TABLE:
             return GGML_TENSOR_OP_TABLE[func](func, args, kwargs)
-        raise NotImplementedError(f"Unsupported function {func}")
+        return NotImplemented
