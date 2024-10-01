@@ -78,6 +78,10 @@ type CanvasSettingsState = {
    * Whether to show only the selected layer while transforming.
    */
   isolatedTransformingPreview: boolean;
+  /**
+   * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
+   */
+  pressureSensitivity: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -98,6 +102,7 @@ const initialState: CanvasSettingsState = {
   isolatedStagingPreview: true,
   isolatedFilteringPreview: true,
   isolatedTransformingPreview: true,
+  pressureSensitivity: true,
 };
 
 export const canvasSettingsSlice = createSlice({

@@ -166,8 +166,8 @@ export const createStore = (uniqueStoreKey?: string, persist = true) =>
     reducer: rememberedRootReducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
-        serializableCheck: import.meta.env.MODE === 'development',
-        immutableCheck: import.meta.env.MODE === 'development',
+        serializableCheck: false, // import.meta.env.MODE === 'development',
+        immutableCheck: false, // import.meta.env.MODE === 'development',
       })
         .concat(api.middleware)
         .concat(dynamicMiddlewares)
