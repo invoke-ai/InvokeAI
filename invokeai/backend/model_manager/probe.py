@@ -30,7 +30,7 @@ from invokeai.backend.model_manager.config import (
     SchedulerPredictionType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
-from invokeai.backend.quantization.gguf.layers import GGUFTensor
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -482,7 +482,7 @@ class CheckpointProbeBase(ProbeBase):
             or "model.diffusion_model.double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict
         ):
             return ModelFormat.BnbQuantizednf4b
-        elif any(isinstance(v, GGUFTensor) for v in state_dict.values()):
+        elif any(isinstance(v, GGMLTensor) for v in state_dict.values()):
             return ModelFormat.GGUFQuantized
         return ModelFormat("checkpoint")
 
