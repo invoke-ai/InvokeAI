@@ -266,11 +266,11 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.stage.on('touchmove', preventDefault);
     this.konva.stage.on('touchend', preventDefault);
 
-    this.konva.stage.on('mouseenter', this.onStageMouseEnter);
-    this.konva.stage.on('mousedown', this.onStageMouseDown);
-    this.konva.stage.on('mouseup', this.onStageMouseUp);
-    this.konva.stage.on('mousemove', this.onStageMouseMove);
-    this.konva.stage.on('mouseleave', this.onStageMouseLeave);
+    this.konva.stage.on('pointerenter', this.onStagePointerEnter);
+    this.konva.stage.on('pointerdown', this.onStagePointerDown);
+    this.konva.stage.on('pointerup', this.onStagePointerUp);
+    this.konva.stage.on('pointermove', this.onStagePointerMove);
+    this.konva.stage.on('pointerleave', this.onStagePointerLeave);
 
     this.konva.stage.on('wheel', this.onStageMouseWheel);
 
@@ -284,11 +284,11 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.konva.stage.off('touchmove', preventDefault);
       this.konva.stage.off('touchend', preventDefault);
 
-      this.konva.stage.off('mouseenter', this.onStageMouseEnter);
-      this.konva.stage.off('mousedown', this.onStageMouseDown);
-      this.konva.stage.off('mouseup', this.onStageMouseUp);
-      this.konva.stage.off('mousemove', this.onStageMouseMove);
-      this.konva.stage.off('mouseleave', this.onStageMouseLeave);
+      this.konva.stage.off('pointerenter', this.onStagePointerEnter);
+      this.konva.stage.off('pointerdown', this.onStagePointerDown);
+      this.konva.stage.off('pointerup', this.onStagePointerUp);
+      this.konva.stage.off('pointermove', this.onStagePointerMove);
+      this.konva.stage.off('pointerleave', this.onStagePointerLeave);
 
       this.konva.stage.off('wheel', this.onStageMouseWheel);
 
@@ -311,7 +311,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStageMouseEnter = async (_: KonvaEventObject<MouseEvent>) => {
+  onStagePointerEnter = async (e: KonvaEventObject<PointerEvent>) => {
+    e.evt.preventDefault();
+
     if (!this.getCanDraw()) {
       return;
     }
@@ -366,7 +368,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStageMouseDown = async (e: KonvaEventObject<MouseEvent>) => {
+  onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
+    e.evt.preventDefault();
+
     if (!this.getCanDraw()) {
       return;
     }
@@ -484,7 +488,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStageMouseUp = (_: KonvaEventObject<MouseEvent>) => {
+  onStagePointerUp = (e: KonvaEventObject<PointerEvent>) => {
+    e.evt.preventDefault();
+
     if (!this.getCanDraw()) {
       return;
     }
@@ -530,7 +536,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStageMouseMove = async (_: KonvaEventObject<MouseEvent>) => {
+  onStagePointerMove = async (e: KonvaEventObject<PointerEvent>) => {
+    e.evt.preventDefault();
+
     if (!this.getCanDraw()) {
       return;
     }
@@ -611,7 +619,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStageMouseLeave = (_: KonvaEventObject<MouseEvent>) => {
+  onStagePointerLeave = (e: KonvaEventObject<PointerEvent>) => {
+    e.evt.preventDefault();
+
     if (!this.getCanDraw()) {
       return;
     }
