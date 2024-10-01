@@ -40,7 +40,7 @@ def apply_to_quantized_tensor(func, args, kwargs):
         raise ValueError("Operation changed the dtype of GGMLTensor unexpectedly.")
 
     return GGMLTensor(
-        new_data, ggml_tensor._ggml_quantization_type, ggml_tensor._tensor_shape, ggml_tensor.compute_dtype
+        new_data, ggml_tensor._ggml_quantization_type, ggml_tensor.tensor_shape, ggml_tensor.compute_dtype
     )
 
 
@@ -91,11 +91,11 @@ class GGMLTensor(torch.Tensor):
         self.quantized_data = data
         self._ggml_quantization_type = ggml_quantization_type
         # The dequantized shape of the tensor.
-        self._tensor_shape = tensor_shape
+        self.tensor_shape = tensor_shape
         self.compute_dtype = compute_dtype
 
     def __repr__(self, *, tensor_contents=None):
-        return f"GGMLTensor(type={self._ggml_quantization_type.name}, dequantized_shape=({self._tensor_shape})"
+        return f"GGMLTensor(type={self._ggml_quantization_type.name}, dequantized_shape=({self.tensor_shape})"
 
     @overload
     def size(self, dim: None = None) -> torch.Size: ...
@@ -106,8 +106,8 @@ class GGMLTensor(torch.Tensor):
     def size(self, dim: int | None = None):
         """Return the size of the tensor after dequantization. I.e. the shape that will be used in any math ops."""
         if dim is not None:
-            return self._tensor_shape[dim]
-        return self._tensor_shape
+            return self.tensor_shape[dim]
+        return self.tensor_shape
 
     @property
     def shape(self) -> torch.Size:  # pyright: ignore[reportIncompatibleVariableOverride] pyright doesn't understand this for some reason.
@@ -136,7 +136,7 @@ class GGMLTensor(torch.Tensor):
         elif self._ggml_quantization_type in DEQUANTIZE_FUNCTIONS:
             # TODO(ryand): Look into how the dtype param is intended to be used.
             return dequantize(
-                data=self.quantized_data, qtype=self._ggml_quantization_type, oshape=self._tensor_shape, dtype=None
+                data=self.quantized_data, qtype=self._ggml_quantization_type, oshape=self.tensor_shape, dtype=None
             ).to(self.compute_dtype)
         else:
             # There is no GPU implementation for this quantization type, so fallback to the numpy implementation.
