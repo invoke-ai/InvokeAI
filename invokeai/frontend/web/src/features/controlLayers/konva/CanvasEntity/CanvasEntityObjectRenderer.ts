@@ -6,7 +6,9 @@ import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEnt
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLine';
+import { CanvasObjectBrushLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLineWithPressure';
 import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLine';
+import { CanvasObjectEraserLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLineWithPressure';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
@@ -286,11 +288,31 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       }
 
       didRender = renderer.update(objectState, force || isFirstRender);
+    } else if (objectState.type === 'brush_line_with_pressure') {
+      assert(renderer instanceof CanvasObjectBrushLineWithPressure || !renderer);
+
+      if (!renderer) {
+        renderer = new CanvasObjectBrushLineWithPressure(objectState, this);
+        this.renderers.set(renderer.id, renderer);
+        this.konva.objectGroup.add(renderer.konva.group);
+      }
+
+      didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'eraser_line') {
       assert(renderer instanceof CanvasObjectEraserLine || !renderer);
 
       if (!renderer) {
         renderer = new CanvasObjectEraserLine(objectState, this);
+        this.renderers.set(renderer.id, renderer);
+        this.konva.objectGroup.add(renderer.konva.group);
+      }
+
+      didRender = renderer.update(objectState, force || isFirstRender);
+    } else if (objectState.type === 'eraser_line_with_pressure') {
+      assert(renderer instanceof CanvasObjectEraserLineWithPressure || !renderer);
+
+      if (!renderer) {
+        renderer = new CanvasObjectEraserLineWithPressure(objectState, this);
         this.renderers.set(renderer.id, renderer);
         this.konva.objectGroup.add(renderer.konva.group);
       }

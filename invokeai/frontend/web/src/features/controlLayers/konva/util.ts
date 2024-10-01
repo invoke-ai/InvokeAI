@@ -6,6 +6,8 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
 import { clamp } from 'lodash-es';
 import { customAlphabet } from 'nanoid';
+import type { StrokeOptions } from 'perfect-freehand';
+import getStroke from 'perfect-freehand';
 import { assert } from 'tsafe';
 
 /**
@@ -148,12 +150,30 @@ export const getLastPointOfLine = (points: number[]): Coordinate | null => {
   if (points.length < 2) {
     return null;
   }
-  const x = points[points.length - 2];
-  const y = points[points.length - 1];
+  const x = points.at(-2);
+  const y = points.at(-1);
   if (x === undefined || y === undefined) {
     return null;
   }
   return { x, y };
+};
+
+/**
+ * Gets the last point of a line as a coordinate.
+ * @param points An array of numbers representing points as [x1, y1, x2, y2, ...]
+ * @returns The last point of the line as a coordinate, or null if the line has less than 1 point
+ */
+export const getLastPointOfLineWithPressure = (points: number[]): CoordinateWithPressure | null => {
+  if (points.length < 3) {
+    return null;
+  }
+  const x = points.at(-3);
+  const y = points.at(-2);
+  const pressure = points.at(-1);
+  if (x === undefined || y === undefined || pressure === undefined) {
+    return null;
+  }
+  return { x, y, pressure };
 };
 
 export function getIsPrimaryMouseDown(e: KonvaEventObject<MouseEvent>) {
@@ -436,7 +456,9 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
  */
 export const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 10);
 
-export function getPrefixedId(prefix: CanvasEntityIdentifier['type'] | (string & Record<never, never>)): string {
+export function getPrefixedId(
+  prefix: CanvasEntityIdentifier['type'] | CanvasObjectState['type'] | (string & Record<never, never>)
+): string {
   return `${prefix}:${nanoid()}`;
 }
 
@@ -492,11 +514,32 @@ export const exhaustiveCheck = (value: never): never => {
   assert(false, `Unhandled value: ${value}`);
 };
 
+type CoordinateWithPressure = {
+  x: number;
+  y: number;
+  pressure: number;
+};
+export const getLastPointOfLastLineWithPressure = (
+  objects: CanvasObjectState[],
+  type: 'brush_line_with_pressure' | 'eraser_line_with_pressure'
+): CoordinateWithPressure | null => {
+  const lastObject = objects.at(-1);
+  if (!lastObject) {
+    return null;
+  }
+
+  if (lastObject.type === type) {
+    return getLastPointOfLineWithPressure(lastObject.points);
+  }
+
+  return null;
+};
+
 export const getLastPointOfLastLine = (
   objects: CanvasObjectState[],
   type: 'brush_line' | 'eraser_line'
 ): Coordinate | null => {
-  const lastObject = objects[objects.length - 1];
+  const lastObject = objects.at(-1);
   if (!lastObject) {
     return null;
   }
@@ -539,4 +582,54 @@ export const getKonvaNodeDebugAttrs = (node: Konva.Node) => {
     offsetY: node.offsetY(),
     rotation: node.rotation(),
   };
+};
+
+const average = (a: number, b: number) => (a + b) / 2;
+
+function getSvgPathFromStroke(points: number[][], closed = true) {
+  const len = points.length;
+
+  if (len < 4) {
+    return '';
+  }
+
+  let a = points[0] as number[];
+  let b = points[1] as number[];
+  const c = points[2] as number[];
+
+  let result = `M${a[0]!.toFixed(2)},${a[1]!.toFixed(2)} Q${b[0]!.toFixed(
+    2
+  )},${b[1]!.toFixed(2)} ${average(b[0]!, c[0]!).toFixed(2)},${average(b[1]!, c[1]!).toFixed(2)} T`;
+
+  for (let i = 2, max = len - 1; i < max; i++) {
+    a = points[i]!;
+    b = points[i + 1]!;
+    result += `${average(a[0]!, b[0]!).toFixed(2)},${average(a[1]!, b[1]!).toFixed(2)} `;
+  }
+
+  if (closed) {
+    result += 'Z';
+  }
+
+  return result;
+}
+
+export const getSVGPathDataFromPoints = (points: number[], options?: StrokeOptions): string => {
+  const chunked: [number, number, number][] = [];
+  for (let i = 0; i < points.length; i += 3) {
+    chunked.push([points[i]!, points[i + 1]!, points[i + 2]!]);
+  }
+  return getSvgPathFromStroke(getStroke(chunked, options));
+};
+
+export const getPointerType = (e: KonvaEventObject<PointerEvent>): 'mouse' | 'pen' | 'touch' => {
+  if (e.evt.pointerType === 'mouse') {
+    return 'mouse';
+  }
+
+  if (e.evt.pointerType === 'pen') {
+    return 'pen';
+  }
+
+  return 'touch';
 };

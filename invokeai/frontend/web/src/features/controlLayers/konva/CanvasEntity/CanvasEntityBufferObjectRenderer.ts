@@ -3,7 +3,9 @@ import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEnt
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLine';
+import { CanvasObjectBrushLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLineWithPressure';
 import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLine';
+import { CanvasObjectEraserLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLineWithPressure';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
@@ -114,11 +116,29 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
       }
 
       didRender = this.renderer.update(this.state, true);
+    } else if (this.state.type === 'brush_line_with_pressure') {
+      assert(this.renderer instanceof CanvasObjectBrushLineWithPressure || !this.renderer);
+
+      if (!this.renderer) {
+        this.renderer = new CanvasObjectBrushLineWithPressure(this.state, this);
+        this.konva.group.add(this.renderer.konva.group);
+      }
+
+      didRender = this.renderer.update(this.state, true);
     } else if (this.state.type === 'eraser_line') {
       assert(this.renderer instanceof CanvasObjectEraserLine || !this.renderer);
 
       if (!this.renderer) {
         this.renderer = new CanvasObjectEraserLine(this.state, this);
+        this.konva.group.add(this.renderer.konva.group);
+      }
+
+      didRender = this.renderer.update(this.state, true);
+    } else if (this.state.type === 'eraser_line_with_pressure') {
+      assert(this.renderer instanceof CanvasObjectEraserLineWithPressure || !this.renderer);
+
+      if (!this.renderer) {
+        this.renderer = new CanvasObjectEraserLineWithPressure(this.state, this);
         this.konva.group.add(this.renderer.konva.group);
       }
 
@@ -205,14 +225,18 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
 
     if (pushToState) {
       const entityIdentifier = this.parent.entityIdentifier;
-      if (this.state.type === 'brush_line') {
-        this.manager.stateApi.addBrushLine({ entityIdentifier, brushLine: this.state });
-      } else if (this.state.type === 'eraser_line') {
-        this.manager.stateApi.addEraserLine({ entityIdentifier, eraserLine: this.state });
-      } else if (this.state.type === 'rect') {
-        this.manager.stateApi.addRect({ entityIdentifier, rect: this.state });
-      } else {
-        this.log.warn({ buffer: this.state }, 'Invalid buffer object type');
+      switch (this.state.type) {
+        case 'brush_line':
+        case 'brush_line_with_pressure':
+          this.manager.stateApi.addBrushLine({ entityIdentifier, brushLine: this.state });
+          break;
+        case 'eraser_line':
+        case 'eraser_line_with_pressure':
+          this.manager.stateApi.addEraserLine({ entityIdentifier, eraserLine: this.state });
+          break;
+        case 'rect':
+          this.manager.stateApi.addRect({ entityIdentifier, rect: this.state });
+          break;
       }
     }
 

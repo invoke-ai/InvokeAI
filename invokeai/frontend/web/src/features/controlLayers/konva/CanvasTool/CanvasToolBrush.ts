@@ -105,6 +105,7 @@ export class CanvasToolBrush extends CanvasModuleBase {
       y: alignedCursorPos.y,
       radius,
       fill: rgbaColorToString(brushPreviewFill),
+      visible: !this.manager.tool.$isMouseDown.get(),
     });
 
     // But the borders are in screen-pixels
