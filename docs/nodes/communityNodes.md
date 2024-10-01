@@ -40,6 +40,7 @@ To use a community workflow, download the `.json` node graph file and load it in
     + [Metadata-Linked](#metadata-linked-nodes)
     + [Negative Image](#negative-image)
     + [Nightmare Promptgen](#nightmare-promptgen)
+    + [Ollama](#ollama-node)
     + [One Button Prompt](#one-button-prompt)
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
@@ -389,6 +390,19 @@ View:
 **Description:** Nightmare Prompt Generator - Uses a local text generation model to create unique imaginative (but usually nightmarish) prompts for InvokeAI. By default, it allows you to choose from some gpt-neo models I finetuned on over 2500 of my own InvokeAI prompts in Compel format, but you're able to add your own, as well. Offers support for replacing any troublesome words with a random choice from list you can also define.
 
 **Node Link:** [https://github.com/gogurtenjoyer/nightmare-promptgen](https://github.com/gogurtenjoyer/nightmare-promptgen)
+
+--------------------------------
+### Ollama Node
+
+**Description:** Uses Ollama API to expand text prompts for text-to-image generation using local LLMs. Works great for expanding basic prompts into detailed natural language prompts for Flux. Also provides a toggle to unload the LLM model immediately after expanding, to free up VRAM for Invoke to continue the image generation workflow.
+
+**Node Link:** https://github.com/Jonseed/Ollama-Node
+
+**Example Node Graph:**  https://github.com/Jonseed/Ollama-Node/blob/main/Ollama-Node-Flux-example.json
+
+**View:** 
+
+![ollama node](https://raw.githubusercontent.com/Jonseed/Ollama-Node/a3e7cdc55e394cb89c1ea7ed54e106c212c85e8c/ollama-node-screenshot.png)
 
 --------------------------------
 ### One Button Prompt
