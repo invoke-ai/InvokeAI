@@ -9,18 +9,42 @@ from invokeai.backend.quantization.gguf.utils import (
     dequantize,
 )
 
+# Ranking of precision preference for different dtypes.
+# When applying an operation involving a GGMLTensor and other non-GGMLTensors, we will run the operation at the
+# highest precision of the non-GGMLTensors.
+DTYPE_PRECISION_RANK = {
+    torch.float64: 0,
+    torch.float32: 1,
+    torch.bfloat16: 2,  # Note: We prefer bfloat16 over float16 for our typical use cases.
+    torch.float16: 3,
+    torch.float8_e4m3fn: 4,
+}
+
+
+def choose_highest_precision_dtype(dtypes: list[torch.dtype]) -> torch.dtype:
+    if len(dtypes) == 0:
+        # TODO(ryand): If we ever hit this case, there's a good chance we'll want to allow the user to specify the
+        # desired compute dtype.
+        return torch.float32
+    return min(dtypes, key=lambda dtype: DTYPE_PRECISION_RANK[dtype])
+
 
 def dequantize_and_run(func, args, kwargs):
     """A helper function for running math ops on GGMLTensor inputs.
 
     Dequantizes the inputs, and runs the function.
     """
-    # TODO(ryand): Use the highest input precision of non-quantized inputs instead of hardcoding torch.float32.
+    # Determine which precision to run the operation at.
+    all_input_dtypes = [a.dtype for a in args if type(a) is torch.Tensor] + [
+        v.dtype for v in kwargs.values() if type(v) is torch.Tensor
+    ]
+    compute_dtype = choose_highest_precision_dtype(all_input_dtypes)
+
     dequantized_args = [
-        a.get_dequantized_tensor(dtype=torch.bfloat16) if hasattr(a, "get_dequantized_tensor") else a for a in args
+        a.get_dequantized_tensor(dtype=compute_dtype) if hasattr(a, "get_dequantized_tensor") else a for a in args
     ]
     dequantized_kwargs = {
-        k: v.get_dequantized_tensor(dtype=torch.bfloat16) if hasattr(v, "get_dequantized_tensor") else v
+        k: v.get_dequantized_tensor(dtype=compute_dtype) if hasattr(v, "get_dequantized_tensor") else v
         for k, v in kwargs.items()
     }
     return func(*dequantized_args, **dequantized_kwargs)
@@ -37,7 +61,12 @@ def apply_to_quantized_tensor(func, args, kwargs):
     assert all(not isinstance(a, GGMLTensor) for a in args[1:])
     assert all(not isinstance(v, GGMLTensor) for v in kwargs.values())
 
-    new_data = func(ggml_tensor._data, *args[1:], **kwargs)
+    new_data = func(ggml_tensor.quantized_data, *args[1:], **kwargs)
+
+    if new_data.dtype != ggml_tensor.quantized_data.dtype:
+        # This is intended to catch calls such as `.to(dtype-torch.float32)`, which are not supported on GGMLTensors.
+        raise ValueError("Operation changed the dtype of GGMLTensor unexpectedly.")
+
     return GGMLTensor(new_data, ggml_tensor._ggml_quantization_type, ggml_tensor._tensor_shape)
 
 
@@ -73,7 +102,7 @@ class GGMLTensor(torch.Tensor):
         )
 
     def __init__(self, data: torch.Tensor, ggml_quantization_type: gguf.GGMLQuantizationType, tensor_shape: torch.Size):
-        self._data = data
+        self.quantized_data = data
         self._ggml_quantization_type = ggml_quantization_type
         # The dequantized shape of the tensor.
         self._tensor_shape = tensor_shape
@@ -101,7 +130,7 @@ class GGMLTensor(torch.Tensor):
     @property
     def quantized_shape(self) -> torch.Size:
         """The shape of the quantized tensor."""
-        return self._data.shape
+        return self.quantized_data.shape
 
     def requires_grad_(self, mode: bool = True) -> torch.Tensor:
         """The GGMLTensor class is currently only designed for inference (not training). Setting requires_grad to True
@@ -116,19 +145,21 @@ class GGMLTensor(torch.Tensor):
             dtype: The dtype of the dequantized tensor.
         """
         if self._ggml_quantization_type in TORCH_COMPATIBLE_QTYPES:
-            return self._data.to(dtype)
+            return self.quantized_data.to(dtype)
         elif self._ggml_quantization_type in DEQUANTIZE_FUNCTIONS:
             # TODO(ryand): Look into how the dtype param is intended to be used.
             return dequantize(
-                data=self._data, qtype=self._ggml_quantization_type, oshape=self._tensor_shape, dtype=None
+                data=self.quantized_data, qtype=self._ggml_quantization_type, oshape=self._tensor_shape, dtype=None
             ).to(dtype)
         else:
             # There is no GPU implementation for this quantization type, so fallback to the numpy implementation.
-            new = gguf.quants.dequantize(self._data.cpu().numpy(), self._ggml_quantization_type)
-            return torch.from_numpy(new).to(self._data.device, dtype=dtype)
+            new = gguf.quants.dequantize(self.quantized_data.cpu().numpy(), self._ggml_quantization_type)
+            return torch.from_numpy(new).to(self.quantized_data.device, dtype=dtype)
 
     @classmethod
     def __torch_dispatch__(cls, func, types, args, kwargs):
+        # We will likely hit cases here in the future where a new op is encountered that is not yet supported.
+        # The new op simply needs to be added to the GGML_TENSOR_OP_TABLE.
         if func in GGML_TENSOR_OP_TABLE:
             return GGML_TENSOR_OP_TABLE[func](func, args, kwargs)
         return NotImplemented
