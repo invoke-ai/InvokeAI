@@ -235,7 +235,8 @@ class FluxGGUFCheckpointModel(ModelLoader):
 
         with SilenceWarnings():
             # Load the state dict and patcher
-            sd = gguf_sd_loader(model_path)
+            # HACK(ryand): We shouldn't be hard-coding the compute_dtype here.
+            sd = gguf_sd_loader(model_path, compute_dtype=torch.bfloat16)
             model = Flux(params[config.config_path])
             model.load_state_dict(sd, assign=True)
         return model

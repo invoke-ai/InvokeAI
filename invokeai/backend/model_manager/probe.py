@@ -412,7 +412,7 @@ class ModelProbe(object):
                 assert isinstance(model, dict)
                 return model
             elif model_path.suffix.endswith(".gguf"):
-                return gguf_sd_loader(model_path)
+                return gguf_sd_loader(model_path, compute_dtype=torch.float32)
             else:
                 return safetensors.torch.load_file(model_path)
 
