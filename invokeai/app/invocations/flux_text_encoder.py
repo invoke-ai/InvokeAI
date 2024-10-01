@@ -10,7 +10,7 @@ from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.conditioner import HFEncoder
-from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import FLUX_KOHYA_CLIP_PREFIX
+from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.lora.lora_patcher import LoRAPatcher
 from invokeai.backend.model_manager.config import ModelFormat
@@ -101,7 +101,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
                     LoRAPatcher.apply_lora_patches(
                         model=clip_text_encoder,
                         patches=self._clip_lora_iterator(context),
-                        prefix=FLUX_KOHYA_CLIP_PREFIX,
+                        prefix=FLUX_LORA_CLIP_PREFIX,
                         cached_weights=cached_weights,
                     )
                 )

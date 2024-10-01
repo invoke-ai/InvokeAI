@@ -5,7 +5,7 @@ from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils impo
     is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
 )
-from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import FLUX_KOHYA_TRANFORMER_PREFIX
+from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from tests.backend.lora.conversions.lora_state_dicts.flux_lora_diffusers_format import (
     state_dict_keys as flux_diffusers_state_dict_keys,
 )
@@ -51,7 +51,7 @@ def test_lora_model_from_flux_diffusers_state_dict():
     concatenated_weights = ["to_k", "to_v", "proj_mlp", "add_k_proj", "add_v_proj"]
     expected_lora_layers = {k for k in expected_lora_layers if not any(w in k for w in concatenated_weights)}
     assert len(model.layers) == len(expected_lora_layers)
-    assert all(k.startswith(FLUX_KOHYA_TRANFORMER_PREFIX) for k in model.layers.keys())
+    assert all(k.startswith(FLUX_LORA_TRANSFORMER_PREFIX) for k in model.layers.keys())
 
 
 def test_lora_model_from_flux_diffusers_state_dict_extra_keys_error():
