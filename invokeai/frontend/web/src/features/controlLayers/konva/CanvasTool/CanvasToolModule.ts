@@ -257,11 +257,21 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   setEventListeners = (): (() => void) => {
+    // The default behavior of touch events is to scroll the page. This breaks drawing, so we need to prevent that
+    // behaviour for the stage (also prevents it for all stage children).
+    const preventDefault = (e: KonvaEventObject<MouseEvent | TouchEvent | PointerEvent>) => {
+      e.evt.preventDefault();
+    };
+    this.konva.stage.on('touchstart', preventDefault);
+    this.konva.stage.on('touchmove', preventDefault);
+    this.konva.stage.on('touchend', preventDefault);
+
     this.konva.stage.on('mouseenter', this.onStageMouseEnter);
     this.konva.stage.on('mousedown', this.onStageMouseDown);
     this.konva.stage.on('mouseup', this.onStageMouseUp);
     this.konva.stage.on('mousemove', this.onStageMouseMove);
     this.konva.stage.on('mouseleave', this.onStageMouseLeave);
+
     this.konva.stage.on('wheel', this.onStageMouseWheel);
 
     window.addEventListener('keydown', this.onKeyDown);
@@ -270,6 +280,10 @@ export class CanvasToolModule extends CanvasModuleBase {
     window.addEventListener('blur', this.onWindowBlur);
 
     return () => {
+      this.konva.stage.off('touchstart', preventDefault);
+      this.konva.stage.off('touchmove', preventDefault);
+      this.konva.stage.off('touchend', preventDefault);
+
       this.konva.stage.off('mouseenter', this.onStageMouseEnter);
       this.konva.stage.off('mousedown', this.onStageMouseDown);
       this.konva.stage.off('mouseup', this.onStageMouseUp);
@@ -277,6 +291,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.konva.stage.off('mouseleave', this.onStageMouseLeave);
 
       this.konva.stage.off('wheel', this.onStageMouseWheel);
+
       window.removeEventListener('keydown', this.onKeyDown);
       window.removeEventListener('keyup', this.onKeyUp);
       window.removeEventListener('pointerup', this.onWindowPointerUp);
