@@ -2,7 +2,7 @@ import gguf
 import pytest
 import torch
 
-from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor, choose_highest_precision_dtype
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 
 def quantize_tensor(data: torch.Tensor, ggml_quantization_type: gguf.GGMLQuantizationType) -> GGMLTensor:
@@ -13,7 +13,10 @@ def quantize_tensor(data: torch.Tensor, ggml_quantization_type: gguf.GGMLQuantiz
     data_np = data.detach().cpu().numpy()
     quantized_np = gguf.quantize(data_np, ggml_quantization_type)
     return GGMLTensor(
-        data=torch.from_numpy(quantized_np), ggml_quantization_type=ggml_quantization_type, tensor_shape=data.shape
+        data=torch.from_numpy(quantized_np),
+        ggml_quantization_type=ggml_quantization_type,
+        tensor_shape=data.shape,
+        compute_dtype=data.dtype,
     ).to(device=data.device)  # type: ignore
 
 
@@ -93,18 +96,6 @@ def test_ggml_tensor_to_device():
     assert x_gpu.device.type == "cuda"
 
     assert torch.allclose(x_cpu.quantized_data, x_gpu.quantized_data.cpu(), atol=1e-5)
-
-
-@pytest.mark.parametrize(
-    ["dtypes", "expected_dtype"],
-    [
-        ([], torch.float32),  # Default to float32 if no dtypes are provided.
-        ([torch.float32, torch.float16, torch.bfloat16], torch.float32),
-        ([torch.float16, torch.bfloat16], torch.bfloat16),
-    ],
-)
-def test_choose_highest_precision_dtype(dtypes: list[torch.dtype], expected_dtype: torch.dtype):
-    assert choose_highest_precision_dtype(dtypes) == expected_dtype
 
 
 def test_ggml_tensor_shape():
