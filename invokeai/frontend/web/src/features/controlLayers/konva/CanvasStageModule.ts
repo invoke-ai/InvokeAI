@@ -57,6 +57,8 @@ export class CanvasStageModule extends CanvasModuleBase {
     scale: 0,
   });
 
+  $initialDragStates = atom<Map<Konva.Node, boolean>>(new Map());
+
   subscriptions = new Set<() => void>();
   resizeObserver: ResizeObserver | null = null;
   mmbPanningInProgress: boolean;
@@ -153,17 +155,29 @@ export class CanvasStageModule extends CanvasModuleBase {
     if (event.evt && event.evt.button === 1 && !this.mmbPanningInProgress) {
       this.mmbPanningInProgress = true;
 
-      // Stop dragging for bbox and layers
-      this.manager.bbox.konva.proxyRect.draggable(false);
+      // Stop dragging for bbox and remember this change in atom copy
+      const currentDragStates = new Map(this.$initialDragStates.get());
+      const bboxProxyRect = this.manager.bbox.konva.proxyRect;
+      currentDragStates.set(bboxProxyRect, bboxProxyRect.draggable());
+      bboxProxyRect.draggable(false);
 
-      // Stop dragging for other possible children layers
+      // Stop dragging for other possible children layers,
+      // also storing previous states
       this.konva.stage.getChildren().forEach(layer => {
         layer.getChildren().forEach(child => {
-          child.draggable(false);
+          const isDraggable = child.draggable();
+          currentDragStates.set(child, isDraggable);
+          if (isDraggable) {
+            child.draggable(false);
+          }
         });
       });
 
-      this.konva.stage.startDrag(event); // Forcefully start canvas drag
+      // Updating the atom nanostore
+      this.$initialDragStates.set(currentDragStates);
+
+      // Forcefully starting the stage drag
+      this.konva.stage.startDrag(event);
     }
   };
 
@@ -175,16 +189,30 @@ export class CanvasStageModule extends CanvasModuleBase {
     if (event.evt && event.evt.button === 1 && this.mmbPanningInProgress) {
       this.mmbPanningInProgress = false;
 
-      // Re-enable dragging for bbox and layers
-      this.manager.bbox.konva.proxyRect.draggable(true);
+      // Retrieve the initial drag states from the atom
+      const initialDragStates = this.$initialDragStates.get();
 
-      // Re-enable dragging for other layers
+      // Restore bbox draggable state if it was initially draggable
+      const bboxProxyRect = this.manager.bbox.konva.proxyRect;
+      const bboxInitialDraggable = initialDragStates.get(bboxProxyRect);
+      if (bboxInitialDraggable !== undefined) {
+        bboxProxyRect.draggable(bboxInitialDraggable);
+      }
+
+      // Restore the draggable state for other children
       this.konva.stage.getChildren().forEach(layer => {
         layer.getChildren().forEach(child => {
-          child.draggable(true);
+          const initialDraggable = initialDragStates.get(child);
+          if (initialDraggable !== undefined) {
+            child.draggable(initialDraggable);
+          }
         });
       });
 
+      // Clearing the nanostore
+      this.$initialDragStates.set(new Map());
+
+      // Stop the canvas drag
       this.konva.stage.stopDrag(event);
     }
   };
