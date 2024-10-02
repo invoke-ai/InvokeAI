@@ -30,6 +30,7 @@ from invokeai.backend.flux.sampling_utils import (
     pack,
     unpack,
 )
+from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.lora.lora_patcher import LoRAPatcher
 from invokeai.backend.model_manager.config import ModelFormat
@@ -208,7 +209,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     LoRAPatcher.apply_lora_patches(
                         model=transformer,
                         patches=self._lora_iterator(context),
-                        prefix="",
+                        prefix=FLUX_LORA_TRANSFORMER_PREFIX,
                         cached_weights=cached_weights,
                     )
                 )
@@ -219,7 +220,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     LoRAPatcher.apply_lora_sidecar_patches(
                         model=transformer,
                         patches=self._lora_iterator(context),
-                        prefix="",
+                        prefix=FLUX_LORA_TRANSFORMER_PREFIX,
                         dtype=inference_dtype,
                     )
                 )

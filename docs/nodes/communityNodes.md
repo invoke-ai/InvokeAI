@@ -39,7 +39,8 @@ To use a community workflow, download the `.json` node graph file and load it in
     + [Match Histogram](#match-histogram)
     + [Metadata-Linked](#metadata-linked-nodes)
     + [Negative Image](#negative-image)
-    + [Nightmare Promptgen](#nightmare-promptgen)    
+    + [Nightmare Promptgen](#nightmare-promptgen)
+    + [One Button Prompt](#one-button-prompt)
     + [Oobabooga](#oobabooga)
     + [Prompt Tools](#prompt-tools)
     + [Remote Image](#remote-image)
@@ -388,6 +389,21 @@ View:
 **Description:** Nightmare Prompt Generator - Uses a local text generation model to create unique imaginative (but usually nightmarish) prompts for InvokeAI. By default, it allows you to choose from some gpt-neo models I finetuned on over 2500 of my own InvokeAI prompts in Compel format, but you're able to add your own, as well. Offers support for replacing any troublesome words with a random choice from list you can also define.
 
 **Node Link:** [https://github.com/gogurtenjoyer/nightmare-promptgen](https://github.com/gogurtenjoyer/nightmare-promptgen)
+
+--------------------------------
+### One Button Prompt
+
+<img src="https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI/blob/main/images/background.png" width="800" />
+
+**Description:** an extensive suite of auto prompt generation and prompt helper nodes based on extensive logic. Get creative with the best prompt generator in the world. 
+
+The main node generates interesting prompts based on a set of parameters. There are also some additional nodes such as Auto Negative Prompt, One Button Artify, Create Prompt Variant and other cool prompt toys to play around with.
+
+**Node Link:** [https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI](https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI)
+
+**Nodes:**
+
+<img src="https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI/blob/main/images/OBP_nodes_invokeai.png" width="800" />
 
 --------------------------------
 ### Oobabooga

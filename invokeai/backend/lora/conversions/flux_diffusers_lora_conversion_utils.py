@@ -2,6 +2,7 @@ from typing import Dict
 
 import torch
 
+from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.lora.layers.any_lora_layer import AnyLoRALayer
 from invokeai.backend.lora.layers.concatenated_lora_layer import ConcatenatedLoRALayer
 from invokeai.backend.lora.layers.lora_layer import LoRALayer
@@ -189,7 +190,9 @@ def lora_model_from_flux_diffusers_state_dict(state_dict: Dict[str, torch.Tensor
     # Assert that all keys were processed.
     assert len(grouped_state_dict) == 0
 
-    return LoRAModelRaw(layers=layers)
+    layers_with_prefix = {f"{FLUX_LORA_TRANSFORMER_PREFIX}{k}": v for k, v in layers.items()}
+
+    return LoRAModelRaw(layers=layers_with_prefix)
 
 
 def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:

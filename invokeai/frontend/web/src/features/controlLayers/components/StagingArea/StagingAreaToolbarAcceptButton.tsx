@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { INTERACTION_SCOPES } from 'common/hooks/interactionScopes';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import {
@@ -25,7 +25,7 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const imageCount = useAppSelector(selectImageCount);
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
-  const isCanvasActive = useStore(INTERACTION_SCOPES.canvas.$isActive);
+  const isCanvasFocused = useIsRegionFocused('canvas');
 
   const { t } = useTranslation();
 
@@ -50,9 +50,9 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
     acceptSelected,
     {
       preventDefault: true,
-      enabled: isCanvasActive && shouldShowStagedImage && imageCount > 1,
+      enabled: isCanvasFocused && shouldShowStagedImage && imageCount > 1,
     },
-    [isCanvasActive, shouldShowStagedImage, imageCount]
+    [isCanvasFocused, shouldShowStagedImage, imageCount]
   );
 
   return (

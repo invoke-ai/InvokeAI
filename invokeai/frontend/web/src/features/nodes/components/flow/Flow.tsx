@@ -1,7 +1,7 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { INTERACTION_SCOPES, useScopeImperativeApi, useScopeOnFocus } from 'common/hooks/interactionScopes';
+import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
@@ -89,9 +89,8 @@ export const Flow = memo(() => {
   const cancelConnection = useReactFlowStore(selectCancelConnection);
   const updateNodeInternals = useUpdateNodeInternals();
   const store = useAppStore();
-  const isWorkflowsActive = useStore(INTERACTION_SCOPES.workflows.$isActive);
-  const workflowsScopeApi = useScopeImperativeApi('workflows');
-  useScopeOnFocus('workflows', flowWrapper);
+  const isWorkflowsFocused = useIsRegionFocused('workflows');
+  useFocusRegion('workflows', flowWrapper);
 
   useWorkflowWatcher();
   useSyncExecutionState();
@@ -129,8 +128,7 @@ export const Flow = memo(() => {
   const { onCloseGlobal } = useGlobalMenuClose();
   const handlePaneClick = useCallback(() => {
     onCloseGlobal();
-    workflowsScopeApi.add();
-  }, [onCloseGlobal, workflowsScopeApi]);
+  }, [onCloseGlobal]);
 
   const onInit: OnInit = useCallback((flow) => {
     $flow.set(flow);
@@ -245,8 +243,8 @@ export const Flow = memo(() => {
     id: 'selectAll',
     category: 'workflows',
     callback: selectAll,
-    options: { enabled: isWorkflowsActive, preventDefault: true },
-    dependencies: [selectAll, isWorkflowsActive],
+    options: { enabled: isWorkflowsFocused, preventDefault: true },
+    dependencies: [selectAll, isWorkflowsFocused],
   });
 
   useRegisteredHotkeys({
@@ -319,8 +317,8 @@ export const Flow = memo(() => {
     id: 'deleteSelection',
     category: 'workflows',
     callback: deleteSelection,
-    options: { preventDefault: true, enabled: isWorkflowsActive },
-    dependencies: [deleteSelection, isWorkflowsActive],
+    options: { preventDefault: true, enabled: isWorkflowsFocused },
+    dependencies: [deleteSelection, isWorkflowsFocused],
   });
 
   return (

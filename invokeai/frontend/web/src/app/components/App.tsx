@@ -1,4 +1,5 @@
 import { Box, useGlobalModifiersInit } from '@invoke-ai/ui-library';
+import { GlobalImageHotkeys } from 'app/components/GlobalImageHotkeys';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useStudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
@@ -7,7 +8,7 @@ import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/ap
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import ImageUploadOverlay from 'common/components/ImageUploadOverlay';
-import { useScopeFocusWatcher } from 'common/hooks/interactionScopes';
+import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useClearStorage } from 'common/hooks/useClearStorage';
 import { useFullscreenDropzone } from 'common/hooks/useFullscreenDropzone';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
@@ -77,7 +78,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
   useStudioInitAction(studioInitAction);
   useStarterModelsToast();
   useSyncQueueStatus();
-  useScopeFocusWatcher();
+  useFocusRegionWatcher();
 
   return (
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
@@ -104,6 +105,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <ClearQueueConfirmationsAlertDialog />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
+      <GlobalImageHotkeys />
     </ErrorBoundary>
   );
 };

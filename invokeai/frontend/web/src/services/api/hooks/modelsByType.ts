@@ -10,6 +10,7 @@ import {
 import type { AnyModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfig,
+  isCLIPVisionModelConfig,
   isControlNetModelConfig,
   isControlNetOrT2IAdapterModelConfig,
   isFluxMainModelModelConfig,
@@ -58,6 +59,7 @@ export const useIPAdapterModels = buildModelsHook(isIPAdapterModelConfig);
 export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
 export const useVAEModels = buildModelsHook(isVAEModelConfig);
 export const useFluxVAEModels = buildModelsHook(isFluxVAEModelConfig);
+export const useCLIPVisionModels = buildModelsHook(isCLIPVisionModelConfig);
 
 // const buildModelsSelector =
 //   <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T): Selector<RootState, T[]> =>

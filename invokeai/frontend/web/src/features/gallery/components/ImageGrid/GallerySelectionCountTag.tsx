@@ -1,32 +1,18 @@
 import { Tag, TagCloseButton, TagLabel } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $activeScopes } from 'common/hooks/interactionScopes';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { useGalleryImages } from 'features/gallery/hooks/useGalleryImages';
 import { selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { $isRightPanelOpen } from 'features/ui/store/uiSlice';
-import { computed } from 'nanostores';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ImageDTO } from 'services/api/types';
 
-const $isSelectAllEnabled = computed([$activeScopes, $isRightPanelOpen], (activeScopes, isGalleryPanelOpen) => {
-  return activeScopes.has('gallery') && !activeScopes.has('workflows') && isGalleryPanelOpen;
-});
-
-export const GallerySelectionCountTag = () => {
+export const GallerySelectionCountTag = memo(() => {
   const dispatch = useAppDispatch();
   const { selection } = useAppSelector((s) => s.gallery);
-  const { t } = useTranslation();
   const { imageDTOs } = useGalleryImages();
-  const isSelectAllEnabled = useStore($isSelectAllEnabled);
-
-  const onClearSelection = useCallback(() => {
-    const firstImage = selection[0];
-    if (firstImage) {
-      dispatch(selectionChanged([firstImage]));
-    }
-  }, [dispatch, selection]);
+  const isGalleryFocused = useIsRegionFocused('gallery');
 
   const onSelectPage = useCallback(() => {
     dispatch(selectionChanged([...selection, ...imageDTOs]));
@@ -36,21 +22,39 @@ export const GallerySelectionCountTag = () => {
     id: 'selectAllOnPage',
     category: 'gallery',
     callback: onSelectPage,
-    options: { preventDefault: true, enabled: isSelectAllEnabled },
-    dependencies: [onSelectPage, isSelectAllEnabled],
-  });
-
-  useRegisteredHotkeys({
-    id: 'clearSelection',
-    category: 'gallery',
-    callback: onClearSelection,
-    options: { enabled: selection.length > 0 && isSelectAllEnabled },
-    dependencies: [onClearSelection, selection, isSelectAllEnabled],
+    options: { preventDefault: true, enabled: isGalleryFocused },
+    dependencies: [onSelectPage, isGalleryFocused],
   });
 
   if (selection.length <= 1) {
     return null;
   }
+
+  return <GallerySelectionCountTagContent selection={selection} />;
+});
+
+GallerySelectionCountTag.displayName = 'GallerySelectionCountTag';
+
+const GallerySelectionCountTagContent = memo(({ selection }: { selection: ImageDTO[] }) => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+
+  const isGalleryFocused = useIsRegionFocused('gallery');
+
+  const onClearSelection = useCallback(() => {
+    const firstImage = selection[0];
+    if (firstImage) {
+      dispatch(selectionChanged([firstImage]));
+    }
+  }, [dispatch, selection]);
+
+  useRegisteredHotkeys({
+    id: 'clearSelection',
+    category: 'gallery',
+    callback: onClearSelection,
+    options: { enabled: selection.length > 0 && isGalleryFocused },
+    dependencies: [onClearSelection, selection, isGalleryFocused],
+  });
 
   return (
     <Tag
@@ -72,4 +76,6 @@ export const GallerySelectionCountTag = () => {
       <TagCloseButton onClick={onClearSelection} />
     </Tag>
   );
-};
+});
+
+GallerySelectionCountTagContent.displayName = 'GallerySelectionCountTagContent';

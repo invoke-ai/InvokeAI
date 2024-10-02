@@ -10,6 +10,7 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useCLIPEmbedModels,
+  useCLIPVisionModels,
   useControlNetModels,
   useEmbeddingModels,
   useIPAdapterModels,
@@ -73,6 +74,12 @@ const ModelList = () => {
     [ipAdapterModels, searchTerm, filteredModelType]
   );
 
+  const [clipVisionModels, { isLoading: isLoadingCLIPVisionModels }] = useCLIPVisionModels();
+  const filteredCLIPVisionModels = useMemo(
+    () => modelsFilter(clipVisionModels, searchTerm, filteredModelType),
+    [clipVisionModels, searchTerm, filteredModelType]
+  );
+
   const [vaeModels, { isLoading: isLoadingVAEModels }] = useVAEModels();
   const filteredVAEModels = useMemo(
     () => modelsFilter(vaeModels, searchTerm, filteredModelType),
@@ -107,6 +114,7 @@ const ModelList = () => {
       filteredControlNetModels.length +
       filteredT2IAdapterModels.length +
       filteredIPAdapterModels.length +
+      filteredCLIPVisionModels.length +
       filteredVAEModels.length +
       filteredSpandrelImageToImageModels.length +
       t5EncoderModels.length +
@@ -116,6 +124,7 @@ const ModelList = () => {
     filteredControlNetModels.length,
     filteredEmbeddingModels.length,
     filteredIPAdapterModels.length,
+    filteredCLIPVisionModels.length,
     filteredLoRAModels.length,
     filteredMainModels.length,
     filteredRefinerModels.length,
@@ -170,6 +179,11 @@ const ModelList = () => {
         {isLoadingIPAdapterModels && <FetchingModelsLoader loadingMessage="Loading IP Adapters..." />}
         {!isLoadingIPAdapterModels && filteredIPAdapterModels.length > 0 && (
           <ModelListWrapper title={t('common.ipAdapter')} modelList={filteredIPAdapterModels} key="ip-adapters" />
+        )}
+        {/* CLIP Vision List */}
+        {isLoadingCLIPVisionModels && <FetchingModelsLoader loadingMessage="Loading CLIP Vision Models..." />}
+        {!isLoadingCLIPVisionModels && filteredCLIPVisionModels.length > 0 && (
+          <ModelListWrapper title="CLIP Vision" modelList={filteredCLIPVisionModels} key="clip-vision" />
         )}
         {/* T2I Adapters List */}
         {isLoadingT2IAdapterModels && <FetchingModelsLoader loadingMessage="Loading T2I Adapters..." />}

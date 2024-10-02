@@ -2,8 +2,8 @@ import { useDndContext } from '@dnd-kit/core';
 import { Box, Button, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useScopeOnFocus } from 'common/hooks/interactionScopes';
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import {
   $canvasRightPanelTabIndex,
   selectCanvasRightPanelGalleryTab,
@@ -18,9 +18,7 @@ import { useTranslation } from 'react-i18next';
 
 export const CanvasRightPanel = memo(() => {
   const { t } = useTranslation();
-  const ref = useRef<HTMLDivElement>(null);
   const tabIndex = useStore($canvasRightPanelTabIndex);
-  useScopeOnFocus('gallery', ref);
   const imageViewer = useImageViewer();
   const onClickViewerToggleButton = useCallback(() => {
     if ($canvasRightPanelTabIndex.get() !== 1) {
@@ -46,7 +44,9 @@ export const CanvasRightPanel = memo(() => {
       </TabList>
       <TabPanels w="full" h="full">
         <TabPanel w="full" h="full" p={0} pt={3}>
-          <CanvasLayersPanelContent />
+          <CanvasManagerProviderGate>
+            <CanvasLayersPanelContent />
+          </CanvasManagerProviderGate>
         </TabPanel>
         <TabPanel w="full" h="full" p={0} pt={3}>
           <GalleryPanelContent />
