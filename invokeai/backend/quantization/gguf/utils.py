@@ -277,25 +277,6 @@ def is_quantized(tensor: torch.Tensor):
     return not is_torch_compatible(tensor)
 
 
-def dequantize_tensor(
-    tensor: torch.Tensor, dtype: torch.dtype, dequant_dtype: Union[torch.dtype, str, None] = None
-) -> torch.Tensor:
-    qtype: Optional[gguf.GGMLQuantizationType] = getattr(tensor, "tensor_type", None)
-    oshape: torch.Size = getattr(tensor, "tensor_shape", tensor.shape)
-    if qtype is None:
-        raise ValueError("This is not a valid quantized tensor")
-    if qtype in TORCH_COMPATIBLE_QTYPES:
-        return tensor.to(dtype)
-    elif qtype in DEQUANTIZE_FUNCTIONS:
-        dequant_dtype = dtype if dequant_dtype == "target" else dequant_dtype
-        if not (dequant_dtype is None or isinstance(dequant_dtype, torch.dtype)):
-            raise ValueError("dequant_dtype must be a torch.dtype")
-        return dequantize(tensor.data, qtype, oshape, dtype=dequant_dtype).to(dtype)
-    else:
-        new = gguf.quants.dequantize(tensor.cpu().numpy(), qtype)
-        return torch.from_numpy(new).to(tensor.device, dtype=dtype)
-
-
 def dequantize(
     data: torch.Tensor, qtype: gguf.GGMLQuantizationType, oshape: torch.Size, dtype: Optional[torch.dtype] = None
 ):
