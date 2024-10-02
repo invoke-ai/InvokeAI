@@ -3,6 +3,7 @@ import pytest
 import torch
 
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
 def quantize_tensor(data: torch.Tensor, ggml_quantization_type: gguf.GGMLQuantizationType) -> GGMLTensor:
@@ -113,3 +114,15 @@ def test_ggml_tensor_quantized_shape():
     # This is mainly just a smoke test to confirm that .quantized_shape can be accesses and doesn't hit any weird
     # dispatch errors.
     assert x_quantized.quantized_shape != x.shape
+
+
+def test_ggml_tensor_calc_size():
+    """Test that the calc_tensor_size(...) utility function correctly uses the underlying quantized tensor to calculate
+    size rather than the unquantized tensor.
+    """
+    x = torch.randn(32, 64)
+    x_quantized = quantize_tensor(x, gguf.GGMLQuantizationType.Q8_0)
+
+    compression_ratio = calc_tensor_size(x) / calc_tensor_size(x_quantized)
+    # Assert that the compression ratio is approximately 4x.
+    assert abs(compression_ratio - 4) < 0.5
