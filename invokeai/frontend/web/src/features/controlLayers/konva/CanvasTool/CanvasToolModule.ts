@@ -77,6 +77,11 @@ export class CanvasToolModule extends CanvasModuleBase {
    * The color currently under the cursor. Only has a value when the color picker tool is active.
    */
   $colorUnderCursor = atom<RgbColor>(RGBA_BLACK);
+  /**
+   * The last pointer type that was used on the stage. This is used to determine if we should show a tool preview. For
+   * example, when using a pen, we should not show a brush preview.
+   */
+  $lastPointerType = atom<string | null>(null);
 
   konva: {
     stage: Konva.Stage;
@@ -173,6 +178,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     const tool = this.$tool.get();
     const isFiltering = this.manager.stateApi.$isFiltering.get();
     const isStaging = this.manager.stagingArea.$isStaging.get();
+    const lastPointerType = this.$lastPointerType.get();
 
     const isDrawable =
       !!selectedEntity &&
@@ -184,7 +190,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     stage.setIsDraggable(tool === 'view');
 
-    if (!cursorPos || renderedEntityCount === 0 || isFiltering || isStaging) {
+    if (!cursorPos || lastPointerType !== 'mouse' || renderedEntityCount === 0 || isFiltering || isStaging) {
       // We can bail early if the mouse isn't over the stage or there are no layers
       this.konva.group.visible(false);
     } else {
@@ -304,6 +310,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   onStagePointerEnter = async (e: KonvaEventObject<PointerEvent>) => {
     try {
+      this.$lastPointerType.set(e.evt.pointerType);
       if (!this.getCanDraw()) {
         return;
       }
@@ -380,6 +387,8 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
     try {
+      this.$lastPointerType.set(e.evt.pointerType);
+
       if (!this.getCanDraw()) {
         return;
       }
@@ -538,17 +547,14 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStagePointerUp = (_: KonvaEventObject<PointerEvent>) => {
+  onStagePointerUp = (e: KonvaEventObject<PointerEvent>) => {
     try {
+      this.$lastPointerType.set(e.evt.pointerType);
+
       if (!this.getCanDraw()) {
         return;
       }
 
-      this.$isMouseDown.set(false);
-      const cursorPos = this.syncLastCursorPos();
-      if (!cursorPos) {
-        return;
-      }
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
       if (!isDrawable) {
@@ -594,6 +600,8 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   onStagePointerMove = async (e: KonvaEventObject<PointerEvent>) => {
     try {
+      this.$lastPointerType.set(e.evt.pointerType);
+
       if (!this.getCanDraw()) {
         return;
       }
@@ -686,8 +694,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStagePointerLeave = (_: PointerEvent) => {
+  onStagePointerLeave = (e: PointerEvent) => {
     try {
+      this.$lastPointerType.set(e.pointerType);
       this.$cursorPos.set(null);
 
       if (!this.getCanDraw()) {
@@ -745,12 +754,22 @@ export class CanvasToolModule extends CanvasModuleBase {
    * whatever the user was drawing from being lost, or ending up with stale state, we need to commit the buffer
    * on window pointer up.
    */
-  onWindowPointerUp = () => {
-    this.$isMouseDown.set(false);
-    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+  onWindowPointerUp = (e: PointerEvent) => {
+    try {
+      this.$lastPointerType.set(e.pointerType);
 
-    if (selectedEntity && selectedEntity.bufferRenderer.hasBuffer() && !this.manager.$isBusy.get()) {
-      selectedEntity.bufferRenderer.commitBuffer();
+      if (e.pointerType !== 'mouse') {
+        this.$cursorPos.set(null);
+      }
+
+      this.$isMouseDown.set(false);
+      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+
+      if (selectedEntity && selectedEntity.bufferRenderer.hasBuffer() && !this.manager.$isBusy.get()) {
+        selectedEntity.bufferRenderer.commitBuffer();
+      }
+    } finally {
+      this.render();
     }
   };
 
