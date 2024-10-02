@@ -16,6 +16,7 @@ const FORMAT_NAME_MAP: Record<AnyModelConfig['format'], string> = {
   t5_encoder: 't5_encoder',
   bnb_quantized_int8b: 'bnb_quantized_int8b',
   bnb_quantized_nf4b: 'quantized',
+  gguf_quantized: 'gguf',
 };
 
 const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
@@ -28,6 +29,7 @@ const FORMAT_COLOR_MAP: Record<AnyModelConfig['format'], string> = {
   t5_encoder: 'base',
   bnb_quantized_int8b: 'base',
   bnb_quantized_nf4b: 'base',
+  gguf_quantized: 'base',
 };
 
 const ModelFormatBadge = ({ format }: Props) => {
