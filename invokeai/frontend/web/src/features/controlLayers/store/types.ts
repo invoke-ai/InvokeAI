@@ -118,9 +118,6 @@ const zCanvasBrushLineWithPressureState = z.object({
   type: z.literal('brush_line_with_pressure'),
   strokeWidth: z.number().min(1),
   points: zPointsWithPressure,
-  // thinning: z.number().min(0).max(1),
-  // streamline: z.number().min(0).max(1),
-  // smoothing: z.number().min(0).max(1),
   color: zRgbaColor,
   clip: zRect.nullable(),
 });
@@ -140,9 +137,6 @@ const zCanvasEraserLineWithPressureState = z.object({
   type: z.literal('eraser_line_with_pressure'),
   strokeWidth: z.number().min(1),
   points: zPointsWithPressure,
-  // thinning: z.number().min(0).max(1),
-  // streamline: z.number().min(0).max(1),
-  // smoothing: z.number().min(0).max(1),
   clip: zRect.nullable(),
 });
 export type CanvasEraserLineWithPressureState = z.infer<typeof zCanvasEraserLineWithPressureState>;
