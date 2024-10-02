@@ -10,6 +10,7 @@ from safetensors.torch import load_file
 from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.flux.controlnet.controlnet_flux import ControlNetFlux
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.util import ae_params, params
@@ -24,6 +25,7 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
     CLIPEmbedDiffusersConfig,
+    ControlNetCheckpointConfig,
     MainBnbQuantized4bCheckpointConfig,
     MainCheckpointConfig,
     MainGGUFCheckpointConfig,
@@ -292,4 +294,25 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
             if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
                 sd = convert_bundle_to_flux_transformer_checkpoint(sd)
             model.load_state_dict(sd, assign=True)
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+class FluxControlnetModel(ModelLoader):
+    """Class to load FLUX ControlNet models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        assert isinstance(config, ControlNetCheckpointConfig)
+        model_path = Path(config.path)
+
+        with accelerate.init_empty_weights():
+            # HACK(ryand): Is it safe to assume dev here?
+            model = ControlNetFlux(params["flux_dev"])
+
+        sd = load_file(model_path)
+        model.load_state_dict(sd, assign=True)
         return model

@@ -255,7 +255,19 @@ class ModelProbe(object):
             # LoRA models, but as of the time of writing, we support Diffusers FLUX PEFT LoRA models.
             elif key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight", "lora_A.weight", "lora_B.weight")):
                 return ModelType.LoRA
-            elif key.startswith(("controlnet", "control_model", "input_blocks")):
+            elif key.startswith(
+                (
+                    "controlnet",
+                    "control_model",
+                    "input_blocks",
+                    # XLabs FLUX ControlNet models have keys starting with "controlnet_blocks."
+                    # For example: https://huggingface.co/XLabs-AI/flux-controlnet-collections/blob/86ab1e915a389d5857135c00e0d350e9e38a9048/flux-canny-controlnet_v2.safetensors
+                    # TODO(ryand): This is very fragile. XLabs FLUX ControlNet models also contain keys starting with
+                    # "double_blocks.", which we check for above. But, I'm afraid to modify this logic because it is so
+                    # delicate.
+                    "controlnet_blocks",
+                )
+            ):
                 return ModelType.ControlNet
             elif key.startswith(("image_proj.", "ip_adapter.")):
                 return ModelType.IPAdapter
@@ -623,6 +635,12 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
 
     def get_base_type(self) -> BaseModelType:
         checkpoint = self.checkpoint
+
+        if "double_blocks.0.img_attn.qkv.weight" in checkpoint:
+            # TODO(ryand): Should I distinguish between XLabs, InstantX and other ControlNet models by implementing
+            # get_format()?
+            return BaseModelType.Flux
+
         for key_name in (
             "control_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
             "controlnet_mid_block.bias",
