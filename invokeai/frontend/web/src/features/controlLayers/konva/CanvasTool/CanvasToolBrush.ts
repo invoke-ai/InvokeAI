@@ -15,11 +15,16 @@ type CanvasToolBrushConfig = {
    * The outer border color for the brush tool preview.
    */
   BORDER_OUTER_COLOR: string;
+  /**
+   * The number of milliseconds to wait before hiding the brush preview's fill circle after the mouse is released.
+   */
+  HIDE_FILL_TIMEOUT_MS: number;
 };
 
 const DEFAULT_CONFIG: CanvasToolBrushConfig = {
   BORDER_INNER_COLOR: 'rgba(0,0,0,1)',
   BORDER_OUTER_COLOR: 'rgba(255,255,255,0.8)',
+  HIDE_FILL_TIMEOUT_MS: 1500, // same as Affinity
 };
 
 /**
@@ -34,6 +39,7 @@ export class CanvasToolBrush extends CanvasModuleBase {
   readonly log: Logger;
 
   config: CanvasToolBrushConfig = DEFAULT_CONFIG;
+  hideFillTimeoutId: number | null = null;
 
   /**
    * The Konva objects that make up the brush tool preview:
@@ -94,6 +100,11 @@ export class CanvasToolBrush extends CanvasModuleBase {
       return;
     }
 
+    if (this.hideFillTimeoutId !== null) {
+      window.clearTimeout(this.hideFillTimeoutId);
+      this.hideFillTimeoutId = null;
+    }
+
     const settings = this.manager.stateApi.getSettings();
     const brushPreviewFill = this.manager.stateApi.getBrushPreviewColor();
     const alignedCursorPos = alignCoordForTool(cursorPos, settings.brushWidth);
@@ -124,6 +135,11 @@ export class CanvasToolBrush extends CanvasModuleBase {
       innerRadius: radius + onePixel,
       outerRadius: radius + twoPixels,
     });
+
+    this.hideFillTimeoutId = window.setTimeout(() => {
+      this.konva.fillCircle.visible(false);
+      this.hideFillTimeoutId = null;
+    }, this.config.HIDE_FILL_TIMEOUT_MS);
   };
 
   setVisibility = (visible: boolean) => {
