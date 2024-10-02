@@ -2,29 +2,12 @@
 # https://github.com/XLabs-AI/x-flux/blob/47495425dbed499be1e8e5a6e52628b07349cba2/src/flux/controlnet.py
 
 
-from dataclasses import dataclass
-
 import torch
 from einops import rearrange
 from torch import Tensor, nn
 
+from invokeai.backend.flux.model import FluxParams
 from invokeai.backend.flux.modules.layers import DoubleStreamBlock, EmbedND, MLPEmbedder, timestep_embedding
-
-
-@dataclass
-class FluxParams:
-    in_channels: int
-    vec_in_dim: int
-    context_in_dim: int
-    hidden_size: int
-    mlp_ratio: float
-    num_heads: int
-    depth: int
-    depth_single_blocks: int
-    axes_dim: list[int]
-    theta: int
-    qkv_bias: bool
-    guidance_embed: bool
 
 
 def zero_module(module):
