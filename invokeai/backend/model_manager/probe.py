@@ -287,6 +287,12 @@ class ModelProbe(object):
                 pass
             else:
                 raise e
+        except ValueError as e:
+            if f"The provided filename {model_path} does not exist" in str(e):
+                # This error is expected if the model_path does not exist (which is the case in some unit tests).
+                pass
+            else:
+                raise e
 
         raise InvalidModelConfigException(f"Unable to determine model type for {model_path}")
 
