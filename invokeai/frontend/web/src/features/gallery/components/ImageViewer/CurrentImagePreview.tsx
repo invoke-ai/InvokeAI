@@ -88,8 +88,9 @@ const CurrentImagePreview = () => {
             exit={exit}
             position="absolute"
             top={0}
-            width="full"
-            height="full"
+            right={0}
+            bottom={0}
+            left={0}
             pointerEvents="none"
           >
             <NextPrevImageButtons />

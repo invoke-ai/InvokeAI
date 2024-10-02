@@ -45,15 +45,7 @@ const FloatingSidePanelButtons = (props: Props) => {
   }, [queue.isDisabled, queueStatus?.queue.in_progress, shift]);
 
   return (
-    <Flex
-      pos="absolute"
-      transform="translate(0, -50%)"
-      top="50%"
-      insetInlineStart={2}
-      direction="column"
-      gap={2}
-      zIndex={11}
-    >
+    <Flex pos="absolute" transform="translate(0, -50%)" top="50%" insetInlineStart={2} direction="column" gap={2}>
       {tab === 'canvas' && !imageViewer.isOpen && (
         <CanvasManagerProviderGate>
           <ToolChooser />
