@@ -27,7 +27,7 @@ import type {
   RgbColor,
   Tool,
 } from 'features/controlLayers/store/types';
-import { isRenderableEntity, RGBA_BLACK } from 'features/controlLayers/store/types';
+import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
@@ -171,41 +171,23 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   render = () => {
-    const stage = this.manager.stage;
     const renderedEntityCount = this.manager.stateApi.getRenderedEntityCount();
-    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
     const cursorPos = this.$cursorPos.get();
     const tool = this.$tool.get();
     const isFiltering = this.manager.stateApi.$isFiltering.get();
     const isStaging = this.manager.stagingArea.$isStaging.get();
-    const lastPointerType = this.$lastPointerType.get();
-
-    const isDrawable =
-      !!selectedEntity &&
-      selectedEntity.state.isEnabled &&
-      !selectedEntity.state.isLocked &&
-      isRenderableEntity(selectedEntity.state);
 
     this.syncCursorStyle();
 
-    stage.setIsDraggable(tool === 'view');
+    this.manager.stage.setIsDraggable(tool === 'view');
 
-    if (!cursorPos || lastPointerType !== 'mouse' || renderedEntityCount === 0 || isFiltering || isStaging) {
-      // We can bail early if the mouse isn't over the stage or there are no layers
+    if (!cursorPos || isFiltering || isStaging || renderedEntityCount === 0) {
       this.konva.group.visible(false);
     } else {
       this.konva.group.visible(true);
-
-      // No need to render the brush preview if the cursor position or color is missing
-      if (cursorPos && tool === 'brush') {
-        this.brushToolPreview.render();
-      } else if (cursorPos && tool === 'eraser') {
-        this.eraserToolPreview.render();
-      } else if (cursorPos && tool === 'colorPicker') {
-        this.colorPickerToolPreview.render();
-      }
-
-      this.setToolVisibility(tool, isDrawable);
+      this.brushToolPreview.render();
+      this.eraserToolPreview.render();
+      this.colorPickerToolPreview.render();
     }
   };
 
@@ -398,14 +380,6 @@ export class CanvasToolModule extends CanvasModuleBase {
       const tool = this.$tool.get();
       const settings = this.manager.stateApi.getSettings();
 
-      if (tool === 'colorPicker') {
-        const color = this.getColorUnderCursor();
-        if (color) {
-          this.manager.stateApi.setColor({ ...settings.color, ...color });
-        }
-        return;
-      }
-
       const isMouseDown = this.$isMouseDown.get();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
@@ -555,12 +529,22 @@ export class CanvasToolModule extends CanvasModuleBase {
         return;
       }
 
+      const tool = this.$tool.get();
+      const settings = this.manager.stateApi.getSettings();
+
+      if (tool === 'colorPicker') {
+        const color = this.getColorUnderCursor();
+        if (color) {
+          this.manager.stateApi.setColor({ ...settings.color, ...color });
+        }
+        return;
+      }
+
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
       if (!isDrawable) {
         return;
       }
-      const tool = this.$tool.get();
 
       if (tool === 'brush') {
         if (
@@ -754,14 +738,8 @@ export class CanvasToolModule extends CanvasModuleBase {
    * whatever the user was drawing from being lost, or ending up with stale state, we need to commit the buffer
    * on window pointer up.
    */
-  onWindowPointerUp = (e: PointerEvent) => {
+  onWindowPointerUp = (_: PointerEvent) => {
     try {
-      this.$lastPointerType.set(e.pointerType);
-
-      if (e.pointerType !== 'mouse') {
-        this.$cursorPos.set(null);
-      }
-
       this.$isMouseDown.set(false);
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 

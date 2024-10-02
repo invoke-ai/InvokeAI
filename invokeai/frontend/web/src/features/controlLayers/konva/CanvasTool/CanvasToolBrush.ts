@@ -91,14 +91,31 @@ export class CanvasToolBrush extends CanvasModuleBase {
     };
     this.konva.group.add(this.konva.fillCircle, this.konva.innerBorder, this.konva.outerBorder);
   }
-
   render = () => {
-    const cursorPos = this.manager.tool.$cursorPos.get();
+    const tool = this.parent.$tool.get();
 
-    // If the cursor position is not available, do not update the brush preview. The tool module will handle visiblity.
-    if (!cursorPos) {
+    if (tool !== 'brush') {
+      this.setVisibility(false);
       return;
     }
+
+    const cursorPos = this.parent.$cursorPos.get();
+    const canDraw = this.parent.getCanDraw();
+
+    if (!cursorPos || !canDraw) {
+      this.setVisibility(false);
+      return;
+    }
+
+    const isMouseDown = this.parent.$isMouseDown.get();
+    const lastPointerType = this.parent.$lastPointerType.get();
+
+    if (lastPointerType !== 'mouse' && isMouseDown) {
+      this.setVisibility(false);
+      return;
+    }
+
+    this.setVisibility(true);
 
     if (this.hideFillTimeoutId !== null) {
       window.clearTimeout(this.hideFillTimeoutId);
@@ -116,7 +133,7 @@ export class CanvasToolBrush extends CanvasModuleBase {
       y: alignedCursorPos.y,
       radius,
       fill: rgbaColorToString(brushPreviewFill),
-      visible: !this.manager.tool.$isMouseDown.get(),
+      visible: !isMouseDown && lastPointerType === 'mouse',
     });
 
     // But the borders are in screen-pixels
