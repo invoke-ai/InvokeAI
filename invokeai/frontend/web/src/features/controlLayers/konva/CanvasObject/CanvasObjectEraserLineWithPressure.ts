@@ -1,6 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
-import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
+import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getSVGPathDataFromPoints } from 'features/controlLayers/konva/util';
@@ -62,7 +62,7 @@ export class CanvasObjectEraserLineWithPressure extends CanvasModuleBase {
         data: getSVGPathDataFromPoints(points, {
           size: strokeWidth / 2,
           simulatePressure: false,
-          last: this.parent instanceof CanvasEntityObjectRenderer,
+          last: true,
           thinning: 1,
         }),
       });
