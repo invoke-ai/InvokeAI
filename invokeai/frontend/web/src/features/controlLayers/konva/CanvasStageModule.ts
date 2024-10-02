@@ -163,8 +163,8 @@ export class CanvasStageModule extends CanvasModuleBase {
 
       // Stop dragging for other possible children layers,
       // also storing previous states
-      this.konva.stage.getChildren().forEach(layer => {
-        layer.getChildren().forEach(child => {
+      this.konva.stage.getChildren().forEach((layer) => {
+        layer.getChildren().forEach((child) => {
           const isDraggable = child.draggable();
           currentDragStates.set(child, isDraggable);
           if (isDraggable) {
@@ -200,8 +200,8 @@ export class CanvasStageModule extends CanvasModuleBase {
       }
 
       // Restore the draggable state for other children
-      this.konva.stage.getChildren().forEach(layer => {
-        layer.getChildren().forEach(child => {
+      this.konva.stage.getChildren().forEach((layer) => {
+        layer.getChildren().forEach((child) => {
           const initialDraggable = initialDragStates.get(child);
           if (initialDraggable !== undefined) {
             child.draggable(initialDraggable);

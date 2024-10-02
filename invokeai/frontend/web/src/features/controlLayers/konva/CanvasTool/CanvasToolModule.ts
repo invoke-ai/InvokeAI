@@ -381,11 +381,11 @@ export class CanvasToolModule extends CanvasModuleBase {
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
       if (
-        !cursorPos
-        || !isMouseDown
-        || !selectedEntity?.state.isEnabled
-        || selectedEntity?.state.isLocked
-        || isMiddleMouseDown
+        !cursorPos ||
+        !isMouseDown ||
+        !selectedEntity?.state.isEnabled ||
+        selectedEntity?.state.isLocked ||
+        isMiddleMouseDown
       ) {
         return;
       }
@@ -671,8 +671,8 @@ export class CanvasToolModule extends CanvasModuleBase {
     if (e.evt.button === 1) {
       e.evt.preventDefault();
       if (this.$toolBuffer.get() === null) {
-          this.$toolBuffer.set(this.$tool.get());
-          this.$tool.set('view');
+        this.$toolBuffer.set(this.$tool.get());
+        this.$tool.set('view');
       }
       this.manager.stage.mmbStartPanning(e);
     }
@@ -683,8 +683,8 @@ export class CanvasToolModule extends CanvasModuleBase {
       e.evt.preventDefault();
       const bufferedTool = this.$toolBuffer.get();
       if (bufferedTool !== null) {
-          this.$tool.set(bufferedTool);
-          this.$toolBuffer.set(null);
+        this.$tool.set(bufferedTool);
+        this.$toolBuffer.set(null);
       }
       this.manager.stage.mmbStopPanning(e);
     }
