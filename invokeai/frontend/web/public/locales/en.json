@@ -1818,6 +1818,11 @@
         "HUD": {
             "bbox": "Bbox",
             "scaledBbox": "Scaled Bbox",
+            "cpuUsage": "CPU Usage",
+            "ramUsage": "RAM Usage",
+            "gpuUsage": "GPU Usage",
+            "gpuVram": "GPU VRAM",
+            "gpuTemp": "GPU Temp",
             "entityStatus": {
                 "isFiltering": "{{title}} is filtering",
                 "isTransforming": "{{title}} is transforming",
