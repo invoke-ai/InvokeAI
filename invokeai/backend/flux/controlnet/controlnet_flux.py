@@ -8,7 +8,7 @@ import torch
 from einops import rearrange
 from torch import Tensor, nn
 
-from .modules.layers import DoubleStreamBlock, EmbedND, MLPEmbedder, timestep_embedding
+from invokeai.backend.flux.modules.layers import DoubleStreamBlock, EmbedND, MLPEmbedder, timestep_embedding
 
 
 @dataclass
@@ -202,7 +202,6 @@ class ControlNetFlux(nn.Module):
 
                     return custom_forward
 
-                ckpt_kwargs: Dict[str, Any] = {"use_reentrant": False} if is_torch_version(">=", "1.11.0") else {}
                 encoder_hidden_states, hidden_states = torch.utils.checkpoint.checkpoint(
                     create_custom_forward(block),
                     img,
