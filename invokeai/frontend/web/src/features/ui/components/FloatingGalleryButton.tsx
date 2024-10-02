@@ -13,9 +13,9 @@ const FloatingGalleryButton = (props: Props) => {
 
   return (
     <Flex pos="absolute" transform="translate(0, -50%)" minW={8} top="50%" insetInlineEnd={2}>
-      <Tooltip label={t('accessibility.showGalleryPanel')} placement="start">
+      <Tooltip label={t('accessibility.toggleRightPanel')} placement="start">
         <IconButton
-          aria-label={t('accessibility.showGalleryPanel')}
+          aria-label={t('accessibility.toggleRightPanel')}
           onClick={props.panelApi.toggle}
           icon={<PiImagesSquareBold />}
           h={48}

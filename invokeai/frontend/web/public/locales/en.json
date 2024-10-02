@@ -10,8 +10,8 @@
         "previousImage": "Previous Image",
         "reset": "Reset",
         "resetUI": "$t(accessibility.reset) UI",
-        "showGalleryPanel": "Show Gallery Panel",
-        "showOptionsPanel": "Show Side Panel",
+        "toggleRightPanel": "Toggle Right Panel (T)",
+        "toggleLeftPanel": "Toggle Left Panel (G)",
         "uploadImage": "Upload Image"
     },
     "boards": {
