@@ -1813,7 +1813,8 @@
             "isolatedStagingPreview": "Isolated Staging Preview",
             "isolatedFilteringPreview": "Isolated Filtering Preview",
             "isolatedTransformingPreview": "Isolated Transforming Preview",
-            "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size"
+            "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
+            "pressureSensitivity": "Pressure Sensitivity"
         },
         "HUD": {
             "bbox": "Bbox",

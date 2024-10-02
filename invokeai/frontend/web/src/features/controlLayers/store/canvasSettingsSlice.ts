@@ -160,6 +160,9 @@ export const canvasSettingsSlice = createSlice({
     settingsIsolatedTransformingPreviewToggled: (state) => {
       state.isolatedTransformingPreview = !state.isolatedTransformingPreview;
     },
+    settingsPressureSensitivityToggled: (state) => {
+      state.pressureSensitivity = !state.pressureSensitivity;
+    },
   },
 });
 
@@ -181,6 +184,7 @@ export const {
   settingsIsolatedStagingPreviewToggled,
   settingsIsolatedFilteringPreviewToggled,
   settingsIsolatedTransformingPreviewToggled,
+  settingsPressureSensitivityToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -219,3 +223,4 @@ export const selectIsolatedFilteringPreview = createCanvasSettingsSelector(
 export const selectIsolatedTransformingPreview = createCanvasSettingsSelector(
   (settings) => settings.isolatedTransformingPreview
 );
+export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
