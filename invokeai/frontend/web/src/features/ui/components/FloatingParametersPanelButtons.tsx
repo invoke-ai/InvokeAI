@@ -1,4 +1,4 @@
-import { ButtonGroup, Flex, Icon, IconButton, spinAnimation, useShiftModifier } from '@invoke-ai/ui-library';
+import { ButtonGroup, Flex, Icon, IconButton, spinAnimation, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -54,14 +54,15 @@ const FloatingSidePanelButtons = (props: Props) => {
         </CanvasManagerProviderGate>
       )}
       <ButtonGroup orientation="vertical" h={48}>
-        <IconButton
-          tooltip={t('accessibility.showOptionsPanel')}
-          aria-label={t('accessibility.showOptionsPanel')}
-          onClick={props.panelApi.toggle}
-          icon={<PiSlidersHorizontalBold />}
-          flexGrow={1}
-        />
-        <QueueButtonTooltip prepend={shift}>
+        <Tooltip label={t('accessibility.toggleLeftPanel')} placement="end">
+          <IconButton
+            aria-label={t('accessibility.toggleLeftPanel')}
+            onClick={props.panelApi.toggle}
+            icon={<PiSlidersHorizontalBold />}
+            flexGrow={1}
+          />
+        </Tooltip>
+        <QueueButtonTooltip prepend={shift} placement="end">
           <IconButton
             aria-label={t('queue.queueBack')}
             onClick={shift ? queue.queueFront : queue.queueBack}
@@ -72,27 +73,30 @@ const FloatingSidePanelButtons = (props: Props) => {
             flexGrow={1}
           />
         </QueueButtonTooltip>
-        <IconButton
-          isDisabled={cancelCurrent.isDisabled}
-          isLoading={cancelCurrent.isLoading}
-          aria-label={t('queue.cancel')}
-          tooltip={t('queue.cancelTooltip')}
-          icon={<PiXBold />}
-          onClick={cancelCurrent.cancelQueueItem}
-          colorScheme="error"
-          flexGrow={1}
-        />
-        <IconButton
-          isDisabled={clearQueue.isDisabled}
-          isLoading={clearQueue.isLoading}
-          aria-label={t('queue.clear')}
-          tooltip={t('queue.clearTooltip')}
-          icon={<PiTrashSimpleBold />}
-          colorScheme="error"
-          onClick={clearQueue.openDialog}
-          data-testid={t('queue.clear')}
-          flexGrow={1}
-        />
+        <Tooltip label={t('queue.cancelTooltip')} placement="end">
+          <IconButton
+            isDisabled={cancelCurrent.isDisabled}
+            isLoading={cancelCurrent.isLoading}
+            aria-label={t('queue.cancelTooltip')}
+            icon={<PiXBold />}
+            onClick={cancelCurrent.cancelQueueItem}
+            colorScheme="error"
+            flexGrow={1}
+          />
+        </Tooltip>
+
+        <Tooltip label={t('queue.clearTooltip')} placement="end">
+          <IconButton
+            isDisabled={clearQueue.isDisabled}
+            isLoading={clearQueue.isLoading}
+            aria-label={t('queue.clearTooltip')}
+            icon={<PiTrashSimpleBold />}
+            colorScheme="error"
+            onClick={clearQueue.openDialog}
+            data-testid={t('queue.clear')}
+            flexGrow={1}
+          />
+        </Tooltip>
       </ButtonGroup>
     </Flex>
   );
