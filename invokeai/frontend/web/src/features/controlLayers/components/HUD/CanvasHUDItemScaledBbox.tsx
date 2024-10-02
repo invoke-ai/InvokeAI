@@ -10,7 +10,7 @@ export const CanvasHUDItemScaledBbox = memo(() => {
   const scaleMethod = useAppSelector(selectScaleMethod);
   const scaledSize = useAppSelector(selectScaledSize);
 
-  // Fetch system stats with polling every 1 seconds
+  // Fetch system stats with polling every 1 second
   const { data: systemStats } = useGetSystemStatsQuery(undefined, {
     pollingInterval: 1000,
   });
@@ -25,7 +25,7 @@ export const CanvasHUDItemScaledBbox = memo(() => {
         />
       )}
 
-      {/* For Testing Always display system stats (CPU, RAM, GPU) */}
+      {/* Display system stats (CPU, RAM, GPU) with temperatures */}
       {systemStats && (
         <>
           <CanvasHUDItem label={t('controlLayers.HUD.cpuUsage')} value={`${systemStats.cpu_usage.toFixed(0)}%`} />
@@ -34,7 +34,11 @@ export const CanvasHUDItemScaledBbox = memo(() => {
           {systemStats.gpu_usage?.map((gpu) => (
             <Fragment key={gpu.id}>
               <CanvasHUDItem label={t('controlLayers.HUD.gpuUsage')} value={`${gpu.load.toFixed(0)}%`} />
-              <CanvasHUDItem label={t('controlLayers.HUD.gpuRamUsage')} value={`${gpu.memory} MB`} />
+              <CanvasHUDItem label={t('controlLayers.HUD.gpuVram')} value={`${gpu.memory} MB`} />
+              <CanvasHUDItem
+                label={t('controlLayers.HUD.gpuTemp')}
+                value={`${gpu.temperature?.toFixed(1) || 'N/A'}°C`}
+              />
             </Fragment>
           ))}
         </>

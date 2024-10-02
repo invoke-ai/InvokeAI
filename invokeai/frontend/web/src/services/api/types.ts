@@ -248,6 +248,7 @@ interface GPUStat {
   load: number;
   memory: number;
   memory_total: number;
+  temperature: number;
 }
 
 export interface SystemStats {

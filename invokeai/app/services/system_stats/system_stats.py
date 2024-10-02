@@ -11,6 +11,7 @@ class GPUStat(BaseModel):
     load: float
     memory: float
     memory_total: float
+    temperature: Optional[float]
 
 
 class SystemStats(BaseModel):
@@ -19,13 +20,13 @@ class SystemStats(BaseModel):
     gpu_usage: Optional[List[GPUStat]]
 
 
-# Function to fetch NVIDIA GPU stats (using nvidia-smi)
+# Function to fetch NVIDIA GPU stats (including temperature)
 def get_nvidia_stats() -> Optional[List[GPUStat]]:
     try:
         result = subprocess.run(
             [
                 "nvidia-smi",
-                "--query-gpu=index,utilization.gpu,memory.used,memory.total",
+                "--query-gpu=index,utilization.gpu,memory.used,memory.total,temperature.gpu",
                 "--format=csv,noheader,nounits",
             ],
             capture_output=True,
@@ -36,34 +37,44 @@ def get_nvidia_stats() -> Optional[List[GPUStat]]:
         gpu_usage = []
         for line in output_lines:
             parts = line.split(", ")
-            if len(parts) == 4:
+            if len(parts) == 5:
                 gpu_id = int(parts[0])
                 load = float(parts[1])
                 memory_used = float(parts[2])
                 memory_total = float(parts[3])
-                gpu_usage.append(GPUStat(id=gpu_id, load=load, memory=memory_used, memory_total=memory_total))
+                temperature = float(parts[4])
+                gpu_usage.append(
+                    GPUStat(
+                        id=gpu_id, load=load, memory=memory_used, memory_total=memory_total, temperature=temperature
+                    )
+                )
         return gpu_usage if gpu_usage else None
     except Exception as e:
         print(f"Error fetching NVIDIA GPU stats: {e}")
         return None
 
 
-# Function to fetch AMD GPU stats (using rocm-smi, needs testing/fixing by someone with AMD gpu)
+# Function to fetch AMD GPU stats (including temperature)
 def get_amd_stats() -> Optional[List[GPUStat]]:
     try:
-        result = subprocess.run(["rocm-smi", "--showuse"], capture_output=True, text=True)
+        result = subprocess.run(["rocm-smi", "--showuse", "--showtemp"], capture_output=True, text=True)
         output_lines = result.stdout.splitlines()
 
         gpu_usage = []
         for line in output_lines:
             if "GPU" in line:
                 parts = line.split()
-                if len(parts) >= 4:
+                if len(parts) >= 5:
                     gpu_id = int(parts[0])
                     load = float(parts[1])
                     memory_used = float(parts[2])
                     memory_total = float(parts[3])
-                    gpu_usage.append(GPUStat(id=gpu_id, load=load, memory=memory_used, memory_total=memory_total))
+                    temperature = float(parts[4])
+                    gpu_usage.append(
+                        GPUStat(
+                            id=gpu_id, load=load, memory=memory_used, memory_total=memory_total, temperature=temperature
+                        )
+                    )
         return gpu_usage if gpu_usage else None
     except Exception as e:
         print(f"Error fetching AMD GPU stats: {e}")
@@ -92,6 +103,7 @@ def get_mps_stats() -> Optional[List[GPUStat]]:
         return None
 
 
+# Function to fetch system stats (CPU, RAM, GPU, and temperature)
 def get_system_stats() -> SystemStats:
     cpu_usage = psutil.cpu_percent(interval=1)
     ram_usage = psutil.virtual_memory().used / (1024**2)

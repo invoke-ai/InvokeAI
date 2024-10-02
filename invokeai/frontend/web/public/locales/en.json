@@ -1821,7 +1821,8 @@
             "cpuUsage": "CPU Usage",
             "ramUsage": "RAM Usage",
             "gpuUsage": "GPU Usage",
-            "gpuRamUsage": "GPU Ram Usage",
+            "gpuVram": "GPU VRAM",
+            "gpuTemp": "GPU Temp",
             "entityStatus": {
                 "isFiltering": "{{title}} is filtering",
                 "isTransforming": "{{title}} is transforming",
