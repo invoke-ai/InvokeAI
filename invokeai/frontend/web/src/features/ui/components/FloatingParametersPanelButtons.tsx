@@ -3,9 +3,9 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import CancelCurrentQueueItemIconButton from 'features/queue/components/CancelCurrentQueueItemIconButton';
 import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { QueueButtonTooltip } from 'features/queue/components/QueueButtonTooltip';
+import { useCancelCurrentQueueItem } from 'features/queue/hooks/useCancelCurrentQueueItem';
 import { useInvoke } from 'features/queue/hooks/useInvoke';
 import type { UsePanelReturn } from 'features/ui/hooks/usePanel';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -17,6 +17,7 @@ import {
   PiSlidersHorizontalBold,
   PiSparkleFill,
   PiTrashSimpleBold,
+  PiXBold,
 } from 'react-icons/pi';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
 
@@ -32,6 +33,7 @@ const FloatingSidePanelButtons = (props: Props) => {
   const imageViewer = useImageViewer();
   const clearQueue = useClearQueue();
   const { data: queueStatus } = useGetQueueStatusQuery();
+  const cancelCurrent = useCancelCurrentQueueItem();
 
   const queueButtonIcon = useMemo(() => {
     const isProcessing = (queueStatus?.queue.in_progress ?? 0) > 0;
@@ -51,12 +53,13 @@ const FloatingSidePanelButtons = (props: Props) => {
           <ToolChooser />
         </CanvasManagerProviderGate>
       )}
-      <ButtonGroup orientation="vertical">
+      <ButtonGroup orientation="vertical" h={48}>
         <IconButton
           tooltip={t('accessibility.showOptionsPanel')}
           aria-label={t('accessibility.showOptionsPanel')}
           onClick={props.panelApi.toggle}
           icon={<PiSlidersHorizontalBold />}
+          flexGrow={1}
         />
         <QueueButtonTooltip prepend={shift}>
           <IconButton
@@ -66,20 +69,31 @@ const FloatingSidePanelButtons = (props: Props) => {
             isDisabled={queue.isDisabled}
             icon={queueButtonIcon}
             colorScheme="invokeYellow"
+            flexGrow={1}
           />
         </QueueButtonTooltip>
-        <CancelCurrentQueueItemIconButton />
+        <IconButton
+          isDisabled={cancelCurrent.isDisabled}
+          isLoading={cancelCurrent.isLoading}
+          aria-label={t('queue.cancel')}
+          tooltip={t('queue.cancelTooltip')}
+          icon={<PiXBold />}
+          onClick={cancelCurrent.cancelQueueItem}
+          colorScheme="error"
+          flexGrow={1}
+        />
+        <IconButton
+          isDisabled={clearQueue.isDisabled}
+          isLoading={clearQueue.isLoading}
+          aria-label={t('queue.clear')}
+          tooltip={t('queue.clearTooltip')}
+          icon={<PiTrashSimpleBold />}
+          colorScheme="error"
+          onClick={clearQueue.openDialog}
+          data-testid={t('queue.clear')}
+          flexGrow={1}
+        />
       </ButtonGroup>
-      <IconButton
-        isDisabled={clearQueue.isDisabled}
-        isLoading={clearQueue.isLoading}
-        aria-label={t('queue.clear')}
-        tooltip={t('queue.clearTooltip')}
-        icon={<PiTrashSimpleBold />}
-        colorScheme="error"
-        onClick={clearQueue.openDialog}
-        data-testid={t('queue.clear')}
-      />
     </Flex>
   );
 };
