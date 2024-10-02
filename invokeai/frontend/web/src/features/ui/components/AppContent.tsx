@@ -33,7 +33,7 @@ import { Panel, PanelGroup } from 'react-resizable-panels';
 import ParametersPanelUpscale from './ParametersPanels/ParametersPanelUpscale';
 import ResizeHandle from './tabs/ResizeHandle';
 
-const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%' };
+const panelStyles: CSSProperties = { position: 'relative', height: '100%', width: '100%', minWidth: 0 };
 
 const onLeftPanelCollapse = (isCollapsed: boolean) => $isLeftPanelOpen.set(!isCollapsed);
 const onRightPanelCollapse = (isCollapsed: boolean) => $isRightPanelOpen.set(!isCollapsed);
@@ -117,42 +117,40 @@ export const AppContent = memo(() => {
   return (
     <Flex id="invoke-app-tabs" w="full" h="full" gap={4} p={4}>
       <VerticalNavBar />
-      <Flex position="relative" w="full" h="full" gap={4} minW={0}>
-        <PanelGroup
-          ref={imperativePanelGroupRef}
-          id="app-panel-group"
-          autoSaveId="app-panel-group"
-          direction="horizontal"
-          style={panelStyles}
-        >
-          {withLeftPanel && (
-            <>
-              <Panel order={0} collapsible style={panelStyles} {...leftPanel.panelProps}>
-                <Flex flexDir="column" w="full" h="full" gap={2}>
-                  <QueueControls />
-                  <Box position="relative" w="full" h="full">
-                    <LeftPanelContent />
-                  </Box>
-                </Flex>
-              </Panel>
-              <ResizeHandle id="left-main-handle" {...leftPanel.resizeHandleProps} />
-            </>
-          )}
-          <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>
-            <MainPanelContent />
-          </Panel>
-          {withRightPanel && (
-            <>
-              <ResizeHandle id="main-right-handle" {...rightPanel.resizeHandleProps} />
-              <Panel order={2} style={panelStyles} collapsible {...rightPanel.panelProps}>
-                <RightPanelContent />
-              </Panel>
-            </>
-          )}
-        </PanelGroup>
-        {withLeftPanel && <FloatingParametersPanelButtons panelApi={leftPanel} />}
-        {withRightPanel && <FloatingGalleryButton panelApi={rightPanel} />}
-      </Flex>
+      <PanelGroup
+        ref={imperativePanelGroupRef}
+        id="app-panel-group"
+        autoSaveId="app-panel-group"
+        direction="horizontal"
+        style={panelStyles}
+      >
+        {withLeftPanel && (
+          <>
+            <Panel order={0} collapsible style={panelStyles} {...leftPanel.panelProps}>
+              <Flex flexDir="column" w="full" h="full" gap={2}>
+                <QueueControls />
+                <Box position="relative" w="full" h="full">
+                  <LeftPanelContent />
+                </Box>
+              </Flex>
+            </Panel>
+            <ResizeHandle id="left-main-handle" {...leftPanel.resizeHandleProps} />
+          </>
+        )}
+        <Panel id="main-panel" order={1} minSize={20} style={panelStyles}>
+          <MainPanelContent />
+          {withLeftPanel && <FloatingParametersPanelButtons panelApi={leftPanel} />}
+          {withRightPanel && <FloatingGalleryButton panelApi={rightPanel} />}
+        </Panel>
+        {withRightPanel && (
+          <>
+            <ResizeHandle id="main-right-handle" {...rightPanel.resizeHandleProps} />
+            <Panel order={2} style={panelStyles} collapsible {...rightPanel.panelProps}>
+              <RightPanelContent />
+            </Panel>
+          </>
+        )}
+      </PanelGroup>
     </Flex>
   );
 });
