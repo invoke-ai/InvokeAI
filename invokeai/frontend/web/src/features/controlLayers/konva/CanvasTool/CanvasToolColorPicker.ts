@@ -190,12 +190,30 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
    * Renders the color picker tool preview on the canvas.
    */
   render = () => {
-    const cursorPos = this.manager.tool.$cursorPos.get();
+    const tool = this.parent.$tool.get();
 
-    // If the cursor position is not available, do not render the preview. The tool module will handle visibility.
-    if (!cursorPos) {
+    if (tool !== 'colorPicker') {
+      this.setVisibility(false);
       return;
     }
+
+    const cursorPos = this.parent.$cursorPos.get();
+    const canDraw = this.parent.getCanDraw();
+
+    if (!cursorPos || tool !== 'colorPicker' || !canDraw) {
+      this.setVisibility(false);
+      return;
+    }
+
+    const isMouseDown = this.parent.$isMouseDown.get();
+    const lastPointerType = this.parent.$lastPointerType.get();
+
+    if (lastPointerType !== 'mouse' && !isMouseDown) {
+      this.setVisibility(false);
+      return;
+    }
+
+    this.setVisibility(true);
 
     const settings = this.manager.stateApi.getSettings();
     const colorUnderCursor = this.parent.$colorUnderCursor.get();
