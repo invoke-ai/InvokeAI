@@ -104,7 +104,6 @@
         "invokeProgressBar": "Invocar barra de progresso",
         "reset": "Reiniciar",
         "nextImage": "Próxima imagem",
-        "showOptionsPanel": "Mostrar painel de opções",
         "uploadImage": "Enviar imagem",
         "previousImage": "Imagem Anterior",
         "menu": "Menu",
@@ -112,8 +111,7 @@
         "resetUI": "$t(accessibility.reset)UI",
         "createIssue": "Reportar Problema",
         "submitSupportTicket": "Submeter um ticket de Suporte",
-        "mode": "Modo",
-        "showGalleryPanel": "Mostrar Painel de Galeria"
+        "mode": "Modo"
     },
     "boards": {
         "selectedForAutoAdd": "Selecionado para Auto-Adicionar",

@@ -2,7 +2,6 @@
     "accessibility": {
         "invokeProgressBar": "Invoke durum çubuğu",
         "nextImage": "Sonraki Görsel",
-        "showOptionsPanel": "Yan Paneli Göster",
         "reset": "Resetle",
         "uploadImage": "Görsel Yükle",
         "previousImage": "Önceki Görsel",
@@ -10,7 +9,6 @@
         "about": "Hakkında",
         "mode": "Kip",
         "resetUI": "$t(accessibility.reset)Arayüz",
-        "showGalleryPanel": "Galeri Panelini Göster",
         "createIssue": "Sorun Bildir"
     },
     "common": {

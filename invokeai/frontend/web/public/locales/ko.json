@@ -92,9 +92,7 @@
         "mode": "모드",
         "menu": "메뉴",
         "uploadImage": "이미지 업로드",
-        "showGalleryPanel": "갤러리 패널 표시",
-        "reset": "리셋",
-        "showOptionsPanel": "사이드 패널 표시"
+        "reset": "리셋"
     },
     "modelManager": {
         "availableModels": "사용 가능한 모델",

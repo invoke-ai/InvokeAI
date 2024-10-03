@@ -311,14 +311,12 @@
         "reset": "Réinitialiser",
         "nextImage": "Image suivante",
         "previousImage": "Image précédente",
-        "showOptionsPanel": "Afficher le panneau latéral",
         "invokeProgressBar": "Barre de Progression Invoke",
         "menu": "Menu",
         "about": "À propos",
         "mode": "Mode",
         "createIssue": "Créer un ticket",
         "submitSupportTicket": "Envoyer un ticket de support",
-        "showGalleryPanel": "Afficher la galerie",
         "resetUI": "$t(accessibility.reset) l'Interface Utilisateur"
     },
     "boards": {
