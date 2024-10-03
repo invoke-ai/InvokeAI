@@ -857,6 +857,9 @@ export const canvasSlice = createSlice({
           break;
         case 'regional_guidance':
           newEntity.id = getPrefixedId('regional_guidance');
+          for (const refImage of newEntity.referenceImages) {
+            refImage.id = getPrefixedId('regional_guidance_ip_adapter');
+          }
           state.regionalGuidance.entities.push(newEntity);
           break;
         case 'reference_image':
