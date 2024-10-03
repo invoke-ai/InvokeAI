@@ -205,14 +205,6 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
       return;
     }
 
-    const isMouseDown = this.parent.$isMouseDown.get();
-    const lastPointerType = this.parent.$lastPointerType.get();
-
-    if (lastPointerType !== 'mouse' && !isMouseDown) {
-      this.setVisibility(false);
-      return;
-    }
-
     this.setVisibility(true);
 
     const settings = this.manager.stateApi.getSettings();
