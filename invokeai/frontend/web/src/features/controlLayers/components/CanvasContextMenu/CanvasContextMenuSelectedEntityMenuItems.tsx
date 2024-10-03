@@ -13,7 +13,6 @@ import {
 import { useEntityTitle } from 'features/controlLayers/hooks/useEntityTitle';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import {
-  isCroppableEntityIdentifier,
   isFilterableEntityIdentifier,
   isSaveableEntityIdentifier,
   isTransformableEntityIdentifier,
@@ -30,7 +29,7 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
       {isTransformableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsTransform />}
       {isSaveableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsCopyToClipboard />}
       {isSaveableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsSave />}
-      {isCroppableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsCropToBbox />}
+      {isTransformableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsCropToBbox />}
       <CanvasEntityMenuItemsDelete />
     </MenuGroup>
   );

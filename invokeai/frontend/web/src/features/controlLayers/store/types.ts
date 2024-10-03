@@ -465,8 +465,6 @@ export function isTransformableEntityIdentifier(
   );
 }
 
-export const isCroppableEntityIdentifier = isTransformableEntityIdentifier;
-
 export function isSaveableEntityIdentifier(
   entityIdentifier: CanvasEntityIdentifier
 ): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> | CanvasEntityIdentifier<'control_layer'> {
