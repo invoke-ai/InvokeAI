@@ -47,7 +47,9 @@ const MetadataViewLoRA = ({
     if (!handlers.recallItem) {
       return;
     }
-    handlers.recallItem(lora, true);
+    handlers.recallItem(lora, true).catch(() => {
+      // no-op, the toast will show the error
+    });
   }, [handlers, lora]);
 
   const [renderedValue, setRenderedValue] = useState<React.ReactNode>(null);
