@@ -104,9 +104,17 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.konva.stage.on('dragmove', this.onStageDragMove);
     this.konva.stage.on('dragend', this.onStageDragEnd);
 
+    // Start dragging the stage when the middle mouse button is clicked. We do not need to listen for 'pointerdown' to
+    // do cleanup - that is done in onStageDragEnd.
+    this.konva.stage.on('pointerdown', this.onStagePointerDown);
+
     this.subscriptions.add(() => this.konva.stage.off('wheel', this.onStageMouseWheel));
     this.subscriptions.add(() => this.konva.stage.off('dragmove', this.onStageDragMove));
     this.subscriptions.add(() => this.konva.stage.off('dragend', this.onStageDragEnd));
+
+    // Whenever the tool changes, we should stop dragging the stage. For example, user is MMB-dragging the stage, then
+    // switches to the brush tool, we should stop dragging the stage.
+    this.subscriptions.add(this.manager.tool.$tool.listen(this.stopDragging));
   };
 
   /**
@@ -286,6 +294,46 @@ export class CanvasStageModule extends CanvasModuleBase {
     }
   };
 
+  onStagePointerDown = (e: KonvaEventObject<PointerEvent>) => {
+    // If the middle mouse button is clicked and we are not already dragging, start dragging the stage
+    if (e.evt.button === 1) {
+      this.startDragging();
+    }
+  };
+
+  /**
+   * Forcibly starts dragging the stage. This is useful when you want to start dragging the stage programmatically.
+   */
+  startDragging = () => {
+    // First make sure the stage is draggable
+    this.setIsDraggable(true);
+
+    // Then start dragging the stage if it's not already being dragged
+    if (!this.konva.stage.isDragging()) {
+      this.konva.stage.startDrag();
+    }
+
+    // And render the tool to update the cursor
+    this.manager.tool.render();
+  };
+
+  /**
+   * Stops dragging the stage. This is useful when you want to stop dragging the stage programmatically.
+   */
+  stopDragging = () => {
+    // Now that we have stopped the current drag event, we may need to revert the stage's draggable status, depending
+    // on the current tool
+    this.setIsDraggable(this.manager.tool.$tool.get() === 'view');
+
+    // Stop dragging the stage if it's being dragged
+    if (this.konva.stage.isDragging()) {
+      this.konva.stage.stopDrag();
+    }
+
+    // And render the tool to update the cursor
+    this.manager.tool.render();
+  };
+
   onStageDragMove = (e: KonvaEventObject<MouseEvent>) => {
     if (e.target !== this.konva.stage) {
       return;
@@ -298,8 +346,8 @@ export class CanvasStageModule extends CanvasModuleBase {
     if (e.target !== this.konva.stage) {
       return;
     }
-
-    this.syncStageAttrs();
+    // Do some cleanup when the stage is no longer being dragged
+    this.stopDragging();
   };
 
   /**
