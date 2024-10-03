@@ -1,6 +1,8 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
+import { newSessionRequested } from 'features/controlLayers/store/actions';
 import type { ParameterHRFMethod, ParameterStrength } from 'features/parameters/types/parameterSchemas';
 
 interface HRFState {
@@ -30,6 +32,11 @@ export const hrfSlice = createSlice({
     setHrfMethod: (state, action: PayloadAction<ParameterHRFMethod>) => {
       state.hrfMethod = action.payload;
     },
+  },
+  extraReducers(builder) {
+    builder.addMatcher(newSessionRequested, () => {
+      return deepClone(initialHRFState);
+    });
   },
 });
 

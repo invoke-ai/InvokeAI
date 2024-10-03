@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { deepClone } from 'common/util/deepClone';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
@@ -25,6 +26,8 @@ import type {
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { clamp } from 'lodash-es';
+
+import { newSessionRequested } from './actions';
 
 export type ParamsState = {
   maskBlur: number;
@@ -258,6 +261,21 @@ export const paramsSlice = createSlice({
     setCanvasCoherenceMinDenoise: (state, action: PayloadAction<number>) => {
       state.canvasCoherenceMinDenoise = action.payload;
     },
+  },
+  extraReducers(builder) {
+    builder.addMatcher(newSessionRequested, (state) => {
+      // When a new session is requested, we need to keep the current model selections, plus dependent state
+      // like VAE precision. Everything else gets reset to default.
+      const newState = deepClone(initialState);
+      newState.model = state.model;
+      newState.vae = state.vae;
+      newState.fluxVAE = state.fluxVAE;
+      newState.vaePrecision = state.vaePrecision;
+      newState.t5EncoderModel = state.t5EncoderModel;
+      newState.clipEmbedModel = state.clipEmbedModel;
+      newState.refinerModel = state.refinerModel;
+      return newState;
+    });
   },
 });
 
