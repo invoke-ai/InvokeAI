@@ -1,6 +1,7 @@
 import { MenuDivider } from '@invoke-ai/ui-library';
 import { CanvasEntityMenuItemsArrange } from 'features/controlLayers/components/common/CanvasEntityMenuItemsArrange';
 import { CanvasEntityMenuItemsCopyToClipboard } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCopyToClipboard';
+import { CanvasEntityMenuItemsCropToBbox } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCropToBbox';
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
 import { CanvasEntityMenuItemsFilter } from 'features/controlLayers/components/common/CanvasEntityMenuItemsFilter';
@@ -18,6 +19,7 @@ export const RasterLayerMenuItems = memo(() => {
       <MenuDivider />
       <CanvasEntityMenuItemsArrange />
       <MenuDivider />
+      <CanvasEntityMenuItemsCropToBbox />
       <CanvasEntityMenuItemsDuplicate />
       <CanvasEntityMenuItemsCopyToClipboard />
       <CanvasEntityMenuItemsSave />

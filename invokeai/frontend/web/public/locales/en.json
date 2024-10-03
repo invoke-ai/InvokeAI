@@ -1563,6 +1563,7 @@
         "saveCanvasToGallery": "Save Canvas to Gallery",
         "saveBboxToGallery": "Save Bbox to Gallery",
         "saveLayerToAssets": "Save Layer to Assets",
+        "cropLayerToBbox": "Crop Layer to Bbox",
         "savedToGalleryOk": "Saved to Gallery",
         "savedToGalleryError": "Error saving to gallery",
         "newGlobalReferenceImageOk": "Created Global Reference Image",
