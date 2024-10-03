@@ -1,5 +1,11 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { newCanvasSessionRequested, newGallerySessionRequested } from 'features/controlLayers/store/actions';
+import {
+  selectCanvasRightPanelGalleryTab,
+  selectCanvasRightPanelLayersTab,
+} from 'features/controlLayers/store/ephemeral';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useClearQueue } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { QueueCountBadge } from 'features/queue/components/QueueCountBadge';
 import { usePauseProcessor } from 'features/queue/hooks/usePauseProcessor';
@@ -25,6 +31,7 @@ export const QueueActionsMenuButton = memo(() => {
   const { t } = useTranslation();
   const isPauseEnabled = useFeatureStatus('pauseQueue');
   const isResumeEnabled = useFeatureStatus('resumeQueue');
+  const imageViewer = useImageViewer();
   const clearQueue = useClearQueue();
   const {
     resumeProcessor,
@@ -39,6 +46,16 @@ export const QueueActionsMenuButton = memo(() => {
   const openQueue = useCallback(() => {
     dispatch(setActiveTab('queue'));
   }, [dispatch]);
+  const onClickNewGallerySession = useCallback(() => {
+    dispatch(newGallerySessionRequested());
+    imageViewer.open();
+    selectCanvasRightPanelGalleryTab();
+  }, [dispatch, imageViewer]);
+  const onClickNewCanvasSession = useCallback(() => {
+    dispatch(newCanvasSessionRequested());
+    imageViewer.close();
+    selectCanvasRightPanelLayersTab();
+  }, [dispatch, imageViewer]);
 
   return (
     <>
@@ -46,10 +63,10 @@ export const QueueActionsMenuButton = memo(() => {
         <MenuButton ref={ref} as={IconButton} size="lg" aria-label="Queue Actions Menu" icon={<PiListBold />} />
         <MenuList>
           <MenuGroup title={t('common.new')}>
-            <MenuItem icon={<PiImageBold />} onClick={resumeProcessor} isLoading={isLoadingResumeProcessor}>
+            <MenuItem icon={<PiImageBold />} onClick={onClickNewGallerySession}>
               {t('controlLayers.newGallerySession')}
             </MenuItem>
-            <MenuItem icon={<PiPaintBrushBold />} onClick={resumeProcessor} isLoading={isLoadingResumeProcessor}>
+            <MenuItem icon={<PiPaintBrushBold />} onClick={onClickNewCanvasSession}>
               {t('controlLayers.newCanvasSession')}
             </MenuItem>
           </MenuGroup>

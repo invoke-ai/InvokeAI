@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { newCanvasSessionRequested, newGallerySessionRequested } from 'features/controlLayers/store/actions';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 
 type CanvasSettingsState = {
@@ -163,6 +164,14 @@ export const canvasSettingsSlice = createSlice({
     settingsPressureSensitivityToggled: (state) => {
       state.pressureSensitivity = !state.pressureSensitivity;
     },
+  },
+  extraReducers(builder) {
+    builder.addCase(newGallerySessionRequested, (state) => {
+      state.sendToCanvas = false;
+    });
+    builder.addCase(newCanvasSessionRequested, (state) => {
+      state.sendToCanvas = true;
+    });
   },
 });
 

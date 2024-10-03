@@ -1,7 +1,7 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { canvasReset } from 'features/controlLayers/store/actions';
+import { canvasReset, newSessionRequested } from 'features/controlLayers/store/actions';
 import { stagingAreaReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -9,7 +9,7 @@ import { queueApi } from 'services/api/endpoints/queue';
 
 const log = logger('canvas');
 
-const matchCanvasOrStagingAreaReset = isAnyOf(stagingAreaReset, canvasReset);
+const matchCanvasOrStagingAreaReset = isAnyOf(stagingAreaReset, canvasReset, newSessionRequested);
 
 export const addStagingListeners = (startAppListening: AppStartListening) => {
   startAppListening({

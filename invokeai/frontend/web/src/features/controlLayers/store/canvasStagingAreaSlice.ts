@@ -5,6 +5,8 @@ import { canvasReset } from 'features/controlLayers/store/actions';
 import type { StagingAreaImage } from 'features/controlLayers/store/types';
 import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
 
+import { newSessionRequested } from './actions';
+
 type CanvasStagingAreaState = {
   stagedImages: StagingAreaImage[];
   selectedStagedImageIndex: number;
@@ -43,6 +45,7 @@ export const canvasStagingAreaSlice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(canvasReset, () => deepClone(initialState));
+    builder.addMatcher(newSessionRequested, () => deepClone(initialState));
   },
 });
 
