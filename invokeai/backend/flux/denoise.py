@@ -3,6 +3,7 @@ from typing import Callable
 import torch
 from tqdm import tqdm
 
+from invokeai.backend.flux.controlnet_extension import ControlNetExtension
 from invokeai.backend.flux.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
@@ -21,6 +22,7 @@ def denoise(
     step_callback: Callable[[PipelineIntermediateState], None],
     guidance: float,
     inpaint_extension: InpaintExtension | None,
+    controlnet_extensions: list[ControlNetExtension] | None,
 ):
     # step 0 is the initial state
     total_steps = len(timesteps) - 1
@@ -38,6 +40,23 @@ def denoise(
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
     for t_curr, t_prev in tqdm(list(zip(timesteps[:-1], timesteps[1:], strict=True))):
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
+
+        # Run ControlNet models.
+        # controlnet_block_residuals[i][j] is the residual of the j-th block of the i-th ControlNet model.
+        controlnet_block_residuals: list[list[torch.Tensor]] = []
+        for controlnet_extension in controlnet_extensions or []:
+            controlnet_block_residuals.append(
+                controlnet_extension.run_controlnet(
+                    img=img,
+                    img_ids=img_ids,
+                    txt=txt,
+                    txt_ids=txt_ids,
+                    y=vec,
+                    timesteps=t_vec,
+                    guidance=guidance_vec,
+                )
+            )
+
         pred = model(
             img=img,
             img_ids=img_ids,
@@ -46,6 +65,7 @@ def denoise(
             y=vec,
             timesteps=t_vec,
             guidance=guidance_vec,
+            block_controlnet_hidden_states=controlnet_block_residuals,
         )
 
         preview_img = img - t_curr * pred
