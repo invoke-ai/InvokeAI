@@ -89,7 +89,7 @@ const Content = ({ data, feature, hideDisable }: ContentProps) => {
 
   const paragraphs = useMemo<string[]>(
     () =>
-      t(`popovers.${feature}.paragraphs`, {
+      t<string, { returnObjects: true }, string[]>(`popovers.${feature}.paragraphs`, {
         returnObjects: true,
       }) ?? [],
     [feature, t]
