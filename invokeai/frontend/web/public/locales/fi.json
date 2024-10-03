@@ -4,8 +4,7 @@
         "uploadImage": "Lataa kuva",
         "invokeProgressBar": "Invoken edistymispalkki",
         "nextImage": "Seuraava kuva",
-        "previousImage": "Edellinen kuva",
-        "showOptionsPanel": "Näytä asetukset"
+        "previousImage": "Edellinen kuva"
     },
     "common": {
         "languagePickerLabel": "Kielen valinta",

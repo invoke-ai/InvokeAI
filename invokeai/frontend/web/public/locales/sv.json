@@ -4,8 +4,7 @@
         "invokeProgressBar": "Invoke förloppsmätare",
         "nextImage": "Nästa bild",
         "reset": "Starta om",
-        "previousImage": "Föregående bild",
-        "showOptionsPanel": "Visa inställningspanelen"
+        "previousImage": "Föregående bild"
     },
     "common": {
         "hotkeysLabel": "Snabbtangenter",

@@ -656,10 +656,8 @@
     "accessibility": {
         "uploadImage": "Bild hochladen",
         "previousImage": "Vorheriges Bild",
-        "showOptionsPanel": "Seitenpanel anzeigen",
         "reset": "Zurücksetzten",
         "nextImage": "Nächstes Bild",
-        "showGalleryPanel": "Galerie-Panel anzeigen",
         "menu": "Menü",
         "invokeProgressBar": "Invoke Fortschrittsanzeige",
         "mode": "Modus",
