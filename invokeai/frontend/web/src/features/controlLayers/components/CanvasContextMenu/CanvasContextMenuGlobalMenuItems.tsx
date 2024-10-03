@@ -1,4 +1,5 @@
 import { MenuGroup, MenuItem } from '@invoke-ai/ui-library';
+import { CanvasContextMenuItemsCropCanvasToBbox } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuItemsCropCanvasToBbox';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import {
   useNewControlLayerFromBbox,
@@ -25,6 +26,9 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
 
   return (
     <>
+      <MenuGroup title={t('controlLayers.canvasContextMenu.canvasGroup')}>
+        <CanvasContextMenuItemsCropCanvasToBbox />
+      </MenuGroup>
       <MenuGroup title={t('controlLayers.canvasContextMenu.saveToGalleryGroup')}>
         <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveCanvasToGallery}>
           {t('controlLayers.canvasContextMenu.saveCanvasToGallery')}
