@@ -1,3 +1,4 @@
+import math
 from typing import List, Union
 
 import torch
@@ -55,6 +56,9 @@ class ControlNetExtension:
             resize_mode=resize_mode,
         )
 
+        # Map pixel values from [0, 1] to [-1, 1].
+        controlnet_cond = controlnet_cond * 2 - 1
+
         return cls(
             model=model,
             controlnet_cond=controlnet_cond,
@@ -65,6 +69,8 @@ class ControlNetExtension:
 
     def run_controlnet(
         self,
+        timestep_index: int,
+        total_num_timesteps: int,
         img: torch.Tensor,
         img_ids: torch.Tensor,
         txt: torch.Tensor,
@@ -72,8 +78,12 @@ class ControlNetExtension:
         y: torch.Tensor,
         timesteps: torch.Tensor,
         guidance: torch.Tensor | None,
-    ) -> list[torch.Tensor]:
-        # TODO(ryand): Handle weight, begin_step_percent, end_step_percent.
+    ) -> list[torch.Tensor] | None:
+        first_step = math.floor(self._begin_step_percent * total_num_timesteps)
+        last_step = math.ceil(self._end_step_percent * total_num_timesteps)
+        if timestep_index < first_step or timestep_index > last_step:
+            return
+        weight = self._weight
 
         controlnet_block_res_samples = self._model(
             img=img,
@@ -85,4 +95,9 @@ class ControlNetExtension:
             y=y,
             guidance=guidance,
         )
+
+        # Apply weight to the residuals.
+        for block_res_sample in controlnet_block_res_samples:
+            block_res_sample *= weight
+
         return controlnet_block_res_samples
