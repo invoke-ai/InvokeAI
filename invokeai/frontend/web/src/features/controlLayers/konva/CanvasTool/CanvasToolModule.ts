@@ -33,6 +33,11 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 
+// Konva's docs say the default drag buttons are [0], but it's actually [0,1]. We only want left-click to drag, so we
+// need to override the default. The stage handles middle-mouse dragging on its own with dedicated event listeners.
+// TODO(psyche): Fix the docs upstream!
+Konva.dragButtons = [0];
+
 type CanvasToolModuleConfig = {
   BRUSH_SPACING_TARGET_SCALE: number;
 };
@@ -142,11 +147,13 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   syncCursorStyle = () => {
     const stage = this.manager.stage;
-    const isMouseDown = this.$isMouseDown.get();
     const tool = this.$tool.get();
+    const isStageDragging = this.manager.stage.konva.stage.isDragging();
 
-    if (tool === 'view') {
-      stage.setCursor(isMouseDown ? 'grabbing' : 'grab');
+    if (tool === 'view' && !isStageDragging) {
+      stage.setCursor('grab');
+    } else if (this.manager.stage.konva.stage.isDragging()) {
+      stage.setCursor('grabbing');
     } else if (this.manager.stateApi.$isTransforming.get()) {
       stage.setCursor('default');
     } else if (this.manager.stateApi.$isFiltering.get()) {
@@ -173,15 +180,23 @@ export class CanvasToolModule extends CanvasModuleBase {
   render = () => {
     const renderedEntityCount = this.manager.stateApi.getRenderedEntityCount();
     const cursorPos = this.$cursorPos.get();
-    const tool = this.$tool.get();
     const isFiltering = this.manager.stateApi.$isFiltering.get();
     const isStaging = this.manager.stagingArea.$isStaging.get();
+    const isStageDragging = this.manager.stage.konva.stage.isDragging();
 
     this.syncCursorStyle();
 
-    this.manager.stage.setIsDraggable(tool === 'view');
-
-    if (!cursorPos || isFiltering || isStaging || renderedEntityCount === 0) {
+    /**
+     * The tool should not be rendered when:
+     * - There is no cursor position (i.e. the cursor is outside of the stage)
+     * - The user is filtering, in which case the user is not allowed to use the tools. Note that we do not disable
+     * the group while transforming, bc that requires use of the move tool.
+     * - The canvas is staging, in which case the user is not allowed to use the tools.
+     * - There are no entities rendered on the canvas. Maybe we should allow the user to draw on an empty canvas,
+     * creating a new layer when they start?
+     * - The stage is being dragged, in which case the user is not allowed to use the tools.
+     */
+    if (!cursorPos || isFiltering || isStaging || renderedEntityCount === 0 || isStageDragging) {
       this.konva.group.visible(false);
     } else {
       this.konva.group.visible(true);
