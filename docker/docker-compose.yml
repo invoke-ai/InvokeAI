@@ -1,7 +1,7 @@
 # Copyright (c) 2023 Eugene Brodsky https://github.com/ebr
 
 x-invokeai: &invokeai
-    image: "local/invokeai:latest"
+    image: "ghcr.io/invoke-ai/invokeai:latest"
     build:
       context: ..
       dockerfile: docker/Dockerfile
