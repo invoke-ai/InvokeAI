@@ -30,12 +30,14 @@ import {
   logIsEnabledChanged,
   selectSystemShouldAntialiasProgressImage,
   selectSystemShouldConfirmOnDelete,
+  selectSystemShouldConfirmOnNewSession,
   selectSystemShouldEnableInformationalPopovers,
   selectSystemShouldUseNSFWChecker,
   selectSystemShouldUseWatermarker,
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
   shouldAntialiasProgressImageChanged,
+  shouldConfirmOnNewSessionToggled,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
@@ -104,6 +106,10 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   const shouldUseNSFWChecker = useAppSelector(selectSystemShouldUseNSFWChecker);
   const shouldUseWatermarker = useAppSelector(selectSystemShouldUseWatermarker);
   const shouldEnableInformationalPopovers = useAppSelector(selectSystemShouldEnableInformationalPopovers);
+  const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
+  const onToggleConfirmOnNewSession = useCallback(() => {
+    dispatch(shouldConfirmOnNewSessionToggled());
+  }, [dispatch]);
 
   const clearStorage = useClearStorage();
 
@@ -180,6 +186,10 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                     <FormControl>
                       <FormLabel>{t('settings.confirmOnDelete')}</FormLabel>
                       <Switch isChecked={shouldConfirmOnDelete} onChange={handleChangeShouldConfirmOnDelete} />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.confirmOnNewSession')}</FormLabel>
+                      <Switch isChecked={shouldConfirmOnNewSession} onChange={onToggleConfirmOnNewSession} />
                     </FormControl>
                   </StickyScrollable>
 
