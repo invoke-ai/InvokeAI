@@ -18,6 +18,7 @@ import type { CanvasEntityIdentifier, CanvasRenderableEntityState, Rect } from '
 import Konva from 'konva';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
+import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
@@ -293,6 +294,11 @@ export abstract class CanvasEntityAdapterBase<
       extra,
     };
     return stableHash(arg);
+  };
+
+  cropToBbox = (): Promise<ImageDTO> => {
+    const { rect } = this.manager.stateApi.getBbox();
+    return this.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1, filters: [] } });
   };
 
   destroy = (): void => {
