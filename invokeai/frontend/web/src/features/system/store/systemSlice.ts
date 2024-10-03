@@ -12,6 +12,7 @@ const initialSystemState: SystemState = {
   _version: 1,
   shouldConfirmOnDelete: true,
   shouldAntialiasProgressImage: false,
+  shouldConfirmOnNewSession: true,
   language: 'en',
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
@@ -56,6 +57,9 @@ export const systemSlice = createSlice({
     setShouldEnableInformationalPopovers(state, action: PayloadAction<boolean>) {
       state.shouldEnableInformationalPopovers = action.payload;
     },
+    shouldConfirmOnNewSessionToggled(state) {
+      state.shouldConfirmOnNewSession = !state.shouldConfirmOnNewSession;
+    },
   },
 });
 
@@ -69,6 +73,7 @@ export const {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
+  shouldConfirmOnNewSessionToggled,
 } = systemSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -103,3 +108,4 @@ export const selectSystemShouldAntialiasProgressImage = createSystemSelector(
 export const selectSystemShouldEnableInformationalPopovers = createSystemSelector(
   (system) => system.shouldEnableInformationalPopovers
 );
+export const selectSystemShouldConfirmOnNewSession = createSystemSelector((system) => system.shouldConfirmOnNewSession);

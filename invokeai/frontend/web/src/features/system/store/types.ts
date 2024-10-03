@@ -32,6 +32,7 @@ export interface SystemState {
   _version: 1;
   shouldConfirmOnDelete: boolean;
   shouldAntialiasProgressImage: boolean;
+  shouldConfirmOnNewSession: boolean;
   language: Language;
   shouldUseNSFWChecker: boolean;
   shouldUseWatermarker: boolean;
