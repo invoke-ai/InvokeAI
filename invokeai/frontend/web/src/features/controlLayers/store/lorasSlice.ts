@@ -37,6 +37,7 @@ export const lorasSlice = createSlice({
     },
     loraRecalled: (state, action: PayloadAction<{ lora: LoRA }>) => {
       const { lora } = action.payload;
+      state.loras = state.loras.filter((l) => l.model.key !== lora.model.key && l.id !== lora.id);
       state.loras.push(lora);
     },
     loraDeleted: (state, action: PayloadAction<{ id: string }>) => {
