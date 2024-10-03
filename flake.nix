@@ -34,7 +34,7 @@
             cudaPackages.cudnn
             cudaPackages.cuda_nvrtc
             cudatoolkit
-            pkgconfig
+            pkg-config
             libconfig
             cmake
             blas
@@ -66,7 +66,7 @@
             black
 
             # Frontend.
-            yarn
+            pnpm_8
             nodejs
           ];
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
