@@ -43,10 +43,12 @@ def denoise(
 
         # Run ControlNet models.
         # controlnet_block_residuals[i][j] is the residual of the j-th block of the i-th ControlNet model.
-        controlnet_block_residuals: list[list[torch.Tensor]] = []
+        controlnet_block_residuals: list[list[torch.Tensor] | None] = []
         for controlnet_extension in controlnet_extensions or []:
             controlnet_block_residuals.append(
                 controlnet_extension.run_controlnet(
+                    timestep_index=step - 1,
+                    total_num_timesteps=total_steps,
                     img=img,
                     img_ids=img_ids,
                     txt=txt,
@@ -65,7 +67,7 @@ def denoise(
             y=vec,
             timesteps=t_vec,
             guidance=guidance_vec,
-            block_controlnet_hidden_states=controlnet_block_residuals,
+            controlnet_block_residuals=controlnet_block_residuals,
         )
 
         preview_img = img - t_curr * pred
