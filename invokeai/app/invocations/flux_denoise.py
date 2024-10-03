@@ -6,6 +6,7 @@ import torchvision.transforms as tv_transforms
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
@@ -19,6 +20,8 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux.controlnet.controlnet_flux import ControlNetFlux
+from invokeai.backend.flux.controlnet_extension import ControlNetExtension
 from invokeai.backend.flux.denoise import denoise
 from invokeai.backend.flux.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
@@ -44,7 +47,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="3.0.0",
+    version="3.1.0",
     classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -87,6 +90,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description="The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images. FLUX dev only, ignored for schnell.",
     )
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
+    controlnet: ControlField | list[ControlField] | None = InputField(
+        default=None, input=Input.Connection, description="ControlNet models."
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
@@ -167,8 +173,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         inpaint_mask = self._prep_inpaint_mask(context, x)
 
-        b, _c, h, w = x.shape
-        img_ids = generate_img_ids(h=h, w=w, batch_size=b, device=x.device, dtype=x.dtype)
+        b, _c, latent_h, latent_w = x.shape
+        img_ids = generate_img_ids(h=latent_h, w=latent_w, batch_size=b, device=x.device, dtype=x.dtype)
 
         bs, t5_seq_len, _ = t5_embeddings.shape
         txt_ids = torch.zeros(bs, t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device())
@@ -231,6 +237,16 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             else:
                 raise ValueError(f"Unsupported model format: {config.format}")
 
+            # Prepare ControlNet extensions.
+            controlnet_extensions = self._prep_controlnet_extensions(
+                context=context,
+                exit_stack=exit_stack,
+                latent_height=latent_h,
+                latent_width=latent_w,
+                dtype=inference_dtype,
+                device=x.device,
+            )
+
             x = denoise(
                 model=transformer,
                 img=x,
@@ -242,6 +258,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 step_callback=self._build_step_callback(context),
                 guidance=self.guidance,
                 inpaint_extension=inpaint_extension,
+                controlnet_extensions=controlnet_extensions,
             )
 
         x = unpack(x.float(), self.height, self.width)
@@ -287,6 +304,50 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Expand the inpaint mask to the same shape as `latents` so that when we 'pack' `mask` it lines up with
         # `latents`.
         return mask.expand_as(latents)
+
+    def _prep_controlnet_extensions(
+        self,
+        context: InvocationContext,
+        exit_stack: ExitStack,
+        latent_height: int,
+        latent_width: int,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> list[ControlNetExtension] | None:
+        # Normalize the controlnet input to list[ControlField].
+        controlnets: list[ControlField]
+        if self.controlnet is None:
+            return None
+        elif isinstance(self.controlnet, ControlField):
+            controlnets = [self.controlnet]
+        elif isinstance(self.controlnet, list):
+            controlnets = self.controlnet
+        else:
+            raise ValueError(f"Unsupported controlnet type: {type(self.controlnet)}")
+
+        controlnet_extensions: list[ControlNetExtension] = []
+        for controlnet in controlnets:
+            model = exit_stack.enter_context(context.models.load(controlnet.control_model))
+            assert isinstance(model, ControlNetFlux)
+            image = context.images.get_pil(controlnet.image.image_name)
+
+            controlnet_extensions.append(
+                ControlNetExtension.from_controlnet_image(
+                    model=model,
+                    controlnet_image=image,
+                    latent_height=latent_height,
+                    latent_width=latent_width,
+                    dtype=dtype,
+                    device=device,
+                    control_mode=controlnet.control_mode,
+                    resize_mode=controlnet.resize_mode,
+                    weight=controlnet.control_weight,
+                    begin_step_percent=controlnet.begin_step_percent,
+                    end_step_percent=controlnet.end_step_percent,
+                )
+            )
+
+        return controlnet_extensions
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
         for lora in self.transformer.loras:

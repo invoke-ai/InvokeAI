@@ -311,7 +311,7 @@ class FluxControlnetModel(ModelLoader):
 
         with accelerate.init_empty_weights():
             # HACK(ryand): Is it safe to assume dev here?
-            model = ControlNetFlux(params["flux_dev"])
+            model = ControlNetFlux(params["flux-dev"])
 
         sd = load_file(model_path)
         model.load_state_dict(sd, assign=True)

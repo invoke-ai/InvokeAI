@@ -88,6 +88,7 @@ class Flux(nn.Module):
         timesteps: Tensor,
         y: Tensor,
         guidance: Tensor | None = None,
+        block_controlnet_hidden_states: list[Tensor] | None = None,
     ) -> Tensor:
         if img.ndim != 3 or txt.ndim != 3:
             raise ValueError("Input img and txt tensors must have 3 dimensions.")
@@ -105,8 +106,12 @@ class Flux(nn.Module):
         ids = torch.cat((txt_ids, img_ids), dim=1)
         pe = self.pe_embedder(ids)
 
-        for block in self.double_blocks:
+        for block_index, block in enumerate(self.double_blocks):
             img, txt = block(img=img, txt=txt, vec=vec, pe=pe)
+
+            # Apply ControlNet residual.
+            if block_controlnet_hidden_states is not None:
+                img = img + block_controlnet_hidden_states[block_index % len(block_controlnet_hidden_states)]
 
         img = torch.cat((txt, img), 1)
         for block in self.single_blocks:
