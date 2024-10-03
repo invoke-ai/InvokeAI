@@ -1836,6 +1836,7 @@
             }
         },
         "canvasContextMenu": {
+            "canvasGroup": "Canvas",
             "saveToGalleryGroup": "Save To Gallery",
             "saveCanvasToGallery": "Save Canvas To Gallery",
             "saveBboxToGallery": "Save Bbox To Gallery",
@@ -1843,7 +1844,8 @@
             "newGlobalReferenceImage": "New Global Reference Image",
             "newRegionalReferenceImage": "New Regional Reference Image",
             "newControlLayer": "New Control Layer",
-            "newRasterLayer": "New Raster Layer"
+            "newRasterLayer": "New Raster Layer",
+            "cropCanvasToBbox": "Crop Canvas to Bbox"
         },
         "stagingArea": {
             "accept": "Accept",
