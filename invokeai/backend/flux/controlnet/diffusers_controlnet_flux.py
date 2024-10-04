@@ -23,7 +23,7 @@ class FluxControlNetOutput(BaseOutput):
     controlnet_single_block_samples: Tuple[torch.Tensor]
 
 
-class FluxControlNetModel(ModelMixin, ConfigMixin, PeftAdapterMixin):
+class DiffusersControlNetFlux(ModelMixin, ConfigMixin, PeftAdapterMixin):
     _supports_gradient_checkpointing = True
 
     @register_to_config
