@@ -20,7 +20,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.controlnet.controlnet_flux import ControlNetFlux
+from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
 from invokeai.backend.flux.controlnet_extension import ControlNetExtension
 from invokeai.backend.flux.denoise import denoise
 from invokeai.backend.flux.inpaint_extension import InpaintExtension
@@ -328,7 +328,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         controlnet_extensions: list[ControlNetExtension] = []
         for controlnet in controlnets:
             model = exit_stack.enter_context(context.models.load(controlnet.control_model))
-            assert isinstance(model, ControlNetFlux)
+            assert isinstance(model, XLabsControlNetFlux)
             image = context.images.get_pil(controlnet.image.image_name)
 
             controlnet_extensions.append(
