@@ -1,7 +1,7 @@
 # State dict keys for an InstantX FLUX ControlNet Union model. Intended to be used for unit tests.
 # These keys were extracted from:
 # https://huggingface.co/InstantX/FLUX.1-dev-Controlnet-Union/blob/4f32d6f2b220f8873d49bb8acc073e1df180c994/diffusion_pytorch_model.safetensors
-state_dict_keys = [
+instantx_state_dict_keys = [
     "context_embedder.bias",
     "context_embedder.weight",
     "controlnet_blocks.0.bias",
