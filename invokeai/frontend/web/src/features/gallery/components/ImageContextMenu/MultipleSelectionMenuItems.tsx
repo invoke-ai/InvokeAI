@@ -58,7 +58,10 @@ const MultipleSelectionMenuItems = () => {
   return (
     <>
       {areAllStarred && (
-        <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarBold />} onPointerUpCapture={handleUnstarSelection}>
+        <MenuItem
+          icon={customStarUi ? customStarUi.on.icon : <PiStarBold />}
+          onPointerUpCapture={handleUnstarSelection}
+        >
           {customStarUi ? customStarUi.off.text : `Unstar All`}
         </MenuItem>
       )}

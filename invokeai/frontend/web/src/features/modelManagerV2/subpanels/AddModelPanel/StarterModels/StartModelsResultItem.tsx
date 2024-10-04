@@ -61,7 +61,12 @@ export const StarterModelsResultItem = memo(({ result, modelList }: Props) => {
         {result.is_installed ? (
           <Badge>{t('common.installed')}</Badge>
         ) : (
-          <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onPointerUp={onPointerUp} size="sm" />
+          <IconButton
+            aria-label={t('modelManager.install')}
+            icon={<PiPlusBold />}
+            onPointerUp={onPointerUp}
+            size="sm"
+          />
         )}
       </Box>
     </Flex>

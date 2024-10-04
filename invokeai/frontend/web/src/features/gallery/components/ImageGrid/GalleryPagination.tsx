@@ -64,7 +64,11 @@ const PageButton = ({ page, currentPage, goToPage }: PageButtonProps) => {
     );
   }
   return (
-    <Button size="sm" onPointerUp={goToPage.bind(null, page - 1)} variant={currentPage === page - 1 ? 'solid' : 'outline'}>
+    <Button
+      size="sm"
+      onPointerUp={goToPage.bind(null, page - 1)}
+      variant={currentPage === page - 1 ? 'solid' : 'outline'}
+    >
       {page}
     </Button>
   );

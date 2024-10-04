@@ -54,7 +54,11 @@ export const PostProcessingPopover = memo((props: Props) => {
           <Flex flexDirection="column" gap={4}>
             <ParamPostProcessingModel />
             {!postProcessingModel && <MissingModelWarning />}
-            <Button size="sm" isDisabled={!imageDTO || inProgress || !postProcessingModel} onPointerUp={handleClickUpscale}>
+            <Button
+              size="sm"
+              isDisabled={!imageDTO || inProgress || !postProcessingModel}
+              onPointerUp={handleClickUpscale}
+            >
               {t('parameters.processImage')}
             </Button>
           </Flex>
