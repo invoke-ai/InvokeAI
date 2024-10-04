@@ -88,8 +88,8 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
     <ErrorBoundary onReset={handleReset} FallbackComponent={AppErrorBoundaryFallback}>
       <Box
         id="invoke-app-wrapper"
-        w="100vw"
-        h="100vh"
+        w="100dvw"
+        h="100dvh"
         position="relative"
         overflow="hidden"
         {...dropzone.getRootProps()}

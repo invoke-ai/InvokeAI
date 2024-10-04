@@ -45,8 +45,8 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
       position="absolute"
       top={0}
       insetInlineStart={0}
-      width="100vw"
-      height="100vh"
+      width="100dvw"
+      height="100dvh"
       zIndex={999}
       backdropFilter="blur(20px)"
     >
