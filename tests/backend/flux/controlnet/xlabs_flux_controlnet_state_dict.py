@@ -1,7 +1,7 @@
 # State dict keys for an XLabs FLUX ControlNet model. Intended to be used for unit tests.
 # These keys were extracted from:
 # https://huggingface.co/XLabs-AI/flux-controlnet-collections/blob/86ab1e915a389d5857135c00e0d350e9e38a9048/flux-canny-controlnet_v2.safetensors
-state_dict_keys = [
+xlabs_state_dict_keys = [
     "controlnet_blocks.0.bias",
     "controlnet_blocks.0.weight",
     "controlnet_blocks.1.bias",
