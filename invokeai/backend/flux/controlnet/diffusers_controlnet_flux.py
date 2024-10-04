@@ -89,38 +89,6 @@ class DiffusersControlNetFlux(ModelMixin, ConfigMixin):
 
         self.controlnet_x_embedder = zero_module(torch.nn.Linear(in_channels, self.inner_dim))
 
-    @classmethod
-    def from_transformer(
-        cls,
-        transformer,
-        num_layers: int = 4,
-        num_single_layers: int = 10,
-        attention_head_dim: int = 128,
-        num_attention_heads: int = 24,
-        load_weights_from_transformer=True,
-    ):
-        config = transformer.config
-        config["num_layers"] = num_layers
-        config["num_single_layers"] = num_single_layers
-        config["attention_head_dim"] = attention_head_dim
-        config["num_attention_heads"] = num_attention_heads
-
-        controlnet = cls(**config)
-
-        if load_weights_from_transformer:
-            controlnet.pos_embed.load_state_dict(transformer.pos_embed.state_dict())
-            controlnet.time_text_embed.load_state_dict(transformer.time_text_embed.state_dict())
-            controlnet.context_embedder.load_state_dict(transformer.context_embedder.state_dict())
-            controlnet.x_embedder.load_state_dict(transformer.x_embedder.state_dict())
-            controlnet.transformer_blocks.load_state_dict(transformer.transformer_blocks.state_dict(), strict=False)
-            controlnet.single_transformer_blocks.load_state_dict(
-                transformer.single_transformer_blocks.state_dict(), strict=False
-            )
-
-            controlnet.controlnet_x_embedder = zero_module(controlnet.controlnet_x_embedder)
-
-        return controlnet
-
     def forward(
         self,
         hidden_states: torch.Tensor,
