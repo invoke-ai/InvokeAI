@@ -22,7 +22,7 @@ class FluxControlNetOutput(BaseOutput):
     controlnet_single_block_samples: Tuple[torch.Tensor]
 
 
-class DiffusersControlNetFlux(ModelMixin, ConfigMixin, PeftAdapterMixin):
+class DiffusersControlNetFlux(ModelMixin, ConfigMixin):
     _supports_gradient_checkpointing = True
 
     @register_to_config
@@ -142,7 +142,6 @@ class DiffusersControlNetFlux(ModelMixin, ConfigMixin, PeftAdapterMixin):
         img_ids: torch.Tensor = None,
         txt_ids: torch.Tensor = None,
         guidance: torch.Tensor = None,
-        joint_attention_kwargs: Optional[Dict[str, Any]] = None,
         return_dict: bool = True,
     ) -> Union[torch.FloatTensor, Transformer2DModelOutput]:
         """
@@ -165,10 +164,6 @@ class DiffusersControlNetFlux(ModelMixin, ConfigMixin, PeftAdapterMixin):
                 Used to indicate denoising step.
             block_controlnet_hidden_states: (`list` of `torch.Tensor`):
                 A list of tensors that if specified are added to the residuals of transformer blocks.
-            joint_attention_kwargs (`dict`, *optional*):
-                A kwargs dictionary that if specified is passed along to the `AttentionProcessor` as defined under
-                `self.processor` in
-                [diffusers.models.attention_processor](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/attention_processor.py).
             return_dict (`bool`, *optional*, defaults to `True`):
                 Whether or not to return a [`~models.transformer_2d.Transformer2DModelOutput`] instead of a plain
                 tuple.
@@ -177,20 +172,7 @@ class DiffusersControlNetFlux(ModelMixin, ConfigMixin, PeftAdapterMixin):
             If `return_dict` is True, an [`~models.transformer_2d.Transformer2DModelOutput`] is returned, otherwise a
             `tuple` where the first element is the sample tensor.
         """
-        if joint_attention_kwargs is not None:
-            joint_attention_kwargs = joint_attention_kwargs.copy()
-            lora_scale = joint_attention_kwargs.pop("scale", 1.0)
-        else:
-            lora_scale = 1.0
 
-        if USE_PEFT_BACKEND:
-            # weight the lora layers by setting `lora_scale` for each PEFT layer
-            scale_lora_layers(self, lora_scale)
-        else:
-            if joint_attention_kwargs is not None and joint_attention_kwargs.get("scale", None) is not None:
-                logger.warning(
-                    "Passing `scale` via `joint_attention_kwargs` when not using the PEFT backend is ineffective."
-                )
         hidden_states = self.x_embedder(hidden_states)
 
         # add
@@ -318,10 +300,6 @@ class DiffusersControlNetFlux(ModelMixin, ConfigMixin, PeftAdapterMixin):
         controlnet_single_block_samples = (
             None if len(controlnet_single_block_samples) == 0 else controlnet_single_block_samples
         )
-
-        if USE_PEFT_BACKEND:
-            # remove `lora_scale` from each PEFT layer
-            unscale_lora_layers(self, lora_scale)
 
         if not return_dict:
             return (controlnet_block_samples, controlnet_single_block_samples)
