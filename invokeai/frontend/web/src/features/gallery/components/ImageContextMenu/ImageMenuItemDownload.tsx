@@ -1,4 +1,4 @@
-import { IconButton } from '@invoke-ai/ui-library';
+import { IconButton, MenuItem } from '@invoke-ai/ui-library';
 import { useDownloadImage } from 'common/hooks/useDownloadImage';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
@@ -16,12 +16,17 @@ export const ImageMenuItemDownload = memo(() => {
 
   return (
     <IconButton
+      as={MenuItem}
       icon={<PiDownloadSimpleBold />}
       aria-label={t('parameters.downloadImage')}
       tooltip={t('parameters.downloadImage')}
-      variant="ghost"
-      colorScheme="base"
       onPointerUp={onPointerUp}
+      variant="unstyled"
+      colorScheme="base"
+      w="min-content"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
     />
   );
 });

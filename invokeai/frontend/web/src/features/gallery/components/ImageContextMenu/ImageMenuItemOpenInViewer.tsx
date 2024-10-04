@@ -1,4 +1,4 @@
-import { IconButton } from '@invoke-ai/ui-library';
+import { IconButton, MenuItem } from '@invoke-ai/ui-library';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
@@ -15,12 +15,17 @@ export const ImageMenuItemOpenInViewer = memo(() => {
 
   return (
     <IconButton
+      as={MenuItem}
       icon={<PiArrowsOutBold />}
-      onPointerUp={onPointerUp}
+      onPointerUpCapture={onPointerUp}
       aria-label={t('common.openInViewer')}
       tooltip={t('common.openInViewer')}
-      variant="ghost"
+      variant="unstyled"
       colorScheme="base"
+      w="min-content"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
     />
   );
 });
