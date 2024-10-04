@@ -1,4 +1,4 @@
-import { IconButton } from '@invoke-ai/ui-library';
+import { IconButton, MenuItem } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
@@ -23,13 +23,18 @@ export const ImageMenuItemSelectForCompare = memo(() => {
 
   return (
     <IconButton
+      as={MenuItem}
       icon={<PiImagesBold />}
       isDisabled={!maySelectForCompare}
       onPointerUp={onPointerUp}
       aria-label={t('gallery.selectForCompare')}
       tooltip={t('gallery.selectForCompare')}
-      variant="ghost"
+      variant="unstyled"
       colorScheme="base"
+      w="min-content"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
     />
   );
 });
