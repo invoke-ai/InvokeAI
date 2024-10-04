@@ -90,7 +90,12 @@ export const SaveWorkflowAsDialog = () => {
             <Button ref={cancelRef} onPointerUp={clearAndClose}>
               {t('common.cancel')}
             </Button>
-            <Button colorScheme="invokeBlue" onPointerUp={onSave} ml={3} isDisabled={!workflowName || !workflowName.length}>
+            <Button
+              colorScheme="invokeBlue"
+              onPointerUp={onSave}
+              ml={3}
+              isDisabled={!workflowName || !workflowName.length}
+            >
               {t('common.saveAs')}
             </Button>
           </AlertDialogFooter>
