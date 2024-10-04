@@ -15,7 +15,7 @@ export const RegionalGuidanceDeletePromptButton = memo(({ onDelete }: Props) => 
         variant="link"
         aria-label={t('controlLayers.deletePrompt')}
         icon={<PiTrashSimpleFill />}
-        onClick={onDelete}
+        onPointerUp={onDelete}
         flexGrow={0}
         size="sm"
         p={0}

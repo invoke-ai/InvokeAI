@@ -15,7 +15,7 @@ export const BboxLockAspectRatioButton = memo(() => {
   const dispatch = useAppDispatch();
   const isLocked = useAppSelector(selectAspectRatioIsLocked);
   const isStaging = useAppSelector(selectIsStaging);
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(bboxAspectRatioLockToggled());
   }, [dispatch]);
 
@@ -23,7 +23,7 @@ export const BboxLockAspectRatioButton = memo(() => {
     <IconButton
       tooltip={t('parameters.lockAspectRatio')}
       aria-label={t('parameters.lockAspectRatio')}
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       variant={isLocked ? 'outline' : 'ghost'}
       size="sm"
       icon={isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}

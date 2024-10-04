@@ -29,7 +29,7 @@ export const StagingAreaToolbarToggleShowResultsButton = memo(() => {
       }
       data-alert={!shouldShowStagedImage}
       icon={shouldShowStagedImage ? <PiEyeBold /> : <PiEyeSlashBold />}
-      onClick={toggleShowResults}
+      onPointerUp={toggleShowResults}
       colorScheme="invokeBlue"
     />
   );

@@ -27,7 +27,7 @@ export const ToolMoveButton = memo(() => {
         icon={<PiCursorBold />}
         colorScheme={isSelected ? 'invokeBlue' : 'base'}
         variant="solid"
-        onClick={selectMove}
+        onPointerUp={selectMove}
       />
     </Tooltip>
   );

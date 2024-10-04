@@ -10,14 +10,14 @@ export const BboxSwapDimensionsButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const isStaging = useAppSelector(selectIsStaging);
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(bboxDimensionsSwapped());
   }, [dispatch]);
   return (
     <IconButton
       tooltip={t('parameters.swapDimensions')}
       aria-label={t('parameters.swapDimensions')}
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       variant="ghost"
       size="sm"
       icon={<PiArrowsDownUpBold />}

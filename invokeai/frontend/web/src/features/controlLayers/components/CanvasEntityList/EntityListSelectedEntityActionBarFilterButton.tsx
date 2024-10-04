@@ -22,7 +22,7 @@ export const EntityListSelectedEntityActionBarFilterButton = memo(() => {
 
   return (
     <IconButton
-      onClick={filter.start}
+      onPointerUp={filter.start}
       isDisabled={filter.isDisabled}
       size="sm"
       variant="link"

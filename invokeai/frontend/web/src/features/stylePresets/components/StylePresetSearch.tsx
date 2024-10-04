@@ -50,7 +50,7 @@ const StylePresetSearch = () => {
       {searchTerm && searchTerm.length && (
         <InputRightElement h="full" pe={2}>
           <IconButton
-            onClick={clearPresetSearch}
+            onPointerUp={clearPresetSearch}
             size="sm"
             variant="link"
             aria-label={t('boards.clearSearch')}

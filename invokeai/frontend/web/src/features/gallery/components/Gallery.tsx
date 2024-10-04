@@ -74,17 +74,17 @@ export const Gallery = () => {
             {boardName}
           </Text>
           <Spacer />
-          <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickImages} data-testid="images-tab">
+          <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onPointerUp={handleClickImages} data-testid="images-tab">
             {t('parameters.images')}
           </Tab>
-          <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickAssets} data-testid="assets-tab">
+          <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onPointerUp={handleClickAssets} data-testid="assets-tab">
             {t('gallery.assets')}
           </Tab>
           <IconButton
             size="sm"
             variant="link"
             alignSelf="stretch"
-            onClick={handleClickSearch}
+            onPointerUp={handleClickSearch}
             tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
             aria-label={t('gallery.displaySearch')}
             icon={<PiMagnifyingGlassBold />}

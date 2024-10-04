@@ -71,7 +71,7 @@ const LinearViewFieldInternal = ({ nodeId, fieldName }: Props) => {
               tooltip={t('nodes.resetToDefaultValue')}
               variant="ghost"
               size="sm"
-              onClick={onReset}
+              onPointerUp={onReset}
               icon={<PiArrowCounterClockwiseBold />}
             />
           )}
@@ -89,7 +89,7 @@ const LinearViewFieldInternal = ({ nodeId, fieldName }: Props) => {
             tooltip={t('nodes.removeLinearView')}
             variant="ghost"
             size="sm"
-            onClick={handleRemoveField}
+            onPointerUp={handleRemoveField}
             icon={<PiTrashSimpleBold />}
           />
         </Flex>

@@ -24,7 +24,7 @@ export const ClearQueueIconButton = memo((_) => {
       tooltip={shift ? t('queue.clearTooltip') : t('queue.cancelTooltip')}
       icon={shift ? <PiTrashSimpleBold /> : <PiXBold />}
       colorScheme="error"
-      onClick={shift ? clearQueue.openDialog : cancelCurrentQueueItem.cancelQueueItem}
+      onPointerUp={shift ? clearQueue.openDialog : cancelCurrentQueueItem.cancelQueueItem}
       data-testid={shift ? t('queue.clear') : t('queue.cancel')}
     />
   );

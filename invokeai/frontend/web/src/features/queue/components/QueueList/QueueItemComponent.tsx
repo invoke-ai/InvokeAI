@@ -66,7 +66,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
       sx={sx}
       data-testid="queue-item"
     >
-      <Flex minH={9} alignItems="center" gap={4} p={1.5} cursor="pointer" onClick={handleToggle}>
+      <Flex minH={9} alignItems="center" gap={4} p={1.5} cursor="pointer" onPointerUp={handleToggle}>
         <Flex w={COLUMN_WIDTHS.number} justifyContent="flex-end" alignItems="center" flexShrink={0}>
           <Text variant="subtext">{index + 1}</Text>
         </Flex>
@@ -110,7 +110,7 @@ const QueueItemComponent = ({ index, item, context }: InnerItemProps) => {
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
           <ButtonGroup size="xs" variant="ghost">
             <IconButton
-              onClick={handleCancelQueueItem}
+              onPointerUp={handleCancelQueueItem}
               isDisabled={isCanceled}
               isLoading={isLoading}
               aria-label={t('queue.cancelItem')}

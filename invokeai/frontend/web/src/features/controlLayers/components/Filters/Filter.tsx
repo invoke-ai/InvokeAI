@@ -109,7 +109,7 @@ const FilterContent = memo(
           <Button
             variant="ghost"
             leftIcon={<PiShootingStarBold />}
-            onClick={adapter.filterer.processImmediate}
+            onPointerUp={adapter.filterer.processImmediate}
             isLoading={isProcessing}
             loadingText={t('controlLayers.filter.process')}
             isDisabled={!isValid || autoProcessFilter}
@@ -119,7 +119,7 @@ const FilterContent = memo(
           <Spacer />
           <Button
             leftIcon={<PiArrowsCounterClockwiseBold />}
-            onClick={adapter.filterer.reset}
+            onPointerUp={adapter.filterer.reset}
             isLoading={isProcessing}
             loadingText={t('controlLayers.filter.reset')}
             variant="ghost"
@@ -129,7 +129,7 @@ const FilterContent = memo(
           <Button
             variant="ghost"
             leftIcon={<PiCheckBold />}
-            onClick={adapter.filterer.apply}
+            onPointerUp={adapter.filterer.apply}
             isLoading={isProcessing}
             loadingText={t('controlLayers.filter.apply')}
             isDisabled={!isValid || !hasProcessed}
@@ -139,7 +139,7 @@ const FilterContent = memo(
           <Button
             variant="ghost"
             leftIcon={<PiXBold />}
-            onClick={adapter.filterer.cancel}
+            onPointerUp={adapter.filterer.cancel}
             loadingText={t('controlLayers.filter.cancel')}
           >
             {t('controlLayers.filter.cancel')}

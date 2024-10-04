@@ -53,7 +53,7 @@ export const StylePresetExportButton = () => {
 
   return (
     <IconButton
-      onClick={handleClickDownloadCsv}
+      onPointerUp={handleClickDownloadCsv}
       icon={!isLoading ? <PiDownloadSimpleBold /> : <PiSpinner />}
       tooltip={t('stylePresets.exportPromptTemplates')}
       aria-label={t('stylePresets.exportPromptTemplates')}

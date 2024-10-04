@@ -10,7 +10,7 @@ export const ImageMenuItemCopy = memo(() => {
   const imageDTO = useImageDTOContext();
   const { isClipboardAPIAvailable, copyImageToClipboard } = useCopyImageToClipboard();
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     copyImageToClipboard(imageDTO.image_url);
   }, [copyImageToClipboard, imageDTO.image_url]);
 
@@ -23,7 +23,7 @@ export const ImageMenuItemCopy = memo(() => {
       icon={<PiCopyBold />}
       aria-label={t('parameters.copyImage')}
       tooltip={t('parameters.copyImage')}
-      onClickCapture={onClick}
+      onPointerUpCapture={onPointerUp}
       variant="ghost"
       colorScheme="base"
     />

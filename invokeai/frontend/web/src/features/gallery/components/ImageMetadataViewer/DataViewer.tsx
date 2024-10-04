@@ -56,7 +56,7 @@ const DataViewer = (props: Props) => {
               icon={<PiDownloadSimpleBold size={16} />}
               variant="ghost"
               opacity={0.7}
-              onClick={handleDownload}
+              onPointerUp={handleDownload}
             />
           </Tooltip>
         )}
@@ -67,7 +67,7 @@ const DataViewer = (props: Props) => {
               icon={<PiCopyBold size={16} />}
               variant="ghost"
               opacity={0.7}
-              onClick={handleCopy}
+              onPointerUp={handleCopy}
             />
           </Tooltip>
         )}
@@ -105,7 +105,7 @@ const ExtraCopyAction = ({ label, data, getData }: ExtraCopyActionProps) => {
         icon={<PiCopyBold size={16} />}
         variant="ghost"
         opacity={0.7}
-        onClick={handleCopy}
+        onPointerUp={handleCopy}
       />
     </Tooltip>
   );

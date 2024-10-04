@@ -75,29 +75,29 @@ const BoardContextMenu = ({ board, children }: Props) => {
       <MenuList visibility="visible">
         <MenuGroup title={boardName}>
           {!autoAssignBoardOnClick && (
-            <MenuItem icon={<PiPlusBold />} isDisabled={isSelectedForAutoAdd} onClick={handleSetAutoAdd}>
+            <MenuItem icon={<PiPlusBold />} isDisabled={isSelectedForAutoAdd} onPointerUp={handleSetAutoAdd}>
               {isSelectedForAutoAdd ? t('boards.selectedForAutoAdd') : t('boards.menuItemAutoAdd')}
             </MenuItem>
           )}
           {isBulkDownloadEnabled && (
-            <MenuItem icon={<PiDownloadBold />} onClickCapture={handleBulkDownload}>
+            <MenuItem icon={<PiDownloadBold />} onPointerUpCapture={handleBulkDownload}>
               {t('boards.downloadBoard')}
             </MenuItem>
           )}
 
           {board.archived && (
-            <MenuItem icon={<PiArchiveBold />} onClick={handleUnarchive}>
+            <MenuItem icon={<PiArchiveBold />} onPointerUp={handleUnarchive}>
               {t('boards.unarchiveBoard')}
             </MenuItem>
           )}
 
           {!board.archived && (
-            <MenuItem icon={<PiArchiveFill />} onClick={handleArchive}>
+            <MenuItem icon={<PiArchiveFill />} onPointerUp={handleArchive}>
               {t('boards.archiveBoard')}
             </MenuItem>
           )}
 
-          <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClick={setAsBoardToDelete} isDestructive>
+          <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onPointerUp={setAsBoardToDelete} isDestructive>
             {t('boards.deleteBoard')}
           </MenuItem>
         </MenuGroup>

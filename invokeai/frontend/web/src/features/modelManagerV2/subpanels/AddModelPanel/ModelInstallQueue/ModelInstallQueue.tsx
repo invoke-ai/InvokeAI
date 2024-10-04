@@ -46,7 +46,7 @@ export const ModelInstallQueue = memo(() => {
         <Button
           size="sm"
           isDisabled={!pruneAvailable}
-          onClick={pruneCompletedModelInstalls}
+          onPointerUp={pruneCompletedModelInstalls}
           tooltip={t('modelManager.pruneTooltip')}
         >
           {t('modelManager.prune')}

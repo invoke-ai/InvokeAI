@@ -68,7 +68,7 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
       <ButtonGroup isAttached={false} size="sm" w="full">
         <Button
           leftIcon={<PiArrowsOutBold />}
-          onClick={adapter.transformer.fitProxyRectToBbox}
+          onPointerUp={adapter.transformer.fitProxyRectToBbox}
           isLoading={isProcessing}
           loadingText={t('controlLayers.transform.fitToBbox')}
           variant="ghost"
@@ -78,7 +78,7 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
         <Spacer />
         <Button
           leftIcon={<PiArrowsCounterClockwiseBold />}
-          onClick={adapter.transformer.resetTransform}
+          onPointerUp={adapter.transformer.resetTransform}
           isLoading={isProcessing}
           loadingText={t('controlLayers.transform.reset')}
           variant="ghost"
@@ -87,7 +87,7 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
         </Button>
         <Button
           leftIcon={<PiCheckBold />}
-          onClick={adapter.transformer.applyTransform}
+          onPointerUp={adapter.transformer.applyTransform}
           isLoading={isProcessing}
           loadingText={t('controlLayers.transform.apply')}
           variant="ghost"
@@ -96,7 +96,7 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
         </Button>
         <Button
           leftIcon={<PiXBold />}
-          onClick={adapter.transformer.stopTransform}
+          onPointerUp={adapter.transformer.stopTransform}
           isLoading={isProcessing}
           loadingText={t('common.cancel')}
           variant="ghost"

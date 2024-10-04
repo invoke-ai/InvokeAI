@@ -113,11 +113,11 @@ const EditableControls = memo(() => {
   const { isEditing, getEditButtonProps } = useEditableControls();
   const handleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      const { onClick } = getEditButtonProps();
-      if (!onClick) {
+      const { onPointerUp } = getEditButtonProps();
+      if (!onPointerUp) {
         return;
       }
-      onClick(e);
+      onPointerUp(e);
       e.preventDefault();
     },
     [getEditButtonProps]
@@ -129,7 +129,7 @@ const EditableControls = memo(() => {
 
   return (
     <Flex
-      onClick={handleClick}
+      onPointerUp={handleClick}
       position="absolute"
       w="min-content"
       h="full"

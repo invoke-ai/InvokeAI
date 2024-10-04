@@ -38,7 +38,7 @@ export const StarterModelsResultItem = memo(({ result, modelList }: Props) => {
   }, [result]);
   const [installModel] = useInstallModel();
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     for (const { config, source } of allSources) {
       if (modelList.some((mc) => config.base === mc.base && config.name === mc.name && config.type === mc.type)) {
         continue;
@@ -61,7 +61,7 @@ export const StarterModelsResultItem = memo(({ result, modelList }: Props) => {
         {result.is_installed ? (
           <Badge>{t('common.installed')}</Badge>
         ) : (
-          <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={onClick} size="sm" />
+          <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onPointerUp={onPointerUp} size="sm" />
         )}
       </Box>
     </Flex>

@@ -41,7 +41,7 @@ export const ImageMenuItemNewLayerFromImage = memo(() => {
   }, [bboxRect.x, bboxRect.y, dispatch, imageDTO, imageViewer, t]);
 
   return (
-    <MenuItem icon={<NewLayerIcon />} onClickCapture={handleSendToCanvas}>
+    <MenuItem icon={<NewLayerIcon />} onPointerUpCapture={handleSendToCanvas}>
       {t('controlLayers.newLayerFromImage')}
     </MenuItem>
   );

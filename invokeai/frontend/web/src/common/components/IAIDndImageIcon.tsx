@@ -16,17 +16,17 @@ const sx: SystemStyleObject = {
   },
 };
 
-type Props = Omit<IconButtonProps, 'aria-label' | 'onClick' | 'tooltip'> & {
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+type Props = Omit<IconButtonProps, 'aria-label' | 'onPointerUp' | 'tooltip'> & {
+  onPointerUp: (event: MouseEvent<HTMLButtonElement>) => void;
   tooltip: string;
 };
 
 const IAIDndImageIcon = (props: Props) => {
-  const { onClick, tooltip, icon, ...rest } = props;
+  const { onPointerUp, tooltip, icon, ...rest } = props;
 
   return (
     <IconButton
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       aria-label={tooltip}
       icon={icon}
       variant="link"

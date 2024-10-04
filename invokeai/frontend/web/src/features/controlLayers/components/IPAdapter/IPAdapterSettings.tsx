@@ -103,7 +103,7 @@ export const IPAdapterSettings = memo(() => {
             />
           </Box>
           <IconButton
-            onClick={pullBboxIntoIPAdapter}
+            onPointerUp={pullBboxIntoIPAdapter}
             isDisabled={isBusy}
             variant="ghost"
             aria-label={t('controlLayers.pullBboxIntoReferenceImage')}

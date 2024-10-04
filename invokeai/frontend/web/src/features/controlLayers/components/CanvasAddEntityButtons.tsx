@@ -33,7 +33,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onClick={addGlobalReferenceImage}
+            onPointerUp={addGlobalReferenceImage}
             isDisabled={isFLUX}
           >
             {t('controlLayers.globalReferenceImage')}
@@ -46,7 +46,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onClick={addInpaintMask}
+            onPointerUp={addInpaintMask}
           >
             {t('controlLayers.inpaintMask')}
           </Button>
@@ -55,7 +55,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onClick={addRegionalGuidance}
+            onPointerUp={addRegionalGuidance}
             isDisabled={isFLUX}
           >
             {t('controlLayers.regionalGuidance')}
@@ -65,7 +65,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onClick={addRegionalReferenceImage}
+            onPointerUp={addRegionalReferenceImage}
             isDisabled={isFLUX}
           >
             {t('controlLayers.regionalReferenceImage')}
@@ -79,7 +79,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onClick={addControlLayer}
+            onPointerUp={addControlLayer}
             isDisabled={isFLUX}
           >
             {t('controlLayers.controlLayer')}
@@ -89,7 +89,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onClick={addRasterLayer}
+            onPointerUp={addRasterLayer}
           >
             {t('controlLayers.rasterLayer')}
           </Button>

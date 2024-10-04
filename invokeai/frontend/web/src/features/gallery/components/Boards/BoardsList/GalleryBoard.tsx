@@ -60,7 +60,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const [localBoardName, setLocalBoardName] = useState(board.board_name);
   const onStartEditingRef = useRef<MouseEventHandler | undefined>(undefined);
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     if (selectedBoardId !== board.board_id) {
       dispatch(boardIdSelected({ boardId: board.board_id }));
     }
@@ -123,7 +123,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
           <Flex
             position="relative"
             ref={ref}
-            onClick={onClick}
+            onPointerUp={onPointerUp}
             onDoubleClick={onDoubleClick}
             w="full"
             alignItems="center"
@@ -180,7 +180,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
 const JankEditableHijack = memo((props: { onStartEditingRef: MutableRefObject<MouseEventHandler | undefined> }) => {
   const editableControls = useEditableControls();
   useEffect(() => {
-    props.onStartEditingRef.current = editableControls.getEditButtonProps().onClick;
+    props.onStartEditingRef.current = editableControls.getEditButtonProps().onPointerUp;
   }, [props, editableControls]);
   return null;
 });

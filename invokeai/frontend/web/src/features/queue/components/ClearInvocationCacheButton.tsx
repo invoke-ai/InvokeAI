@@ -8,7 +8,7 @@ const ClearInvocationCacheButton = () => {
   const { clearInvocationCache, isDisabled, isLoading } = useClearInvocationCache();
 
   return (
-    <Button isDisabled={isDisabled} isLoading={isLoading} onClick={clearInvocationCache}>
+    <Button isDisabled={isDisabled} isLoading={isLoading} onPointerUp={clearInvocationCache}>
       {t('invocationCache.clear')}
     </Button>
   );

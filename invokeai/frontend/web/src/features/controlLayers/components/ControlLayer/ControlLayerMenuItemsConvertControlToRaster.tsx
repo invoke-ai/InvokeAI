@@ -18,7 +18,7 @@ export const ControlLayerMenuItemsConvertControlToRaster = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   return (
-    <MenuItem onClick={convertControlLayerToRasterLayer} icon={<PiLightningBold />} isDisabled={!isInteractable}>
+    <MenuItem onPointerUp={convertControlLayerToRasterLayer} icon={<PiLightningBold />} isDisabled={!isInteractable}>
       {t('controlLayers.convertToRasterLayer')}
     </MenuItem>
   );

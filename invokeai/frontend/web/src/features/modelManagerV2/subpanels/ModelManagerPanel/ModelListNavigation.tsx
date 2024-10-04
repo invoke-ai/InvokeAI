@@ -42,7 +42,7 @@ export const ModelListNavigation = memo(() => {
               variant="link"
               aria-label={t('boards.clearSearch')}
               icon={<PiXBold />}
-              onClick={clearSearch}
+              onPointerUp={clearSearch}
             />
           </InputRightElement>
         )}

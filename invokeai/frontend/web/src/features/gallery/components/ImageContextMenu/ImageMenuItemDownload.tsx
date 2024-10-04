@@ -10,7 +10,7 @@ export const ImageMenuItemDownload = memo(() => {
   const imageDTO = useImageDTOContext();
   const { downloadImage } = useDownloadImage();
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     downloadImage(imageDTO.image_url, imageDTO.image_name);
   }, [downloadImage, imageDTO.image_name, imageDTO.image_url]);
 
@@ -21,7 +21,7 @@ export const ImageMenuItemDownload = memo(() => {
       tooltip={t('parameters.downloadImage')}
       variant="ghost"
       colorScheme="base"
-      onClick={onClick}
+      onPointerUp={onPointerUp}
     />
   );
 });

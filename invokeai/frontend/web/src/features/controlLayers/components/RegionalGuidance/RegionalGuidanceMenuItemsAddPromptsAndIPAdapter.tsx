@@ -26,13 +26,13 @@ export const RegionalGuidanceMenuItemsAddPromptsAndIPAdapter = memo(() => {
 
   return (
     <>
-      <MenuItem onClick={addRegionalGuidancePositivePrompt} isDisabled={!validActions.canAddPositivePrompt || isBusy}>
+      <MenuItem onPointerUp={addRegionalGuidancePositivePrompt} isDisabled={!validActions.canAddPositivePrompt || isBusy}>
         {t('controlLayers.addPositivePrompt')}
       </MenuItem>
-      <MenuItem onClick={addRegionalGuidanceNegativePrompt} isDisabled={!validActions.canAddNegativePrompt || isBusy}>
+      <MenuItem onPointerUp={addRegionalGuidanceNegativePrompt} isDisabled={!validActions.canAddNegativePrompt || isBusy}>
         {t('controlLayers.addNegativePrompt')}
       </MenuItem>
-      <MenuItem onClick={addRegionalGuidanceIPAdapter} isDisabled={isBusy}>
+      <MenuItem onPointerUp={addRegionalGuidanceIPAdapter} isDisabled={isBusy}>
         {t('controlLayers.addReferenceImage')}
       </MenuItem>
     </>

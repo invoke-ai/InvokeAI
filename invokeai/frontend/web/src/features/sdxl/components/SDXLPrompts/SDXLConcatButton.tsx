@@ -24,7 +24,7 @@ export const SDXLConcatButton = memo(() => {
     <Tooltip label={label}>
       <IconButton
         aria-label={label}
-        onClick={handleShouldConcatPromptChange}
+        onPointerUp={handleShouldConcatPromptChange}
         icon={shouldConcatPrompts ? <PiLinkSimpleBold size={14} /> : <PiLinkSimpleBreakBold size={14} />}
         variant="promptOverlay"
         fontSize={12}

@@ -28,7 +28,7 @@ const SaveWorkflowMenuItem = () => {
   }, [onOpen, saveWorkflow]);
 
   return (
-    <MenuItem as="button" isDisabled={!isTouched} icon={<PiFloppyDiskBold />} onClick={handleClickSave}>
+    <MenuItem as="button" isDisabled={!isTouched} icon={<PiFloppyDiskBold />} onPointerUp={handleClickSave}>
       {t('workflows.saveWorkflow')}
     </MenuItem>
   );

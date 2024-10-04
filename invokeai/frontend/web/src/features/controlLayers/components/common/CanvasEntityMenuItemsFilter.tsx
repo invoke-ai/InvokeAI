@@ -11,7 +11,7 @@ export const CanvasEntityMenuItemsFilter = memo(() => {
   const filter = useEntityFilter(entityIdentifier);
 
   return (
-    <MenuItem onClick={filter.start} icon={<PiShootingStarBold />} isDisabled={filter.isDisabled}>
+    <MenuItem onPointerUp={filter.start} icon={<PiShootingStarBold />} isDisabled={filter.isDisabled}>
       {t('controlLayers.filter.filter')}
     </MenuItem>
   );

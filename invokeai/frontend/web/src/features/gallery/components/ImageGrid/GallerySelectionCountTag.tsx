@@ -73,7 +73,7 @@ const GallerySelectionCountTagContent = memo(({ selection }: { selection: ImageD
       <TagLabel>
         {selection.length} {t('common.selected')}
       </TagLabel>
-      <TagCloseButton onClick={onClearSelection} />
+      <TagCloseButton onPointerUp={onClearSelection} />
     </Tag>
   );
 });

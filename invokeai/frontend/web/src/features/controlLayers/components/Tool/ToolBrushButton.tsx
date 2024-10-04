@@ -27,7 +27,7 @@ export const ToolBrushButton = memo(() => {
         icon={<PiPaintBrushBold />}
         colorScheme={isSelected ? 'invokeBlue' : 'base'}
         variant="solid"
-        onClick={selectBrush}
+        onPointerUp={selectBrush}
       />
     </Tooltip>
   );

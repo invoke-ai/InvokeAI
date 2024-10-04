@@ -78,7 +78,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
         minSize={8}
       >
         <IAIDndImageIcon
-          onClick={handleReset}
+          onPointerUp={handleReset}
           icon={imageDTO ? <PiArrowCounterClockwiseBold /> : undefined}
           tooltip="Reset Image"
         />

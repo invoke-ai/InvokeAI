@@ -20,7 +20,7 @@ export const StylePresetCreateButton = () => {
       icon={<PiPlusBold />}
       tooltip={t('stylePresets.createPromptTemplate')}
       aria-label={t('stylePresets.createPromptTemplate')}
-      onClick={handleClickAddNew}
+      onPointerUp={handleClickAddNew}
       size="md"
       variant="ghost"
       w={8}

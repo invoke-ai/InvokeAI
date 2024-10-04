@@ -25,7 +25,7 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
   const addControlLayer = useAddControlLayer();
   const addGlobalReferenceImage = useAddGlobalReferenceImage();
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     switch (type) {
       case 'inpaint_mask':
         addInpaintMask();
@@ -67,7 +67,7 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
       tooltip={label}
       variant="link"
       icon={<NewLayerIcon />}
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       alignSelf="stretch"
       isDisabled={isBusy}
     />

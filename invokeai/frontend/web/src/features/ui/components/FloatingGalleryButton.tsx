@@ -16,7 +16,7 @@ const FloatingGalleryButton = (props: Props) => {
       <Tooltip label={t('accessibility.toggleRightPanel')} placement="start">
         <IconButton
           aria-label={t('accessibility.toggleRightPanel')}
-          onClick={props.panelApi.toggle}
+          onPointerUp={props.panelApi.toggle}
           icon={<PiImagesSquareBold />}
           h={48}
         />

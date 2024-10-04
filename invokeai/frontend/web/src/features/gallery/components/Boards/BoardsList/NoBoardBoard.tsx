@@ -64,7 +64,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
           <Flex
             position="relative"
             ref={ref}
-            onClick={handleSelectBoard}
+            onPointerUp={handleSelectBoard}
             w="full"
             alignItems="center"
             borderRadius="base"

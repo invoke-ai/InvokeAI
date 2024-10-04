@@ -43,7 +43,7 @@ export const ScanModelsForm = memo(() => {
         <Flex gap={3} alignItems="center" w="full">
           <Input placeholder={t('modelManager.scanPlaceholder')} value={scanPath} onChange={handleSetScanPath} />
           <Button
-            onClick={scanFolder}
+            onPointerUp={scanFolder}
             isLoading={isLoading}
             isDisabled={scanPath === undefined || scanPath.length === 0}
             size="sm"

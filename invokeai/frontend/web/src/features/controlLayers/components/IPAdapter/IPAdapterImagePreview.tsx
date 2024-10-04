@@ -60,7 +60,7 @@ export const IPAdapterImagePreview = memo(({ image, onChangeImage, droppableData
       {controlImage && (
         <Flex position="absolute" flexDir="column" top={2} insetInlineEnd={2} gap={1}>
           <IAIDndImageIcon
-            onClick={handleResetControlImage}
+            onPointerUp={handleResetControlImage}
             icon={<PiArrowCounterClockwiseBold size={16} />}
             tooltip={t('common.reset')}
           />

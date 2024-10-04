@@ -84,7 +84,7 @@ export const ControlLayerControlAdapter = memo(() => {
       <Flex w="full" gap={2}>
         <ControlLayerControlAdapterModel modelKey={controlAdapter.model?.key ?? null} onChange={onChangeModel} />
         <IconButton
-          onClick={filter.start}
+          onPointerUp={filter.start}
           isDisabled={filter.isDisabled}
           size="sm"
           alignSelf="stretch"
@@ -94,7 +94,7 @@ export const ControlLayerControlAdapter = memo(() => {
           icon={<PiShootingStarBold />}
         />
         <IconButton
-          onClick={pullBboxIntoLayer}
+          onPointerUp={pullBboxIntoLayer}
           isDisabled={isBusy}
           size="sm"
           alignSelf="stretch"

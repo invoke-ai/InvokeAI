@@ -174,7 +174,7 @@ const SCALE_SNAPS = [0.1, 0.15, 0.2, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 5, 7.5, 10
 const ZoomOutButton = () => {
   const canvasManager = useCanvasManager();
   const scale = useStore(computed(canvasManager.stage.$stageAttrs, (attrs) => attrs.scale));
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     const nextScale =
       SCALE_SNAPS.slice()
         .reverse()
@@ -184,7 +184,7 @@ const ZoomOutButton = () => {
 
   return (
     <IconButton
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       icon={<PiMagnifyingGlassMinusBold />}
       aria-label="Zoom out"
       variant="link"
@@ -197,14 +197,14 @@ const ZoomOutButton = () => {
 const ZoomInButton = () => {
   const canvasManager = useCanvasManager();
   const scale = useStore(computed(canvasManager.stage.$stageAttrs, (attrs) => attrs.scale));
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     const nextScale = SCALE_SNAPS.find((snap) => snap > scale) ?? canvasManager.stage.config.MAX_SCALE;
     canvasManager.stage.setScale(Math.min(nextScale, canvasManager.stage.config.MAX_SCALE));
   }, [canvasManager.stage, scale]);
 
   return (
     <IconButton
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       icon={<PiMagnifyingGlassPlusBold />}
       aria-label="Zoom out"
       variant="link"
