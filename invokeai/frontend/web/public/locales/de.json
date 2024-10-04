@@ -1304,7 +1304,28 @@
         "mergeVisibleError": "Fehler beim Vereinen sichtbarer Ebenen",
         "clearHistory": "Verlauf leeren",
         "addLayer": "Ebene hinzufügen",
-        "width": "Breite"
+        "width": "Breite",
+        "weight": "Gewichtung",
+        "addReferenceImage": "$t(controlLayers.referenceImage) hinzufügen",
+        "addInpaintMask": "$t(controlLayers.inpaintMask) hinzufügen",
+        "addGlobalReferenceImage": "$t(controlLayers.globalReferenceImage) hinzufügen",
+        "regionalGuidance": "Regionale Führung",
+        "globalReferenceImages_withCount_visible": "Globale Referenzbilder ({{count}})",
+        "addPositivePrompt": "$t(controlLayers.prompt) hinzufügen",
+        "locked": "Gesperrt",
+        "showHUD": "HUD anzeigen",
+        "addNegativePrompt": "$t(controlLayers.negativePrompt) hinzufügen",
+        "addRasterLayer": "$t(controlLayers.rasterLayer) hinzufügen",
+        "addRegionalGuidance": "$t(controlLayers.regionalGuidance) hinzufügen",
+        "addControlLayer": "$t(controlLayers.controlLayer) hinzufügen",
+        "newCanvasSession": "Neue Leinwand-Sitzung",
+        "replaceLayer": "Ebene ersetzen",
+        "newGallerySession": "Neue Galerie-Sitzung",
+        "unlocked": "Entsperrt",
+        "showProgressOnCanvas": "Fortschritt auf Leinwand anzeigen",
+        "controlMode": {
+            "balanced": "Ausgewogen"
+        }
     },
     "upsell": {
         "shareAccess": "Zugang teilen",
