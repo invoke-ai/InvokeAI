@@ -83,10 +83,12 @@ type CanvasSettingsState = {
    * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
    */
   pressureSensitivity: boolean;
+  showSystemStats: boolean;
 };
 
 const initialState: CanvasSettingsState = {
   showHUD: true,
+  showSystemStats: false,
   clipToBbox: false,
   dynamicGrid: false,
   brushWidth: 50,
@@ -118,6 +120,9 @@ export const canvasSettingsSlice = createSlice({
     },
     settingsShowHUDToggled: (state) => {
       state.showHUD = !state.showHUD;
+    },
+    settingsShowSystemStatsToggled: (state) => {
+      state.showSystemStats = !state.showSystemStats;
     },
     settingsBrushWidthChanged: (state, action: PayloadAction<number>) => {
       state.brushWidth = Math.round(action.payload);
@@ -194,6 +199,7 @@ export const {
   settingsIsolatedFilteringPreviewToggled,
   settingsIsolatedTransformingPreviewToggled,
   settingsPressureSensitivityToggled,
+  settingsShowSystemStatsToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */

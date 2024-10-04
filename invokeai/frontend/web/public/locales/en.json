@@ -1602,6 +1602,7 @@
         "deletePrompt": "Delete Prompt",
         "deleteReferenceImage": "Delete Reference Image",
         "showHUD": "Show HUD",
+        "showSystemStats": "Show System Stats",
         "rectangle": "Rectangle",
         "maskFill": "Mask Fill",
         "addPositivePrompt": "Add $t(controlLayers.prompt)",
