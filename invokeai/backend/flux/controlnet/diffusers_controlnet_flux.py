@@ -6,20 +6,19 @@
 # 2. We need to sort out https://github.com/invoke-ai/InvokeAI/pull/6740 before we can bump the diffusers package.
 
 from dataclasses import dataclass
-from typing import List, Tuple, Union
+from typing import List
 
 import torch
 import torch.nn as nn
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.controlnet import zero_module
 from diffusers.models.modeling_utils import ModelMixin
-from diffusers.utils.outputs import BaseOutput
 
 
 @dataclass
-class FluxControlNetOutput(BaseOutput):
-    controlnet_block_samples: Tuple[torch.Tensor]
-    controlnet_single_block_samples: Tuple[torch.Tensor]
+class DiffusersControlNetFluxOutput:
+    controlnet_block_samples: list[torch.Tensor] | None
+    controlnet_single_block_samples: list[torch.Tensor] | None
 
 
 class DiffusersControlNetFlux(ModelMixin, ConfigMixin):
@@ -134,11 +133,8 @@ class DiffusersControlNetFlux(ModelMixin, ConfigMixin):
         img_ids: torch.Tensor = None,
         txt_ids: torch.Tensor = None,
         guidance: torch.Tensor = None,
-        return_dict: bool = True,
-    ) -> Union[torch.FloatTensor, Transformer2DModelOutput]:
+    ) -> DiffusersControlNetFluxOutput:
         """
-        The [`FluxTransformer2DModel`] forward method.
-
         Args:
             hidden_states (`torch.FloatTensor` of shape `(batch size, channel, height, width)`):
                 Input `hidden_states`.
@@ -156,13 +152,6 @@ class DiffusersControlNetFlux(ModelMixin, ConfigMixin):
                 Used to indicate denoising step.
             block_controlnet_hidden_states: (`list` of `torch.Tensor`):
                 A list of tensors that if specified are added to the residuals of transformer blocks.
-            return_dict (`bool`, *optional*, defaults to `True`):
-                Whether or not to return a [`~models.transformer_2d.Transformer2DModelOutput`] instead of a plain
-                tuple.
-
-        Returns:
-            If `return_dict` is True, an [`~models.transformer_2d.Transformer2DModelOutput`] is returned, otherwise a
-            `tuple` where the first element is the sample tensor.
         """
 
         hidden_states = self.x_embedder(hidden_states)
@@ -250,10 +239,7 @@ class DiffusersControlNetFlux(ModelMixin, ConfigMixin):
             None if len(controlnet_single_block_samples) == 0 else controlnet_single_block_samples
         )
 
-        if not return_dict:
-            return (controlnet_block_samples, controlnet_single_block_samples)
-
-        return FluxControlNetOutput(
+        return DiffusersControlNetFluxOutput(
             controlnet_block_samples=controlnet_block_samples,
             controlnet_single_block_samples=controlnet_single_block_samples,
         )
