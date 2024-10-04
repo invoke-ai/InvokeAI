@@ -103,7 +103,7 @@ class DiffusersControlNetFlux(torch.nn.Module):
 
         self.controlnet_x_embedder = zero_module(torch.nn.Linear(self.in_channels, self.hidden_size))
 
-    def other_forward(
+    def forward(
         self,
         controlnet_cond: torch.Tensor,
         controlnet_mode: torch.Tensor | None,
