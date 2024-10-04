@@ -44,7 +44,7 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
   }, [error.message, error.name, isLocal]);
 
   return (
-    <Flex layerStyle="body" w="100vw" h="100vh" alignItems="center" justifyContent="center" p={4}>
+    <Flex layerStyle="body" w="100dvw" h="100dvh" alignItems="center" justifyContent="center" p={4}>
       <Flex layerStyle="first" flexDir="column" borderRadius="base" justifyContent="center" gap={8} p={16}>
         <Flex alignItems="center" gap="2">
           <Image src={InvokeLogoYellow} alt="invoke-logo" w="24px" h="24px" minW="24px" minH="24px" userSelect="none" />
