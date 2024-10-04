@@ -1,0 +1,34 @@
+{
+    "accessibility": {
+        "uploadImage": "Ladda upp bild",
+        "invokeProgressBar": "Invoke förloppsmätare",
+        "nextImage": "Nästa bild",
+        "reset": "Starta om",
+        "previousImage": "Föregående bild"
+    },
+    "common": {
+        "hotkeysLabel": "Snabbtangenter",
+        "reportBugLabel": "Rapportera bugg",
+        "githubLabel": "Github",
+        "discordLabel": "Discord",
+        "settingsLabel": "Inställningar",
+        "upload": "Ladda upp",
+        "cancel": "Avbryt",
+        "accept": "Acceptera",
+        "statusDisconnected": "Frånkopplad",
+        "loading": "Laddar",
+        "languagePickerLabel": "Språkväljare",
+        "txt2img": "Text till bild",
+        "nodes": "Noder",
+        "img2img": "Bild till bild",
+        "postprocessing": "Efterbehandling",
+        "load": "Ladda",
+        "back": "Bakåt"
+    },
+    "gallery": {
+        "galleryImageSize": "Bildstorlek",
+        "gallerySettings": "Galleriinställningar",
+        "noImagesInGallery": "Inga bilder i galleriet",
+        "autoSwitchNewImages": "Ändra automatiskt till nya bilder"
+    }
+}

@@ -1,0 +1,16 @@
+dist/
+public/locales/*.json
+!public/locales/en.json
+.husky/
+node_modules/
+patches/
+stats.html
+index.html
+.yarn/
+.yalc/
+*.scss
+src/services/api/schema.ts
+static/
+src/theme/css/overlayscrollbars.css
+src/theme_/css/overlayscrollbars.css
+pnpm-lock.yaml

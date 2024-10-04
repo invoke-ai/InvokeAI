@@ -1,0 +1,208 @@
+{
+    "common": {
+        "nodes": "工作流程",
+        "img2img": "圖片轉圖片",
+        "statusDisconnected": "已中斷連線",
+        "back": "返回",
+        "load": "載入",
+        "settingsLabel": "設定",
+        "upload": "上傳",
+        "discordLabel": "Discord",
+        "reportBugLabel": "回報錯誤",
+        "githubLabel": "GitHub",
+        "hotkeysLabel": "快捷鍵",
+        "languagePickerLabel": "語言",
+        "cancel": "取消",
+        "txt2img": "文字轉圖片",
+        "controlNet": "ControlNet",
+        "advanced": "進階",
+        "folder": "資料夾",
+        "installed": "已安裝",
+        "accept": "接受",
+        "goTo": "前往",
+        "input": "輸入",
+        "random": "隨機",
+        "selected": "已選擇",
+        "communityLabel": "社群",
+        "loading": "載入中",
+        "delete": "刪除",
+        "copy": "複製",
+        "error": "錯誤",
+        "file": "檔案",
+        "format": "格式",
+        "imageFailedToLoad": "無法載入圖片"
+    },
+    "accessibility": {
+        "invokeProgressBar": "Invoke 進度條",
+        "uploadImage": "上傳圖片",
+        "reset": "重置",
+        "nextImage": "下一張圖片",
+        "previousImage": "上一張圖片",
+        "menu": "選單",
+        "about": "關於",
+        "createIssue": "建立問題",
+        "resetUI": "$t(accessibility.reset) 介面",
+        "submitSupportTicket": "提交支援工單",
+        "mode": "模式"
+    },
+    "boards": {
+        "loading": "載入中…",
+        "movingImagesToBoard_other": "正在移動 {{count}} 張圖片至板上：",
+        "move": "移動",
+        "uncategorized": "未分類",
+        "cancel": "取消"
+    },
+    "metadata": {
+        "workflow": "工作流程",
+        "steps": "步數",
+        "model": "模型",
+        "seed": "種子",
+        "vae": "VAE",
+        "seamless": "無縫",
+        "metadata": "元數據",
+        "width": "寬度",
+        "height": "高度"
+    },
+    "accordions": {
+        "control": {
+            "title": "控制"
+        },
+        "compositing": {
+            "title": "合成"
+        },
+        "advanced": {
+            "title": "進階",
+            "options": "$t(accordions.advanced.title) 選項"
+        }
+    },
+    "modelManager": {
+        "advanced": "進階",
+        "allModels": "全部模型",
+        "variant": "變體",
+        "config": "配置",
+        "model": "模型",
+        "selected": "已選擇",
+        "huggingFace": "HuggingFace",
+        "install": "安裝",
+        "metadata": "元數據",
+        "delete": "刪除",
+        "description": "描述",
+        "cancel": "取消",
+        "convert": "轉換",
+        "manual": "手動",
+        "none": "無",
+        "name": "名稱",
+        "load": "載入",
+        "height": "高度",
+        "width": "寬度",
+        "search": "搜尋",
+        "vae": "VAE",
+        "settings": "設定"
+    },
+    "queue": {
+        "queue": "佇列",
+        "canceled": "已取消",
+        "failed": "已失敗",
+        "completed": "已完成",
+        "cancel": "取消",
+        "session": "工作階段",
+        "batch": "批量",
+        "item": "項目",
+        "completedIn": "完成於",
+        "notReady": "無法排隊"
+    },
+    "parameters": {
+        "cancel": {
+            "cancel": "取消"
+        },
+        "height": "高度",
+        "type": "類型",
+        "symmetry": "對稱性",
+        "images": "圖片",
+        "width": "寬度",
+        "coherenceMode": "模式",
+        "seed": "種子",
+        "general": "一般",
+        "strength": "強度",
+        "steps": "步數",
+        "info": "資訊"
+    },
+    "settings": {
+        "beta": "Beta",
+        "developer": "開發者",
+        "general": "一般",
+        "models": "模型"
+    },
+    "popovers": {
+        "paramModel": {
+            "heading": "模型"
+        },
+        "compositingCoherenceMode": {
+            "heading": "模式"
+        },
+        "paramSteps": {
+            "heading": "步數"
+        },
+        "controlNetProcessor": {
+            "heading": "處理器"
+        },
+        "paramVAE": {
+            "heading": "VAE"
+        },
+        "paramHeight": {
+            "heading": "高度"
+        },
+        "paramSeed": {
+            "heading": "種子"
+        },
+        "paramWidth": {
+            "heading": "寬度"
+        },
+        "refinerSteps": {
+            "heading": "步數"
+        }
+    },
+    "nodes": {
+        "workflowName": "名稱",
+        "notes": "註釋",
+        "workflowVersion": "版本",
+        "workflowNotes": "註釋",
+        "executionStateError": "錯誤",
+        "unableToUpdateNodes_other": "無法更新 {{count}} 個節點",
+        "integer": "整數",
+        "workflow": "工作流程",
+        "enum": "枚舉",
+        "edit": "編輯",
+        "string": "字串",
+        "workflowTags": "標籤",
+        "node": "節點",
+        "boolean": "布林值",
+        "workflowAuthor": "作者",
+        "version": "版本",
+        "executionStateCompleted": "已完成",
+        "edge": "邊緣",
+        "versionUnknown": " 版本未知"
+    },
+    "sdxl": {
+        "steps": "步數",
+        "loading": "載入中…",
+        "refiner": "精煉器"
+    },
+    "gallery": {
+        "copy": "複製",
+        "download": "下載",
+        "loading": "載入中"
+    },
+    "ui": {
+        "tabs": {
+            "models": "模型",
+            "queue": "佇列"
+        }
+    },
+    "models": {
+        "loading": "載入中"
+    },
+    "workflows": {
+        "name": "名稱"
+    }
+}

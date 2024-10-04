@@ -1,0 +1,851 @@
+{
+    "common": {
+        "hotkeysLabel": "Sneltoetsen",
+        "languagePickerLabel": "Taal",
+        "reportBugLabel": "Meld bug",
+        "settingsLabel": "Instellingen",
+        "img2img": "Afbeelding naar afbeelding",
+        "nodes": "Werkstromen",
+        "upload": "Upload",
+        "load": "Laad",
+        "statusDisconnected": "Niet verbonden",
+        "githubLabel": "Github",
+        "discordLabel": "Discord",
+        "back": "Terug",
+        "cancel": "Annuleer",
+        "accept": "Akkoord",
+        "loading": "Bezig met laden",
+        "txt2img": "Tekst naar afbeelding",
+        "postprocessing": "Naverwerking",
+        "dontAskMeAgain": "Vraag niet opnieuw",
+        "random": "Willekeurig",
+        "openInNewTab": "Open in nieuw tabblad",
+        "areYouSure": "Weet je het zeker?",
+        "linear": "Lineair",
+        "batch": "Seriebeheer",
+        "modelManager": "Modelbeheer",
+        "communityLabel": "Gemeenschap",
+        "t2iAdapter": "T2I-adapter",
+        "on": "Aan",
+        "ipAdapter": "IP-adapter",
+        "auto": "Autom.",
+        "controlNet": "ControlNet",
+        "imageFailedToLoad": "Kan afbeelding niet laden",
+        "learnMore": "Meer informatie",
+        "advanced": "Uitgebreid",
+        "file": "Bestand",
+        "installed": "Geïnstalleerd",
+        "notInstalled": "Niet $t(common.installed)",
+        "simple": "Eenvoudig",
+        "somethingWentWrong": "Er ging iets mis",
+        "add": "Voeg toe",
+        "checkpoint": "Checkpoint",
+        "details": "Details",
+        "outputs": "Uitvoeren",
+        "save": "Bewaar",
+        "nextPage": "Volgende pagina",
+        "blue": "Blauw",
+        "alpha": "Alfa",
+        "red": "Rood",
+        "editor": "Editor",
+        "folder": "Map",
+        "format": "structuur",
+        "goTo": "Ga naar",
+        "template": "Sjabloon",
+        "input": "Invoer",
+        "safetensors": "Safetensors",
+        "saveAs": "Bewaar als",
+        "created": "Gemaakt",
+        "green": "Groen",
+        "tab": "Tab",
+        "positivePrompt": "Positieve prompt",
+        "negativePrompt": "Negatieve prompt",
+        "selected": "Geselecteerd",
+        "orderBy": "Sorteer op",
+        "prevPage": "Vorige pagina",
+        "beta": "Bèta",
+        "copyError": "$t(gallery.copy) Fout",
+        "toResolve": "Op te lossen",
+        "aboutDesc": "Gebruik je Invoke voor het werk? Kijk dan naar:",
+        "aboutHeading": "Creatieve macht voor jou",
+        "copy": "Kopieer",
+        "data": "Gegevens",
+        "or": "of",
+        "updated": "Bijgewerkt",
+        "outpaint": "outpainten",
+        "ai": "ai",
+        "inpaint": "inpainten",
+        "unknown": "Onbekend",
+        "delete": "Verwijder",
+        "direction": "Richting",
+        "error": "Fout",
+        "localSystem": "Lokaal systeem",
+        "unknownError": "Onbekende fout"
+    },
+    "gallery": {
+        "galleryImageSize": "Afbeeldingsgrootte",
+        "gallerySettings": "Instellingen galerij",
+        "autoSwitchNewImages": "Wissel autom. naar nieuwe afbeeldingen",
+        "noImagesInGallery": "Geen afbeeldingen om te tonen",
+        "deleteImage_one": "Verwijder afbeelding",
+        "deleteImage_other": "",
+        "deleteImagePermanent": "Verwijderde afbeeldingen kunnen niet worden hersteld.",
+        "assets": "Eigen onderdelen",
+        "autoAssignBoardOnClick": "Ken automatisch bord toe bij klikken",
+        "featuresWillReset": "Als je deze afbeelding verwijdert, dan worden deze functies onmiddellijk teruggezet.",
+        "loading": "Bezig met laden",
+        "unableToLoad": "Kan galerij niet laden",
+        "downloadSelection": "Download selectie",
+        "currentlyInUse": "Deze afbeelding is momenteel in gebruik door de volgende functies:",
+        "copy": "Kopieer",
+        "download": "Download"
+    },
+    "modelManager": {
+        "modelManager": "Modelonderhoud",
+        "model": "Model",
+        "modelUpdated": "Model bijgewerkt",
+        "manual": "Handmatig",
+        "name": "Naam",
+        "description": "Beschrijving",
+        "config": "Configuratie",
+        "width": "Breedte",
+        "height": "Hoogte",
+        "addModel": "Voeg model toe",
+        "availableModels": "Beschikbare modellen",
+        "search": "Zoek",
+        "load": "Laad",
+        "active": "actief",
+        "selected": "Gekozen",
+        "delete": "Verwijder",
+        "deleteModel": "Verwijder model",
+        "deleteConfig": "Verwijder configuratie",
+        "deleteMsg1": "Weet je zeker dat je dit model wilt verwijderen uit InvokeAI?",
+        "deleteMsg2": "Hiermee ZAL het model van schijf worden verwijderd als het zich bevindt in de beginmap van InvokeAI. Als je het model vanaf een eigen locatie gebruikt, dan ZAL het model NIET van schijf worden verwijderd.",
+        "convertToDiffusersHelpText3": "Je checkpoint-bestand op de schijf ZAL worden verwijderd als het zich in de beginmap van InvokeAI bevindt. Het ZAL NIET worden verwijderd als het zich in een andere locatie bevindt.",
+        "convertToDiffusersHelpText6": "Wil je dit model omzetten?",
+        "allModels": "Alle modellen",
+        "repo_id": "Repo-id",
+        "convert": "Omzetten",
+        "convertToDiffusers": "Omzetten naar Diffusers",
+        "convertToDiffusersHelpText1": "Dit model wordt omgezet naar de🧨 Diffusers-indeling.",
+        "convertToDiffusersHelpText2": "Dit proces vervangt het onderdeel in Modelonderhoud met de Diffusers-versie van hetzelfde model.",
+        "convertToDiffusersHelpText4": "Dit is een eenmalig proces. Dit neemt ongeveer 30 tot 60 sec. in beslag, afhankelijk van de specificaties van je computer.",
+        "convertToDiffusersHelpText5": "Zorg ervoor dat je genoeg schijfruimte hebt. Modellen nemen gewoonlijk ongeveer 2 tot 7 GB ruimte in beslag.",
+        "modelConverted": "Model omgezet",
+        "alpha": "Alfa",
+        "none": "geen",
+        "baseModel": "Basismodel",
+        "vae": "VAE",
+        "variant": "Variant",
+        "modelConversionFailed": "Omzetten model mislukt",
+        "modelUpdateFailed": "Bijwerken model mislukt",
+        "selectModel": "Kies model",
+        "settings": "Instellingen",
+        "modelDeleted": "Model verwijderd",
+        "syncModels": "Synchroniseer Modellen",
+        "modelDeleteFailed": "Model kon niet verwijderd worden",
+        "convertingModelBegin": "Model aan het converteren. Even geduld.",
+        "predictionType": "Soort voorspelling",
+        "advanced": "Uitgebreid",
+        "modelType": "Soort model",
+        "vaePrecision": "Nauwkeurigheid VAE",
+        "loraTriggerPhrases": "LoRA-triggerzinnen",
+        "urlOrLocalPathHelper": "URL's zouden moeten wijzen naar een los bestand. Lokale paden kunnen wijzen naar een los bestand of map voor een individueel Diffusers-model.",
+        "modelName": "Modelnaam",
+        "path": "Pad",
+        "triggerPhrases": "Triggerzinnen",
+        "typePhraseHere": "Typ zin hier in",
+        "useDefaultSettings": "Gebruik standaardinstellingen",
+        "modelImageDeleteFailed": "Fout bij verwijderen modelafbeelding",
+        "modelImageUpdated": "Modelafbeelding bijgewerkt",
+        "modelImageUpdateFailed": "Fout bij bijwerken modelafbeelding",
+        "noMatchingModels": "Geen overeenkomende modellen",
+        "scanPlaceholder": "Pad naar een lokale map",
+        "noModelsInstalled": "Geen modellen geïnstalleerd",
+        "noModelsInstalledDesc1": "Installeer modellen met de",
+        "noModelSelected": "Geen model geselecteerd",
+        "starterModels": "Beginnermodellen",
+        "textualInversions": "Tekstuele omkeringen",
+        "upcastAttention": "Upcast-aandacht",
+        "uploadImage": "Upload afbeelding",
+        "mainModelTriggerPhrases": "Triggerzinnen hoofdmodel",
+        "urlOrLocalPath": "URL of lokaal pad",
+        "scanFolderHelper": "De map zal recursief worden ingelezen voor modellen. Dit kan enige tijd in beslag nemen voor erg grote mappen.",
+        "simpleModelPlaceholder": "URL of pad naar een lokaal pad of Diffusers-map",
+        "modelSettings": "Modelinstellingen",
+        "pathToConfig": "Pad naar configuratie",
+        "prune": "Snoei",
+        "pruneTooltip": "Snoei voltooide importeringen uit wachtrij",
+        "repoVariant": "Repovariant",
+        "scanFolder": "Lees map in",
+        "scanResults": "Resultaten inlezen",
+        "source": "Bron"
+    },
+    "parameters": {
+        "images": "Afbeeldingen",
+        "steps": "Stappen",
+        "cfgScale": "CFG-schaal",
+        "width": "Breedte",
+        "height": "Hoogte",
+        "seed": "Seed",
+        "shuffle": "Mengseed",
+        "noiseThreshold": "Drempelwaarde ruis",
+        "perlinNoise": "Perlinruis",
+        "type": "Soort",
+        "strength": "Sterkte",
+        "upscaling": "Opschalen",
+        "scale": "Schaal",
+        "imageFit": "Pas initiële afbeelding in uitvoergrootte",
+        "scaleBeforeProcessing": "Schalen voor verwerking",
+        "scaledWidth": "Geschaalde B",
+        "scaledHeight": "Geschaalde H",
+        "infillMethod": "Infill-methode",
+        "tileSize": "Grootte tegel",
+        "downloadImage": "Download afbeelding",
+        "usePrompt": "Hergebruik invoertekst",
+        "useSeed": "Hergebruik seed",
+        "useAll": "Hergebruik alles",
+        "info": "Info",
+        "showOptionsPanel": "Toon deelscherm Opties (O of T)",
+        "symmetry": "Symmetrie",
+        "cancel": {
+            "cancel": "Annuleer"
+        },
+        "general": "Algemeen",
+        "copyImage": "Kopieer afbeelding",
+        "denoisingStrength": "Sterkte ontruisen",
+        "scheduler": "Planner",
+        "seamlessXAxis": "Naadloze tegels in x-as",
+        "seamlessYAxis": "Naadloze tegels in y-as",
+        "clipSkip": "Overslaan CLIP",
+        "negativePromptPlaceholder": "Negatieve prompt",
+        "controlNetControlMode": "Aansturingsmodus",
+        "positivePromptPlaceholder": "Positieve prompt",
+        "maskBlur": "Vervaging van masker",
+        "invoke": {
+            "noNodesInGraph": "Geen knooppunten in graaf",
+            "noModelSelected": "Geen model ingesteld",
+            "invoke": "Start",
+            "noPrompts": "Geen prompts gegenereerd",
+            "missingInputForField": "{{nodeLabel}} -> {{fieldLabel}} invoer ontbreekt",
+            "systemDisconnected": "Systeem is niet verbonden",
+            "missingNodeTemplate": "Knooppuntsjabloon ontbreekt",
+            "missingFieldTemplate": "Veldsjabloon ontbreekt",
+            "addingImagesTo": "Bezig met toevoegen van afbeeldingen aan",
+            "layer": {
+                "controlAdapterNoModelSelected": "geen controle-adaptermodel geselecteerd",
+                "controlAdapterIncompatibleBaseModel": "niet-compatibele basismodel voor controle-adapter",
+                "ipAdapterIncompatibleBaseModel": "niet-compatibele basismodel voor IP-adapter",
+                "ipAdapterNoImageSelected": "geen afbeelding voor IP-adapter geselecteerd",
+                "rgNoRegion": "geen gebied geselecteerd",
+                "rgNoPromptsOrIPAdapters": "geen tekstprompts of IP-adapters",
+                "ipAdapterNoModelSelected": "geen IP-adapter geselecteerd"
+            }
+        },
+        "patchmatchDownScaleSize": "Verklein",
+        "useCpuNoise": "Gebruik CPU-ruis",
+        "imageActions": "Afbeeldingshandeling",
+        "iterations": "Iteraties",
+        "coherenceMode": "Modus",
+        "infillColorValue": "Vulkleur",
+        "remixImage": "Meng afbeelding opnieuw",
+        "setToOptimalSize": "Optimaliseer grootte voor het model",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (is mogelijk te klein)",
+        "aspect": "Beeldverhouding",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (is mogelijk te groot)",
+        "lockAspectRatio": "Zet beeldverhouding vast",
+        "useSize": "Gebruik grootte",
+        "swapDimensions": "Wissel afmetingen om",
+        "coherenceEdgeSize": "Randgrootte",
+        "coherenceMinDenoise": "Min. ontruising",
+        "cfgRescaleMultiplier": "Vermenigvuldiger voor CFG-herschaling"
+    },
+    "settings": {
+        "models": "Modellen",
+        "displayInProgress": "Toon voortgangsafbeeldingen",
+        "confirmOnDelete": "Bevestig bij verwijderen",
+        "resetWebUI": "Herstel web-UI",
+        "resetWebUIDesc1": "Herstel web-UI herstelt alleen de lokale afbeeldingscache en de onthouden instellingen van je browser. Het verwijdert geen afbeeldingen van schijf.",
+        "resetWebUIDesc2": "Als afbeeldingen niet getoond worden in de galerij of iets anders werkt niet, probeer dan eerst deze herstelfunctie voordat je een fout aanmeldt op GitHub.",
+        "resetComplete": "Webinterface is hersteld.",
+        "developer": "Ontwikkelaar",
+        "general": "Algemeen",
+        "showProgressInViewer": "Toon voortgangsafbeeldingen in viewer",
+        "generation": "Genereren",
+        "ui": "Gebruikersinterface",
+        "antialiasProgressImages": "Voer anti-aliasing uit op voortgangsafbeeldingen",
+        "beta": "Bèta",
+        "clearIntermediates": "Wis tussentijdse afbeeldingen",
+        "clearIntermediatesDesc3": "Je galerijafbeeldingen zullen niet worden verwijderd.",
+        "clearIntermediatesWithCount_one": "Wis {{count}} tussentijdse afbeelding",
+        "clearIntermediatesWithCount_other": "Wis {{count}} tussentijdse afbeeldingen",
+        "clearIntermediatesDesc2": "Tussentijdse afbeeldingen zijn nevenproducten bij het genereren. Deze wijken af van de uitvoerafbeeldingen in de galerij. Als je tussentijdse afbeeldingen wist, wordt schijfruimte vrijgemaakt.",
+        "intermediatesCleared_one": "{{count}} tussentijdse afbeelding gewist",
+        "intermediatesCleared_other": "{{count}} tussentijdse afbeeldingen gewist",
+        "clearIntermediatesDesc1": "Als je tussentijdse afbeeldingen wist, dan wordt de staat hersteld van je canvas en van ControlNet.",
+        "intermediatesClearedFailed": "Fout bij wissen van tussentijdse afbeeldingen",
+        "clearIntermediatesDisabled": "Wachtrij moet leeg zijn om tussentijdse afbeeldingen te kunnen leegmaken",
+        "enableInformationalPopovers": "Schakel informatieve hulpballonnen in",
+        "enableInvisibleWatermark": "Schakel onzichtbaar watermerk in",
+        "enableNSFWChecker": "Schakel NSFW-controle in",
+        "reloadingIn": "Opnieuw laden na"
+    },
+    "toast": {
+        "uploadFailed": "Upload mislukt",
+        "imageCopied": "Afbeelding gekopieerd",
+        "parametersNotSet": "Parameters niet ingesteld",
+        "serverError": "Serverfout",
+        "connected": "Verbonden met server",
+        "canceled": "Verwerking geannuleerd",
+        "uploadFailedInvalidUploadDesc": "Moet een enkele PNG- of JPEG-afbeelding zijn",
+        "parameterNotSet": "{{parameter}} niet ingesteld",
+        "parameterSet": "{{parameter}} ingesteld",
+        "problemCopyingImage": "Kan Afbeelding Niet Kopiëren",
+        "baseModelChangedCleared_one": "Basismodel is gewijzigd: {{count}} niet-compatibel submodel weggehaald of uitgeschakeld",
+        "baseModelChangedCleared_other": "Basismodel is gewijzigd: {{count}} niet-compatibele submodellen weggehaald of uitgeschakeld",
+        "loadedWithWarnings": "Werkstroom geladen met waarschuwingen",
+        "setControlImage": "Ingesteld als controle-afbeelding",
+        "setNodeField": "Ingesteld als knooppuntveld",
+        "imageUploaded": "Afbeelding geüpload",
+        "addedToBoard": "Toegevoegd aan bord",
+        "workflowLoaded": "Werkstroom geladen",
+        "modelAddedSimple": "Model toegevoegd aan wachtrij",
+        "imageUploadFailed": "Fout bij uploaden afbeelding",
+        "workflowDeleted": "Werkstroom verwijderd",
+        "invalidUpload": "Ongeldige upload",
+        "problemRetrievingWorkflow": "Fout bij ophalen van werkstroom",
+        "parameters": "Parameters",
+        "modelImportCanceled": "Importeren model geannuleerd",
+        "problemDeletingWorkflow": "Fout bij verwijderen van werkstroom",
+        "prunedQueue": "Wachtrij gesnoeid",
+        "problemDownloadingImage": "Fout bij downloaden afbeelding"
+    },
+    "accessibility": {
+        "invokeProgressBar": "Voortgangsbalk Invoke",
+        "reset": "Herstel",
+        "uploadImage": "Upload afbeelding",
+        "previousImage": "Vorige afbeelding",
+        "nextImage": "Volgende afbeelding",
+        "menu": "Menu",
+        "about": "Over",
+        "mode": "Modus",
+        "resetUI": "$t(accessibility.reset) UI",
+        "createIssue": "Maak probleem aan"
+    },
+    "nodes": {
+        "zoomOutNodes": "Uitzoomen",
+        "fitViewportNodes": "Aanpassen aan beeld",
+        "hideMinimapnodes": "Minimap verbergen",
+        "showLegendNodes": "Typelegende veld tonen",
+        "zoomInNodes": "Inzoomen",
+        "showMinimapnodes": "Minimap tonen",
+        "hideLegendNodes": "Typelegende veld verbergen",
+        "reloadNodeTemplates": "Herlaad knooppuntsjablonen",
+        "loadWorkflow": "Laad werkstroom",
+        "downloadWorkflow": "Download JSON van werkstroom",
+        "scheduler": "Planner",
+        "missingTemplate": "Ongeldig knooppunt: knooppunt {{node}} van het soort {{type}} heeft een ontbrekend sjabloon (niet geïnstalleerd?)",
+        "workflowDescription": "Korte beschrijving",
+        "versionUnknown": " Versie onbekend",
+        "noNodeSelected": "Geen knooppunt gekozen",
+        "addNode": "Voeg knooppunt toe",
+        "unableToValidateWorkflow": "Kan werkstroom niet valideren",
+        "enum": "Enumeratie",
+        "noOutputRecorded": "Geen uitvoer opgenomen",
+        "updateApp": "Werk app bij",
+        "colorCodeEdgesHelp": "Kleurgecodeerde randen op basis van hun verbonden velden",
+        "float": "Zwevende-kommagetal",
+        "workflowContact": "Contactpersoon",
+        "animatedEdges": "Geanimeerde randen",
+        "integer": "Geheel getal",
+        "nodeTemplate": "Sjabloon knooppunt",
+        "nodeOpacity": "Dekking knooppunt",
+        "unableToLoadWorkflow": "Fout bij laden werkstroom",
+        "snapToGrid": "Lijn uit op raster",
+        "noFieldsLinearview": "Geen velden toegevoegd aan lineaire weergave",
+        "nodeSearch": "Zoek naar knooppunten",
+        "updateNode": "Werk knooppunt bij",
+        "version": "Versie",
+        "validateConnections": "Valideer verbindingen en graaf",
+        "inputMayOnlyHaveOneConnection": "Invoer mag slechts een enkele verbinding hebben",
+        "notes": "Opmerkingen",
+        "nodeOutputs": "Uitvoer knooppunt",
+        "currentImageDescription": "Toont de huidige afbeelding in de knooppunteditor",
+        "validateConnectionsHelp": "Voorkom dat er ongeldige verbindingen worden gelegd en dat er ongeldige grafen worden aangeroepen",
+        "problemSettingTitle": "Fout bij instellen titel",
+        "ipAdapter": "IP-adapter",
+        "noConnectionInProgress": "Geen verbinding bezig te maken",
+        "workflowVersion": "Versie",
+        "fieldTypesMustMatch": "Veldsoorten moeten overeenkomen",
+        "workflow": "Werkstroom",
+        "edge": "Rand",
+        "animatedEdgesHelp": "Animeer gekozen randen en randen verbonden met de gekozen knooppunten",
+        "cannotDuplicateConnection": "Kan geen dubbele verbindingen maken",
+        "unknownTemplate": "Onbekend sjabloon",
+        "noWorkflow": "Geen werkstroom",
+        "removeLinearView": "Verwijder uit lineaire weergave",
+        "workflowTags": "Labels",
+        "fullyContainNodesHelp": "Knooppunten moeten zich volledig binnen het keuzevak bevinden om te worden gekozen",
+        "workflowValidation": "Validatiefout werkstroom",
+        "nodeType": "Soort knooppunt",
+        "fullyContainNodes": "Omvat knooppunten volledig om ze te kiezen",
+        "executionStateInProgress": "Bezig",
+        "executionStateError": "Fout",
+        "boolean": "Booleaanse waarden",
+        "executionStateCompleted": "Voltooid",
+        "node": "Knooppunt",
+        "workflowAuthor": "Auteur",
+        "currentImage": "Huidige afbeelding",
+        "workflowName": "Naam",
+        "collection": "Verzameling",
+        "cannotConnectInputToInput": "Kan invoer niet aan invoer verbinden",
+        "workflowNotes": "Opmerkingen",
+        "string": "Tekenreeks",
+        "cannotConnectOutputToOutput": "Kan uitvoer niet aan uitvoer verbinden",
+        "connectionWouldCreateCycle": "Verbinding zou cyclisch worden",
+        "cannotConnectToSelf": "Kan niet aan zichzelf verbinden",
+        "notesDescription": "Voeg opmerkingen toe aan je werkstroom",
+        "unknownField": "Onbekend veld",
+        "colorCodeEdges": "Kleurgecodeerde randen",
+        "unknownNode": "Onbekend knooppunt",
+        "mismatchedVersion": "Ongeldig knooppunt: knooppunt {{node}} van het soort {{type}} heeft een niet-overeenkomende versie (probeer het bij te werken?)",
+        "addNodeToolTip": "Voeg knooppunt toe (Shift+A, spatie)",
+        "loadingNodes": "Bezig met laden van knooppunten...",
+        "snapToGridHelp": "Lijn knooppunten uit op raster bij verplaatsing",
+        "workflowSettings": "Instellingen werkstroomeditor",
+        "addLinearView": "Voeg toe aan lineaire weergave",
+        "nodePack": "Knooppuntpakket",
+        "unknownInput": "Onbekende invoer: {{name}}",
+        "sourceNodeFieldDoesNotExist": "Ongeldige rand: bron-/uitvoerveld {{node}}.{{field}} bestaat niet",
+        "collectionFieldType": "Verzameling {{name}}",
+        "deletedInvalidEdge": "Ongeldige hoek {{source}} -> {{target}} verwijderd",
+        "graph": "Grafiek",
+        "targetNodeDoesNotExist": "Ongeldige rand: doel-/invoerknooppunt {{node}} bestaat niet",
+        "resetToDefaultValue": "Herstel naar standaardwaarden",
+        "editMode": "Bewerk in Werkstroom-editor",
+        "showEdgeLabels": "Toon randlabels",
+        "showEdgeLabelsHelp": "Toon labels aan randen, waarmee de verbonden knooppunten mee worden aangegeven",
+        "clearWorkflowDesc2": "Je huidige werkstroom heeft niet-bewaarde wijzigingen.",
+        "unableToParseFieldType": "fout bij bepalen soort veld",
+        "sourceNodeDoesNotExist": "Ongeldige rand: bron-/uitvoerknooppunt {{node}} bestaat niet",
+        "unsupportedArrayItemType": "niet-ondersteunde soort van het array-onderdeel \"{{type}}\"",
+        "targetNodeFieldDoesNotExist": "Ongeldige rand: doel-/invoerveld {{node}}.{{field}} bestaat niet",
+        "reorderLinearView": "Herorden lineaire weergave",
+        "newWorkflowDesc": "Een nieuwe werkstroom aanmaken?",
+        "collectionOrScalarFieldType": "Verzameling|scalair {{name}}",
+        "newWorkflow": "Nieuwe werkstroom",
+        "unknownErrorValidatingWorkflow": "Onbekende fout bij valideren werkstroom",
+        "unsupportedAnyOfLength": "te veel union-leden ({{count}})",
+        "unknownOutput": "Onbekende uitvoer: {{name}}",
+        "viewMode": "Gebruik in lineaire weergave",
+        "unableToExtractSchemaNameFromRef": "fout bij het extraheren van de schemanaam via de ref",
+        "unsupportedMismatchedUnion": "niet-overeenkomende soort CollectionOrScalar met basissoorten {{firstType}} en {{secondType}}",
+        "unknownNodeType": "Onbekend soort knooppunt",
+        "edit": "Bewerk",
+        "updateAllNodes": "Werk knooppunten bij",
+        "allNodesUpdated": "Alle knooppunten bijgewerkt",
+        "nodeVersion": "Knooppuntversie",
+        "newWorkflowDesc2": "Je huidige werkstroom heeft niet-bewaarde wijzigingen.",
+        "clearWorkflow": "Maak werkstroom leeg",
+        "clearWorkflowDesc": "Deze werkstroom leegmaken en met een nieuwe beginnen?",
+        "inputFieldTypeParseError": "Fout bij bepalen van het soort invoerveld {{node}}.{{field}} ({{message}})",
+        "outputFieldTypeParseError": "Fout bij het bepalen van het soort uitvoerveld {{node}}.{{field}} ({{message}})",
+        "unableToExtractEnumOptions": "fout bij extraheren enumeratie-opties",
+        "unknownFieldType": "Soort $t(nodes.unknownField): {{type}}",
+        "unableToGetWorkflowVersion": "Fout bij ophalen schemaversie van werkstroom",
+        "betaDesc": "Deze uitvoering is in bèta. Totdat deze stabiel is kunnen er wijzigingen voorkomen gedurende app-updates die zaken kapotmaken. We zijn van plan om deze uitvoering op lange termijn te gaan ondersteunen.",
+        "prototypeDesc": "Deze uitvoering is een prototype. Er kunnen wijzigingen voorkomen gedurende app-updates die zaken kapotmaken. Deze kunnen op een willekeurig moment verwijderd worden.",
+        "noFieldsViewMode": "Deze werkstroom heeft geen geselecteerde velden om te tonen. Bekijk de volledige werkstroom om de waarden te configureren.",
+        "unableToUpdateNodes_one": "Fout bij bijwerken van {{count}} knooppunt",
+        "unableToUpdateNodes_other": "Fout bij bijwerken van {{count}} knooppunten"
+    },
+    "dynamicPrompts": {
+        "seedBehaviour": {
+            "perPromptDesc": "Gebruik een verschillende seedwaarde per afbeelding",
+            "perIterationLabel": "Seedwaarde per iteratie",
+            "perIterationDesc": "Gebruik een verschillende seedwaarde per iteratie",
+            "perPromptLabel": "Seedwaarde per afbeelding",
+            "label": "Gedrag seedwaarde"
+        },
+        "maxPrompts": "Max. prompts",
+        "dynamicPrompts": "Dynamische prompts",
+        "showDynamicPrompts": "Toon dynamische prompts",
+        "loading": "Genereren van dynamische prompts...",
+        "promptsPreview": "Voorvertoning prompts"
+    },
+    "popovers": {
+        "noiseUseCPU": {
+            "paragraphs": [
+                "Bepaalt of ruis wordt gegenereerd op de CPU of de GPU.",
+                "Met CPU-ruis ingeschakeld zal een bepaalde seedwaarde dezelfde afbeelding opleveren op welke machine dan ook.",
+                "Er is geen prestatieverschil bij het inschakelen van CPU-ruis."
+            ],
+            "heading": "Gebruik CPU-ruis"
+        },
+        "paramScheduler": {
+            "paragraphs": [
+                "De planner gebruikt gedurende het genereringsproces."
+            ],
+            "heading": "Planner"
+        },
+        "scaleBeforeProcessing": {
+            "paragraphs": [
+                "Schaalt het gekozen gebied naar de grootte die het meest geschikt is voor het model, vooraf aan het proces van het afbeeldingen genereren."
+            ],
+            "heading": "Schaal vooraf aan verwerking"
+        },
+        "compositingMaskAdjustments": {
+            "heading": "Aanpassingen masker",
+            "paragraphs": [
+                "Pas het masker aan."
+            ]
+        },
+        "paramRatio": {
+            "heading": "Beeldverhouding",
+            "paragraphs": [
+                "De beeldverhouding van de afmetingen van de afbeelding die wordt gegenereerd.",
+                "Een afbeeldingsgrootte (in aantal pixels) equivalent aan 512x512 wordt aanbevolen voor SD1.5-modellen. Een grootte-equivalent van 1024x1024 wordt aanbevolen voor SDXL-modellen."
+            ]
+        },
+        "dynamicPrompts": {
+            "paragraphs": [
+                "Dynamische prompts vormt een enkele prompt om in vele.",
+                "De basissyntax is \"a {red|green|blue} ball\". Dit zal de volgende drie prompts geven: \"a red ball\", \"a green ball\" en \"a blue ball\".",
+                "Gebruik de syntax zo vaak als je wilt in een enkele prompt, maar zorg ervoor dat het aantal gegenereerde prompts in lijn ligt met de instelling Max. prompts."
+            ],
+            "heading": "Dynamische prompts"
+        },
+        "paramVAE": {
+            "paragraphs": [
+                "Het model gebruikt voor het vertalen van AI-uitvoer naar de uiteindelijke afbeelding."
+            ],
+            "heading": "VAE"
+        },
+        "paramIterations": {
+            "paragraphs": [
+                "Het aantal te genereren afbeeldingen.",
+                "Als dynamische prompts is ingeschakeld, dan zal elke prompt dit aantal keer gegenereerd worden."
+            ],
+            "heading": "Iteraties"
+        },
+        "paramVAEPrecision": {
+            "heading": "Nauwkeurigheid VAE",
+            "paragraphs": [
+                "De nauwkeurigheid gebruikt tijdens de VAE-codering en -decodering. FP16/halve nauwkeurig is efficiënter, ten koste van kleine afbeeldingsvariaties."
+            ]
+        },
+        "compositingCoherenceMode": {
+            "heading": "Modus",
+            "paragraphs": [
+                "De modus van de coherentiefase."
+            ]
+        },
+        "paramSeed": {
+            "paragraphs": [
+                "Bepaalt de startruis die gebruikt wordt bij het genereren.",
+                "Schakel \"Willekeurige seedwaarde\" uit om identieke resultaten te krijgen met dezelfde genereer-instellingen."
+            ],
+            "heading": "Seedwaarde"
+        },
+        "controlNetResizeMode": {
+            "heading": "Schaalmodus",
+            "paragraphs": [
+                "Hoe de ControlNet-afbeelding zal worden geschaald aan de uitvoergrootte van de afbeelding."
+            ]
+        },
+        "controlNetBeginEnd": {
+            "paragraphs": [
+                "Op welke stappen van het ontruisingsproces ControlNet worden toegepast.",
+                "ControlNets die worden toegepast aan het begin begeleiden het compositieproces. ControlNets die worden toegepast aan het eind zorgen voor details."
+            ],
+            "heading": "Percentage begin- / eindstap"
+        },
+        "dynamicPromptsSeedBehaviour": {
+            "paragraphs": [
+                "Bepaalt hoe de seedwaarde wordt gebruikt bij het genereren van prompts.",
+                "Per iteratie zal een unieke seedwaarde worden gebruikt voor elke iteratie. Gebruik dit om de promptvariaties binnen een enkele seedwaarde te verkennen.",
+                "Bijvoorbeeld: als je vijf prompts heb, dan zal voor elke afbeelding dezelfde seedwaarde gebruikt worden.",
+                "De optie Per afbeelding zal een unieke seedwaarde voor elke afbeelding gebruiken. Dit biedt meer variatie."
+            ],
+            "heading": "Gedrag seedwaarde"
+        },
+        "clipSkip": {
+            "paragraphs": [
+                "Aantal over te slaan CLIP-modellagen.",
+                "Bepaalde modellen zijn beter geschikt met bepaalde Overslaan CLIP-instellingen."
+            ],
+            "heading": "Overslaan CLIP"
+        },
+        "paramModel": {
+            "heading": "Model",
+            "paragraphs": [
+                "Model gebruikt voor de ontruisingsstappen."
+            ]
+        },
+        "compositingCoherencePass": {
+            "heading": "Coherentiefase",
+            "paragraphs": [
+                "Een tweede ronde ontruising helpt bij het samenstellen van de erin- of eruitgetekende afbeelding."
+            ]
+        },
+        "paramDenoisingStrength": {
+            "paragraphs": [
+                "Hoeveel ruis wordt toegevoegd aan de invoerafbeelding.",
+                "0 levert een identieke afbeelding op, waarbij 1 een volledig nieuwe afbeelding oplevert."
+            ],
+            "heading": "Ontruisingssterkte"
+        },
+        "paramNegativeConditioning": {
+            "paragraphs": [
+                "Het genereerproces voorkomt de gegeven begrippen in de negatieve prompt. Gebruik dit om bepaalde zaken of voorwerpen uit te sluiten van de uitvoerafbeelding.",
+                "Ondersteunt Compel-syntax en -embeddingen."
+            ],
+            "heading": "Negatieve prompt"
+        },
+        "compositingBlurMethod": {
+            "heading": "Vervagingsmethode",
+            "paragraphs": [
+                "De methode van de vervaging die wordt toegepast op het gemaskeerd gebied."
+            ]
+        },
+        "dynamicPromptsMaxPrompts": {
+            "heading": "Max. prompts",
+            "paragraphs": [
+                "Beperkt het aantal prompts die kunnen worden gegenereerd door dynamische prompts."
+            ]
+        },
+        "infillMethod": {
+            "paragraphs": [
+                "Methode om een gekozen gebied in te vullen."
+            ],
+            "heading": "Invulmethode"
+        },
+        "controlNetWeight": {
+            "heading": "Gewicht",
+            "paragraphs": [
+                "Hoe sterk ControlNet effect heeft op de gegeneerde afbeelding."
+            ]
+        },
+        "controlNet": {
+            "heading": "ControlNet",
+            "paragraphs": [
+                "ControlNets begeleidt het genereerproces, waarbij geholpen wordt bij het maken van afbeeldingen met aangestuurde compositie, structuur of stijl, afhankelijk van het gekozen model."
+            ]
+        },
+        "paramCFGScale": {
+            "heading": "CFG-schaal",
+            "paragraphs": [
+                "Bepaalt hoeveel je prompt invloed heeft op het genereerproces."
+            ]
+        },
+        "controlNetControlMode": {
+            "paragraphs": [
+                "Geeft meer gewicht aan ofwel de prompt danwel ControlNet."
+            ],
+            "heading": "Controlemodus"
+        },
+        "paramSteps": {
+            "heading": "Stappen",
+            "paragraphs": [
+                "Het aantal uit te voeren stappen tijdens elke generatie.",
+                "Een hoger aantal stappen geven meestal betere afbeeldingen, ten koste van een hogere benodigde tijd om te genereren."
+            ]
+        },
+        "paramPositiveConditioning": {
+            "heading": "Positieve prompt",
+            "paragraphs": [
+                "Begeleidt het generartieproces. Gebruik een woord of frase naar keuze.",
+                "Syntaxes en embeddings voor Compel en dynamische prompts."
+            ]
+        },
+        "lora": {
+            "heading": "Gewicht LoRA",
+            "paragraphs": [
+                "Een hogere LoRA-gewicht zal leiden tot een groter effect op de uiteindelijke afbeelding."
+            ]
+        }
+    },
+    "metadata": {
+        "seamless": "Naadloos",
+        "positivePrompt": "Positieve prompt",
+        "negativePrompt": "Negatieve prompt",
+        "generationMode": "Genereermodus",
+        "Threshold": "Drempelwaarde ruis",
+        "metadata": "Metagegevens",
+        "strength": "Sterkte Afbeelding naar afbeelding",
+        "seed": "Seedwaarde",
+        "imageDetails": "Afbeeldingsdetails",
+        "model": "Model",
+        "noImageDetails": "Geen afbeeldingsdetails gevonden",
+        "cfgScale": "CFG-schaal",
+        "recallParameters": "Opnieuw aan te roepen parameters",
+        "height": "Hoogte",
+        "noMetaData": "Geen metagegevens gevonden",
+        "width": "Breedte",
+        "createdBy": "Gemaakt door",
+        "workflow": "Werkstroom",
+        "steps": "Stappen",
+        "scheduler": "Planner",
+        "noRecallParameters": "Geen opnieuw uit te voeren parameters gevonden"
+    },
+    "queue": {
+        "status": "Status",
+        "pruneSucceeded": "{{item_count}} voltooide onderdelen uit wachtrij opgeruimd",
+        "cancelTooltip": "Annuleer huidig onderdeel",
+        "queueEmpty": "Wachtrij leeg",
+        "pauseSucceeded": "Verwerker onderbroken",
+        "in_progress": "Bezig",
+        "queueFront": "Voeg vooraan toe in wachtrij",
+        "notReady": "Fout bij plaatsen in wachtrij",
+        "batchFailedToQueue": "Fout bij reeks in wachtrij plaatsen",
+        "completed": "Voltooid",
+        "queueBack": "Voeg toe aan wachtrij",
+        "cancelFailed": "Fout bij annuleren onderdeel",
+        "batchQueued": "Reeks in wachtrij geplaatst",
+        "pauseFailed": "Fout bij onderbreken verwerker",
+        "clearFailed": "Fout bij wissen van wachtrij",
+        "front": "begin",
+        "clearSucceeded": "Wachtrij gewist",
+        "pause": "Onderbreek",
+        "pruneTooltip": "Ruim {{item_count}} voltooide onderdelen op",
+        "cancelSucceeded": "Onderdeel geannuleerd",
+        "batchQueuedDesc_one": "Voeg {{count}} sessie toe aan het {{direction}} van de wachtrij",
+        "batchQueuedDesc_other": "Voeg {{count}} sessies toe aan het {{direction}} van de wachtrij",
+        "graphQueued": "Graaf in wachtrij geplaatst",
+        "queue": "Wachtrij",
+        "batch": "Reeks",
+        "clearQueueAlertDialog": "Als je de wachtrij onmiddellijk wist, dan worden alle onderdelen die bezig zijn geannuleerd en wordt de wachtrij volledig gewist.",
+        "pending": "Wachtend",
+        "completedIn": "Voltooid na",
+        "resumeFailed": "Fout bij hervatten verwerker",
+        "clear": "Wis",
+        "prune": "Ruim op",
+        "total": "Totaal",
+        "canceled": "Geannuleerd",
+        "pruneFailed": "Fout bij opruimen van wachtrij",
+        "cancelBatchSucceeded": "Reeks geannuleerd",
+        "clearTooltip": "Annuleer en wis alle onderdelen",
+        "current": "Huidig",
+        "pauseTooltip": "Onderbreek verwerker",
+        "failed": "Mislukt",
+        "cancelItem": "Annuleer onderdeel",
+        "next": "Volgende",
+        "cancelBatch": "Annuleer reeks",
+        "back": "eind",
+        "cancel": "Annuleer",
+        "session": "Sessie",
+        "resumeSucceeded": "Verwerker hervat",
+        "enqueueing": "Bezig met toevoegen van reeks aan wachtrij",
+        "resumeTooltip": "Hervat verwerker",
+        "resume": "Hervat",
+        "cancelBatchFailed": "Fout bij annuleren van reeks",
+        "clearQueueAlertDialog2": "Weet je zeker dat je de wachtrij wilt wissen?",
+        "item": "Onderdeel",
+        "graphFailedToQueue": "Fout bij toevoegen graaf aan wachtrij"
+    },
+    "sdxl": {
+        "refinerStart": "Startwaarde verfijning",
+        "scheduler": "Planner",
+        "cfgScale": "CFG-schaal",
+        "negStylePrompt": "Negatieve-stijlprompt",
+        "noModelsAvailable": "Geen modellen beschikbaar",
+        "refiner": "Verfijning",
+        "negAestheticScore": "Negatieve esthetische score",
+        "denoisingStrength": "Sterkte ontruising",
+        "refinermodel": "Verfijningsmodel",
+        "posAestheticScore": "Positieve esthetische score",
+        "concatPromptStyle": "Koppelen van prompt en stijl",
+        "loading": "Bezig met laden...",
+        "steps": "Stappen",
+        "posStylePrompt": "Positieve-stijlprompt",
+        "freePromptStyle": "Handmatige stijlprompt",
+        "refinerSteps": "Aantal stappen verfijner"
+    },
+    "models": {
+        "noMatchingModels": "Geen overeenkomend modellen",
+        "loading": "bezig met laden",
+        "noMatchingLoRAs": "Geen overeenkomende LoRA's",
+        "noModelsAvailable": "Geen modellen beschikbaar",
+        "selectModel": "Kies een model",
+        "noLoRAsInstalled": "Geen LoRA's geïnstalleerd",
+        "noRefinerModelsInstalled": "Geen SDXL-verfijningsmodellen geïnstalleerd",
+        "defaultVAE": "Standaard-VAE",
+        "lora": "LoRA",
+        "addLora": "Voeg LoRA toe",
+        "concepts": "Concepten"
+    },
+    "boards": {
+        "autoAddBoard": "Voeg automatisch bord toe",
+        "topMessage": "Dit bord bevat afbeeldingen die in gebruik zijn door de volgende functies:",
+        "move": "Verplaats",
+        "menuItemAutoAdd": "Voeg dit automatisch toe aan bord",
+        "myBoard": "Mijn bord",
+        "searchBoard": "Zoek borden...",
+        "noMatching": "Geen overeenkomende borden",
+        "selectBoard": "Kies een bord",
+        "cancel": "Annuleer",
+        "addBoard": "Voeg bord toe",
+        "bottomMessage": "Als je dit bord en alle afbeeldingen erop verwijdert, dan worden alle functies teruggezet die ervan gebruik maken.",
+        "uncategorized": "Zonder categorie",
+        "downloadBoard": "Download bord",
+        "changeBoard": "Wijzig bord",
+        "loading": "Bezig met laden...",
+        "clearSearch": "Maak zoekopdracht leeg",
+        "deleteBoard": "Verwijder bord",
+        "deleteBoardAndImages": "Verwijder bord en afbeeldingen",
+        "deleteBoardOnly": "Verwijder alleen bord",
+        "deletedBoardsCannotbeRestored": "Verwijderde borden kunnen niet worden hersteld",
+        "movingImagesToBoard_one": "Verplaatsen van {{count}} afbeelding naar bord:",
+        "movingImagesToBoard_other": "Verplaatsen van {{count}} afbeeldingen naar bord:"
+    },
+    "invocationCache": {
+        "disable": "Schakel uit",
+        "misses": "Mislukt cacheverzoek",
+        "enableFailed": "Fout bij inschakelen aanroepcache",
+        "invocationCache": "Aanroepcache",
+        "clearSucceeded": "Aanroepcache gewist",
+        "enableSucceeded": "Aanroepcache ingeschakeld",
+        "clearFailed": "Fout bij wissen aanroepcache",
+        "hits": "Gelukt cacheverzoek",
+        "disableSucceeded": "Aanroepcache uitgeschakeld",
+        "disableFailed": "Fout bij uitschakelen aanroepcache",
+        "enable": "Schakel in",
+        "clear": "Wis",
+        "maxCacheSize": "Max. grootte cache",
+        "cacheSize": "Grootte cache"
+    },
+    "accordions": {
+        "generation": {
+            "title": "Genereren"
+        },
+        "image": {
+            "title": "Afbeelding"
+        },
+        "advanced": {
+            "title": "Geavanceerd",
+            "options": "$t(accordions.advanced.title) Opties"
+        },
+        "control": {
+            "title": "Besturing"
+        },
+        "compositing": {
+            "title": "Samenstellen",
+            "coherenceTab": "Coherentiefase",
+            "infillTab": "Invullen"
+        }
+    },
+    "hrf": {
+        "upscaleMethod": "Opschaalmethode",
+        "metadata": {
+            "strength": "Sterkte oplossing voor hoge resolutie",
+            "method": "Methode oplossing voor hoge resolutie",
+            "enabled": "Oplossing voor hoge resolutie ingeschakeld"
+        },
+        "hrf": "Oplossing voor hoge resolutie",
+        "enableHrf": "Schakel oplossing in voor hoge resolutie"
+    },
+    "prompt": {
+        "addPromptTrigger": "Voeg prompttrigger toe",
+        "compatibleEmbeddings": "Compatibele embeddings"
+    }
+}

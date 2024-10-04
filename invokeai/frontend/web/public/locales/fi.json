@@ -1,0 +1,34 @@
+{
+    "accessibility": {
+        "reset": "Resetoi",
+        "uploadImage": "Lataa kuva",
+        "invokeProgressBar": "Invoken edistymispalkki",
+        "nextImage": "Seuraava kuva",
+        "previousImage": "Edellinen kuva"
+    },
+    "common": {
+        "languagePickerLabel": "Kielen valinta",
+        "hotkeysLabel": "Pikanäppäimet",
+        "reportBugLabel": "Raportoi Bugista",
+        "settingsLabel": "Asetukset",
+        "githubLabel": "Github",
+        "discordLabel": "Discord",
+        "upload": "Lataa",
+        "img2img": "Kuva kuvaksi",
+        "nodes": "Solmut",
+        "postprocessing": "Jälkikäsitellään",
+        "cancel": "Peruuta",
+        "accept": "Hyväksy",
+        "load": "Lataa",
+        "back": "Takaisin",
+        "statusDisconnected": "Yhteys katkaistu",
+        "loading": "Ladataan",
+        "txt2img": "Teksti kuvaksi"
+    },
+    "gallery": {
+        "galleryImageSize": "Kuvan koko",
+        "gallerySettings": "Gallerian asetukset",
+        "autoSwitchNewImages": "Vaihda uusiin kuviin automaattisesti",
+        "noImagesInGallery": "Ei kuvia galleriassa"
+    }
+}

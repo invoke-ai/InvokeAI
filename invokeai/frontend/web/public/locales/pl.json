@@ -1,0 +1,70 @@
+{
+    "common": {
+        "hotkeysLabel": "Skróty klawiszowe",
+        "languagePickerLabel": "Wybór języka",
+        "reportBugLabel": "Zgłoś błąd",
+        "settingsLabel": "Ustawienia",
+        "img2img": "Obraz na obraz",
+        "nodes": "Węzły",
+        "upload": "Prześlij",
+        "load": "Załaduj",
+        "statusDisconnected": "Odłączono od serwera",
+        "githubLabel": "GitHub",
+        "discordLabel": "Discord"
+    },
+    "gallery": {
+        "galleryImageSize": "Rozmiar obrazów",
+        "gallerySettings": "Ustawienia galerii",
+        "autoSwitchNewImages": "Przełączaj na nowe obrazy",
+        "noImagesInGallery": "Brak obrazów w galerii"
+    },
+    "parameters": {
+        "images": "L. obrazów",
+        "steps": "L. kroków",
+        "cfgScale": "Skala CFG",
+        "width": "Szerokość",
+        "height": "Wysokość",
+        "seed": "Inicjator",
+        "shuffle": "Losuj",
+        "noiseThreshold": "Poziom szumu",
+        "perlinNoise": "Szum Perlina",
+        "type": "Metoda",
+        "strength": "Siła",
+        "upscaling": "Powiększanie",
+        "scale": "Skala",
+        "imageFit": "Przeskaluj oryginalny obraz",
+        "scaleBeforeProcessing": "Tryb skalowania",
+        "scaledWidth": "Sk. do szer.",
+        "scaledHeight": "Sk. do wys.",
+        "infillMethod": "Metoda wypełniania",
+        "tileSize": "Rozmiar kafelka",
+        "downloadImage": "Pobierz obraz",
+        "usePrompt": "Skopiuj sugestie",
+        "useSeed": "Skopiuj inicjator",
+        "useAll": "Skopiuj wszystko",
+        "info": "Informacje",
+        "showOptionsPanel": "Pokaż panel ustawień"
+    },
+    "settings": {
+        "models": "Modele",
+        "displayInProgress": "Podgląd generowanego obrazu",
+        "confirmOnDelete": "Potwierdzaj usuwanie",
+        "resetWebUI": "Zresetuj interfejs",
+        "resetWebUIDesc1": "Resetowanie interfejsu wyczyści jedynie dane i ustawienia zapisane w pamięci przeglądarki. Nie usunie żadnych obrazów z dysku.",
+        "resetWebUIDesc2": "Jeśli obrazy nie są poprawnie wyświetlane w galerii lub doświadczasz innych problemów, przed zgłoszeniem błędu spróbuj zresetować interfejs.",
+        "resetComplete": "Interfejs został zresetowany. Odśwież stronę, aby załadować ponownie."
+    },
+    "toast": {
+        "uploadFailed": "Błąd przesyłania obrazu",
+        "imageCopied": "Skopiowano obraz",
+        "parametersNotSet": "Nie ustawiono parametrów"
+    },
+    "accessibility": {
+        "invokeProgressBar": "Pasek postępu",
+        "reset": "Zerowanie",
+        "uploadImage": "Wgrywanie obrazu",
+        "previousImage": "Poprzedni obraz",
+        "nextImage": "Następny obraz",
+        "menu": "Menu"
+    }
+}

@@ -1,0 +1,60 @@
+{
+    "accessibility": {
+        "menu": "Меню",
+        "nextImage": "Следваща снимка",
+        "previousImage": "Предишно изображение",
+        "uploadImage": "Качете изображение",
+        "invokeProgressBar": "Invoke лента за напредък",
+        "mode": "Режим"
+    },
+    "boards": {
+        "addBoard": "Добавете табло",
+        "cancel": "Отказ",
+        "autoAddBoard": "Авто-добавяне на табло",
+        "changeBoard": "Смяна на табло",
+        "deleteBoard": "Изтриване на табло",
+        "deleteBoardAndImages": "Изтриване на табло и изображения",
+        "deleteBoardOnly": "Изтриване само на таблото",
+        "loading": "Зареждане...",
+        "movingImagesToBoard_one": "Преместване на {{count}} снимка към табло:",
+        "movingImagesToBoard_other": "Преместване на {{count}} снимки към табло:",
+        "selectBoard": "Изберете табло",
+        "uncategorized": "Некатегоризирани",
+        "downloadBoard": "Изтегляне на табло",
+        "bottomMessage": "Изтриването на това табло и изображенията в него ще нулира всички функции, които ги използват в момента.",
+        "deletedBoardsCannotbeRestored": "Изтритите табла не могат да бъдат възстановени",
+        "myBoard": "Моето табло"
+    },
+    "accordions": {
+        "image": {
+            "title": "Изображение"
+        },
+        "control": {
+            "title": "Контрол"
+        }
+    },
+    "common": {
+        "aboutDesc": "Използвате Invoke за работа? Разгледайте:",
+        "ai": "ии",
+        "areYouSure": "Сигурен ли сте?",
+        "back": "Назад",
+        "cancel": "Отказ",
+        "or": "или",
+        "controlNet": "ControlNet",
+        "details": "Детайли",
+        "dontAskMeAgain": "Не питай повече",
+        "folder": "Папка",
+        "githubLabel": "Github",
+        "img2img": "Снимка към снимка",
+        "languagePickerLabel": "Език",
+        "loading": "Зареждане",
+        "learnMore": "Научете повече",
+        "modelManager": "Мениджър на модели",
+        "openInNewTab": "Отворете в нов таб",
+        "orderBy": "Подреждане по",
+        "communityLabel": "Общност",
+        "discordLabel": "Дискорд",
+        "error": "Грешка",
+        "file": "Файл"
+    }
+}
