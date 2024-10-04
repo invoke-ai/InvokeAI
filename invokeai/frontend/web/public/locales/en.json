@@ -53,7 +53,8 @@
         "imagesWithCount_one": "{{count}} image",
         "imagesWithCount_other": "{{count}} images",
         "assetsWithCount_one": "{{count}} asset",
-        "assetsWithCount_other": "{{count}} assets"
+        "assetsWithCount_other": "{{count}} assets",
+        "updateBoardError": "Error updating board"
     },
     "accordions": {
         "generation": {
