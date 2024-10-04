@@ -207,7 +207,9 @@
         "settings": "Paramètres",
         "predictionType": "Type de Prédiction",
         "advanced": "Avancé",
-        "modelType": "Type de modèle"
+        "modelType": "Type de modèle",
+        "vaePrecision": "Précision VAE",
+        "noModelSelected": "Aucun modèle sélectionné"
     },
     "parameters": {
         "images": "Images",
@@ -268,7 +270,16 @@
             "cancel": "Annuler"
         },
         "useCpuNoise": "Utiliser le bruit du CPU",
-        "imageActions": "Actions d'image"
+        "imageActions": "Actions d'image",
+        "setToOptimalSize": "Optimiser la taille pour le modèle",
+        "setToOptimalSizeTooSmall": "$t(parameters.setToOptimalSize) (peut être trop petit)",
+        "swapDimensions": "Échanger les dimensions",
+        "aspect": "Aspect",
+        "cfgRescaleMultiplier": "Multiplicateur de mise à l'échelle CFG",
+        "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (peut être trop grand)",
+        "useSize": "Utiliser la taille",
+        "remixImage": "Remixer l'image",
+        "lockAspectRatio": "Verrouiller le rapport hauteur/largeur"
     },
     "settings": {
         "models": "Modèles",
@@ -284,7 +295,23 @@
         "beta": "Bêta",
         "generation": "Génération",
         "ui": "Interface Utilisateur",
-        "developer": "Développeur"
+        "developer": "Développeur",
+        "enableNSFWChecker": "Activer le vérificateur NSFW",
+        "clearIntermediatesDesc2": "Les images intermédiaires sont des sous-produits de la génération, différentes des images de résultat dans la galerie. La suppression des intermédiaires libérera de l'espace disque.",
+        "clearIntermediatesDisabled": "La file d'attente doit être vide pour effacer les intermédiaires.",
+        "reloadingIn": "Rechargement dans",
+        "intermediatesClearedFailed": "Problème de suppression des intermédiaires",
+        "clearIntermediates": "Effacer les intermédiaires",
+        "enableInvisibleWatermark": "Activer le Filigrane Invisible",
+        "clearIntermediatesDesc1": "Effacer les intermédiaires réinitialisera votre  Toile et votre ControlNet.",
+        "enableInformationalPopovers": "Activer les infobulles d'information",
+        "intermediatesCleared_one": "Effacé {{count}} Intermédiaire",
+        "intermediatesCleared_many": "Effacé {{count}} Intermédiaires",
+        "intermediatesCleared_other": "Effacé {{count}} Intermédiaires",
+        "clearIntermediatesDesc3": "Vos images de galerie ne seront pas supprimées.",
+        "clearIntermediatesWithCount_one": "Effacé {{count}} Intermédiaire",
+        "clearIntermediatesWithCount_many": "Effacé {{count}} Intermédiaires",
+        "clearIntermediatesWithCount_other": "Effacé {{count}} Intermédiaires"
     },
     "toast": {
         "uploadFailed": "Téléchargement échoué",
@@ -304,7 +331,15 @@
         "loadedWithWarnings": "Processus chargé avec des avertissements",
         "imageUploaded": "Image importée",
         "modelAddedSimple": "Modèle ajouté à la file d'attente",
-        "setControlImage": "Définir comme image de contrôle"
+        "setControlImage": "Définir comme image de contrôle",
+        "workflowDeleted": "Processus supprimé",
+        "baseModelChangedCleared_one": "Effacé ou désactivé {{count}} sous-modèle incompatible",
+        "baseModelChangedCleared_many": "Effacé ou désactivé {{count}} sous-modèles incompatibles",
+        "baseModelChangedCleared_other": "Effacé ou désactivé {{count}} sous-modèles incompatibles",
+        "invalidUpload": "Téléchargement invalide",
+        "problemDownloadingImage": "Impossible de télécharger l'image",
+        "problemRetrievingWorkflow": "Problème de récupération du processus",
+        "problemDeletingWorkflow": "Problème de suppression du processus"
     },
     "accessibility": {
         "uploadImage": "Charger une image",
@@ -630,7 +665,10 @@
             "heading": "Prompt Négatif"
         },
         "paramVAEPrecision": {
-            "heading": "Précision du VAE"
+            "heading": "Précision du VAE",
+            "paragraphs": [
+                "La précision utilisée lors de l'encodage et du décodage VAE."
+            ]
         },
         "controlNetWeight": {
             "heading": "Poids",
@@ -660,7 +698,8 @@
         "paramScheduler": {
             "heading": "Planificateur",
             "paragraphs": [
-                "Planificateur utilisé pendant le processus de génération."
+                "Planificateur utilisé pendant le processus de génération.",
+                "Chaque planificateur définit comment ajouter de manière itérative du bruit à une image ou comment mettre à jour un échantillon en fonction de la sortie d'un modèle."
             ]
         },
         "controlNet": {
@@ -670,7 +709,11 @@
             "heading": "ControlNet"
         },
         "paramSteps": {
-            "heading": "Étapes"
+            "heading": "Étapes",
+            "paragraphs": [
+                "Nombre d'étapes qui seront effectuées à chaque génération.",
+                "Des nombres d'étapes plus élevés créeront généralement de meilleures images, mais nécessiteront plus de temps de génération."
+            ]
         },
         "controlNetBeginEnd": {
             "heading": "Pourcentage de début / de fin d'étape",
@@ -695,7 +738,10 @@
             ]
         },
         "paramVAE": {
-            "heading": "VAE"
+            "heading": "VAE",
+            "paragraphs": [
+                "Modèle utilisé pour convertir la sortie de l'IA en l'image finale."
+            ]
         },
         "compositingCoherenceMode": {
             "heading": "Mode",
@@ -704,7 +750,11 @@
             ]
         },
         "paramIterations": {
-            "heading": "Itérations"
+            "heading": "Itérations",
+            "paragraphs": [
+                "Le nombre d'images à générer.",
+                "Si les prompts dynamiques sont activées, chaque prompt sera généré autant de fois."
+            ]
         },
         "dynamicPrompts": {
             "paragraphs": [
@@ -715,7 +765,10 @@
             "heading": "Prompts Dynamiques"
         },
         "paramModel": {
-            "heading": "Modèle"
+            "heading": "Modèle",
+            "paragraphs": [
+                "Modèle utilisé pour la génération. Différents modèles sont entraînés pour se spécialiser dans la production de résultats esthétiques et de contenus variés."
+            ]
         },
         "compositingCoherencePass": {
             "heading": "Passe de cohérence",
@@ -724,13 +777,24 @@
             ]
         },
         "paramRatio": {
-            "heading": "Rapport hauteur/largeur"
+            "heading": "Rapport hauteur/largeur",
+            "paragraphs": [
+                "Le rapport hauteur/largeur de l'image générée.",
+                "Une taille d'image (en nombre de pixels) équivalente à 512x512 est recommandée pour les modèles SD1.5 et une taille équivalente à 1024x1024 est recommandée pour les modèles SDXL."
+            ]
         },
         "paramSeed": {
-            "heading": "Graine"
+            "heading": "Graine",
+            "paragraphs": [
+                "Contrôle le bruit de départ utilisé pour la génération.",
+                "Désactivez l'option \"Aléatoire\" pour produire des résultats identiques avec les mêmes paramètres de génération."
+            ]
         },
         "scaleBeforeProcessing": {
-            "heading": "Échelle avant traitement"
+            "heading": "Échelle avant traitement",
+            "paragraphs": [
+                "\"Auto\" ajuste la zone sélectionnée à la taille la mieux adaptée au modèle avant le processus de génération d'image."
+            ]
         },
         "compositingBlurMethod": {
             "heading": "Méthode de flou",
@@ -751,7 +815,11 @@
             ]
         },
         "paramDenoisingStrength": {
-            "heading": "Force de débruitage"
+            "heading": "Force de débruitage",
+            "paragraphs": [
+                "Intensité du bruit ajouté à l'image d'entrée.",
+                "0 produira une image identique, tandis que 1 produira une image complètement différente."
+            ]
         },
         "lora": {
             "heading": "LoRA",
@@ -760,10 +828,39 @@
             ]
         },
         "noiseUseCPU": {
-            "heading": "Utiliser le bruit du CPU"
+            "heading": "Utiliser le bruit du CPU",
+            "paragraphs": [
+                "Contrôle si le bruit est généré sur le CPU ou le GPU.",
+                "Avec le bruit du CPU activé, une graine particulière produira la même image sur n'importe quelle machine.",
+                "Il n'y a aucun impact sur les performances à activer le bruit du CPU."
+            ]
         },
         "paramCFGScale": {
-            "heading": "Échelle CFG"
+            "heading": "Échelle CFG",
+            "paragraphs": [
+                "Contrôle de l'influence du prompt sur le processus de génération."
+            ]
+        },
+        "loraWeight": {
+            "heading": "Poids"
+        },
+        "imageFit": {
+            "heading": "Ajuster l'image initiale à la taille de sortie",
+            "paragraphs": [
+                "Redimensionne l'image initiale à la largeur et à la hauteur de l'image de sortie. Il est recommandé de l'activer."
+            ]
+        },
+        "paramCFGRescaleMultiplier": {
+            "heading": "Multiplicateur de mise à l'échelle CFG",
+            "paragraphs": [
+                "Multiplicateur de mise à l'échelle pour le guidage CFG, utilisé pour les modèles entraînés en utilisant le zero-terminal SNR (ztsnr)."
+            ]
+        },
+        "controlNetProcessor": {
+            "heading": "Processeur",
+            "paragraphs": [
+                "Méthode de traitement de l'image d'entrée pour guider le processus de génération. Différents processeurs fourniront différents effets ou styles dans vos images générées."
+            ]
         }
     },
     "dynamicPrompts": {
@@ -800,7 +897,11 @@
         "generationMode": "Mode Génération",
         "height": "Hauteur",
         "createdBy": "Créé par",
-        "strength": "Force d'image à image"
+        "strength": "Force d'image à image",
+        "vae": "VAE",
+        "noRecallParameters": "Aucun paramètre à rappeler trouvé.",
+        "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
+        "recallParameters": "Rappeler les paramètres"
     },
     "sdxl": {
         "freePromptStyle": "Écriture de Prompt manuelle",
@@ -830,9 +931,9 @@
         "downloadWorkflow": "Télécharger processus en JSON",
         "loadWorkflow": "Charger le processus",
         "reloadNodeTemplates": "Recharger les modèles de nœuds",
-        "animatedEdges": "Bords animés",
+        "animatedEdges": "Connexions animées",
         "cannotConnectToSelf": "Impossible de se connecter à soi-même",
-        "edge": "Bord",
+        "edge": "Connexion",
         "workflowAuthor": "Auteur",
         "enum": "Énumération",
         "integer": "Entier",
@@ -844,8 +945,8 @@
         "version": "Version",
         "boolean": "Booléens",
         "executionStateCompleted": "Terminé",
-        "colorCodeEdges": "Code de couleur des bords",
-        "colorCodeEdgesHelp": "Code couleur des arêtes en fonction de leurs champs connectés.",
+        "colorCodeEdges": "Code de couleur des connexions",
+        "colorCodeEdgesHelp": "Code couleur des connexions en fonction de leurs champs connectés.",
         "currentImage": "Image actuelle",
         "noFieldsLinearview": "Aucun champ ajouté à la vue linéaire",
         "float": "Flottant",
@@ -874,7 +975,7 @@
         "unknownField": "Champ inconnu",
         "workflowNotes": "Notes",
         "workflowTags": "Tags",
-        "animatedEdgesHelp": "Animer les arêtes sélectionnées et les arêtes connectées aux nœuds sélectionnés.",
+        "animatedEdgesHelp": "Animer les connexions sélectionnées et les connexions associées aux nœuds sélectionnés",
         "nodeTemplate": "Modèle de nœud",
         "fieldTypesMustMatch": "Les types de champs doivent correspondre.",
         "fullyContainNodes": "Contient complètement les nœuds à sélectionner",
@@ -897,13 +998,86 @@
         "workflowName": "Nom",
         "snapToGridHelp": "Aligner les nœuds sur la grille lorsqu'ils sont déplacés.",
         "unableToValidateWorkflow": "Impossible de valider le processus",
-        "validateConnections": "Valider les connexions et le graphique"
+        "validateConnections": "Valider les connexions et le graphique",
+        "unableToUpdateNodes_one": "Impossible de mettre à jour {{count}} nœud",
+        "unableToUpdateNodes_many": "Impossible de mettre à jour {{count}} nœuds",
+        "unableToUpdateNodes_other": "Impossible de mettre à jour {{count}} nœuds",
+        "cannotDuplicateConnection": "Impossible de créer des connexions en double.",
+        "resetToDefaultValue": "Réinitialiser à la valeur par défaut",
+        "unknownNodeType": "Type de nœud inconnu",
+        "unknownInput": "Entrée inconnue : {{name}}",
+        "prototypeDesc": "Cette invocation est un prototype. Elle peut subir des modifications majeures lors des mises à jour de l'application et peut être supprimée à tout moment.",
+        "nodePack": "Paquet de nœuds",
+        "sourceNodeDoesNotExist": "Connexion invalide : le nœud source/de sortie {{node}} n'existe pas.",
+        "sourceNodeFieldDoesNotExist": "Connexion invalide : {{node}}.{{field}} n'existe pas",
+        "unableToGetWorkflowVersion": "Impossible d'obtenir la version du schéma de processus",
+        "newWorkflowDesc2": "Votre processus actuel comporte des modifications non enregistrées.",
+        "deletedInvalidEdge": "Connexion invalide supprimé {{source}} -> {{target}}",
+        "targetNodeDoesNotExist": "Connexion invalide : le nœud cible/entrée {{node}} n'existe pas.",
+        "targetNodeFieldDoesNotExist": "Connexion invalide : le champ {{node}}.{{field}} n'existe pas.",
+        "nodeVersion": "Version du noeud",
+        "clearWorkflowDesc2": "Votre processus actuel comporte des modifications non enregistrées.",
+        "clearWorkflow": "Effacer le Processus",
+        "clearWorkflowDesc": "Effacer ce processus et en commencer un nouveau ?",
+        "unsupportedArrayItemType": "type d'élément de tableau non pris en charge \"{{type}}\"",
+        "addLinearView": "Ajouter à la vue linéaire",
+        "collectionOrScalarFieldType": "{{name}} (Unique ou Collection)",
+        "unableToExtractEnumOptions": "impossible d'extraire les options d'énumération",
+        "unsupportedAnyOfLength": "trop de membres dans l'union ({{count}})",
+        "ipAdapter": "IP-Adapter",
+        "viewMode": "Utiliser en vue linéaire",
+        "collectionFieldType": "{{name}} (Collection)",
+        "newWorkflow": "Nouveau processus",
+        "reorderLinearView": "Réorganiser la vue linéaire",
+        "unknownOutput": "Sortie inconnue : {{name}}",
+        "outputFieldTypeParseError": "Impossible d'analyser le type du champ de sortie {{node}}.{{field}} ({{message}})",
+        "unsupportedMismatchedUnion": "type CollectionOrScalar non concordant avec les types de base {{firstType}} et {{secondType}}",
+        "unableToParseFieldType": "impossible d'analyser le type de champ",
+        "betaDesc": "Cette invocation est en version bêta. Tant qu'elle n'est pas stable, elle peut avoir des changements majeurs lors des mises à jour de l'application. Nous prévoyons de soutenir cette invocation à long terme.",
+        "unknownFieldType": "$t(nodes.unknownField) type : {{type}}",
+        "inputFieldTypeParseError": "Impossible d'analyser le type du champ d'entrée {{node}}.{{field}} ({{message}})",
+        "unableToExtractSchemaNameFromRef": "impossible d'extraire le nom du schéma à partir de la référence",
+        "editMode": "Modifier dans l'éditeur de processus",
+        "unknownErrorValidatingWorkflow": "Erreur inconnue lors de la validation du processus.",
+        "updateAllNodes": "Mettre à jour les nœuds",
+        "allNodesUpdated": "Tous les nœuds mis à jour",
+        "newWorkflowDesc": "Créer un nouveau processus ?"
     },
     "models": {
         "noMatchingModels": "Aucun modèle correspondant",
         "noModelsAvailable": "Aucun modèle disponible",
         "loading": "chargement",
         "selectModel": "Sélectionner un modèle",
-        "noMatchingLoRAs": "Aucun LoRA correspondant"
+        "noMatchingLoRAs": "Aucun LoRA correspondant",
+        "lora": "LoRA",
+        "noRefinerModelsInstalled": "Aucun modèle SDXL Refiner installé",
+        "noLoRAsInstalled": "Aucun LoRA installé",
+        "addLora": "Ajouter LoRA",
+        "defaultVAE": "VAE par défaut"
+    },
+    "workflows": {
+        "workflowLibrary": "Bibliothèque",
+        "loading": "Chargement des processus",
+        "searchWorkflows": "Rechercher des processus",
+        "workflowCleared": "Processus effacé",
+        "noDescription": "Aucune description",
+        "deleteWorkflow": "Supprimer le processus",
+        "openWorkflow": "Ouvrir le processus",
+        "uploadWorkflow": "Charger à partir du fichier",
+        "workflowName": "Nom du processus",
+        "unnamedWorkflow": "Processus sans nom",
+        "saveWorkflowAs": "Enregistrer le processus sous",
+        "workflows": "Processus",
+        "savingWorkflow": "Enregistrement du processus...",
+        "saveWorkflowToProject": "Enregistrer le processus dans le projet",
+        "downloadWorkflow": "Enregistrer dans le fichier",
+        "saveWorkflow": "Enregistrer le processus",
+        "problemSavingWorkflow": "Problème de sauvegarde du processus",
+        "workflowEditorMenu": "Menu de l'Éditeur de Processus",
+        "newWorkflowCreated": "Nouveau processus créé",
+        "clearWorkflowSearchFilter": "Réinitialiser le filtre de recherche de processus",
+        "problemLoading": "Problème de chargement des processus",
+        "workflowSaved": "Processus enregistré",
+        "noWorkflows": "Pas de processus"
     }
 }
