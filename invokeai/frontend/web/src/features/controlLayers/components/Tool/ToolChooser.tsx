@@ -11,7 +11,7 @@ import { ToolViewButton } from './ToolViewButton';
 export const ToolChooser: React.FC = () => {
   return (
     <>
-      <ButtonGroup isAttached>
+      <ButtonGroup isAttached orientation="vertical">
         <ToolBrushButton />
         <ToolEraserButton />
         <ToolRectButton />

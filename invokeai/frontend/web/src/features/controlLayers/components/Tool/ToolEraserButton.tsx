@@ -1,4 +1,4 @@
-import { IconButton } from '@invoke-ai/ui-library';
+import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -21,14 +21,15 @@ export const ToolEraserButton = memo(() => {
   });
 
   return (
-    <IconButton
-      aria-label={`${t('controlLayers.tool.eraser')} (E)`}
-      tooltip={`${t('controlLayers.tool.eraser')} (E)`}
-      icon={<PiEraserBold />}
-      colorScheme={isSelected ? 'invokeBlue' : 'base'}
-      variant="solid"
-      onClick={selectEraser}
-    />
+    <Tooltip label={`${t('controlLayers.tool.eraser')} (E)`} placement="end">
+      <IconButton
+        aria-label={`${t('controlLayers.tool.eraser')} (E)`}
+        icon={<PiEraserBold />}
+        colorScheme={isSelected ? 'invokeBlue' : 'base'}
+        variant="solid"
+        onClick={selectEraser}
+      />
+    </Tooltip>
   );
 });
 

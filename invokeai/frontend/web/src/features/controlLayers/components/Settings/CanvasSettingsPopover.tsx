@@ -22,6 +22,7 @@ import { CanvasSettingsIsolatedTransformingPreviewSwitch } from 'features/contro
 import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
 import { CanvasSettingsOutputOnlyMaskedRegionsCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsOutputOnlyMaskedRegionsCheckbox';
 import { CanvasSettingsPreserveMaskCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPreserveMaskCheckbox';
+import { CanvasSettingsPressureSensitivityCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPressureSensitivity';
 import { CanvasSettingsRecalculateRectsButton } from 'features/controlLayers/components/Settings/CanvasSettingsRecalculateRectsButton';
 import { CanvasSettingsShowHUDSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsShowHUDSwitch';
 import { CanvasSettingsShowProgressOnCanvas } from 'features/controlLayers/components/Settings/CanvasSettingsShowProgressOnCanvasSwitch';
@@ -50,6 +51,7 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsClipToBboxCheckbox />
             <CanvasSettingsOutputOnlyMaskedRegionsCheckbox />
             <CanvasSettingsSnapToGridCheckbox />
+            <CanvasSettingsPressureSensitivityCheckbox />
             <CanvasSettingsShowProgressOnCanvas />
             <CanvasSettingsIsolatedStagingPreviewSwitch />
             <CanvasSettingsIsolatedFilteringPreviewSwitch />

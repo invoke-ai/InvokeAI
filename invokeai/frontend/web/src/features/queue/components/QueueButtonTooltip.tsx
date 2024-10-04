@@ -1,3 +1,4 @@
+import type { TooltipProps } from '@invoke-ai/ui-library';
 import { Divider, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -20,19 +21,19 @@ const selectPromptsCount = createSelector(selectParamsSlice, selectDynamicPrompt
   getShouldProcessPrompt(params.positivePrompt) ? dynamicPrompts.prompts.length : 1
 );
 
-type Props = {
+type Props = TooltipProps & {
   prepend?: boolean;
 };
 
-export const QueueButtonTooltip = (props: PropsWithChildren<Props>) => {
+export const QueueButtonTooltip = ({ prepend, children, ...rest }: PropsWithChildren<Props>) => {
   return (
-    <Tooltip label={<TooltipContent prepend={props.prepend} />} maxW={512}>
-      {props.children}
+    <Tooltip label={<TooltipContent prepend={prepend} />} maxW={512} {...rest}>
+      {children}
     </Tooltip>
   );
 };
 
-const TooltipContent = memo(({ prepend = false }: Props) => {
+const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const { t } = useTranslation();
   const { isReady, reasons } = useIsReadyToEnqueue();
   const sendToCanvas = useAppSelector(selectSendToCanvas);

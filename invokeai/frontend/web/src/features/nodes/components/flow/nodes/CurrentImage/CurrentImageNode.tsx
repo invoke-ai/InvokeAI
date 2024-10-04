@@ -73,7 +73,7 @@ const Wrapper = (props: PropsWithChildren<{ nodeProps: NodeProps }>) => {
           {props.children}
           {isHovering && (
             <motion.div key="nextPrevButtons" initial={initial} animate={animate} exit={exit} style={styles}>
-              <NextPrevImageButtons />
+              <NextPrevImageButtons inset={2} />
             </motion.div>
           )}
         </Flex>

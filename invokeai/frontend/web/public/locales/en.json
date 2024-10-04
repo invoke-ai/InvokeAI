@@ -10,8 +10,8 @@
         "previousImage": "Previous Image",
         "reset": "Reset",
         "resetUI": "$t(accessibility.reset) UI",
-        "showGalleryPanel": "Show Gallery Panel",
-        "showOptionsPanel": "Show Side Panel",
+        "toggleRightPanel": "Toggle Right Panel (T)",
+        "toggleLeftPanel": "Toggle Left Panel (G)",
         "uploadImage": "Upload Image"
     },
     "boards": {
@@ -94,6 +94,7 @@
         "on": "On",
         "off": "Off",
         "or": "or",
+        "ok": "Ok",
         "checkpoint": "Checkpoint",
         "communityLabel": "Community",
         "controlNet": "ControlNet",
@@ -1081,6 +1082,7 @@
         "antialiasProgressImages": "Antialias Progress Images",
         "beta": "Beta",
         "confirmOnDelete": "Confirm On Delete",
+        "confirmOnNewSession": "Confirm On New Session",
         "developer": "Developer",
         "displayInProgress": "Display Progress Images",
         "enableInformationalPopovers": "Enable Informational Popovers",
@@ -1561,6 +1563,7 @@
         "saveCanvasToGallery": "Save Canvas to Gallery",
         "saveBboxToGallery": "Save Bbox to Gallery",
         "saveLayerToAssets": "Save Layer to Assets",
+        "cropLayerToBbox": "Crop Layer to Bbox",
         "savedToGalleryOk": "Saved to Gallery",
         "savedToGalleryError": "Error saving to gallery",
         "newGlobalReferenceImageOk": "Created Global Reference Image",
@@ -1674,6 +1677,10 @@
         "negativePrompt": "Negative Prompt",
         "beginEndStepPercentShort": "Begin/End %",
         "weight": "Weight",
+        "newGallerySession": "New Gallery Session",
+        "newGallerySessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be sent to the gallery.",
+        "newCanvasSession": "New Canvas Session",
+        "newCanvasSessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be staged on the canvas.",
         "controlMode": {
             "controlMode": "Control Mode",
             "balanced": "Balanced",
@@ -1813,7 +1820,8 @@
             "isolatedStagingPreview": "Isolated Staging Preview",
             "isolatedFilteringPreview": "Isolated Filtering Preview",
             "isolatedTransformingPreview": "Isolated Transforming Preview",
-            "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size"
+            "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
+            "pressureSensitivity": "Pressure Sensitivity"
         },
         "HUD": {
             "bbox": "Bbox",
@@ -1833,6 +1841,7 @@
             }
         },
         "canvasContextMenu": {
+            "canvasGroup": "Canvas",
             "saveToGalleryGroup": "Save To Gallery",
             "saveCanvasToGallery": "Save Canvas To Gallery",
             "saveBboxToGallery": "Save Bbox To Gallery",
@@ -1840,7 +1849,8 @@
             "newGlobalReferenceImage": "New Global Reference Image",
             "newRegionalReferenceImage": "New Regional Reference Image",
             "newControlLayer": "New Control Layer",
-            "newRasterLayer": "New Raster Layer"
+            "newRasterLayer": "New Raster Layer",
+            "cropCanvasToBbox": "Crop Canvas to Bbox"
         },
         "stagingArea": {
             "accept": "Accept",

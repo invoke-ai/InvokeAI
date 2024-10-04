@@ -1,4 +1,4 @@
-import { IconButton } from '@invoke-ai/ui-library';
+import { IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -21,14 +21,15 @@ export const ToolRectButton = memo(() => {
   });
 
   return (
-    <IconButton
-      aria-label={`${t('controlLayers.tool.rectangle')} (U)`}
-      tooltip={`${t('controlLayers.tool.rectangle')} (U)`}
-      icon={<PiRectangleBold />}
-      colorScheme={isSelected ? 'invokeBlue' : 'base'}
-      variant="solid"
-      onClick={selectRect}
-    />
+    <Tooltip label={`${t('controlLayers.tool.rectangle')} (U)`} placement="end">
+      <IconButton
+        aria-label={`${t('controlLayers.tool.rectangle')} (U)`}
+        icon={<PiRectangleBold />}
+        colorScheme={isSelected ? 'invokeBlue' : 'base'}
+        variant="solid"
+        onClick={selectRect}
+      />
+    </Tooltip>
   );
 });
 

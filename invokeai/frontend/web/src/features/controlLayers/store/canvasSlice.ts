@@ -5,7 +5,7 @@ import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/uti
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { canvasReset } from 'features/controlLayers/store/actions';
+import { canvasReset, newSessionRequested } from 'features/controlLayers/store/actions';
 import { modelChanged } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
@@ -857,6 +857,9 @@ export const canvasSlice = createSlice({
           break;
         case 'regional_guidance':
           newEntity.id = getPrefixedId('regional_guidance');
+          for (const refImage of newEntity.referenceImages) {
+            refImage.id = getPrefixedId('regional_guidance_ip_adapter');
+          }
           state.regionalGuidance.entities.push(newEntity);
           break;
         case 'reference_image':
@@ -947,7 +950,11 @@ export const canvasSlice = createSlice({
 
       // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
       // re-render it (reference equality check). I don't like this behaviour.
-      entity.objects.push({ ...brushLine, points: simplifyFlatNumbersArray(brushLine.points) });
+      entity.objects.push({
+        ...brushLine,
+        // If the brush line is not pressure sensitive, we simplify the points to reduce the size of the state
+        points: brushLine.type === 'brush_line' ? simplifyFlatNumbersArray(brushLine.points) : brushLine.points,
+      });
     },
     entityEraserLineAdded: (state, action: PayloadAction<EntityEraserLineAddedPayload>) => {
       const { entityIdentifier, eraserLine } = action.payload;
@@ -962,7 +969,11 @@ export const canvasSlice = createSlice({
 
       // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
       // re-render it (reference equality check). I don't like this behaviour.
-      entity.objects.push({ ...eraserLine, points: simplifyFlatNumbersArray(eraserLine.points) });
+      entity.objects.push({
+        ...eraserLine,
+        // If the brush line is not pressure sensitive, we simplify the points to reduce the size of the state
+        points: eraserLine.type === 'eraser_line' ? simplifyFlatNumbersArray(eraserLine.points) : eraserLine.points,
+      });
     },
     entityRectAdded: (state, action: PayloadAction<EntityRectAddedPayload>) => {
       const { entityIdentifier, rect } = action.payload;
@@ -1121,6 +1132,9 @@ export const canvasSlice = createSlice({
         state.bbox.modelBase = base;
         syncScaledSize(state);
       }
+    });
+    builder.addMatcher(newSessionRequested, (state) => {
+      return resetState(state);
     });
   },
 });

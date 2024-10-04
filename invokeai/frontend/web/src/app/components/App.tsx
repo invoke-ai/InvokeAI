@@ -13,6 +13,10 @@ import { useClearStorage } from 'common/hooks/useClearStorage';
 import { useFullscreenDropzone } from 'common/hooks/useFullscreenDropzone';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
 import ChangeBoardModal from 'features/changeBoardModal/components/ChangeBoardModal';
+import {
+  NewCanvasSessionDialog,
+  NewGallerySessionDialog,
+} from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
@@ -106,6 +110,8 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <RefreshAfterResetModal />
       <DeleteBoardModal />
       <GlobalImageHotkeys />
+      <NewGallerySessionDialog />
+      <NewCanvasSessionDialog />
     </ErrorBoundary>
   );
 };

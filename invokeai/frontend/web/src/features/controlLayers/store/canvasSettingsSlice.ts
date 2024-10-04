@@ -1,6 +1,7 @@
 import type { PayloadAction, Selector } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { newCanvasSessionRequested, newGallerySessionRequested } from 'features/controlLayers/store/actions';
 import type { RgbaColor } from 'features/controlLayers/store/types';
 
 type CanvasSettingsState = {
@@ -78,6 +79,10 @@ type CanvasSettingsState = {
    * Whether to show only the selected layer while transforming.
    */
   isolatedTransformingPreview: boolean;
+  /**
+   * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
+   */
+  pressureSensitivity: boolean;
 };
 
 const initialState: CanvasSettingsState = {
@@ -98,6 +103,7 @@ const initialState: CanvasSettingsState = {
   isolatedStagingPreview: true,
   isolatedFilteringPreview: true,
   isolatedTransformingPreview: true,
+  pressureSensitivity: true,
 };
 
 export const canvasSettingsSlice = createSlice({
@@ -155,6 +161,17 @@ export const canvasSettingsSlice = createSlice({
     settingsIsolatedTransformingPreviewToggled: (state) => {
       state.isolatedTransformingPreview = !state.isolatedTransformingPreview;
     },
+    settingsPressureSensitivityToggled: (state) => {
+      state.pressureSensitivity = !state.pressureSensitivity;
+    },
+  },
+  extraReducers(builder) {
+    builder.addCase(newGallerySessionRequested, (state) => {
+      state.sendToCanvas = false;
+    });
+    builder.addCase(newCanvasSessionRequested, (state) => {
+      state.sendToCanvas = true;
+    });
   },
 });
 
@@ -176,6 +193,7 @@ export const {
   settingsIsolatedStagingPreviewToggled,
   settingsIsolatedFilteringPreviewToggled,
   settingsIsolatedTransformingPreviewToggled,
+  settingsPressureSensitivityToggled,
 } = canvasSettingsSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -214,3 +232,4 @@ export const selectIsolatedFilteringPreview = createCanvasSettingsSelector(
 export const selectIsolatedTransformingPreview = createCanvasSettingsSelector(
   (settings) => settings.isolatedTransformingPreview
 );
+export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);

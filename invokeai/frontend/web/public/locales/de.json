@@ -4,7 +4,7 @@
         "reportBugLabel": "Fehler melden",
         "settingsLabel": "Einstellungen",
         "img2img": "Bild zu Bild",
-        "nodes": "Workflows",
+        "nodes": "Arbeitsabläufe",
         "upload": "Hochladen",
         "load": "Laden",
         "statusDisconnected": "Getrennt",
@@ -263,6 +263,10 @@
             "quickSwitch": {
                 "title": "Ebenen schnell umschalten",
                 "desc": "Wechseln Sie zwischen den beiden zuletzt gewählten Ebenen. Wenn eine Ebene mit einem Lesezeichen versehen ist, wird zwischen ihr und der letzten nicht markierten Ebene gewechselt."
+            },
+            "applyFilter": {
+                "title": "Filter anwenden",
+                "desc": "Wende den ausstehenden Filter auf die ausgewählte Ebene an."
             }
         },
         "viewer": {
@@ -652,10 +656,8 @@
     "accessibility": {
         "uploadImage": "Bild hochladen",
         "previousImage": "Vorheriges Bild",
-        "showOptionsPanel": "Seitenpanel anzeigen",
         "reset": "Zurücksetzten",
         "nextImage": "Nächstes Bild",
-        "showGalleryPanel": "Galerie-Panel anzeigen",
         "menu": "Menü",
         "invokeProgressBar": "Invoke Fortschrittsanzeige",
         "mode": "Modus",
@@ -702,7 +704,8 @@
         "viewBoards": "Ordner ansehen",
         "deletedPrivateBoardsCannotbeRestored": "Gelöschte Boards können nicht wiederhergestellt werden. Wenn Sie „Nur Board löschen“ wählen, werden die Bilder in einen privaten, nicht kategorisierten Status für den Ersteller des Bildes versetzt.",
         "assetsWithCount_one": "{{count}} in der Sammlung",
-        "assetsWithCount_other": "{{count}} in der Sammlung"
+        "assetsWithCount_other": "{{count}} in der Sammlung",
+        "deletedBoardsCannotbeRestored": "Gelöschte Ordner können nicht wiederhergestellt werden. Die Auswahl von \"Nur Ordner löschen\" verschiebt Bilder in einen unkategorisierten Zustand."
     },
     "queue": {
         "status": "Status",
@@ -1127,7 +1130,17 @@
         "openWorkflow": "Arbeitsablauf öffnen",
         "saveWorkflowToProject": "Arbeitsablauf in Projekt speichern",
         "workflowCleared": "Arbeitsablauf gelöscht",
-        "loading": "Lade Arbeitsabläufe"
+        "loading": "Lade Arbeitsabläufe",
+        "name": "Name",
+        "ascending": "Aufsteigend",
+        "defaultWorkflows": "Standard Arbeitsabläufe",
+        "userWorkflows": "Benutzer Arbeitsabläufe",
+        "projectWorkflows": "Projekt Arbeitsabläufe",
+        "opened": "Geöffnet",
+        "loadWorkflow": "Arbeitsablauf $t(common.load)",
+        "updated": "Aktualisiert",
+        "created": "Erstellt",
+        "descending": "Absteigend"
     },
     "sdxl": {
         "concatPromptStyle": "Verknüpfen von Prompt & Stil",
@@ -1249,7 +1262,49 @@
         "canvasContextMenu": {
             "saveBboxToGallery": "Bbox in Galerie speichern",
             "bboxGroup": "Aus Bbox erstellen"
-        }
+        },
+        "rectangle": "Rechteck",
+        "saveCanvasToGallery": "Leinwand in Galerie speichern",
+        "newRasterLayerError": "Problem beim Erstellen einer Raster-Ebene",
+        "saveLayerToAssets": "Ebene in Galerie speichern",
+        "deleteReferenceImage": "Referenzbild löschen",
+        "referenceImage": "Referenzbild",
+        "opacity": "Opazität",
+        "resetCanvas": "Leinwand zurücksetzen",
+        "removeBookmark": "Lesezeichen entfernen",
+        "rasterLayer": "Raster-Ebene",
+        "rasterLayers_withCount_visible": "Raster-Ebenen ({{count}})",
+        "controlLayers_withCount_visible": "Kontroll-Ebenen ({{count}})",
+        "deleteSelected": "Ausgewählte löschen",
+        "newRegionalReferenceImageError": "Problem beim Erstellen eines regionalen Referenzbilds",
+        "newControlLayerOk": "Kontroll-Ebene erstellt",
+        "newControlLayerError": "Problem beim Erstellen einer Kontroll-Ebene",
+        "newRasterLayerOk": "Raster-Layer erstellt",
+        "moveToFront": "Nach vorne bringen",
+        "copyToClipboard": "In die Zwischenablage kopieren",
+        "controlLayers_withCount_hidden": "Kontroll-Ebenen ({{count}} ausgeblendet)",
+        "clearCaches": "Cache leeren",
+        "controlLayer": "Kontroll-Ebene",
+        "rasterLayers_withCount_hidden": "Raster-Ebenen ({{count}} ausgeblendet)",
+        "transparency": "Transparenz",
+        "canvas": "Leinwand",
+        "global": "Global",
+        "regional": "Regional",
+        "newGlobalReferenceImageOk": "Globales Referenzbild erstellt",
+        "savedToGalleryError": "Fehler beim Speichern in der Galerie",
+        "savedToGalleryOk": "In Galerie speichern",
+        "newGlobalReferenceImageError": "Problem beim Erstellen eines globalen Referenzbilds",
+        "newRegionalReferenceImageOk": "Regionales Referenzbild erstellt",
+        "duplicate": "Duplizieren",
+        "regionalReferenceImage": "Regionales Referenzbild",
+        "globalReferenceImage": "Globales Referenzbild",
+        "regionIsEmpty": "Ausgewählte Region is leer",
+        "mergeVisible": "Sichtbare vereinen",
+        "mergeVisibleOk": "Sichtbare Ebenen vereinen",
+        "mergeVisibleError": "Fehler beim Vereinen sichtbarer Ebenen",
+        "clearHistory": "Verlauf leeren",
+        "addLayer": "Ebene hinzufügen",
+        "width": "Breite"
     },
     "upsell": {
         "shareAccess": "Zugang teilen",

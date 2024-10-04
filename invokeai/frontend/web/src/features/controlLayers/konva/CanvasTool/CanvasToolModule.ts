@@ -9,6 +9,7 @@ import {
   floorCoord,
   getIsPrimaryMouseDown,
   getLastPointOfLastLine,
+  getLastPointOfLastLineWithPressure,
   getLastPointOfLine,
   getPrefixedId,
   getScaledCursorPosition,
@@ -26,11 +27,16 @@ import type {
   RgbColor,
   Tool,
 } from 'features/controlLayers/store/types';
-import { isRenderableEntity, RGBA_BLACK } from 'features/controlLayers/store/types';
+import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
+
+// Konva's docs say the default drag buttons are [0], but it's actually [0,1]. We only want left-click to drag, so we
+// need to override the default. The stage handles middle-mouse dragging on its own with dedicated event listeners.
+// TODO(psyche): Fix the docs upstream!
+Konva.dragButtons = [0];
 
 type CanvasToolModuleConfig = {
   BRUSH_SPACING_TARGET_SCALE: number;
@@ -76,6 +82,11 @@ export class CanvasToolModule extends CanvasModuleBase {
    * The color currently under the cursor. Only has a value when the color picker tool is active.
    */
   $colorUnderCursor = atom<RgbColor>(RGBA_BLACK);
+  /**
+   * The last pointer type that was used on the stage. This is used to determine if we should show a tool preview. For
+   * example, when using a pen, we should not show a brush preview.
+   */
+  $lastPointerType = atom<string | null>(null);
 
   konva: {
     stage: Konva.Stage;
@@ -136,11 +147,13 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   syncCursorStyle = () => {
     const stage = this.manager.stage;
-    const isMouseDown = this.$isMouseDown.get();
     const tool = this.$tool.get();
+    const isStageDragging = this.manager.stage.konva.stage.isDragging();
 
-    if (tool === 'view') {
-      stage.setCursor(isMouseDown ? 'grabbing' : 'grab');
+    if (tool === 'view' && !isStageDragging) {
+      stage.setCursor('grab');
+    } else if (this.manager.stage.konva.stage.isDragging()) {
+      stage.setCursor('grabbing');
     } else if (this.manager.stateApi.$isTransforming.get()) {
       stage.setCursor('default');
     } else if (this.manager.stateApi.$isFiltering.get()) {
@@ -165,40 +178,31 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   render = () => {
-    const stage = this.manager.stage;
     const renderedEntityCount = this.manager.stateApi.getRenderedEntityCount();
-    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
     const cursorPos = this.$cursorPos.get();
-    const tool = this.$tool.get();
     const isFiltering = this.manager.stateApi.$isFiltering.get();
     const isStaging = this.manager.stagingArea.$isStaging.get();
-
-    const isDrawable =
-      !!selectedEntity &&
-      selectedEntity.state.isEnabled &&
-      !selectedEntity.state.isLocked &&
-      isRenderableEntity(selectedEntity.state);
+    const isStageDragging = this.manager.stage.konva.stage.isDragging();
 
     this.syncCursorStyle();
 
-    stage.setIsDraggable(tool === 'view');
-
-    if (!cursorPos || renderedEntityCount === 0 || isFiltering || isStaging) {
-      // We can bail early if the mouse isn't over the stage or there are no layers
+    /**
+     * The tool should not be rendered when:
+     * - There is no cursor position (i.e. the cursor is outside of the stage)
+     * - The user is filtering, in which case the user is not allowed to use the tools. Note that we do not disable
+     * the group while transforming, bc that requires use of the move tool.
+     * - The canvas is staging, in which case the user is not allowed to use the tools.
+     * - There are no entities rendered on the canvas. Maybe we should allow the user to draw on an empty canvas,
+     * creating a new layer when they start?
+     * - The stage is being dragged, in which case the user is not allowed to use the tools.
+     */
+    if (!cursorPos || isFiltering || isStaging || renderedEntityCount === 0 || isStageDragging) {
       this.konva.group.visible(false);
     } else {
       this.konva.group.visible(true);
-
-      // No need to render the brush preview if the cursor position or color is missing
-      if (cursorPos && tool === 'brush') {
-        this.brushToolPreview.render();
-      } else if (cursorPos && tool === 'eraser') {
-        this.eraserToolPreview.render();
-      } else if (cursorPos && tool === 'colorPicker') {
-        this.colorPickerToolPreview.render();
-      }
-
-      this.setToolVisibility(tool, isDrawable);
+      this.brushToolPreview.render();
+      this.eraserToolPreview.render();
+      this.colorPickerToolPreview.render();
     }
   };
 
@@ -257,11 +261,14 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   setEventListeners = (): (() => void) => {
-    this.konva.stage.on('mouseenter', this.onStageMouseEnter);
-    this.konva.stage.on('mousedown', this.onStageMouseDown);
-    this.konva.stage.on('mouseup', this.onStageMouseUp);
-    this.konva.stage.on('mousemove', this.onStageMouseMove);
-    this.konva.stage.on('mouseleave', this.onStageMouseLeave);
+    this.konva.stage.on('pointerenter', this.onStagePointerEnter);
+    this.konva.stage.on('pointerdown', this.onStagePointerDown);
+    this.konva.stage.on('pointerup', this.onStagePointerUp);
+    this.konva.stage.on('pointermove', this.onStagePointerMove);
+
+    // The Konva stage doesn't appear to handle pointerleave events, so we need to listen to the container instead
+    this.manager.stage.container.addEventListener('pointerleave', this.onStagePointerLeave);
+
     this.konva.stage.on('wheel', this.onStageMouseWheel);
 
     window.addEventListener('keydown', this.onKeyDown);
@@ -270,13 +277,15 @@ export class CanvasToolModule extends CanvasModuleBase {
     window.addEventListener('blur', this.onWindowBlur);
 
     return () => {
-      this.konva.stage.off('mouseenter', this.onStageMouseEnter);
-      this.konva.stage.off('mousedown', this.onStageMouseDown);
-      this.konva.stage.off('mouseup', this.onStageMouseUp);
-      this.konva.stage.off('mousemove', this.onStageMouseMove);
-      this.konva.stage.off('mouseleave', this.onStageMouseLeave);
+      this.konva.stage.off('pointerenter', this.onStagePointerEnter);
+      this.konva.stage.off('pointerdown', this.onStagePointerDown);
+      this.konva.stage.off('pointerup', this.onStagePointerUp);
+      this.konva.stage.off('pointermove', this.onStagePointerMove);
+
+      this.manager.stage.container.removeEventListener('pointerleave', this.onStagePointerLeave);
 
       this.konva.stage.off('wheel', this.onStageMouseWheel);
+
       window.removeEventListener('keydown', this.onKeyDown);
       window.removeEventListener('keyup', this.onKeyUp);
       window.removeEventListener('pointerup', this.onWindowPointerUp);
@@ -296,13 +305,14 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStageMouseEnter = async (_: KonvaEventObject<MouseEvent>) => {
-    if (!this.getCanDraw()) {
-      return;
-    }
-
-    const cursorPos = this.syncLastCursorPos();
+  onStagePointerEnter = async (e: KonvaEventObject<PointerEvent>) => {
     try {
+      this.$lastPointerType.set(e.evt.pointerType);
+      if (!this.getCanDraw()) {
+        return;
+      }
+
+      const cursorPos = this.syncLastCursorPos();
       const isMouseDown = this.$isMouseDown.get();
       const settings = this.manager.stateApi.getSettings();
       const tool = this.$tool.get();
@@ -320,14 +330,25 @@ export class CanvasToolModule extends CanvasModuleBase {
       if (tool === 'brush') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
         const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-        await selectedEntity.bufferRenderer.setBuffer({
-          id: getPrefixedId('brush_line'),
-          type: 'brush_line',
-          points: [alignedPoint.x, alignedPoint.y],
-          strokeWidth: settings.brushWidth,
-          color: this.manager.stateApi.getCurrentColor(),
-          clip: this.getClip(selectedEntity.state),
-        });
+        if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
+          await selectedEntity.bufferRenderer.setBuffer({
+            id: getPrefixedId('brush_line_with_pressure'),
+            type: 'brush_line_with_pressure',
+            points: [alignedPoint.x, alignedPoint.y, e.evt.pressure],
+            strokeWidth: settings.brushWidth,
+            color: this.manager.stateApi.getCurrentColor(),
+            clip: this.getClip(selectedEntity.state),
+          });
+        } else {
+          await selectedEntity.bufferRenderer.setBuffer({
+            id: getPrefixedId('brush_line'),
+            type: 'brush_line',
+            points: [alignedPoint.x, alignedPoint.y],
+            strokeWidth: settings.brushWidth,
+            color: this.manager.stateApi.getCurrentColor(),
+            clip: this.getClip(selectedEntity.state),
+          });
+        }
         return;
       }
 
@@ -337,13 +358,23 @@ export class CanvasToolModule extends CanvasModuleBase {
         if (selectedEntity.bufferRenderer.state && selectedEntity.bufferRenderer.hasBuffer()) {
           selectedEntity.bufferRenderer.commitBuffer();
         }
-        await selectedEntity.bufferRenderer.setBuffer({
-          id: getPrefixedId('eraser_line'),
-          type: 'eraser_line',
-          points: [alignedPoint.x, alignedPoint.y],
-          strokeWidth: settings.eraserWidth,
-          clip: this.getClip(selectedEntity.state),
-        });
+        if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
+          await selectedEntity.bufferRenderer.setBuffer({
+            id: getPrefixedId('eraser_line_with_pressure'),
+            type: 'eraser_line_with_pressure',
+            points: [alignedPoint.x, alignedPoint.y],
+            strokeWidth: settings.eraserWidth,
+            clip: this.getClip(selectedEntity.state),
+          });
+        } else {
+          await selectedEntity.bufferRenderer.setBuffer({
+            id: getPrefixedId('eraser_line'),
+            type: 'eraser_line',
+            points: [alignedPoint.x, alignedPoint.y],
+            strokeWidth: settings.eraserWidth,
+            clip: this.getClip(selectedEntity.state),
+          });
+        }
         return;
       }
     } finally {
@@ -351,25 +382,18 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStageMouseDown = async (e: KonvaEventObject<MouseEvent>) => {
-    if (!this.getCanDraw()) {
-      return;
-    }
-
-    this.$isMouseDown.set(getIsPrimaryMouseDown(e));
-    const cursorPos = this.syncLastCursorPos();
-
+  onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
     try {
-      const tool = this.$tool.get();
-      const settings = this.manager.stateApi.getSettings();
+      this.$lastPointerType.set(e.evt.pointerType);
 
-      if (tool === 'colorPicker') {
-        const color = this.getColorUnderCursor();
-        if (color) {
-          this.manager.stateApi.setColor({ ...settings.color, ...color });
-        }
+      if (!this.getCanDraw()) {
         return;
       }
+
+      this.$isMouseDown.set(getIsPrimaryMouseDown(e));
+      const cursorPos = this.syncLastCursorPos();
+      const tool = this.$tool.get();
+      const settings = this.manager.stateApi.getSettings();
 
       const isMouseDown = this.$isMouseDown.get();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
@@ -381,36 +405,57 @@ export class CanvasToolModule extends CanvasModuleBase {
       const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
 
       if (tool === 'brush') {
-        const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'brush_line');
-        const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-        if (e.evt.shiftKey && lastLinePoint) {
-          // Create a straight line from the last line point
+        if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
+          const lastLinePoint = getLastPointOfLastLineWithPressure(
+            selectedEntity.state.objects,
+            'brush_line_with_pressure'
+          );
+          const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
           if (selectedEntity.bufferRenderer.hasBuffer()) {
             selectedEntity.bufferRenderer.commitBuffer();
           }
-
-          await selectedEntity.bufferRenderer.setBuffer({
-            id: getPrefixedId('brush_line'),
-            type: 'brush_line',
-            points: [
-              // The last point of the last line is already normalized to the entity's coordinates
+          let points: number[];
+          if (e.evt.shiftKey && lastLinePoint) {
+            // Create a straight line from the last line point
+            points = [
               lastLinePoint.x,
               lastLinePoint.y,
+              lastLinePoint.pressure,
               alignedPoint.x,
               alignedPoint.y,
-            ],
+              e.evt.pressure,
+            ];
+          } else {
+            points = [alignedPoint.x, alignedPoint.y, e.evt.pressure];
+          }
+          await selectedEntity.bufferRenderer.setBuffer({
+            id: getPrefixedId('brush_line_with_pressure'),
+            type: 'brush_line_with_pressure',
+            points,
             strokeWidth: settings.brushWidth,
             color: this.manager.stateApi.getCurrentColor(),
             clip: this.getClip(selectedEntity.state),
           });
         } else {
+          const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'brush_line');
+          const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
+
           if (selectedEntity.bufferRenderer.hasBuffer()) {
             selectedEntity.bufferRenderer.commitBuffer();
           }
+
+          let points: number[];
+          if (e.evt.shiftKey && lastLinePoint) {
+            // Create a straight line from the last line point
+            points = [lastLinePoint.x, lastLinePoint.y, alignedPoint.x, alignedPoint.y];
+          } else {
+            points = [alignedPoint.x, alignedPoint.y];
+          }
+
           await selectedEntity.bufferRenderer.setBuffer({
             id: getPrefixedId('brush_line'),
             type: 'brush_line',
-            points: [alignedPoint.x, alignedPoint.y],
+            points,
             strokeWidth: settings.brushWidth,
             color: this.manager.stateApi.getCurrentColor(),
             clip: this.getClip(selectedEntity.state),
@@ -419,34 +464,56 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'eraser') {
-        const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'eraser_line');
-        const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
-        if (e.evt.shiftKey && lastLinePoint) {
-          // Create a straight line from the last line point
+        if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
+          const lastLinePoint = getLastPointOfLastLineWithPressure(
+            selectedEntity.state.objects,
+            'eraser_line_with_pressure'
+          );
+          const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
           if (selectedEntity.bufferRenderer.hasBuffer()) {
             selectedEntity.bufferRenderer.commitBuffer();
           }
-          await selectedEntity.bufferRenderer.setBuffer({
-            id: getPrefixedId('eraser_line'),
-            type: 'eraser_line',
-            points: [
-              // The last point of the last line is already normalized to the entity's coordinates
+          let points: number[];
+          if (e.evt.shiftKey && lastLinePoint) {
+            // Create a straight line from the last line point
+            points = [
               lastLinePoint.x,
               lastLinePoint.y,
+              lastLinePoint.pressure,
               alignedPoint.x,
               alignedPoint.y,
-            ],
+              e.evt.pressure,
+            ];
+          } else {
+            points = [alignedPoint.x, alignedPoint.y, e.evt.pressure];
+          }
+          await selectedEntity.bufferRenderer.setBuffer({
+            id: getPrefixedId('eraser_line_with_pressure'),
+            type: 'eraser_line_with_pressure',
+            points,
             strokeWidth: settings.eraserWidth,
             clip: this.getClip(selectedEntity.state),
           });
         } else {
+          const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'eraser_line');
+          const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
+
           if (selectedEntity.bufferRenderer.hasBuffer()) {
             selectedEntity.bufferRenderer.commitBuffer();
           }
+
+          let points: number[];
+          if (e.evt.shiftKey && lastLinePoint) {
+            // Create a straight line from the last line point
+            points = [lastLinePoint.x, lastLinePoint.y, alignedPoint.x, alignedPoint.y];
+          } else {
+            points = [alignedPoint.x, alignedPoint.y];
+          }
+
           await selectedEntity.bufferRenderer.setBuffer({
             id: getPrefixedId('eraser_line'),
             type: 'eraser_line',
-            points: [alignedPoint.x, alignedPoint.y],
+            points,
             strokeWidth: settings.eraserWidth,
             clip: this.getClip(selectedEntity.state),
           });
@@ -469,26 +536,37 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStageMouseUp = (_: KonvaEventObject<MouseEvent>) => {
-    if (!this.getCanDraw()) {
-      return;
-    }
-
+  onStagePointerUp = (e: KonvaEventObject<PointerEvent>) => {
     try {
-      this.$isMouseDown.set(false);
-      const cursorPos = this.syncLastCursorPos();
-      if (!cursorPos) {
+      this.$lastPointerType.set(e.evt.pointerType);
+
+      if (!this.getCanDraw()) {
         return;
       }
+
+      const tool = this.$tool.get();
+      const settings = this.manager.stateApi.getSettings();
+
+      if (tool === 'colorPicker') {
+        const color = this.getColorUnderCursor();
+        if (color) {
+          this.manager.stateApi.setColor({ ...settings.color, ...color });
+        }
+        return;
+      }
+
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
       if (!isDrawable) {
         return;
       }
-      const tool = this.$tool.get();
 
       if (tool === 'brush') {
-        if (selectedEntity.bufferRenderer.state?.type === 'brush_line' && selectedEntity.bufferRenderer.hasBuffer()) {
+        if (
+          (selectedEntity.bufferRenderer.state?.type === 'brush_line' ||
+            selectedEntity.bufferRenderer.state?.type === 'brush_line_with_pressure') &&
+          selectedEntity.bufferRenderer.hasBuffer()
+        ) {
           selectedEntity.bufferRenderer.commitBuffer();
         } else {
           selectedEntity.bufferRenderer.clearBuffer();
@@ -496,7 +574,11 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'eraser') {
-        if (selectedEntity.bufferRenderer.state?.type === 'eraser_line' && selectedEntity.bufferRenderer.hasBuffer()) {
+        if (
+          (selectedEntity.bufferRenderer.state?.type === 'eraser_line' ||
+            selectedEntity.bufferRenderer.state?.type === 'eraser_line_with_pressure') &&
+          selectedEntity.bufferRenderer.hasBuffer()
+        ) {
           selectedEntity.bufferRenderer.commitBuffer();
         } else {
           selectedEntity.bufferRenderer.clearBuffer();
@@ -515,12 +597,14 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStageMouseMove = async (_: KonvaEventObject<MouseEvent>) => {
-    if (!this.getCanDraw()) {
-      return;
-    }
-
+  onStagePointerMove = async (e: KonvaEventObject<PointerEvent>) => {
     try {
+      this.$lastPointerType.set(e.evt.pointerType);
+
+      if (!this.getCanDraw()) {
+        return;
+      }
+
       const tool = this.$tool.get();
       const cursorPos = this.syncLastCursorPos();
 
@@ -548,7 +632,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       const settings = this.manager.stateApi.getSettings();
 
-      if (tool === 'brush' && bufferState.type === 'brush_line') {
+      if (tool === 'brush' && (bufferState.type === 'brush_line' || bufferState.type === 'brush_line_with_pressure')) {
         const lastPoint = getLastPointOfLine(bufferState.points);
         const minDistance = settings.brushWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
         if (!lastPoint || !isDistanceMoreThanMin(cursorPos, lastPoint, minDistance)) {
@@ -564,8 +648,16 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
 
         bufferState.points.push(alignedPoint.x, alignedPoint.y);
+
+        if (bufferState.type === 'brush_line_with_pressure') {
+          bufferState.points.push(e.evt.pressure);
+        }
+
         await selectedEntity.bufferRenderer.setBuffer(bufferState);
-      } else if (tool === 'eraser' && bufferState.type === 'eraser_line') {
+      } else if (
+        tool === 'eraser' &&
+        (bufferState.type === 'eraser_line' || bufferState.type === 'eraser_line_with_pressure')
+      ) {
         const lastPoint = getLastPointOfLine(bufferState.points);
         const minDistance = settings.eraserWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
         if (!lastPoint || !isDistanceMoreThanMin(cursorPos, lastPoint, minDistance)) {
@@ -581,6 +673,11 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
 
         bufferState.points.push(alignedPoint.x, alignedPoint.y);
+
+        if (bufferState.type === 'eraser_line_with_pressure') {
+          bufferState.points.push(e.evt.pressure);
+        }
+
         await selectedEntity.bufferRenderer.setBuffer(bufferState);
       } else if (tool === 'rect' && bufferState.type === 'rect') {
         const normalizedPoint = offsetCoord(cursorPos, selectedEntity.state.position);
@@ -596,23 +693,27 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  onStageMouseLeave = (_: KonvaEventObject<MouseEvent>) => {
-    if (!this.getCanDraw()) {
-      return;
+  onStagePointerLeave = (e: PointerEvent) => {
+    try {
+      this.$lastPointerType.set(e.pointerType);
+      this.$cursorPos.set(null);
+
+      if (!this.getCanDraw()) {
+        return;
+      }
+
+      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+
+      if (
+        selectedEntity &&
+        selectedEntity.bufferRenderer.state?.type !== 'rect' &&
+        selectedEntity.bufferRenderer.hasBuffer()
+      ) {
+        selectedEntity.bufferRenderer.commitBuffer();
+      }
+    } finally {
+      this.render();
     }
-
-    this.$cursorPos.set(null);
-    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-
-    if (
-      selectedEntity &&
-      selectedEntity.bufferRenderer.state?.type !== 'rect' &&
-      selectedEntity.bufferRenderer.hasBuffer()
-    ) {
-      selectedEntity.bufferRenderer.commitBuffer();
-    }
-
-    this.render();
   };
 
   onStageMouseWheel = (e: KonvaEventObject<WheelEvent>) => {
@@ -652,12 +753,16 @@ export class CanvasToolModule extends CanvasModuleBase {
    * whatever the user was drawing from being lost, or ending up with stale state, we need to commit the buffer
    * on window pointer up.
    */
-  onWindowPointerUp = () => {
-    this.$isMouseDown.set(false);
-    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+  onWindowPointerUp = (_: PointerEvent) => {
+    try {
+      this.$isMouseDown.set(false);
+      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (selectedEntity && selectedEntity.bufferRenderer.hasBuffer() && !this.manager.$isBusy.get()) {
-      selectedEntity.bufferRenderer.commitBuffer();
+      if (selectedEntity && selectedEntity.bufferRenderer.hasBuffer() && !this.manager.$isBusy.get()) {
+        selectedEntity.bufferRenderer.commitBuffer();
+      }
+    } finally {
+      this.render();
     }
   };
 

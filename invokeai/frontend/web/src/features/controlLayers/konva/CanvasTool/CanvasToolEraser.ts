@@ -78,11 +78,30 @@ export class CanvasToolEraser extends CanvasModuleBase {
   }
 
   render = () => {
-    const cursorPos = this.manager.tool.$cursorPos.get();
+    const tool = this.parent.$tool.get();
 
-    if (!cursorPos) {
+    if (tool !== 'eraser') {
+      this.setVisibility(false);
       return;
     }
+
+    const cursorPos = this.parent.$cursorPos.get();
+    const canDraw = this.parent.getCanDraw();
+
+    if (!cursorPos || !canDraw) {
+      this.setVisibility(false);
+      return;
+    }
+
+    const isMouseDown = this.parent.$isMouseDown.get();
+    const lastPointerType = this.parent.$lastPointerType.get();
+
+    if (lastPointerType !== 'mouse' && isMouseDown) {
+      this.setVisibility(false);
+      return;
+    }
+
+    this.setVisibility(true);
 
     const settings = this.manager.stateApi.getSettings();
     const alignedCursorPos = alignCoordForTool(cursorPos, settings.eraserWidth);

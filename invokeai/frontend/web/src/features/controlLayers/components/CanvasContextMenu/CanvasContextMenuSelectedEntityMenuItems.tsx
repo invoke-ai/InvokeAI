@@ -1,6 +1,7 @@
 import { MenuGroup } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasEntityMenuItemsCopyToClipboard } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCopyToClipboard';
+import { CanvasEntityMenuItemsCropToBbox } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCropToBbox';
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsFilter } from 'features/controlLayers/components/common/CanvasEntityMenuItemsFilter';
 import { CanvasEntityMenuItemsSave } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSave';
@@ -28,6 +29,7 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
       {isTransformableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsTransform />}
       {isSaveableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsCopyToClipboard />}
       {isSaveableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsSave />}
+      {isTransformableEntityIdentifier(entityIdentifier) && <CanvasEntityMenuItemsCropToBbox />}
       <CanvasEntityMenuItemsDelete />
     </MenuGroup>
   );

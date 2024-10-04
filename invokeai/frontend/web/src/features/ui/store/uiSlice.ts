@@ -1,6 +1,7 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
+import { newSessionRequested } from 'features/controlLayers/store/actions';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { atom } from 'nanostores';
 
@@ -44,6 +45,9 @@ export const uiSlice = createSlice({
   extraReducers(builder) {
     builder.addCase(workflowLoadRequested, (state) => {
       state.activeTab = 'workflows';
+    });
+    builder.addMatcher(newSessionRequested, (state) => {
+      state.activeTab = 'canvas';
     });
   },
 });

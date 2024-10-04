@@ -46,11 +46,12 @@ export const useImageActions = (imageDTO: ImageDTO) => {
           setHasSeed(false);
         }
 
+        // Need to catch all of these to avoid unhandled promise rejections bubbling up to instrumented error handlers
         const promptParseResults = await Promise.allSettled([
-          handlers.positivePrompt.parse(metadata),
-          handlers.negativePrompt.parse(metadata),
-          handlers.sdxlPositiveStylePrompt.parse(metadata),
-          handlers.sdxlNegativeStylePrompt.parse(metadata),
+          handlers.positivePrompt.parse(metadata).catch(() => {}),
+          handlers.negativePrompt.parse(metadata).catch(() => {}),
+          handlers.sdxlPositiveStylePrompt.parse(metadata).catch(() => {}),
+          handlers.sdxlNegativeStylePrompt.parse(metadata).catch(() => {}),
         ]);
         if (promptParseResults.some((result) => result.status === 'fulfilled')) {
           setHasPrompts(true);
@@ -97,9 +98,14 @@ export const useImageActions = (imageDTO: ImageDTO) => {
     if (!metadata) {
       return;
     }
-    handlers.seed.parse(metadata).then((seed) => {
-      handlers.seed.recall && handlers.seed.recall(seed, true);
-    });
+    handlers.seed
+      .parse(metadata)
+      .then((seed) => {
+        handlers.seed.recall?.(seed, true);
+      })
+      .catch(() => {
+        // no-op, the toast will show the error
+      });
   }, [metadata]);
 
   const recallPrompts = useCallback(() => {
