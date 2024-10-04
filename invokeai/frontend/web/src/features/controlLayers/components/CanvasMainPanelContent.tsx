@@ -1,4 +1,4 @@
-import { ContextMenu, Flex, MenuList } from '@invoke-ai/ui-library';
+import { ContextMenu, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion } from 'common/hooks/focus';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
@@ -18,6 +18,18 @@ import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/Canva
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import { GatedImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import { memo, useCallback, useRef } from 'react';
+import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
+
+const MenuContent = () => {
+  return (
+    <CanvasManagerProviderGate>
+      <MenuList>
+        <CanvasContextMenuGlobalMenuItems />
+        <CanvasContextMenuSelectedEntityMenuItems />
+      </MenuList>
+    </CanvasManagerProviderGate>
+  );
+};
 
 export const CanvasMainPanelContent = memo(() => {
   const ref = useRef<HTMLDivElement>(null);
@@ -25,14 +37,7 @@ export const CanvasMainPanelContent = memo(() => {
   const showHUD = useAppSelector(selectShowHUD);
 
   const renderMenu = useCallback(() => {
-    return (
-      <CanvasManagerProviderGate>
-        <MenuList>
-          <CanvasContextMenuGlobalMenuItems />
-          <CanvasContextMenuSelectedEntityMenuItems />
-        </MenuList>
-      </CanvasManagerProviderGate>
-    );
+    return <MenuContent />;
   }, []);
 
   useFocusRegion('canvas', ref);
@@ -53,7 +58,7 @@ export const CanvasMainPanelContent = memo(() => {
       <CanvasManagerProviderGate>
         <CanvasToolbar />
       </CanvasManagerProviderGate>
-      <ContextMenu<HTMLDivElement> renderMenu={renderMenu}>
+      <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
         {(ref) => (
           <Flex
             ref={ref}
@@ -74,6 +79,12 @@ export const CanvasMainPanelContent = memo(() => {
                 <CanvasAlertsSelectedEntityStatus />
                 <CanvasAlertsPreserveMask />
                 <CanvasAlertsSendingToGallery />
+              </Flex>
+              <Flex position="absolute" top={1} insetInlineEnd={1}>
+                <Menu>
+                  <MenuButton as={IconButton} icon={<PiDotsThreeOutlineVerticalFill />} colorScheme="base" />
+                  <MenuContent />
+                </Menu>
               </Flex>
             </CanvasManagerProviderGate>
           </Flex>
