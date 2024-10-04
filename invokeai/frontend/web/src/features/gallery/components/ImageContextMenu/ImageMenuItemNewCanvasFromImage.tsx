@@ -41,7 +41,7 @@ export const ImageMenuItemNewCanvasFromImage = memo(() => {
   }, [bboxRect.x, bboxRect.y, dispatch, imageDTO, imageViewer, t]);
 
   return (
-    <MenuItem icon={<PiFileBold />} onClickCapture={handleSendToCanvas}>
+    <MenuItem icon={<PiFileBold />} onPointerUpCapture={handleSendToCanvas}>
       {t('controlLayers.newCanvasFromImage')}
     </MenuItem>
   );

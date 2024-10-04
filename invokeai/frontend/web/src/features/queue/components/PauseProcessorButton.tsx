@@ -21,7 +21,7 @@ const PauseProcessorButton = ({ asIconButton }: Props) => {
       isDisabled={isDisabled}
       isLoading={isLoading}
       icon={<PiPauseFill />}
-      onClick={pauseProcessor}
+      onPointerUp={pauseProcessor}
       colorScheme="gold"
     />
   );

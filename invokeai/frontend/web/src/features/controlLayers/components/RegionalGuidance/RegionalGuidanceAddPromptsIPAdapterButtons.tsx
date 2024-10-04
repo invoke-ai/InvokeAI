@@ -30,7 +30,7 @@ export const RegionalGuidanceAddPromptsIPAdapterButtons = () => {
         size="sm"
         variant="ghost"
         leftIcon={<PiPlusBold />}
-        onClick={addRegionalGuidancePositivePrompt}
+        onPointerUp={addRegionalGuidancePositivePrompt}
         isDisabled={!validActions.canAddPositivePrompt}
       >
         {t('controlLayers.prompt')}
@@ -39,12 +39,12 @@ export const RegionalGuidanceAddPromptsIPAdapterButtons = () => {
         size="sm"
         variant="ghost"
         leftIcon={<PiPlusBold />}
-        onClick={addRegionalGuidanceNegativePrompt}
+        onPointerUp={addRegionalGuidanceNegativePrompt}
         isDisabled={!validActions.canAddNegativePrompt}
       >
         {t('controlLayers.negativePrompt')}
       </Button>
-      <Button size="sm" variant="ghost" leftIcon={<PiPlusBold />} onClick={addRegionalGuidanceIPAdapter}>
+      <Button size="sm" variant="ghost" leftIcon={<PiPlusBold />} onPointerUp={addRegionalGuidanceIPAdapter}>
         {t('controlLayers.referenceImage')}
       </Button>
     </Flex>

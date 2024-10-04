@@ -27,7 +27,7 @@ export const ToolViewButton = memo(() => {
         icon={<PiHandBold />}
         colorScheme={isSelected ? 'invokeBlue' : 'base'}
         variant="solid"
-        onClick={selectView}
+        onPointerUp={selectView}
       />
     </Tooltip>
   );

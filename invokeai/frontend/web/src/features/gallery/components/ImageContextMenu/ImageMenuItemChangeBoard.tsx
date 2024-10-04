@@ -11,13 +11,13 @@ export const ImageMenuItemChangeBoard = memo(() => {
   const dispatch = useAppDispatch();
   const imageDTO = useImageDTOContext();
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(imagesToChangeSelected([imageDTO]));
     dispatch(isModalOpenChanged(true));
   }, [dispatch, imageDTO]);
 
   return (
-    <MenuItem icon={<PiFoldersBold />} onClickCapture={onClick}>
+    <MenuItem icon={<PiFoldersBold />} onPointerUpCapture={onPointerUp}>
       {t('boards.changeBoard')}
     </MenuItem>
   );

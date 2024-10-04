@@ -15,7 +15,7 @@ export const RasterLayerMenuItemsConvertRasterToControl = memo(() => {
   const defaultControlAdapter = useAppSelector(selectDefaultControlAdapter);
   const isInteractable = useIsEntityInteractable(entityIdentifier);
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(
       rasterLayerConvertedToControlLayer({
         entityIdentifier,
@@ -27,7 +27,7 @@ export const RasterLayerMenuItemsConvertRasterToControl = memo(() => {
   }, [defaultControlAdapter, dispatch, entityIdentifier]);
 
   return (
-    <MenuItem onClick={onClick} icon={<PiLightningBold />} isDisabled={!isInteractable}>
+    <MenuItem onPointerUp={onPointerUp} icon={<PiLightningBold />} isDisabled={!isInteractable}>
       {t('controlLayers.convertToControlLayer')}
     </MenuItem>
   );

@@ -18,7 +18,7 @@ export const StagingAreaToolbarDiscardAllButton = memo(() => {
       tooltip={`${t('controlLayers.stagingArea.discardAll')} (Esc)`}
       aria-label={t('controlLayers.stagingArea.discardAll')}
       icon={<PiTrashSimpleBold />}
-      onClick={discardAll}
+      onPointerUp={discardAll}
       colorScheme="error"
       fontSize={16}
     />

@@ -9,14 +9,14 @@ export const ImageMenuItemOpenInViewer = memo(() => {
   const { t } = useTranslation();
   const imageDTO = useImageDTOContext();
   const imageViewer = useImageViewer();
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     imageViewer.openImageInViewer(imageDTO);
   }, [imageDTO, imageViewer]);
 
   return (
     <IconButton
       icon={<PiArrowsOutBold />}
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       aria-label={t('common.openInViewer')}
       tooltip={t('common.openInViewer')}
       variant="ghost"

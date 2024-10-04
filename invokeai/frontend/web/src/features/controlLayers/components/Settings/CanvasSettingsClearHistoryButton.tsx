@@ -7,11 +7,11 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsClearHistoryButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(canvasClearHistory());
   }, [dispatch]);
   return (
-    <Button onClick={onClick} size="sm">
+    <Button onPointerUp={onPointerUp} size="sm">
       {t('controlLayers.clearHistory')}
     </Button>
   );

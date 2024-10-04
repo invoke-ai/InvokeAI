@@ -14,7 +14,7 @@ export const CanvasEntityEnabledToggle = memo(() => {
   const isEnabled = useEntityIsEnabled(entityIdentifier);
   const isBusy = useCanvasIsBusy();
   const dispatch = useAppDispatch();
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(entityIsEnabledToggled({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
 
@@ -26,7 +26,7 @@ export const CanvasEntityEnabledToggle = memo(() => {
       variant="link"
       alignSelf="stretch"
       icon={isEnabled ? <PiCircleFill /> : <PiCircleBold />}
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       isDisabled={isBusy}
     />
   );

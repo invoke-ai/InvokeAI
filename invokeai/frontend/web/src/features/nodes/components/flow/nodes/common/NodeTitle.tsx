@@ -64,11 +64,11 @@ function EditableControls() {
   const { isEditing, getEditButtonProps } = useEditableControls();
   const handleDoubleClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      const { onClick } = getEditButtonProps();
-      if (!onClick) {
+      const { onPointerUp } = getEditButtonProps();
+      if (!onPointerUp) {
         return;
       }
-      onClick(e);
+      onPointerUp(e);
     },
     [getEditButtonProps]
   );

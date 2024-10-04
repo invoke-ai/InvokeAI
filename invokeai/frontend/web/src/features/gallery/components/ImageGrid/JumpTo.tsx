@@ -35,7 +35,7 @@ export const JumpTo = () => {
     setNewPage(v - 1);
   }, []);
 
-  const onClickGo = useCallback(() => {
+  const onPointerUpGo = useCallback(() => {
     goToPage(newPage);
     onClose();
   }, [newPage, goToPage, onClose]);
@@ -43,10 +43,10 @@ export const JumpTo = () => {
   useHotkeys(
     'enter',
     () => {
-      onClickGo();
+      onPointerUpGo();
     },
     { enabled: isOpen, enableOnFormTags: ['input'] },
-    [isOpen, onClickGo]
+    [isOpen, onPointerUpGo]
   );
 
   useHotkeys(
@@ -66,7 +66,7 @@ export const JumpTo = () => {
   return (
     <Popover isOpen={isOpen} onClose={onClose} onOpen={onOpen}>
       <PopoverTrigger>
-        <Button aria-label={t('gallery.jump')} size="sm" onClick={onToggle} variant="outline">
+        <Button aria-label={t('gallery.jump')} size="sm" onPointerUp={onToggle} variant="outline">
           {t('gallery.jump')}
         </Button>
       </PopoverTrigger>
@@ -86,7 +86,7 @@ export const JumpTo = () => {
                 onChange={onChangeJumpTo}
               />
             </FormControl>
-            <Button h="full" size="sm" onClick={onClickGo}>
+            <Button h="full" size="sm" onPointerUp={onPointerUpGo}>
               {t('gallery.go')}
             </Button>
           </Flex>

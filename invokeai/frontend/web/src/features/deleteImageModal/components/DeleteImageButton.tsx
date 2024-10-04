@@ -9,11 +9,11 @@ import { PiTrashSimpleBold } from 'react-icons/pi';
 import { $isConnected } from 'services/events/stores';
 
 type DeleteImageButtonProps = Omit<IconButtonProps, 'aria-label'> & {
-  onClick: () => void;
+  onPointerUp: () => void;
 };
 
 export const DeleteImageButton = memo((props: DeleteImageButtonProps) => {
-  const { onClick, isDisabled } = props;
+  const { onPointerUp, isDisabled } = props;
   const { t } = useTranslation();
   const isConnected = useStore($isConnected);
   const imageSelectionLength = useAppSelector(selectSelectionCount);
@@ -21,7 +21,7 @@ export const DeleteImageButton = memo((props: DeleteImageButtonProps) => {
 
   return (
     <IconButton
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       icon={<PiTrashSimpleBold />}
       tooltip={labelMessage}
       aria-label={labelMessage}

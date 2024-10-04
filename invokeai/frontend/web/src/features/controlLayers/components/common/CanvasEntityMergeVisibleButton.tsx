@@ -26,7 +26,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
   const canvasManager = useCanvasManager();
   const isBusy = useCanvasIsBusy();
   const entityCount = useEntityTypeCount(type);
-  const onClick = useCallback(async () => {
+  const onPointerUp = useCallback(async () => {
     if (type === 'raster_layer') {
       const rect = canvasManager.stage.getVisibleRect('raster_layer');
       const result = await withResultAsync(() =>
@@ -83,7 +83,7 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
       tooltip={t('controlLayers.mergeVisible')}
       variant="link"
       icon={<PiStackBold />}
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       alignSelf="stretch"
       isDisabled={entityCount <= 1 || isBusy}
     />

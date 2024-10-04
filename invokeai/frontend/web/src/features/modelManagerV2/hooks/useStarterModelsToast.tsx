@@ -43,7 +43,7 @@ const ToastDescription = () => {
   const dispatch = useAppDispatch();
   const toast = useToast();
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(setActiveTab('models'));
     $installModelsTab.set(3);
     toast.close(TOAST_ID);
@@ -52,7 +52,7 @@ const ToastDescription = () => {
   return (
     <Text fontSize="md">
       {t('modelManager.noModelsInstalledDesc1')}{' '}
-      <Button onClick={onClick} variant="link" color="base.50" flexGrow={0}>
+      <Button onPointerUp={onPointerUp} variant="link" color="base.50" flexGrow={0}>
         {t('ui.tabs.modelsTab')}.
       </Button>
     </Text>

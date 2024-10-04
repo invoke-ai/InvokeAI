@@ -48,7 +48,7 @@ export const InstallModelForm = memo(() => {
             <Flex alignItems="center" gap={3} w="full">
               <Input placeholder={t('modelManager.simpleModelPlaceholder')} {...register('location')} />
               <Button
-                onClick={handleSubmit(onSubmit)}
+                onPointerUp={handleSubmit(onSubmit)}
                 isDisabled={!formState.dirtyFields.location}
                 isLoading={isLoading}
                 size="sm"

@@ -119,7 +119,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
         tooltip={t('modelManager.cancel')}
         aria-label={t('modelManager.cancel')}
         icon={<PiXBold />}
-        onClick={handleDeleteModelImport}
+        onPointerUp={handleDeleteModelImport}
         variant="ghost"
       />
     </Flex>

@@ -52,7 +52,7 @@ const BoardsSearch = () => {
       {boardSearchText && boardSearchText.length && (
         <InputRightElement h="full" pe={2}>
           <IconButton
-            onClick={clearBoardSearch}
+            onPointerUp={clearBoardSearch}
             size="sm"
             variant="link"
             aria-label={t('boards.clearSearch')}

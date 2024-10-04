@@ -50,7 +50,7 @@ export const StylePresetPromptField = (props: Props) => {
       <Flex alignItems="center" gap={2}>
         <FormLabel>{props.label}</FormLabel>
         <Button
-          onClick={insertPromptPlaceholder}
+          onPointerUp={insertPromptPlaceholder}
           size="xs"
           aria-label={t('stylePresets.insertPlaceholder')}
           isDisabled={isPromptPresent}

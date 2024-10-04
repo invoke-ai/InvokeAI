@@ -79,7 +79,7 @@ export const UpscaleWarning = () => {
             i18nKey="upscaling.missingModelsWarning"
             components={{
               LinkComponent: (
-                <Button size="sm" flexGrow={0} variant="link" color="base.50" onClick={handleGoToModelManager} />
+                <Button size="sm" flexGrow={0} variant="link" color="base.50" onPointerUp={handleGoToModelManager} />
               ),
             }}
           />

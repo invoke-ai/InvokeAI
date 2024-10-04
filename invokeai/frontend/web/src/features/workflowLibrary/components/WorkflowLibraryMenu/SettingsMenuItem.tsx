@@ -9,7 +9,7 @@ const DownloadWorkflowMenuItem = () => {
   const modal = useWorkflowEditorSettingsModal();
 
   return (
-    <MenuItem as="button" icon={<PiGearSixFill />} onClick={modal.setTrue}>
+    <MenuItem as="button" icon={<PiGearSixFill />} onPointerUp={modal.setTrue}>
       {t('nodes.workflowSettings')}
     </MenuItem>
   );

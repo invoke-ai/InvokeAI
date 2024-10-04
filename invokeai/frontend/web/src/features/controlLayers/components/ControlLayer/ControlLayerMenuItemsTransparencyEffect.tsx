@@ -28,7 +28,7 @@ export const ControlLayerMenuItemsTransparencyEffect = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   return (
-    <MenuItem onClick={onToggle} icon={<PiDropHalfBold />} isDisabled={!isInteractable}>
+    <MenuItem onPointerUp={onToggle} icon={<PiDropHalfBold />} isDisabled={!isInteractable}>
       {withTransparencyEffect
         ? t('controlLayers.disableTransparencyEffect')
         : t('controlLayers.enableTransparencyEffect')}

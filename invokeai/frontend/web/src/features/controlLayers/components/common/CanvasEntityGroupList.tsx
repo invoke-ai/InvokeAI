@@ -31,7 +31,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
         <Flex
           flexGrow={1}
           as={Button}
-          onClick={collapse.toggle}
+          onPointerUp={collapse.toggle}
           justifyContent="space-between"
           alignItems="center"
           gap={3}

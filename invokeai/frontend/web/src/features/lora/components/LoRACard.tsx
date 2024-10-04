@@ -56,7 +56,7 @@ export const LoRACard = memo((props: LoRACardProps) => {
               aria-label="Remove LoRA"
               variant="ghost"
               size="sm"
-              onClick={handleRemoveLora}
+              onPointerUp={handleRemoveLora}
               icon={<PiTrashSimpleBold />}
             />
           </Flex>

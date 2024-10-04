@@ -14,7 +14,7 @@ export const ModelEditButton = memo(() => {
   }, [dispatch]);
 
   return (
-    <Button size="sm" leftIcon={<PiPencilBold />} colorScheme="invokeYellow" onClick={handleEditModel} flexShrink={0}>
+    <Button size="sm" leftIcon={<PiPencilBold />} colorScheme="invokeYellow" onPointerUp={handleEditModel} flexShrink={0}>
       {t('modelManager.edit')}
     </Button>
   );

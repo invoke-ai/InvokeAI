@@ -25,7 +25,7 @@ export const ScanModelResultItem = memo(({ result, installModel }: Props) => {
         {result.is_installed ? (
           <Badge>{t('common.installed')}</Badge>
         ) : (
-          <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={handleInstall} size="sm" />
+          <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onPointerUp={handleInstall} size="sm" />
         )}
       </Box>
     </Flex>

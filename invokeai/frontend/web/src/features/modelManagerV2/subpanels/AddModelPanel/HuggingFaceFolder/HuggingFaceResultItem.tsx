@@ -12,7 +12,7 @@ export const HuggingFaceResultItem = memo(({ result }: Props) => {
 
   const [installModel] = useInstallModel();
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     installModel({ source: result });
   }, [installModel, result]);
 
@@ -24,7 +24,7 @@ export const HuggingFaceResultItem = memo(({ result }: Props) => {
           {result}
         </Text>
       </Flex>
-      <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onClick={onClick} size="sm" />
+      <IconButton aria-label={t('modelManager.install')} icon={<PiPlusBold />} onPointerUp={onPointerUp} size="sm" />
     </Flex>
   );
 });

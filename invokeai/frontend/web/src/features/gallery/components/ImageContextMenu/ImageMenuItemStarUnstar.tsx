@@ -28,14 +28,14 @@ export const ImageMenuItemStarUnstar = memo(() => {
 
   if (imageDTO.starred) {
     return (
-      <MenuItem icon={customStarUi ? customStarUi.off.icon : <PiStarFill />} onClickCapture={unstarImage}>
+      <MenuItem icon={customStarUi ? customStarUi.off.icon : <PiStarFill />} onPointerUpCapture={unstarImage}>
         {customStarUi ? customStarUi.off.text : t('gallery.unstarImage')}
       </MenuItem>
     );
   }
 
   return (
-    <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarBold />} onClickCapture={starImage}>
+    <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarBold />} onPointerUpCapture={starImage}>
       {customStarUi ? customStarUi.on.text : t('gallery.starImage')}
     </MenuItem>
   );

@@ -65,10 +65,10 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
           </Text>
         </Flex>
         <Flex gap={4}>
-          <Button leftIcon={<PiArrowCounterClockwiseBold />} onClick={resetErrorBoundary}>
+          <Button leftIcon={<PiArrowCounterClockwiseBold />} onPointerUp={resetErrorBoundary}>
             {t('accessibility.resetUI')}
           </Button>
-          <Button leftIcon={<PiCopyBold />} onClick={handleCopy}>
+          <Button leftIcon={<PiCopyBold />} onPointerUp={handleCopy}>
             {t('common.copyError')}
           </Button>
           <Link href={url} isExternal>

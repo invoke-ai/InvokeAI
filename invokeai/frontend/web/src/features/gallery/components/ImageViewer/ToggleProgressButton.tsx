@@ -11,7 +11,7 @@ export const ToggleProgressButton = memo(() => {
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const { t } = useTranslation();
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(setShouldShowProgressInViewer(!shouldShowProgressInViewer));
   }, [dispatch, shouldShowProgressInViewer]);
 
@@ -20,7 +20,7 @@ export const ToggleProgressButton = memo(() => {
       aria-label={t('settings.displayInProgress')}
       tooltip={t('settings.displayInProgress')}
       icon={<PiHourglassHighBold />}
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       variant="outline"
       colorScheme={shouldShowProgressInViewer ? 'invokeBlue' : 'base'}
       data-testid="toggle-show-progress-button"

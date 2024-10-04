@@ -12,7 +12,7 @@ export const CanvasToolbarRedoButton = memo(() => {
   const dispatch = useAppDispatch();
   const isBusy = useCanvasIsBusy();
   const mayRedo = useAppSelector(selectCanvasMayRedo);
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(canvasRedo());
   }, [dispatch]);
 
@@ -20,7 +20,7 @@ export const CanvasToolbarRedoButton = memo(() => {
     <IconButton
       aria-label={t('hotkeys.canvas.redo.title')}
       tooltip={t('hotkeys.canvas.redo.title')}
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       icon={<PiArrowClockwiseBold />}
       variant="link"
       alignSelf="stretch"

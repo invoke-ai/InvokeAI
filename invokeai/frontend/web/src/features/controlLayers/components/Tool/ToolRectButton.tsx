@@ -27,7 +27,7 @@ export const ToolRectButton = memo(() => {
         icon={<PiRectangleBold />}
         colorScheme={isSelected ? 'invokeBlue' : 'base'}
         variant="solid"
-        onClick={selectRect}
+        onPointerUp={selectRect}
       />
     </Tooltip>
   );

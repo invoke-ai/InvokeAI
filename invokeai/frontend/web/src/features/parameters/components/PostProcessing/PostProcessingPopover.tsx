@@ -44,7 +44,7 @@ export const PostProcessingPopover = memo((props: Props) => {
       <PopoverTrigger>
         <IconButton
           tooltip={t('parameters.postProcessing')}
-          onClick={onOpen}
+          onPointerUp={onOpen}
           icon={<PiFrameCornersBold />}
           aria-label={t('parameters.postProcessing')}
         />
@@ -54,7 +54,7 @@ export const PostProcessingPopover = memo((props: Props) => {
           <Flex flexDirection="column" gap={4}>
             <ParamPostProcessingModel />
             {!postProcessingModel && <MissingModelWarning />}
-            <Button size="sm" isDisabled={!imageDTO || inProgress || !postProcessingModel} onClick={handleClickUpscale}>
+            <Button size="sm" isDisabled={!imageDTO || inProgress || !postProcessingModel} onPointerUp={handleClickUpscale}>
               {t('parameters.processImage')}
             </Button>
           </Flex>
@@ -81,7 +81,7 @@ const MissingModelWarning = () => {
           i18nKey="upscaling.postProcessingMissingModelWarning"
           components={{
             LinkComponent: (
-              <Button size="sm" flexGrow={0} variant="link" color="base.50" onClick={handleGoToModelManager} />
+              <Button size="sm" flexGrow={0} variant="link" color="base.50" onPointerUp={handleGoToModelManager} />
             ),
           }}
         />

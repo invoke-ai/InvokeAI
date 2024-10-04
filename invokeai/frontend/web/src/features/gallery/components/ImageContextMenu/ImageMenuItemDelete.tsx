@@ -11,14 +11,14 @@ export const ImageMenuItemDelete = memo(() => {
   const dispatch = useAppDispatch();
   const imageDTO = useImageDTOContext();
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(imagesToDeleteSelected([imageDTO]));
   }, [dispatch, imageDTO]);
 
   return (
     <IconButton
       icon={<PiTrashSimpleBold />}
-      onClickCapture={onClick}
+      onPointerUpCapture={onPointerUp}
       aria-label={t('gallery.deleteImage', { count: 1 })}
       tooltip={t('gallery.deleteImage', { count: 1 })}
       variant="ghost"

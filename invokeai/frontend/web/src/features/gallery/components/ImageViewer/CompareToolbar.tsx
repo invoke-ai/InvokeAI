@@ -67,13 +67,13 @@ export const CompareToolbar = memo(() => {
             icon={<PiSwapBold />}
             aria-label={`${t('gallery.swapImages')} (C)`}
             tooltip={`${t('gallery.swapImages')} (C)`}
-            onClick={swapImages}
+            onPointerUp={swapImages}
           />
           {comparisonMode !== 'side-by-side' && (
             <IconButton
               aria-label={t('gallery.stretchToFit')}
               tooltip={t('gallery.stretchToFit')}
-              onClick={toggleComparisonFit}
+              onPointerUp={toggleComparisonFit}
               colorScheme={comparisonFit === 'fill' ? 'invokeBlue' : 'base'}
               variant="outline"
               icon={<PiArrowsOutBold />}
@@ -85,21 +85,21 @@ export const CompareToolbar = memo(() => {
         <ButtonGroup variant="outline">
           <Button
             flexShrink={0}
-            onClick={setComparisonModeSlider}
+            onPointerUp={setComparisonModeSlider}
             colorScheme={comparisonMode === 'slider' ? 'invokeBlue' : 'base'}
           >
             {t('gallery.slider')}
           </Button>
           <Button
             flexShrink={0}
-            onClick={setComparisonModeSideBySide}
+            onPointerUp={setComparisonModeSideBySide}
             colorScheme={comparisonMode === 'side-by-side' ? 'invokeBlue' : 'base'}
           >
             {t('gallery.sideBySide')}
           </Button>
           <Button
             flexShrink={0}
-            onClick={setComparisonModeHover}
+            onPointerUp={setComparisonModeHover}
             colorScheme={comparisonMode === 'hover' ? 'invokeBlue' : 'base'}
           >
             {t('gallery.hover')}
@@ -117,7 +117,7 @@ export const CompareToolbar = memo(() => {
             variant="ghost"
             aria-label={`${t('gallery.exitCompare')} (Esc)`}
             tooltip={`${t('gallery.exitCompare')} (Esc)`}
-            onClick={exitCompare}
+            onPointerUp={exitCompare}
           >
             {t('gallery.exitCompare')}
           </Button>
