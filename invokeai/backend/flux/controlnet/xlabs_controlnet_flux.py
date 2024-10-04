@@ -17,7 +17,7 @@ def _zero_module(module: torch.nn.Module) -> torch.nn.Module:
     return module
 
 
-class ControlNetFlux(nn.Module):
+class XLabsControlNetFlux(nn.Module):
     """A ControlNet model for FLUX.
 
     The architecture is very similar to the base FLUX model, with the following differences:

@@ -10,7 +10,7 @@ from safetensors.torch import load_file
 from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.flux.controlnet.controlnet_flux import ControlNetFlux
+from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.util import ae_params, params
@@ -311,7 +311,7 @@ class FluxControlnetModel(ModelLoader):
 
         with accelerate.init_empty_weights():
             # HACK(ryand): Is it safe to assume dev here?
-            model = ControlNetFlux(params["flux-dev"])
+            model = XLabsControlNetFlux(params["flux-dev"])
 
         sd = load_file(model_path)
         model.load_state_dict(sd, assign=True)

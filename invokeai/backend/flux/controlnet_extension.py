@@ -6,13 +6,13 @@ from PIL.Image import Image
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES, prepare_control_image
-from invokeai.backend.flux.controlnet.controlnet_flux import ControlNetFlux
+from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
 
 
 class ControlNetExtension:
     def __init__(
         self,
-        model: ControlNetFlux,
+        model: XLabsControlNetFlux,
         controlnet_cond: torch.Tensor,
         weight: Union[float, List[float]],
         begin_step_percent: float,
@@ -30,7 +30,7 @@ class ControlNetExtension:
     @classmethod
     def from_controlnet_image(
         cls,
-        model: ControlNetFlux,
+        model: XLabsControlNetFlux,
         controlnet_image: Image,
         latent_height: int,
         latent_width: int,
