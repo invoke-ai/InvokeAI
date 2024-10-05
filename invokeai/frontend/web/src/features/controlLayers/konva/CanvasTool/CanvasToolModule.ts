@@ -318,7 +318,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       const tool = this.$tool.get();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-      if (!cursorPos || !isMouseDown || !selectedEntity?.state.isEnabled || selectedEntity.state.isLocked) {
+      if (!cursorPos || !isMouseDown || !selectedEntity?.$isInteractable.get()) {
         return;
       }
 
@@ -390,15 +390,14 @@ export class CanvasToolModule extends CanvasModuleBase {
         return;
       }
 
-      this.$isMouseDown.set(getIsPrimaryMouseDown(e));
+      const isMouseDown = getIsPrimaryMouseDown(e);
+      this.$isMouseDown.set(isMouseDown);
       const cursorPos = this.syncLastCursorPos();
       const tool = this.$tool.get();
       const settings = this.manager.stateApi.getSettings();
-
-      const isMouseDown = this.$isMouseDown.get();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-      if (!cursorPos || !isMouseDown || !selectedEntity?.state.isEnabled || selectedEntity?.state.isLocked) {
+      if (!cursorPos || !isMouseDown || !selectedEntity?.$isInteractable.get()) {
         return;
       }
 
@@ -556,8 +555,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-      const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked;
-      if (!isDrawable) {
+      if (!selectedEntity?.$isInteractable.get()) {
         return;
       }
 
@@ -618,9 +616,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       const isMouseDown = this.$isMouseDown.get();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-      const isDrawable = selectedEntity?.state.isEnabled && !selectedEntity.state.isLocked && cursorPos && isMouseDown;
-
-      if (!isDrawable) {
+      if (!cursorPos || !isMouseDown || !selectedEntity?.$isInteractable.get()) {
         return;
       }
 
