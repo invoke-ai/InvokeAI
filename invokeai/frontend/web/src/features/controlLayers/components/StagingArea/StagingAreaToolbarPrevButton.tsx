@@ -40,7 +40,7 @@ export const StagingAreaToolbarPrevButton = memo(() => {
       tooltip={`${t('controlLayers.stagingArea.previous')} (Left)`}
       aria-label={`${t('controlLayers.stagingArea.previous')} (Left)`}
       icon={<PiArrowLeftBold />}
-      onClick={selectPrev}
+      onPointerUp={selectPrev}
       colorScheme="invokeBlue"
       isDisabled={imageCount <= 1 || !shouldShowStagedImage}
     />

@@ -30,24 +30,24 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
         <CanvasContextMenuItemsCropCanvasToBbox />
       </MenuGroup>
       <MenuGroup title={t('controlLayers.canvasContextMenu.saveToGalleryGroup')}>
-        <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveCanvasToGallery}>
+        <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onPointerUp={saveCanvasToGallery}>
           {t('controlLayers.canvasContextMenu.saveCanvasToGallery')}
         </MenuItem>
-        <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveBboxToGallery}>
+        <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onPointerUp={saveBboxToGallery}>
           {t('controlLayers.canvasContextMenu.saveBboxToGallery')}
         </MenuItem>
       </MenuGroup>
       <MenuGroup title={t('controlLayers.canvasContextMenu.bboxGroup')}>
-        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newGlobalReferenceImageFromBbox}>
+        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onPointerUp={newGlobalReferenceImageFromBbox}>
           {t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
         </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newRegionalReferenceImageFromBbox}>
+        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onPointerUp={newRegionalReferenceImageFromBbox}>
           {t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
         </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newControlLayerFromBbox}>
+        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onPointerUp={newControlLayerFromBbox}>
           {t('controlLayers.canvasContextMenu.newControlLayer')}
         </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newRasterLayerFromBbox}>
+        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onPointerUp={newRasterLayerFromBbox}>
           {t('controlLayers.canvasContextMenu.newRasterLayer')}
         </MenuItem>
       </MenuGroup>

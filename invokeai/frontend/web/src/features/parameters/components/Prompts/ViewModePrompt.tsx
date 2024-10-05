@@ -32,7 +32,7 @@ export const ViewModePrompt = ({
     <Box position="absolute" top={0} bottom={0} left={0} right={0} layerStyle="second" borderRadius="base">
       <Flex
         flexDir="column"
-        onClick={handleExitViewMode}
+        onPointerUp={handleExitViewMode}
         justifyContent="space-between"
         h="full"
         borderWidth={1}

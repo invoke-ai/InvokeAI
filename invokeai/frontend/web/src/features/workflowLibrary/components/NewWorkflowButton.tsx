@@ -8,12 +8,12 @@ export const NewWorkflowButton = memo(() => {
   const { t } = useTranslation();
 
   const renderButton = useCallback(
-    (onClick: () => void) => (
+    (onPointerUp: () => void) => (
       <IconButton
         aria-label={t('nodes.newWorkflow')}
         tooltip={t('nodes.newWorkflow')}
         icon={<PiFilePlusBold />}
-        onClick={onClick}
+        onPointerUp={onPointerUp}
         pointerEvents="auto"
       />
     ),

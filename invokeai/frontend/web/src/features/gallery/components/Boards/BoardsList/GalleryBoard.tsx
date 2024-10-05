@@ -1,22 +1,12 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import {
-  Editable,
-  EditableInput,
-  EditablePreview,
-  Flex,
-  Icon,
-  Image,
-  Text,
-  Tooltip,
-  useDisclosure,
-  useEditableControls,
-} from '@invoke-ai/ui-library';
+import { Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import type { AddToBoardDropData } from 'features/dnd/types';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
+import { BoardEditableTitle } from 'features/gallery/components/Boards/BoardsList/BoardEditableTitle';
 import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
 import {
   selectAutoAddBoardId,
@@ -24,22 +14,11 @@ import {
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
-import type { MouseEvent, MouseEventHandler, MutableRefObject } from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiImageSquare } from 'react-icons/pi';
-import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
-
-const editableInputStyles: SystemStyleObject = {
-  p: 0,
-  fontSize: 'md',
-  w: '100%',
-  _focusVisible: {
-    p: 0,
-  },
-};
 
 const _hover: SystemStyleObject = {
   bg: 'base.850',
@@ -56,11 +35,8 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
-  const editingDisclosure = useDisclosure();
-  const [localBoardName, setLocalBoardName] = useState(board.board_name);
-  const onStartEditingRef = useRef<MouseEventHandler | undefined>(undefined);
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     if (selectedBoardId !== board.board_id) {
       dispatch(boardIdSelected({ boardId: board.board_id }));
     }
@@ -68,8 +44,6 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
       dispatch(autoAddBoardIdChanged(board.board_id));
     }
   }, [selectedBoardId, board.board_id, autoAssignBoardOnClick, autoAddBoardId, dispatch]);
-
-  const [updateBoard, { isLoading: isUpdateBoardLoading }] = useUpdateBoardMutation();
 
   const droppableData: AddToBoardDropData = useMemo(
     () => ({
@@ -80,42 +54,6 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     [board.board_id]
   );
 
-  const onSubmit = useCallback(
-    async (newBoardName: string) => {
-      if (!newBoardName.trim()) {
-        // empty strings are not allowed
-        setLocalBoardName(board.board_name);
-      } else if (newBoardName === board.board_name) {
-        // don't updated the board name if it hasn't changed
-      } else {
-        try {
-          const { board_name } = await updateBoard({
-            board_id: board.board_id,
-            changes: { board_name: newBoardName },
-          }).unwrap();
-
-          // update local state
-          setLocalBoardName(board_name);
-        } catch {
-          // revert on error
-          setLocalBoardName(board.board_name);
-        }
-      }
-      editingDisclosure.onClose();
-    },
-    [board.board_id, board.board_name, editingDisclosure, updateBoard]
-  );
-
-  const onChange = useCallback((newBoardName: string) => {
-    setLocalBoardName(newBoardName);
-  }, []);
-
-  const onDoubleClick = useCallback((e: MouseEvent<HTMLDivElement>) => {
-    if (onStartEditingRef.current) {
-      onStartEditingRef.current(e);
-    }
-  }, []);
-
   return (
     <BoardContextMenu board={board}>
       {(ref) => (
@@ -123,8 +61,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
           <Flex
             position="relative"
             ref={ref}
-            onClick={onClick}
-            onDoubleClick={onDoubleClick}
+            onPointerUp={onPointerUp}
             w="full"
             alignItems="center"
             borderRadius="base"
@@ -138,36 +75,12 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
             h={12}
           >
             <CoverImage board={board} />
-            <Editable
-              as={Flex}
-              alignItems="center"
-              gap={4}
-              flexGrow={1}
-              onEdit={editingDisclosure.onOpen}
-              value={localBoardName}
-              isDisabled={isUpdateBoardLoading}
-              submitOnBlur={true}
-              onChange={onChange}
-              onSubmit={onSubmit}
-              isPreviewFocusable={false}
-              fontSize="sm"
-            >
-              <EditablePreview
-                cursor="pointer"
-                p={0}
-                fontSize="sm"
-                textOverflow="ellipsis"
-                noOfLines={1}
-                w="fit-content"
-                wordBreak="break-all"
-                fontWeight={isSelected ? 'bold' : 'normal'}
-              />
-              <EditableInput sx={editableInputStyles} />
-              <JankEditableHijack onStartEditingRef={onStartEditingRef} />
-            </Editable>
-            {autoAddBoardId === board.board_id && !editingDisclosure.isOpen && <AutoAddBadge />}
-            {board.archived && !editingDisclosure.isOpen && <Icon as={PiArchiveBold} fill="base.300" />}
-            {!editingDisclosure.isOpen && <Text variant="subtext">{board.image_count}</Text>}
+            <Flex w="full">
+              <BoardEditableTitle board={board} isSelected={isSelected} />
+            </Flex>
+            {autoAddBoardId === board.board_id && <AutoAddBadge />}
+            {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
+            <Text variant="subtext">{board.image_count}</Text>
 
             <IAIDroppable data={droppableData} dropLabel={t('gallery.move')} />
           </Flex>
@@ -176,16 +89,6 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     </BoardContextMenu>
   );
 };
-
-const JankEditableHijack = memo((props: { onStartEditingRef: MutableRefObject<MouseEventHandler | undefined> }) => {
-  const editableControls = useEditableControls();
-  useEffect(() => {
-    props.onStartEditingRef.current = editableControls.getEditButtonProps().onClick;
-  }, [props, editableControls]);
-  return null;
-});
-
-JankEditableHijack.displayName = 'JankEditableHijack';
 
 export default memo(GalleryBoard);
 

@@ -42,7 +42,7 @@ export const HuggingFaceResults = memo(({ results }: HuggingFaceResultsProps) =>
     setSearchTerm('');
   }, []);
 
-  const onClickAddAll = useCallback(() => {
+  const onPointerUpAddAll = useCallback(() => {
     for (const result of filteredResults) {
       installModel({ source: result });
     }
@@ -55,7 +55,7 @@ export const HuggingFaceResults = memo(({ results }: HuggingFaceResultsProps) =>
         <Flex justifyContent="space-between" alignItems="center">
           <Heading size="sm">{t('modelManager.availableModels')}</Heading>
           <Flex alignItems="center" gap={3}>
-            <Button size="sm" onClick={onClickAddAll} isDisabled={results.length === 0} flexShrink={0}>
+            <Button size="sm" onPointerUp={onPointerUpAddAll} isDisabled={results.length === 0} flexShrink={0}>
               {t('modelManager.installAll')}
             </Button>
             <InputGroup w={64} size="xs">
@@ -74,7 +74,7 @@ export const HuggingFaceResults = memo(({ results }: HuggingFaceResultsProps) =>
                     variant="link"
                     aria-label={t('boards.clearSearch')}
                     icon={<PiXBold />}
-                    onClick={clearSearch}
+                    onPointerUp={clearSearch}
                   />
                 </InputRightElement>
               )}

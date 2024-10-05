@@ -41,19 +41,19 @@ const ViewportControls = () => {
       <IconButton
         tooltip={t('nodes.zoomInNodes')}
         aria-label={t('nodes.zoomInNodes')}
-        onClick={handleClickedZoomIn}
+        onPointerUp={handleClickedZoomIn}
         icon={<PiMagnifyingGlassPlusBold />}
       />
       <IconButton
         tooltip={t('nodes.zoomOutNodes')}
         aria-label={t('nodes.zoomOutNodes')}
-        onClick={handleClickedZoomOut}
+        onPointerUp={handleClickedZoomOut}
         icon={<PiMagnifyingGlassMinusBold />}
       />
       <IconButton
         tooltip={t('nodes.fitViewportNodes')}
         aria-label={t('nodes.fitViewportNodes')}
-        onClick={handleClickedFitView}
+        onPointerUp={handleClickedFitView}
         icon={<PiFrameCornersBold />}
       />
       {/* <Tooltip
@@ -66,7 +66,7 @@ const ViewportControls = () => {
         <IconButton
           aria-label="Toggle field type legend"
           isChecked={shouldShowFieldTypeLegend}
-          onClick={handleClickedToggleFieldTypeLegend}
+          onPointerUp={handleClickedToggleFieldTypeLegend}
           icon={<FaInfo />}
         />
       </Tooltip> */}
@@ -74,7 +74,7 @@ const ViewportControls = () => {
         tooltip={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
         aria-label={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
         isChecked={shouldShowMinimapPanel}
-        onClick={handleClickedToggleMiniMapPanel}
+        onPointerUp={handleClickedToggleMiniMapPanel}
         icon={<PiMapPinBold />}
       />
     </ButtonGroup>

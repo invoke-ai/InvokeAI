@@ -94,7 +94,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
           position="absolute"
           insetInlineEnd={0}
           insetBlockStart={0}
-          onClick={handleResetImage}
+          onPointerUp={handleResetImage}
           aria-label={t('modelManager.deleteModelImage')}
           tooltip={t('modelManager.deleteModelImage')}
           icon={<PiArrowCounterClockwiseBold />}

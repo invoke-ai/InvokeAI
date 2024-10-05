@@ -50,7 +50,7 @@ export default function ErrorToastDescription({ errorType, errorMessage, session
             size="sm"
             aria-label="Copy"
             icon={<PiCopyBold />}
-            onClick={onCopy.bind(null, sessionId)}
+            onPointerUp={onCopy.bind(null, sessionId)}
             variant="ghost"
             sx={sx}
           />

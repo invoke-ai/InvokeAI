@@ -33,7 +33,7 @@ const SaveWorkflowButton = () => {
       aria-label={t('workflows.saveWorkflow')}
       icon={<PiFloppyDiskBold />}
       isDisabled={!isTouched}
-      onClick={handleClickSave}
+      onPointerUp={handleClickSave}
       pointerEvents="auto"
     />
   );

@@ -56,7 +56,7 @@ const ParamSDXLRefinerModelSelect = () => {
           variant="ghost"
           icon={<PiXBold />}
           aria-label={t('common.reset')}
-          onClick={onReset}
+          onPointerUp={onReset}
           isDisabled={!value}
         />
       </Flex>

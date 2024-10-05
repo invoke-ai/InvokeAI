@@ -127,13 +127,13 @@ const DeleteBoardModal = () => {
           </AlertDialogBody>
           <AlertDialogFooter>
             <Flex w="full" gap={2} justifyContent="end">
-              <Button ref={cancelRef} onClick={handleClose}>
+              <Button ref={cancelRef} onPointerUp={handleClose}>
                 {t('boards.cancel')}
               </Button>
-              <Button colorScheme="warning" isLoading={isLoading} onClick={handleDeleteBoardOnly}>
+              <Button colorScheme="warning" isLoading={isLoading} onPointerUp={handleDeleteBoardOnly}>
                 {t('boards.deleteBoardOnly')}
               </Button>
-              <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteBoardAndImages}>
+              <Button colorScheme="error" isLoading={isLoading} onPointerUp={handleDeleteBoardAndImages}>
                 {t('boards.deleteBoardAndImages')}
               </Button>
             </Flex>

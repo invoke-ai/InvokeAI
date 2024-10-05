@@ -80,7 +80,7 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
   return (
     <Flex flexDir="column" gap={4}>
       <ModelHeader modelConfig={modelConfig}>
-        <Button flexShrink={0} size="sm" onClick={handleClickCancel} leftIcon={<PiXBold />}>
+        <Button flexShrink={0} size="sm" onPointerUp={handleClickCancel} leftIcon={<PiXBold />}>
           {t('common.cancel')}
         </Button>
         <Button
@@ -88,7 +88,7 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
           size="sm"
           colorScheme="invokeYellow"
           leftIcon={<PiCheckBold />}
-          onClick={form.handleSubmit(onSubmit)}
+          onPointerUp={form.handleSubmit(onSubmit)}
           isLoading={isSubmitting}
           isDisabled={Boolean(Object.keys(form.formState.errors).length)}
         >

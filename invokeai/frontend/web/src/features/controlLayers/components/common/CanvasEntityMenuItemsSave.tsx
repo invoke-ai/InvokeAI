@@ -13,12 +13,12 @@ export const CanvasEntityMenuItemsSave = memo(() => {
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const isInteractable = useIsEntityInteractable(entityIdentifier);
   const saveLayerToAssets = useSaveLayerToAssets();
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     saveLayerToAssets(adapter);
   }, [saveLayerToAssets, adapter]);
 
   return (
-    <MenuItem onClick={onClick} icon={<PiFloppyDiskBold />} isDisabled={!isInteractable}>
+    <MenuItem onPointerUp={onPointerUp} icon={<PiFloppyDiskBold />} isDisabled={!isInteractable}>
       {t('controlLayers.saveLayerToAssets')}
     </MenuItem>
   );

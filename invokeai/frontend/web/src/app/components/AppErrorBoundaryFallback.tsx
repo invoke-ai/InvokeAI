@@ -44,7 +44,7 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
   }, [error.message, error.name, isLocal]);
 
   return (
-    <Flex layerStyle="body" w="100vw" h="100vh" alignItems="center" justifyContent="center" p={4}>
+    <Flex layerStyle="body" w="100dvw" h="100dvh" alignItems="center" justifyContent="center" p={4}>
       <Flex layerStyle="first" flexDir="column" borderRadius="base" justifyContent="center" gap={8} p={16}>
         <Flex alignItems="center" gap="2">
           <Image src={InvokeLogoYellow} alt="invoke-logo" w="24px" h="24px" minW="24px" minH="24px" userSelect="none" />
@@ -65,10 +65,10 @@ const AppErrorBoundaryFallback = ({ error, resetErrorBoundary }: Props) => {
           </Text>
         </Flex>
         <Flex gap={4}>
-          <Button leftIcon={<PiArrowCounterClockwiseBold />} onClick={resetErrorBoundary}>
+          <Button leftIcon={<PiArrowCounterClockwiseBold />} onPointerUp={resetErrorBoundary}>
             {t('accessibility.resetUI')}
           </Button>
-          <Button leftIcon={<PiCopyBold />} onClick={handleCopy}>
+          <Button leftIcon={<PiCopyBold />} onPointerUp={handleCopy}>
             {t('common.copyError')}
           </Button>
           <Link href={url} isExternal>

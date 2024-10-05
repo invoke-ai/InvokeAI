@@ -40,7 +40,7 @@ export const StagingAreaToolbarSaveSelectedToGalleryButton = memo(() => {
       tooltip={t('controlLayers.stagingArea.saveToGallery')}
       aria-label={t('controlLayers.stagingArea.saveToGallery')}
       icon={<PiFloppyDiskBold />}
-      onClick={saveSelectedImageToGallery}
+      onPointerUp={saveSelectedImageToGallery}
       colorScheme="invokeBlue"
       isDisabled={!selectedImage || !selectedImage.imageDTO.is_intermediate}
     />

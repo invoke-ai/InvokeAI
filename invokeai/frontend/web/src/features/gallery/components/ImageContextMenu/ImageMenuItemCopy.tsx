@@ -1,4 +1,4 @@
-import { IconButton } from '@invoke-ai/ui-library';
+import { IconButton, MenuItem } from '@invoke-ai/ui-library';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
@@ -10,7 +10,7 @@ export const ImageMenuItemCopy = memo(() => {
   const imageDTO = useImageDTOContext();
   const { isClipboardAPIAvailable, copyImageToClipboard } = useCopyImageToClipboard();
 
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     copyImageToClipboard(imageDTO.image_url);
   }, [copyImageToClipboard, imageDTO.image_url]);
 
@@ -20,12 +20,17 @@ export const ImageMenuItemCopy = memo(() => {
 
   return (
     <IconButton
+      as={MenuItem}
       icon={<PiCopyBold />}
       aria-label={t('parameters.copyImage')}
       tooltip={t('parameters.copyImage')}
-      onClickCapture={onClick}
-      variant="ghost"
+      onPointerUpCapture={onPointerUp}
+      variant="unstyled"
       colorScheme="base"
+      w="min-content"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
     />
   );
 });

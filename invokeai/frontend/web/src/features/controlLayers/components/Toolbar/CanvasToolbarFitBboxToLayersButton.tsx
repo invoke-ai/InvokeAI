@@ -9,13 +9,13 @@ export const CanvasToolbarFitBboxToLayersButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const isBusy = useCanvasIsBusy();
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     canvasManager.bbox.fitToLayers();
   }, [canvasManager.bbox]);
 
   return (
     <IconButton
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       variant="link"
       alignSelf="stretch"
       aria-label={t('controlLayers.fitBboxToLayers')}

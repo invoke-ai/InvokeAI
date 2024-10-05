@@ -77,7 +77,7 @@ export const ScanModelsResults = memo(({ results }: ScanModelResultsProps) => {
               <FormLabel m={0}>{t('modelManager.inplaceInstall')}</FormLabel>
               <Checkbox isChecked={inplace} onChange={onChangeInplace} size="md" />
             </FormControl>
-            <Button size="sm" onClick={handleAddAll} isDisabled={filteredResults.length === 0}>
+            <Button size="sm" onPointerUp={handleAddAll} isDisabled={filteredResults.length === 0}>
               {t('modelManager.installAll')}
             </Button>
             <InputGroup w={64} size="xs">
@@ -96,7 +96,7 @@ export const ScanModelsResults = memo(({ results }: ScanModelResultsProps) => {
                     variant="link"
                     aria-label={t('boards.clearSearch')}
                     icon={<PiXBold />}
-                    onClick={clearSearch}
+                    onPointerUp={clearSearch}
                     flexShrink={0}
                   />
                 </InputRightElement>

@@ -40,26 +40,26 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
       />
       <MenuList>
         <MenuGroup title={t('controlLayers.global')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addGlobalReferenceImage} isDisabled={isFLUX}>
+          <MenuItem icon={<PiPlusBold />} onPointerUp={addGlobalReferenceImage} isDisabled={isFLUX}>
             {t('controlLayers.globalReferenceImage')}
           </MenuItem>
         </MenuGroup>
         <MenuGroup title={t('controlLayers.regional')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask}>
+          <MenuItem icon={<PiPlusBold />} onPointerUp={addInpaintMask}>
             {t('controlLayers.inpaintMask')}
           </MenuItem>
-          <MenuItem icon={<PiPlusBold />} onClick={addRegionalGuidance} isDisabled={isFLUX}>
+          <MenuItem icon={<PiPlusBold />} onPointerUp={addRegionalGuidance} isDisabled={isFLUX}>
             {t('controlLayers.regionalGuidance')}
           </MenuItem>
-          <MenuItem icon={<PiPlusBold />} onClick={addRegionalReferenceImage} isDisabled={isFLUX}>
+          <MenuItem icon={<PiPlusBold />} onPointerUp={addRegionalReferenceImage} isDisabled={isFLUX}>
             {t('controlLayers.regionalReferenceImage')}
           </MenuItem>
         </MenuGroup>
         <MenuGroup title={t('controlLayers.layer_other')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addControlLayer} isDisabled={isFLUX}>
+          <MenuItem icon={<PiPlusBold />} onPointerUp={addControlLayer} isDisabled={isFLUX}>
             {t('controlLayers.controlLayer')}
           </MenuItem>
-          <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>
+          <MenuItem icon={<PiPlusBold />} onPointerUp={addRasterLayer}>
             {t('controlLayers.rasterLayer')}
           </MenuItem>
         </MenuGroup>

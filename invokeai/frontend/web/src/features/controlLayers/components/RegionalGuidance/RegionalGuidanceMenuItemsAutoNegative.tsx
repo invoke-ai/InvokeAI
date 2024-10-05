@@ -17,12 +17,12 @@ export const RegionalGuidanceMenuItemsAutoNegative = memo(() => {
     [entityIdentifier]
   );
   const autoNegative = useAppSelector(selectAutoNegative);
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(rgAutoNegativeToggled({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
 
   return (
-    <MenuItem icon={<PiSelectionInverseBold />} onClick={onClick}>
+    <MenuItem icon={<PiSelectionInverseBold />} onPointerUp={onPointerUp}>
       {autoNegative ? t('controlLayers.disableAutoNegative') : t('controlLayers.enableAutoNegative')}
     </MenuItem>
   );

@@ -13,7 +13,7 @@ const LoadWorkflowFromGraphMenuItem = () => {
   const { onOpen } = useLoadWorkflowFromGraphModal();
 
   return (
-    <MenuItem as="button" icon={<PiFlaskBold />} onClick={onOpen} isDisabled={!size(templates)}>
+    <MenuItem as="button" icon={<PiFlaskBold />} onPointerUp={onOpen} isDisabled={!size(templates)}>
       {t('workflows.loadFromGraph')}
     </MenuItem>
   );

@@ -21,7 +21,7 @@ const PruneQueueButton = ({ asIconButton }: Props) => {
       label={t('queue.prune')}
       tooltip={t('queue.pruneTooltip', { item_count: finishedCount })}
       icon={<PiBroomBold />}
-      onClick={pruneQueue}
+      onPointerUp={pruneQueue}
       colorScheme="invokeBlue"
     />
   );

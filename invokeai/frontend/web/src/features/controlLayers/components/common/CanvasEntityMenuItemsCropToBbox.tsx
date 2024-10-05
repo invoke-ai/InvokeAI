@@ -11,7 +11,7 @@ export const CanvasEntityMenuItemsCropToBbox = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const isInteractable = useIsEntityInteractable(entityIdentifier);
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     if (!adapter) {
       return;
     }
@@ -19,7 +19,7 @@ export const CanvasEntityMenuItemsCropToBbox = memo(() => {
   }, [adapter]);
 
   return (
-    <MenuItem onClick={onClick} icon={<PiCropBold />} isDisabled={!isInteractable}>
+    <MenuItem onPointerUp={onPointerUp} icon={<PiCropBold />} isDisabled={!isInteractable}>
       {t('controlLayers.cropLayerToBbox')}
     </MenuItem>
   );

@@ -59,7 +59,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
 
   return (
     <Box
-      onClick={handleClick}
+      onPointerUp={handleClick}
       onMouseEnter={handleMouseOver}
       onMouseLeave={handleMouseOut}
       className={DRAG_HANDLE_CLASSNAME}

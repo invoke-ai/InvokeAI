@@ -27,7 +27,7 @@ export const BboxSetOptimalSizeButton = memo(() => {
     () => getIsSizeTooLarge(width, height, optimalDimension),
     [height, width, optimalDimension]
   );
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dispatch(bboxSizeOptimized());
   }, [dispatch]);
   const tooltip = useMemo(() => {
@@ -44,7 +44,7 @@ export const BboxSetOptimalSizeButton = memo(() => {
     <IconButton
       tooltip={tooltip}
       aria-label={t('parameters.setToOptimalSize')}
-      onClick={onClick}
+      onPointerUp={onPointerUp}
       variant="ghost"
       size="sm"
       icon={<PiSparkleFill />}

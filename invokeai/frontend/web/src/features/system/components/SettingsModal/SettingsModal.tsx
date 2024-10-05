@@ -171,7 +171,7 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   return (
     <>
       {cloneElement(children, {
-        onClick: settingsModal.setTrue,
+        onPointerUp: settingsModal.setTrue,
       })}
       <Modal isOpen={settingsModal.isTrue} onClose={settingsModal.setFalse} size="2xl" isCentered useInert={false}>
         <ModalOverlay />
@@ -248,7 +248,7 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                       <Button
                         tooltip={hasPendingItems ? t('settings.clearIntermediatesDisabled') : undefined}
                         colorScheme="warning"
-                        onClick={clearIntermediates}
+                        onPointerUp={clearIntermediates}
                         isLoading={isLoadingClearIntermediates}
                         isDisabled={!intermediatesCount || hasPendingItems}
                       >
@@ -263,7 +263,7 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                   )}
 
                   <StickyScrollable title={t('settings.resetWebUI')}>
-                    <Button colorScheme="error" onClick={handleClickResetWebUI}>
+                    <Button colorScheme="error" onPointerUp={handleClickResetWebUI}>
                       {t('settings.resetWebUI')}
                     </Button>
                     {Boolean(config?.shouldShowResetWebUiText) && (

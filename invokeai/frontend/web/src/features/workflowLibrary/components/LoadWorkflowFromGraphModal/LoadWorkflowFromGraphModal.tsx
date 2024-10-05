@@ -69,7 +69,7 @@ export const LoadWorkflowFromGraphModal = () => {
         <ModalCloseButton />
         <ModalBody as={Flex} flexDir="column" gap={4} w="full" h="full" pb={4}>
           <Flex gap={4}>
-            <Button onClick={parse} size="sm" flexShrink={0}>
+            <Button onPointerUp={parse} size="sm" flexShrink={0}>
               {t('workflows.convertGraph')}
             </Button>
             <FormControl>
@@ -77,7 +77,7 @@ export const LoadWorkflowFromGraphModal = () => {
               <Checkbox isChecked={shouldAutoLayout} onChange={onChangeShouldAutoLayout} />
             </FormControl>
             <Spacer />
-            <Button onClick={loadWorkflow} size="sm" flexShrink={0}>
+            <Button onPointerUp={loadWorkflow} size="sm" flexShrink={0}>
               {t('workflows.loadWorkflow')}
             </Button>
           </Flex>

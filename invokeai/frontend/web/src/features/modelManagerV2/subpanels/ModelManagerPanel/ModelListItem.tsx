@@ -43,7 +43,7 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
     dispatch(setSelectedModelKey(model.key));
   }, [model.key, dispatch]);
 
-  const onClickDeleteButton = useCallback(
+  const onPointerUpDeleteButton = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
       onOpen();
@@ -83,7 +83,7 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
       alignItems="center"
       gap={2}
       cursor="pointer"
-      onClick={handleSelectModel}
+      onPointerUp={handleSelectModel}
     >
       <Flex gap={2} w="full" h="full" minW={0}>
         <ModelImage image_url={model.cover_image} />
@@ -110,7 +110,7 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
         </Flex>
       </Flex>
       <IconButton
-        onClick={onClickDeleteButton}
+        onPointerUp={onPointerUpDeleteButton}
         icon={<PiTrashSimpleBold size={16} />}
         aria-label={t('modelManager.deleteConfig')}
         colorScheme="error"

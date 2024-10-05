@@ -12,7 +12,7 @@ export const CanvasEntityIsBookmarkedForQuickSwitchToggle = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
   const isBookmarked = useEntityIsBookmarkedForQuickSwitch(entityIdentifier);
   const dispatch = useAppDispatch();
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     if (isBookmarked) {
       dispatch(bookmarkedEntityChanged({ entityIdentifier: null }));
     } else {
@@ -28,7 +28,7 @@ export const CanvasEntityIsBookmarkedForQuickSwitchToggle = memo(() => {
       variant="link"
       alignSelf="stretch"
       icon={isBookmarked ? <PiBookmarkSimpleFill /> : <PiBookmarkSimpleBold />}
-      onClick={onClick}
+      onPointerUp={onPointerUp}
     />
   );
 });

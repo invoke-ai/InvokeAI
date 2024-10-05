@@ -17,7 +17,7 @@ export const CanvasContextMenuItemsCropCanvasToBbox = memo(() => {
   }, [canvasManager]);
 
   return (
-    <MenuItem icon={<PiCropBold />} isDisabled={isBusy} onClick={cropCanvasToBbox}>
+    <MenuItem icon={<PiCropBold />} isDisabled={isBusy} onPointerUp={cropCanvasToBbox}>
       {t('controlLayers.canvasContextMenu.cropCanvasToBbox')}
     </MenuItem>
   );

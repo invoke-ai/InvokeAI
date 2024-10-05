@@ -116,7 +116,7 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
           leftIcon={<PiCheckBold />}
           colorScheme="invokeYellow"
           isDisabled={!formState.isDirty}
-          onClick={handleSubmit(onSubmit)}
+          onPointerUp={handleSubmit(onSubmit)}
           isLoading={isLoadingUpdateModel}
         >
           {t('common.save')}

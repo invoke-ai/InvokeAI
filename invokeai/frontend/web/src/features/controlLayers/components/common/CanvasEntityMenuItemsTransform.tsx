@@ -11,7 +11,7 @@ export const CanvasEntityMenuItemsTransform = memo(() => {
   const transform = useEntityTransform(entityIdentifier);
 
   return (
-    <MenuItem onClick={transform.start} icon={<PiFrameCornersBold />} isDisabled={transform.isDisabled}>
+    <MenuItem onPointerUp={transform.start} icon={<PiFrameCornersBold />} isDisabled={transform.isDisabled}>
       {t('controlLayers.transform.transform')}
     </MenuItem>
   );

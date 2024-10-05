@@ -64,7 +64,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
           <Flex
             position="relative"
             ref={ref}
-            onClick={handleSelectBoard}
+            onPointerUp={handleSelectBoard}
             w="full"
             alignItems="center"
             borderRadius="base"
@@ -87,7 +87,13 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               </Icon>
             </Flex>
 
-            <Text fontSize="sm" fontWeight={isSelected ? 'bold' : 'normal'} noOfLines={1} flexGrow={1}>
+            <Text
+              fontSize="sm"
+              color={isSelected ? 'base.100' : 'base.300'}
+              fontWeight="semibold"
+              noOfLines={1}
+              flexGrow={1}
+            >
               {boardName}
             </Text>
             {autoAddBoardId === 'none' && <AutoAddBadge />}

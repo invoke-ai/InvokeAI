@@ -36,7 +36,7 @@ export const ToggleMetadataViewerButton = memo(() => {
       icon={<PiInfoBold />}
       tooltip={`${t('parameters.info')} (I)`}
       aria-label={`${t('parameters.info')} (I)`}
-      onClick={toggleMetadataViewer}
+      onPointerUp={toggleMetadataViewer}
       isDisabled={!imageDTO}
       variant="outline"
       colorScheme={shouldShowImageDetails ? 'invokeBlue' : 'base'}

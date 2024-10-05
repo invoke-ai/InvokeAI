@@ -24,7 +24,7 @@ export const ImageMenuItemSendToUpscale = memo(() => {
   }, [dispatch, imageDTO, t]);
 
   return (
-    <MenuItem icon={<PiShareFatBold />} onClickCapture={handleSendToCanvas} id="send-to-upscale">
+    <MenuItem icon={<PiShareFatBold />} onPointerUpCapture={handleSendToCanvas} id="send-to-upscale">
       {t('parameters.sendToUpscale')}
     </MenuItem>
   );

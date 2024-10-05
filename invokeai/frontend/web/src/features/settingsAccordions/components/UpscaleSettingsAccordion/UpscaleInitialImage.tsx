@@ -44,7 +44,7 @@ export const UpscaleInitialImage = () => {
           <>
             <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
               <IAIDndImageIcon
-                onClick={onReset}
+                onPointerUp={onReset}
                 icon={<PiArrowCounterClockwiseBold size={16} />}
                 tooltip={t('common.reset')}
               />

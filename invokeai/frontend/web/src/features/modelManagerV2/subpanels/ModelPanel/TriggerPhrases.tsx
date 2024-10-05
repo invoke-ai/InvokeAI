@@ -85,7 +85,7 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
               <Button
                 leftIcon={<PiPlusBold />}
                 size="sm"
-                onClick={addTriggerPhrase}
+                onPointerUp={addTriggerPhrase}
                 isDisabled={!phrase || Boolean(errors.length)}
                 isLoading={isLoading}
               >
@@ -103,7 +103,7 @@ export const TriggerPhrases = memo(({ modelConfig }: Props) => {
         {triggerPhrases.map((phrase, index) => (
           <Tag size="md" key={index} py={2} px={4} bg="base.700">
             <TagLabel>{phrase}</TagLabel>
-            <TagCloseButton onClick={removeTriggerPhrase.bind(null, phrase)} isDisabled={isLoading} />
+            <TagCloseButton onPointerUp={removeTriggerPhrase.bind(null, phrase)} isDisabled={isLoading} />
           </Tag>
         ))}
       </Flex>

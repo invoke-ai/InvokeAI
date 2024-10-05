@@ -57,7 +57,7 @@ const FloatingSidePanelButtons = (props: Props) => {
         <Tooltip label={t('accessibility.toggleLeftPanel')} placement="end">
           <IconButton
             aria-label={t('accessibility.toggleLeftPanel')}
-            onClick={props.panelApi.toggle}
+            onPointerUp={props.panelApi.toggle}
             icon={<PiSlidersHorizontalBold />}
             flexGrow={1}
           />
@@ -65,7 +65,7 @@ const FloatingSidePanelButtons = (props: Props) => {
         <QueueButtonTooltip prepend={shift} placement="end">
           <IconButton
             aria-label={t('queue.queueBack')}
-            onClick={shift ? queue.queueFront : queue.queueBack}
+            onPointerUp={shift ? queue.queueFront : queue.queueBack}
             isLoading={queue.isLoading}
             isDisabled={queue.isDisabled}
             icon={queueButtonIcon}
@@ -79,7 +79,7 @@ const FloatingSidePanelButtons = (props: Props) => {
             isLoading={cancelCurrent.isLoading}
             aria-label={t('queue.cancelTooltip')}
             icon={<PiXBold />}
-            onClick={cancelCurrent.cancelQueueItem}
+            onPointerUp={cancelCurrent.cancelQueueItem}
             colorScheme="error"
             flexGrow={1}
           />
@@ -92,7 +92,7 @@ const FloatingSidePanelButtons = (props: Props) => {
             aria-label={t('queue.clearTooltip')}
             icon={<PiTrashSimpleBold />}
             colorScheme="error"
-            onClick={clearQueue.openDialog}
+            onPointerUp={clearQueue.openDialog}
             data-testid={t('queue.clear')}
             flexGrow={1}
           />

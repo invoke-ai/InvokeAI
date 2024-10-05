@@ -98,8 +98,8 @@ const RgbColorPicker = (props: Props) => {
 export default memo(RgbColorPicker);
 
 const ColorSwatch = ({ color, onChange }: { color: RgbColor; onChange: (color: RgbColor) => void }) => {
-  const onClick = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     onChange(color);
   }, [color, onChange]);
-  return <Box role="button" onClick={onClick} h={8} w={8} bg={rgbColorToString(color)} borderRadius="base" />;
+  return <Box role="button" onPointerUp={onPointerUp} h={8} w={8} bg={rgbColorToString(color)} borderRadius="base" />;
 };

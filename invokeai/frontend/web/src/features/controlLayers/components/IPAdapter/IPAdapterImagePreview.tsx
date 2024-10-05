@@ -49,7 +49,16 @@ export const IPAdapterImagePreview = memo(({ image, onChangeImage, droppableData
   }, [handleResetControlImage, isConnected, isErrorControlImage]);
 
   return (
-    <Flex position="relative" w="full" h="full" alignItems="center">
+    <Flex
+      position="relative"
+      w="full"
+      h="full"
+      alignItems="center"
+      borderColor="error.500"
+      borderStyle="solid"
+      borderWidth={controlImage ? 0 : 1}
+      borderRadius="base"
+    >
       <IAIDndImage
         draggableData={draggableData}
         droppableData={droppableData}
@@ -60,7 +69,7 @@ export const IPAdapterImagePreview = memo(({ image, onChangeImage, droppableData
       {controlImage && (
         <Flex position="absolute" flexDir="column" top={2} insetInlineEnd={2} gap={1}>
           <IAIDndImageIcon
-            onClick={handleResetControlImage}
+            onPointerUp={handleResetControlImage}
             icon={<PiArrowCounterClockwiseBold size={16} />}
             tooltip={t('common.reset')}
           />

@@ -111,7 +111,7 @@ export const StylePresetForm = ({
       <Flex justifyContent="space-between" alignItems="flex-end" gap={10}>
         {allowPrivateStylePresets ? <StylePresetTypeField control={control} name="type" /> : <Spacer />}
         <Button
-          onClick={handleSubmit(handleClickSave)}
+          onPointerUp={handleSubmit(handleClickSave)}
           isDisabled={!formState.isValid}
           isLoading={isCreating || isUpdating}
         >
