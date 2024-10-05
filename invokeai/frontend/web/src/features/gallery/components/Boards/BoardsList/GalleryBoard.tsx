@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
@@ -55,38 +55,38 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   );
 
   return (
-    <BoardContextMenu board={board}>
-      {(ref) => (
-        <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll p={2}>
-          <Flex
-            position="relative"
-            ref={ref}
-            onPointerUp={onPointerUp}
-            w="full"
-            alignItems="center"
-            borderRadius="base"
-            cursor="pointer"
-            py={1}
-            ps={1}
-            pe={4}
-            gap={4}
-            bg={isSelected ? 'base.850' : undefined}
-            _hover={_hover}
-            h={12}
-          >
-            <CoverImage board={board} />
-            <Flex w="full">
-              <BoardEditableTitle board={board} isSelected={isSelected} />
+    <Box position="relative" w="full" h={12}>
+      <BoardContextMenu board={board}>
+        {(ref) => (
+          <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll p={2}>
+            <Flex
+              ref={ref}
+              onPointerUp={onPointerUp}
+              alignItems="center"
+              borderRadius="base"
+              cursor="pointer"
+              py={1}
+              ps={1}
+              pe={4}
+              gap={4}
+              bg={isSelected ? 'base.850' : undefined}
+              _hover={_hover}
+              w="full"
+              h="full"
+            >
+              <CoverImage board={board} />
+              <Flex w="full">
+                <BoardEditableTitle board={board} isSelected={isSelected} />
+              </Flex>
+              {autoAddBoardId === board.board_id && <AutoAddBadge />}
+              {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
+              <Text variant="subtext">{board.image_count}</Text>
             </Flex>
-            {autoAddBoardId === board.board_id && <AutoAddBadge />}
-            {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
-            <Text variant="subtext">{board.image_count}</Text>
-
-            <IAIDroppable data={droppableData} dropLabel={t('gallery.move')} />
-          </Flex>
-        </Tooltip>
-      )}
-    </BoardContextMenu>
+          </Tooltip>
+        )}
+      </BoardContextMenu>
+      <IAIDroppable data={droppableData} dropLabel={t('gallery.move')} />
+    </Box>
   );
 };
 
