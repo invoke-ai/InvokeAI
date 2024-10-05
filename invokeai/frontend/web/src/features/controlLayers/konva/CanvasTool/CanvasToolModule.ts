@@ -7,6 +7,7 @@ import {
   alignCoordForTool,
   calculateNewBrushSizeFromWheelDelta,
   floorCoord,
+  getColorUnderCursor,
   getIsPrimaryMouseDown,
   getLastPointOfLastLine,
   getLastPointOfLastLineWithPressure,
@@ -215,28 +216,6 @@ export class CanvasToolModule extends CanvasModuleBase {
     const pos = getScaledCursorPosition(this.konva.stage);
     this.$cursorPos.set(pos);
     return pos;
-  };
-
-  getColorUnderCursor = (): RgbColor | null => {
-    const pos = this.konva.stage.getPointerPosition();
-    if (!pos) {
-      return null;
-    }
-    const ctx = this.konva.stage
-      .toCanvas({ x: pos.x, y: pos.y, width: 1, height: 1, imageSmoothingEnabled: false })
-      .getContext('2d');
-
-    if (!ctx) {
-      return null;
-    }
-
-    const [r, g, b, _a] = ctx.getImageData(0, 0, 1, 1).data;
-
-    if (r === undefined || g === undefined || b === undefined) {
-      return null;
-    }
-
-    return { r, g, b };
   };
 
   getClip = (
@@ -562,7 +541,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       const settings = this.manager.stateApi.getSettings();
 
       if (tool === 'colorPicker') {
-        const color = this.getColorUnderCursor();
+        const color = getColorUnderCursor(this.konva.stage);
         if (color) {
           this.manager.stateApi.setColor({ ...settings.color, ...color });
         }
@@ -622,7 +601,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       const cursorPos = this.syncLastCursorPos();
 
       if (tool === 'colorPicker') {
-        const color = this.getColorUnderCursor();
+        const color = getColorUnderCursor(this.konva.stage);
         if (color) {
           this.$colorUnderCursor.set(color);
         }

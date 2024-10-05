@@ -8,6 +8,7 @@ import { clamp } from 'lodash-es';
 import { customAlphabet } from 'nanoid';
 import type { StrokeOptions } from 'perfect-freehand';
 import getStroke from 'perfect-freehand';
+import type { RgbColor } from 'react-colorful';
 import { assert } from 'tsafe';
 
 /**
@@ -632,4 +633,31 @@ export const getPointerType = (e: KonvaEventObject<PointerEvent>): 'mouse' | 'pe
   }
 
   return 'touch';
+};
+
+/**
+ * Gets the color under the cursor on a Konva stage.
+ * @param stage The konva stage
+ * @returns The color under the cursor, or null if the cursor is not over the stage
+ */
+export const getColorUnderCursor = (stage: Konva.Stage): RgbColor | null => {
+  const pos = stage.getPointerPosition();
+  if (!pos) {
+    return null;
+  }
+  const ctx = stage
+    .toCanvas({ x: pos.x, y: pos.y, width: 1, height: 1, imageSmoothingEnabled: false })
+    .getContext('2d');
+
+  if (!ctx) {
+    return null;
+  }
+
+  const [r, g, b, _a] = ctx.getImageData(0, 0, 1, 1).data;
+
+  if (r === undefined || g === undefined || b === undefined) {
+    return null;
+  }
+
+  return { r, g, b };
 };
