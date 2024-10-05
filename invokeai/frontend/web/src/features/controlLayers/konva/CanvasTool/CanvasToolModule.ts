@@ -38,6 +38,11 @@ import type { Logger } from 'roarr';
 // TODO(psyche): Fix the docs upstream!
 Konva.dragButtons = [0];
 
+// Typo insurance
+const KEY_ESCAPE = 'Escape';
+const KEY_SPACE = ' ';
+const KEY_ALT = 'Alt';
+
 type CanvasToolModuleConfig = {
   BRUSH_SPACING_TARGET_SCALE: number;
 };
@@ -789,7 +794,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (e.key === 'Escape') {
+    if (e.key === KEY_ESCAPE) {
       // Cancel shape drawing on escape
       e.preventDefault();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
@@ -804,7 +809,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (e.key === ' ') {
+    if (e.key === KEY_SPACE) {
       // Select the view tool on space key down
       e.preventDefault();
       this.$toolBuffer.set(this.$tool.get());
@@ -814,7 +819,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (e.key === 'Alt') {
+    if (e.key === KEY_ALT) {
       // Select the color picker on alt key down
       e.preventDefault();
       this.$toolBuffer.set(this.$tool.get());
@@ -831,7 +836,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (e.key === ' ') {
+    if (e.key === KEY_SPACE) {
       // Revert the tool to the previous tool on space key up
       e.preventDefault();
       this.revertToolBuffer();
@@ -839,7 +844,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (e.key === 'Alt') {
+    if (e.key === KEY_ALT) {
       // Revert the tool to the previous tool on alt key up
       e.preventDefault();
       this.revertToolBuffer();
