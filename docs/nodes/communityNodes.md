@@ -21,6 +21,7 @@ To use a community workflow, download the `.json` node graph file and load it in
     + [Clothing Mask](#clothing-mask)
     + [Contrast Limited Adaptive Histogram Equalization](#contrast-limited-adaptive-histogram-equalization)
     + [Depth Map from Wavefront OBJ](#depth-map-from-wavefront-obj)
+    + [Enhance Detail](#enhance-detail)
     + [Film Grain](#film-grain)
     + [Generative Grammar-Based Prompt Nodes](#generative-grammar-based-prompt-nodes)
     + [GPT2RandomPromptMaker](#gpt2randompromptmaker)
@@ -81,7 +82,7 @@ Note: These are inherited from the core nodes so any update to the core nodes sh
 
 **Example Usage:**
 </br>
-<img src="https://github.com/skunkworxdark/autostereogram_nodes/blob/main/images/spider.png" width="200" /> -> <img src="https://github.com/skunkworxdark/autostereogram_nodes/blob/main/images/spider-depth.png" width="200" /> -> <img src="https://github.com/skunkworxdark/autostereogram_nodes/raw/main/images/spider-dots.png" width="200" /> <img src="https://github.com/skunkworxdark/autostereogram_nodes/raw/main/images/spider-pattern.png" width="200" />
+<img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider.png" width="200" /> -> <img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-depth.png" width="200" /> -> <img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-dots.png" width="200" /> <img src="https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-pattern.png" width="200" />
 
 --------------------------------
 ### Average Images
@@ -141,6 +142,17 @@ To be imported, an .obj must use triangulated meshes, so make sure to enable tha
 
 **Example Usage:**
 </br><img src="https://raw.githubusercontent.com/dwringer/depth-from-obj-node/main/depth_from_obj_usage.jpg" width="500" />
+
+--------------------------------
+### Enhance Detail
+
+**Description:** A single node that can enhance the detail in an image. Increase or decrease details in an image using a guided filter (as opposed to the typical Gaussian blur used by most sharpening filters.) Based on the `Enhance Detail` ComfyUI node from  https://github.com/spacepxl/ComfyUI-Image-Filters
+
+**Node Link:** https://github.com/skunkworxdark/enhance-detail-node
+
+**Example Usage:**
+</br>
+<img src="https://raw.githubusercontent.com/skunkworxdark/enhance-detail-node/refs/heads/main/images/Comparison.png" />
 
 --------------------------------
 ### Film Grain
@@ -308,7 +320,7 @@ View:
 **Node Link:** https://github.com/helix4u/load_video_frame
 
 **Output Example:** 
-<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/main/_git_assets/testmp4_embed_converted.gif" width="500" />
+<img src="https://raw.githubusercontent.com/helix4u/load_video_frame/refs/heads/main/_git_assets/dance1736978273.gif" width="500" />
 
 --------------------------------
 ### Make 3D
@@ -349,7 +361,7 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 
 **Output Examples** 
 
-<img src="https://github.com/skunkworxdark/match_histogram/assets/21961335/ed12f329-a0ef-444a-9bae-129ed60d6097" width="300" />
+<img src="https://github.com/skunkworxdark/match_histogram/assets/21961335/ed12f329-a0ef-444a-9bae-129ed60d6097" />
 
 --------------------------------
 ### Metadata Linked Nodes
@@ -407,7 +419,7 @@ View:
 --------------------------------
 ### One Button Prompt
 
-<img src="https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI/blob/main/images/background.png" width="800" />
+<img src="https://raw.githubusercontent.com/AIrjen/OneButtonPrompt_X_InvokeAI/refs/heads/main/images/background.png" width="800" />
 
 **Description:** an extensive suite of auto prompt generation and prompt helper nodes based on extensive logic. Get creative with the best prompt generator in the world. 
 
@@ -417,7 +429,7 @@ The main node generates interesting prompts based on a set of parameters. There 
 
 **Nodes:**
 
-<img src="https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI/blob/main/images/OBP_nodes_invokeai.png" width="800" />
+<img src="https://raw.githubusercontent.com/AIrjen/OneButtonPrompt_X_InvokeAI/refs/heads/main/images/OBP_nodes_invokeai.png" width="800" />
 
 --------------------------------
 ### Oobabooga
@@ -470,7 +482,7 @@ See full docs here: https://github.com/skunkworxdark/Prompt-tools-nodes/edit/mai
 
 **Workflow Examples** 
 
-<img src="https://github.com/skunkworxdark/prompt-tools/blob/main/images/CSVToIndexStringNode.png" width="300" />
+<img src="https://raw.githubusercontent.com/skunkworxdark/prompt-tools/refs/heads/main/images/CSVToIndexStringNode.png"/>
 
 --------------------------------
 ### Remote Image
@@ -608,7 +620,7 @@ See full docs here: https://github.com/skunkworxdark/XYGrid_nodes/edit/main/READ
 
 **Output Examples** 
 
-<img src="https://github.com/skunkworxdark/XYGrid_nodes/blob/main/images/collage.png" width="300" />
+<img src="https://raw.githubusercontent.com/skunkworxdark/XYGrid_nodes/refs/heads/main/images/collage.png" />
 
 
 --------------------------------
