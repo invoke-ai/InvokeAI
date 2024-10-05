@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDroppable from 'common/components/IAIDroppable';
 import type { RemoveFromBoardDropData } from 'features/dnd/types';
@@ -58,51 +58,52 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   }
 
   return (
-    <NoBoardBoardContextMenu>
-      {(ref) => (
-        <Tooltip label={<BoardTooltip board={null} />} openDelay={1000} placement="left" closeOnScroll>
-          <Flex
-            position="relative"
-            ref={ref}
-            onPointerUp={handleSelectBoard}
-            w="full"
-            alignItems="center"
-            borderRadius="base"
-            cursor="pointer"
-            py={1}
-            ps={1}
-            pe={4}
-            gap={4}
-            bg={isSelected ? 'base.850' : undefined}
-            _hover={_hover}
-            h={12}
-          >
-            <Flex w="10" justifyContent="space-around">
-              {/* iconified from public/assets/images/invoke-symbol-wht-lrg.svg */}
-              <Icon boxSize={8} opacity={1} stroke="base.500" viewBox="0 0 66 66" fill="none">
-                <path
-                  d="M43.9137 16H63.1211V3H3.12109V16H22.3285L43.9137 50H63.1211V63H3.12109V50H22.3285"
-                  strokeWidth="5"
-                />
-              </Icon>
-            </Flex>
-
-            <Text
-              fontSize="sm"
-              color={isSelected ? 'base.100' : 'base.300'}
-              fontWeight="semibold"
-              noOfLines={1}
-              flexGrow={1}
+    <Box position="relative" w="full" h={12}>
+      <NoBoardBoardContextMenu>
+        {(ref) => (
+          <Tooltip label={<BoardTooltip board={null} />} openDelay={1000} placement="left" closeOnScroll>
+            <Flex
+              ref={ref}
+              onPointerUp={handleSelectBoard}
+              w="full"
+              h="full"
+              alignItems="center"
+              borderRadius="base"
+              cursor="pointer"
+              py={1}
+              ps={1}
+              pe={4}
+              gap={4}
+              bg={isSelected ? 'base.850' : undefined}
+              _hover={_hover}
             >
-              {boardName}
-            </Text>
-            {autoAddBoardId === 'none' && <AutoAddBadge />}
-            <Text variant="subtext">{imagesTotal}</Text>
-            <IAIDroppable data={droppableData} dropLabel={t('gallery.move')} />
-          </Flex>
-        </Tooltip>
-      )}
-    </NoBoardBoardContextMenu>
+              <Flex w="10" justifyContent="space-around">
+                {/* iconified from public/assets/images/invoke-symbol-wht-lrg.svg */}
+                <Icon boxSize={8} opacity={1} stroke="base.500" viewBox="0 0 66 66" fill="none">
+                  <path
+                    d="M43.9137 16H63.1211V3H3.12109V16H22.3285L43.9137 50H63.1211V63H3.12109V50H22.3285"
+                    strokeWidth="5"
+                  />
+                </Icon>
+              </Flex>
+
+              <Text
+                fontSize="sm"
+                color={isSelected ? 'base.100' : 'base.300'}
+                fontWeight="semibold"
+                noOfLines={1}
+                flexGrow={1}
+              >
+                {boardName}
+              </Text>
+              {autoAddBoardId === 'none' && <AutoAddBadge />}
+              <Text variant="subtext">{imagesTotal}</Text>
+            </Flex>
+          </Tooltip>
+        )}
+      </NoBoardBoardContextMenu>
+      <IAIDroppable data={droppableData} dropLabel={t('gallery.move')} />
+    </Box>
   );
 });
 
