@@ -296,13 +296,23 @@ export class CanvasToolModule extends CanvasModuleBase {
   getCanDraw = (): boolean => {
     if (this.manager.stateApi.getRenderedEntityCount() === 0) {
       return false;
-    } else if (this.manager.$isBusy.get()) {
-      return false;
-    } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.$isInteractable.get()) {
-      return false;
-    } else {
-      return true;
     }
+
+    if (this.manager.$isBusy.get()) {
+      return false;
+    }
+
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+
+    if (!selectedEntity) {
+      return false;
+    }
+
+    if (!selectedEntity.$isInteractable.get()) {
+      return false;
+    }
+
+    return true;
   };
 
   onStagePointerEnter = async (e: KonvaEventObject<PointerEvent>) => {
