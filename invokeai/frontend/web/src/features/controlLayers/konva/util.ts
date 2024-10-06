@@ -640,13 +640,9 @@ export const getPointerType = (e: KonvaEventObject<PointerEvent>): 'mouse' | 'pe
  * @param stage The konva stage
  * @returns The color under the cursor, or null if the cursor is not over the stage
  */
-export const getColorUnderCursor = (stage: Konva.Stage): RgbColor | null => {
-  const pos = stage.getPointerPosition();
-  if (!pos) {
-    return null;
-  }
+export const getColorAtCoordinate = (stage: Konva.Stage, coord: Coordinate): RgbColor | null => {
   const ctx = stage
-    .toCanvas({ x: pos.x, y: pos.y, width: 1, height: 1, imageSmoothingEnabled: false })
+    .toCanvas({ x: coord.x, y: coord.y, width: 1, height: 1, imageSmoothingEnabled: false })
     .getContext('2d');
 
   if (!ctx) {
