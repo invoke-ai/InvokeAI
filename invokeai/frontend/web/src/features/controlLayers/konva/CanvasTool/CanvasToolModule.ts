@@ -31,6 +31,7 @@ import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
+import rafThrottle from 'raf-throttle';
 import type { Logger } from 'roarr';
 
 // Konva's docs say the default drag buttons are [0], but it's actually [0,1]. We only want left-click to drag, so we
@@ -597,6 +598,18 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
+  syncColorUnderCursor = rafThrottle(() => {
+    const cursorPos = this.$cursorPos.get();
+    if (!cursorPos) {
+      return;
+    }
+
+    const color = getColorAtCoordinate(this.konva.stage, cursorPos.absolute);
+    if (color) {
+      this.$colorUnderCursor.set(color);
+    }
+  });
+
   onStagePointerMove = async (e: KonvaEventObject<PointerEvent>) => {
     try {
       this.$lastPointerType.set(e.evt.pointerType);
@@ -615,11 +628,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       const tool = this.$tool.get();
 
       if (tool === 'colorPicker') {
-        const color = getColorAtCoordinate(this.konva.stage, cursorPos.absolute);
-        if (color) {
-          this.$colorUnderCursor.set(color);
-        }
-        return;
+        this.syncColorUnderCursor();
       }
 
       const isMouseDown = this.$isMouseDown.get();
