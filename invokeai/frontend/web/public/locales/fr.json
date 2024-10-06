@@ -667,7 +667,8 @@
         "paramVAEPrecision": {
             "heading": "Précision du VAE",
             "paragraphs": [
-                "La précision utilisée lors de l'encodage et du décodage VAE."
+                "La précision utilisée lors de l'encodage et du décodage VAE.",
+                "La pr'ecision Fp16/Half est plus efficace, au détriment de légères variations d'image."
             ]
         },
         "controlNetWeight": {
@@ -838,11 +839,15 @@
         "paramCFGScale": {
             "heading": "Échelle CFG",
             "paragraphs": [
-                "Contrôle de l'influence du prompt sur le processus de génération."
+                "Contrôle de l'influence du prompt sur le processus de génération.",
+                "Des valeurs élevées de l'échelle CFG peuvent entraîner une saturation excessive et des distortions. "
             ]
         },
         "loraWeight": {
-            "heading": "Poids"
+            "heading": "Poids",
+            "paragraphs": [
+                "Poids du LoRA. Un poids plus élevé aura un impact plus important sur l'image finale."
+            ]
         },
         "imageFit": {
             "heading": "Ajuster l'image initiale à la taille de sortie",
@@ -853,7 +858,8 @@
         "paramCFGRescaleMultiplier": {
             "heading": "Multiplicateur de mise à l'échelle CFG",
             "paragraphs": [
-                "Multiplicateur de mise à l'échelle pour le guidage CFG, utilisé pour les modèles entraînés en utilisant le zero-terminal SNR (ztsnr)."
+                "Multiplicateur de mise à l'échelle pour le guidage CFG, utilisé pour les modèles entraînés en utilisant le zero-terminal SNR (ztsnr).",
+                "Une valeur de 0.7 est suggérée pour ces modèles."
             ]
         },
         "controlNetProcessor": {
@@ -861,6 +867,51 @@
             "paragraphs": [
                 "Méthode de traitement de l'image d'entrée pour guider le processus de génération. Différents processeurs fourniront différents effets ou styles dans vos images générées."
             ]
+        },
+        "paramUpscaleMethod": {
+            "paragraphs": [
+                "Méthode utilisée pour améliorer l'image pour la correction de haute résolution."
+            ],
+            "heading": "Méthode d'agrandissement"
+        },
+        "refinerModel": {
+            "heading": "Modèle de Raffinage",
+            "paragraphs": [
+                "Modèle utilisé pendant la partie raffinage du processus de génération.",
+                "Similaire au Modèle de Génération."
+            ]
+        },
+        "paramWidth": {
+            "paragraphs": [
+                "Largeur de l'image générée. Doit être un multiple de 8."
+            ],
+            "heading": "Largeur"
+        },
+        "paramHeight": {
+            "heading": "Hauteur",
+            "paragraphs": [
+                "Hauteur de l'image générée. Doit être un multiple de 8."
+            ]
+        },
+        "paramHrf": {
+            "heading": "Activer la correction haute résolution",
+            "paragraphs": [
+                "Générez des images de haute qualité à une résolution plus grande que celle qui est optimale pour le modèle. Cela est généralement utilisé pour prévenir la duplication dans l'image générée."
+            ]
+        },
+        "patchmatchDownScaleSize": {
+            "paragraphs": [
+                "Intensité du sous-échantillonage qui se produit avant le remplissage ?",
+                "Un sous-échantillonage plus élevé améliorera les performances et réduira la qualité."
+            ],
+            "heading": "Sous-échantillonage"
+        },
+        "paramAspect": {
+            "paragraphs": [
+                "Rapport hauteur/largeur de l'image générée. Changer le rapport mettra à jour la largeur et la hauteur en conséquence.",
+                "\"Optimiser\" définira la largeur et la hauteur aux dimensions optimales pour le modèle choisi."
+            ],
+            "heading": "Aspect"
         }
     },
     "dynamicPrompts": {
