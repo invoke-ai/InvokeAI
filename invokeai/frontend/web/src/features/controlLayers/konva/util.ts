@@ -636,9 +636,10 @@ export const getPointerType = (e: KonvaEventObject<PointerEvent>): 'mouse' | 'pe
 };
 
 /**
- * Gets the color under the cursor on a Konva stage.
- * @param stage The konva stage
- * @returns The color under the cursor, or null if the cursor is not over the stage
+ * Gets the color at the given coordinate on the stage.
+ * @param stage The konva stage.
+ * @param coord The coordinate to get the color at. This must be the _absolute_ coordinate on the stage.
+ * @returns The color under the coordinate, or null if there was a problem getting the color.
  */
 export const getColorAtCoordinate = (stage: Konva.Stage, coord: Coordinate): RgbColor | null => {
   const ctx = stage
