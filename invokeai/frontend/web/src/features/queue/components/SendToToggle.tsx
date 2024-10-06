@@ -184,14 +184,14 @@ TooltipContent.displayName = 'TooltipContent';
 const ActivateCanvasButton = (props: PropsWithChildren) => {
   const dispatch = useAppDispatch();
   const imageViewer = useImageViewer();
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     dispatch(setActiveTab('canvas'));
     selectCanvasRightPanelLayersTab();
     imageViewer.close();
   }, [dispatch, imageViewer]);
   return (
     <Button
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       size="sm"
       variant="link"
       color="base.800"

@@ -9,11 +9,11 @@ export const GalleryPagination = () => {
   const { goPrev, goNext, isPrevEnabled, isNextEnabled, pageButtons, goToPage, currentPage, total } =
     useGalleryPagination();
 
-  const onPointerUpPrev = useCallback(() => {
+  const onClickPrev = useCallback(() => {
     goPrev();
   }, [goPrev]);
 
-  const onPointerUpNext = useCallback(() => {
+  const onClickNext = useCallback(() => {
     goNext();
   }, [goNext]);
 
@@ -27,7 +27,7 @@ export const GalleryPagination = () => {
         size="sm"
         aria-label="prev"
         icon={<PiCaretLeftBold />}
-        onPointerUp={onPointerUpPrev}
+        onClick={onClickPrev}
         isDisabled={!isPrevEnabled}
         variant="ghost"
       />
@@ -40,7 +40,7 @@ export const GalleryPagination = () => {
         size="sm"
         aria-label="next"
         icon={<PiCaretRightBold />}
-        onPointerUp={onPointerUpNext}
+        onClick={onClickNext}
         isDisabled={!isNextEnabled}
         variant="ghost"
       />
@@ -64,11 +64,7 @@ const PageButton = ({ page, currentPage, goToPage }: PageButtonProps) => {
     );
   }
   return (
-    <Button
-      size="sm"
-      onPointerUp={goToPage.bind(null, page - 1)}
-      variant={currentPage === page - 1 ? 'solid' : 'outline'}
-    >
+    <Button size="sm" onClick={goToPage.bind(null, page - 1)} variant={currentPage === page - 1 ? 'solid' : 'outline'}>
       {page}
     </Button>
   );

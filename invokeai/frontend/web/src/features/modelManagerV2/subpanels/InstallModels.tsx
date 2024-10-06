@@ -20,7 +20,7 @@ export const InstallModels = memo(() => {
     $installModelsTab.set(index);
   }, []);
 
-  const onPointerUpLearnMore = useCallback(() => {
+  const onClickLearnMore = useCallback(() => {
     window.open('https://support.invoke.ai/support/solutions/articles/151000170961-supported-models');
   }, []);
 
@@ -28,7 +28,7 @@ export const InstallModels = memo(() => {
     <Flex layerStyle="first" borderRadius="base" w="full" h="full" flexDir="column" gap={4}>
       <Flex alignItems="center" justifyContent="space-between">
         <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
-        <Button alignItems="center" variant="link" leftIcon={<PiInfoBold />} onPointerUp={onPointerUpLearnMore}>
+        <Button alignItems="center" variant="link" leftIcon={<PiInfoBold />} onClick={onClickLearnMore}>
           <Text variant="subtext">{t('modelManager.learnMoreAboutSupportedModels')}</Text>
         </Button>
       </Flex>

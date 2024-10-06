@@ -40,7 +40,7 @@ export const StagingAreaToolbarNextButton = memo(() => {
       tooltip={`${t('controlLayers.stagingArea.next')} (Right)`}
       aria-label={`${t('controlLayers.stagingArea.next')} (Right)`}
       icon={<PiArrowRightBold />}
-      onPointerUp={selectNext}
+      onClick={selectNext}
       colorScheme="invokeBlue"
       isDisabled={imageCount <= 1 || !shouldShowStagedImage}
     />

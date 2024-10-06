@@ -36,7 +36,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
 
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     if (selectedBoardId !== board.board_id) {
       dispatch(boardIdSelected({ boardId: board.board_id }));
     }
@@ -61,7 +61,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
           <Tooltip label={<BoardTooltip board={board} />} openDelay={1000} placement="left" closeOnScroll p={2}>
             <Flex
               ref={ref}
-              onPointerUp={onPointerUp}
+              onClick={onClick}
               alignItems="center"
               borderRadius="base"
               cursor="pointer"

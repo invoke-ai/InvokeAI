@@ -24,7 +24,7 @@ const NextPrevImageButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineS
     return false;
   }, [isOnFirstImageOfView, isPrevEnabled]);
 
-  const onPointerUpLeftArrow = useCallback(() => {
+  const onClickLeftArrow = useCallback(() => {
     if (isOnFirstImageOfView) {
       if (isPrevEnabled && !isFetching) {
         goPrev('arrow');
@@ -44,7 +44,7 @@ const NextPrevImageButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineS
     return false;
   }, [isNextEnabled, isOnLastImageOfView]);
 
-  const onPointerUpRightArrow = useCallback(() => {
+  const onClickRightArrow = useCallback(() => {
     if (isOnLastImageOfView) {
       if (isNextEnabled && !isFetching) {
         goNext('arrow');
@@ -64,7 +64,7 @@ const NextPrevImageButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineS
           aria-label={t('accessibility.previousImage')}
           icon={<PiCaretLeftBold size={64} />}
           variant="unstyled"
-          onPointerUp={onPointerUpLeftArrow}
+          onClick={onClickLeftArrow}
           isDisabled={isFetching}
           color="base.100"
           pointerEvents="auto"
@@ -79,7 +79,7 @@ const NextPrevImageButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineS
           aria-label={t('accessibility.nextImage')}
           icon={<PiCaretRightBold size={64} />}
           variant="unstyled"
-          onPointerUp={onPointerUpRightArrow}
+          onClick={onClickRightArrow}
           isDisabled={isFetching}
           color="base.100"
           pointerEvents="auto"

@@ -13,7 +13,7 @@ import { useFieldLabel } from 'features/nodes/hooks/useFieldLabel';
 import { useFieldTemplateTitle } from 'features/nodes/hooks/useFieldTemplateTitle';
 import { fieldLabelChanged } from 'features/nodes/store/nodesSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import type { PointerEvent } from 'react';
+import type { MouseEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -112,12 +112,12 @@ export default memo(EditableFieldTitle);
 const EditableControls = memo(() => {
   const { isEditing, getEditButtonProps } = useEditableControls();
   const handleClick = useCallback(
-    (e: PointerEvent<HTMLDivElement>) => {
-      const { onPointerUp } = getEditButtonProps();
-      if (!onPointerUp) {
+    (e: MouseEvent<HTMLDivElement>) => {
+      const { onClick } = getEditButtonProps();
+      if (!onClick) {
         return;
       }
-      onPointerUp(e);
+      onClick(e);
       e.preventDefault();
     },
     [getEditButtonProps]
@@ -129,7 +129,7 @@ const EditableControls = memo(() => {
 
   return (
     <Flex
-      onPointerUp={handleClick}
+      onClick={handleClick}
       position="absolute"
       w="min-content"
       h="full"

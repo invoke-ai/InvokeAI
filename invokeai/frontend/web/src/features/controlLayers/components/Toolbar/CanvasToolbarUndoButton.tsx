@@ -12,7 +12,7 @@ export const CanvasToolbarUndoButton = memo(() => {
   const dispatch = useAppDispatch();
   const isBusy = useCanvasIsBusy();
   const mayUndo = useAppSelector(selectCanvasMayUndo);
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     dispatch(canvasUndo());
   }, [dispatch]);
 
@@ -20,7 +20,7 @@ export const CanvasToolbarUndoButton = memo(() => {
     <IconButton
       aria-label={t('hotkeys.canvas.undo.title')}
       tooltip={t('hotkeys.canvas.undo.title')}
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       icon={<PiArrowCounterClockwiseBold />}
       variant="link"
       alignSelf="stretch"

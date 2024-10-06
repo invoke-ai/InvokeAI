@@ -10,7 +10,7 @@ export const CanvasSettingsClearCachesButton = memo(() => {
     canvasManager.cache.clearAll();
   }, [canvasManager]);
   return (
-    <Button onPointerUp={clearCaches} size="sm" colorScheme="warning">
+    <Button onClick={clearCaches} size="sm" colorScheme="warning">
       {t('controlLayers.clearCaches')}
     </Button>
   );

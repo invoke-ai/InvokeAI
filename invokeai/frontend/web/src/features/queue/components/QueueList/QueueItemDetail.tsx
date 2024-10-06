@@ -62,7 +62,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
         <QueueItemData label={t('queue.session')} data={session_id} />
         <ButtonGroup size="xs" orientation="vertical">
           <Button
-            onPointerUp={cancelQueueItem}
+            onClick={cancelQueueItem}
             isLoading={isLoadingCancelQueueItem}
             isDisabled={queueItem ? ['canceled', 'completed', 'failed'].includes(queueItem.status) : true}
             aria-label={t('queue.cancelItem')}
@@ -72,7 +72,7 @@ const QueueItemComponent = ({ queueItemDTO }: Props) => {
             {t('queue.cancelItem')}
           </Button>
           <Button
-            onPointerUp={cancelBatch}
+            onClick={cancelBatch}
             isLoading={isLoadingCancelBatch}
             isDisabled={isCanceled}
             aria-label={t('queue.cancelBatch')}

@@ -15,7 +15,7 @@ export const EntityListSelectedEntityActionBarSaveToAssetsButton = memo(() => {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const adapter = useEntityAdapterSafe(selectedEntityIdentifier);
   const saveLayerToAssets = useSaveLayerToAssets();
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     saveLayerToAssets(adapter);
   }, [saveLayerToAssets, adapter]);
 
@@ -29,7 +29,7 @@ export const EntityListSelectedEntityActionBarSaveToAssetsButton = memo(() => {
 
   return (
     <IconButton
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       isDisabled={!selectedEntityIdentifier || isBusy}
       size="sm"
       variant="link"

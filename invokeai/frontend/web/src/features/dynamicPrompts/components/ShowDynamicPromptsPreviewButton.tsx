@@ -28,7 +28,7 @@ export const ShowDynamicPromptsPreviewButton = memo(() => {
         isDisabled={isOpen}
         aria-label={t('dynamicPrompts.showDynamicPrompts')}
         icon={<PiBracketsCurlyBold />}
-        onPointerUp={onOpen}
+        onClick={onOpen}
         sx={isLoading ? loadingStyles : undefined}
         colorScheme={isError && !isLoading ? 'error' : 'base'}
       />

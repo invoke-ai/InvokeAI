@@ -14,7 +14,7 @@ export const CanvasEntityIsLockedToggle = memo(() => {
   const isLocked = useEntityIsLocked(entityIdentifier);
   const isBusy = useCanvasIsBusy();
   const dispatch = useAppDispatch();
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     dispatch(entityIsLockedToggled({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
 
@@ -26,7 +26,7 @@ export const CanvasEntityIsLockedToggle = memo(() => {
       variant="link"
       alignSelf="stretch"
       icon={isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       isDisabled={isBusy}
     />
   );

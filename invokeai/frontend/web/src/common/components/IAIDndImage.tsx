@@ -55,7 +55,7 @@ type IAIDndImageProps = FlexProps & {
   imageDTO: ImageDTO | undefined;
   onError?: (event: SyntheticEvent<HTMLImageElement>) => void;
   onLoad?: (event: SyntheticEvent<HTMLImageElement>) => void;
-  onPointerUp?: (event: MouseEvent<HTMLDivElement>) => void;
+  onClick?: (event: MouseEvent<HTMLDivElement>) => void;
   withMetadataOverlay?: boolean;
   isDragDisabled?: boolean;
   isDropDisabled?: boolean;
@@ -82,7 +82,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
   const {
     imageDTO,
     onError,
-    onPointerUp,
+    onClick,
     withMetadataOverlay = false,
     isDropDisabled = false,
     isDragDisabled = false,
@@ -228,7 +228,7 @@ const IAIDndImage = (props: IAIDndImageProps) => {
             <IAIDraggable
               data={draggableData}
               disabled={isDragDisabled || !imageDTO}
-              onPointerUp={onPointerUp}
+              onClick={onClick}
               onAuxClick={openInNewTab}
             />
           )}
