@@ -63,7 +63,7 @@ export const StarterModelsResults = memo(({ results, modelList }: StarterModelsR
                 variant="link"
                 aria-label={t('boards.clearSearch')}
                 icon={<PiXBold />}
-                onPointerUp={clearSearch}
+                onClick={clearSearch}
                 flexShrink={0}
               />
             </InputRightElement>

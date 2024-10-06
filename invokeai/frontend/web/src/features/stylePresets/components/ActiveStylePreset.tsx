@@ -81,7 +81,7 @@ export const ActiveStylePreset = () => {
       <Spacer />
       <Tooltip label={t('stylePresets.toggleViewMode')}>
         <IconButton
-          onPointerUp={handleToggleViewMode}
+          onClick={handleToggleViewMode}
           variant="outline"
           size="sm"
           aria-label={t('stylePresets.toggleViewMode')}
@@ -91,7 +91,7 @@ export const ActiveStylePreset = () => {
       </Tooltip>
       <Tooltip label={t('stylePresets.flatten')}>
         <IconButton
-          onPointerUp={handleFlattenPrompts}
+          onClick={handleFlattenPrompts}
           variant="outline"
           size="sm"
           aria-label={t('stylePresets.flatten')}
@@ -100,7 +100,7 @@ export const ActiveStylePreset = () => {
       </Tooltip>
       <Tooltip label={t('stylePresets.clearTemplateSelection')}>
         <IconButton
-          onPointerUp={handleClearActiveStylePreset}
+          onClick={handleClearActiveStylePreset}
           variant="outline"
           size="sm"
           aria-label={t('stylePresets.clearTemplateSelection')}

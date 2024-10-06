@@ -56,7 +56,7 @@ const GalleryPanelContent = () => {
           <Button
             size="sm"
             variant="ghost"
-            onPointerUp={boardsListPanel.toggle}
+            onClick={boardsListPanel.toggle}
             rightIcon={boardsListPanel.isCollapsed ? <PiCaretDownBold /> : <PiCaretUpBold />}
           >
             {boardsListPanel.isCollapsed ? t('boards.viewBoards') : t('boards.hideBoards')}
@@ -69,7 +69,7 @@ const GalleryPanelContent = () => {
             size="sm"
             variant="link"
             alignSelf="stretch"
-            onPointerUp={handleClickBoardSearch}
+            onClick={handleClickBoardSearch}
             tooltip={
               boardSearchDisclosure.isOpen ? `${t('gallery.exitBoardSearch')}` : `${t('gallery.displayBoardSearch')}`
             }

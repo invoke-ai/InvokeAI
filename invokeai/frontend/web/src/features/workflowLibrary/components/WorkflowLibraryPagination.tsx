@@ -9,7 +9,7 @@ const PAGES_TO_DISPLAY = 7;
 
 type PageData = {
   page: number;
-  onPointerUp: () => void;
+  onClick: () => void;
 };
 
 type Props = {
@@ -39,7 +39,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
     for (let i = first; i < last; i++) {
       pages.push({
         page: i,
-        onPointerUp: () => setPage(i),
+        onClick: () => setPage(i),
       });
     }
     return pages;
@@ -49,7 +49,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
     <ButtonGroup>
       <IconButton
         variant="ghost"
-        onPointerUp={handlePrevPage}
+        onClick={handlePrevPage}
         isDisabled={page === 0}
         aria-label={t('common.prevPage')}
         icon={<PiCaretLeftBold />}
@@ -58,7 +58,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
         <Button
           w={10}
           isDisabled={data.pages === 1}
-          onPointerUp={p.page === page ? undefined : p.onPointerUp}
+          onClick={p.page === page ? undefined : p.onClick}
           variant={p.page === page ? 'solid' : 'ghost'}
           key={p.page}
           transitionDuration="0s" // the delay in animation looks jank
@@ -68,7 +68,7 @@ const WorkflowLibraryPagination = ({ page, setPage, data }: Props) => {
       ))}
       <IconButton
         variant="ghost"
-        onPointerUp={handleNextPage}
+        onClick={handleNextPage}
         isDisabled={page === data.pages - 1}
         aria-label={t('common.nextPage')}
         icon={<PiCaretRightBold />}

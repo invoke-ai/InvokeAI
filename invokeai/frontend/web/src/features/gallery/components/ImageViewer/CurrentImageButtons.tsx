@@ -65,34 +65,34 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
           tooltip={`${t('nodes.loadWorkflow')} (W)`}
           aria-label={`${t('nodes.loadWorkflow')} (W)`}
           isDisabled={!imageActions.hasWorkflow || !hasTemplates}
-          onPointerUp={imageActions.loadWorkflow}
+          onClick={imageActions.loadWorkflow}
         />
         <IconButton
           icon={<PiArrowsCounterClockwiseBold />}
           tooltip={`${t('parameters.remixImage')} (R)`}
           aria-label={`${t('parameters.remixImage')} (R)`}
           isDisabled={!imageActions.hasMetadata}
-          onPointerUp={imageActions.remix}
+          onClick={imageActions.remix}
         />
         <IconButton
           icon={<PiQuotesBold />}
           tooltip={`${t('parameters.usePrompt')} (P)`}
           aria-label={`${t('parameters.usePrompt')} (P)`}
           isDisabled={!imageActions.hasPrompts}
-          onPointerUp={imageActions.recallPrompts}
+          onClick={imageActions.recallPrompts}
         />
         <IconButton
           icon={<PiPlantBold />}
           tooltip={`${t('parameters.useSeed')} (S)`}
           aria-label={`${t('parameters.useSeed')} (S)`}
           isDisabled={!imageActions.hasSeed}
-          onPointerUp={imageActions.recallSeed}
+          onClick={imageActions.recallSeed}
         />
         <IconButton
           icon={<PiRulerBold />}
           tooltip={`${t('parameters.useSize')} (D)`}
           aria-label={`${t('parameters.useSize')} (D)`}
-          onPointerUp={imageActions.recallSize}
+          onClick={imageActions.recallSize}
           isDisabled={isStaging}
         />
         <IconButton
@@ -100,7 +100,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
           tooltip={`${t('parameters.useAll')} (A)`}
           aria-label={`${t('parameters.useAll')} (A)`}
           isDisabled={!imageActions.hasMetadata}
-          onPointerUp={imageActions.recallAll}
+          onClick={imageActions.recallAll}
         />
       </ButtonGroup>
 
@@ -111,7 +111,7 @@ const CurrentImageButtonsContent = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
       )}
 
       <ButtonGroup>
-        <DeleteImageButton onPointerUp={imageActions.delete} />
+        <DeleteImageButton onClick={imageActions.delete} />
       </ButtonGroup>
     </>
   );

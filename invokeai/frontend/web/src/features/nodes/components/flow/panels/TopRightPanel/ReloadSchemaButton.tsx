@@ -17,7 +17,7 @@ const ReloadNodeTemplatesButton = () => {
       leftIcon={<PiArrowsClockwiseBold />}
       tooltip={t('nodes.reloadNodeTemplates')}
       aria-label={t('nodes.reloadNodeTemplates')}
-      onPointerUp={handleReloadSchema}
+      onClick={handleReloadSchema}
     >
       {t('nodes.reloadNodeTemplates')}
     </Button>

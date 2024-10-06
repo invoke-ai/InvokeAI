@@ -7,14 +7,14 @@ import { PiArrowSquareOutBold } from 'react-icons/pi';
 export const ImageMenuItemOpenInNewTab = memo(() => {
   const { t } = useTranslation();
   const imageDTO = useImageDTOContext();
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     window.open(imageDTO.image_url, '_blank');
   }, [imageDTO.image_url]);
 
   return (
     <IconButton
       as={MenuItem}
-      onPointerUpCapture={onPointerUp}
+      onClickCapture={onClick}
       aria-label={t('common.openInNewTab')}
       tooltip={t('common.openInNewTab')}
       icon={<PiArrowSquareOutBold />}

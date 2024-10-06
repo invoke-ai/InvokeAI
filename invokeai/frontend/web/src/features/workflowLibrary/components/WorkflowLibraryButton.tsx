@@ -17,7 +17,7 @@ const WorkflowLibraryButton = () => {
         aria-label={t('workflows.workflowLibrary')}
         tooltip={t('workflows.workflowLibrary')}
         icon={<PiFolderOpenBold />}
-        onPointerUp={workflowLibraryModal.setTrue}
+        onClick={workflowLibraryModal.setTrue}
         pointerEvents="auto"
       />
       <WorkflowLibraryModal />

@@ -20,7 +20,7 @@ const ClearQueueButton = (props: Props) => {
         tooltip={t('queue.clearTooltip')}
         leftIcon={<PiTrashSimpleFill />}
         colorScheme="error"
-        onPointerUp={clearQueue.openDialog}
+        onClick={clearQueue.openDialog}
         data-testid={t('queue.clear')}
         {...props}
       >

@@ -52,10 +52,10 @@ export const QueueActionsMenuButton = memo(() => {
         <MenuButton ref={ref} as={IconButton} size="lg" aria-label="Queue Actions Menu" icon={<PiListBold />} />
         <MenuList>
           <MenuGroup title={t('common.new')}>
-            <MenuItem icon={<PiImageBold />} onPointerUp={newGallerySessionWithDialog}>
+            <MenuItem icon={<PiImageBold />} onClick={newGallerySessionWithDialog}>
               {t('controlLayers.newGallerySession')}
             </MenuItem>
-            <MenuItem icon={<PiPaintBrushBold />} onPointerUp={newCanvasSessionWithDialog}>
+            <MenuItem icon={<PiPaintBrushBold />} onClick={newCanvasSessionWithDialog}>
               {t('controlLayers.newCanvasSession')}
             </MenuItem>
           </MenuGroup>
@@ -63,7 +63,7 @@ export const QueueActionsMenuButton = memo(() => {
             <MenuItem
               isDestructive
               icon={<PiXBold />}
-              onPointerUp={clearQueue.openDialog}
+              onClick={clearQueue.openDialog}
               isLoading={clearQueue.isLoading}
               isDisabled={clearQueue.isDisabled}
             >
@@ -72,7 +72,7 @@ export const QueueActionsMenuButton = memo(() => {
             <MenuItem
               isDestructive
               icon={<PiTrashSimpleBold />}
-              onPointerUp={clearQueue.openDialog}
+              onClick={clearQueue.openDialog}
               isLoading={clearQueue.isLoading}
               isDisabled={clearQueue.isDisabled}
             >
@@ -81,7 +81,7 @@ export const QueueActionsMenuButton = memo(() => {
             {isResumeEnabled && (
               <MenuItem
                 icon={<PiPlayFill />}
-                onPointerUp={resumeProcessor}
+                onClick={resumeProcessor}
                 isLoading={isLoadingResumeProcessor}
                 isDisabled={isDisabledResumeProcessor}
               >
@@ -91,14 +91,14 @@ export const QueueActionsMenuButton = memo(() => {
             {isPauseEnabled && (
               <MenuItem
                 icon={<PiPauseFill />}
-                onPointerUp={pauseProcessor}
+                onClick={pauseProcessor}
                 isLoading={isLoadingPauseProcessor}
                 isDisabled={isDisabledPauseProcessor}
               >
                 {t('queue.pauseTooltip')}
               </MenuItem>
             )}
-            <MenuItem icon={<PiQueueBold />} onPointerUp={openQueue}>
+            <MenuItem icon={<PiQueueBold />} onClick={openQueue}>
               {t('queue.openQueue')}
             </MenuItem>
           </MenuGroup>

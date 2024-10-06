@@ -27,7 +27,7 @@ export const ToolColorPickerButton = memo(() => {
         icon={<PiEyedropperBold />}
         colorScheme={isSelected ? 'invokeBlue' : 'base'}
         variant="solid"
-        onPointerUp={selectColorPicker}
+        onClick={selectColorPicker}
       />
     </Tooltip>
   );

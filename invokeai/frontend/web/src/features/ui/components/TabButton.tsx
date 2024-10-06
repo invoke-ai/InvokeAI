@@ -9,7 +9,7 @@ export const TabButton = memo(
   forwardRef(({ tab, icon, label }: { tab: TabName; icon: ReactElement; label: string }, ref) => {
     const dispatch = useAppDispatch();
     const activeTabName = useAppSelector(selectActiveTab);
-    const onPointerUp = useCallback(() => {
+    const onClick = useCallback(() => {
       dispatch(setActiveTab(tab));
     }, [dispatch, tab]);
 
@@ -18,7 +18,7 @@ export const TabButton = memo(
         <IconButton
           ref={ref}
           p={0}
-          onPointerUp={onPointerUp}
+          onClick={onClick}
           icon={icon}
           size="md"
           fontSize="24px"

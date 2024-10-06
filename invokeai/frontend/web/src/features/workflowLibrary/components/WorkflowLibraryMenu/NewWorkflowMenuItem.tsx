@@ -8,8 +8,8 @@ export const NewWorkflowMenuItem = memo(() => {
   const { t } = useTranslation();
 
   const renderButton = useCallback(
-    (onPointerUp: () => void) => (
-      <MenuItem as="button" icon={<PiFilePlusBold />} onPointerUp={onPointerUp}>
+    (onClick: () => void) => (
+      <MenuItem as="button" icon={<PiFilePlusBold />} onClick={onClick}>
         {t('nodes.newWorkflow')}
       </MenuItem>
     ),

@@ -35,7 +35,7 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(() => {
       tooltip={t('controlLayers.stagingArea.discard')}
       aria-label={t('controlLayers.stagingArea.discard')}
       icon={<PiXBold />}
-      onPointerUp={discardSelected}
+      onClick={discardSelected}
       colorScheme="invokeBlue"
       fontSize={16}
       isDisabled={!selectedImage}

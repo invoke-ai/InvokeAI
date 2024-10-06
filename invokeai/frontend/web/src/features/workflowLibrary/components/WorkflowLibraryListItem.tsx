@@ -72,7 +72,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
         <Button
           flexShrink={0}
           isDisabled={isOpen}
-          onPointerUp={handleGetAndLoadWorkflow}
+          onClick={handleGetAndLoadWorkflow}
           isLoading={getAndLoadWorkflowResult.isLoading}
           aria-label={t('workflows.openWorkflow')}
         >
@@ -83,7 +83,7 @@ const WorkflowLibraryListItem = ({ workflowDTO }: Props) => {
             flexShrink={0}
             colorScheme="error"
             isDisabled={isOpen}
-            onPointerUp={handleDeleteWorkflow}
+            onClick={handleDeleteWorkflow}
             isLoading={deleteWorkflowResult.isLoading}
             aria-label={t('workflows.deleteWorkflow')}
           >

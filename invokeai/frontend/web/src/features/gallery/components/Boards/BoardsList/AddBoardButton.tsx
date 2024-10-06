@@ -42,7 +42,7 @@ const AddBoardButton = ({ isPrivateBoard }: Props) => {
       isLoading={isLoading}
       tooltip={label}
       aria-label={label}
-      onPointerUp={handleCreateBoard}
+      onClick={handleCreateBoard}
       size="md"
       data-testid="add-board-button"
       variant="link"

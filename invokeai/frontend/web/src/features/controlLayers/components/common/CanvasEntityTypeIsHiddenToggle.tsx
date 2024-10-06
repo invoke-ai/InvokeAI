@@ -18,7 +18,7 @@ export const CanvasEntityTypeIsHiddenToggle = memo(({ type }: Props) => {
   const dispatch = useAppDispatch();
   const isHidden = useEntityTypeIsHidden(type);
   const typeString = useEntityTypeString(type, true);
-  const onPointerUp = useCallback<MouseEventHandler>(
+  const onClick = useCallback<MouseEventHandler>(
     (e) => {
       e.stopPropagation();
       dispatch(allEntitiesOfTypeIsHiddenToggled({ type }));
@@ -33,7 +33,7 @@ export const CanvasEntityTypeIsHiddenToggle = memo(({ type }: Props) => {
       tooltip={t(isHidden ? 'controlLayers.hidingType' : 'controlLayers.showingType', { type: typeString })}
       variant="link"
       icon={isHidden ? <PiEyeClosedBold /> : <PiEyeBold />}
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       alignSelf="stretch"
     />
   );

@@ -23,7 +23,7 @@ const UpdateNodesButton = () => {
       tooltip={t('nodes.updateAllNodes')}
       aria-label={t('nodes.updateAllNodes')}
       icon={<PiWarningBold />}
-      onPointerUp={handleClickUpdateNodes}
+      onClick={handleClickUpdateNodes}
       pointerEvents="auto"
       colorScheme="warning"
     />

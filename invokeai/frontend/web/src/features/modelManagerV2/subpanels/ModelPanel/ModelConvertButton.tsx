@@ -52,7 +52,7 @@ export const ModelConvertButton = memo(({ modelConfig }: ModelConvertProps) => {
   return (
     <>
       <Button
-        onPointerUp={onOpen}
+        onClick={onOpen}
         size="sm"
         aria-label={t('modelManager.convertToDiffusers')}
         className=" modal-close-btn"

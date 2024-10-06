@@ -17,7 +17,7 @@ export const ImageMenuItemSelectForCompare = memo(() => {
   );
   const maySelectForCompare = useAppSelector(selectMaySelectForCompare);
 
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     dispatch(imageToCompareChanged(imageDTO));
   }, [dispatch, imageDTO]);
 
@@ -26,7 +26,7 @@ export const ImageMenuItemSelectForCompare = memo(() => {
       as={MenuItem}
       icon={<PiImagesBold />}
       isDisabled={!maySelectForCompare}
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       aria-label={t('gallery.selectForCompare')}
       tooltip={t('gallery.selectForCompare')}
       variant="unstyled"

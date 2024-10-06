@@ -14,14 +14,14 @@ export const ImageMenuItemLoadWorkflow = memo(() => {
   const [getAndLoadEmbeddedWorkflow, { isLoading }] = useGetAndLoadEmbeddedWorkflow();
   const hasTemplates = useStore($hasTemplates);
 
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     getAndLoadEmbeddedWorkflow(imageDTO.image_name);
   }, [getAndLoadEmbeddedWorkflow, imageDTO.image_name]);
 
   return (
     <MenuItem
       icon={isLoading ? <SpinnerIcon /> : <PiFlowArrowBold />}
-      onPointerUpCapture={onPointerUp}
+      onClickCapture={onClick}
       isDisabled={!imageDTO.has_workflow || !hasTemplates}
     >
       {t('nodes.loadWorkflow')}

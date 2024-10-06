@@ -10,7 +10,7 @@ export const ImageMenuItemDownload = memo(() => {
   const imageDTO = useImageDTOContext();
   const { downloadImage } = useDownloadImage();
 
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     downloadImage(imageDTO.image_url, imageDTO.image_name);
   }, [downloadImage, imageDTO.image_name, imageDTO.image_url]);
 
@@ -20,7 +20,7 @@ export const ImageMenuItemDownload = memo(() => {
       icon={<PiDownloadSimpleBold />}
       aria-label={t('parameters.downloadImage')}
       tooltip={t('parameters.downloadImage')}
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       variant="unstyled"
       colorScheme="base"
       w="min-content"

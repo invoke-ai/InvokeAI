@@ -32,7 +32,7 @@ const WorkflowFieldInternal = ({ nodeId, fieldName }: Props) => {
             tooltip={t('nodes.resetToDefaultValue')}
             variant="ghost"
             size="sm"
-            onPointerUp={onReset}
+            onClick={onReset}
             icon={<PiArrowCounterClockwiseBold />}
           />
         )}
