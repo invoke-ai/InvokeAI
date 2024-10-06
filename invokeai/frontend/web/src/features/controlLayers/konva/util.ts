@@ -506,6 +506,36 @@ export const getRectUnion = (...rects: Rect[]): Rect => {
 };
 
 /**
+ * Gets the intersection of any number of rects.
+ * @params rects The rects to intersect
+ * @returns The intersection of the rects, or an empty rect if no intersection exists
+ */
+export const getRectIntersection = (...rects: Rect[]): Rect => {
+  const firstRect = rects.shift();
+
+  if (!firstRect) {
+    return getEmptyRect();
+  }
+
+  const rect = rects.reduce<Rect>((acc, r) => {
+    const x = Math.max(acc.x, r.x);
+    const y = Math.max(acc.y, r.y);
+    const width = Math.min(acc.x + acc.width, r.x + r.width) - x;
+    const height = Math.min(acc.y + acc.height, r.y + r.height) - y;
+
+    // We continue even if width or height is negative, and check at the end
+    return { x, y, width, height };
+  }, firstRect);
+
+  // Final check to ensure positive width and height, else return empty rect
+  if (rect.width < 0 || rect.height < 0) {
+    return getEmptyRect();
+  }
+
+  return rect || getEmptyRect();
+};
+
+/**
  * Asserts that the value is never reached. Used for exhaustive checks in switch statements or conditional logic to ensure
  * that all possible values are handled.
  * @param value The value that should never be reached
