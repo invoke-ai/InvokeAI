@@ -207,6 +207,8 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
 
     this.setVisibility(true);
 
+    const { x, y } = cursorPos.relative;
+
     const settings = this.manager.stateApi.getSettings();
     const colorUnderCursor = this.parent.$colorUnderCursor.get();
     const colorPickerInnerRadius = this.manager.stage.unscale(this.config.RING_INNER_RADIUS);
@@ -215,28 +217,28 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
     const twoPixels = this.manager.stage.unscale(2);
 
     this.konva.ringCandidateColor.setAttrs({
-      x: cursorPos.x,
-      y: cursorPos.y,
+      x,
+      y,
       fill: rgbColorToString(colorUnderCursor),
       innerRadius: colorPickerInnerRadius,
       outerRadius: colorPickerOuterRadius,
     });
     this.konva.ringCurrentColor.setAttrs({
-      x: cursorPos.x,
-      y: cursorPos.y,
+      x,
+      y,
       fill: rgbColorToString(settings.color),
       innerRadius: colorPickerInnerRadius,
       outerRadius: colorPickerOuterRadius,
     });
     this.konva.ringInnerBorder.setAttrs({
-      x: cursorPos.x,
-      y: cursorPos.y,
+      x,
+      y,
       innerRadius: colorPickerOuterRadius,
       outerRadius: colorPickerOuterRadius + onePixel,
     });
     this.konva.ringOuterBorder.setAttrs({
-      x: cursorPos.x,
-      y: cursorPos.y,
+      x,
+      y,
       innerRadius: colorPickerOuterRadius + onePixel,
       outerRadius: colorPickerOuterRadius + twoPixels,
     });
@@ -249,35 +251,35 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
     );
     this.konva.crosshairNorthOuter.setAttrs({
       strokeWidth: outerThickness,
-      points: [cursorPos.x, cursorPos.y - size, cursorPos.x, cursorPos.y - space],
+      points: [x, y - size, x, y - space],
     });
     this.konva.crosshairNorthInner.setAttrs({
       strokeWidth: innerThickness,
-      points: [cursorPos.x, cursorPos.y - size, cursorPos.x, cursorPos.y - space],
+      points: [x, y - size, x, y - space],
     });
     this.konva.crosshairEastOuter.setAttrs({
       strokeWidth: outerThickness,
-      points: [cursorPos.x + space, cursorPos.y, cursorPos.x + size, cursorPos.y],
+      points: [x + space, y, x + size, y],
     });
     this.konva.crosshairEastInner.setAttrs({
       strokeWidth: innerThickness,
-      points: [cursorPos.x + space, cursorPos.y, cursorPos.x + size, cursorPos.y],
+      points: [x + space, y, x + size, y],
     });
     this.konva.crosshairSouthOuter.setAttrs({
       strokeWidth: outerThickness,
-      points: [cursorPos.x, cursorPos.y + space, cursorPos.x, cursorPos.y + size],
+      points: [x, y + space, x, y + size],
     });
     this.konva.crosshairSouthInner.setAttrs({
       strokeWidth: innerThickness,
-      points: [cursorPos.x, cursorPos.y + space, cursorPos.x, cursorPos.y + size],
+      points: [x, y + space, x, y + size],
     });
     this.konva.crosshairWestOuter.setAttrs({
       strokeWidth: outerThickness,
-      points: [cursorPos.x - space, cursorPos.y, cursorPos.x - size, cursorPos.y],
+      points: [x - space, y, x - size, y],
     });
     this.konva.crosshairWestInner.setAttrs({
       strokeWidth: innerThickness,
-      points: [cursorPos.x - space, cursorPos.y, cursorPos.x - size, cursorPos.y],
+      points: [x - space, y, x - size, y],
     });
   };
 

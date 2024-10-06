@@ -104,7 +104,7 @@ export class CanvasToolEraser extends CanvasModuleBase {
     this.setVisibility(true);
 
     const settings = this.manager.stateApi.getSettings();
-    const alignedCursorPos = alignCoordForTool(cursorPos, settings.eraserWidth);
+    const alignedCursorPos = alignCoordForTool(cursorPos.relative, settings.eraserWidth);
     const radius = settings.eraserWidth / 2;
 
     // The circle is scaled
@@ -119,14 +119,14 @@ export class CanvasToolEraser extends CanvasModuleBase {
     const twoPixels = this.manager.stage.unscale(2);
 
     this.konva.innerBorder.setAttrs({
-      x: cursorPos.x,
-      y: cursorPos.y,
+      x: cursorPos.relative.x,
+      y: cursorPos.relative.y,
       innerRadius: radius,
       outerRadius: radius + onePixel,
     });
     this.konva.outerBorder.setAttrs({
-      x: cursorPos.x,
-      y: cursorPos.y,
+      x: cursorPos.relative.x,
+      y: cursorPos.relative.y,
       innerRadius: radius + onePixel,
       outerRadius: radius + twoPixels,
     });
