@@ -3,10 +3,11 @@ import torch
 
 from invokeai.backend.flux.controlnet.state_dict_utils import (
     convert_diffusers_instantx_state_dict_to_bfl_format,
+    infer_flux_params_from_state_dict,
     is_state_dict_instantx_controlnet,
     is_state_dict_xlabs_controlnet,
 )
-from tests.backend.flux.controlnet.instantx_flux_controlnet_state_dict import instantx_sd_shapes
+from tests.backend.flux.controlnet.instantx_flux_controlnet_state_dict import instantx_config, instantx_sd_shapes
 from tests.backend.flux.controlnet.xlabs_flux_controlnet_state_dict import xlabs_sd_shapes
 
 
@@ -41,3 +42,25 @@ def test_convert_diffusers_instantx_state_dict_to_bfl_format():
     sd = {k: torch.zeros(1) for k in instantx_sd_shapes}
     bfl_sd = convert_diffusers_instantx_state_dict_to_bfl_format(sd)
     assert bfl_sd is not None
+
+
+def test_infer_flux_params_from_state_dict():
+    # Construct a dummy state_dict with tensor of the correct shape on the meta device.
+    with torch.device("meta"):
+        sd = {k: torch.zeros(v) for k, v in instantx_sd_shapes.items()}
+
+    sd = convert_diffusers_instantx_state_dict_to_bfl_format(sd)
+    flux_params = infer_flux_params_from_state_dict(sd)
+
+    assert flux_params.in_channels == instantx_config["in_channels"]
+    assert flux_params.vec_in_dim == instantx_config["pooled_projection_dim"]
+    assert flux_params.context_in_dim == instantx_config["joint_attention_dim"]
+    assert flux_params.hidden_size // flux_params.num_heads == instantx_config["attention_head_dim"]
+    assert flux_params.num_heads == instantx_config["num_attention_heads"]
+    assert flux_params.mlp_ratio == 4
+    assert flux_params.depth == instantx_config["num_layers"]
+    assert flux_params.depth_single_blocks == instantx_config["num_single_layers"]
+    assert flux_params.axes_dim == instantx_config["axes_dims_rope"]
+    assert flux_params.theta == 10000
+    assert flux_params.qkv_bias
+    assert flux_params.guidance_embed == instantx_config["guidance_embeds"]

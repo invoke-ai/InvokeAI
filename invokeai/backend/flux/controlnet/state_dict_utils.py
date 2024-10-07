@@ -250,7 +250,7 @@ def infer_flux_params_from_state_dict(sd: Dict[str, torch.Tensor]) -> FluxParams
     """
     hidden_size = sd["img_in.weight"].shape[0]
     mlp_hidden_dim = sd["double_blocks.0.img_mlp.0.weight"].shape[0]
-    # mlp_ratio is a float, but we treat it as an int here to avoid having to think about possible flost precision
+    # mlp_ratio is a float, but we treat it as an int here to avoid having to think about possible float precision
     # issues. In practice, mlp_ratio is usually 4.
     mlp_ratio = mlp_hidden_dim // hidden_size
 
