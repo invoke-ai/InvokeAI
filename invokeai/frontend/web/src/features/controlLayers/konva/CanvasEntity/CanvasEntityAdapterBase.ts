@@ -14,7 +14,12 @@ import {
   selectIsolatedFilteringPreview,
   selectIsolatedTransformingPreview,
 } from 'features/controlLayers/store/canvasSettingsSlice';
-import { buildEntityIsHiddenSelector, selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import {
+  buildEntityIsHiddenSelector,
+  selectBboxRect,
+  selectCanvasSlice,
+  selectEntity,
+} from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, CanvasRenderableEntityState, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom, computed } from 'nanostores';
@@ -133,6 +138,10 @@ export abstract class CanvasEntityAdapterBase<
    * Whether this entity is onscreen. This is computed based on the entity's bounding box and the stage's viewport rect.
    */
   $isOnScreen = atom(false);
+  /**
+   * Whether this entity's rect intersects the bbox rect.
+   */
+  $intersectsBbox = atom(false);
 
   constructor(entityIdentifier: CanvasEntityIdentifier<T['type']>, manager: CanvasManager, adapterType: U) {
     super();
@@ -192,6 +201,13 @@ export abstract class CanvasEntityAdapterBase<
      */
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.syncIsOnscreen));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectPosition, this.syncIsOnscreen));
+
+    /**
+     * When the bbox rect changes or the entity is moved, we need to update the intersectsBbox status. We also need to
+     * subscribe to changes to the entity's pixel rect, but this is handled in the initialize method.
+     */
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectBboxRect, this.syncIntersectsBbox));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectPosition, this.syncIntersectsBbox));
   }
 
   /**
@@ -238,6 +254,29 @@ export abstract class CanvasEntityAdapterBase<
     }
   };
 
+  syncIntersectsBbox = () => {
+    const bboxRect = this.manager.stateApi.getBbox().rect;
+    const entityRect = this.transformer.$pixelRect.get();
+    const position = this.manager.stateApi.runSelector(this.selectPosition);
+    if (!position) {
+      return;
+    }
+    const entityRectRelativeToStage = {
+      x: entityRect.x + position.x,
+      y: entityRect.y + position.y,
+      width: entityRect.width,
+      height: entityRect.height,
+    };
+
+    const intersection = getRectIntersection(bboxRect, entityRectRelativeToStage);
+    const prevIntersectsBbox = this.$intersectsBbox.get();
+    const intersectsBbox = intersection.width > 0 && intersection.height > 0;
+    this.$intersectsBbox.set(intersectsBbox);
+    if (prevIntersectsBbox !== intersectsBbox) {
+      this.log.trace(`Moved ${intersectsBbox ? 'into bbox' : 'out of bbox'}`);
+    }
+  };
+
   initialize = async () => {
     this.log.debug('Initializing module');
 
@@ -249,6 +288,15 @@ export abstract class CanvasEntityAdapterBase<
      * dependency between the transformer and concrete adapter classes
      */
     this.subscriptions.add(this.transformer.$pixelRect.listen(this.syncIsOnscreen));
+
+    /**
+     * When the pixel rect changes, we need to sync the bbox intersection state of the parent entity.
+     *
+     * TODO(psyche): It'd be nice to set this listener in the constructor, but the transformer is only created in the
+     * concrete classes, so we have to do this here. IIRC the reason for this awkwardness was to satisfy a circular
+     * dependency between the transformer and concrete adapter classes
+     */
+    this.subscriptions.add(this.transformer.$pixelRect.listen(this.syncIntersectsBbox));
 
     await this.sync(this.manager.stateApi.runSelector(this.selectState), undefined);
     this.transformer.initialize();
