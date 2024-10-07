@@ -3,8 +3,8 @@ from typing import Callable
 import torch
 from tqdm import tqdm
 
-from invokeai.backend.flux.controlnet_extension import ControlNetExtension
-from invokeai.backend.flux.inpaint_extension import InpaintExtension
+from invokeai.backend.flux.extensions.controlnet_extension import ControlNetExtension
+from invokeai.backend.flux.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
