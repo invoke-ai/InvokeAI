@@ -22,7 +22,7 @@ const NodeCollapseButton = ({ nodeId, isOpen }: Props) => {
   return (
     <IconButton
       className="nodrag"
-      onPointerUp={handleClick}
+      onClick={handleClick}
       aria-label="Minimize"
       minW={8}
       w={8}

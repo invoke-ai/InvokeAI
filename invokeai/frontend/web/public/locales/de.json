@@ -651,7 +651,8 @@
         "imageCopied": "Bild kopiert",
         "parametersNotSet": "Parameter nicht festgelegt",
         "addedToBoard": "Dem Board hinzugefügt",
-        "loadedWithWarnings": "Workflow mit Warnungen geladen"
+        "loadedWithWarnings": "Workflow mit Warnungen geladen",
+        "imageSaved": "Bild gespeichert"
     },
     "accessibility": {
         "uploadImage": "Bild hochladen",
@@ -664,7 +665,9 @@
         "resetUI": "$t(accessibility.reset) von UI",
         "createIssue": "Ticket erstellen",
         "about": "Über",
-        "submitSupportTicket": "Support-Ticket senden"
+        "submitSupportTicket": "Support-Ticket senden",
+        "toggleRightPanel": "Rechtes Bedienfeld umschalten (G)",
+        "toggleLeftPanel": "Linkes Bedienfeld umschalten (T)"
     },
     "boards": {
         "autoAddBoard": "Board automatisch erstellen",
@@ -1062,7 +1065,22 @@
         "missingFieldTemplate": "Fehlende Feldvorlage",
         "missingNode": "Fehlender Aufrufknoten",
         "missingInvocationTemplate": "Fehlende Aufrufvorlage",
-        "edit": "Bearbeiten"
+        "edit": "Bearbeiten",
+        "workflowAuthor": "Autor",
+        "graph": "Graph",
+        "workflowDescription": "Kurze Beschreibung",
+        "versionUnknown": " Version unbekannt",
+        "workflow": "Arbeitsablauf",
+        "noGraph": "Kein Graph",
+        "version": "Version",
+        "zoomInNodes": "Hineinzoomen",
+        "zoomOutNodes": "Herauszoomen",
+        "workflowName": "Name",
+        "unknownNode": "Unbekannter Knoten",
+        "workflowContact": "Kontaktdaten",
+        "workflowNotes": "Notizen",
+        "workflowTags": "Tags",
+        "workflowVersion": "Version"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",

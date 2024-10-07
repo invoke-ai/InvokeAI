@@ -77,7 +77,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
   return (
     <>
       {cloneElement(children, {
-        onPointerUp: onOpen,
+        onClick: onOpen,
       })}
       <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false} initialFocusRef={inputRef}>
         <ModalOverlay />
@@ -90,7 +90,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
               {hotkeyFilter.length && (
                 <InputRightElement h="full" pe={2}>
                   <IconButton
-                    onPointerUp={clearHotkeyFilter}
+                    onClick={clearHotkeyFilter}
                     size="sm"
                     variant="ghost"
                     aria-label={t('hotkeys.clearSearch')}

@@ -51,7 +51,7 @@ export const HuggingFaceForm = memo(() => {
             onChange={handleSetHuggingFaceRepo}
           />
           <Button
-            onPointerUp={getModels}
+            onClick={getModels}
             isLoading={isLoading}
             isDisabled={huggingFaceRepo.length === 0}
             size="sm"

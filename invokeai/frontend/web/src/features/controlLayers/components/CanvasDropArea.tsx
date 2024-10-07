@@ -8,6 +8,7 @@ import type {
 } from 'features/dnd/types';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const addRasterLayerFromImageDropData: AddRasterLayerFromImageDropData = {
   id: 'add-raster-layer-from-image-drop-data',
@@ -30,6 +31,7 @@ const addGlobalReferenceImageFromImageDropData: AddGlobalReferenceImageFromImage
 };
 
 export const CanvasDropArea = memo(() => {
+  const { t } = useTranslation();
   const imageViewer = useImageViewer();
 
   if (imageViewer.isOpen) {
@@ -49,16 +51,28 @@ export const CanvasDropArea = memo(() => {
         pointerEvents="none"
       >
         <GridItem position="relative">
-          <IAIDroppable dropLabel="New Raster Layer" data={addRasterLayerFromImageDropData} />
+          <IAIDroppable
+            dropLabel={t('controlLayers.canvasContextMenu.newRasterLayer')}
+            data={addRasterLayerFromImageDropData}
+          />
         </GridItem>
         <GridItem position="relative">
-          <IAIDroppable dropLabel="New Control Layer" data={addControlLayerFromImageDropData} />
+          <IAIDroppable
+            dropLabel={t('controlLayers.canvasContextMenu.newControlLayer')}
+            data={addControlLayerFromImageDropData}
+          />
         </GridItem>
         <GridItem position="relative">
-          <IAIDroppable dropLabel="New Regional Reference Image" data={addRegionalReferenceImageFromImageDropData} />
+          <IAIDroppable
+            dropLabel={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
+            data={addRegionalReferenceImageFromImageDropData}
+          />
         </GridItem>
         <GridItem position="relative">
-          <IAIDroppable dropLabel="New Global Reference Image" data={addGlobalReferenceImageFromImageDropData} />
+          <IAIDroppable
+            dropLabel={t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
+            data={addGlobalReferenceImageFromImageDropData}
+          />
         </GridItem>
       </Grid>
     </>

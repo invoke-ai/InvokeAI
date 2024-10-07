@@ -10,7 +10,7 @@ export const CanvasToolbarResetCanvasButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const canvasManager = useCanvasManager();
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     dispatch(canvasReset());
     canvasManager.stage.fitLayersToStage();
   }, [canvasManager.stage, dispatch]);
@@ -18,7 +18,7 @@ export const CanvasToolbarResetCanvasButton = memo(() => {
     <IconButton
       aria-label={t('controlLayers.resetCanvas')}
       tooltip={t('controlLayers.resetCanvas')}
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       colorScheme="error"
       icon={<PiTrashBold />}
       variant="link"

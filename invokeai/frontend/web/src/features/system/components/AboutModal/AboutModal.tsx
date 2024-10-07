@@ -51,7 +51,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
   return (
     <>
       {cloneElement(children, {
-        onPointerUp: onOpen,
+        onClick: onOpen,
       })}
       <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false}>
         <ModalOverlay />
@@ -67,7 +67,7 @@ const AboutModal = ({ children }: AboutModalProps) => {
                     <Spacer />
                     <Tooltip label={t('common.copy')}>
                       <IconButton
-                        onPointerUp={handleCopy}
+                        onClick={handleCopy}
                         isDisabled={!depsObject}
                         aria-label={t('common.copy')}
                         icon={<PiCopyBold />}

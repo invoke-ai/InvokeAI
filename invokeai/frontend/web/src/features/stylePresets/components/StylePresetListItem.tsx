@@ -97,7 +97,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
     <>
       <Flex
         gap={4}
-        onPointerUp={handleClickApply}
+        onClick={handleClickApply}
         cursor="pointer"
         _hover={{ backgroundColor: 'base.750' }}
         py={3}
@@ -131,7 +131,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
                 size="sm"
                 variant="ghost"
                 aria-label={t('stylePresets.copyTemplate')}
-                onPointerUp={handleClickCopy}
+                onClick={handleClickCopy}
                 icon={<PiCopyBold />}
               />
               {preset.type !== 'default' && (
@@ -140,14 +140,14 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
                     size="sm"
                     variant="ghost"
                     aria-label={t('stylePresets.editTemplate')}
-                    onPointerUp={handleClickEdit}
+                    onClick={handleClickEdit}
                     icon={<PiPencilBold />}
                   />
                   <IconButton
                     size="sm"
                     variant="ghost"
                     aria-label={t('stylePresets.deleteTemplate')}
-                    onPointerUp={handleClickDelete}
+                    onClick={handleClickDelete}
                     colorScheme="error"
                     icon={<PiTrashBold />}
                   />

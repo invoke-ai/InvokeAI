@@ -10,11 +10,11 @@ export const ModeToggle = () => {
   const mode = useAppSelector(selectWorkflowMode);
   const { t } = useTranslation();
 
-  const onPointerUpEdit = useCallback(() => {
+  const onClickEdit = useCallback(() => {
     dispatch(workflowModeChanged('edit'));
   }, [dispatch]);
 
-  const onPointerUpView = useCallback(() => {
+  const onClickView = useCallback(() => {
     dispatch(workflowModeChanged('view'));
   }, [dispatch]);
 
@@ -24,7 +24,7 @@ export const ModeToggle = () => {
         <IconButton
           aria-label={t('nodes.editMode')}
           tooltip={t('nodes.editMode')}
-          onPointerUp={onPointerUpEdit}
+          onClick={onClickEdit}
           icon={<PiPencilBold />}
           colorScheme="invokeBlue"
         />
@@ -33,7 +33,7 @@ export const ModeToggle = () => {
         <IconButton
           aria-label={t('nodes.viewMode')}
           tooltip={t('nodes.viewMode')}
-          onPointerUp={onPointerUpView}
+          onClick={onClickView}
           icon={<PiEyeBold />}
           colorScheme="invokeBlue"
         />

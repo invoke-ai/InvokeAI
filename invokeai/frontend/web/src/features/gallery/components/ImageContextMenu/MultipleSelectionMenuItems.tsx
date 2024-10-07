@@ -58,28 +58,25 @@ const MultipleSelectionMenuItems = () => {
   return (
     <>
       {areAllStarred && (
-        <MenuItem
-          icon={customStarUi ? customStarUi.on.icon : <PiStarBold />}
-          onPointerUpCapture={handleUnstarSelection}
-        >
+        <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarBold />} onClickCapture={handleUnstarSelection}>
           {customStarUi ? customStarUi.off.text : `Unstar All`}
         </MenuItem>
       )}
       {(areAllUnstarred || (!areAllStarred && !areAllUnstarred)) && (
-        <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarFill />} onPointerUpCapture={handleStarSelection}>
+        <MenuItem icon={customStarUi ? customStarUi.on.icon : <PiStarFill />} onClickCapture={handleStarSelection}>
           {customStarUi ? customStarUi.on.text : `Star All`}
         </MenuItem>
       )}
       {isBulkDownloadEnabled && (
-        <MenuItem icon={<PiDownloadSimpleBold />} onPointerUpCapture={handleBulkDownload}>
+        <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleBulkDownload}>
           {t('gallery.downloadSelection')}
         </MenuItem>
       )}
-      <MenuItem icon={<PiFoldersBold />} onPointerUpCapture={handleChangeBoard}>
+      <MenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>
         {t('boards.changeBoard')}
       </MenuItem>
       <MenuDivider />
-      <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onPointerUpCapture={handleDeleteSelection}>
+      <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClickCapture={handleDeleteSelection}>
         {t('gallery.deleteSelection')}
       </MenuItem>
     </>

@@ -9,7 +9,7 @@ export const EmptyState = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     dispatch(workflowModeChanged('edit'));
   }, [dispatch]);
 
@@ -46,7 +46,7 @@ export const EmptyState = () => {
         <Text textAlign="center" fontSize="md">
           {t('nodes.noFieldsViewMode')}
         </Text>
-        <Button colorScheme="invokeBlue" onPointerUp={onPointerUp}>
+        <Button colorScheme="invokeBlue" onClick={onClick}>
           {t('nodes.edit')}
         </Button>
       </Flex>

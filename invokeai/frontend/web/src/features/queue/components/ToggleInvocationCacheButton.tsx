@@ -23,14 +23,14 @@ const ToggleInvocationCacheButton = () => {
 
   if (cacheStatus?.enabled) {
     return (
-      <Button isDisabled={isDisableDisabled} isLoading={isDisableLoading} onPointerUp={disableInvocationCache}>
+      <Button isDisabled={isDisableDisabled} isLoading={isDisableLoading} onClick={disableInvocationCache}>
         {t('invocationCache.disable')}
       </Button>
     );
   }
 
   return (
-    <Button isDisabled={isEnableDisabled} isLoading={isEnableLoading} onPointerUp={enableInvocationCache}>
+    <Button isDisabled={isEnableDisabled} isLoading={isEnableLoading} onClick={enableInvocationCache}>
       {t('invocationCache.enable')}
     </Button>
   );

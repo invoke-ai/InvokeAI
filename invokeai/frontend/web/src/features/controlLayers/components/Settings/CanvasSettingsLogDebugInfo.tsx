@@ -6,11 +6,11 @@ import { useTranslation } from 'react-i18next';
 export const CanvasSettingsLogDebugInfoButton = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     canvasManager.logDebugInfo();
   }, [canvasManager]);
   return (
-    <Button onPointerUp={onPointerUp} size="sm">
+    <Button onClick={onClick} size="sm">
       {t('controlLayers.logDebugInfo')}
     </Button>
   );

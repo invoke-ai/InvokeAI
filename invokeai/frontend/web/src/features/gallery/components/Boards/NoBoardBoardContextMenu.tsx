@@ -38,12 +38,12 @@ const NoBoardBoardContextMenu = ({ children }: Props) => {
       <MenuList visibility="visible">
         <MenuGroup title={t('boards.uncategorized')}>
           {!autoAssignBoardOnClick && (
-            <MenuItem icon={<PiPlusBold />} isDisabled={isSelectedForAutoAdd} onPointerUp={handleSetAutoAdd}>
+            <MenuItem icon={<PiPlusBold />} isDisabled={isSelectedForAutoAdd} onClick={handleSetAutoAdd}>
               {isSelectedForAutoAdd ? t('boards.selectedForAutoAdd') : t('boards.menuItemAutoAdd')}
             </MenuItem>
           )}
           {isBulkDownloadEnabled && (
-            <MenuItem icon={<PiDownloadBold />} onPointerUpCapture={handleBulkDownload}>
+            <MenuItem icon={<PiDownloadBold />} onClickCapture={handleBulkDownload}>
               {t('boards.downloadBoard')}
             </MenuItem>
           )}

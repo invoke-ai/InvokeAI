@@ -9,7 +9,7 @@ const SaveWorkflowAsMenuItem = () => {
   const { onOpen } = useSaveWorkflowAsDialog();
 
   return (
-    <MenuItem as="button" icon={<PiCopyBold />} onPointerUp={onOpen}>
+    <MenuItem as="button" icon={<PiCopyBold />} onClick={onOpen}>
       {t('workflows.saveWorkflowAs')}
     </MenuItem>
   );

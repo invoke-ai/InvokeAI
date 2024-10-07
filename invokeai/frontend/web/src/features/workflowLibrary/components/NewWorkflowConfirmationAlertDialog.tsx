@@ -7,7 +7,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
-  renderButton: (onPointerUp: () => void) => JSX.Element;
+  renderButton: (onClick: () => void) => JSX.Element;
 };
 
 export const NewWorkflowConfirmationAlertDialog = memo((props: Props) => {
@@ -29,7 +29,7 @@ export const NewWorkflowConfirmationAlertDialog = memo((props: Props) => {
     onClose();
   }, [dispatch, onClose, t]);
 
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     if (!isTouched) {
       handleNewWorkflow();
       return;
@@ -39,7 +39,7 @@ export const NewWorkflowConfirmationAlertDialog = memo((props: Props) => {
 
   return (
     <>
-      {props.renderButton(onPointerUp)}
+      {props.renderButton(onClick)}
 
       <ConfirmationAlertDialog
         isOpen={isOpen}

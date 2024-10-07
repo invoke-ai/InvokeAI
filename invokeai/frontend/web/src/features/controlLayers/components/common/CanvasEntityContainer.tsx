@@ -12,7 +12,7 @@ export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
   const entityIdentifier = useEntityIdentifierContext();
   const isSelected = useEntityIsSelected(entityIdentifier);
   const selectionColor = useEntitySelectionColor(entityIdentifier);
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     if (isSelected) {
       return;
     }
@@ -25,7 +25,7 @@ export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
       flexDir="column"
       w="full"
       bg={isSelected ? 'base.800' : 'base.850'}
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       borderInlineStartWidth={5}
       borderColor={isSelected ? selectionColor : 'base.800'}
       borderRadius="base"

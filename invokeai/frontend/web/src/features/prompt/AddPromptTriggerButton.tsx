@@ -18,7 +18,7 @@ export const AddPromptTriggerButton = memo((props: Props) => {
         isDisabled={isOpen}
         aria-label={t('prompt.addPromptTrigger')}
         icon={<PiCodeBold />}
-        onPointerUp={onOpen}
+        onClick={onOpen}
       />
     </Tooltip>
   );
