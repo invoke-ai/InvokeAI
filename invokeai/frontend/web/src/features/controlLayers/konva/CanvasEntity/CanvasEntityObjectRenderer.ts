@@ -1,6 +1,5 @@
 import { $authToken } from 'app/store/nanostores/authToken';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
-import { withResult } from 'common/util/result';
 import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
@@ -26,10 +25,7 @@ import type { Rect } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
-import { debounce } from 'lodash-es';
-import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
-import { serializeError } from 'serialize-error';
 import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -95,17 +91,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       patternImage: HTMLImageElement;
     } | null;
   };
-
-  /**
-   * The entity's object group as a canvas element along with the pixel rect of the entity at the time the canvas was
-   * drawn.
-   *
-   * Technically, this is an internal Konva object, created when a Konva node's `.cache()` method is called. We cache
-   * the object group after every update, so we get this as a "free" side effect.
-   *
-   * This is used to render the entity's preview in the control layer.
-   */
-  $canvasCache = atom<{ canvas: HTMLCanvasElement; rect: Rect } | null>(null);
 
   constructor(parent: CanvasEntityAdapter) {
     super();
@@ -198,12 +183,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     if (this.renderers.size === 0) {
       this.log.trace('Clearing object group cache');
       this.konva.objectGroup.clearCache();
-      this.$canvasCache.set(null);
     } else if (force || !this.konva.objectGroup.isCached()) {
       this.log.trace('Caching object group');
       this.konva.objectGroup.clearCache();
       this.konva.objectGroup.cache({ pixelRatio: 1, imageSmoothingEnabled: false });
-      this.parent.renderer.updatePreviewCanvas();
     }
   };
 
@@ -459,52 +442,15 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     return imageDTO;
   };
 
-  updatePreviewCanvas = debounce(() => {
-    if (this.parent.transformer.$isPendingRectCalculation.get()) {
-      return;
-    }
-
-    const pixelRect = this.parent.transformer.$pixelRect.get();
-    if (pixelRect.width === 0 || pixelRect.height === 0) {
-      return;
-    }
-
-    /**
-     * TODO(psyche): This is an internal Konva method, so it may break in the future. Can we make this API public?
-     *
-     * This method's API is unknown. It has been experimentally determined that it may throw, so we need to handle
-     * errors.
-     */
-    const getCacheCanvasResult = withResult(
-      () => this.konva.objectGroup._getCachedSceneCanvas()._canvas as HTMLCanvasElement | undefined | null
-    );
-    if (getCacheCanvasResult.isErr()) {
-      // We are using an internal Konva method, so we need to catch any errors that may occur.
-      this.log.warn({ error: serializeError(getCacheCanvasResult.error) }, 'Failed to update preview canvas');
-      return;
-    }
-
-    const canvas = getCacheCanvasResult.value;
-
-    if (canvas) {
-      const nodeRect = this.parent.transformer.$nodeRect.get();
-      const rect = {
-        x: pixelRect.x - nodeRect.x,
-        y: pixelRect.y - nodeRect.y,
-        width: pixelRect.width,
-        height: pixelRect.height,
-      };
-      this.$canvasCache.set({ rect, canvas });
-    }
-  }, 300);
-
   cloneObjectGroup = (arg: { attrs?: GroupConfig } = {}): Konva.Group => {
     const { attrs } = arg;
     const clone = this.konva.objectGroup.clone();
     if (attrs) {
       clone.setAttrs(attrs);
     }
-    clone.cache({ pixelRatio: 1, imageSmoothingEnabled: false });
+    if (clone.hasChildren()) {
+      clone.cache({ pixelRatio: 1, imageSmoothingEnabled: false });
+    }
     return clone;
   };
 
@@ -551,7 +497,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       konva: {
         objectGroup: getKonvaNodeDebugAttrs(this.konva.objectGroup),
       },
-      hasCache: this.$canvasCache.get() !== null,
     };
   };
 }

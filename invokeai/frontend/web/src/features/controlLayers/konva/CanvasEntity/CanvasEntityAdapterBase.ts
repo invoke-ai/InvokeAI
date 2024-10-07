@@ -124,6 +124,10 @@ export abstract class CanvasEntityAdapterBase<
   $isInteractable = computed([this.$isLocked, this.$isDisabled, this.$isHidden], (isLocked, isDisabled, isHidden) => {
     return !isLocked && !isDisabled && !isHidden;
   });
+  /**
+   * A cache of the entity's canvas element. This is generated from a clone of the entity's Konva layer.
+   */
+  $canvasCache = atom<HTMLCanvasElement | null>(null);
 
   constructor(entityIdentifier: CanvasEntityIdentifier<T['type']>, manager: CanvasManager, adapterType: U) {
     super();
@@ -333,6 +337,7 @@ export abstract class CanvasEntityAdapterBase<
       renderer: this.renderer.repr(),
       bufferRenderer: this.bufferRenderer.repr(),
       filterer: this.filterer?.repr(),
+      hasCache: this.$canvasCache.get() !== null,
     };
   };
 }

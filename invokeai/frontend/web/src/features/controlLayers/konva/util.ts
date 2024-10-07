@@ -333,7 +333,7 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
 
 export const konvaNodeToCanvas = (arg: { node: Konva.Node; rect?: Rect; bg?: string }): HTMLCanvasElement => {
   const { node, rect, bg } = arg;
-  const canvas = node.toCanvas({ ...(rect ?? {}), imageSmoothingEnabled: false });
+  const canvas = node.toCanvas({ ...(rect ?? {}), imageSmoothingEnabled: false, pixelRatio: 1 });
 
   if (!bg) {
     return canvas;

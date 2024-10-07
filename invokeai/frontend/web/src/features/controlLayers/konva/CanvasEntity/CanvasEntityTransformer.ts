@@ -96,14 +96,21 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   config: CanvasEntityTransformerConfig = DEFAULT_CONFIG;
 
   /**
-   * The rect of the parent, _including_ transparent regions.
+   * The rect of the parent, _including_ transparent regions, **relative to the parent's position**. To get the rect
+   * relative to the _stage_, add the parent's position.
+   *
    * It is calculated via Konva's getClientRect method, which is fast but includes transparent regions.
+   *
+   * This rect is relative _to the parent's position_, not the stage.
    */
   $nodeRect = atom<Rect>(getEmptyRect());
 
   /**
-   * The rect of the parent, _excluding_ transparent regions.
+   * The rect of the parent, _excluding_ transparent regions, **relative to the parent's position**. To get the rect
+   * relative to the _stage_, add the parent's position.
+   *
    * If the parent's nodes have no possibility of transparent regions, this will be calculated the same way as nodeRect.
+   *
    * If the parent's nodes may have transparent regions, this will be calculated manually by rasterizing the parent and
    * checking the pixel data.
    */
@@ -795,19 +802,19 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
       this.parent.bufferRenderer.konva.group.setAttrs(groupAttrs);
     }
-
-    this.parent.renderer.updatePreviewCanvas();
   };
 
   calculateRect = debounce(() => {
     this.log.debug('Calculating bbox');
 
     this.$isPendingRectCalculation.set(true);
+    const canvas = this.parent.getCanvas();
 
     if (!this.parent.renderer.hasObjects()) {
       this.log.trace('No objects, resetting bbox');
       this.$nodeRect.set(getEmptyRect());
       this.$pixelRect.set(getEmptyRect());
+      this.parent.$canvasCache.set(canvas);
       this.$isPendingRectCalculation.set(false);
       this.updateBbox();
       return;
@@ -819,13 +826,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       this.$nodeRect.set({ ...rect });
       this.$pixelRect.set({ ...rect });
       this.log.trace({ nodeRect: this.$nodeRect.get(), pixelRect: this.$pixelRect.get() }, 'Got bbox from client rect');
+      this.parent.$canvasCache.set(canvas);
       this.$isPendingRectCalculation.set(false);
       this.updateBbox();
       return;
     }
 
     // We have eraser strokes - we must calculate the bbox using pixel data
-    const canvas = this.parent.renderer.getCanvas({ attrs: { opacity: 1, filters: [] } });
     const imageData = canvasToImageData(canvas);
     this.manager.worker.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
@@ -847,6 +854,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
           { nodeRect: this.$nodeRect.get(), pixelRect: this.$pixelRect.get(), extents },
           `Got bbox from worker`
         );
+        this.parent.$canvasCache.set(canvas);
         this.$isPendingRectCalculation.set(false);
         this.updateBbox();
       }

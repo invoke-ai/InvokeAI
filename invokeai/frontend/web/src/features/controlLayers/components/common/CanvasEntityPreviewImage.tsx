@@ -6,12 +6,11 @@ import { useEntityAdapter } from 'features/controlLayers/contexts/EntityAdapterC
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import { selectCanvasSlice, selectEntity } from 'features/controlLayers/store/selectors';
+import { debounce } from 'lodash-es';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
 
 const ChakraCanvas = chakra.canvas;
-
-const PADDING = 2;
 
 const CONTAINER_WIDTH = 36; // this is size 12 in our theme - need it in px for the canvas
 const CONTAINER_WIDTH_PX = `${CONTAINER_WIDTH}px`;
@@ -35,48 +34,57 @@ export const CanvasEntityPreviewImage = memo(() => {
   );
   const maskColor = useSelector(selectMaskColor);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const cache = useStore(adapter.renderer.$canvasCache);
-  useEffect(() => {
-    if (!canvasRef.current) {
-      return;
-    }
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) {
-      return;
-    }
+  const pixelRect = useStore(adapter.transformer.$pixelRect);
+  const nodeRect = useStore(adapter.transformer.$nodeRect);
+  const canvasCache = useStore(adapter.$canvasCache);
 
-    if (!cache) {
-      // Draw an empty canvas
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      return;
-    }
+  const updatePreview = useMemo(
+    () =>
+      debounce(() => {
+        if (!canvasRef.current) {
+          return;
+        }
+        const ctx = canvasRef.current.getContext('2d');
+        if (!ctx) {
+          return;
+        }
 
-    const { rect, canvas } = cache;
+        const pixelRect = adapter.transformer.$pixelRect.get();
+        const nodeRect = adapter.transformer.$nodeRect.get();
+        const canvasCache = adapter.$canvasCache.get();
 
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        if (!canvasCache || canvasCache.width === 0 || canvasCache.height === 0) {
+          // Draw an empty canvas
+          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+          return;
+        }
 
-    canvasRef.current.width = rect.width;
-    canvasRef.current.height = rect.height;
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
-    const scale = CONTAINER_WIDTH / rect.width;
+        canvasRef.current.width = pixelRect.width;
+        canvasRef.current.height = pixelRect.height;
 
-    const sx = rect.x;
-    const sy = rect.y;
-    const sWidth = rect.width;
-    const sHeight = rect.height;
-    const dx = PADDING / scale;
-    const dy = PADDING / scale;
-    const dWidth = rect.width - (PADDING * 2) / scale;
-    const dHeight = rect.height - (PADDING * 2) / scale;
+        const sx = pixelRect.x - nodeRect.x;
+        const sy = pixelRect.y - nodeRect.y;
+        const sWidth = pixelRect.width;
+        const sHeight = pixelRect.height;
+        const dx = 0;
+        const dy = 0;
+        const dWidth = pixelRect.width;
+        const dHeight = pixelRect.height;
 
-    ctx.drawImage(canvas, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+        ctx.drawImage(canvasCache, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
 
-    if (maskColor) {
-      ctx.fillStyle = maskColor;
-      ctx.globalCompositeOperation = 'source-in';
-      ctx.fillRect(0, 0, rect.width, rect.height);
-    }
-  }, [cache, maskColor]);
+        if (maskColor) {
+          ctx.fillStyle = maskColor;
+          ctx.globalCompositeOperation = 'source-in';
+          ctx.fillRect(0, 0, pixelRect.width, pixelRect.height);
+        }
+      }, 300),
+    [adapter.$canvasCache, adapter.transformer.$nodeRect, adapter.transformer.$pixelRect, maskColor]
+  );
+
+  useEffect(updatePreview, [updatePreview, canvasCache, nodeRect, pixelRect]);
 
   return (
     <Flex
