@@ -21,9 +21,9 @@ from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
-from invokeai.backend.flux.controlnet_extension import ControlNetExtension
 from invokeai.backend.flux.denoise import denoise
-from invokeai.backend.flux.inpaint_extension import InpaintExtension
+from invokeai.backend.flux.extensions.controlnet_extension import ControlNetExtension
+from invokeai.backend.flux.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
     clip_timestep_schedule_fractional,
