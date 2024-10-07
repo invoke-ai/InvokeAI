@@ -56,8 +56,8 @@ def _convert_flux_double_block_sd_from_diffusers_to_bfl_format(
     sd: Dict[str, torch.Tensor], double_block_index: int
 ) -> Dict[str, torch.Tensor]:
     """Convert the state dict for a double block from diffusers format to BFL format."""
-    to_prefix = f"double_blocks.{double_block_index}."
-    from_prefix = f"transformer_blocks.{double_block_index}."
+    to_prefix = f"double_blocks.{double_block_index}"
+    from_prefix = f"transformer_blocks.{double_block_index}"
 
     new_sd: dict[str, torch.Tensor] = {}
 
@@ -128,8 +128,8 @@ def _convert_flux_single_block_sd_from_diffusers_to_bfl_format(
     sd: Dict[str, torch.Tensor], single_block_index: int
 ) -> Dict[str, torch.Tensor]:
     """Convert the state dict for a single block from diffusers format to BFL format."""
-    to_prefix = f"single_blocks.{single_block_index}."
-    from_prefix = f"single_transformer_blocks.{single_block_index}."
+    to_prefix = f"single_blocks.{single_block_index}"
+    from_prefix = f"single_transformer_blocks.{single_block_index}"
 
     new_sd: dict[str, torch.Tensor] = {}
 
@@ -232,9 +232,9 @@ def convert_diffusers_instantx_state_dict_to_bfl_format(sd: Dict[str, torch.Tens
         block_index += 1
 
     # Transfer controlnet keys as-is.
-    for k in sd:
+    for k in list(sd.keys()):
         if k.startswith("controlnet_"):
-            new_sd[k] = sd[k]
+            new_sd[k] = sd.pop(k)
 
     # Assert that all keys have been handled.
     assert len(sd) == 0
