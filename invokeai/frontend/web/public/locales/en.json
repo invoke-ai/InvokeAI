@@ -1652,7 +1652,6 @@
         "rasterLayers_withCount_visible": "Raster Layers ({{count}})",
         "globalReferenceImages_withCount_visible": "Global Reference Images ({{count}})",
         "inpaintMasks_withCount_visible": "Inpaint Masks ({{count}})",
-        "layer": "Layer",
         "layer_one": "Layer",
         "layer_other": "Layers",
         "layer_withCount_one": "Layer ({{count}})",
