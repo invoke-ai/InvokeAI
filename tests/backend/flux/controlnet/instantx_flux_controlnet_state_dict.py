@@ -352,3 +352,23 @@ instantx_sd_shapes = {
     "x_embedder.bias": [3072],
     "x_embedder.weight": [3072, 64],
 }
+
+
+# InstantX FLUX ControlNet config for unit tests.
+# Copied from https://huggingface.co/InstantX/FLUX.1-dev-Controlnet-Union/blob/main/config.json
+instantx_config = {
+    "_class_name": "FluxControlNetModel",
+    "_diffusers_version": "0.30.0.dev0",
+    "_name_or_path": "/mnt/wangqixun/",
+    "attention_head_dim": 128,
+    "axes_dims_rope": [16, 56, 56],
+    "guidance_embeds": True,
+    "in_channels": 64,
+    "joint_attention_dim": 4096,
+    "num_attention_heads": 24,
+    "num_layers": 5,
+    "num_mode": 10,
+    "num_single_layers": 10,
+    "patch_size": 1,
+    "pooled_projection_dim": 768,
+}
