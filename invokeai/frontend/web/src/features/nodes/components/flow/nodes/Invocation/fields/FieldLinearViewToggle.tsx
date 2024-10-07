@@ -45,7 +45,7 @@ const FieldLinearViewToggle = ({ nodeId, fieldName }: Props) => {
         tooltip={t('nodes.addLinearView')}
         aria-label={t('nodes.addLinearView')}
         icon={<PiPlusBold />}
-        onPointerUp={handleExposeField}
+        onClick={handleExposeField}
         pointerEvents="auto"
         size="xs"
       />
@@ -57,7 +57,7 @@ const FieldLinearViewToggle = ({ nodeId, fieldName }: Props) => {
         tooltip={t('nodes.removeLinearView')}
         aria-label={t('nodes.removeLinearView')}
         icon={<PiMinusBold />}
-        onPointerUp={handleUnexposeField}
+        onClick={handleUnexposeField}
         pointerEvents="auto"
         size="xs"
       />

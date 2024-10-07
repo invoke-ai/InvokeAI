@@ -14,12 +14,12 @@ export const CanvasEntityMenuItemsCopyToClipboard = memo(() => {
   const isInteractable = useIsEntityInteractable(entityIdentifier);
   const copyLayerToClipboard = useCopyLayerToClipboard();
 
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     copyLayerToClipboard(adapter);
   }, [copyLayerToClipboard, adapter]);
 
   return (
-    <MenuItem onPointerUp={onPointerUp} icon={<PiCopyBold />} isDisabled={!isInteractable}>
+    <MenuItem onClick={onClick} icon={<PiCopyBold />} isDisabled={!isInteractable}>
       {t('controlLayers.copyToClipboard')}
     </MenuItem>
   );

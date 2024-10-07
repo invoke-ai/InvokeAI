@@ -25,7 +25,7 @@ const ClearFlowButton = () => {
     onClose();
   }, [dispatch, onClose, t]);
 
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     if (!isTouched) {
       handleNewWorkflow();
       return;
@@ -39,7 +39,7 @@ const ClearFlowButton = () => {
         tooltip={t('nodes.clearWorkflow')}
         aria-label={t('nodes.clearWorkflow')}
         icon={<PiTrashSimpleFill />}
-        onPointerUp={onPointerUp}
+        onClick={onClick}
         pointerEvents="auto"
       />
       <ConfirmationAlertDialog

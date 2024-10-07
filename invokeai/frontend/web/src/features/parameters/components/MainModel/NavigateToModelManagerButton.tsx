@@ -25,7 +25,7 @@ export const NavigateToModelManagerButton = memo((props: Omit<IconButtonProps, '
       icon={<PiGearSixFill />}
       tooltip={`${t('common.goTo')} ${t('ui.tabs.modelsTab')}`}
       aria-label={`${t('common.goTo')} ${t('ui.tabs.modelsTab')}`}
-      onPointerUp={handleClick}
+      onClick={handleClick}
       size="sm"
       variant="ghost"
       {...props}

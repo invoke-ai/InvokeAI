@@ -84,7 +84,7 @@ export const BoardsList = ({ isPrivate }: Props) => {
         bg="base.900"
       >
         {allowPrivateBoards ? (
-          <Button variant="unstyled" onPointerUp={onToggle}>
+          <Button variant="unstyled" onClick={onToggle}>
             <Flex gap="2" alignItems="center">
               <Icon
                 boxSize={4}

@@ -20,19 +20,19 @@ export const ImageMenuItemMetadataRecallActions = memo(() => {
 
   return (
     <>
-      <MenuItem icon={<PiArrowsCounterClockwiseBold />} onPointerUpCapture={remix} isDisabled={!hasMetadata}>
+      <MenuItem icon={<PiArrowsCounterClockwiseBold />} onClickCapture={remix} isDisabled={!hasMetadata}>
         {t('parameters.remixImage')}
       </MenuItem>
-      <MenuItem icon={<PiQuotesBold />} onPointerUpCapture={recallPrompts} isDisabled={!hasPrompts}>
+      <MenuItem icon={<PiQuotesBold />} onClickCapture={recallPrompts} isDisabled={!hasPrompts}>
         {t('parameters.usePrompt')}
       </MenuItem>
-      <MenuItem icon={<PiPlantBold />} onPointerUpCapture={recallSeed} isDisabled={!hasSeed}>
+      <MenuItem icon={<PiPlantBold />} onClickCapture={recallSeed} isDisabled={!hasSeed}>
         {t('parameters.useSeed')}
       </MenuItem>
-      <MenuItem icon={<PiAsteriskBold />} onPointerUpCapture={recallAll} isDisabled={!hasMetadata}>
+      <MenuItem icon={<PiAsteriskBold />} onClickCapture={recallAll} isDisabled={!hasMetadata}>
         {t('parameters.useAll')}
       </MenuItem>
-      <MenuItem icon={<PiPaintBrushBold />} onPointerUpCapture={createAsPreset} isDisabled={!hasPrompts}>
+      <MenuItem icon={<PiPaintBrushBold />} onClickCapture={createAsPreset} isDisabled={!hasPrompts}>
         {t('stylePresets.useForTemplate')}
       </MenuItem>
     </>

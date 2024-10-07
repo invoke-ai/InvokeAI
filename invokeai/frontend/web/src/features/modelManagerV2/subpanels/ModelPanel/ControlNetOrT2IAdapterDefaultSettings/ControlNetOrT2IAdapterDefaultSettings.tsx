@@ -71,7 +71,7 @@ export const ControlNetOrT2IAdapterDefaultSettings = memo(({ modelConfig }: Prop
           leftIcon={<PiCheckBold />}
           colorScheme="invokeYellow"
           isDisabled={!formState.isDirty}
-          onPointerUp={handleSubmit(onSubmit)}
+          onClick={handleSubmit(onSubmit)}
           isLoading={isLoadingUpdateModel}
         >
           {t('common.save')}

@@ -21,7 +21,7 @@ export const UseDefaultSettingsButton = () => {
       tooltip={t('modelManager.useDefaultSettings')}
       aria-label={t('modelManager.useDefaultSettings')}
       isDisabled={!model}
-      onPointerUp={handleClickDefaultSettings}
+      onClick={handleClickDefaultSettings}
       size="sm"
       variant="ghost"
     />

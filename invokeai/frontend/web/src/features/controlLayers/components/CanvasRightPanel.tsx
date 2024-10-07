@@ -20,7 +20,7 @@ export const CanvasRightPanel = memo(() => {
   const { t } = useTranslation();
   const tabIndex = useStore($canvasRightPanelTabIndex);
   const imageViewer = useImageViewer();
-  const onPointerUpViewerToggleButton = useCallback(() => {
+  const onClickViewerToggleButton = useCallback(() => {
     if ($canvasRightPanelTabIndex.get() !== 1) {
       $canvasRightPanelTabIndex.set(1);
     }
@@ -38,7 +38,7 @@ export const CanvasRightPanel = memo(() => {
       <TabList alignItems="center">
         <PanelTabs />
         <Spacer />
-        <Button size="sm" variant="ghost" onPointerUp={onPointerUpViewerToggleButton}>
+        <Button size="sm" variant="ghost" onClick={onClickViewerToggleButton}>
           {imageViewer.isOpen ? t('gallery.closeViewer') : t('gallery.openViewer')}
         </Button>
       </TabList>

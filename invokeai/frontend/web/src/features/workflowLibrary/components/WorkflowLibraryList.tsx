@@ -161,7 +161,7 @@ const WorkflowLibraryList = () => {
             <Button
               key={category}
               variant={selectedCategory === category ? undefined : 'ghost'}
-              onPointerUp={handleSetCategory.bind(null, category)}
+              onClick={handleSetCategory.bind(null, category)}
               isChecked={selectedCategory === category}
             >
               {t(`workflows.${category}Workflows`)}
@@ -208,7 +208,7 @@ const WorkflowLibraryList = () => {
           {query.trim().length && (
             <InputRightElement h="full" pe={2}>
               <IconButton
-                onPointerUp={resetFilterText}
+                onClick={resetFilterText}
                 size="sm"
                 variant="link"
                 aria-label={t('workflows.clearWorkflowSearchFilter')}

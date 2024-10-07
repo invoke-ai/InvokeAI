@@ -13,12 +13,12 @@ export const CanvasEntityMenuItemsDuplicate = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
   const isInteractable = useIsEntityInteractable(entityIdentifier);
 
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     dispatch(entityDuplicated({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
 
   return (
-    <MenuItem onPointerUp={onPointerUp} icon={<PiCopyFill />} isDisabled={!isInteractable}>
+    <MenuItem onClick={onClick} icon={<PiCopyFill />} isDisabled={!isInteractable}>
       {t('controlLayers.duplicate')}
     </MenuItem>
   );

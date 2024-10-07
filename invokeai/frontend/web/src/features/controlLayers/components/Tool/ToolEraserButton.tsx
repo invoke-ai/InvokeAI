@@ -27,7 +27,7 @@ export const ToolEraserButton = memo(() => {
         icon={<PiEraserBold />}
         colorScheme={isSelected ? 'invokeBlue' : 'base'}
         variant="solid"
-        onPointerUp={selectEraser}
+        onClick={selectEraser}
       />
     </Tooltip>
   );

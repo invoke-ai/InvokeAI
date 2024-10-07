@@ -17,12 +17,12 @@ import { Trans, useTranslation } from 'react-i18next';
 
 const ActivateImageViewerButton = (props: PropsWithChildren) => {
   const imageViewer = useImageViewer();
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     imageViewer.open();
     selectCanvasRightPanelGalleryTab();
   }, [imageViewer]);
   return (
-    <Button onPointerUp={onPointerUp} size="sm" variant="link" color="base.50">
+    <Button onClick={onClick} size="sm" variant="link" color="base.50">
       {props.children}
     </Button>
   );
@@ -58,13 +58,13 @@ export const CanvasAlertsSendingToGallery = () => {
 const ActivateCanvasButton = (props: PropsWithChildren) => {
   const dispatch = useAppDispatch();
   const imageViewer = useImageViewer();
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     dispatch(setActiveTab('canvas'));
     selectCanvasRightPanelLayersTab();
     imageViewer.close();
   }, [dispatch, imageViewer]);
   return (
-    <Button onPointerUp={onPointerUp} size="sm" variant="link" color="base.50">
+    <Button onClick={onClick} size="sm" variant="link" color="base.50">
       {props.children}
     </Button>
   );

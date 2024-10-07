@@ -7,7 +7,7 @@ type Props = {
   label: string;
   tooltip: ReactNode;
   icon?: ReactElement;
-  onPointerUp?: () => void;
+  onClick?: () => void;
   isDisabled?: boolean;
   colorScheme: ThemeTypings['colorSchemes'];
   asIconButton?: boolean;
@@ -20,7 +20,7 @@ const QueueButton = ({
   label,
   tooltip,
   icon,
-  onPointerUp,
+  onClick,
   isDisabled,
   colorScheme,
   asIconButton,
@@ -34,7 +34,7 @@ const QueueButton = ({
         aria-label={label}
         tooltip={tooltip}
         icon={icon}
-        onPointerUp={onPointerUp}
+        onClick={onClick}
         isDisabled={isDisabled}
         colorScheme={colorScheme}
         isLoading={isLoading}
@@ -49,7 +49,7 @@ const QueueButton = ({
       aria-label={label}
       tooltip={tooltip}
       leftIcon={icon}
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       isDisabled={isDisabled}
       colorScheme={colorScheme}
       isLoading={isLoading}

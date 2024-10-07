@@ -16,7 +16,7 @@ export const CanvasToolbarSaveToGalleryButton = memo(() => {
     <IconButton
       variant="link"
       alignSelf="stretch"
-      onPointerUp={shift ? saveBboxToGallery : saveCanvasToGallery}
+      onClick={shift ? saveBboxToGallery : saveCanvasToGallery}
       icon={<PiFloppyDiskBold />}
       aria-label={shift ? t('controlLayers.saveBboxToGallery') : t('controlLayers.saveCanvasToGallery')}
       tooltip={shift ? t('controlLayers.saveBboxToGallery') : t('controlLayers.saveCanvasToGallery')}

@@ -38,7 +38,7 @@ SettingsDeveloperLogNamespaces.displayName = 'SettingsDeveloperLogNamespaces';
 const LogLevelTag = ({ namespace, isEnabled }: { namespace: LogNamespace; isEnabled: boolean }) => {
   const { t } = useTranslation();
   const dispatch = useDispatch();
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     dispatch(logNamespaceToggled(namespace));
   }, [dispatch, namespace]);
 
@@ -46,7 +46,7 @@ const LogLevelTag = ({ namespace, isEnabled }: { namespace: LogNamespace; isEnab
     <Tag
       h="min-content"
       borderRadius="base"
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       colorScheme={isEnabled ? 'invokeBlue' : 'base'}
       userSelect="none"
       role="button"

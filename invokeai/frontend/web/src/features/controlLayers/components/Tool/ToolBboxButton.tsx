@@ -27,7 +27,7 @@ export const ToolBboxButton = memo(() => {
         icon={<PiBoundingBoxBold />}
         colorScheme={isSelected ? 'invokeBlue' : 'base'}
         variant="solid"
-        onPointerUp={selectBbox}
+        onClick={selectBbox}
       />
     </Tooltip>
   );

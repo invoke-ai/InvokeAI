@@ -12,7 +12,7 @@ export const EntityListSelectedEntityActionBarDuplicateButton = memo(() => {
   const dispatch = useAppDispatch();
   const isBusy = useCanvasIsBusy();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     if (!selectedEntityIdentifier) {
       return;
     }
@@ -21,7 +21,7 @@ export const EntityListSelectedEntityActionBarDuplicateButton = memo(() => {
 
   return (
     <IconButton
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       isDisabled={!selectedEntityIdentifier || isBusy}
       size="sm"
       variant="link"

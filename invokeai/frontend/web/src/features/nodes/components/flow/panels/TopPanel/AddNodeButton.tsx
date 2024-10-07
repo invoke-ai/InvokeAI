@@ -13,7 +13,7 @@ const AddNodeButton = () => {
       tooltip={t('nodes.addNodeToolTip')}
       aria-label={t('nodes.addNode')}
       icon={<PiPlusBold />}
-      onPointerUp={addNodeCmdk.setTrue}
+      onClick={addNodeCmdk.setTrue}
       pointerEvents="auto"
     />
   );

@@ -124,7 +124,7 @@ export class CanvasToolBrush extends CanvasModuleBase {
 
     const settings = this.manager.stateApi.getSettings();
     const brushPreviewFill = this.manager.stateApi.getBrushPreviewColor();
-    const alignedCursorPos = alignCoordForTool(cursorPos, settings.brushWidth);
+    const alignedCursorPos = alignCoordForTool(cursorPos.relative, settings.brushWidth);
     const radius = settings.brushWidth / 2;
 
     // The circle is scaled
@@ -141,14 +141,14 @@ export class CanvasToolBrush extends CanvasModuleBase {
     const twoPixels = this.manager.stage.unscale(2);
 
     this.konva.innerBorder.setAttrs({
-      x: cursorPos.x,
-      y: cursorPos.y,
+      x: cursorPos.relative.x,
+      y: cursorPos.relative.y,
       innerRadius: radius,
       outerRadius: radius + onePixel,
     });
     this.konva.outerBorder.setAttrs({
-      x: cursorPos.x,
-      y: cursorPos.y,
+      x: cursorPos.relative.x,
+      y: cursorPos.relative.y,
       innerRadius: radius + onePixel,
       outerRadius: radius + twoPixels,
     });
