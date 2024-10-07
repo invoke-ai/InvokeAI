@@ -10,7 +10,7 @@ from safetensors.torch import load_file
 from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.services.config.config_default import get_config
-from invokeai.backend.flux.controlnet.diffusers_controlnet_flux import DiffusersControlNetFlux
+from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
 from invokeai.backend.flux.controlnet.state_dict_utils import (
     convert_diffusers_instantx_state_dict_to_bfl_format,
     infer_flux_params_from_state_dict,
@@ -341,7 +341,7 @@ class FluxControlnetModel(ModelLoader):
         num_control_modes = infer_instantx_num_control_modes_from_state_dict(sd)
 
         with accelerate.init_empty_weights():
-            model = DiffusersControlNetFlux(flux_params, num_control_modes)
+            model = InstantXControlNetFlux(flux_params, num_control_modes)
 
         model.load_state_dict(sd, assign=True)
         return model

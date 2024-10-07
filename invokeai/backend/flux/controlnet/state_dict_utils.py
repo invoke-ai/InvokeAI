@@ -173,11 +173,11 @@ def _convert_flux_single_block_sd_from_diffusers_to_bfl_format(
 
 def convert_diffusers_instantx_state_dict_to_bfl_format(sd: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
     """Convert an InstantX ControlNet state dict to the format that can be loaded by our internal
-    DiffusersControlNetFlux.
+    InstantXControlNetFlux model.
 
     The original InstantX ControlNet model was developed to be used in diffusers. We have ported the original
-    implementation to DiffusersControlNetFlux to make it compatible with BFL-style models. This function converts the
-    original state dict to the format expected by DiffusersControlNetFlux.
+    implementation to InstantXControlNetFlux to make it compatible with BFL-style models. This function converts the
+    original state dict to the format expected by InstantXControlNetFlux.
     """
     # Shallow copy sd so that we can pop keys from it without modifying the original.
     sd = sd.copy()
