@@ -78,7 +78,7 @@ export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase
   getCanvas = (rect?: Rect): HTMLCanvasElement => {
     // The opacity may have been changed in response to user selecting a different entity category, and the mask regions
     // should be fully opaque - set opacity to 1 before rendering the canvas
-    const attrs: GroupConfig = { opacity: 1 };
+    const attrs: GroupConfig = { opacity: 1, filters: [] };
     const canvas = this.renderer.getCanvas({ rect, attrs });
     return canvas;
   };

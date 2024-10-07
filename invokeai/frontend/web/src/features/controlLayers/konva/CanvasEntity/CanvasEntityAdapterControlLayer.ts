@@ -69,7 +69,7 @@ export class CanvasEntityAdapterControlLayer extends CanvasEntityAdapterBase<
     this.log.trace({ rect }, 'Getting canvas');
     // The opacity may have been changed in response to user selecting a different entity category, so we must restore
     // the original opacity before rendering the canvas
-    const attrs: GroupConfig = { opacity: this.state.opacity };
+    const attrs: GroupConfig = { opacity: this.state.opacity, filters: [] };
     const canvas = this.renderer.getCanvas({ rect, attrs });
     return canvas;
   };
