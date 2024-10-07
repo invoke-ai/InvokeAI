@@ -65,7 +65,7 @@
         "blue": "Blu",
         "alpha": "Alfa",
         "copy": "Copia",
-        "on": "Attivato",
+        "on": "Acceso",
         "checkpoint": "Checkpoint",
         "safetensors": "Safetensors",
         "ai": "ia",
@@ -85,7 +85,7 @@
         "openInViewer": "Apri nel visualizzatore",
         "apply": "Applica",
         "loadingImage": "Caricamento immagine",
-        "off": "Disattivato",
+        "off": "Spento",
         "edit": "Modifica",
         "placeholderSelectAModel": "Seleziona un modello",
         "reset": "Reimposta",
@@ -590,8 +590,8 @@
         "scale": "Scala",
         "imageFit": "Adatta l'immagine iniziale alle dimensioni di output",
         "scaleBeforeProcessing": "Scala prima dell'elaborazione",
-        "scaledWidth": "Larghezza ridimensionata",
-        "scaledHeight": "Altezza ridimensionata",
+        "scaledWidth": "Larghezza scalata",
+        "scaledHeight": "Altezza scalata",
         "infillMethod": "Metodo di riempimento",
         "tileSize": "Dimensione piastrella",
         "downloadImage": "Scarica l'immagine",
@@ -1718,7 +1718,81 @@
             "autoProcess": "Processo automatico",
             "filterType": "Tipo Filtro",
             "filter": "Filtro",
-            "filters": "Filtri"
+            "filters": "Filtri",
+            "mlsd_detection": {
+                "score_threshold": "Soglia di punteggio",
+                "distance_threshold": "Soglia di distanza",
+                "description": "Genera una mappa dei segmenti di linea dal livello selezionato utilizzando il modello di rilevamento dei segmenti di linea MLSD."
+            },
+            "content_shuffle": {
+                "label": "Mescola contenuto",
+                "scale_factor": "Fattore di scala",
+                "description": "Mescola il contenuto del livello selezionato, in modo simile all'effetto \"liquefa\"."
+            },
+            "mediapipe_face_detection": {
+                "min_confidence": "Confidenza minima",
+                "label": "Rilevamento del volto MediaPipe",
+                "max_faces": "Max volti",
+                "description": "Rileva i volti nel livello selezionato utilizzando il modello di rilevamento dei volti MediaPipe."
+            },
+            "dw_openpose_detection": {
+                "draw_face": "Disegna il volto",
+                "description": "Rileva le pose umane nel livello selezionato utilizzando il modello DW Openpose.",
+                "label": "Rilevamento DW Openpose",
+                "draw_hands": "Disegna le mani",
+                "draw_body": "Disegna il corpo"
+            },
+            "normal_map": {
+                "description": "Genera una mappa delle normali dal livello selezionato.",
+                "label": "Mappa delle normali"
+            },
+            "lineart_edge_detection": {
+                "label": "Rilevamento bordi Lineart",
+                "coarse": "Grossolano",
+                "description": "Genera una mappa dei bordi dal livello selezionato utilizzando il modello di rilevamento dei bordi Lineart."
+            },
+            "depth_anything_depth_estimation": {
+                "model_size_small": "Piccolo",
+                "model_size_small_v2": "Piccolo v2",
+                "model_size": "Dimensioni modello",
+                "model_size_large": "Grande",
+                "model_size_base": "Base",
+                "description": "Genera una mappa di profondità dal livello selezionato utilizzando un modello Depth Anything."
+            },
+            "color_map": {
+                "label": "Mappa colore",
+                "description": "Crea una mappa dei colori dal livello selezionato.",
+                "tile_size": "Dimens. Piastrella"
+            },
+            "canny_edge_detection": {
+                "high_threshold": "Soglia superiore",
+                "low_threshold": "Soglia inferiore",
+                "description": "Genera una mappa dei bordi dal livello selezionato utilizzando l'algoritmo di rilevamento dei bordi Canny.",
+                "label": "Rilevamento bordi Canny"
+            },
+            "spandrel_filter": {
+                "scale": "Scala di destinazione",
+                "autoScaleDesc": "Il modello selezionato verrà eseguito fino al raggiungimento della scala di destinazione.",
+                "description": "Esegue un modello immagine-a-immagine sul livello selezionato.",
+                "label": "Modello Immagine-a-Immagine",
+                "model": "Modello",
+                "autoScale": "Auto Scala"
+            },
+            "pidi_edge_detection": {
+                "quantize_edges": "Quantizza i bordi",
+                "scribble": "Scarabocchio",
+                "description": "Genera una mappa dei bordi dal livello selezionato utilizzando il modello di rilevamento dei bordi PiDiNet.",
+                "label": "Rilevamento bordi PiDiNet"
+            },
+            "hed_edge_detection": {
+                "label": "Rilevamento bordi HED",
+                "description": "Genera una mappa dei bordi dal livello selezionato utilizzando il modello di rilevamento dei bordi HED.",
+                "scribble": "Scarabocchio"
+            },
+            "lineart_anime_edge_detection": {
+                "description": "Genera una mappa dei bordi dal livello selezionato utilizzando il modello di rilevamento dei bordi Lineart Anime.",
+                "label": "Rilevamento bordi Lineart Anime"
+            }
         },
         "controlLayers_withCount_hidden": "Livelli di controllo ({{count}} nascosti)",
         "regionalGuidance_withCount_hidden": "Guida regionale ({{count}} nascosti)",
@@ -1762,7 +1836,65 @@
         "newGallerySession": "Nuova sessione Galleria",
         "newGallerySessionDesc": "Questo cancellerà la tela e tutte le impostazioni, eccetto la selezione del modello. Le generazioni saranno inviate alla galleria.",
         "newCanvasSession": "Nuova sessione Tela",
-        "deleteSelected": "Elimina selezione"
+        "deleteSelected": "Elimina selezione",
+        "settings": {
+            "isolatedFilteringPreview": "Anteprima del filtraggio isolata",
+            "isolatedStagingPreview": "Anteprima di generazione isolata",
+            "isolatedTransformingPreview": "Anteprima di trasformazione isolata",
+            "isolatedPreview": "Anteprima isolata",
+            "invertBrushSizeScrollDirection": "Inverti scorrimento per dimensione pennello",
+            "snapToGrid": {
+                "label": "Aggancia alla griglia",
+                "on": "Acceso",
+                "off": "Spento"
+            },
+            "pressureSensitivity": "Sensibilità alla pressione",
+            "preserveMask": {
+                "alert": "Preservare la regione mascherata",
+                "label": "Preserva la regione mascherata"
+            }
+        },
+        "transform": {
+            "reset": "Reimposta",
+            "fitToBbox": "Adatta al Riquadro",
+            "transform": "Trasforma",
+            "apply": "Applica",
+            "cancel": "Annulla"
+        },
+        "stagingArea": {
+            "next": "Successiva",
+            "discard": "Scarta",
+            "discardAll": "Scarta tutto",
+            "accept": "Accetta",
+            "saveToGallery": "Salva nella Galleria",
+            "previous": "Precedente",
+            "showResultsOn": "Risultati visualizzati",
+            "showResultsOff": "Risultati nascosti"
+        },
+        "HUD": {
+            "bbox": "Riquadro di delimitazione",
+            "entityStatus": {
+                "isHidden": "{{title}} è nascosto",
+                "isLocked": "{{title}} è bloccato",
+                "isTransforming": "{{title}} sta trasformando",
+                "isFiltering": "{{title}} sta filtrando",
+                "isEmpty": "{{title}} è vuoto",
+                "isDisabled": "{{title}} è disabilitato"
+            },
+            "scaledBbox": "Riquadro scalato"
+        },
+        "canvasContextMenu": {
+            "newControlLayer": "Nuovo Livello di Controllo",
+            "newRegionalReferenceImage": "Nuova immagine di riferimento Regionale",
+            "newGlobalReferenceImage": "Nuova immagine di riferimento Globale",
+            "bboxGroup": "Crea dal riquadro di delimitazione",
+            "saveBboxToGallery": "Salva il riquadro nella Galleria",
+            "cropCanvasToBbox": "Ritaglia la Tela al riquadro",
+            "canvasGroup": "Tela",
+            "newRasterLayer": "Nuovo Livello Raster",
+            "saveCanvasToGallery": "Salva la Tela nella Galleria",
+            "saveToGalleryGroup": "Salva nella Galleria"
+        }
     },
     "ui": {
         "tabs": {
@@ -1774,7 +1906,8 @@
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
             "queue": "Coda",
             "upscaling": "Amplia",
-            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)"
+            "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
+            "gallery": "Galleria"
         }
     },
     "upscaling": {
@@ -1844,5 +1977,45 @@
         "noTemplates": "Nessun modello",
         "acceptedColumnsKeys": "Colonne/chiavi accettate:",
         "promptTemplateCleared": "Modello di prompt cancellato"
+    },
+    "newUserExperience": {
+        "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
+        "toGetStarted": "Per iniziare, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
+    },
+    "whatsNew": {
+        "canvasV2Announcement": {
+            "readReleaseNotes": "Leggi le Note di Rilascio",
+            "fluxSupport": "Supporto per la famiglia di modelli Flux",
+            "newCanvas": "Una nuova potente tela di controllo",
+            "watchReleaseVideo": "Guarda il video di rilascio",
+            "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
+            "newLayerTypes": "Nuovi tipi di livello per un miglior controllo"
+        },
+        "whatsNewInInvoke": "Novità in Invoke"
+    },
+    "system": {
+        "logLevel": {
+            "info": "Info",
+            "warn": "Avviso",
+            "fatal": "Fatale",
+            "error": "Errore",
+            "debug": "Debug",
+            "trace": "Traccia",
+            "logLevel": "Livello di registro"
+        },
+        "logNamespaces": {
+            "workflows": "Flussi di lavoro",
+            "generation": "Generazione",
+            "canvas": "Tela",
+            "config": "Configurazione",
+            "models": "Modelli",
+            "gallery": "Galleria",
+            "queue": "Coda",
+            "events": "Eventi",
+            "system": "Sistema",
+            "metadata": "Metadati",
+            "logNamespaces": "Elementi del registro"
+        },
+        "enableLogging": "Abilita la registrazione"
     }
 }
