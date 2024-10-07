@@ -2,12 +2,24 @@
 # https://github.com/XLabs-AI/x-flux/blob/47495425dbed499be1e8e5a6e52628b07349cba2/src/flux/controlnet.py
 
 
+from dataclasses import dataclass
+
 import torch
 from einops import rearrange
 
 from invokeai.backend.flux.controlnet.zero_module import zero_module
 from invokeai.backend.flux.model import FluxParams
 from invokeai.backend.flux.modules.layers import DoubleStreamBlock, EmbedND, MLPEmbedder, timestep_embedding
+
+
+@dataclass
+class XLabsControlNetFluxOutput:
+    controlnet_double_block_residuals: list[torch.Tensor] | None
+
+    def apply_weight(self, weight: float):
+        if self.controlnet_double_block_residuals is not None:
+            for i in range(len(self.controlnet_double_block_residuals)):
+                self.controlnet_double_block_residuals[i] = self.controlnet_double_block_residuals[i] * weight
 
 
 class XLabsControlNetFlux(torch.nn.Module):
@@ -88,7 +100,7 @@ class XLabsControlNetFlux(torch.nn.Module):
         timesteps: torch.Tensor,
         y: torch.Tensor,
         guidance: torch.Tensor | None = None,
-    ) -> list[torch.Tensor]:
+    ) -> XLabsControlNetFluxOutput:
         if img.ndim != 3 or txt.ndim != 3:
             raise ValueError("Input img and txt tensors must have 3 dimensions.")
 
@@ -120,4 +132,4 @@ class XLabsControlNetFlux(torch.nn.Module):
             block_res_sample = controlnet_block(block_res_sample)
             controlnet_block_res_samples.append(block_res_sample)
 
-        return controlnet_block_res_samples
+        return XLabsControlNetFluxOutput(controlnet_double_block_residuals=controlnet_block_res_samples)

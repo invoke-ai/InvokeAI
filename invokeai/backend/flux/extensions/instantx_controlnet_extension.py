@@ -1,37 +1,46 @@
-import math
 from typing import List, Union
 
 import torch
 from PIL.Image import Image
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
+from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES, prepare_control_image
-from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
+from invokeai.backend.flux.controlnet.instantx_controlnet_flux import (
+    InstantXControlNetFlux,
+    InstantXControlNetFluxOutput,
+)
+from invokeai.backend.flux.extensions.base_controlnet_extension import BaseControlNetExtension
+from invokeai.backend.model_manager.load.load_base import LoadedModel
 
 
-class ControlNetExtension:
+class InstantXControlNetExtension(BaseControlNetExtension):
     def __init__(
         self,
-        model: XLabsControlNetFlux,
+        model: InstantXControlNetFlux,
         controlnet_cond: torch.Tensor,
+        instantx_control_mode: torch.Tensor | None,
         weight: Union[float, List[float]],
         begin_step_percent: float,
         end_step_percent: float,
     ):
+        super().__init__(
+            weight=weight,
+            begin_step_percent=begin_step_percent,
+            end_step_percent=end_step_percent,
+        )
         self._model = model
-        # _controlnet_cond is the control image passed to the ControlNet model.
-        # Pixel values are in the range [-1, 1]. Shape: (batch_size, 3, height, width).
         self._controlnet_cond = controlnet_cond
-
-        self._weight = weight
-        self._begin_step_percent = begin_step_percent
-        self._end_step_percent = end_step_percent
+        # TODO(ryand): Should we define an enum for the instantx_control_mode? Is it likely to change for future models?
+        self._instantx_control_mode = instantx_control_mode
 
     @classmethod
     def from_controlnet_image(
         cls,
-        model: XLabsControlNetFlux,
+        model: InstantXControlNetFlux,
         controlnet_image: Image,
+        instantx_control_mode: torch.Tensor | None,
+        vae_info: LoadedModel,
         latent_height: int,
         latent_width: int,
         dtype: torch.dtype,
@@ -45,7 +54,7 @@ class ControlNetExtension:
         image_height = latent_height * LATENT_SCALE_FACTOR
         image_width = latent_width * LATENT_SCALE_FACTOR
 
-        controlnet_cond = prepare_control_image(
+        resized_controlnet_image = prepare_control_image(
             image=controlnet_image,
             do_classifier_free_guidance=False,
             width=image_width,
@@ -56,12 +65,13 @@ class ControlNetExtension:
             resize_mode=resize_mode,
         )
 
-        # Map pixel values from [0, 1] to [-1, 1].
-        controlnet_cond = controlnet_cond * 2 - 1
+        # Run VAE encoder.
+        controlnet_cond = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=resized_controlnet_image)
 
         return cls(
             model=model,
             controlnet_cond=controlnet_cond,
+            instantx_control_mode=instantx_control_mode,
             weight=weight,
             begin_step_percent=begin_step_percent,
             end_step_percent=end_step_percent,
@@ -78,17 +88,16 @@ class ControlNetExtension:
         y: torch.Tensor,
         timesteps: torch.Tensor,
         guidance: torch.Tensor | None,
-    ) -> list[torch.Tensor] | None:
-        first_step = math.floor(self._begin_step_percent * total_num_timesteps)
-        last_step = math.ceil(self._end_step_percent * total_num_timesteps)
-        if timestep_index < first_step or timestep_index > last_step:
-            return
-        weight = self._weight
+    ) -> InstantXControlNetFluxOutput | None:
+        weight = self._get_weight(timestep_index=timestep_index, total_num_timesteps=total_num_timesteps)
+        if weight < 1e-6:
+            return None
 
-        controlnet_block_res_samples = self._model(
+        output: InstantXControlNetFluxOutput = self._model(
+            controlnet_cond=self._controlnet_cond,
+            controlnet_mode=self._instantx_control_mode,
             img=img,
             img_ids=img_ids,
-            controlnet_cond=self._controlnet_cond,
             txt=txt,
             txt_ids=txt_ids,
             timesteps=timesteps,
@@ -96,8 +105,5 @@ class ControlNetExtension:
             guidance=guidance,
         )
 
-        # Apply weight to the residuals.
-        for block_res_sample in controlnet_block_res_samples:
-            block_res_sample *= weight
-
-        return controlnet_block_res_samples
+        output.apply_weight(weight)
+        return output
