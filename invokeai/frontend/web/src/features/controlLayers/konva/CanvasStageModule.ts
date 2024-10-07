@@ -411,16 +411,18 @@ export class CanvasStageModule extends CanvasModuleBase {
   /**
    * Gets the rectangle of the stage in the absolute coordinates. This can be used to draw a rect that covers the
    * entire stage.
+   * @param snapToInteger Whether to snap the values to integers. Default is true. This is useful when the stage is
+   * scaled in such a way that the absolute (screen) coordinates or dimensions are not integers.
    */
-  getScaledStageRect = (): Rect => {
+  getScaledStageRect = (snapToInteger: boolean = true): Rect => {
     const { x, y } = this.getPosition();
     const { width, height } = this.getSize();
     const scale = this.getScale();
     return {
-      x: -x / scale,
-      y: -y / scale,
-      width: width / scale,
-      height: height / scale,
+      x: snapToInteger ? Math.floor(-x / scale) : -x / scale,
+      y: snapToInteger ? Math.floor(-y / scale) : -y / scale,
+      width: snapToInteger ? Math.ceil(width / scale) : width / scale,
+      height: snapToInteger ? Math.ceil(height / scale) : height / scale,
     };
   };
 
