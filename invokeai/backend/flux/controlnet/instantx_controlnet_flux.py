@@ -18,7 +18,7 @@ from invokeai.backend.flux.modules.layers import (
 
 
 @dataclass
-class DiffusersControlNetFluxOutput:
+class InstantXControlNetFluxOutput:
     controlnet_block_samples: list[torch.Tensor] | None
     controlnet_single_block_samples: list[torch.Tensor] | None
 
@@ -36,7 +36,7 @@ class DiffusersControlNetFluxOutput:
 # - axes_dims_rope: axes_dim
 
 
-class DiffusersControlNetFlux(torch.nn.Module):
+class InstantXControlNetFlux(torch.nn.Module):
     def __init__(self, params: FluxParams, num_control_modes: int | None = None):
         """
         Args:
@@ -114,7 +114,7 @@ class DiffusersControlNetFlux(torch.nn.Module):
         timesteps: torch.Tensor,
         y: torch.Tensor,
         guidance: torch.Tensor | None = None,
-    ) -> DiffusersControlNetFluxOutput:
+    ) -> InstantXControlNetFluxOutput:
         if img.ndim != 3 or txt.ndim != 3:
             raise ValueError("Input img and txt tensors must have 3 dimensions.")
 
@@ -168,7 +168,7 @@ class DiffusersControlNetFlux(torch.nn.Module):
             single_block_sample = controlnet_block(single_block_sample)
             controlnet_single_block_samples.append(single_block_sample)
 
-        return DiffusersControlNetFluxOutput(
+        return InstantXControlNetFluxOutput(
             controlnet_block_samples=controlnet_double_block_samples or None,
             controlnet_single_block_samples=controlnet_single_block_samples or None,
         )
