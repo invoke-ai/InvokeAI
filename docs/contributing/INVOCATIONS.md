@@ -144,7 +144,7 @@ As you might have noticed, we added two new arguments to the `InputField`
 definition for `width` and `height`, called `gt` and `le`. They stand for
 _greater than or equal to_ and _less than or equal to_.
 
-These impose contraints on those fields, and will raise an exception if the
+These impose constraints on those fields, and will raise an exception if the
 values do not meet the constraints. Field constraints are provided by
 **pydantic**, so anything you see in the **pydantic docs** will work.
 

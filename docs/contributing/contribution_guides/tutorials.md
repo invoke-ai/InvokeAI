@@ -1,6 +1,6 @@
 # Tutorials
 
-Tutorials help new & existing users expand their abilty to use InvokeAI to the full extent of our features and services.  
+Tutorials help new & existing users expand their ability to use InvokeAI to the full extent of our features and services.  
 
 Currently, we have a set of tutorials available on our [YouTube channel](https://www.youtube.com/@invokeai), but as InvokeAI continues to evolve with new updates, we want to ensure that we are giving our users the resources they need to succeed. 
 

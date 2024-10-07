@@ -239,7 +239,7 @@ Consult the
 get it set up.
 
 Suggest using VSCode's included settings sync so that your remote dev host has
-all the same app settings and extensions automagically.
+all the same app settings and extensions automatically.
 
 ##### One remote dev gotcha
 
