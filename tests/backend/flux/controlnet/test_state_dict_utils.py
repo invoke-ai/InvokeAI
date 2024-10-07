@@ -1,6 +1,7 @@
 import pytest
 import torch
 
+from invokeai.backend.flux.controlnet.diffusers_controlnet_flux import DiffusersControlNetFlux
 from invokeai.backend.flux.controlnet.state_dict_utils import (
     convert_diffusers_instantx_state_dict_to_bfl_format,
     infer_flux_params_from_state_dict,
@@ -46,7 +47,7 @@ def test_convert_diffusers_instantx_state_dict_to_bfl_format():
 
 
 def test_infer_flux_params_from_state_dict():
-    # Construct a dummy state_dict with tensor of the correct shape on the meta device.
+    # Construct a dummy state_dict with tensors of the correct shape on the meta device.
     with torch.device("meta"):
         sd = {k: torch.zeros(v) for k, v in instantx_sd_shapes.items()}
 
@@ -68,7 +69,7 @@ def test_infer_flux_params_from_state_dict():
 
 
 def test_infer_instantx_num_control_modes_from_state_dict():
-    # Construct a dummy state_dict with tensor of the correct shape on the meta device.
+    # Construct a dummy state_dict with tensors of the correct shape on the meta device.
     with torch.device("meta"):
         sd = {k: torch.zeros(v) for k, v in instantx_sd_shapes.items()}
 
@@ -76,3 +77,23 @@ def test_infer_instantx_num_control_modes_from_state_dict():
     num_control_modes = infer_instantx_num_control_modes_from_state_dict(sd)
 
     assert num_control_modes == instantx_config["num_mode"]
+
+
+def test_load_instantx_from_state_dict():
+    # Construct a dummy state_dict with tensors of the correct shape on the meta device.
+    with torch.device("meta"):
+        sd = {k: torch.zeros(v) for k, v in instantx_sd_shapes.items()}
+
+    sd = convert_diffusers_instantx_state_dict_to_bfl_format(sd)
+    flux_params = infer_flux_params_from_state_dict(sd)
+    num_control_modes = infer_instantx_num_control_modes_from_state_dict(sd)
+
+    with torch.device("meta"):
+        model = DiffusersControlNetFlux(flux_params, num_control_modes)
+
+    model_sd = model.state_dict()
+
+    assert set(model_sd.keys()) == set(sd.keys())
+    for key, tensor in model_sd.items():
+        assert isinstance(tensor, torch.Tensor)
+        assert tensor.shape == sd[key].shape
