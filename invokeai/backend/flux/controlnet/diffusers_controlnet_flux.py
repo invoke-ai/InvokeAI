@@ -89,11 +89,11 @@ class DiffusersControlNetFlux(torch.nn.Module):
         # The following modules are specific to the ControlNet model.
         # -----------------------------------------------------------
         self.controlnet_blocks = nn.ModuleList([])
-        for _ in range(len(self.transformer_blocks)):
+        for _ in range(len(self.double_blocks)):
             self.controlnet_blocks.append(zero_module(nn.Linear(self.hidden_size, self.hidden_size)))
 
         self.controlnet_single_blocks = nn.ModuleList([])
-        for _ in range(len(self.single_transformer_blocks)):
+        for _ in range(len(self.single_blocks)):
             self.controlnet_single_blocks.append(zero_module(nn.Linear(self.hidden_size, self.hidden_size)))
 
         self.is_union = False
