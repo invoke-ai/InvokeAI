@@ -9,6 +9,7 @@ import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/Ca
 import type { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { getRectIntersection } from 'features/controlLayers/konva/util';
 import {
   selectIsolatedFilteringPreview,
   selectIsolatedTransformingPreview,
@@ -128,6 +129,10 @@ export abstract class CanvasEntityAdapterBase<
    * A cache of the entity's canvas element. This is generated from a clone of the entity's Konva layer.
    */
   $canvasCache = atom<HTMLCanvasElement | null>(null);
+  /**
+   * Whether this entity is onscreen. This is computed based on the entity's bounding box and the stage's viewport rect.
+   */
+  $isOnScreen = atom(false);
 
   constructor(entityIdentifier: CanvasEntityIdentifier<T['type']>, manager: CanvasManager, adapterType: U) {
     super();
@@ -179,6 +184,14 @@ export abstract class CanvasEntityAdapterBase<
      * entity, we should hide the tool preview & change the cursor.
      */
     this.subscriptions.add(this.$isInteractable.subscribe(this.manager.tool.render));
+
+    /**
+     * When the stage is transformed in any way (panning, zooming, resizing) or the entity is moved, we need to update
+     * the entity's onscreen status. We also need to subscribe to changes to the entity's pixel rect, but this is
+     * handled in the initialize method.
+     */
+    this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.syncIsOnscreen));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectPosition, this.syncIsOnscreen));
   }
 
   /**
@@ -189,6 +202,11 @@ export abstract class CanvasEntityAdapterBase<
     (canvas) => selectEntity(canvas, this.entityIdentifier) as T | undefined
   );
 
+  /**
+   * A redux selector that selects the entity's position from the canvas slice.
+   */
+  selectPosition = createSelector(this.selectState, (entity) => entity?.position);
+
   // This must be a getter because the selector depends on the entityIdentifier, which is set in the constructor.
   get selectIsHidden() {
     if (!this._selectIsHidden) {
@@ -197,8 +215,41 @@ export abstract class CanvasEntityAdapterBase<
     return this._selectIsHidden;
   }
 
+  syncIsOnscreen = () => {
+    const stageRect = this.manager.stage.getScaledStageRect();
+    const entityRect = this.transformer.$pixelRect.get();
+    const position = this.manager.stateApi.runSelector(this.selectPosition);
+    if (!position) {
+      return;
+    }
+    const entityRectRelativeToStage = {
+      x: entityRect.x + position.x,
+      y: entityRect.y + position.y,
+      width: entityRect.width,
+      height: entityRect.height,
+    };
+
+    const intersection = getRectIntersection(stageRect, entityRectRelativeToStage);
+    const prevIsOnScreen = this.$isOnScreen.get();
+    const isOnScreen = intersection.width > 0 && intersection.height > 0;
+    this.$isOnScreen.set(isOnScreen);
+    if (prevIsOnScreen !== isOnScreen) {
+      this.log.trace(`Moved ${isOnScreen ? 'on-screen' : 'off-screen'}`);
+    }
+  };
+
   initialize = async () => {
     this.log.debug('Initializing module');
+
+    /**
+     * When the pixel rect changes, we need to sync the onscreen state of the parent entity.
+     *
+     * TODO(psyche): It'd be nice to set this listener in the constructor, but the transformer is only created in the
+     * concrete classes, so we have to do this here. IIRC the reason for this awkwardness was to satisfy a circular
+     * dependency between the transformer and concrete adapter classes
+     */
+    this.subscriptions.add(this.transformer.$pixelRect.listen(this.syncIsOnscreen));
+
     await this.sync(this.manager.stateApi.runSelector(this.selectState), undefined);
     this.transformer.initialize();
     await this.renderer.initialize();
