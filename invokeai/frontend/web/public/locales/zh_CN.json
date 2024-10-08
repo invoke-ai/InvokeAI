@@ -415,7 +415,8 @@
         "resetUI": "$t(accessibility.reset) UI",
         "createIssue": "创建问题",
         "about": "关于",
-        "submitSupportTicket": "提交支持工单"
+        "submitSupportTicket": "提交支持工单",
+        "toggleRightPanel": "切换右侧面板(G)"
     },
     "nodes": {
         "zoomInNodes": "放大",
