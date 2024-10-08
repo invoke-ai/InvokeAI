@@ -5,7 +5,7 @@ from PIL.Image import Image
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
-from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES, prepare_control_image
+from invokeai.app.util.controlnet_utils import CONTROLNET_RESIZE_VALUES, prepare_control_image
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import (
     InstantXControlNetFlux,
 )
@@ -51,7 +51,6 @@ class InstantXControlNetExtension(BaseControlNetExtension):
         latent_width: int,
         dtype: torch.dtype,
         device: torch.device,
-        control_mode: CONTROLNET_MODE_VALUES,
         resize_mode: CONTROLNET_RESIZE_VALUES,
         weight: Union[float, List[float]],
         begin_step_percent: float,
@@ -67,7 +66,7 @@ class InstantXControlNetExtension(BaseControlNetExtension):
             height=image_height,
             device=device,
             dtype=dtype,
-            control_mode=control_mode,
+            control_mode="balanced",
             resize_mode=resize_mode,
         )
 

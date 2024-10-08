@@ -6,7 +6,6 @@ import torchvision.transforms as tv_transforms
 from torchvision.transforms.functional import resize as tv_resize
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.controlnet_image_processors import ControlField
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
@@ -17,6 +16,7 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
+from invokeai.app.invocations.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -92,7 +92,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description="The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images. FLUX dev only, ignored for schnell.",
     )
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
-    controlnet: ControlField | list[ControlField] | None = InputField(
+    controlnet: FluxControlNetField | list[FluxControlNetField] | None = InputField(
         default=None, input=Input.Connection, description="ControlNet models."
     )
     controlnet_vae: VAEField | None = InputField(
@@ -322,10 +322,10 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         device: torch.device,
     ) -> tuple[list[XLabsControlNetExtension], list[InstantXControlNetExtension]]:
         # Normalize the controlnet input to list[ControlField].
-        controlnets: list[ControlField]
+        controlnets: list[FluxControlNetField]
         if self.controlnet is None:
             controlnets = []
-        elif isinstance(self.controlnet, ControlField):
+        elif isinstance(self.controlnet, FluxControlNetField):
             controlnets = [self.controlnet]
         elif isinstance(self.controlnet, list):
             controlnets = self.controlnet
@@ -339,7 +339,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         xlabs_controlnet_extensions: list[XLabsControlNetExtension] = []
         instantx_controlnet_extensions: list[InstantXControlNetExtension] = []
         for controlnet in controlnets:
-            model = exit_stack.enter_context(context.models.load(controlnet.control_model))
+            model = exit_stack.enter_context(context.models.load(controlnet.controlnet_model))
             image = context.images.get_pil(controlnet.image.image_name)
 
             if isinstance(model, XLabsControlNetFlux):
@@ -351,7 +351,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         latent_width=latent_width,
                         dtype=dtype,
                         device=device,
-                        control_mode=controlnet.control_mode,
                         resize_mode=controlnet.resize_mode,
                         weight=controlnet.control_weight,
                         begin_step_percent=controlnet.begin_step_percent,
@@ -377,7 +376,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         latent_width=latent_width,
                         dtype=dtype,
                         device=device,
-                        control_mode=controlnet.control_mode,
                         resize_mode=controlnet.resize_mode,
                         weight=controlnet.control_weight,
                         begin_step_percent=controlnet.begin_step_percent,
