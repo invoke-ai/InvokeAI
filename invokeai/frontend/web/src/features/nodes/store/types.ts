@@ -39,4 +39,6 @@ export type WorkflowsState = Omit<WorkflowV3, 'nodes' | 'edges'> & {
   isTouched: boolean;
   mode: WorkflowMode;
   originalExposedFieldValues: FieldIdentifierWithValue[];
+  searchTerm: string;
+  categorySections: Record<string, boolean>;
 };
