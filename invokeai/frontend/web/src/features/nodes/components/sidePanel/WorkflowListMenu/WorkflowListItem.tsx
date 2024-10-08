@@ -10,6 +10,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { EMPTY_OBJECT } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import dateFormat, { masks } from 'dateformat';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { selectWorkflowId, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { useDeleteLibraryWorkflow } from 'features/workflowLibrary/hooks/useDeleteLibraryWorkflow';
@@ -20,6 +21,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold, PiPencilBold, PiTrashBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemDTO } from 'services/api/types';
+
+import { WorkflowListItemTooltip } from './WorkflowListItemTooltip';
 
 export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemDTO }) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -87,14 +90,31 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
         onMouseOut={handleMouseOut}
         alignItems="center"
       >
-        <Tooltip label={workflow.description}>
-          <Text noOfLines={2}>{workflow.name}</Text>
+        <Tooltip label={<WorkflowListItemTooltip workflow={workflow} />}>
+          <Flex flexDir="column" gap={1}>
+            <Flex gap={4} alignItems="center">
+              <Text noOfLines={2}>{workflow.name}</Text>
+
+              {isActive && (
+                <Badge
+                  color="invokeBlue.400"
+                  borderColor="invokeBlue.700"
+                  borderWidth={1}
+                  bg="transparent"
+                  flexShrink={0}
+                >
+                  {t('workflows.opened')}
+                </Badge>
+              )}
+            </Flex>
+            {workflow.category !== 'default' && (
+              <Text fontSize="xs" variant="subtext" flexShrink={0} noOfLines={1}>
+                {t('common.updated')}: {dateFormat(workflow.updated_at, masks.shortDate)}{' '}
+                {dateFormat(workflow.updated_at, masks.shortTime)}
+              </Text>
+            )}
+          </Flex>
         </Tooltip>
-        {isActive && (
-          <Badge color="invokeBlue.400" borderColor="invokeBlue.700" borderWidth={1} bg="transparent" flexShrink={0}>
-            {t('workflows.opened')}
-          </Badge>
-        )}
         <Spacer />
 
         <Flex alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>

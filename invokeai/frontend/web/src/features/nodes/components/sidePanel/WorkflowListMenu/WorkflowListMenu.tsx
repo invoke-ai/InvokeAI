@@ -1,6 +1,7 @@
 import { Flex, Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { EMPTY_ARRAY } from 'app/store/constants';
+import { $projectId } from 'app/store/nanostores/projectId';
 import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowSearchTerm } from 'features/nodes/store/workflowSlice';
@@ -14,8 +15,9 @@ import WorkflowSearch from './WorkflowSearch';
 
 export const WorkflowListMenu = () => {
   const searchTerm = useAppSelector(selectWorkflowSearchTerm);
+  const projectId = useStore($projectId);
   const { data, isLoading } = useListWorkflowsQuery(
-    {},
+    { order_by: projectId ? 'created_at' : 'opened_at' },
     {
       selectFromResult: ({ data, isLoading }) => {
         const filteredData =
