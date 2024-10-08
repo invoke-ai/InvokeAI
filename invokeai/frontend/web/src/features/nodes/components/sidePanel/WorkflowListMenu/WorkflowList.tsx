@@ -1,19 +1,55 @@
-import { Button, Collapse, Flex, Icon, Text } from '@invoke-ai/ui-library';
+import { Button, Collapse, Flex, Icon, Spinner, Text } from '@invoke-ai/ui-library';
+import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { useCategorySections } from 'features/nodes/hooks/useCategorySections';
-import { selectWorkflowSearchTerm } from 'features/nodes/store/workflowSlice';
+import {
+  selectWorkflowOrderBy,
+  selectWorkflowOrderDirection,
+  selectWorkflowSearchTerm,
+} from 'features/nodes/store/workflowSlice';
+import type { WorkflowCategory } from 'features/nodes/types/workflow';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
-import type { WorkflowRecordListItemDTO } from 'services/api/types';
+import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
 
 import { WorkflowListItem } from './WorkflowListItem';
 
-export const WorkflowList = ({ title, data }: { title: string; data: WorkflowRecordListItemDTO[] }) => {
-  const { t } = useTranslation();
+export const WorkflowList = ({ category }: { category: WorkflowCategory }) => {
   const searchTerm = useAppSelector(selectWorkflowSearchTerm);
+  const orderBy = useAppSelector(selectWorkflowOrderBy);
+  const direction = useAppSelector(selectWorkflowOrderDirection);
+  const { t } = useTranslation();
 
-  const { isOpen, onToggle } = useCategorySections(title);
+  const queryArg = useMemo<Parameters<typeof useListWorkflowsQuery>[0]>(() => {
+    if (category !== 'default') {
+      return {
+        order_by: orderBy,
+        direction,
+        category: category,
+      };
+    }
+    return {
+      order_by: 'name' as const,
+      direction: 'ASC' as const,
+      category: category,
+    };
+  }, [category, direction, orderBy]);
+
+  const { data, isLoading } = useListWorkflowsQuery(queryArg, {
+    selectFromResult: ({ data, isLoading }) => {
+      const filteredData =
+        data?.items.filter((workflow) => workflow.name.toLowerCase().includes(searchTerm.toLowerCase())) || EMPTY_ARRAY;
+
+      return {
+        data: filteredData,
+        isLoading,
+      };
+    },
+  });
+
+  const { isOpen, onToggle } = useCategorySections(category);
 
   return (
     <Flex flexDir="column">
@@ -21,12 +57,16 @@ export const WorkflowList = ({ title, data }: { title: string; data: WorkflowRec
         <Flex gap={2} alignItems="center">
           <Icon boxSize={4} as={PiCaretDownBold} transform={isOpen ? undefined : 'rotate(-90deg)'} fill="base.500" />
           <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
-            {title}
+            {t(`workflows.${category}Workflows`)}
           </Text>
         </Flex>
       </Button>
       <Collapse in={isOpen}>
-        {data.length ? (
+        {isLoading ? (
+          <Flex alignItems="center" justifyContent="center" p={20}>
+            <Spinner />
+          </Flex>
+        ) : data.length ? (
           data.map((workflow) => <WorkflowListItem workflow={workflow} key={workflow.workflow_id} />)
         ) : (
           <IAINoContentFallback
