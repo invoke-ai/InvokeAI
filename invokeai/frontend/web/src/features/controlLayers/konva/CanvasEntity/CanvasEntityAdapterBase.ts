@@ -23,6 +23,7 @@ import {
 import type { CanvasEntityIdentifier, CanvasRenderableEntityState, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import { atom, computed } from 'nanostores';
+import rafThrottle from 'raf-throttle';
 import type { Logger } from 'roarr';
 import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
@@ -137,7 +138,7 @@ export abstract class CanvasEntityAdapterBase<
   /**
    * Whether this entity is onscreen. This is computed based on the entity's bounding box and the stage's viewport rect.
    */
-  $isOnScreen = atom(false);
+  $isOnScreen = atom(true);
   /**
    * Whether this entity's rect intersects the bbox rect.
    */
@@ -223,8 +224,8 @@ export abstract class CanvasEntityAdapterBase<
    */
   selectPosition = createSelector(this.selectState, (entity) => entity?.position);
 
-  // This must be a getter because the selector depends on the entityIdentifier, which is set in the constructor.
   get selectIsHidden() {
+    // This must be a getter because the selector depends on the entityIdentifier, which is set in the constructor.
     if (!this._selectIsHidden) {
       this._selectIsHidden = buildEntityIsHiddenSelector(this.entityIdentifier);
     }
@@ -252,6 +253,7 @@ export abstract class CanvasEntityAdapterBase<
     if (prevIsOnScreen !== isOnScreen) {
       this.log.trace(`Moved ${isOnScreen ? 'on-screen' : 'off-screen'}`);
     }
+    this.syncVisibility();
   };
 
   syncIntersectsBbox = () => {
@@ -355,14 +357,19 @@ export abstract class CanvasEntityAdapterBase<
     this.renderer.updateOpacity();
   };
 
-  syncVisibility = () => {
-    let isHidden = this.manager.stateApi.runSelector(this.selectIsHidden);
+  syncVisibility = rafThrottle(() => {
+    // Handle the base hidden state
+    if (this.manager.stateApi.runSelector(this.selectIsHidden)) {
+      this.setVisibility(false);
+      return;
+    }
 
     // Handle isolated preview modes - if another entity is filtering or transforming, we may need to hide this entity.
     if (this.manager.stateApi.runSelector(selectIsolatedFilteringPreview)) {
       const filteringEntityIdentifier = this.manager.stateApi.$filteringAdapter.get()?.entityIdentifier;
       if (filteringEntityIdentifier && filteringEntityIdentifier.id !== this.id) {
-        isHidden = true;
+        this.setVisibility(false);
+        return;
       }
     }
 
@@ -374,12 +381,27 @@ export abstract class CanvasEntityAdapterBase<
         // Silent transforms should be transparent to the user, so we don't need to hide the entity.
         !transformingEntity.transformer.$silentTransform.get()
       ) {
-        isHidden = true;
+        this.setVisibility(false);
+        return;
       }
     }
 
-    this.$isHidden.set(isHidden);
-    this.konva.layer.visible(!isHidden);
+    // If the entity is not selected and offscreen, we can hide it
+    if (!this.$isOnScreen.get() && !this.manager.stateApi.getIsSelected(this.entityIdentifier.id)) {
+      this.setVisibility(false);
+      return;
+    }
+
+    this.setVisibility(true);
+  });
+
+  setVisibility = (isVisible: boolean) => {
+    if (this.$isHidden.get() === !isVisible && this.konva.layer.visible() === isVisible) {
+      return;
+    }
+    this.log.trace(isVisible ? 'Showing' : 'Hiding');
+    this.$isHidden.set(!isVisible);
+    this.konva.layer.visible(isVisible);
   };
 
   /**
