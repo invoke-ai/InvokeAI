@@ -92,7 +92,6 @@ async def list_workflows(
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
 ) -> PaginatedResults[WorkflowRecordListItemDTO]:
     """Gets a page of workflows"""
-    print(category)
     return ApiDependencies.invoker.services.workflow_records.get_many(
         order_by=order_by, direction=direction, page=page, per_page=per_page, query=query, category=category
     )
