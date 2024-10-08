@@ -10,6 +10,10 @@ from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.flux.controlnet.state_dict_utils import (
+    is_state_dict_instantx_controlnet,
+    is_state_dict_xlabs_controlnet,
+)
 from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
 )
@@ -635,8 +639,7 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
 
     def get_base_type(self) -> BaseModelType:
         checkpoint = self.checkpoint
-
-        if "double_blocks.0.img_attn.qkv.weight" in checkpoint:
+        if is_state_dict_xlabs_controlnet(checkpoint) or is_state_dict_instantx_controlnet(checkpoint):
             # TODO(ryand): Should I distinguish between XLabs, InstantX and other ControlNet models by implementing
             # get_format()?
             return BaseModelType.Flux
