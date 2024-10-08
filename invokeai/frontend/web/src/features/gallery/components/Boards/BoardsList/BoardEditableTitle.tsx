@@ -26,6 +26,11 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
     setLocalTitle(e.target.value);
   }, []);
 
+  const onEdit = useCallback(() => {
+    isEditing.setTrue();
+    setIsHovering(false);
+  }, [isEditing]);
+
   const onBlur = useCallback(async () => {
     const trimmedTitle = localTitle.trim();
     isEditing.setFalse();
@@ -83,7 +88,7 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
           fontWeight="semibold"
           userSelect="none"
           color={isSelected ? 'base.100' : 'base.300'}
-          onDoubleClick={isEditing.setTrue}
+          onDoubleClick={onEdit}
           cursor="text"
         >
           {localTitle}
@@ -94,7 +99,7 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
             icon={<PiPencilBold />}
             size="sm"
             variant="ghost"
-            onClick={isEditing.setTrue}
+            onClick={onEdit}
           />
         )}
       </Flex>
