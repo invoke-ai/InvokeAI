@@ -165,8 +165,6 @@ export type Graph = S['Graph'];
 export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
 export type Batch = S['Batch'];
 export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
-export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
-export type SQLiteDirection = S['SQLiteDirection'];
 export type WorkflowRecordListItemDTO = S['WorkflowRecordListItemDTO'];
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
