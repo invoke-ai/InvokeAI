@@ -32,6 +32,8 @@ const initialWorkflowState: WorkflowState = {
   isTouched: false,
   mode: 'view',
   originalExposedFieldValues: [],
+  searchTerm: '',
+  categorySections: {},
   ...blankWorkflow,
 };
 
@@ -41,6 +43,13 @@ export const workflowSlice = createSlice({
   reducers: {
     workflowModeChanged: (state, action: PayloadAction<WorkflowMode>) => {
       state.mode = action.payload;
+    },
+    workflowSearchTermChanged: (state, action: PayloadAction<string>) => {
+      state.searchTerm = action.payload;
+    },
+    categorySectionsChanged: (state, action: PayloadAction<{ id: string; isOpen: boolean }>) => {
+      const { id, isOpen } = action.payload;
+      state.categorySections[id] = isOpen;
     },
     workflowExposedFieldAdded: (state, action: PayloadAction<FieldIdentifierWithValue>) => {
       state.exposedFields = uniqBy(
@@ -207,6 +216,8 @@ export const {
   workflowContactChanged,
   workflowIDChanged,
   workflowSaved,
+  workflowSearchTermChanged,
+  categorySectionsChanged,
 } = workflowSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -232,3 +243,4 @@ export const selectWorkflowName = createWorkflowSelector((workflow) => workflow.
 export const selectWorkflowId = createWorkflowSelector((workflow) => workflow.id);
 export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.mode);
 export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);
+export const selectWorkflowSearchTerm = createWorkflowSelector((workflow) => workflow.searchTerm);

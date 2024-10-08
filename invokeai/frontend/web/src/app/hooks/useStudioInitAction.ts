@@ -9,11 +9,11 @@ import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
+import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
-import { $workflowLibraryModal } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getImageDTO, getImageMetadata } from 'services/api/endpoints/images';
@@ -160,7 +160,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
         case 'viewAllWorkflows':
           // Go to the workflows tab and open the workflow library modal
           store.dispatch(setActiveTab('workflows'));
-          $workflowLibraryModal.set(true);
+          $isWorkflowListMenuIsOpen.set(true);
           break;
         case 'viewAllStylePresets':
           // Go to the canvas tab and open the style presets menu
