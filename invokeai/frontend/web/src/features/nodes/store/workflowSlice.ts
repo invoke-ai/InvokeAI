@@ -244,3 +244,4 @@ export const selectWorkflowId = createWorkflowSelector((workflow) => workflow.id
 export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.mode);
 export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);
 export const selectWorkflowSearchTerm = createWorkflowSelector((workflow) => workflow.searchTerm);
+export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);

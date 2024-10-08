@@ -7,7 +7,7 @@ import { useDeleteLibraryWorkflow } from 'features/workflowLibrary/hooks/useDele
 import { useDownloadWorkflow } from 'features/workflowLibrary/hooks/useDownloadWorkflow';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import type { MouseEvent } from 'react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold, PiPencilBold, PiShareFatBold, PiTrashBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemDTO } from 'services/api/types';
@@ -16,6 +16,16 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseOver = useCallback(() => {
+    setIsHovered(true);
+  }, []);
+
+  const handleMouseOut = useCallback(() => {
+    setIsHovered(false);
+  }, []);
 
   const workflowId = useAppSelector(selectWorkflowId);
   const downloadWorkflow = useDownloadWorkflow();
@@ -65,12 +75,14 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
         borderRadius="base"
         alignItems="flex-start"
         w="full"
+        onMouseOver={handleMouseOver}
+        onMouseOut={handleMouseOut}
       >
         <Flex flexDir="column" w="full">
           <Flex w="full" justifyContent="space-between" alignItems="flex-start">
             <Flex alignItems="center" gap={2} w="full">
               <Flex flexDir="column" gap={2} w="full">
-                <Flex alignItems="start" gap={4} justifyContent="space-between" w="full">
+                <Flex alignItems="center" gap={1} justifyContent="space-between" w="full" minH={8}>
                   <Flex alignItems="center" gap={3}>
                     <Tooltip label={workflow.description}>
                       <Text fontSize="md" noOfLines={2}>
@@ -90,7 +102,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
                     )}
                   </Flex>
 
-                  <Flex alignItems="center" gap={1}>
+                  <Flex alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>
                     <IconButton
                       size="sm"
                       variant="outline"
@@ -98,6 +110,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
                       onClick={handleClickEdit}
                       isLoading={deleteWorkflowResult.isLoading}
                       icon={<PiPencilBold />}
+                      isDisabled={!isHovered}
                     />
                     <IconButton
                       size="sm"
@@ -105,6 +118,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
                       aria-label="Download"
                       onClick={downloadWorkflow}
                       icon={<PiDownloadSimpleBold />}
+                      isDisabled={!isHovered}
                     />
                     <IconButton
                       size="sm"
@@ -113,6 +127,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
                       onClick={handleClickDelete}
                       isLoading={deleteWorkflowResult.isLoading}
                       icon={<PiShareFatBold />}
+                      isDisabled={!isHovered}
                     />
                     {workflow.category !== 'default' && (
                       <IconButton
@@ -123,22 +138,11 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
                         isLoading={deleteWorkflowResult.isLoading}
                         colorScheme="error"
                         icon={<PiTrashBold />}
+                        isDisabled={!isHovered}
                       />
                     )}
                   </Flex>
-                  {/* <IconButton
-                    size="sm"
-                    variant="outline"
-                    aria-label={t('stylePresets.deleteTemplate')}
-                    onClick={handleClickDelete}
-                    isLoading={deleteWorkflowResult.isLoading}
-                    colorScheme="invokeBlue"
-                    icon={<PiArrowRightBold />}
-                  /> */}
                 </Flex>
-                {/* <Text fontSize="sm" noOfLines={2} variant="subtext">
-                  {workflow.description}
-                </Text> */}
               </Flex>
             </Flex>
           </Flex>
@@ -147,13 +151,13 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
       <ConfirmationAlertDialog
         isOpen={isOpen}
         onClose={onClose}
-        title={t('stylePresets.deleteTemplate')}
+        title={t('workflows.deleteWorkflow')}
         acceptCallback={handleDeleteWorklow}
         acceptButtonText={t('common.delete')}
         cancelButtonText={t('common.cancel')}
         useInert={false}
       >
-        <p>{t('stylePresets.deleteTemplate2')}</p>
+        <p>{t('workflows.deleteWorkflow2')}</p>
       </ConfirmationAlertDialog>
     </>
   );

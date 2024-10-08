@@ -2,14 +2,16 @@ import 'reactflow/dist/style.css';
 
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
-import { selectWorkflowMode } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowMode, selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -26,10 +28,24 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
+const selectCleanEditor = createMemoizedSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
+  const noNodes = !nodes.nodes.length;
+  const isTouched = workflow.isTouched;
+  return noNodes && !isTouched;
+});
+
 const NodeEditorPanelGroup = () => {
   const mode = useAppSelector(selectWorkflowMode);
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const isWorkflowListMenuOpen = useStore($isWorkflowListMenuIsOpen);
+
+  const isCleanEditor = useAppSelector(selectCleanEditor);
+
+  useEffect(() => {
+    if (isCleanEditor) {
+      $isWorkflowListMenuIsOpen.set(true);
+    }
+  }, [isCleanEditor]);
 
   const handleDoubleClickHandle = useCallback(() => {
     if (!panelGroupRef.current) {
@@ -52,11 +68,6 @@ const NodeEditorPanelGroup = () => {
           )}
 
           <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
-            {/* <Flex w="full" justifyContent="space-between" alignItems="center" gap="4" padding={1}>
-              <WorkflowName />
-              <WorkflowMenu />
-            </Flex> */}
-
             {mode === 'view' && <WorkflowViewMode />}
             {mode === 'edit' && (
               <PanelGroup
