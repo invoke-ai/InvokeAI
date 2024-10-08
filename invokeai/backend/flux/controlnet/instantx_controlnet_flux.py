@@ -129,7 +129,7 @@ class InstantXControlNetFlux(torch.nn.Module):
             assert controlnet_mode is not None
             controlnet_mode_emb = self.controlnet_mode_embedder(controlnet_mode)
             txt = torch.cat([controlnet_mode_emb, txt], dim=1)
-            txt_ids = torch.cat([txt_ids[:1], txt_ids], dim=0)
+            txt_ids = torch.cat([txt_ids[:, :1, :], txt_ids], dim=1)
         else:
             assert controlnet_mode is None
 
