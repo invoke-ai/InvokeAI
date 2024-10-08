@@ -28,7 +28,7 @@ const overlayScrollbarsStyles: CSSProperties = {
   width: '100%',
 };
 
-const selectCleanEditor = createMemoizedSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
+export const selectCleanEditor = createMemoizedSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
   const noNodes = !nodes.nodes.length;
   const isTouched = workflow.isTouched;
   return noNodes && !isTouched;

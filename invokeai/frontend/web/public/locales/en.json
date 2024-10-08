@@ -870,6 +870,7 @@
         "nodeType": "Node Type",
         "noFieldsLinearview": "No fields added to Linear View",
         "noFieldsViewMode": "This workflow has no selected fields to display. View the full workflow to configure values.",
+        "workflowHelpText": "Need Help? Check out our guide to <LinkComponent>Getting Started with Workflows</LinkComponent>",
         "noNodeSelected": "No node selected",
         "nodeOpacity": "Node Opacity",
         "nodeVersion": "Node Version",
