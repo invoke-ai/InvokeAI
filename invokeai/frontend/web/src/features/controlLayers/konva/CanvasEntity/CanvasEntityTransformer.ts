@@ -189,7 +189,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
         name: `${this.type}:outline_rect`,
         stroke: this.config.OUTLINE_COLOR,
         perfectDrawEnabled: false,
-        strokeHitEnabled: false,
+        hitStrokeWidth: 0,
       }),
       transformer: new Konva.Transformer({
         name: `${this.type}:transformer`,
