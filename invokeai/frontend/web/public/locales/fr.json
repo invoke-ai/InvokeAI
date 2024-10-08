@@ -912,6 +912,21 @@
                 "\"Optimiser\" définira la largeur et la hauteur aux dimensions optimales pour le modèle choisi."
             ],
             "heading": "Aspect"
+        },
+        "refinerScheduler": {
+            "heading": "Planificateur"
+        },
+        "refinerPositiveAestheticScore": {
+            "paragraphs": [
+                "Ajoute un biais envers les générations pour qu'elles soient plus similaires aux images ayant un score esthétique élevé, en fonction des données d'entraînement."
+            ],
+            "heading": "Score Esthétique Positif"
+        },
+        "refinerNegativeAestheticScore": {
+            "heading": "Score Esthétique Négatif",
+            "paragraphs": [
+                "Ajoute un biais envers les générations pour qu'elles soient plus similaires aux images ayant un faible score esthétique, en fonction des données d'entraînement."
+            ]
         }
     },
     "dynamicPrompts": {
