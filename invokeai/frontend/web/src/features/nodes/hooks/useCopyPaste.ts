@@ -1,3 +1,4 @@
+import { logger } from 'app/logging/logger';
 import { getStore } from 'app/store/nanostores/store';
 import { deepClone } from 'common/util/deepClone';
 import {
@@ -5,14 +6,20 @@ import {
   $copiedNodes,
   $cursorPos,
   $edgesToCopiedNodes,
+  $templates,
   edgesChanged,
   nodesChanged,
 } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupiedPosition';
-import { isEqual, uniqWith } from 'lodash-es';
+import { validateConnection } from 'features/nodes/store/util/validateConnection';
+import { t } from 'i18next';
+import { isEqual, isNil, uniqWith } from 'lodash-es';
 import type { EdgeChange, NodeChange } from 'reactflow';
+import { assert } from 'tsafe';
 import { v4 as uuidv4 } from 'uuid';
+
+const log = logger('workflows');
 
 const copySelection = () => {
   // Use the imperative API here so we don't have to pass the whole slice around
@@ -29,6 +36,7 @@ const copySelection = () => {
 const _pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
   const { getState, dispatch } = getStore();
   const { nodes, edges } = selectNodesSlice(getState());
+  const templates = $templates.get();
   const cursorPos = $cursorPos.get();
 
   const copiedNodes = deepClone($copiedNodes.get());
@@ -101,12 +109,44 @@ const _pasteSelection = (withEdgesToCopiedNodes?: boolean) => {
       });
     }
   });
+
+  // When we validate the new edges, we need to include the copied nodes as well as the existing nodes,
+  // else the edges will all fail bc they point to nodes that don't exist yet
+  const validationNodes = [...nodes, ...copiedNodes];
+  // As an edge is validated, we will need to add it to the list of edges used for validation, because
+  // validation may depend on the existence of other edges
+  const validationEdges = [...edges];
+
   // Add new edges
   copiedEdges.forEach((e) => {
+    const { source, sourceHandle, target, targetHandle } = e;
+    // We need a type guard here to work around reactflow types
+    assert(!isNil(sourceHandle));
+    assert(!isNil(targetHandle));
+
+    // Validate the edge before adding it
+    const validationResult = validateConnection(
+      { source, sourceHandle, target, targetHandle },
+      validationNodes,
+      validationEdges,
+      templates,
+      null,
+      true
+    );
+    // If the edge is invalid, log a warning and skip it
+    if (!validationResult.isValid) {
+      log.warn(
+        { edge: { source, sourceHandle, target, targetHandle } },
+        `Invalid edge, cannot paste: ${t(validationResult.messageTKey)}`
+      );
+      return;
+    }
     edgeChanges.push({
       type: 'add',
       item: e,
     });
+    // Add the edge to the list of edges used for validation so that subsequent edges can depend on it
+    validationEdges.push(e);
   });
   if (nodeChanges.length > 0) {
     dispatch(nodesChanged(nodeChanges));
