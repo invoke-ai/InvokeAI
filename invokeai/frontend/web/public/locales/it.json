@@ -155,7 +155,9 @@
         "move": "Sposta",
         "gallery": "Galleria",
         "openViewer": "Apri visualizzatore",
-        "closeViewer": "Chiudi visualizzatore"
+        "closeViewer": "Chiudi visualizzatore",
+        "imagesTab": "Immagini create e salvate in Invoke.",
+        "assetsTab": "File che hai caricato per usarli nei tuoi progetti."
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -899,7 +901,7 @@
         "clearWorkflowDesc": "Cancellare questo flusso di lavoro e avviarne uno nuovo?",
         "clearWorkflow": "Cancella il flusso di lavoro",
         "clearWorkflowDesc2": "Il tuo flusso di lavoro attuale presenta modifiche non salvate.",
-        "viewMode": "Utilizzare nella vista lineare",
+        "viewMode": "Usa la vista lineare",
         "reorderLinearView": "Riordina la vista lineare",
         "editMode": "Modifica nell'editor del flusso di lavoro",
         "resetToDefaultValue": "Ripristina il valore predefinito",
@@ -917,7 +919,10 @@
         "imageAccessError": "Impossibile trovare l'immagine {{image_name}}, ripristino ai valori predefiniti",
         "boardAccessError": "Impossibile trovare la bacheca {{board_id}}, ripristino ai valori predefiniti",
         "modelAccessError": "Impossibile trovare il modello {{key}}, ripristino ai valori predefiniti",
-        "saveToGallery": "Salva nella Galleria"
+        "saveToGallery": "Salva nella Galleria",
+        "noMatchingWorkflows": "Nessun flusso di lavoro corrispondente",
+        "noWorkflows": "Nessun flusso di lavoro",
+        "workflowHelpText": "Hai bisogno di aiuto? Consulta la nostra guida <LinkComponent>Introduzione ai flussi di lavoro</LinkComponent>"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1562,7 +1567,10 @@
         "loadFromGraph": "Carica il flusso di lavoro dal grafico",
         "userWorkflows": "Flussi di lavoro utente",
         "projectWorkflows": "Flussi di lavoro del progetto",
-        "defaultWorkflows": "Flussi di lavoro predefiniti"
+        "defaultWorkflows": "Flussi di lavoro predefiniti",
+        "uploadAndSaveWorkflow": "Carica nella libreria",
+        "chooseWorkflowFromLibrary": "Scegli il flusso di lavoro dalla libreria",
+        "deleteWorkflow2": "Vuoi davvero eliminare questo flusso di lavoro? Questa operazione non può essere annullata."
     },
     "accordions": {
         "compositing": {
@@ -1814,8 +1822,8 @@
         "logDebugInfo": "Registro Info Debug",
         "inpaintMasks_withCount_visible": "Maschere Inpaint ({{count}})",
         "layer_one": "Livello",
-        "layer_many": "",
-        "layer_other": "",
+        "layer_many": "Livelli",
+        "layer_other": "Livelli",
         "disableTransparencyEffect": "Disabilita l'effetto trasparenza",
         "controlLayers_withCount_visible": "Livelli di controllo ({{count}})",
         "transparency": "Trasparenza",
@@ -1982,7 +1990,7 @@
     },
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
-        "toGetStarted": "Per iniziare, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
+        "toGetStarted": "Per iniziare, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
     },
     "whatsNew": {
         "canvasV2Announcement": {
