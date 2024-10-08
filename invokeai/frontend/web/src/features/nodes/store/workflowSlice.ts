@@ -14,6 +14,8 @@ import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { WorkflowCategory, WorkflowV3 } from 'features/nodes/types/workflow';
 import { isEqual, omit, uniqBy } from 'lodash-es';
 
+import { selectNodesSlice } from './selectors';
+
 const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
   name: '',
   author: '',
@@ -245,3 +247,10 @@ export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.
 export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);
 export const selectWorkflowSearchTerm = createWorkflowSelector((workflow) => workflow.searchTerm);
 export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
+
+export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
+  const noNodes = !nodes.nodes.length;
+  const isTouched = workflow.isTouched;
+  const savedWorkflow = !!workflow.id;
+  return noNodes && !isTouched && !savedWorkflow;
+});

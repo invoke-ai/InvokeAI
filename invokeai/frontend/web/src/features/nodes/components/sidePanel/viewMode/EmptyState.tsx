@@ -1,8 +1,7 @@
 import { Button, Flex, Image, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectCleanEditor } from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
-import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { selectCleanEditor, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { useCallback } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
