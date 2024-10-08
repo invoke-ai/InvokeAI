@@ -423,6 +423,17 @@ class CLIPEmbedDiffusersConfig(DiffusersConfigBase):
         return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}")
 
 
+class CLIPEmbedCheckpointConfig(CheckpointConfigBase):
+    """Model config for CLIP Embedding checkpoints."""
+
+    type: Literal[ModelType.CLIPEmbed] = ModelType.CLIPEmbed
+    format: Literal[ModelFormat.Checkpoint]
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Checkpoint.value}")
+
+
 class CLIPVisionDiffusersConfig(DiffusersConfigBase):
     """Model config for CLIPVision."""
 
@@ -499,6 +510,7 @@ AnyModelConfig = Annotated[
         Annotated[SpandrelImageToImageConfig, SpandrelImageToImageConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
         Annotated[CLIPEmbedDiffusersConfig, CLIPEmbedDiffusersConfig.get_tag()],
+        Annotated[CLIPEmbedCheckpointConfig, CLIPEmbedCheckpointConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),
 ]
