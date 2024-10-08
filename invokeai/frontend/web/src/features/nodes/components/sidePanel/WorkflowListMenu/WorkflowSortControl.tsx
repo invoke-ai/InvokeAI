@@ -95,7 +95,7 @@ export const WorkflowSortControl = () => {
       <PopoverTrigger>
         <IconButton
           tooltip={`Sorting by ${valueOrderBy?.label} ${valueDirection?.label}`}
-          aria-label="Sort Workflow Librar"
+          aria-label="Sort Workflow Library"
           icon={direction === 'ASC' ? <PiSortAscendingBold /> : <PiSortDescendingBold />}
           variant="ghost"
         />
