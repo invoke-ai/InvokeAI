@@ -39,6 +39,9 @@ export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase
       return;
     }
 
+    // If prevState is undefined, this is the first render. Some logic is only needed on the first render, or required
+    // on first render.
+
     if (!prevState || this.state.isEnabled !== prevState.isEnabled) {
       this.syncIsEnabled();
     }
@@ -55,19 +58,14 @@ export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase
       this.syncOpacity();
     }
     if (!prevState || this.state.fill !== prevState.fill) {
-      this.syncCompositingRectFill();
+      // On first render, we must force the update
+      this.renderer.updateCompositingRectFill(!prevState);
     }
     if (!prevState) {
-      this.syncCompositingRectSize();
+      // On first render, we must force the updates
+      this.renderer.updateCompositingRectSize(true);
+      this.renderer.updateCompositingRectPosition(true);
     }
-  };
-
-  syncCompositingRectSize = () => {
-    this.renderer.updateCompositingRectSize();
-  };
-
-  syncCompositingRectFill = () => {
-    this.renderer.updateCompositingRectFill();
   };
 
   getHashableState = (): SerializableObject => {

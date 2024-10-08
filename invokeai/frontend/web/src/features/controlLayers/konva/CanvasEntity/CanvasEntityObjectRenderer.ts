@@ -25,6 +25,7 @@ import type { Rect } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
+import { throttle } from 'lodash-es';
 import type { Logger } from 'roarr';
 import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -131,12 +132,21 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     // The compositing rect must cover the whole stage at all times. When the stage is scaled, moved or resized, we
     // need to update the compositing rect to match the stage.
     this.subscriptions.add(
-      this.manager.stage.$stageAttrs.listen(() => {
+      this.manager.stage.$stageAttrs.listen((stageAttrs, oldStageAttrs) => {
+        if (!this.konva.compositing) {
+          return;
+        }
+
         if (
-          this.konva.compositing &&
-          (this.parent.type === 'inpaint_mask_adapter' || this.parent.type === 'regional_guidance_adapter')
+          stageAttrs.width !== oldStageAttrs.width ||
+          stageAttrs.height !== oldStageAttrs.height ||
+          stageAttrs.scale !== oldStageAttrs.scale
         ) {
           this.updateCompositingRectSize();
+        }
+
+        if (stageAttrs.x !== oldStageAttrs.x || stageAttrs.y !== oldStageAttrs.y) {
+          this.updateCompositingRectPosition();
         }
       })
     );
@@ -197,7 +207,11 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     }
   };
 
-  updateCompositingRectFill = () => {
+  updateCompositingRectFill = throttle((force?: boolean) => {
+    if (!force && !this.hasObjects()) {
+      return;
+    }
+
     this.log.trace('Updating compositing rect fill');
 
     assert(this.konva.compositing, 'Missing compositing rect');
@@ -216,9 +230,13 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       });
       setFillPatternImage(this.konva.compositing.rect, fill.style, fill.color);
     }
-  };
+  }, 100);
 
-  updateCompositingRectSize = () => {
+  updateCompositingRectSize = (force?: boolean) => {
+    if (!force && !this.hasObjects()) {
+      return;
+    }
+
     this.log.trace('Updating compositing rect size');
 
     assert(this.konva.compositing, 'Missing compositing rect');
@@ -232,7 +250,21 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     });
   };
 
-  updateOpacity = () => {
+  updateCompositingRectPosition = (force?: boolean) => {
+    if (!force && !this.hasObjects()) {
+      return;
+    }
+
+    this.log.trace('Updating compositing rect position');
+
+    assert(this.konva.compositing, 'Missing compositing rect');
+
+    this.konva.compositing.rect.setAttrs({
+      ...this.manager.stage.getScaledStageRect(),
+    });
+  };
+
+  updateOpacity = throttle(() => {
     this.log.trace('Updating opacity');
 
     const opacity = this.parent.state.opacity;
@@ -243,7 +275,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       this.konva.objectGroup.opacity(opacity);
     }
     this.parent.bufferRenderer.konva.group.opacity(opacity);
-  };
+  }, 100);
 
   /**
    * Renders the given object. If the object renderer does not exist, it will be created and its Konva group added to the
