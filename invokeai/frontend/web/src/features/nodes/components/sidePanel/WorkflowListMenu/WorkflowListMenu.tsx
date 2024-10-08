@@ -1,8 +1,9 @@
-import { Flex } from '@invoke-ai/ui-library';
+import { Flex, Spinner } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { EMPTY_ARRAY } from 'app/store/constants';
+import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectStylePresetSearchTerm } from 'features/stylePresets/store/stylePresetSlice';
-import { selectAllowPrivateStylePresets } from 'features/system/store/configSlice';
+import { selectWorkflowSearchTerm } from 'features/nodes/store/workflowSlice';
 import UploadWorkflowButton from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { useTranslation } from 'react-i18next';
 import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
@@ -12,12 +13,11 @@ import { WorkflowList } from './WorkflowList';
 import WorkflowSearch from './WorkflowSearch';
 
 export const WorkflowListMenu = () => {
-  const searchTerm = useAppSelector(selectStylePresetSearchTerm);
-  const allowProjectWorkflows = useAppSelector(selectAllowPrivateStylePresets);
-  const { data } = useListWorkflowsQuery(
+  const searchTerm = useAppSelector(selectWorkflowSearchTerm);
+  const { data, isLoading } = useListWorkflowsQuery(
     {},
     {
-      selectFromResult: ({ data }) => {
+      selectFromResult: ({ data, isLoading }) => {
         const filteredData =
           data?.items.filter((workflow) => workflow.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
           EMPTY_ARRAY;
@@ -25,30 +25,33 @@ export const WorkflowListMenu = () => {
         const groupedData = filteredData.reduce(
           (
             acc: {
-              defaultWorkflows: WorkflowRecordListItemDTO[];
-              sharedWorkflows: WorkflowRecordListItemDTO[];
-              workflows: WorkflowRecordListItemDTO[];
+              default: WorkflowRecordListItemDTO[];
+              project: WorkflowRecordListItemDTO[];
+              user: WorkflowRecordListItemDTO[];
             },
             workflow
           ) => {
             if (workflow.category === 'default') {
-              acc.defaultWorkflows.push(workflow);
+              acc.default.push(workflow);
             } else if (workflow.category === 'project') {
-              acc.sharedWorkflows.push(workflow);
+              acc.project.push(workflow);
             } else {
-              acc.workflows.push(workflow);
+              acc.user.push(workflow);
             }
             return acc;
           },
-          { defaultWorkflows: [], sharedWorkflows: [], workflows: [] }
+          { default: [], project: [], user: [] }
         );
 
         return {
           data: groupedData,
+          isLoading,
         };
       },
     }
   );
+
+  const workflowCategories = useStore($workflowCategories);
 
   const { t } = useTranslation();
 
@@ -59,9 +62,17 @@ export const WorkflowListMenu = () => {
         <UploadWorkflowButton />
       </Flex>
 
-      <WorkflowList title="My Workflows" data={data.workflows} />
-      {allowProjectWorkflows && <WorkflowList title={t('stylePresets.sharedTemplates')} data={data.sharedWorkflows} />}
-      <WorkflowList title="Default Workflows" data={data.defaultWorkflows} />
+      {isLoading ? (
+        <Flex alignItems="center" justifyContent="center" p={20}>
+          <Spinner />
+        </Flex>
+      ) : (
+        <>
+          {workflowCategories.map((category) => (
+            <WorkflowList key={category} title={t(`workflows.${category}Workflows`)} data={data[category]} isLoading />
+          ))}
+        </>
+      )}
     </Flex>
   );
 };

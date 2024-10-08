@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ModeToggle } from 'features/nodes/components/sidePanel/ModeToggle';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
-import { selectWorkflowName } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowDescription, selectWorkflowName } from 'features/nodes/store/workflowSlice';
 import type { MouseEventHandler } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import SaveWorkflowButton from './SaveWorkflowButton';
 
 export const ActiveWorkflow = () => {
   const activeWorkflowName = useAppSelector(selectWorkflowName);
+  const activeWorkflowDescription = useAppSelector(selectWorkflowDescription);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -29,9 +30,11 @@ export const ActiveWorkflow = () => {
   return (
     <Flex w="full" alignItems="center" gap={2} minW={0}>
       {activeWorkflowName ? (
-        <Text colorScheme="invokeBlue" fontWeight="semibold" fontSize="md" justifySelf="flex-start">
-          {activeWorkflowName}
-        </Text>
+        <Tooltip label={activeWorkflowDescription}>
+          <Text colorScheme="invokeBlue" fontWeight="semibold" fontSize="md" justifySelf="flex-start">
+            {activeWorkflowName}
+          </Text>
+        </Tooltip>
       ) : (
         <Text fontSize="sm" fontWeight="semibold" color="base.300">
           {t('workflows.chooseWorkflowFromLibrary')}

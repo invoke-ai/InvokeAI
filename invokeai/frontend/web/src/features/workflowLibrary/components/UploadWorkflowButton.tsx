@@ -1,4 +1,4 @@
-import { Button } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
 import { memo, useCallback, useRef } from 'react';
@@ -33,15 +33,15 @@ const UploadWorkflowButton = () => {
   });
   return (
     <>
-      <Button
+      <IconButton
         aria-label={t('workflows.uploadWorkflow')}
         tooltip={t('workflows.uploadWorkflow')}
-        leftIcon={<PiUploadSimpleBold />}
+        icon={<PiUploadSimpleBold />}
         {...getRootProps()}
         pointerEvents="auto"
-      >
-        {t('workflows.uploadWorkflow')}
-      </Button>
+        variant="ghost"
+      />
+
       <input {...getInputProps()} />
     </>
   );

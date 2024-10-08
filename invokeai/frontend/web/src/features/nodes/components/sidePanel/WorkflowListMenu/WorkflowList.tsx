@@ -2,7 +2,7 @@ import { Button, Collapse, Flex, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { useCategorySections } from 'features/nodes/hooks/useCategorySections';
-import { selectStylePresetSearchTerm } from 'features/stylePresets/store/stylePresetSlice';
+import { selectWorkflowSearchTerm } from 'features/nodes/store/workflowSlice';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemDTO } from 'services/api/types';
@@ -11,7 +11,7 @@ import { WorkflowListItem } from './WorkflowListItem';
 
 export const WorkflowList = ({ title, data }: { title: string; data: WorkflowRecordListItemDTO[] }) => {
   const { t } = useTranslation();
-  const searchTerm = useAppSelector(selectStylePresetSearchTerm);
+  const searchTerm = useAppSelector(selectWorkflowSearchTerm);
 
   const { isOpen, onToggle } = useCategorySections(title);
 
