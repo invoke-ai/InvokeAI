@@ -1,4 +1,13 @@
-import { Badge, ConfirmationAlertDialog, Flex, IconButton, Text, Tooltip, useDisclosure } from '@invoke-ai/ui-library';
+import {
+  Badge,
+  ConfirmationAlertDialog,
+  Flex,
+  IconButton,
+  Spacer,
+  Text,
+  Tooltip,
+  useDisclosure,
+} from '@invoke-ai/ui-library';
 import { EMPTY_OBJECT } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
@@ -70,73 +79,51 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
         onClick={handleClickLoad}
         cursor="pointer"
         _hover={{ backgroundColor: 'base.750' }}
-        py={3}
-        px={2}
+        p={2}
+        ps={3}
         borderRadius="base"
-        alignItems="flex-start"
         w="full"
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
+        alignItems="center"
       >
-        <Flex flexDir="column" w="full">
-          <Flex w="full" justifyContent="space-between" alignItems="flex-start">
-            <Flex alignItems="center" gap={2} w="full">
-              <Flex flexDir="column" gap={2} w="full">
-                <Flex alignItems="center" gap={1} justifyContent="space-between" w="full" minH={8}>
-                  <Flex alignItems="center" gap={3}>
-                    <Tooltip label={workflow.description}>
-                      <Text fontSize="md" noOfLines={2}>
-                        {workflow.name}
-                      </Text>
-                    </Tooltip>
-                    {isActive && (
-                      <Badge
-                        color="invokeBlue.400"
-                        borderColor="invokeBlue.700"
-                        borderWidth={1}
-                        bg="transparent"
-                        flexShrink={0}
-                      >
-                        {t('stylePresets.active')}
-                      </Badge>
-                    )}
-                  </Flex>
+        <Tooltip label={workflow.description}>
+          <Text noOfLines={2}>{workflow.name}</Text>
+        </Tooltip>
+        {isActive && (
+          <Badge color="invokeBlue.400" borderColor="invokeBlue.700" borderWidth={1} bg="transparent" flexShrink={0}>
+            {t('stylePresets.active')}
+          </Badge>
+        )}
+        <Spacer />
 
-                  <Flex alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>
-                    <IconButton
-                      size="sm"
-                      variant="outline"
-                      aria-label="Edit"
-                      onClick={handleClickEdit}
-                      isLoading={deleteWorkflowResult.isLoading}
-                      icon={<PiPencilBold />}
-                      isDisabled={!isHovered}
-                    />
-                    <IconButton
-                      size="sm"
-                      variant="outline"
-                      aria-label="Download"
-                      onClick={downloadWorkflow}
-                      icon={<PiDownloadSimpleBold />}
-                      isDisabled={!isHovered}
-                    />
-                    {workflow.category !== 'default' && (
-                      <IconButton
-                        size="sm"
-                        variant="outline"
-                        aria-label={t('stylePresets.deleteTemplate')}
-                        onClick={handleClickDelete}
-                        isLoading={deleteWorkflowResult.isLoading}
-                        colorScheme="error"
-                        icon={<PiTrashBold />}
-                        isDisabled={!isHovered}
-                      />
-                    )}
-                  </Flex>
-                </Flex>
-              </Flex>
-            </Flex>
-          </Flex>
+        <Flex alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>
+          <IconButton
+            size="sm"
+            variant="ghost"
+            aria-label="Edit"
+            onClick={handleClickEdit}
+            isLoading={deleteWorkflowResult.isLoading}
+            icon={<PiPencilBold />}
+          />
+          <IconButton
+            size="sm"
+            variant="ghost"
+            aria-label="Download"
+            onClick={downloadWorkflow}
+            icon={<PiDownloadSimpleBold />}
+          />
+          {workflow.category !== 'default' && (
+            <IconButton
+              size="sm"
+              variant="ghost"
+              aria-label={t('stylePresets.deleteTemplate')}
+              onClick={handleClickDelete}
+              isLoading={deleteWorkflowResult.isLoading}
+              colorScheme="error"
+              icon={<PiTrashBold />}
+            />
+          )}
         </Flex>
       </Flex>
       <ConfirmationAlertDialog
