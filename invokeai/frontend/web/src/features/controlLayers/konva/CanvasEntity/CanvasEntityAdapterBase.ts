@@ -87,7 +87,7 @@ export abstract class CanvasEntityAdapterBase<
    */
   abstract getHashableState: () => SerializableObject;
 
-  private _selectIsHidden: Selector<RootState, boolean> | null = null;
+  selectIsHidden: Selector<RootState, boolean>;
 
   /**
    * The Konva nodes that make up the entity adapter:
@@ -171,6 +171,8 @@ export abstract class CanvasEntityAdapterBase<
     assert(state !== undefined, 'Missing entity state on creation');
     this.state = state;
 
+    this.selectIsHidden = buildEntityIsHiddenSelector(this.entityIdentifier);
+
     /**
      * There are a number of reason we may need to show or hide a layer:
      * - The entity is enabled/disabled
@@ -223,14 +225,6 @@ export abstract class CanvasEntityAdapterBase<
    * A redux selector that selects the entity's position from the canvas slice.
    */
   selectPosition = createSelector(this.selectState, (entity) => entity?.position);
-
-  get selectIsHidden() {
-    // This must be a getter because the selector depends on the entityIdentifier, which is set in the constructor.
-    if (!this._selectIsHidden) {
-      this._selectIsHidden = buildEntityIsHiddenSelector(this.entityIdentifier);
-    }
-    return this._selectIsHidden;
-  }
 
   syncIsOnscreen = () => {
     const stageRect = this.manager.stage.getScaledStageRect();
