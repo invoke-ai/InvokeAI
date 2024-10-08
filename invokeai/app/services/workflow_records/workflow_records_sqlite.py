@@ -189,7 +189,6 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             else:
                 pages = 1  # If no pagination, there is only one page
 
-            print(workflows)
             return PaginatedResults(
                 items=workflows,
                 page=page,
