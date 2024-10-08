@@ -1,11 +1,11 @@
 # This file was initially copied from:
 # https://github.com/huggingface/diffusers/blob/99f608218caa069a2f16dcf9efab46959b15aec0/src/diffusers/models/controlnet_flux.py
 
-from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
 
+from invokeai.backend.flux.controlnet.instantx_controlnet_flux_output import InstantXControlNetFluxOutput
 from invokeai.backend.flux.controlnet.zero_module import zero_module
 from invokeai.backend.flux.model import FluxParams
 from invokeai.backend.flux.modules.layers import (
@@ -15,21 +15,6 @@ from invokeai.backend.flux.modules.layers import (
     SingleStreamBlock,
     timestep_embedding,
 )
-
-
-@dataclass
-class InstantXControlNetFluxOutput:
-    controlnet_block_samples: list[torch.Tensor] | None
-    controlnet_single_block_samples: list[torch.Tensor] | None
-
-    def apply_weight(self, weight: float):
-        if self.controlnet_block_samples is not None:
-            for i in range(len(self.controlnet_block_samples)):
-                self.controlnet_block_samples[i] = self.controlnet_block_samples[i] * weight
-        if self.controlnet_single_block_samples is not None:
-            for i in range(len(self.controlnet_single_block_samples)):
-                self.controlnet_single_block_samples[i] = self.controlnet_single_block_samples[i] * weight
-
 
 # NOTE(ryand): Mapping between diffusers FLUX transformer params and BFL FLUX transformer params:
 # - Diffusers: BFL

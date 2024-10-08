@@ -6,8 +6,8 @@ from dataclasses import dataclass
 import torch
 from torch import Tensor, nn
 
-from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFluxOutput
-from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFluxOutput
+from invokeai.backend.flux.controlnet.instantx_controlnet_flux_output import InstantXControlNetFluxOutput
+from invokeai.backend.flux.controlnet.xlabs_controlnet_flux_output import XLabsControlNetFluxOutput
 from invokeai.backend.flux.modules.layers import (
     DoubleStreamBlock,
     EmbedND,

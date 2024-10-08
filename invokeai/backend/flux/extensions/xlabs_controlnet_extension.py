@@ -5,7 +5,8 @@ from PIL.Image import Image
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES, prepare_control_image
-from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux, XLabsControlNetFluxOutput
+from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
+from invokeai.backend.flux.controlnet.xlabs_controlnet_flux_output import XLabsControlNetFluxOutput
 from invokeai.backend.flux.extensions.base_controlnet_extension import BaseControlNetExtension
 
 
