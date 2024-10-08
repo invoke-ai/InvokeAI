@@ -94,13 +94,7 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
           {localTitle}
         </Text>
         {isHovering && (
-          <IconButton
-            aria-label="edit name"
-            icon={<PiPencilBold />}
-            size="sm"
-            variant="ghost"
-            onClick={onEdit}
-          />
+          <IconButton aria-label="edit name" icon={<PiPencilBold />} size="sm" variant="ghost" onClick={onEdit} />
         )}
       </Flex>
     );
