@@ -77,7 +77,7 @@ class InstantXControlNetExtension(BaseControlNetExtension):
         return cls(
             model=model,
             controlnet_cond=controlnet_cond,
-            instantx_control_mode=instantx_control_mode,
+            instantx_control_mode=instantx_control_mode if model.is_union else None,
             weight=weight,
             begin_step_percent=begin_step_percent,
             end_step_percent=end_step_percent,
