@@ -281,6 +281,7 @@
         "gallery": "Gallery",
         "alwaysShowImageSizeBadge": "Always Show Image Size Badge",
         "assets": "Assets",
+        "assetsTab": "Files you’ve uploaded for use in your projects.",
         "autoAssignBoardOnClick": "Auto-Assign Board on Click",
         "autoSwitchNewImages": "Auto-Switch to New Images",
         "copy": "Copy",
@@ -301,6 +302,7 @@
         "gallerySettings": "Gallery Settings",
         "go": "Go",
         "image": "image",
+        "imagesTab": "Images you’ve created and saved within Invoke.",
         "jump": "Jump",
         "loading": "Loading",
         "newestFirst": "Newest First",
@@ -1974,7 +1976,7 @@
         }
     },
     "newUserExperience": {
-        "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
+        "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio."
     },
     "whatsNew": {
