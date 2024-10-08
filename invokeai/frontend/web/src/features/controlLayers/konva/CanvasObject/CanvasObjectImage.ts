@@ -65,6 +65,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
           width,
           height,
           listening: false,
+          perfectDrawEnabled: false,
         }),
         text: new Konva.Text({
           name: `${this.type}:placeholder_text`,
@@ -78,6 +79,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
           fontStyle: '600',
           text: t('common.loadingImage', 'Loading Image'),
           listening: false,
+          perfectDrawEnabled: false,
         }),
       },
       image: null,
@@ -144,6 +146,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
             image: this.imageElement,
             width,
             height,
+            perfectDrawEnabled: false,
           });
           this.konva.group.add(this.konva.image);
         }

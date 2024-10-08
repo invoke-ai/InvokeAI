@@ -48,6 +48,7 @@ export class CanvasObjectBrushLineWithPressure extends CanvasModuleBase {
         listening: false,
         shadowForStrokeEnabled: false,
         globalCompositeOperation: 'source-over',
+        perfectDrawEnabled: false,
       }),
     };
     this.konva.group.add(this.konva.line);
