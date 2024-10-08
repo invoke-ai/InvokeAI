@@ -9,8 +9,6 @@ import {
   PopoverBody,
   PopoverContent,
   PopoverTrigger,
-  Tooltip,
-  useDisclosure,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $projectId } from 'app/store/nanostores/projectId';
@@ -92,39 +90,31 @@ export const WorkflowSortControl = () => {
     [direction, DIRECTION_OPTIONS]
   );
 
-  const { isOpen, onToggle, onClose } = useDisclosure();
-
   return (
-    <>
-      <Tooltip label={`Sorting by ${valueOrderBy?.label} ${valueDirection?.label}`}>
+    <Popover placement="bottom">
+      <PopoverTrigger>
         <IconButton
+          tooltip={`Sorting by ${valueOrderBy?.label} ${valueDirection?.label}`}
           aria-label="Sort Workflow Librar"
           icon={direction === 'ASC' ? <PiSortAscendingBold /> : <PiSortDescendingBold />}
           variant="ghost"
-          onClick={onToggle}
         />
-      </Tooltip>
+      </PopoverTrigger>
 
-      <Popover placement="bottom" isOpen={isOpen} onClose={onClose} returnFocusOnClose={false} closeOnBlur={false}>
-        <PopoverTrigger>
-          <Flex></Flex>
-        </PopoverTrigger>
-
-        <PopoverContent>
-          <PopoverBody>
-            <Flex flexDir="column" gap={4}>
-              <FormControl orientation="horizontal" gap={1}>
-                <FormLabel>{t('common.orderBy')}</FormLabel>
-                <Combobox value={valueOrderBy} options={orderByOptions} onChange={onChangeOrderBy} />
-              </FormControl>
-              <FormControl orientation="horizontal" gap={1}>
-                <FormLabel>{t('common.direction')}</FormLabel>
-                <Combobox value={valueDirection} options={DIRECTION_OPTIONS} onChange={onChangeDirection} />
-              </FormControl>
-            </Flex>
-          </PopoverBody>
-        </PopoverContent>
-      </Popover>
-    </>
+      <PopoverContent>
+        <PopoverBody>
+          <Flex flexDir="column" gap={4}>
+            <FormControl orientation="horizontal" gap={1}>
+              <FormLabel>{t('common.orderBy')}</FormLabel>
+              <Combobox value={valueOrderBy} options={orderByOptions} onChange={onChangeOrderBy} />
+            </FormControl>
+            <FormControl orientation="horizontal" gap={1}>
+              <FormLabel>{t('common.direction')}</FormLabel>
+              <Combobox value={valueDirection} options={DIRECTION_OPTIONS} onChange={onChangeDirection} />
+            </FormControl>
+          </Flex>
+        </PopoverBody>
+      </PopoverContent>
+    </Popover>
   );
 };
