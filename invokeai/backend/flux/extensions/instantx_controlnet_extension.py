@@ -8,8 +8,8 @@ from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES, prepare_control_image
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import (
     InstantXControlNetFlux,
-    InstantXControlNetFluxOutput,
 )
+from invokeai.backend.flux.controlnet.instantx_controlnet_flux_output import InstantXControlNetFluxOutput
 from invokeai.backend.flux.extensions.base_controlnet_extension import BaseControlNetExtension
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 

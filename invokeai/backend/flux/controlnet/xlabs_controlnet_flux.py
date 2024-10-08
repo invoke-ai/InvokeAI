@@ -2,24 +2,13 @@
 # https://github.com/XLabs-AI/x-flux/blob/47495425dbed499be1e8e5a6e52628b07349cba2/src/flux/controlnet.py
 
 
-from dataclasses import dataclass
-
 import torch
 from einops import rearrange
 
+from invokeai.backend.flux.controlnet.xlabs_controlnet_flux_output import XLabsControlNetFluxOutput
 from invokeai.backend.flux.controlnet.zero_module import zero_module
 from invokeai.backend.flux.model import FluxParams
 from invokeai.backend.flux.modules.layers import DoubleStreamBlock, EmbedND, MLPEmbedder, timestep_embedding
-
-
-@dataclass
-class XLabsControlNetFluxOutput:
-    controlnet_double_block_residuals: list[torch.Tensor] | None
-
-    def apply_weight(self, weight: float):
-        if self.controlnet_double_block_residuals is not None:
-            for i in range(len(self.controlnet_double_block_residuals)):
-                self.controlnet_double_block_residuals[i] = self.controlnet_double_block_residuals[i] * weight
 
 
 class XLabsControlNetFlux(torch.nn.Module):
