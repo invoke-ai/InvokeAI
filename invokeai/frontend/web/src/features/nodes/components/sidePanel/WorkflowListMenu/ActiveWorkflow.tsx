@@ -44,12 +44,12 @@ export const ActiveWorkflow = () => {
       <Spacer />
       {mode === 'edit' && <SaveWorkflowButton />}
       <ModeToggle />
-      <Tooltip label="Clear workflow">
+      <Tooltip label={t('nodes.clearWorkflow')}>
         <IconButton
           onClick={handleNewWorkflow}
           variant="outline"
           size="sm"
-          aria-label="Clear workflow"
+          aria-label={t('nodes.clearWorkflow')}
           icon={<PiXBold />}
           colorScheme="error"
         />
