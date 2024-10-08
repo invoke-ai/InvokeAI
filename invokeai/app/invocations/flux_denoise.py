@@ -359,8 +359,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     )
                 )
             elif isinstance(model, InstantXControlNetFlux):
-                # control_mode = torch.tensor(0, dtype=torch.long)
-                # control_mode = control_mode.reshape([-1, 1])
+                # TODO(ryand): Pass in the correct control mode.
+                control_mode = torch.tensor(0, dtype=torch.long)
+                control_mode = control_mode.reshape([-1, 1])
 
                 if self.controlnet_vae is None:
                     raise ValueError("A ControlNet VAE is required when using an InstantX FLUX ControlNet.")
@@ -370,8 +371,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     InstantXControlNetExtension.from_controlnet_image(
                         model=model,
                         controlnet_image=image,
-                        # TODO(ryand): Pass in the correct control mode.
-                        instantx_control_mode=None,
+                        instantx_control_mode=control_mode,
                         vae_info=vae_info,
                         latent_height=latent_height,
                         latent_width=latent_width,
