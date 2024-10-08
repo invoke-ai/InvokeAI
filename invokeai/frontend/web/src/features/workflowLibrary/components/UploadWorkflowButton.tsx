@@ -6,13 +6,20 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiUploadSimpleBold } from 'react-icons/pi';
 
+import { useSaveWorkflowAsDialog } from './SaveWorkflowAsDialog/useSaveWorkflowAsDialog';
+
 const UploadWorkflowButton = () => {
   const { t } = useTranslation();
   const resetRef = useRef<() => void>(null);
 
+  const { onOpen } = useSaveWorkflowAsDialog();
+
   const loadWorkflowFromFile = useLoadWorkflowFromFile({
     resetRef,
-    onSuccess: () => $isWorkflowListMenuIsOpen.set(false),
+    onSuccess: () => {
+      $isWorkflowListMenuIsOpen.set(false);
+      onOpen();
+    },
   });
 
   const onDropAccepted = useCallback(
@@ -34,8 +41,8 @@ const UploadWorkflowButton = () => {
   return (
     <>
       <IconButton
-        aria-label={t('workflows.uploadWorkflow')}
-        tooltip={t('workflows.uploadWorkflow')}
+        aria-label={t('workflows.uploadAndSaveWorkflow')}
+        tooltip={t('workflows.uploadAndSaveWorkflow')}
         icon={<PiUploadSimpleBold />}
         {...getRootProps()}
         pointerEvents="auto"

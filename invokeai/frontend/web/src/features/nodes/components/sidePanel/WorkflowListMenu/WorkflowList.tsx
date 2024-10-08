@@ -32,7 +32,7 @@ export const WorkflowList = ({ title, data }: { title: string; data: WorkflowRec
           <IAINoContentFallback
             fontSize="sm"
             py={4}
-            label={searchTerm ? t('stylePresets.noMatchingTemplates') : t('stylePresets.noTemplates')}
+            label={searchTerm ? t('nodes.noMatchingWorkflows') : t('nodes.noWorkflows')}
             icon={null}
           />
         )}

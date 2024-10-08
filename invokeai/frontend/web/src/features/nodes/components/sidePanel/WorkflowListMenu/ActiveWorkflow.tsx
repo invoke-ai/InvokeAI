@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ModeToggle } from 'features/nodes/components/sidePanel/ModeToggle';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
-import { selectWorkflowDescription, selectWorkflowName } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowDescription, selectWorkflowMode, selectWorkflowName } from 'features/nodes/store/workflowSlice';
 import type { MouseEventHandler } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,7 @@ import SaveWorkflowButton from './SaveWorkflowButton';
 export const ActiveWorkflow = () => {
   const activeWorkflowName = useAppSelector(selectWorkflowName);
   const activeWorkflowDescription = useAppSelector(selectWorkflowDescription);
+  const mode = useAppSelector(selectWorkflowMode);
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -41,8 +42,8 @@ export const ActiveWorkflow = () => {
         </Text>
       )}
       <Spacer />
+      {mode === 'edit' && <SaveWorkflowButton />}
       <ModeToggle />
-      <SaveWorkflowButton />
       <Tooltip label="Clear workflow">
         <IconButton
           onClick={handleNewWorkflow}

@@ -2,12 +2,10 @@ import 'reactflow/dist/style.css';
 
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
-import { selectWorkflowMode, selectWorkflowSlice } from 'features/nodes/store/workflowSlice';
+import { selectCleanEditor, selectWorkflowMode } from 'features/nodes/store/workflowSlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
@@ -27,12 +25,6 @@ const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',
   width: '100%',
 };
-
-export const selectCleanEditor = createMemoizedSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
-  const noNodes = !nodes.nodes.length;
-  const isTouched = workflow.isTouched;
-  return noNodes && !isTouched;
-});
 
 const NodeEditorPanelGroup = () => {
   const mode = useAppSelector(selectWorkflowMode);

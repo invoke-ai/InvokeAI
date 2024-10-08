@@ -92,7 +92,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
         </Tooltip>
         {isActive && (
           <Badge color="invokeBlue.400" borderColor="invokeBlue.700" borderWidth={1} bg="transparent" flexShrink={0}>
-            {t('stylePresets.active')}
+            {t('workflows.opened')}
           </Badge>
         )}
         <Spacer />
