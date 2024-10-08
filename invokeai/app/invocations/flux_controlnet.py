@@ -25,6 +25,10 @@ class FluxControlNetField(BaseModel):
         default=1, ge=0, le=1, description="When the ControlNet is last applied (% of total steps)"
     )
     resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode to use")
+    instantx_control_mode: int = Field(
+        default=0,
+        description="The control mode for InstantX ControlNet union models. Ignored for other ControlNet models.",
+    )
 
     @field_validator("control_weight")
     @classmethod
@@ -70,6 +74,10 @@ class FluxControlNetInvocation(BaseInvocation):
         default=1, ge=0, le=1, description="When the ControlNet is last applied (% of total steps)"
     )
     resize_mode: CONTROLNET_RESIZE_VALUES = InputField(default="just_resize", description="The resize mode used")
+    instantx_control_mode: int = InputField(
+        default=0,
+        description="The control mode for InstantX ControlNet union models. Ignored for other ControlNet models.",
+    )
 
     @field_validator("control_weight")
     @classmethod
@@ -91,5 +99,6 @@ class FluxControlNetInvocation(BaseInvocation):
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
                 resize_mode=self.resize_mode,
+                instantx_control_mode=self.instantx_control_mode,
             ),
         )
