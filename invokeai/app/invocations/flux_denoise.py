@@ -264,7 +264,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 step_callback=self._build_step_callback(context),
                 guidance=self.guidance,
                 inpaint_extension=inpaint_extension,
-                controlnet_extensions=controlnet_extensions,
+                xlabs_controlnet_extensions=xlabs_controlnet_extensions,
+                instantx_controlnet_extensions=instantx_controlnet_extensions,
             )
 
         x = unpack(x.float(), self.height, self.width)
