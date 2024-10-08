@@ -250,9 +250,9 @@ class InvokeAIAppConfig(BaseSettings):
             )
 
             if as_example:
-                file.write(
-                    "# This is an example file with default and example settings. Use the values here as a baseline.\n\n"
-                )
+                file.write("# This is an example file with default and example settings.\n")
+                file.write("# You should not copy this whole file into your config.\n")
+                file.write("# Only add the settings you need to change to your config file.\n\n")
             file.write("# Internal metadata - do not edit:\n")
             file.write(yaml.dump(meta_dict, sort_keys=False))
             file.write("\n")
