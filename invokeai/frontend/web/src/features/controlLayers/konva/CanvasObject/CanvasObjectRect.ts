@@ -35,7 +35,7 @@ export class CanvasObjectRect extends CanvasModuleBase {
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
-      rect: new Konva.Rect({ name: `${this.type}:rect`, listening: false }),
+      rect: new Konva.Rect({ name: `${this.type}:rect`, listening: false, perfectDrawEnabled: false }),
     };
     this.konva.group.add(this.konva.rect);
     this.state = state;

@@ -46,6 +46,7 @@ export class CanvasObjectEraserLine extends CanvasModuleBase {
         lineCap: 'round',
         lineJoin: 'round',
         globalCompositeOperation: 'destination-out',
+        perfectDrawEnabled: false,
       }),
     };
     this.konva.group.add(this.konva.line);

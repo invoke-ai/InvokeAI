@@ -57,6 +57,7 @@ export class CanvasToolEraser extends CanvasModuleBase {
         // The fill is used only to erase what is underneath it, so its color doesn't matter - just needs to be opaque
         fill: 'white',
         globalCompositeOperation: 'destination-out',
+        perfectDrawEnabled: false,
       }),
       innerBorder: new Konva.Ring({
         name: `${this.type}:eraser_inner_border_ring`,
@@ -65,6 +66,7 @@ export class CanvasToolEraser extends CanvasModuleBase {
         outerRadius: 0,
         fill: this.config.BORDER_INNER_COLOR,
         strokeEnabled: false,
+        perfectDrawEnabled: false,
       }),
       outerBorder: new Konva.Ring({
         name: `${this.type}:eraser_outer_border_ring`,
@@ -72,6 +74,7 @@ export class CanvasToolEraser extends CanvasModuleBase {
         outerRadius: 0,
         fill: this.config.BORDER_OUTER_COLOR,
         strokeEnabled: false,
+        perfectDrawEnabled: false,
       }),
     };
     this.konva.group.add(this.konva.cutoutCircle, this.konva.innerBorder, this.konva.outerBorder);

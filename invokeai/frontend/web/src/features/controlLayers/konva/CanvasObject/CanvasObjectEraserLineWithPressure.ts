@@ -48,6 +48,7 @@ export class CanvasObjectEraserLineWithPressure extends CanvasModuleBase {
         fill: 'red', // Eraser lines use compositing, does not matter what color they have
         shadowForStrokeEnabled: false,
         globalCompositeOperation: 'destination-out',
+        perfectDrawEnabled: false,
       }),
     };
     this.konva.group.add(this.konva.line);

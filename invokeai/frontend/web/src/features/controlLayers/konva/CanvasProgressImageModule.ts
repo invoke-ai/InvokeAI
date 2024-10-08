@@ -140,6 +140,7 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
           y,
           width,
           height,
+          perfectDrawEnabled: false,
         });
         this.konva.group.add(this.konva.image);
       }

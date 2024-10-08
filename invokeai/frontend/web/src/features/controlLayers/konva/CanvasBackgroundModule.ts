@@ -69,7 +69,7 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
       layer: new Konva.Layer({ name: `${this.type}:layer`, listening: false, imageSmoothingEnabled: false }),
       linesGroup: new Konva.Group({ name: `${this.type}:linesGroup` }),
       lines: [],
-      patternRect: new Konva.Rect({ name: `${this.type}:patternRect` }),
+      patternRect: new Konva.Rect({ name: `${this.type}:patternRect`, perfectDrawEnabled: false }),
     };
 
     this.konva.layer.add(this.konva.patternRect);
@@ -174,6 +174,7 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
         stroke: _x % 64 ? this.config.GRID_LINE_COLOR_FINE : this.config.GRID_LINE_COLOR_COARSE,
         strokeWidth,
         listening: false,
+        perfectDrawEnabled: false,
       });
       this.konva.lines.push(line);
       this.konva.linesGroup.add(line);
@@ -187,6 +188,7 @@ export class CanvasBackgroundModule extends CanvasModuleBase {
         stroke: _y % 64 ? this.config.GRID_LINE_COLOR_FINE : this.config.GRID_LINE_COLOR_COARSE,
         strokeWidth,
         listening: false,
+        perfectDrawEnabled: false,
       });
       this.konva.lines.push(line);
       this.konva.linesGroup.add(line);
