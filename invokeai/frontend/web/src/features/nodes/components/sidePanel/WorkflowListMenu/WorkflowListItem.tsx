@@ -9,7 +9,7 @@ import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/use
 import type { MouseEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiDownloadSimpleBold, PiPencilBold, PiShareFatBold, PiTrashBold } from 'react-icons/pi';
+import { PiDownloadSimpleBold, PiPencilBold, PiTrashBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemDTO } from 'services/api/types';
 
 export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemDTO }) => {
@@ -118,15 +118,6 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
                       aria-label="Download"
                       onClick={downloadWorkflow}
                       icon={<PiDownloadSimpleBold />}
-                      isDisabled={!isHovered}
-                    />
-                    <IconButton
-                      size="sm"
-                      variant="outline"
-                      aria-label={t('stylePresets.deleteTemplate')}
-                      onClick={handleClickDelete}
-                      isLoading={deleteWorkflowResult.isLoading}
-                      icon={<PiShareFatBold />}
                       isDisabled={!isHovered}
                     />
                     {workflow.category !== 'default' && (

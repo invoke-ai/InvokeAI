@@ -69,7 +69,7 @@ export const WorkflowListMenu = () => {
       ) : (
         <>
           {workflowCategories.map((category) => (
-            <WorkflowList key={category} title={t(`workflows.${category}Workflows`)} data={data[category]} isLoading />
+            <WorkflowList key={category} title={t(`workflows.${category}Workflows`)} data={data[category]} />
           ))}
         </>
       )}
