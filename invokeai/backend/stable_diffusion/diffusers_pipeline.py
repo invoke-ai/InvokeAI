@@ -204,6 +204,15 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             else:
                 raise Exception("torch-sdp attention slicing not available")
 
+        # See https://github.com/invoke-ai/InvokeAI/issues/7049 for context.
+        # Bumping torch from 2.2.2 to 2.4.1 caused the sliced attention implementation to produce incorrect results.
+        # For now, if a user is on an MPS device and has not explicitly set the attention_type, then we select the
+        # non-sliced torch-sdp implementation. This keeps things working on MPS at the cost of increased peak memory
+        # utilization.
+        if torch.backends.mps.is_available():
+            assert hasattr(torch.nn.functional, "scaled_dot_product_attention")
+            return
+
         # the remainder if this code is called when attention_type=='auto'
         if self.unet.device.type == "cuda":
             if is_xformers_available() and prefer_xformers:
