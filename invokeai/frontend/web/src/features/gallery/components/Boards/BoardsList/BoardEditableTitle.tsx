@@ -1,10 +1,11 @@
-import { Input, Text } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Input, Text } from '@invoke-ai/ui-library';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { withResultAsync } from 'common/util/result';
 import { toast } from 'features/toast/toast';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiPencilBold } from 'react-icons/pi';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import type { BoardDTO } from 'services/api/types';
 
@@ -16,6 +17,7 @@ type Props = {
 export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
   const { t } = useTranslation();
   const isEditing = useBoolean(false);
+  const [isHovering, setIsHovering] = useState(false);
   const [localTitle, setLocalTitle] = useState(board.board_name);
   const ref = useRef<HTMLInputElement>(null);
   const [updateBoard, updateBoardResult] = useUpdateBoardMutation();
@@ -58,6 +60,14 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
     [board.board_name, isEditing, onBlur]
   );
 
+  const handleMouseOver = useCallback(() => {
+    setIsHovering(true);
+  }, []);
+
+  const handleMouseOut = useCallback(() => {
+    setIsHovering(false);
+  }, []);
+
   useEffect(() => {
     if (isEditing.isTrue) {
       ref.current?.focus();
@@ -67,17 +77,28 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
 
   if (!isEditing.isTrue) {
     return (
-      <Text
-        size="sm"
-        fontWeight="semibold"
-        userSelect="none"
-        color={isSelected ? 'base.100' : 'base.300'}
-        onDoubleClick={isEditing.setTrue}
-        cursor="text"
-        minW={16}
-      >
-        {localTitle}
-      </Text>
+      <Flex alignItems="center" gap={1} onMouseOver={handleMouseOver} onMouseOut={handleMouseOut}>
+        <Text
+          size="sm"
+          fontWeight="semibold"
+          userSelect="none"
+          color={isSelected ? 'base.100' : 'base.300'}
+          onDoubleClick={isEditing.setTrue}
+          cursor="text"
+          minW={16}
+        >
+          {localTitle}
+        </Text>
+        {isHovering && (
+          <IconButton
+            aria-label="edit name"
+            icon={<PiPencilBold />}
+            size="sm"
+            variant="ghost"
+            onClick={isEditing.setTrue}
+          />
+        )}
+      </Flex>
     );
   }
 
