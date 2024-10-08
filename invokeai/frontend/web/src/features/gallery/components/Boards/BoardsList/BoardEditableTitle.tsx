@@ -77,7 +77,7 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
 
   if (!isEditing.isTrue) {
     return (
-      <Flex alignItems="center" gap={1} onMouseOver={handleMouseOver} onMouseOut={handleMouseOut}>
+      <Flex alignItems="center" gap={3} onMouseOver={handleMouseOver} onMouseOut={handleMouseOut}>
         <Text
           size="sm"
           fontWeight="semibold"
@@ -85,7 +85,6 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
           color={isSelected ? 'base.100' : 'base.300'}
           onDoubleClick={isEditing.setTrue}
           cursor="text"
-          minW={16}
         >
           {localTitle}
         </Text>
