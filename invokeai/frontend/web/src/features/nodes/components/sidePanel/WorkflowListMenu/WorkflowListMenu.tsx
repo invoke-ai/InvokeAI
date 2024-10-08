@@ -1,10 +1,13 @@
 import { Flex, Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import { $projectId } from 'app/store/nanostores/projectId';
 import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectWorkflowSearchTerm } from 'features/nodes/store/workflowSlice';
+import {
+  selectWorkflowOrderBy,
+  selectWorkflowOrderDirection,
+  selectWorkflowSearchTerm,
+} from 'features/nodes/store/workflowSlice';
 import UploadWorkflowButton from 'features/workflowLibrary/components/UploadWorkflowButton';
 import { useTranslation } from 'react-i18next';
 import { useListWorkflowsQuery } from 'services/api/endpoints/workflows';
@@ -12,12 +15,16 @@ import type { WorkflowRecordListItemDTO } from 'services/api/types';
 
 import { WorkflowList } from './WorkflowList';
 import WorkflowSearch from './WorkflowSearch';
+import { WorkflowSortControl } from './WorkflowSortControl';
 
 export const WorkflowListMenu = () => {
   const searchTerm = useAppSelector(selectWorkflowSearchTerm);
-  const projectId = useStore($projectId);
+  const orderBy = useAppSelector(selectWorkflowOrderBy);
+  const direction = useAppSelector(selectWorkflowOrderDirection);
+  const { t } = useTranslation();
+
   const { data, isLoading } = useListWorkflowsQuery(
-    { order_by: projectId ? 'created_at' : 'opened_at' },
+    { order_by: orderBy, direction },
     {
       selectFromResult: ({ data, isLoading }) => {
         const filteredData =
@@ -55,13 +62,14 @@ export const WorkflowListMenu = () => {
 
   const workflowCategories = useStore($workflowCategories);
 
-  const { t } = useTranslation();
-
   return (
     <Flex flexDir="column" gap={2} padding={3} layerStyle="second" borderRadius="base">
       <Flex alignItems="center" gap={2} w="full" justifyContent="space-between">
         <WorkflowSearch />
-        <UploadWorkflowButton />
+        <Flex>
+          <WorkflowSortControl />
+          <UploadWorkflowButton />
+        </Flex>
       </Flex>
 
       {isLoading ? (
