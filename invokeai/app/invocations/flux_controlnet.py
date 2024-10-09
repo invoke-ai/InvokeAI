@@ -16,7 +16,7 @@ from invokeai.app.util.controlnet_utils import CONTROLNET_RESIZE_VALUES
 
 class FluxControlNetField(BaseModel):
     image: ImageField = Field(description="The control image")
-    controlnet_model: ModelIdentifierField = Field(description="The ControlNet model to use")
+    control_model: ModelIdentifierField = Field(description="The ControlNet model to use")
     control_weight: float | list[float] = Field(default=1, description="The weight given to the ControlNet")
     begin_step_percent: float = Field(
         default=0, ge=0, le=1, description="When the ControlNet is first applied (% of total steps)"
@@ -42,7 +42,7 @@ class FluxControlNetField(BaseModel):
 class FluxControlNetOutput(BaseInvocationOutput):
     """FLUX ControlNet info"""
 
-    controlnet: FluxControlNetField = OutputField(description=FieldDescriptions.control)
+    control: FluxControlNetField = OutputField(description=FieldDescriptions.control)
 
 
 @invocation(
@@ -57,7 +57,7 @@ class FluxControlNetInvocation(BaseInvocation):
     """Collect FLUX ControlNet info to pass to other nodes."""
 
     image: ImageField = InputField(description="The control image")
-    controlnet_model: ModelIdentifierField = InputField(
+    control_model: ModelIdentifierField = InputField(
         description=FieldDescriptions.controlnet_model, ui_type=UIType.ControlNetModel
     )
     control_weight: float | list[float] = InputField(
@@ -84,9 +84,9 @@ class FluxControlNetInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> FluxControlNetOutput:
         return FluxControlNetOutput(
-            controlnet=FluxControlNetField(
+            control=FluxControlNetField(
                 image=self.image,
-                controlnet_model=self.controlnet_model,
+                control_model=self.control_model,
                 control_weight=self.control_weight,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,

@@ -92,7 +92,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description="The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images. FLUX dev only, ignored for schnell.",
     )
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
-    controlnet: FluxControlNetField | list[FluxControlNetField] | None = InputField(
+    control: FluxControlNetField | list[FluxControlNetField] | None = InputField(
         default=None, input=Input.Connection, description="ControlNet models."
     )
     controlnet_vae: VAEField | None = InputField(
@@ -322,14 +322,14 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     ) -> list[XLabsControlNetExtension | InstantXControlNetExtension]:
         # Normalize the controlnet input to list[ControlField].
         controlnets: list[FluxControlNetField]
-        if self.controlnet is None:
+        if self.control is None:
             controlnets = []
-        elif isinstance(self.controlnet, FluxControlNetField):
-            controlnets = [self.controlnet]
-        elif isinstance(self.controlnet, list):
-            controlnets = self.controlnet
+        elif isinstance(self.control, FluxControlNetField):
+            controlnets = [self.control]
+        elif isinstance(self.control, list):
+            controlnets = self.control
         else:
-            raise ValueError(f"Unsupported controlnet type: {type(self.controlnet)}")
+            raise ValueError(f"Unsupported controlnet type: {type(self.control)}")
 
         # TODO(ryand): Add a field to the model config so that we can distinguish between XLabs and InstantX ControlNets
         # before loading the models. Then make sure that all VAE encoding is done before loading the ControlNets to
@@ -337,7 +337,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension] = []
         for controlnet in controlnets:
-            model = exit_stack.enter_context(context.models.load(controlnet.controlnet_model))
+            model = exit_stack.enter_context(context.models.load(controlnet.control_model))
             image = context.images.get_pil(controlnet.image.image_name)
 
             if isinstance(model, XLabsControlNetFlux):
