@@ -119,12 +119,7 @@ const addControlNetToGraph = (
     control_weight: weight,
     image: { image_name },
   });
-
-  if (controlNet.type === 'flux_controlnet') {
-    g.addEdge(controlNet, 'controlnet', collector, 'item');
-  } else {
-    g.addEdge(controlNet, 'control', collector, 'item');
-  }
+  g.addEdge(controlNet, 'control', collector, 'item');
 };
 
 const addT2IAdapterToGraph = (

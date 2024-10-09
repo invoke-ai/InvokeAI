@@ -95,6 +95,7 @@ export const buildFLUXGraph = async (
   > = l2i;
 
   g.addEdge(modelLoader, 'transformer', noise, 'transformer');
+  g.addEdge(modelLoader, 'vae', noise, 'controlnet_vae');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
@@ -192,7 +193,7 @@ export const buildFLUXGraph = async (
     modelConfig.base
   );
   if (controlNetResult.addedControlNets > 0) {
-    g.addEdge(controlNetCollector, 'collection', noise, 'controlnet');
+    g.addEdge(controlNetCollector, 'collection', noise, 'control');
   } else {
     g.deleteNode(controlNetCollector.id);
   }

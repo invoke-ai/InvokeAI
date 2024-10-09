@@ -4622,7 +4622,7 @@ export type components = {
             /**
              * Fp32
              * @description Whether or not to use full float32 precision
-             * @default true
+             * @default false
              */
             fp32?: boolean;
             /**
@@ -4705,7 +4705,7 @@ export type components = {
             /**
              * Fp32
              * @description Whether or not to use full float32 precision
-             * @default true
+             * @default false
              */
             fp32?: boolean;
             /**
@@ -6297,7 +6297,7 @@ export type components = {
             /** @description The control image */
             image: components["schemas"]["ImageField"];
             /** @description The ControlNet model to use */
-            controlnet_model: components["schemas"]["ModelIdentifierField"];
+            control_model: components["schemas"]["ModelIdentifierField"];
             /**
              * Control Weight
              * @description The weight given to the ControlNet
@@ -6323,12 +6323,6 @@ export type components = {
              * @enum {string}
              */
             resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
-            /**
-             * Instantx Control Mode
-             * @description The control mode for InstantX ControlNet union models. Ignored for other ControlNet models.
-             * @default 0
-             */
-            instantx_control_mode?: number;
         };
         /**
          * FLUX ControlNet
@@ -6361,7 +6355,7 @@ export type components = {
              * @description ControlNet model to load
              * @default null
              */
-            controlnet_model?: components["schemas"]["ModelIdentifierField"];
+            control_model?: components["schemas"]["ModelIdentifierField"];
             /**
              * Control Weight
              * @description The weight given to the ControlNet
@@ -6388,12 +6382,6 @@ export type components = {
              */
             resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
             /**
-             * Instantx Control Mode
-             * @description The control mode for InstantX ControlNet union models. Ignored for other ControlNet models.
-             * @default 0
-             */
-            instantx_control_mode?: number;
-            /**
              * type
              * @default flux_controlnet
              * @constant
@@ -6407,7 +6395,7 @@ export type components = {
          */
         FluxControlNetOutput: {
             /** @description ControlNet(s) to apply */
-            controlnet: components["schemas"]["FluxControlNetField"];
+            control: components["schemas"]["FluxControlNetField"];
             /**
              * type
              * @default flux_controlnet_output
@@ -6512,11 +6500,11 @@ export type components = {
              */
             seed?: number;
             /**
-             * Controlnet
+             * Control
              * @description ControlNet models.
              * @default null
              */
-            controlnet?: components["schemas"]["FluxControlNetField"] | components["schemas"]["FluxControlNetField"][] | null;
+            control?: components["schemas"]["FluxControlNetField"] | components["schemas"]["FluxControlNetField"][] | null;
             /**
              * @description VAE
              * @default null
@@ -8863,7 +8851,7 @@ export type components = {
             /**
              * Fp32
              * @description Whether or not to use full float32 precision
-             * @default true
+             * @default false
              */
             fp32?: boolean;
             /**
@@ -10146,7 +10134,7 @@ export type components = {
             /**
              * Fp32
              * @description Whether or not to use full float32 precision
-             * @default true
+             * @default false
              */
             fp32?: boolean;
             /**
