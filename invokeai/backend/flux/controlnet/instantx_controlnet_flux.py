@@ -134,8 +134,13 @@ class InstantXControlNetFlux(torch.nn.Module):
 
         # If this is a union ControlNet, then concat the control mode embedding to the T5 text embedding.
         if self.is_union:
-            assert controlnet_mode is not None
-            controlnet_mode_emb = self.controlnet_mode_embedder(controlnet_mode)
+            if controlnet_mode is None:
+                # We allow users to enter 'None' as the controlnet_mode if they don't want to worry about this input.
+                # We've chosen to use a zero-embedding in this case.
+                zero_index = torch.zeros([1, 1], dtype=torch.long, device=txt.device)
+                controlnet_mode_emb = torch.zeros_like(self.controlnet_mode_embedder(zero_index))
+            else:
+                controlnet_mode_emb = self.controlnet_mode_embedder(controlnet_mode)
             txt = torch.cat([controlnet_mode_emb, txt], dim=1)
             txt_ids = torch.cat([txt_ids[:, :1, :], txt_ids], dim=1)
         else:
