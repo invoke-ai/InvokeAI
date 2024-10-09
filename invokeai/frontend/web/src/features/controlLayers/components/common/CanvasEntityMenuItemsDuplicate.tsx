@@ -1,5 +1,5 @@
-import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useIsEntityInteractable } from 'features/controlLayers/hooks/useEntityIsInteractable';
 import { entityDuplicated } from 'features/controlLayers/store/canvasSlice';
@@ -18,9 +18,13 @@ export const CanvasEntityMenuItemsDuplicate = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   return (
-    <MenuItem onClick={onClick} icon={<PiCopyFill />} isDisabled={!isInteractable}>
-      {t('controlLayers.duplicate')}
-    </MenuItem>
+    <IconMenuItem
+      aria-label={t('controlLayers.duplicate')}
+      tooltip={t('controlLayers.duplicate')}
+      onClick={onClick}
+      icon={<PiCopyFill />}
+      isDisabled={!isInteractable}
+    />
   );
 });
 
