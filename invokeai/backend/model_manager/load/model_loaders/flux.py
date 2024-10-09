@@ -34,6 +34,7 @@ from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
     CLIPEmbedDiffusersConfig,
     ControlNetCheckpointConfig,
+    ControlNetDiffusersConfig,
     MainBnbQuantized4bCheckpointConfig,
     MainCheckpointConfig,
     MainGGUFCheckpointConfig,
@@ -306,6 +307,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Diffusers)
 class FluxControlnetModel(ModelLoader):
     """Class to load FLUX ControlNet models."""
 
@@ -314,8 +316,13 @@ class FluxControlnetModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        assert isinstance(config, ControlNetCheckpointConfig)
-        model_path = Path(config.path)
+        if isinstance(config, ControlNetCheckpointConfig):
+            model_path = Path(config.path)
+        elif isinstance(config, ControlNetDiffusersConfig):
+            # If this is a diffusers directory, we simply ignore the config file and load from the weight file.
+            model_path = Path(config.path) / "diffusion_pytorch_model.safetensors"
+        else:
+            raise ValueError(f"Unexpected ControlNet model config type: {type(config)}")
 
         sd = load_file(model_path)
 
