@@ -13,7 +13,7 @@ import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/sel
 import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
-import { debounce, get } from 'lodash-es';
+import { clamp, debounce, get } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
@@ -376,9 +376,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   };
 
   /**
-   * Fits the proxy rect to the bounding box of the parent entity, then syncs the object group with the proxy rect.
+   * Fits the entity to the bbox using the "fill" strategy.
    */
-  fitProxyRectToBbox = () => {
+  fitToBboxFill = () => {
+    if (!this.$isTransformEnabled.get()) {
+      this.log.warn('Cannot fit to bbox contain when transform is disabled');
+      return;
+    }
     const { rect } = this.manager.stateApi.getBbox();
     const scaleX = rect.width / this.konva.proxyRect.width();
     const scaleY = rect.height / this.konva.proxyRect.height();
@@ -387,6 +391,68 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       y: rect.y,
       scaleX,
       scaleY,
+      rotation: 0,
+    });
+    this.syncObjectGroupWithProxyRect();
+  };
+
+  /**
+   * Fits the entity to the bbox using the "contain" strategy.
+   */
+  fitToBboxContain = () => {
+    if (!this.$isTransformEnabled.get()) {
+      this.log.warn('Cannot fit to bbox contain when transform is disabled');
+      return;
+    }
+    const { rect } = this.manager.stateApi.getBbox();
+    const width = this.konva.proxyRect.width();
+    const height = this.konva.proxyRect.height();
+    const scaleX = rect.width / width;
+    const scaleY = rect.height / height;
+
+    // "contain" means that the entity should be scaled to fit within the bbox, but it should not exceed the bbox.
+    const scale = Math.min(scaleX, scaleY);
+
+    // Center the shape within the bounding box
+    const offsetX = (rect.width - width * scale) / 2;
+    const offsetY = (rect.height - height * scale) / 2;
+
+    this.konva.proxyRect.setAttrs({
+      x: clamp(Math.round(rect.x + offsetX), rect.x, rect.x + rect.width),
+      y: clamp(Math.round(rect.y + offsetY), rect.y, rect.y + rect.height),
+      scaleX: scale,
+      scaleY: scale,
+      rotation: 0,
+    });
+    this.syncObjectGroupWithProxyRect();
+  };
+
+  /**
+   * Fits the entity to the bbox using the "cover" strategy.
+   */
+  fitToBboxCover = () => {
+    if (!this.$isTransformEnabled.get()) {
+      this.log.warn('Cannot fit to bbox contain when transform is disabled');
+      return;
+    }
+    const { rect } = this.manager.stateApi.getBbox();
+    const width = this.konva.proxyRect.width();
+    const height = this.konva.proxyRect.height();
+    const scaleX = rect.width / width;
+    const scaleY = rect.height / height;
+
+    // "cover" is the same as "contain", but we choose the larger scale to cover the shape
+    const scale = Math.max(scaleX, scaleY);
+
+    // Center the shape within the bounding box
+    const offsetX = (rect.width - width * scale) / 2;
+    const offsetY = (rect.height - height * scale) / 2;
+
+    this.konva.proxyRect.setAttrs({
+      x: Math.round(rect.x + offsetX),
+      y: Math.round(rect.y + offsetY),
+      scaleX: scale,
+      scaleY: scale,
       rotation: 0,
     });
     this.syncObjectGroupWithProxyRect();
