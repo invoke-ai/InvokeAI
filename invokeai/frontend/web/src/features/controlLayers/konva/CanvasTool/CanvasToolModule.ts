@@ -395,6 +395,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       const isMouseDown = getIsPrimaryMouseDown(e);
       this.$isMouseDown.set(isMouseDown);
 
+      this.syncCursorPositions();
       const cursorPos = this.$cursorPos.get();
       const tool = this.$tool.get();
       const settings = this.manager.stateApi.getSettings();
