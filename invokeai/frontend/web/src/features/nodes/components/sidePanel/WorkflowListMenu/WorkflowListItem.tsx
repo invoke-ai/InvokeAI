@@ -13,7 +13,6 @@ import { EMPTY_OBJECT } from 'app/store/constants';
 import { $projectUrl } from 'app/store/nanostores/projectId';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import dateFormat, { masks } from 'dateformat';
-import { useCopyWorkflowLinkModal } from 'features/nodes/hooks/useCopyWorkflowLinkModal';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { selectWorkflowId, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { useDeleteLibraryWorkflow } from 'features/workflowLibrary/hooks/useDeleteLibraryWorkflow';
@@ -25,7 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold, PiPencilBold, PiShareFatBold, PiTrashBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemDTO } from 'services/api/types';
 
-import { CopyWorkflowLinkModal } from './CopyWorkflowLinkModal';
+import { CopyWorkflowLinkModal, useCopyWorkflowLinkModal } from './CopyWorkflowLinkModal';
 import { WorkflowListItemTooltip } from './WorkflowListItemTooltip';
 
 export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemDTO }) => {
@@ -47,7 +46,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
   const workflowId = useAppSelector(selectWorkflowId);
   const downloadWorkflow = useDownloadWorkflow();
 
-  const { onOpen: onOpenCopyWorkflowLinkModal } = useCopyWorkflowLinkModal();
+  const copyWorkflowLinkModal = useCopyWorkflowLinkModal();
 
   const { deleteWorkflow, deleteWorkflowResult } = useDeleteLibraryWorkflow(EMPTY_OBJECT);
   const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow({
@@ -85,9 +84,9 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
   const handleClickShare = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      onOpenCopyWorkflowLinkModal();
+      copyWorkflowLinkModal.open();
     },
-    [onOpenCopyWorkflowLinkModal]
+    [copyWorkflowLinkModal]
   );
 
   return (
