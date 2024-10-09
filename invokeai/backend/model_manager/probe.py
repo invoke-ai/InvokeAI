@@ -120,6 +120,7 @@ class ModelProbe(object):
         "CLIPModel": ModelType.CLIPEmbed,
         "CLIPTextModel": ModelType.CLIPEmbed,
         "T5EncoderModel": ModelType.T5Encoder,
+        "FluxControlNetModel": ModelType.ControlNet,
     }
 
     @classmethod
@@ -865,22 +866,19 @@ class ControlNetFolderProbe(FolderProbeBase):
             raise InvalidModelConfigException(f"Cannot determine base type for {self.model_path}")
         with open(config_file, "r") as file:
             config = json.load(file)
+
+        if config.get("_class_name", None) == "FluxControlNetModel":
+            return BaseModelType.Flux
+
         # no obvious way to distinguish between sd2-base and sd2-768
         dimension = config["cross_attention_dim"]
-        base_model = (
-            BaseModelType.StableDiffusion1
-            if dimension == 768
-            else (
-                BaseModelType.StableDiffusion2
-                if dimension == 1024
-                else BaseModelType.StableDiffusionXL
-                if dimension == 2048
-                else None
-            )
-        )
-        if not base_model:
-            raise InvalidModelConfigException(f"Unable to determine model base for {self.model_path}")
-        return base_model
+        if dimension == 768:
+            return BaseModelType.StableDiffusion1
+        if dimension == 1024:
+            return BaseModelType.StableDiffusion2
+        if dimension == 2048:
+            return BaseModelType.StableDiffusionXL
+        raise InvalidModelConfigException(f"Unable to determine model base for {self.model_path}")
 
 
 class LoRAFolderProbe(FolderProbeBase):
