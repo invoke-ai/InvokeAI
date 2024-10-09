@@ -1,17 +1,9 @@
-import {
-  Badge,
-  ConfirmationAlertDialog,
-  Flex,
-  IconButton,
-  Spacer,
-  Text,
-  Tooltip,
-  useDisclosure,
-} from '@invoke-ai/ui-library';
+import { Badge, ConfirmationAlertDialog, Flex, IconButton, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { EMPTY_OBJECT } from 'app/store/constants';
 import { $projectUrl } from 'app/store/nanostores/projectId';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useDisclosure } from 'common/hooks/useBoolean';
 import dateFormat, { masks } from 'dateformat';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { selectWorkflowId, workflowModeChanged } from 'features/nodes/store/workflowSlice';
@@ -28,7 +20,7 @@ import { CopyWorkflowLinkModal, useCopyWorkflowLinkModal } from './CopyWorkflowL
 import { WorkflowListItemTooltip } from './WorkflowListItemTooltip';
 
 export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemDTO }) => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const deleteConfirmationDialog = useDisclosure(false);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const projectUrl = useStore($projectUrl);
@@ -70,15 +62,15 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
 
   const handleDeleteWorklow = useCallback(() => {
     deleteWorkflow(workflow.workflow_id);
-    onClose();
-  }, [workflow.workflow_id, deleteWorkflow, onClose]);
+    deleteConfirmationDialog.close();
+  }, [deleteWorkflow, workflow.workflow_id, deleteConfirmationDialog]);
 
   const handleClickDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
-      onOpen();
+      deleteConfirmationDialog.open();
     },
-    [onOpen]
+    [deleteConfirmationDialog]
   );
 
   const handleClickShare = useCallback(
@@ -178,8 +170,8 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
         </Flex>
       </Flex>
       <ConfirmationAlertDialog
-        isOpen={isOpen}
-        onClose={onClose}
+        isOpen={deleteConfirmationDialog.isOpen}
+        onClose={deleteConfirmationDialog.close}
         title={t('workflows.deleteWorkflow')}
         acceptCallback={handleDeleteWorklow}
         acceptButtonText={t('common.delete')}
