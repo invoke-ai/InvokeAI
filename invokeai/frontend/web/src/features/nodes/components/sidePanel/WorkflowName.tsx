@@ -28,7 +28,7 @@ export const WorkflowName = () => {
       )}
 
       {isTouched && mode === 'edit' && (
-        <Tooltip label="Workflow has unsaved changes">
+        <Tooltip label={t('nodes.newWorkflowDesc2')}>
           <Flex>
             <Icon as={PiDotOutlineFill} boxSize="20px" sx={{ color: 'invokeYellow.500' }} />
           </Flex>

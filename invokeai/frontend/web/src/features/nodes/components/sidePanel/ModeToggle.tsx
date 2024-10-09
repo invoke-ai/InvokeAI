@@ -1,6 +1,7 @@
 import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowMode, workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import type { MouseEventHandler } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold, PiPencilBold } from 'react-icons/pi';
@@ -10,13 +11,21 @@ export const ModeToggle = () => {
   const mode = useAppSelector(selectWorkflowMode);
   const { t } = useTranslation();
 
-  const onPointerUpEdit = useCallback(() => {
-    dispatch(workflowModeChanged('edit'));
-  }, [dispatch]);
+  const onClickEdit = useCallback<MouseEventHandler<HTMLButtonElement>>(
+    (e) => {
+      e.stopPropagation();
+      dispatch(workflowModeChanged('edit'));
+    },
+    [dispatch]
+  );
 
-  const onPointerUpView = useCallback(() => {
-    dispatch(workflowModeChanged('view'));
-  }, [dispatch]);
+  const onClickView = useCallback<MouseEventHandler<HTMLButtonElement>>(
+    (e) => {
+      e.stopPropagation();
+      dispatch(workflowModeChanged('view'));
+    },
+    [dispatch]
+  );
 
   return (
     <Flex justifyContent="flex-end">
@@ -24,18 +33,20 @@ export const ModeToggle = () => {
         <IconButton
           aria-label={t('nodes.editMode')}
           tooltip={t('nodes.editMode')}
-          onPointerUp={onPointerUpEdit}
+          onClick={onClickEdit}
           icon={<PiPencilBold />}
-          colorScheme="invokeBlue"
+          variant="outline"
+          size="sm"
         />
       )}
       {mode === 'edit' && (
         <IconButton
           aria-label={t('nodes.viewMode')}
           tooltip={t('nodes.viewMode')}
-          onPointerUp={onPointerUpView}
+          onClick={onClickView}
           icon={<PiEyeBold />}
-          colorScheme="invokeBlue"
+          variant="outline"
+          size="sm"
         />
       )}
     </Flex>

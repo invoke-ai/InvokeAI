@@ -22,7 +22,7 @@ export const EntityListSelectedEntityActionBarTransformButton = memo(() => {
 
   return (
     <IconButton
-      onPointerUp={transform.start}
+      onClick={transform.start}
       isDisabled={transform.isDisabled}
       size="sm"
       variant="link"

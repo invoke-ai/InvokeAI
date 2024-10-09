@@ -95,14 +95,14 @@ const Content = ({ data, feature, hideDisable }: ContentProps) => {
     [feature, t]
   );
 
-  const onPointerUpLearnMore = useCallback(() => {
+  const onClickLearnMore = useCallback(() => {
     if (!data?.href) {
       return;
     }
     window.open(data.href);
   }, [data?.href]);
 
-  const onPointerUpDontShowMeThese = useCallback(() => {
+  const onClickDontShowMeThese = useCallback(() => {
     dispatch(setShouldEnableInformationalPopovers(false));
     toast({
       title: t('settings.informationalPopoversDisabled'),
@@ -135,13 +135,13 @@ const Content = ({ data, feature, hideDisable }: ContentProps) => {
           <Divider />
           <Flex alignItems="center" justifyContent="space-between" w="full">
             {!hideDisable && (
-              <Button onPointerUp={onPointerUpDontShowMeThese} variant="link" size="sm">
+              <Button onClick={onClickDontShowMeThese} variant="link" size="sm">
                 {t('common.dontShowMeThese')}
               </Button>
             )}
             <Spacer />
             {data?.href && (
-              <Button onPointerUp={onPointerUpLearnMore} leftIcon={<PiArrowSquareOutBold />} variant="link" size="sm">
+              <Button onClick={onClickLearnMore} leftIcon={<PiArrowSquareOutBold />} variant="link" size="sm">
                 {t('common.learnMore') ?? heading}
               </Button>
             )}

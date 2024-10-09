@@ -120,7 +120,7 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
           icon={<PiTrashSimpleFill />}
           tooltip={t('controlLayers.deleteReferenceImage')}
           aria-label={t('controlLayers.deleteReferenceImage')}
-          onPointerUp={onDeleteIPAdapter}
+          onClick={onDeleteIPAdapter}
           colorScheme="error"
         />
       </Flex>
@@ -135,7 +135,7 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
             />
           </Box>
           <IconButton
-            onPointerUp={pullBboxIntoIPAdapter}
+            onClick={pullBboxIntoIPAdapter}
             isDisabled={isBusy}
             variant="ghost"
             aria-label={t('controlLayers.pullBboxIntoReferenceImage')}

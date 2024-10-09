@@ -13,6 +13,9 @@ import type { FieldIdentifier } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import type { WorkflowCategory, WorkflowV3 } from 'features/nodes/types/workflow';
 import { isEqual, omit, uniqBy } from 'lodash-es';
+import type { SQLiteDirection, WorkflowRecordOrderBy } from 'services/api/types';
+
+import { selectNodesSlice } from './selectors';
 
 const blankWorkflow: Omit<WorkflowV3, 'nodes' | 'edges'> = {
   name: '',
@@ -32,6 +35,10 @@ const initialWorkflowState: WorkflowState = {
   isTouched: false,
   mode: 'view',
   originalExposedFieldValues: [],
+  searchTerm: '',
+  orderBy: undefined, // initial value is decided in component
+  orderDirection: 'DESC',
+  categorySections: {},
   ...blankWorkflow,
 };
 
@@ -41,6 +48,19 @@ export const workflowSlice = createSlice({
   reducers: {
     workflowModeChanged: (state, action: PayloadAction<WorkflowMode>) => {
       state.mode = action.payload;
+    },
+    workflowSearchTermChanged: (state, action: PayloadAction<string>) => {
+      state.searchTerm = action.payload;
+    },
+    workflowOrderByChanged: (state, action: PayloadAction<WorkflowRecordOrderBy>) => {
+      state.orderBy = action.payload;
+    },
+    workflowOrderDirectionChanged: (state, action: PayloadAction<SQLiteDirection>) => {
+      state.orderDirection = action.payload;
+    },
+    categorySectionsChanged: (state, action: PayloadAction<{ id: string; isOpen: boolean }>) => {
+      const { id, isOpen } = action.payload;
+      state.categorySections[id] = isOpen;
     },
     workflowExposedFieldAdded: (state, action: PayloadAction<FieldIdentifierWithValue>) => {
       state.exposedFields = uniqBy(
@@ -207,6 +227,10 @@ export const {
   workflowContactChanged,
   workflowIDChanged,
   workflowSaved,
+  workflowSearchTermChanged,
+  workflowOrderByChanged,
+  workflowOrderDirectionChanged,
+  categorySectionsChanged,
 } = workflowSlice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -232,3 +256,14 @@ export const selectWorkflowName = createWorkflowSelector((workflow) => workflow.
 export const selectWorkflowId = createWorkflowSelector((workflow) => workflow.id);
 export const selectWorkflowMode = createWorkflowSelector((workflow) => workflow.mode);
 export const selectWorkflowIsTouched = createWorkflowSelector((workflow) => workflow.isTouched);
+export const selectWorkflowSearchTerm = createWorkflowSelector((workflow) => workflow.searchTerm);
+export const selectWorkflowOrderBy = createWorkflowSelector((workflow) => workflow.orderBy);
+export const selectWorkflowOrderDirection = createWorkflowSelector((workflow) => workflow.orderDirection);
+export const selectWorkflowDescription = createWorkflowSelector((workflow) => workflow.description);
+
+export const selectCleanEditor = createSelector([selectNodesSlice, selectWorkflowSlice], (nodes, workflow) => {
+  const noNodes = !nodes.nodes.length;
+  const isTouched = workflow.isTouched;
+  const savedWorkflow = !!workflow.id;
+  return noNodes && !isTouched && !savedWorkflow;
+});

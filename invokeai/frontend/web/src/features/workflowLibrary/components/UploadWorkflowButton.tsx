@@ -1,17 +1,27 @@
-import { Button } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
+import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { useLoadWorkflowFromFile } from 'features/workflowLibrary/hooks/useLoadWorkflowFromFile';
-import { useWorkflowLibraryModal } from 'features/workflowLibrary/store/isWorkflowLibraryModalOpen';
 import { memo, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiUploadSimpleBold } from 'react-icons/pi';
 
+import { useSaveWorkflowAsDialog } from './SaveWorkflowAsDialog/useSaveWorkflowAsDialog';
+
 const UploadWorkflowButton = () => {
   const { t } = useTranslation();
   const resetRef = useRef<() => void>(null);
-  const workflowLibraryModal = useWorkflowLibraryModal();
 
-  const loadWorkflowFromFile = useLoadWorkflowFromFile({ resetRef, onSuccess: workflowLibraryModal.setFalse });
+  const { onOpen } = useSaveWorkflowAsDialog();
+
+  const loadWorkflowFromFile = useLoadWorkflowFromFile({
+    resetRef,
+    onSuccess: () => {
+      $isWorkflowListMenuIsOpen.set(false);
+      onOpen();
+    },
+  });
+
   const onDropAccepted = useCallback(
     (files: File[]) => {
       if (!files[0]) {
@@ -30,15 +40,15 @@ const UploadWorkflowButton = () => {
   });
   return (
     <>
-      <Button
-        aria-label={t('workflows.uploadWorkflow')}
-        tooltip={t('workflows.uploadWorkflow')}
-        leftIcon={<PiUploadSimpleBold />}
+      <IconButton
+        aria-label={t('workflows.uploadAndSaveWorkflow')}
+        tooltip={t('workflows.uploadAndSaveWorkflow')}
+        icon={<PiUploadSimpleBold />}
         {...getRootProps()}
         pointerEvents="auto"
-      >
-        {t('workflows.uploadWorkflow')}
-      </Button>
+        variant="ghost"
+      />
+
       <input {...getInputProps()} />
     </>
   );

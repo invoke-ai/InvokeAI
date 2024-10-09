@@ -60,7 +60,7 @@ export const CanvasToolbarResetViewButton = memo(() => {
     <IconButton
       tooltip={t('hotkeys.canvas.fitLayersToCanvas.title')}
       aria-label={t('hotkeys.canvas.fitLayersToCanvas.title')}
-      onPointerUp={canvasManager.stage.fitLayersToStage}
+      onClick={canvasManager.stage.fitLayersToStage}
       icon={<PiArrowsOutBold />}
       variant="link"
       alignSelf="stretch"

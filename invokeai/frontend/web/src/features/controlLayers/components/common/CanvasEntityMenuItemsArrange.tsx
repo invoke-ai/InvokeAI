@@ -89,28 +89,28 @@ export const CanvasEntityMenuItemsArrange = memo(() => {
   return (
     <>
       <MenuItem
-        onPointerUp={moveToFront}
+        onClick={moveToFront}
         isDisabled={!validActions.canMoveToFront || !isInteractable}
         icon={<PiArrowLineUpBold />}
       >
         {t('controlLayers.moveToFront')}
       </MenuItem>
       <MenuItem
-        onPointerUp={moveForwardOne}
+        onClick={moveForwardOne}
         isDisabled={!validActions.canMoveForwardOne || !isInteractable}
         icon={<PiArrowUpBold />}
       >
         {t('controlLayers.moveForward')}
       </MenuItem>
       <MenuItem
-        onPointerUp={moveBackwardOne}
+        onClick={moveBackwardOne}
         isDisabled={!validActions.canMoveBackwardOne || !isInteractable}
         icon={<PiArrowDownBold />}
       >
         {t('controlLayers.moveBackward')}
       </MenuItem>
       <MenuItem
-        onPointerUp={moveToBack}
+        onClick={moveToBack}
         isDisabled={!validActions.canMoveToBack || !isInteractable}
         icon={<PiArrowLineDownBold />}
       >

@@ -21,7 +21,7 @@ export const ParamSeedShuffle = memo(() => {
     <Button
       size="sm"
       isDisabled={shouldRandomizeSeed}
-      onPointerUp={handleClickRandomizeSeed}
+      onClick={handleClickRandomizeSeed}
       leftIcon={<PiShuffleBold />}
       flexShrink={0}
     >

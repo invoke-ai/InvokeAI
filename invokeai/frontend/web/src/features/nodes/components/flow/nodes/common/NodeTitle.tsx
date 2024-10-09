@@ -5,7 +5,7 @@ import { useNodeLabel } from 'features/nodes/hooks/useNodeLabel';
 import { useNodeTemplateTitle } from 'features/nodes/hooks/useNodeTemplateTitle';
 import { nodeLabelChanged } from 'features/nodes/store/nodesSlice';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
-import type { PointerEvent } from 'react';
+import type { MouseEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -63,12 +63,12 @@ export default memo(NodeTitle);
 function EditableControls() {
   const { isEditing, getEditButtonProps } = useEditableControls();
   const handleDoubleClick = useCallback(
-    (e: PointerEvent<HTMLDivElement>) => {
-      const { onPointerUp } = getEditButtonProps();
-      if (!onPointerUp) {
+    (e: MouseEvent<HTMLDivElement>) => {
+      const { onClick } = getEditButtonProps();
+      if (!onClick) {
         return;
       }
-      onPointerUp(e);
+      onClick(e);
     },
     [getEditButtonProps]
   );

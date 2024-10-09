@@ -105,7 +105,7 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 ### Other features
 
 - Support for both ckpt and diffusers models
-- SD1.5, SD2.0, and SDXL support
+- SD1.5, SD2.0, SDXL, and FLUX support
 - Upscaling Tools
 - Embedding Manager & Support
 - Model Manager & Support

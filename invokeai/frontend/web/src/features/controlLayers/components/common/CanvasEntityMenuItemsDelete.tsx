@@ -18,7 +18,7 @@ export const CanvasEntityMenuItemsDelete = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   return (
-    <MenuItem onPointerUp={deleteEntity} icon={<PiTrashSimpleBold />} isDestructive isDisabled={!isInteractable}>
+    <MenuItem onClick={deleteEntity} icon={<PiTrashSimpleBold />} isDestructive isDisabled={!isInteractable}>
       {t('common.delete')}
     </MenuItem>
   );

@@ -9,6 +9,7 @@ import {
   TabList,
   Tabs,
   Text,
+  Tooltip,
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
@@ -74,17 +75,21 @@ export const Gallery = () => {
             {boardName}
           </Text>
           <Spacer />
-          <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onPointerUp={handleClickImages} data-testid="images-tab">
-            {t('parameters.images')}
-          </Tab>
-          <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onPointerUp={handleClickAssets} data-testid="assets-tab">
-            {t('gallery.assets')}
-          </Tab>
+          <Tooltip label={t('gallery.imagesTab')}>
+            <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickImages} data-testid="images-tab">
+              {t('parameters.images')}
+            </Tab>
+          </Tooltip>
+          <Tooltip label={t('gallery.assetsTab')}>
+            <Tab sx={BASE_STYLES} _selected={SELECTED_STYLES} onClick={handleClickAssets} data-testid="assets-tab">
+              {t('gallery.assets')}
+            </Tab>
+          </Tooltip>
           <IconButton
             size="sm"
             variant="link"
             alignSelf="stretch"
-            onPointerUp={handleClickSearch}
+            onClick={handleClickSearch}
             tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
             aria-label={t('gallery.displaySearch')}
             icon={<PiMagnifyingGlassBold />}

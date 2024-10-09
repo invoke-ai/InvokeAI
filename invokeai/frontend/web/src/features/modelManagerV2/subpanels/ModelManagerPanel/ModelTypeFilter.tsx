@@ -46,12 +46,12 @@ export const ModelTypeFilter = memo(() => {
         {filteredModelType ? MODEL_TYPE_LABELS[filteredModelType] : t('modelManager.allModels')}
       </MenuButton>
       <MenuList>
-        <MenuItem onPointerUp={clearModelType}>{t('modelManager.allModels')}</MenuItem>
+        <MenuItem onClick={clearModelType}>{t('modelManager.allModels')}</MenuItem>
         {objectKeys(MODEL_TYPE_LABELS).map((option) => (
           <MenuItem
             key={option}
             bg={filteredModelType === option ? 'base.700' : 'transparent'}
-            onPointerUp={selectModelType.bind(null, option)}
+            onClick={selectModelType.bind(null, option)}
           >
             {MODEL_TYPE_LABELS[option]}
           </MenuItem>

@@ -21,7 +21,7 @@ const ResumeProcessorButton = ({ asIconButton }: Props) => {
       isDisabled={isDisabled}
       isLoading={isLoading}
       icon={<PiPlayFill />}
-      onPointerUp={resumeProcessor}
+      onClick={resumeProcessor}
       colorScheme="green"
     />
   );

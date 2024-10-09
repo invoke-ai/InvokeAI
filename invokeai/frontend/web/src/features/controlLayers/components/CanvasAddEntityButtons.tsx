@@ -33,7 +33,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onPointerUp={addGlobalReferenceImage}
+            onClick={addGlobalReferenceImage}
             isDisabled={isFLUX}
           >
             {t('controlLayers.globalReferenceImage')}
@@ -46,7 +46,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onPointerUp={addInpaintMask}
+            onClick={addInpaintMask}
           >
             {t('controlLayers.inpaintMask')}
           </Button>
@@ -55,7 +55,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onPointerUp={addRegionalGuidance}
+            onClick={addRegionalGuidance}
             isDisabled={isFLUX}
           >
             {t('controlLayers.regionalGuidance')}
@@ -65,7 +65,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onPointerUp={addRegionalReferenceImage}
+            onClick={addRegionalReferenceImage}
             isDisabled={isFLUX}
           >
             {t('controlLayers.regionalReferenceImage')}
@@ -79,7 +79,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onPointerUp={addControlLayer}
+            onClick={addControlLayer}
             isDisabled={isFLUX}
           >
             {t('controlLayers.controlLayer')}
@@ -89,7 +89,7 @@ export const CanvasAddEntityButtons = memo(() => {
             variant="ghost"
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
-            onPointerUp={addRasterLayer}
+            onClick={addRasterLayer}
           >
             {t('controlLayers.rasterLayer')}
           </Button>

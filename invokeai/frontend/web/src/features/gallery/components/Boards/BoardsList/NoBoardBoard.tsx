@@ -64,7 +64,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
           <Tooltip label={<BoardTooltip board={null} />} openDelay={1000} placement="left" closeOnScroll>
             <Flex
               ref={ref}
-              onPointerUp={handleSelectBoard}
+              onClick={handleSelectBoard}
               w="full"
               h="full"
               alignItems="center"

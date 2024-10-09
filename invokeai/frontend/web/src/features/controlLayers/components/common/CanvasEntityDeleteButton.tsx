@@ -12,7 +12,7 @@ export const CanvasEntityDeleteButton = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
   const dispatch = useAppDispatch();
   const isBusy = useCanvasIsBusy();
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     dispatch(entityDeleted({ entityIdentifier }));
   }, [dispatch, entityIdentifier]);
 
@@ -24,7 +24,7 @@ export const CanvasEntityDeleteButton = memo(() => {
       variant="link"
       alignSelf="stretch"
       icon={<PiTrashSimpleFill />}
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       colorScheme="error"
       isDisabled={isBusy}
     />

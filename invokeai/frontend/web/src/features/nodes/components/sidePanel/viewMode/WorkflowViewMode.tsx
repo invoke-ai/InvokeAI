@@ -23,7 +23,7 @@ export const WorkflowViewMode = () => {
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
-        <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} h="full" w="full">
+        <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} w="full" h="full">
           {isLoading ? (
             <IAINoContentFallback label={t('nodes.loadingNodes')} icon={null} />
           ) : fields.length ? (

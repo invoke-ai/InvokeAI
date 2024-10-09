@@ -157,7 +157,7 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
         aspectRatio="1/1"
       >
         <IAIDndImage
-          onPointerUp={handleClick}
+          onClick={handleClick}
           onDoubleClick={onDoubleClick}
           imageDTO={imageDTO}
           draggableData={draggableData}
@@ -191,7 +191,7 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
               >{`${imageDTO.width}x${imageDTO.height}`}</Text>
             )}
             <IAIDndImageIcon
-              onPointerUp={toggleStarredState}
+              onClick={toggleStarredState}
               icon={starIcon}
               tooltip={starTooltip}
               position="absolute"
@@ -213,7 +213,7 @@ const DeleteIcon = ({ imageDTO }: { imageDTO: ImageDTO }) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const onPointerUp = useCallback(
+  const onClick = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
       if (!imageDTO) {
@@ -230,7 +230,7 @@ const DeleteIcon = ({ imageDTO }: { imageDTO: ImageDTO }) => {
 
   return (
     <IAIDndImageIcon
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       icon={<PiTrashSimpleFill />}
       tooltip={t('gallery.deleteImage_one')}
       position="absolute"
@@ -244,13 +244,13 @@ const OpenInViewerIconButton = ({ imageDTO }: { imageDTO: ImageDTO }) => {
   const imageViewer = useImageViewer();
   const { t } = useTranslation();
 
-  const onPointerUp = useCallback(() => {
+  const onClick = useCallback(() => {
     imageViewer.openImageInViewer(imageDTO);
   }, [imageDTO, imageViewer]);
 
   return (
     <IAIDndImageIcon
-      onPointerUp={onPointerUp}
+      onClick={onClick}
       icon={<PiArrowsOutBold />}
       tooltip={t('gallery.openInViewer')}
       position="absolute"

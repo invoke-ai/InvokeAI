@@ -22,7 +22,7 @@ export const StylePresetMenuTrigger = () => {
 
   return (
     <Flex
-      onPointerUp={handleToggle}
+      onClick={handleToggle}
       backgroundColor="base.800"
       justifyContent="space-between"
       alignItems="center"

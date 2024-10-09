@@ -172,10 +172,10 @@ const initialConfigState: AppConfig = {
       initial: 4,
       sliderMin: 2,
       sliderMax: 6,
-      numberInputMin: 2,
-      numberInputMax: 6,
+      numberInputMin: 1,
+      numberInputMax: 20,
       fineStep: 0.1,
-      coarseStep: 1,
+      coarseStep: 0.5,
     },
   },
 };
