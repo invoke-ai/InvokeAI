@@ -422,6 +422,41 @@ STARTER_MODELS: list[StarterModel] = [
         description="ControlNet weights trained on sdxl-1.0 with tiled image conditioning",
         type=ModelType.ControlNet,
     ),
+    StarterModel(
+        name="flux-canny-controlnet-v3",
+        base=BaseModelType.Flux,
+        source="https://huggingface.co/XLabs-AI/flux-controlnet-collections/resolve/main/flux-canny-controlnet-v3.safetensors",
+        description="ControlNet weights trained on FLUX with canny image conditioning",
+        type=ModelType.ControlNet,
+    ),
+    StarterModel(
+        name="flux-depth-controlnet-v3",
+        base=BaseModelType.Flux,
+        source="https://huggingface.co/XLabs-AI/flux-controlnet-collections/resolve/main/flux-depth-controlnet-v3.safetensors",
+        description="ControlNet weights trained on FLUX with depth image conditioning",
+        type=ModelType.ControlNet,
+    ),
+    StarterModel(
+        name="flux-hed-controlnet-v3",
+        base=BaseModelType.Flux,
+        source="https://huggingface.co/XLabs-AI/flux-controlnet-collections/resolve/main/flux-hed-controlnet-v3.safetensors",
+        description="ControlNet weights trained on FLUX with HED image conditioning",
+        type=ModelType.ControlNet,
+    ),
+    StarterModel(
+        name="FLUX.1-dev-Controlnet-Canny",
+        base=BaseModelType.Flux,
+        source="InstantX/FLUX.1-dev-Controlnet-Canny",
+        description="ControlNet weights trained on FLUX with Canny image conditioning",
+        type=ModelType.ControlNet,
+    ),
+    StarterModel(
+        name="FLUX.1-dev-Controlnet-Union",
+        base=BaseModelType.Flux,
+        source="InstantX/FLUX.1-dev-Controlnet-Union",
+        description="A unified ControlNet for FLUX.1-dev model that supports 7 control modes, including canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6)",
+        type=ModelType.ControlNet,
+    ),
     # endregion
     # region T2I Adapter
     StarterModel(
