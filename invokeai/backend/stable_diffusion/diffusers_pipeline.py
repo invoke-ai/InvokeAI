@@ -171,8 +171,19 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         """
         if xformers is available, use it, otherwise use sliced attention.
         """
+
+        # On 30xx and 40xx series GPUs, `torch-sdp` is faster than `xformers`. This corresponds to a CUDA major
+        # version of 8 or higher. So, for major version 7 or below, we prefer `xformers`.
+        # See:
+        # - https://developer.nvidia.com/cuda-gpus
+        # - https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#compute-capabilities
+        try:
+            prefer_xformers = torch.cuda.is_available() and torch.cuda.get_device_properties("cuda").major <= 7  # type: ignore # Type of "get_device_properties" is partially unknown
+        except Exception:
+            prefer_xformers = False
+
         config = get_config()
-        if config.attention_type == "xformers":
+        if config.attention_type == "xformers" and is_xformers_available() and prefer_xformers:
             self.enable_xformers_memory_efficient_attention()
             return
         elif config.attention_type == "sliced":
@@ -195,7 +206,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
 
         # the remainder if this code is called when attention_type=='auto'
         if self.unet.device.type == "cuda":
-            if is_xformers_available():
+            if is_xformers_available() and prefer_xformers:
                 self.enable_xformers_memory_efficient_attention()
                 return
             elif hasattr(torch.nn.functional, "scaled_dot_product_attention"):
