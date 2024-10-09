@@ -38,8 +38,8 @@ class InstantXControlNetExtension(BaseControlNetExtension):
         # TODO(ryand): Should we define an enum for the instantx_control_mode? Is it likely to change for future models?
         # The control mode for InstantX ControlNet union models.
         # See the values defined here: https://huggingface.co/InstantX/FLUX.1-dev-Controlnet-Union#control-mode
-        # Expected shape: (batch_size, 1)
-        # Expected dtype: torch.long
+        # Expected shape: (batch_size, 1), Expected dtype: torch.long
+        # If None, a zero-embedding will be used.
         self._instantx_control_mode = instantx_control_mode
 
         # TODO(ryand): Pass in these params if a new base transformer / InstantX ControlNet pair get released.
@@ -86,7 +86,7 @@ class InstantXControlNetExtension(BaseControlNetExtension):
         return cls(
             model=model,
             controlnet_cond=controlnet_cond,
-            instantx_control_mode=instantx_control_mode if model.is_union else None,
+            instantx_control_mode=instantx_control_mode,
             weight=weight,
             begin_step_percent=begin_step_percent,
             end_step_percent=end_step_percent,
