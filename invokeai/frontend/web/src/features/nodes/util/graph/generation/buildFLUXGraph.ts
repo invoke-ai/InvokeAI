@@ -19,6 +19,8 @@ import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
+import { addControlNets } from './addControlAdapters';
+
 const log = logger('system');
 
 export const buildFLUXGraph = async (
@@ -175,6 +177,24 @@ export const buildFLUXGraph = async (
       denoisingStart,
       false
     );
+  }
+
+  const controlNetCollector = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('control_net_collector'),
+  });
+  const controlNetResult = await addControlNets(
+    manager,
+    canvas.controlLayers.entities,
+    g,
+    canvas.bbox.rect,
+    controlNetCollector,
+    modelConfig.base
+  );
+  if (controlNetResult.addedControlNets > 0) {
+    g.addEdge(controlNetCollector, 'collection', noise, 'controlnet');
+  } else {
+    g.deleteNode(controlNetCollector.id);
   }
 
   if (state.system.shouldUseNSFWChecker) {
