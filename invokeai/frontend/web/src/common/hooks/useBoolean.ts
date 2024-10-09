@@ -47,6 +47,54 @@ export const buildUseBoolean = (initialValue: boolean): [() => UseBoolean, Writa
   return [useBoolean, $boolean] as const;
 };
 
+type UseDisclosure = {
+  isOpen: boolean;
+  open: () => void;
+  close: () => void;
+  set: (isOpen: boolean) => void;
+  toggle: () => void;
+};
+
+/**
+ * This is the same as `buildUseBoolean`, but the method names are more descriptive,
+ * serving the semantics of a disclosure state.
+ *
+ * Creates a hook to manage a boolean state. The boolean is stored in a nanostores atom.
+ * Returns a tuple containing the hook and the atom. Use this for global boolean state.
+ *
+ * @param defaultIsOpen Initial state of the disclosure
+ */
+export const buildUseDisclosure = (defaultIsOpen: boolean): [() => UseDisclosure, WritableAtom<boolean>] => {
+  const $isOpen = atom(defaultIsOpen);
+
+  const open = () => {
+    $isOpen.set(true);
+  };
+  const close = () => {
+    $isOpen.set(false);
+  };
+  const set = (isOpen: boolean) => {
+    $isOpen.set(isOpen);
+  };
+  const toggle = () => {
+    $isOpen.set(!$isOpen.get());
+  };
+
+  const useDisclosure = () => {
+    const isOpen = useStore($isOpen);
+
+    return {
+      isOpen,
+      open,
+      close,
+      set,
+      toggle,
+    };
+  };
+
+  return [useDisclosure, $isOpen] as const;
+};
+
 /**
  * Hook to manage a boolean state. Use this for a local boolean state.
  * @param initialValue Initial value of the boolean
