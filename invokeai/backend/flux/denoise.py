@@ -61,6 +61,9 @@ def denoise(
             )
 
         # Merge the ControlNet residuals from multiple ControlNets.
+        # TODO(ryand): We may want to alculate the sum just-in-time to keep peak memory low. Keep in mind, that the
+        # controlnet_residuals datastructure is efficient in that it likely contains multiple references to the same
+        # tensors. Calculating the sum materializes each tensor into its own instance.
         merged_controlnet_residuals = sum_controlnet_flux_outputs(controlnet_residuals)
 
         pred = model(
