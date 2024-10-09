@@ -1809,6 +1809,10 @@
         "transform": {
             "transform": "Transform",
             "fitToBbox": "Fit to Bbox",
+            "fitMode": "Fit Mode",
+            "fitModeContain": "Contain",
+            "fitModeCover": "Cover",
+            "fitModeFill": "Fill",
             "reset": "Reset",
             "apply": "Apply",
             "cancel": "Cancel"
