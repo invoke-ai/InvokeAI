@@ -97,6 +97,46 @@ def clip_timestep_schedule(timesteps: list[float], denoising_start: float, denoi
     return clipped_timesteps
 
 
+def clip_timestep_schedule_fractional(
+    timesteps: list[float], denoising_start: float, denoising_end: float
+) -> list[float]:
+    """Clip the timestep schedule to the denoising range. Insert new timesteps to exactly match the desired denoising
+    range. (A fractional version of clip_timestep_schedule().)
+
+    Args:
+        timesteps (list[float]): The original timestep schedule: [1.0, ..., 0.0].
+        denoising_start (float): A value in [0, 1] specifying the start of the denoising process. E.g. a value of 0.2
+            would mean that the denoising process start at t=0.8.
+        denoising_end (float): A value in [0, 1] specifying the end of the denoising process. E.g. a value of 0.8 would
+            mean that the denoising process ends at t=0.2.
+
+    Returns:
+        list[float]: The clipped timestep schedule.
+    """
+    assert 0.0 <= denoising_start <= 1.0
+    assert 0.0 <= denoising_end <= 1.0
+    assert denoising_start <= denoising_end
+
+    t_start_val = 1.0 - denoising_start
+    t_end_val = 1.0 - denoising_end
+
+    t_start_idx = _find_last_index_ge_val(timesteps, t_start_val)
+    t_end_idx = _find_last_index_ge_val(timesteps, t_end_val)
+
+    clipped_timesteps = timesteps[t_start_idx : t_end_idx + 1]
+
+    # We know that clipped_timesteps[0] >= t_start_val. Replace clipped_timesteps[0] with t_start_val.
+    clipped_timesteps[0] = t_start_val
+
+    # We know that clipped_timesteps[-1] >= t_end_val. If clipped_timesteps[-1] > t_end_val, add another step to
+    # t_end_val.
+    eps = 1e-6
+    if clipped_timesteps[-1] > t_end_val + eps:
+        clipped_timesteps.append(t_end_val)
+
+    return clipped_timesteps
+
+
 def unpack(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
     """Unpack flat array of patch embeddings to latent image."""
     return rearrange(

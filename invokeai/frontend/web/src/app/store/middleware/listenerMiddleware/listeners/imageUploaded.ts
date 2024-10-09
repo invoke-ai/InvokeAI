@@ -1,19 +1,16 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { setInitialCanvasImage } from 'features/canvas/store/canvasSlice';
 import {
-  controlAdapterImageChanged,
-  controlAdapterIsEnabledChanged,
-} from 'features/controlAdapters/store/controlAdaptersSlice';
-import {
-  caLayerImageChanged,
-  iiLayerImageChanged,
-  ipaLayerImageChanged,
-  rgLayerIPAdapterImageChanged,
-} from 'features/controlLayers/store/controlLayersSlice';
+  entityRasterized,
+  entitySelected,
+  referenceImageIPAdapterImageChanged,
+  rgIPAdapterImageChanged,
+} from 'features/controlLayers/store/canvasSlice';
+import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { boardIdSelected, galleryViewChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
-import { selectOptimalDimension } from 'features/parameters/store/generationSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -21,11 +18,12 @@ import { omit } from 'lodash-es';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 
+const log = logger('gallery');
+
 export const addImageUploadedFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
-      const log = logger('images');
       const imageDTO = action.payload;
       const state = getState();
       const { autoAddBoardId } = state.gallery;
@@ -54,6 +52,8 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         if (!autoAddBoardId || autoAddBoardId === 'none') {
           const title = postUploadAction.title || DEFAULT_UPLOADED_TOAST.title;
           toast({ ...DEFAULT_UPLOADED_TOAST, title });
+          dispatch(boardIdSelected({ boardId: 'none' }));
+          dispatch(galleryViewChanged('assets'));
         } else {
           // Add this image to the board
           dispatch(
@@ -77,16 +77,9 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
             ...DEFAULT_UPLOADED_TOAST,
             description,
           });
+          dispatch(boardIdSelected({ boardId: autoAddBoardId }));
+          dispatch(galleryViewChanged('assets'));
         }
-        return;
-      }
-
-      if (postUploadAction?.type === 'SET_CANVAS_INITIAL_IMAGE') {
-        dispatch(setInitialCanvasImage(imageDTO, selectOptimalDimension(state)));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setAsCanvasInitialImage'),
-        });
         return;
       }
 
@@ -99,70 +92,44 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
-      if (postUploadAction?.type === 'SET_CONTROL_ADAPTER_IMAGE') {
+      // if (postUploadAction?.type === 'SET_CA_IMAGE') {
+      //   const { id } = postUploadAction;
+      //   dispatch(caImageChanged({ id, imageDTO }));
+      //   toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
+      //   return;
+      // }
+
+      if (postUploadAction?.type === 'SET_IPA_IMAGE') {
         const { id } = postUploadAction;
-        dispatch(
-          controlAdapterIsEnabledChanged({
-            id,
-            isEnabled: true,
-          })
-        );
-        dispatch(
-          controlAdapterImageChanged({
-            id,
-            controlImage: imageDTO.image_name,
-          })
-        );
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setControlImage'),
-        });
+        dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier: { id, type: 'reference_image' }, imageDTO }));
+        toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
         return;
       }
 
-      if (postUploadAction?.type === 'SET_CA_LAYER_IMAGE') {
-        const { layerId } = postUploadAction;
-        dispatch(caLayerImageChanged({ layerId, imageDTO }));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setControlImage'),
-        });
-      }
-
-      if (postUploadAction?.type === 'SET_IPA_LAYER_IMAGE') {
-        const { layerId } = postUploadAction;
-        dispatch(ipaLayerImageChanged({ layerId, imageDTO }));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setControlImage'),
-        });
-      }
-
-      if (postUploadAction?.type === 'SET_RG_LAYER_IP_ADAPTER_IMAGE') {
-        const { layerId, ipAdapterId } = postUploadAction;
-        dispatch(rgLayerIPAdapterImageChanged({ layerId, ipAdapterId, imageDTO }));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setControlImage'),
-        });
-      }
-
-      if (postUploadAction?.type === 'SET_II_LAYER_IMAGE') {
-        const { layerId } = postUploadAction;
-        dispatch(iiLayerImageChanged({ layerId, imageDTO }));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: t('toast.setControlImage'),
-        });
+      if (postUploadAction?.type === 'SET_RG_IP_ADAPTER_IMAGE') {
+        const { id, referenceImageId } = postUploadAction;
+        dispatch(
+          rgIPAdapterImageChanged({ entityIdentifier: { id, type: 'regional_guidance' }, referenceImageId, imageDTO })
+        );
+        toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
+        return;
       }
 
       if (postUploadAction?.type === 'SET_NODES_IMAGE') {
         const { nodeId, fieldName } = postUploadAction;
         dispatch(fieldImageValueChanged({ nodeId, fieldName, value: imageDTO }));
-        toast({
-          ...DEFAULT_UPLOADED_TOAST,
-          description: `${t('toast.setNodeField')} ${fieldName}`,
-        });
+        toast({ ...DEFAULT_UPLOADED_TOAST, description: `${t('toast.setNodeField')} ${fieldName}` });
+        return;
+      }
+
+      if (postUploadAction?.type === 'REPLACE_LAYER_WITH_IMAGE') {
+        const { entityIdentifier } = postUploadAction;
+
+        const state = getState();
+        const imageObject = imageDTOToImageObject(imageDTO);
+        const { x, y } = selectCanvasSlice(state).bbox.rect;
+        dispatch(entityRasterized({ entityIdentifier, imageObject, position: { x, y }, replaceObjects: true }));
+        dispatch(entitySelected({ entityIdentifier }));
         return;
       }
     },
@@ -171,7 +138,6 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchRejected,
     effect: (action) => {
-      const log = logger('images');
       const sanitizedData = {
         arg: {
           ...omit(action.meta.arg.originalArgs, ['file', 'postUploadAction']),

@@ -425,7 +425,7 @@ const buildSchedulerFieldInputTemplate: FieldInputTemplateBuilder<SchedulerField
   const template: SchedulerFieldInputTemplate = {
     ...baseField,
     type: fieldType,
-    default: schemaObject.default ?? 'euler',
+    default: schemaObject.default ?? 'dpmpp_3m_k',
   };
 
   return template;

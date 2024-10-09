@@ -1,6 +1,6 @@
-import type { CONTROLNET_PROCESSORS } from 'features/controlAdapters/store/constants';
+import type { FilterType } from 'features/controlLayers/store/filters';
 import type { ParameterPrecision, ParameterScheduler } from 'features/parameters/types/parameterSchemas';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
+import type { TabName } from 'features/ui/store/uiTypes';
 import type { O } from 'ts-toolbelt';
 
 /**
@@ -22,7 +22,6 @@ export type AppFeature =
   | 'multiselect'
   | 'pauseQueue'
   | 'resumeQueue'
-  | 'prependQueue'
   | 'invocationCache'
   | 'bulkDownload'
   | 'starterModels'
@@ -72,7 +71,7 @@ export type AppConfig = {
   maxUpscaleDimension?: number;
   allowPrivateBoards: boolean;
   allowPrivateStylePresets: boolean;
-  disabledTabs: InvokeTabName[];
+  disabledTabs: TabName[];
   disabledFeatures: AppFeature[];
   disabledSDFeatures: SDFeature[];
   nodesAllowlist: string[] | undefined;
@@ -83,7 +82,7 @@ export type AppConfig = {
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];
-    disabledControlNetProcessors: (keyof typeof CONTROLNET_PROCESSORS)[];
+    disabledControlNetProcessors: FilterType[];
     // Core parameters
     iterations: NumericalParameterConfig;
     width: NumericalParameterConfig; // initial value comes from model
@@ -113,6 +112,9 @@ export type AppConfig = {
     ca: {
       weight: NumericalParameterConfig;
     };
+  };
+  flux: {
+    guidance: NumericalParameterConfig;
   };
 };
 

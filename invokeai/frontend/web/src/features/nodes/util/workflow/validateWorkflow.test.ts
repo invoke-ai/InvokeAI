@@ -28,6 +28,7 @@ describe('validateWorkflow', () => {
           isOpen: true,
           isIntermediate: true,
           useCache: true,
+          nodePack: 'invokeai',
           inputs: {
             model: {
               name: 'model',
@@ -56,6 +57,7 @@ describe('validateWorkflow', () => {
           isOpen: true,
           isIntermediate: true,
           useCache: true,
+          nodePack: 'invokeai',
           inputs: {
             board: {
               name: 'board',
@@ -78,8 +80,14 @@ describe('validateWorkflow', () => {
     ],
     edges: [],
   };
-  const resolveTrue = async (): Promise<boolean> => new Promise((resolve) => resolve(true));
-  const resolveFalse = async (): Promise<boolean> => new Promise((resolve) => resolve(false));
+  const resolveTrue = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      resolve(true);
+    });
+  const resolveFalse = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      resolve(false);
+    });
   it('should reset images that are inaccessible', async () => {
     const validationResult = await validateWorkflow(
       workflow,

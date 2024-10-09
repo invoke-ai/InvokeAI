@@ -1,6 +1,7 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
@@ -11,13 +12,14 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
+import { $isConnected } from 'services/events/stores';
 
 import type { FieldComponentProps } from './types';
 
 const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInstance, ImageFieldInputTemplate>) => {
-  const { nodeId, field } = props;
+  const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const { currentData: imageDTO, isError } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
 
   const handleReset = useCallback(() => {
@@ -65,7 +67,17 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   }, [handleReset, isConnected, isError]);
 
   return (
-    <Flex className="nodrag" w="full" h="full" alignItems="center" justifyContent="center">
+    <Flex
+      className="nodrag"
+      w="full"
+      h="full"
+      alignItems="center"
+      justifyContent="center"
+      borderColor="error.500"
+      borderStyle="solid"
+      borderWidth={fieldTemplate.required && !field.value ? 1 : 0}
+      borderRadius="base"
+    >
       <IAIDndImage
         imageDTO={imageDTO}
         droppableData={droppableData}
@@ -73,7 +85,6 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
         postUploadAction={postUploadAction}
         useThumbailFallback
         uploadElement={<UploadElement />}
-        dropLabel={<DropLabel />}
         minSize={8}
       >
         <IAIDndImageIcon
@@ -91,21 +102,12 @@ export default memo(ImageFieldInputComponent);
 const UploadElement = memo(() => {
   const { t } = useTranslation();
   return (
-    <Text fontSize={16} fontWeight="semibold">
-      {t('gallery.dropOrUpload')}
-    </Text>
+    <Flex h={16} w="full" alignItems="center" justifyContent="center">
+      <Text fontSize={16} fontWeight="semibold">
+        {t('gallery.dropOrUpload')}
+      </Text>
+    </Flex>
   );
 });
 
 UploadElement.displayName = 'UploadElement';
-
-const DropLabel = memo(() => {
-  const { t } = useTranslation();
-  return (
-    <Text fontSize={16} fontWeight="semibold">
-      {t('gallery.drop')}
-    </Text>
-  );
-});
-
-DropLabel.displayName = 'DropLabel';

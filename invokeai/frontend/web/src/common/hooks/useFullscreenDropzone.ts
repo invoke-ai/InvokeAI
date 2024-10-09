@@ -1,7 +1,8 @@
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
-import { activeTabNameSelector } from 'features/ui/store/uiSelectors';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
 import type { Accept, FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
@@ -14,12 +15,8 @@ const accept: Accept = {
   'image/jpeg': ['.jpg', '.jpeg', '.png'],
 };
 
-const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (activeTabName) => {
+const selectPostUploadAction = createMemoizedSelector(selectActiveTab, (activeTabName) => {
   let postUploadAction: PostUploadAction = { type: 'TOAST' };
-
-  if (activeTabName === 'canvas') {
-    postUploadAction = { type: 'SET_CANVAS_INITIAL_IMAGE' };
-  }
 
   if (activeTabName === 'upscaling') {
     postUploadAction = { type: 'SET_UPSCALE_INITIAL_IMAGE' };
@@ -30,10 +27,9 @@ const selectPostUploadAction = createMemoizedSelector(activeTabNameSelector, (ac
 
 export const useFullscreenDropzone = () => {
   const { t } = useTranslation();
-  const postUploadAction = useAppSelector(selectPostUploadAction);
-  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
-
+  const postUploadAction = useAppSelector(selectPostUploadAction);
   const [uploadImage] = useUploadImageMutation();
 
   const fileRejectionCallback = useCallback(
@@ -51,7 +47,7 @@ export const useFullscreenDropzone = () => {
   );
 
   const fileAcceptedCallback = useCallback(
-    async (file: File) => {
+    (file: File) => {
       uploadImage({
         file,
         image_category: 'user',
@@ -101,7 +97,7 @@ export const useFullscreenDropzone = () => {
 
   useEffect(() => {
     // This is a hack to allow pasting images into the uploader
-    const handlePaste = async (e: ClipboardEvent) => {
+    const handlePaste = (e: ClipboardEvent) => {
       if (!dropzone.inputRef.current) {
         return;
       }

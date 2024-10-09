@@ -1,11 +1,21 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import { selectSystemSlice } from 'features/system/store/systemSlice';
 import { memo, useMemo } from 'react';
+import { $isProgressFromCanvas, $progressImage } from 'services/events/stores';
+
+const selectShouldAntialiasProgressImage = createSelector(
+  selectSystemSlice,
+  (system) => system.shouldAntialiasProgressImage
+);
 
 const CurrentImagePreview = () => {
-  const progress_image = useAppSelector((s) => s.system.denoiseProgress?.progress_image);
-  const shouldAntialiasProgressImage = useAppSelector((s) => s.system.shouldAntialiasProgressImage);
+  const progressImage = useStore($progressImage);
+  const isProgressFromCanvas = useStore($isProgressFromCanvas);
+  const shouldAntialiasProgressImage = useAppSelector(selectShouldAntialiasProgressImage);
 
   const sx = useMemo<SystemStyleObject>(
     () => ({
@@ -14,15 +24,15 @@ const CurrentImagePreview = () => {
     [shouldAntialiasProgressImage]
   );
 
-  if (!progress_image) {
+  if (!progressImage || isProgressFromCanvas) {
     return null;
   }
 
   return (
     <Image
-      src={progress_image.dataURL}
-      width={progress_image.width}
-      height={progress_image.height}
+      src={progressImage.dataURL}
+      width={progressImage.width}
+      height={progressImage.height}
       draggable={false}
       data-testid="progress-image"
       objectFit="contain"

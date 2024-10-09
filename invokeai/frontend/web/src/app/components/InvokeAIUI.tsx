@@ -1,7 +1,7 @@
 import 'i18n';
 
 import type { Middleware } from '@reduxjs/toolkit';
-import { $socketOptions } from 'app/hooks/useSocketIO';
+import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
@@ -19,11 +19,11 @@ import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
 import AppDndContext from 'features/dnd/components/AppDndContext';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
-import type { InvokeTabName } from 'features/ui/store/tabMap';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
+import { $socketOptions } from 'services/events/stores';
 import type { ManagerOptions, SocketOptions } from 'socket.io-client';
 
 const App = lazy(() => import('./App'));
@@ -40,13 +40,7 @@ interface Props extends PropsWithChildren {
   projectName?: string;
   projectUrl?: string;
   queueId?: string;
-  selectedImage?: {
-    imageName: string;
-    action: 'sendToImg2Img' | 'sendToCanvas' | 'useAllParameters';
-  };
-  selectedWorkflowId?: string;
-  selectedStylePresetId?: string;
-  destination?: InvokeTabName;
+  studioInitAction?: StudioInitAction;
   customStarUi?: CustomStarUi;
   socketOptions?: Partial<ManagerOptions & SocketOptions>;
   isDebugging?: boolean;
@@ -65,10 +59,7 @@ const InvokeAIUI = ({
   projectName,
   projectUrl,
   queueId,
-  selectedImage,
-  selectedWorkflowId,
-  selectedStylePresetId,
-  destination,
+  studioInitAction,
   customStarUi,
   socketOptions,
   isDebugging = false,
@@ -225,13 +216,7 @@ const InvokeAIUI = ({
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
             <AppDndContext>
-              <App
-                config={config}
-                selectedImage={selectedImage}
-                selectedWorkflowId={selectedWorkflowId}
-                selectedStylePresetId={selectedStylePresetId}
-                destination={destination}
-              />
+              <App config={config} studioInitAction={studioInitAction} />
             </AppDndContext>
           </ThemeLocaleProvider>
         </React.Suspense>

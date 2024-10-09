@@ -15,8 +15,8 @@ from invokeai.app.services.events.events_common import (
     DownloadStartedEvent,
     EventBase,
     InvocationCompleteEvent,
-    InvocationDenoiseProgressEvent,
     InvocationErrorEvent,
+    InvocationProgressEvent,
     InvocationStartedEvent,
     ModelInstallCancelledEvent,
     ModelInstallCompleteEvent,
@@ -30,7 +30,6 @@ from invokeai.app.services.events.events_common import (
     QueueClearedEvent,
     QueueItemStatusChangedEvent,
 )
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
@@ -58,15 +57,16 @@ class EventServiceBase:
         """Emitted when an invocation is started"""
         self.dispatch(InvocationStartedEvent.build(queue_item, invocation))
 
-    def emit_invocation_denoise_progress(
+    def emit_invocation_progress(
         self,
         queue_item: "SessionQueueItem",
         invocation: "BaseInvocation",
-        intermediate_state: PipelineIntermediateState,
-        progress_image: "ProgressImage",
+        message: str,
+        percentage: float | None = None,
+        image: "ProgressImage | None" = None,
     ) -> None:
-        """Emitted at each step during denoising of an invocation."""
-        self.dispatch(InvocationDenoiseProgressEvent.build(queue_item, invocation, intermediate_state, progress_image))
+        """Emitted at periodically during an invocation"""
+        self.dispatch(InvocationProgressEvent.build(queue_item, invocation, message, percentage, image))
 
     def emit_invocation_complete(
         self, queue_item: "SessionQueueItem", invocation: "BaseInvocation", output: "BaseInvocationOutput"

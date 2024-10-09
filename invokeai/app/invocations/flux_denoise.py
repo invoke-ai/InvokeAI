@@ -1,4 +1,5 @@
-from typing import Callable, Optional
+from contextlib import ExitStack
+from typing import Callable, Iterator, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -22,13 +23,17 @@ from invokeai.backend.flux.denoise import denoise
 from invokeai.backend.flux.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
-    clip_timestep_schedule,
+    clip_timestep_schedule_fractional,
     generate_img_ids,
     get_noise,
     get_schedule,
     pack,
     unpack,
 )
+from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
+from invokeai.backend.lora.lora_patcher import LoRAPatcher
+from invokeai.backend.model_manager.config import ModelFormat
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -39,7 +44,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="1.0.0",
+    version="3.0.0",
     classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -133,7 +138,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         # Clip the timesteps schedule based on denoising_start and denoising_end.
-        timesteps = clip_timestep_schedule(timesteps, self.denoising_start, self.denoising_end)
+        timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
 
         # Prepare input latent image.
         if init_latents is not None:
@@ -187,8 +192,44 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 noise=noise,
             )
 
-        with transformer_info as transformer:
+        with (
+            transformer_info.model_on_device() as (cached_weights, transformer),
+            ExitStack() as exit_stack,
+        ):
             assert isinstance(transformer, Flux)
+
+            config = transformer_info.config
+            assert config is not None
+
+            # Apply LoRA models to the transformer.
+            # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
+            if config.format in [ModelFormat.Checkpoint]:
+                # The model is non-quantized, so we can apply the LoRA weights directly into the model.
+                exit_stack.enter_context(
+                    LoRAPatcher.apply_lora_patches(
+                        model=transformer,
+                        patches=self._lora_iterator(context),
+                        prefix=FLUX_LORA_TRANSFORMER_PREFIX,
+                        cached_weights=cached_weights,
+                    )
+                )
+            elif config.format in [
+                ModelFormat.BnbQuantizedLlmInt8b,
+                ModelFormat.BnbQuantizednf4b,
+                ModelFormat.GGUFQuantized,
+            ]:
+                # The model is quantized, so apply the LoRA weights as sidecar layers. This results in slower inference,
+                # than directly patching the weights, but is agnostic to the quantization format.
+                exit_stack.enter_context(
+                    LoRAPatcher.apply_lora_sidecar_patches(
+                        model=transformer,
+                        patches=self._lora_iterator(context),
+                        prefix=FLUX_LORA_TRANSFORMER_PREFIX,
+                        dtype=inference_dtype,
+                    )
+                )
+            else:
+                raise ValueError(f"Unsupported model format: {config.format}")
 
             x = denoise(
                 model=transformer,
@@ -220,12 +261,18 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 device, and dtype for the inpaint mask.
 
         Returns:
-            torch.Tensor | None: Inpaint mask.
+            torch.Tensor | None: Inpaint mask. Values of 0.0 represent the regions to be fully denoised, and 1.0
+                represent the regions to be preserved.
         """
         if self.denoise_mask is None:
             return None
 
         mask = context.tensors.load(self.denoise_mask.mask_name)
+
+        # The input denoise_mask contains values in [0, 1], where 0.0 represents the regions to be fully denoised, and
+        # 1.0 represents the regions to be preserved.
+        # We invert the mask so that the regions to be preserved are 0.0 and the regions to be denoised are 1.0.
+        mask = 1.0 - mask
 
         _, _, latent_height, latent_width = latents.shape
         mask = tv_resize(
@@ -240,6 +287,13 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Expand the inpaint mask to the same shape as `latents` so that when we 'pack' `mask` it lines up with
         # `latents`.
         return mask.expand_as(latents)
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            assert isinstance(lora_info.model, LoRAModelRaw)
+            yield (lora_info.model, lora.weight)
+            del lora_info
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

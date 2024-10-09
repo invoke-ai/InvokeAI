@@ -1,4 +1,3 @@
-from math import floor
 from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Optional, Protocol, TypeAlias, TypeVar
 
 from fastapi_events.handlers.local import local_handler
@@ -16,7 +15,6 @@ from invokeai.app.services.session_queue.session_queue_common import (
 from invokeai.app.services.shared.graph import AnyInvocation, AnyInvocationOutput
 from invokeai.app.util.misc import get_timestamp
 from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 if TYPE_CHECKING:
     from invokeai.app.services.download.download_base import DownloadJob
@@ -88,6 +86,8 @@ class QueueItemEventBase(QueueEventBase):
 
     item_id: int = Field(description="The ID of the queue item")
     batch_id: str = Field(description="The ID of the queue batch")
+    origin: str | None = Field(default=None, description="The origin of the queue item")
+    destination: str | None = Field(default=None, description="The destination of the queue item")
 
 
 class InvocationEventBase(QueueItemEventBase):
@@ -95,8 +95,6 @@ class InvocationEventBase(QueueItemEventBase):
 
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
     queue_id: str = Field(description="The ID of the queue")
-    item_id: int = Field(description="The ID of the queue item")
-    batch_id: str = Field(description="The ID of the queue batch")
     session_id: str = Field(description="The ID of the session (aka graph execution state)")
     invocation: AnyInvocation = Field(description="The ID of the invocation")
     invocation_source_id: str = Field(description="The ID of the prepared invocation's source node")
@@ -114,6 +112,8 @@ class InvocationStartedEvent(InvocationEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -121,51 +121,41 @@ class InvocationStartedEvent(InvocationEventBase):
 
 
 @payload_schema.register
-class InvocationDenoiseProgressEvent(InvocationEventBase):
-    """Event model for invocation_denoise_progress"""
+class InvocationProgressEvent(InvocationEventBase):
+    """Event model for invocation_progress"""
 
-    __event_name__ = "invocation_denoise_progress"
+    __event_name__ = "invocation_progress"
 
-    progress_image: ProgressImage = Field(description="The progress image sent at each step during processing")
-    step: int = Field(description="The current step of the invocation")
-    total_steps: int = Field(description="The total number of steps in the invocation")
-    order: int = Field(description="The order of the invocation in the session")
-    percentage: float = Field(description="The percentage of completion of the invocation")
+    message: str = Field(description="A message to display")
+    percentage: float | None = Field(
+        default=None, ge=0, le=1, description="The percentage of the progress (omit to indicate indeterminate progress)"
+    )
+    image: ProgressImage | None = Field(
+        default=None, description="An image representing the current state of the progress"
+    )
 
     @classmethod
     def build(
         cls,
         queue_item: SessionQueueItem,
         invocation: AnyInvocation,
-        intermediate_state: PipelineIntermediateState,
-        progress_image: ProgressImage,
-    ) -> "InvocationDenoiseProgressEvent":
-        step = intermediate_state.step
-        total_steps = intermediate_state.total_steps
-        order = intermediate_state.order
+        message: str,
+        percentage: float | None = None,
+        image: ProgressImage | None = None,
+    ) -> "InvocationProgressEvent":
         return cls(
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
-            progress_image=progress_image,
-            step=step,
-            total_steps=total_steps,
-            order=order,
-            percentage=cls.calc_percentage(step, total_steps, order),
+            percentage=percentage,
+            image=image,
+            message=message,
         )
-
-    @staticmethod
-    def calc_percentage(step: int, total_steps: int, scheduler_order: float) -> float:
-        """Calculate the percentage of completion of denoising."""
-        if total_steps == 0:
-            return 0.0
-        if scheduler_order == 2:
-            return floor((step + 1 + 1) / 2) / floor((total_steps + 1) / 2)
-        # order == 1
-        return (step + 1 + 1) / (total_steps + 1)
 
 
 @payload_schema.register
@@ -184,6 +174,8 @@ class InvocationCompleteEvent(InvocationEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -216,6 +208,8 @@ class InvocationErrorEvent(InvocationEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -253,6 +247,8 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             queue_id=queue_item.queue_id,
             item_id=queue_item.item_id,
             batch_id=queue_item.batch_id,
+            origin=queue_item.origin,
+            destination=queue_item.destination,
             session_id=queue_item.session_id,
             status=queue_item.status,
             error_type=queue_item.error_type,
@@ -279,12 +275,14 @@ class BatchEnqueuedEvent(QueueEventBase):
         description="The number of invocations initially requested to be enqueued (may be less than enqueued if queue was full)"
     )
     priority: int = Field(description="The priority of the batch")
+    origin: str | None = Field(default=None, description="The origin of the batch")
 
     @classmethod
     def build(cls, enqueue_result: EnqueueBatchResult) -> "BatchEnqueuedEvent":
         return cls(
             queue_id=enqueue_result.queue_id,
             batch_id=enqueue_result.batch.batch_id,
+            origin=enqueue_result.batch.origin,
             enqueued=enqueue_result.enqueued,
             requested=enqueue_result.requested,
             priority=enqueue_result.priority,

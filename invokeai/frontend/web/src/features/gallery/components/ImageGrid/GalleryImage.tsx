@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Text, useShiftModifier } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { createSelector } from '@reduxjs/toolkit';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
@@ -9,13 +10,15 @@ import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import type { GallerySelectionDraggableData, ImageDraggableData, TypesafeDraggableData } from 'features/dnd/types';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
-import { imageToCompareChanged, isImageViewerOpenChanged } from 'features/gallery/store/gallerySlice';
+import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
+import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
+import { PiArrowsOutBold, PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
@@ -38,29 +41,35 @@ interface HoverableImageProps {
   index: number;
 }
 
-const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
+const selectAlwaysShouldImageSizeBadge = createSelector(
+  selectGallerySlice,
+  (gallery) => gallery.alwaysShowImageSizeBadge
+);
+
+export const GalleryImage = memo(({ index, imageDTO }: HoverableImageProps) => {
+  if (!imageDTO) {
+    return <IAIFillSkeleton />;
+  }
+
+  return <GalleryImageContent index={index} imageDTO={imageDTO} />;
+});
+
+GalleryImage.displayName = 'GalleryImage';
+
+const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
   const dispatch = useAppDispatch();
-  const shift = useShiftModifier();
-  const { t } = useTranslation();
-  const selectedBoardId = useAppSelector((s) => s.gallery.selectedBoardId);
-  const alwaysShowImageSizeBadge = useAppSelector((s) => s.gallery.alwaysShowImageSizeBadge);
-  const isSelectedForCompare = useAppSelector((s) => s.gallery.imageToCompare?.image_name === imageDTO.image_name);
+  const selectedBoardId = useAppSelector(selectSelectedBoardId);
+  const selectIsSelectedForCompare = useMemo(
+    () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name === imageDTO.image_name),
+    [imageDTO.image_name]
+  );
+  const alwaysShowImageSizeBadge = useAppSelector(selectAlwaysShouldImageSizeBadge);
+  const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
 
   const customStarUi = useStore($customStarUI);
 
   const imageContainerRef = useScrollIntoView(isSelected, index, areMultiplesSelected);
-
-  const handleDelete = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      if (!imageDTO) {
-        return;
-      }
-      dispatch(imagesToDeleteSelected([imageDTO]));
-    },
-    [dispatch, imageDTO]
-  );
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
     if (areMultiplesSelected) {
@@ -102,10 +111,11 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
     setIsHovered(true);
   }, []);
 
+  const imageViewer = useImageViewer();
   const onDoubleClick = useCallback(() => {
-    dispatch(isImageViewerOpenChanged(true));
+    imageViewer.open();
     dispatch(imageToCompareChanged(null));
-  }, [dispatch]);
+  }, [dispatch, imageViewer]);
 
   const handleMouseOut = useCallback(() => {
     setIsHovered(false);
@@ -113,10 +123,10 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
 
   const starIcon = useMemo(() => {
     if (imageDTO.starred) {
-      return customStarUi ? customStarUi.on.icon : <PiStarFill size="20" />;
+      return customStarUi ? customStarUi.on.icon : <PiStarFill />;
     }
     if (!imageDTO.starred && isHovered) {
-      return customStarUi ? customStarUi.off.icon : <PiStarBold size="20" />;
+      return customStarUi ? customStarUi.off.icon : <PiStarBold />;
     }
   }, [imageDTO.starred, isHovered, customStarUi]);
 
@@ -137,7 +147,7 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
   }
 
   return (
-    <Box w="full" h="full" p={1.5} className={GALLERY_IMAGE_CLASS_NAME} data-testid={dataTestId} sx={boxSx}>
+    <Box w="full" h="full" className={GALLERY_IMAGE_CLASS_NAME} data-testid={dataTestId} sx={boxSx}>
       <Flex
         ref={imageContainerRef}
         userSelect="none"
@@ -170,13 +180,12 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
                 color="base.50"
                 fontSize="sm"
                 fontWeight="semibold"
-                bottom={0}
-                left={0}
+                bottom={1}
+                left={1}
                 opacity={0.7}
                 px={2}
                 lineHeight={1.25}
                 borderTopEndRadius="base"
-                borderBottomStartRadius="base"
                 sx={badgeSx}
                 pointerEvents="none"
               >{`${imageDTO.width}x${imageDTO.height}`}</Text>
@@ -186,25 +195,67 @@ const GalleryImage = ({ index, imageDTO }: HoverableImageProps) => {
               icon={starIcon}
               tooltip={starTooltip}
               position="absolute"
-              top={1}
-              insetInlineEnd={1}
+              top={2}
+              insetInlineEnd={2}
             />
-
-            {isHovered && shift && (
-              <IAIDndImageIcon
-                onClick={handleDelete}
-                icon={<PiTrashSimpleFill size="16px" />}
-                tooltip={t('gallery.deleteImage_one')}
-                position="absolute"
-                bottom={1}
-                insetInlineEnd={1}
-              />
-            )}
+            {isHovered && <DeleteIcon imageDTO={imageDTO} />}
+            {isHovered && <OpenInViewerIconButton imageDTO={imageDTO} />}
           </>
         </IAIDndImage>
       </Flex>
     </Box>
   );
+});
+
+GalleryImageContent.displayName = 'GalleryImageContent';
+
+const DeleteIcon = ({ imageDTO }: { imageDTO: ImageDTO }) => {
+  const shift = useShiftModifier();
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const onClick = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      if (!imageDTO) {
+        return;
+      }
+      dispatch(imagesToDeleteSelected([imageDTO]));
+    },
+    [dispatch, imageDTO]
+  );
+
+  if (!shift) {
+    return null;
+  }
+
+  return (
+    <IAIDndImageIcon
+      onClick={onClick}
+      icon={<PiTrashSimpleFill />}
+      tooltip={t('gallery.deleteImage_one')}
+      position="absolute"
+      bottom={2}
+      insetInlineEnd={2}
+    />
+  );
 };
 
-export default memo(GalleryImage);
+const OpenInViewerIconButton = ({ imageDTO }: { imageDTO: ImageDTO }) => {
+  const imageViewer = useImageViewer();
+  const { t } = useTranslation();
+
+  const onClick = useCallback(() => {
+    imageViewer.openImageInViewer(imageDTO);
+  }, [imageDTO, imageViewer]);
+
+  return (
+    <IAIDndImageIcon
+      onClick={onClick}
+      icon={<PiArrowsOutBold />}
+      tooltip={t('gallery.openInViewer')}
+      position="absolute"
+      insetBlockStart={2}
+      insetInlineStart={2}
+    />
+  );
+};

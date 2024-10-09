@@ -10,6 +10,10 @@ from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_diffusers_format,
+)
+from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import is_state_dict_likely_in_flux_kohya_format
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -26,6 +30,8 @@ from invokeai.backend.model_manager.config import (
     SchedulerPredictionType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
@@ -183,6 +189,7 @@ class ModelProbe(object):
         if fields["type"] in [ModelType.Main, ModelType.ControlNet, ModelType.VAE] and fields["format"] in [
             ModelFormat.Checkpoint,
             ModelFormat.BnbQuantizednf4b,
+            ModelFormat.GGUFQuantized,
         ]:
             ckpt_config_path = cls._get_checkpoint_config_path(
                 model_path,
@@ -216,7 +223,7 @@ class ModelProbe(object):
 
     @classmethod
     def get_model_type_from_checkpoint(cls, model_path: Path, checkpoint: Optional[CkptType] = None) -> ModelType:
-        if model_path.suffix not in (".bin", ".pt", ".ckpt", ".safetensors", ".pth"):
+        if model_path.suffix not in (".bin", ".pt", ".ckpt", ".safetensors", ".pth", ".gguf"):
             raise InvalidModelConfigException(f"{model_path}: unrecognized suffix")
 
         if model_path.name == "learned_embeds.bin":
@@ -244,7 +251,9 @@ class ModelProbe(object):
                 return ModelType.VAE
             elif key.startswith(("lora_te_", "lora_unet_")):
                 return ModelType.LoRA
-            elif key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight")):
+            # "lora_A.weight" and "lora_B.weight" are associated with models in PEFT format. We don't support all PEFT
+            # LoRA models, but as of the time of writing, we support Diffusers FLUX PEFT LoRA models.
+            elif key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight", "lora_A.weight", "lora_B.weight")):
                 return ModelType.LoRA
             elif key.startswith(("controlnet", "control_model", "input_blocks")):
                 return ModelType.ControlNet
@@ -272,12 +281,10 @@ class ModelProbe(object):
             return ModelType.SpandrelImageToImage
         except spandrel.UnsupportedModelError:
             pass
-        except RuntimeError as e:
-            if "No such file or directory" in str(e):
-                # This error is expected if the model_path does not exist (which is the case in some unit tests).
-                pass
-            else:
-                raise e
+        except Exception as e:
+            logger.warning(
+                f"Encountered error while probing to determine if {model_path} is a Spandrel model. Ignoring. Error: {e}"
+            )
 
         raise InvalidModelConfigException(f"Unable to determine model type for {model_path}")
 
@@ -402,6 +409,8 @@ class ModelProbe(object):
                 model = torch.load(model_path, map_location="cpu")
                 assert isinstance(model, dict)
                 return model
+            elif model_path.suffix.endswith(".gguf"):
+                return gguf_sd_loader(model_path, compute_dtype=torch.float32)
             else:
                 return safetensors.torch.load_file(model_path)
 
@@ -471,6 +480,8 @@ class CheckpointProbeBase(ProbeBase):
             or "model.diffusion_model.double_blocks.0.img_attn.proj.weight.quant_state.bitsandbytes__nf4" in state_dict
         ):
             return ModelFormat.BnbQuantizednf4b
+        elif any(isinstance(v, GGMLTensor) for v in state_dict.values()):
+            return ModelFormat.GGUFQuantized
         return ModelFormat("checkpoint")
 
     def get_variant_type(self) -> ModelVariantType:
@@ -554,12 +565,21 @@ class LoRACheckpointProbe(CheckpointProbeBase):
     """Class for LoRA checkpoints."""
 
     def get_format(self) -> ModelFormat:
-        return ModelFormat("lycoris")
+        if is_state_dict_likely_in_flux_diffusers_format(self.checkpoint):
+            # TODO(ryand): This is an unusual case. In other places throughout the codebase, we treat
+            # ModelFormat.Diffusers as meaning that the model is in a directory. In this case, the model is a single
+            # file, but the weight keys are in the diffusers format.
+            return ModelFormat.Diffusers
+        return ModelFormat.LyCORIS
 
     def get_base_type(self) -> BaseModelType:
-        checkpoint = self.checkpoint
-        token_vector_length = lora_token_vector_length(checkpoint)
+        if is_state_dict_likely_in_flux_kohya_format(self.checkpoint) or is_state_dict_likely_in_flux_diffusers_format(
+            self.checkpoint
+        ):
+            return BaseModelType.Flux
 
+        # If we've gotten here, we assume that the model is a Stable Diffusion model.
+        token_vector_length = lora_token_vector_length(self.checkpoint)
         if token_vector_length == 768:
             return BaseModelType.StableDiffusion1
         elif token_vector_length == 1024:

@@ -1,16 +1,17 @@
 import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { useConnection } from 'features/nodes/hooks/useConnection';
 import { useCopyPaste } from 'features/nodes/hooks/useCopyPaste';
 import { useSyncExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { useIsValidConnection } from 'features/nodes/hooks/useIsValidConnection';
 import { useWorkflowWatcher } from 'features/nodes/hooks/useWorkflowWatcher';
 import {
+  $addNodeCmdk,
   $cursorPos,
   $didUpdateEdge,
   $edgePendingUpdate,
-  $isAddNodePopoverOpen,
   $lastEdgeUpdateMouseEvent,
   $pendingConnection,
   $viewport,
@@ -20,7 +21,16 @@ import {
   undo,
 } from 'features/nodes/store/nodesSlice';
 import { $flow, $needsFit } from 'features/nodes/store/reactFlowInstance';
+import {
+  selectEdges,
+  selectMayRedo,
+  selectMayUndo,
+  selectNodes,
+  selectNodesSlice,
+} from 'features/nodes/store/selectors';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
+import { selectSelectionMode, selectShouldSnapToGrid } from 'features/nodes/store/workflowSettingsSlice';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { CSSProperties, MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -65,30 +75,27 @@ const selectCancelConnection = (state: ReactFlowState) => state.cancelConnection
 
 export const Flow = memo(() => {
   const dispatch = useAppDispatch();
-  const nodes = useAppSelector((s) => s.nodes.present.nodes);
-  const edges = useAppSelector((s) => s.nodes.present.edges);
+  const nodes = useAppSelector(selectNodes);
+  const edges = useAppSelector(selectEdges);
   const viewport = useStore($viewport);
   const needsFit = useStore($needsFit);
-  const mayUndo = useAppSelector((s) => s.nodes.past.length > 0);
-  const mayRedo = useAppSelector((s) => s.nodes.future.length > 0);
-  const shouldSnapToGrid = useAppSelector((s) => s.workflowSettings.shouldSnapToGrid);
-  const selectionMode = useAppSelector((s) => s.workflowSettings.selectionMode);
+  const mayUndo = useAppSelector(selectMayUndo);
+  const mayRedo = useAppSelector(selectMayRedo);
+  const shouldSnapToGrid = useAppSelector(selectShouldSnapToGrid);
+  const selectionMode = useAppSelector(selectSelectionMode);
   const { onConnectStart, onConnect, onConnectEnd } = useConnection();
   const flowWrapper = useRef<HTMLDivElement>(null);
   const isValidConnection = useIsValidConnection();
   const cancelConnection = useReactFlowStore(selectCancelConnection);
   const updateNodeInternals = useUpdateNodeInternals();
   const store = useAppStore();
+  const isWorkflowsFocused = useIsRegionFocused('workflows');
+  useFocusRegion('workflows', flowWrapper);
+
   useWorkflowWatcher();
   useSyncExecutionState();
   const [borderRadius] = useToken('radii', ['base']);
-
-  const flowStyles = useMemo<CSSProperties>(
-    () => ({
-      borderRadius,
-    }),
-    [borderRadius]
-  );
+  const flowStyles = useMemo<CSSProperties>(() => ({ borderRadius }), [borderRadius]);
 
   const onNodesChange: OnNodesChange = useCallback(
     (nodeChanges) => {
@@ -201,87 +208,92 @@ export const Flow = memo(() => {
 
   // #endregion
 
-  const { copySelection, pasteSelection } = useCopyPaste();
+  const { copySelection, pasteSelection, pasteSelectionWithEdges } = useCopyPaste();
 
-  const onCopyHotkey = useCallback(
-    (e: KeyboardEvent) => {
-      e.preventDefault();
-      copySelection();
-    },
-    [copySelection]
-  );
-  useHotkeys(['Ctrl+c', 'Meta+c'], onCopyHotkey);
+  useRegisteredHotkeys({
+    id: 'copySelection',
+    category: 'workflows',
+    callback: copySelection,
+    options: { preventDefault: true },
+    dependencies: [copySelection],
+  });
 
-  const onSelectAllHotkey = useCallback(
-    (e: KeyboardEvent) => {
-      e.preventDefault();
-      const { nodes, edges } = store.getState().nodes.present;
-      const nodeChanges: NodeChange[] = [];
-      const edgeChanges: EdgeChange[] = [];
-      nodes.forEach(({ id, selected }) => {
-        if (!selected) {
-          nodeChanges.push({ type: 'select', id, selected: true });
-        }
-      });
-      edges.forEach(({ id, selected }) => {
-        if (!selected) {
-          edgeChanges.push({ type: 'select', id, selected: true });
-        }
-      });
-      if (nodeChanges.length > 0) {
-        dispatch(nodesChanged(nodeChanges));
+  const selectAll = useCallback(() => {
+    const { nodes, edges } = selectNodesSlice(store.getState());
+    const nodeChanges: NodeChange[] = [];
+    const edgeChanges: EdgeChange[] = [];
+    nodes.forEach(({ id, selected }) => {
+      if (!selected) {
+        nodeChanges.push({ type: 'select', id, selected: true });
       }
-      if (edgeChanges.length > 0) {
-        dispatch(edgesChanged(edgeChanges));
+    });
+    edges.forEach(({ id, selected }) => {
+      if (!selected) {
+        edgeChanges.push({ type: 'select', id, selected: true });
       }
-    },
-    [dispatch, store]
-  );
-  useHotkeys(['Ctrl+a', 'Meta+a'], onSelectAllHotkey);
+    });
+    if (nodeChanges.length > 0) {
+      dispatch(nodesChanged(nodeChanges));
+    }
+    if (edgeChanges.length > 0) {
+      dispatch(edgesChanged(edgeChanges));
+    }
+  }, [dispatch, store]);
+  useRegisteredHotkeys({
+    id: 'selectAll',
+    category: 'workflows',
+    callback: selectAll,
+    options: { enabled: isWorkflowsFocused, preventDefault: true },
+    dependencies: [selectAll, isWorkflowsFocused],
+  });
 
-  const onPasteHotkey = useCallback(
-    (e: KeyboardEvent) => {
-      e.preventDefault();
-      pasteSelection();
-    },
-    [pasteSelection]
-  );
-  useHotkeys(['Ctrl+v', 'Meta+v'], onPasteHotkey);
+  useRegisteredHotkeys({
+    id: 'pasteSelection',
+    category: 'workflows',
+    callback: pasteSelection,
+    options: { preventDefault: true },
+    dependencies: [pasteSelection],
+  });
 
-  const onPasteWithEdgesToNodesHotkey = useCallback(
-    (e: KeyboardEvent) => {
-      e.preventDefault();
-      pasteSelection(true);
-    },
-    [pasteSelection]
-  );
-  useHotkeys(['Ctrl+shift+v', 'Meta+shift+v'], onPasteWithEdgesToNodesHotkey);
+  useRegisteredHotkeys({
+    id: 'pasteSelectionWithEdges',
+    category: 'workflows',
+    callback: pasteSelectionWithEdges,
+    options: { preventDefault: true },
+    dependencies: [pasteSelectionWithEdges],
+  });
 
-  const onUndoHotkey = useCallback(() => {
-    if (mayUndo) {
+  useRegisteredHotkeys({
+    id: 'undo',
+    category: 'workflows',
+    callback: () => {
       dispatch(undo());
-    }
-  }, [dispatch, mayUndo]);
-  useHotkeys(['meta+z', 'ctrl+z'], onUndoHotkey);
+    },
+    options: { enabled: mayUndo, preventDefault: true },
+    dependencies: [mayUndo],
+  });
 
-  const onRedoHotkey = useCallback(() => {
-    if (mayRedo) {
+  useRegisteredHotkeys({
+    id: 'redo',
+    category: 'workflows',
+    callback: () => {
       dispatch(redo());
-    }
-  }, [dispatch, mayRedo]);
-  useHotkeys(['meta+shift+z', 'ctrl+shift+z'], onRedoHotkey);
+    },
+    options: { enabled: mayRedo, preventDefault: true },
+    dependencies: [mayRedo],
+  });
 
   const onEscapeHotkey = useCallback(() => {
     if (!$edgePendingUpdate.get()) {
       $pendingConnection.set(null);
-      $isAddNodePopoverOpen.set(false);
+      $addNodeCmdk.set(false);
       cancelConnection();
     }
   }, [cancelConnection]);
   useHotkeys('esc', onEscapeHotkey);
 
-  const onDeleteHotkey = useCallback(() => {
-    const { nodes, edges } = store.getState().nodes.present;
+  const deleteSelection = useCallback(() => {
+    const { nodes, edges } = selectNodesSlice(store.getState());
     const nodeChanges: NodeChange[] = [];
     const edgeChanges: EdgeChange[] = [];
     nodes
@@ -301,7 +313,13 @@ export const Flow = memo(() => {
       dispatch(edgesChanged(edgeChanges));
     }
   }, [dispatch, store]);
-  useHotkeys(['delete', 'backspace'], onDeleteHotkey);
+  useRegisteredHotkeys({
+    id: 'deleteSelection',
+    category: 'workflows',
+    callback: deleteSelection,
+    options: { preventDefault: true, enabled: isWorkflowsFocused },
+    dependencies: [deleteSelection, isWorkflowsFocused],
+  });
 
   return (
     <ReactFlow

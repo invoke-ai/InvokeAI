@@ -1,42 +1,46 @@
+import type { TooltipProps } from '@invoke-ai/ui-library';
 import { Divider, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useIsReadyToEnqueue } from 'common/hooks/useIsReadyToEnqueue';
-import { selectControlLayersSlice } from 'features/controlLayers/store/controlLayersSlice';
-import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { selectSendToCanvas } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectIterations, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectDynamicPromptsIsLoading,
+  selectDynamicPromptsSlice,
+} from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
+import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import type { PropsWithChildren } from 'react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEnqueueBatchMutation } from 'services/api/endpoints/queue';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-const selectPromptsCount = createSelector(
-  selectControlLayersSlice,
-  selectDynamicPromptsSlice,
-  (controlLayers, dynamicPrompts) =>
-    getShouldProcessPrompt(controlLayers.present.positivePrompt) ? dynamicPrompts.prompts.length : 1
+const selectPromptsCount = createSelector(selectParamsSlice, selectDynamicPromptsSlice, (params, dynamicPrompts) =>
+  getShouldProcessPrompt(params.positivePrompt) ? dynamicPrompts.prompts.length : 1
 );
 
-type Props = {
+type Props = TooltipProps & {
   prepend?: boolean;
 };
 
-export const QueueButtonTooltip = (props: PropsWithChildren<Props>) => {
+export const QueueButtonTooltip = ({ prepend, children, ...rest }: PropsWithChildren<Props>) => {
   return (
-    <Tooltip label={<TooltipContent prepend={props.prepend} />} maxW={512}>
-      {props.children}
+    <Tooltip label={<TooltipContent prepend={prepend} />} maxW={512} {...rest}>
+      {children}
     </Tooltip>
   );
 };
 
-const TooltipContent = memo(({ prepend = false }: Props) => {
+const TooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const { t } = useTranslation();
   const { isReady, reasons } = useIsReadyToEnqueue();
-  const isLoadingDynamicPrompts = useAppSelector((s) => s.dynamicPrompts.isLoading);
+  const sendToCanvas = useAppSelector(selectSendToCanvas);
+  const isLoadingDynamicPrompts = useAppSelector(selectDynamicPromptsIsLoading);
   const promptsCount = useAppSelector(selectPromptsCount);
-  const iterationsCount = useAppSelector((s) => s.generation.iterations);
-  const autoAddBoardId = useAppSelector((s) => s.gallery.autoAddBoardId);
+  const iterationsCount = useAppSelector(selectIterations);
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAddBoardName = useBoardName(autoAddBoardId);
   const [_, { isLoading }] = useEnqueueBatchMutation({
     fixedCacheKey: 'enqueueBatch',
@@ -65,6 +69,23 @@ const TooltipContent = memo(({ prepend = false }: Props) => {
     return t('queue.notReady');
   }, [isLoading, isLoadingDynamicPrompts, isReady, prepend, t]);
 
+  const addingTo = useMemo(() => {
+    if (sendToCanvas) {
+      return t('controlLayers.stagingOnCanvas');
+    }
+    return t('parameters.invoke.addingImagesTo');
+  }, [sendToCanvas, t]);
+
+  const destination = useMemo(() => {
+    if (sendToCanvas) {
+      return t('queue.canvas');
+    }
+    if (autoAddBoardName) {
+      return autoAddBoardName;
+    }
+    return t('boards.uncategorized');
+  }, [autoAddBoardName, sendToCanvas, t]);
+
   return (
     <Flex flexDir="column" gap={1}>
       <Text fontWeight="semibold">{label}</Text>
@@ -90,9 +111,9 @@ const TooltipContent = memo(({ prepend = false }: Props) => {
       )}
       <Divider opacity={0.2} borderColor="base.900" />
       <Text fontStyle="oblique 10deg">
-        {t('parameters.invoke.addingImagesTo')}{' '}
+        {addingTo}{' '}
         <Text as="span" fontWeight="semibold">
-          {autoAddBoardName || t('boards.uncategorized')}
+          {destination}
         </Text>
       </Text>
     </Flex>

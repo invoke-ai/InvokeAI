@@ -25,6 +25,7 @@ from enum import Enum
 from typing import Literal, Optional, Type, TypeAlias, Union
 
 import diffusers
+import onnxruntime as ort
 import torch
 from diffusers.models.modeling_utils import ModelMixin
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
@@ -37,7 +38,9 @@ from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NA
 
 # ModelMixin is the base class for all diffusers and transformers models
 # RawModel is the InvokeAI wrapper class for ip_adapters, loras, textual_inversion and onnx runtime
-AnyModel = Union[ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor], diffusers.DiffusionPipeline]
+AnyModel = Union[
+    ModelMixin, RawModel, torch.nn.Module, Dict[str, torch.Tensor], diffusers.DiffusionPipeline, ort.InferenceSession
+]
 
 
 class InvalidModelConfigException(Exception):
@@ -111,6 +114,7 @@ class ModelFormat(str, Enum):
     T5Encoder = "t5_encoder"
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
+    GGUFQuantized = "gguf_quantized"
 
 
 class SchedulerPredictionType(str, Enum):
@@ -154,6 +158,7 @@ class MainModelDefaultSettings(BaseModel):
     )
     width: int | None = Field(default=None, multiple_of=8, ge=64, description="Default width for this model")
     height: int | None = Field(default=None, multiple_of=8, ge=64, description="Default height for this model")
+    guidance: float | None = Field(default=None, ge=1, description="Default Guidance for this model")
 
     model_config = ConfigDict(extra="forbid")
 
@@ -193,7 +198,7 @@ class ModelConfigBase(BaseModel):
 class CheckpointConfigBase(ModelConfigBase):
     """Model config for checkpoint-style models."""
 
-    format: Literal[ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b] = Field(
+    format: Literal[ModelFormat.Checkpoint, ModelFormat.BnbQuantizednf4b, ModelFormat.GGUFQuantized] = Field(
         description="Format of the provided checkpoint model", default=ModelFormat.Checkpoint
     )
     config_path: str = Field(description="path to the checkpoint model config file")
@@ -359,6 +364,21 @@ class MainBnbQuantized4bCheckpointConfig(CheckpointConfigBase, MainConfigBase):
         return Tag(f"{ModelType.Main.value}.{ModelFormat.BnbQuantizednf4b.value}")
 
 
+class MainGGUFCheckpointConfig(CheckpointConfigBase, MainConfigBase):
+    """Model config for main checkpoint models."""
+
+    prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
+    upcast_attention: bool = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.format = ModelFormat.GGUFQuantized
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.Main.value}.{ModelFormat.GGUFQuantized.value}")
+
+
 class MainDiffusersConfig(DiffusersConfigBase, MainConfigBase):
     """Model config for main diffusers models."""
 
@@ -462,6 +482,7 @@ AnyModelConfig = Annotated[
         Annotated[MainDiffusersConfig, MainDiffusersConfig.get_tag()],
         Annotated[MainCheckpointConfig, MainCheckpointConfig.get_tag()],
         Annotated[MainBnbQuantized4bCheckpointConfig, MainBnbQuantized4bCheckpointConfig.get_tag()],
+        Annotated[MainGGUFCheckpointConfig, MainGGUFCheckpointConfig.get_tag()],
         Annotated[VAEDiffusersConfig, VAEDiffusersConfig.get_tag()],
         Annotated[VAECheckpointConfig, VAECheckpointConfig.get_tag()],
         Annotated[ControlNetDiffusersConfig, ControlNetDiffusersConfig.get_tag()],

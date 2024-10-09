@@ -5,7 +5,6 @@
         "languagePickerLabel": "Seletor de Idioma",
         "hotkeysLabel": "Hotkeys",
         "img2img": "Imagem para Imagem",
-        "unifiedCanvas": "Tela Unificada",
         "nodes": "Nós",
         "upload": "Upload",
         "load": "Abrir",
@@ -18,204 +17,8 @@
     "gallery": {
         "gallerySettings": "Configurações de Galeria",
         "autoSwitchNewImages": "Trocar para Novas Imagens Automaticamente",
-        "loadMore": "Carregar Mais",
         "noImagesInGallery": "Sem Imagens na Galeria",
         "galleryImageSize": "Tamanho da Imagem"
-    },
-    "hotkeys": {
-        "generalHotkeys": "Atalhos Gerais",
-        "galleryHotkeys": "Atalhos da Galeria",
-        "maximizeWorkSpace": {
-            "desc": "Fechar painéis e maximixar área de trabalho",
-            "title": "Maximizar a Área de Trabalho"
-        },
-        "changeTabs": {
-            "title": "Mudar Guias",
-            "desc": "Trocar para outra área de trabalho"
-        },
-        "consoleToggle": {
-            "desc": "Abrir e fechar console",
-            "title": "Ativar Console"
-        },
-        "setPrompt": {
-            "title": "Definir Prompt",
-            "desc": "Usar o prompt da imagem atual"
-        },
-        "sendToImageToImage": {
-            "desc": "Manda a imagem atual para Imagem Para Imagem",
-            "title": "Mandar para Imagem Para Imagem"
-        },
-        "previousImage": {
-            "desc": "Mostra a imagem anterior na galeria",
-            "title": "Imagem Anterior"
-        },
-        "nextImage": {
-            "title": "Próxima Imagem",
-            "desc": "Mostra a próxima imagem na galeria"
-        },
-        "decreaseGalleryThumbSize": {
-            "desc": "Diminui o tamanho das thumbs na galeria",
-            "title": "Diminuir Tamanho da Galeria de Imagem"
-        },
-        "selectBrush": {
-            "title": "Selecionar Pincel",
-            "desc": "Seleciona o pincel"
-        },
-        "selectEraser": {
-            "title": "Selecionar Apagador",
-            "desc": "Seleciona o apagador"
-        },
-        "decreaseBrushSize": {
-            "title": "Diminuir Tamanho do Pincel",
-            "desc": "Diminui o tamanho do pincel/apagador"
-        },
-        "increaseBrushOpacity": {
-            "desc": "Aumenta a opacidade do pincel",
-            "title": "Aumentar Opacidade do Pincel"
-        },
-        "moveTool": {
-            "title": "Ferramenta Mover",
-            "desc": "Permite navegar pela tela"
-        },
-        "decreaseBrushOpacity": {
-            "desc": "Diminui a opacidade do pincel",
-            "title": "Diminuir Opacidade do Pincel"
-        },
-        "toggleSnap": {
-            "title": "Ativar Encaixe",
-            "desc": "Ativa Encaixar na Grade"
-        },
-        "quickToggleMove": {
-            "title": "Ativar Mover Rapidamente",
-            "desc": "Temporariamente ativa o modo Mover"
-        },
-        "toggleLayer": {
-            "title": "Ativar Camada",
-            "desc": "Ativa a seleção de camada de máscara/base"
-        },
-        "clearMask": {
-            "title": "Limpar Máscara",
-            "desc": "Limpa toda a máscara"
-        },
-        "hideMask": {
-            "title": "Esconder Máscara",
-            "desc": "Esconde e Revela a máscara"
-        },
-        "mergeVisible": {
-            "title": "Fundir Visível",
-            "desc": "Fundir todas as camadas visíveis das telas"
-        },
-        "downloadImage": {
-            "desc": "Descarregar a tela atual",
-            "title": "Descarregar Imagem"
-        },
-        "undoStroke": {
-            "title": "Desfazer Traço",
-            "desc": "Desfaz um traço de pincel"
-        },
-        "redoStroke": {
-            "title": "Refazer Traço",
-            "desc": "Refaz o traço de pincel"
-        },
-        "keyboardShortcuts": "Atalhos de Teclado",
-        "appHotkeys": "Atalhos do app",
-        "invoke": {
-            "title": "Invocar",
-            "desc": "Gerar uma imagem"
-        },
-        "cancel": {
-            "title": "Cancelar",
-            "desc": "Cancelar geração de imagem"
-        },
-        "focusPrompt": {
-            "title": "Foco do Prompt",
-            "desc": "Foco da área de texto do prompt"
-        },
-        "toggleOptions": {
-            "title": "Ativar Opções",
-            "desc": "Abrir e fechar o painel de opções"
-        },
-        "pinOptions": {
-            "title": "Fixar Opções",
-            "desc": "Fixar o painel de opções"
-        },
-        "closePanels": {
-            "title": "Fechar Painéis",
-            "desc": "Fecha os painéis abertos"
-        },
-        "unifiedCanvasHotkeys": "Atalhos da Tela Unificada",
-        "toggleGallery": {
-            "title": "Ativar Galeria",
-            "desc": "Abrir e fechar a gaveta da galeria"
-        },
-        "setSeed": {
-            "title": "Definir Seed",
-            "desc": "Usar seed da imagem atual"
-        },
-        "setParameters": {
-            "title": "Definir Parâmetros",
-            "desc": "Usar todos os parâmetros da imagem atual"
-        },
-        "restoreFaces": {
-            "title": "Restaurar Rostos",
-            "desc": "Restaurar a imagem atual"
-        },
-        "showInfo": {
-            "title": "Mostrar Informações",
-            "desc": "Mostrar metadados de informações da imagem atual"
-        },
-        "deleteImage": {
-            "title": "Apagar Imagem",
-            "desc": "Apaga a imagem atual"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "Aumentar Tamanho da Galeria de Imagem",
-            "desc": "Aumenta o tamanho das thumbs na galeria"
-        },
-        "increaseBrushSize": {
-            "title": "Aumentar Tamanho do Pincel",
-            "desc": "Aumenta o tamanho do pincel/apagador"
-        },
-        "fillBoundingBox": {
-            "title": "Preencher Caixa Delimitadora",
-            "desc": "Preenche a caixa delimitadora com a cor do pincel"
-        },
-        "eraseBoundingBox": {
-            "title": "Apagar Caixa Delimitadora",
-            "desc": "Apaga a área da caixa delimitadora"
-        },
-        "colorPicker": {
-            "title": "Selecionar Seletor de Cor",
-            "desc": "Seleciona o seletor de cores"
-        },
-        "showHideBoundingBox": {
-            "title": "Mostrar/Esconder Caixa Delimitadora",
-            "desc": "Ativa a visibilidade da caixa delimitadora"
-        },
-        "saveToGallery": {
-            "title": "Gravara Na Galeria",
-            "desc": "Grava a tela atual na galeria"
-        },
-        "copyToClipboard": {
-            "title": "Copiar para a Área de Transferência",
-            "desc": "Copia a tela atual para a área de transferência"
-        },
-        "resetView": {
-            "title": "Resetar Visualização",
-            "desc": "Reseta Visualização da Tela"
-        },
-        "previousStagingImage": {
-            "title": "Imagem de Preparação Anterior",
-            "desc": "Área de Imagem de Preparação Anterior"
-        },
-        "nextStagingImage": {
-            "title": "Próxima Imagem de Preparação Anterior",
-            "desc": "Próxima Área de Imagem de Preparação Anterior"
-        },
-        "acceptStagingImage": {
-            "title": "Aceitar Imagem de Preparação Anterior",
-            "desc": "Aceitar Área de Imagem de Preparação Anterior"
-        }
     },
     "modelManager": {
         "modelUpdated": "Modelo Atualizado",
@@ -227,7 +30,6 @@
         "convertToDiffusersHelpText6": "Deseja converter este modelo?",
         "alpha": "Alpha",
         "config": "Configuração",
-        "v2_768": "v2 (768px)",
         "modelConverted": "Modelo Convertido",
         "manual": "Manual",
         "name": "Nome",
@@ -241,7 +43,6 @@
         "convertToDiffusersHelpText1": "Este modelo será convertido ao formato 🧨 Diffusers.",
         "convertToDiffusersHelpText2": "Este processo irá substituir a sua entrada de Gestor de Modelos por uma versão Diffusers do mesmo modelo.",
         "convertToDiffusersHelpText3": "O seu ficheiro de ponto de verificação no disco NÃO será excluído ou modificado de forma alguma. Pode adicionar o seu ponto de verificação ao Gestor de modelos novamente, se desejar.",
-        "v2_base": "v2 (512px)",
         "none": "nenhum",
         "modelManager": "Gerente de Modelo",
         "model": "Modelo",
@@ -279,8 +80,6 @@
         "scaledWidth": "L Escalada",
         "scaledHeight": "A Escalada",
         "infillMethod": "Método de Preenchimento",
-        "sendToImg2Img": "Mandar para Imagem Para Imagem",
-        "sendToUnifiedCanvas": "Mandar para Tela Unificada",
         "copyImage": "Copiar imagem",
         "downloadImage": "Descarregar Imagem",
         "useSeed": "Usar Seed",
@@ -289,7 +88,6 @@
     },
     "settings": {
         "confirmOnDelete": "Confirmar Antes de Apagar",
-        "enableImageDebugging": "Ativar Depuração de Imagem",
         "resetWebUIDesc1": "Reiniciar a interface apenas reinicia o cache local do broswer para imagens e configurações lembradas. Não apaga nenhuma imagem do disco.",
         "models": "Modelos",
         "displayInProgress": "Mostrar Progresso de Imagens Em Andamento",
@@ -299,80 +97,30 @@
     },
     "toast": {
         "uploadFailed": "Envio Falhou",
-        "imageNotLoadedDesc": "Nenhuma imagem encontrada a enviar para o módulo de imagem para imagem",
         "imageCopied": "Imagem Copiada",
-        "canvasMerged": "Tela Fundida",
-        "sentToImageToImage": "Mandar Para Imagem Para Imagem",
-        "sentToUnifiedCanvas": "Enviada para a Tela Unificada",
-        "parametersNotSet": "Parâmetros Não Definidos",
-        "metadataLoadFailed": "Falha ao tentar carregar metadados"
-    },
-    "tooltip": {
-        "feature": {
-            "prompt": "Este é o campo de prompt. O prompt inclui objetos de geração e termos estilísticos. Também pode adicionar peso (importância do token) no prompt, mas comandos e parâmetros de CLI não funcionarão.",
-            "other": "Essas opções ativam modos alternativos de processamento para o Invoke. 'Seamless tiling' criará padrões repetidos na saída. 'High resolution' é uma geração em duas etapas com img2img: use essa configuração quando desejar uma imagem maior e mais coerente sem artefatos. Levará mais tempo do que o txt2img usual.",
-            "seed": "O valor da semente afeta o ruído inicial a partir do qual a imagem é formada. Pode usar as sementes já existentes de imagens anteriores. 'Limiar de ruído' é usado para mitigar artefatos em valores CFG altos (experimente a faixa de 0-10) e o Perlin para adicionar ruído Perlin durante a geração: ambos servem para adicionar variação às suas saídas.",
-            "gallery": "A galeria exibe as gerações da pasta de saída conforme elas são criadas. As configurações são armazenadas em ficheiros e acessadas pelo menu de contexto.",
-            "upscale": "Use o ESRGAN para ampliar a imagem imediatamente após a geração.",
-            "boundingBox": "A caixa delimitadora é a mesma que as configurações de largura e altura para Texto para Imagem ou Imagem para Imagem. Apenas a área na caixa será processada."
-        }
-    },
-    "unifiedCanvas": {
-        "scaledBoundingBox": "Caixa Delimitadora Escalada",
-        "boundingBoxPosition": "Posição da Caixa Delimitadora",
-        "next": "Próximo",
-        "accept": "Aceitar",
-        "discardAll": "Descartar Todos",
-        "base": "Base",
-        "brush": "Pincel",
-        "showIntermediates": "Mostrar Intermediários",
-        "showGrid": "Mostrar Grade",
-        "clearCanvasHistoryConfirm": "Tem certeza que quer limpar o histórico de tela?",
-        "boundingBox": "Caixa Delimitadora",
-        "canvasDimensions": "Dimensões da Tela",
-        "canvasPosition": "Posição da Tela",
-        "cursorPosition": "Posição do cursor",
-        "previous": "Anterior",
-        "layer": "Camada",
-        "mask": "Máscara",
-        "maskingOptions": "Opções de Mascaramento",
-        "enableMask": "Ativar Máscara",
-        "preserveMaskedArea": "Preservar Área da Máscara",
-        "clearMask": "Limpar Máscara",
-        "eraser": "Apagador",
-        "fillBoundingBox": "Preencher Caixa Delimitadora",
-        "eraseBoundingBox": "Apagar Caixa Delimitadora",
-        "colorPicker": "Seletor de Cor",
-        "brushOptions": "Opções de Pincel",
-        "brushSize": "Tamanho",
-        "move": "Mover",
-        "resetView": "Resetar Visualização",
-        "mergeVisible": "Fundir Visível",
-        "saveToGallery": "Gravar na Galeria",
-        "copyToClipboard": "Copiar para a Área de Transferência",
-        "downloadAsImage": "Descarregar Como Imagem",
-        "undo": "Desfazer",
-        "redo": "Refazer",
-        "clearCanvas": "Limpar Tela",
-        "canvasSettings": "Configurações de Tela",
-        "snapToGrid": "Encaixar na Grade",
-        "darkenOutsideSelection": "Escurecer Seleção Externa",
-        "autoSaveToGallery": "Gravar Automaticamente na Galeria",
-        "saveBoxRegionOnly": "Gravar Apenas a Região da Caixa",
-        "limitStrokesToBox": "Limitar Traços à Caixa",
-        "showCanvasDebugInfo": "Mostrar Informações de Depuração daTela",
-        "clearCanvasHistory": "Limpar o Histórico da Tela",
-        "clearHistory": "Limpar Históprico",
-        "clearCanvasHistoryMessage": "Limpar o histórico de tela deixa a sua tela atual intacta, mas limpa de forma irreversível o histórico de desfazer e refazer.",
-        "activeLayer": "Camada Ativa",
-        "canvasScale": "Escala da Tela"
+        "parametersNotSet": "Parâmetros Não Definidos"
     },
     "accessibility": {
         "invokeProgressBar": "Invocar barra de progresso",
-        "reset": "Repôr",
+        "reset": "Reiniciar",
         "nextImage": "Próxima imagem",
-        "showOptionsPanel": "Mostrar painel de opções",
         "uploadImage": "Enviar imagem",
-        "previousImage": "Imagem anterior"
+        "previousImage": "Imagem Anterior",
+        "menu": "Menu",
+        "about": "Sobre",
+        "resetUI": "$t(accessibility.reset)UI",
+        "createIssue": "Reportar Problema",
+        "submitSupportTicket": "Submeter um ticket de Suporte",
+        "mode": "Modo"
+    },
+    "boards": {
+        "selectedForAutoAdd": "Selecionado para Auto-Adicionar",
+        "addBoard": "Adicionar Quadro",
+        "addPrivateBoard": "Adicionar Quadro privado",
+        "addSharedBoard": "Adicionar quadro Compartilhado",
+        "boards": "Quadros",
+        "autoAddBoard": "Auto-adicao de Quadro",
+        "archiveBoard": "Arquivar Quadro",
+        "archived": "Arquivado"
     }
 }

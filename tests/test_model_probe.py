@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import torch
 from torch import tensor
 
 from invokeai.backend.model_manager import BaseModelType, ModelRepoVariant
@@ -58,8 +59,9 @@ def test_default_settings_main():
     assert get_default_settings_main(BaseModelType.Any) is None
 
 
-def test_probe_handles_state_dict_with_integer_keys():
-    # This structure isn't supported by invoke, but we still need to handle it gracefully. See #6044
+def test_probe_handles_state_dict_with_integer_keys(tmp_path: Path):
+    # This structure isn't supported by invoke, but we still need to handle it gracefully.
+    # See https://github.com/invoke-ai/InvokeAI/issues/6044
     state_dict_with_integer_keys: CkptType = {
         320: (
             {
@@ -76,8 +78,10 @@ def test_probe_handles_state_dict_with_integer_keys():
             },
         ),
     }
+    sd_path = tmp_path / "sd.pt"
+    torch.save(state_dict_with_integer_keys, sd_path)
     with pytest.raises(InvalidModelConfigException):
-        ModelProbe.get_model_type_from_checkpoint(Path("embedding.pt"), state_dict_with_integer_keys)
+        ModelProbe.get_model_type_from_checkpoint(sd_path, state_dict_with_integer_keys)
 
 
 def test_probe_sd1_diffusers_inpainting(datadir: Path):

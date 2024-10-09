@@ -6,12 +6,14 @@ from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     BatchStatus,
     CancelByBatchIDsResult,
+    CancelByDestinationResult,
     CancelByQueueIDResult,
     ClearResult,
     EnqueueBatchResult,
     IsEmptyResult,
     IsFullResult,
     PruneResult,
+    SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueItemDTO,
     SessionQueueStatus,
@@ -69,6 +71,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def get_counts_by_destination(self, queue_id: str, destination: str) -> SessionQueueCountsByDestination:
+        """Gets the counts of queue items by destination"""
+        pass
+
+    @abstractmethod
     def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatus:
         """Gets the status of a batch"""
         pass
@@ -93,6 +100,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def cancel_by_batch_ids(self, queue_id: str, batch_ids: list[str]) -> CancelByBatchIDsResult:
         """Cancels all queue items with matching batch IDs"""
+        pass
+
+    @abstractmethod
+    def cancel_by_destination(self, queue_id: str, destination: str) -> CancelByDestinationResult:
+        """Cancels all queue items with the given batch destination"""
         pass
 
     @abstractmethod

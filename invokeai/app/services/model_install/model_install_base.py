@@ -254,7 +254,7 @@ class ModelInstallServiceBase(ABC):
         is periodically cleared of infrequently-used entries when the model
         converter runs.
 
-        Note that this doesn't automaticallly install or register the model, but is
+        Note that this doesn't automatically install or register the model, but is
         intended for use by nodes that need access to models that aren't directly
         supported by InvokeAI. The downloading process takes advantage of the download queue
         to avoid interrupting other operations.

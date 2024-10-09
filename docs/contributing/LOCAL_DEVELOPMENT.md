@@ -1,21 +1,10 @@
 # Local Development
 
-If you are looking to contribute you will need to have a local development
-environment. See the
-[Developer Install](../installation/020_INSTALL_MANUAL.md#developer-install) for
-full details.
-
-Broadly this involves cloning the repository, installing the pre-reqs, and
-InvokeAI (in editable form). Assuming this is working, choose your area of
-focus.
+If you want to contribute, you will need to set up a [local development environment](./dev-environment.md).
 
 ## Documentation
 
-We use [mkdocs](https://www.mkdocs.org) for our documentation with the
-[material theme](https://squidfunk.github.io/mkdocs-material/). Documentation is
-written in markdown files under the `./docs` folder and then built into a static
-website for hosting with GitHub Pages at
-[invoke-ai.github.io/InvokeAI](https://invoke-ai.github.io/InvokeAI).
+We use [mkdocs](https://www.mkdocs.org) for our documentation with the [material theme](https://squidfunk.github.io/mkdocs-material/). Documentation is written in markdown files under the `./docs` folder and then built into a static website for hosting with GitHub Pages at [invoke-ai.github.io/InvokeAI](https://invoke-ai.github.io/InvokeAI).
 
 To contribute to the documentation you'll need to install the dependencies. Note
 the use of `"`.
@@ -50,6 +39,7 @@ and will be required for testing the changes you make to the code.
 ### Tests
 
 See the [tests documentation](./TESTS.md) for information about running and writing tests.
+
 ### Reloading Changes
 
 Experimenting with changes to the Python source code is a drag if you have to re-start the server —
@@ -62,7 +52,6 @@ running server on the fly.
 
 This will allow you to avoid restarting the server (and reloading models) in most cases, but there are some caveats; see
 the [jurigged documentation](https://github.com/breuleux/jurigged#caveats) for details.
-
 
 ## Front End
 
@@ -250,7 +239,7 @@ Consult the
 get it set up.
 
 Suggest using VSCode's included settings sync so that your remote dev host has
-all the same app settings and extensions automagically.
+all the same app settings and extensions automatically.
 
 ##### One remote dev gotcha
 

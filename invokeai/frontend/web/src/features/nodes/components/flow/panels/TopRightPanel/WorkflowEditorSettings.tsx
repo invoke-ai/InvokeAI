@@ -14,61 +14,42 @@ import {
   ModalHeader,
   ModalOverlay,
   Switch,
-  useDisclosure,
 } from '@invoke-ai/ui-library';
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { buildUseBoolean } from 'common/hooks/useBoolean';
 import ReloadNodeTemplatesButton from 'features/nodes/components/flow/panels/TopRightPanel/ReloadSchemaButton';
 import {
   selectionModeChanged,
-  selectWorkflowSettingsSlice,
+  selectSelectionMode,
+  selectShouldAnimateEdges,
+  selectShouldColorEdges,
+  selectShouldShouldValidateGraph,
+  selectShouldShowEdgeLabels,
+  selectShouldSnapToGrid,
   shouldAnimateEdgesChanged,
   shouldColorEdgesChanged,
   shouldShowEdgeLabelsChanged,
   shouldSnapToGridChanged,
   shouldValidateGraphChanged,
 } from 'features/nodes/store/workflowSettingsSlice';
-import type { ChangeEvent, ReactNode } from 'react';
+import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SelectionMode } from 'reactflow';
 
 const formLabelProps: FormLabelProps = { flexGrow: 1 };
+export const [useWorkflowEditorSettingsModal] = buildUseBoolean(false);
 
-const selector = createMemoizedSelector(selectWorkflowSettingsSlice, (workflowSettings) => {
-  const {
-    shouldAnimateEdges,
-    shouldValidateGraph,
-    shouldSnapToGrid,
-    shouldColorEdges,
-    shouldShowEdgeLabels,
-    selectionMode,
-  } = workflowSettings;
-  return {
-    shouldAnimateEdges,
-    shouldValidateGraph,
-    shouldSnapToGrid,
-    shouldColorEdges,
-    shouldShowEdgeLabels,
-    selectionModeIsChecked: selectionMode === SelectionMode.Full,
-  };
-});
-
-type Props = {
-  children: (props: { onOpen: () => void }) => ReactNode;
-};
-
-const WorkflowEditorSettings = ({ children }: Props) => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+const WorkflowEditorSettings = () => {
   const dispatch = useAppDispatch();
-  const {
-    shouldAnimateEdges,
-    shouldValidateGraph,
-    shouldSnapToGrid,
-    shouldColorEdges,
-    shouldShowEdgeLabels,
-    selectionModeIsChecked,
-  } = useAppSelector(selector);
+  const modal = useWorkflowEditorSettingsModal();
+
+  const shouldSnapToGrid = useAppSelector(selectShouldSnapToGrid);
+  const selectionMode = useAppSelector(selectSelectionMode);
+  const shouldColorEdges = useAppSelector(selectShouldColorEdges);
+  const shouldAnimateEdges = useAppSelector(selectShouldAnimateEdges);
+  const shouldShowEdgeLabels = useAppSelector(selectShouldShowEdgeLabels);
+  const shouldValidateGraph = useAppSelector(selectShouldShouldValidateGraph);
 
   const handleChangeShouldValidate = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -115,76 +96,72 @@ const WorkflowEditorSettings = ({ children }: Props) => {
   const { t } = useTranslation();
 
   return (
-    <>
-      {children({ onOpen })}
-
-      <Modal isOpen={isOpen} onClose={onClose} size="2xl" isCentered>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>{t('nodes.workflowSettings')}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <Flex flexDirection="column" gap={4} py={4}>
-              <Heading size="sm">{t('parameters.general')}</Heading>
-              <FormControlGroup orientation="vertical" formLabelProps={formLabelProps}>
-                <FormControl>
-                  <Flex w="full">
-                    <FormLabel>{t('nodes.animatedEdges')}</FormLabel>
-                    <Switch onChange={handleChangeShouldAnimate} isChecked={shouldAnimateEdges} />
-                  </Flex>
-                  <FormHelperText>{t('nodes.animatedEdgesHelp')}</FormHelperText>
-                </FormControl>
-                <Divider />
-                <FormControl>
-                  <Flex w="full">
-                    <FormLabel>{t('nodes.snapToGrid')}</FormLabel>
-                    <Switch isChecked={shouldSnapToGrid} onChange={handleChangeShouldSnap} />
-                  </Flex>
-                  <FormHelperText>{t('nodes.snapToGridHelp')}</FormHelperText>
-                </FormControl>
-                <Divider />
-                <FormControl>
-                  <Flex w="full">
-                    <FormLabel>{t('nodes.colorCodeEdges')}</FormLabel>
-                    <Switch isChecked={shouldColorEdges} onChange={handleChangeShouldColor} />
-                  </Flex>
-                  <FormHelperText>{t('nodes.colorCodeEdgesHelp')}</FormHelperText>
-                </FormControl>
-                <Divider />
-                <FormControl>
-                  <Flex w="full">
-                    <FormLabel>{t('nodes.fullyContainNodes')}</FormLabel>
-                    <Switch isChecked={selectionModeIsChecked} onChange={handleChangeSelectionMode} />
-                  </Flex>
-                  <FormHelperText>{t('nodes.fullyContainNodesHelp')}</FormHelperText>
-                </FormControl>
-                <Divider />
-                <FormControl>
-                  <Flex w="full">
-                    <FormLabel>{t('nodes.showEdgeLabels')}</FormLabel>
-                    <Switch isChecked={shouldShowEdgeLabels} onChange={handleChangeShouldShowEdgeLabels} />
-                  </Flex>
-                  <FormHelperText>{t('nodes.showEdgeLabelsHelp')}</FormHelperText>
-                </FormControl>
-                <Divider />
-                <Heading size="sm" pt={4}>
-                  {t('common.advanced')}
-                </Heading>
-                <FormControl>
-                  <Flex w="full">
-                    <FormLabel>{t('nodes.validateConnections')}</FormLabel>
-                    <Switch isChecked={shouldValidateGraph} onChange={handleChangeShouldValidate} />
-                  </Flex>
-                  <FormHelperText>{t('nodes.validateConnectionsHelp')}</FormHelperText>
-                </FormControl>
-                <Divider />
-              </FormControlGroup>
-              <ReloadNodeTemplatesButton />
-            </Flex>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
-    </>
+    <Modal isOpen={modal.isTrue} onClose={modal.setFalse} size="2xl" isCentered useInert={false}>
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>{t('nodes.workflowSettings')}</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody>
+          <Flex flexDirection="column" gap={4} py={4}>
+            <Heading size="sm">{t('parameters.general')}</Heading>
+            <FormControlGroup orientation="vertical" formLabelProps={formLabelProps}>
+              <FormControl>
+                <Flex w="full">
+                  <FormLabel>{t('nodes.animatedEdges')}</FormLabel>
+                  <Switch onChange={handleChangeShouldAnimate} isChecked={shouldAnimateEdges} />
+                </Flex>
+                <FormHelperText>{t('nodes.animatedEdgesHelp')}</FormHelperText>
+              </FormControl>
+              <Divider />
+              <FormControl>
+                <Flex w="full">
+                  <FormLabel>{t('nodes.snapToGrid')}</FormLabel>
+                  <Switch isChecked={shouldSnapToGrid} onChange={handleChangeShouldSnap} />
+                </Flex>
+                <FormHelperText>{t('nodes.snapToGridHelp')}</FormHelperText>
+              </FormControl>
+              <Divider />
+              <FormControl>
+                <Flex w="full">
+                  <FormLabel>{t('nodes.colorCodeEdges')}</FormLabel>
+                  <Switch isChecked={shouldColorEdges} onChange={handleChangeShouldColor} />
+                </Flex>
+                <FormHelperText>{t('nodes.colorCodeEdgesHelp')}</FormHelperText>
+              </FormControl>
+              <Divider />
+              <FormControl>
+                <Flex w="full">
+                  <FormLabel>{t('nodes.fullyContainNodes')}</FormLabel>
+                  <Switch isChecked={selectionMode === SelectionMode.Full} onChange={handleChangeSelectionMode} />
+                </Flex>
+                <FormHelperText>{t('nodes.fullyContainNodesHelp')}</FormHelperText>
+              </FormControl>
+              <Divider />
+              <FormControl>
+                <Flex w="full">
+                  <FormLabel>{t('nodes.showEdgeLabels')}</FormLabel>
+                  <Switch isChecked={shouldShowEdgeLabels} onChange={handleChangeShouldShowEdgeLabels} />
+                </Flex>
+                <FormHelperText>{t('nodes.showEdgeLabelsHelp')}</FormHelperText>
+              </FormControl>
+              <Divider />
+              <Heading size="sm" pt={4}>
+                {t('common.advanced')}
+              </Heading>
+              <FormControl>
+                <Flex w="full">
+                  <FormLabel>{t('nodes.validateConnections')}</FormLabel>
+                  <Switch isChecked={shouldValidateGraph} onChange={handleChangeShouldValidate} />
+                </Flex>
+                <FormHelperText>{t('nodes.validateConnectionsHelp')}</FormHelperText>
+              </FormControl>
+              <Divider />
+            </FormControlGroup>
+            <ReloadNodeTemplatesButton />
+          </Flex>
+        </ModalBody>
+      </ModalContent>
+    </Modal>
   );
 };
 

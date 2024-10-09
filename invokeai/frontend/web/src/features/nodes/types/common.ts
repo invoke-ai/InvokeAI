@@ -22,7 +22,7 @@ export const zColorField = z.object({
 });
 export type ColorField = z.infer<typeof zColorField>;
 
-export const zClassification = z.enum(['stable', 'beta', 'prototype']);
+export const zClassification = z.enum(['stable', 'beta', 'prototype', 'deprecated', 'internal']);
 export type Classification = z.infer<typeof zClassification>;
 
 export const zSchedulerField = z.enum([
@@ -62,6 +62,9 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 
 // #region Model-related schemas
 const zBaseModel = z.enum(['any', 'sd-1', 'sd-2', 'sdxl', 'sdxl-refiner', 'flux']);
+export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sdxl', 'flux']);
+export type MainModelBase = z.infer<typeof zMainModelBase>;
+export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
 const zModelType = z.enum([
   'main',
   'vae',

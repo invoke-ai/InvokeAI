@@ -57,7 +57,7 @@ to footgun.
 
 In v4.0.0, this object has been refactored to be much simpler.
 
-See [INVOCATION_API](./INVOCATION_API.md) for full details of the API.
+See the [invocation API docs](./invocation-api.md) for full details of the API.
 
 !!! warning ""
 

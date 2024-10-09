@@ -10,7 +10,6 @@
         "cancel": "キャンセル",
         "accept": "同意",
         "img2img": "img2img",
-        "unifiedCanvas": "Unified Canvas",
         "loading": "ロード中",
         "githubLabel": "Github",
         "hotkeysLabel": "ホットキー",
@@ -23,7 +22,6 @@
         "dontAskMeAgain": "次回から確認しない",
         "areYouSure": "本当によろしいですか？",
         "on": "オン",
-        "nodeEditor": "ノードエディター",
         "ipAdapter": "IPアダプター",
         "auto": "自動",
         "openInNewTab": "新しいタブで開く",
@@ -71,8 +69,6 @@
         "prevPage": "前のページ",
         "unknownError": "未知のエラー",
         "orderBy": "並び順:",
-        "comparing": "比較中",
-        "comparingDesc": "2 つの画像の比較する",
         "enabled": "有効",
         "notInstalled": "未インストール",
         "positivePrompt": "プロンプト",
@@ -81,31 +77,24 @@
         "aboutDesc": "Invokeを業務で利用する場合はマークしてください:",
         "beta": "ベータ",
         "disabled": "無効",
-        "loglevel": "ログラベル",
         "editor": "エディタ",
         "safetensors": "Safetensors",
         "tab": "タブ",
-        "viewingDesc": "画像を大きなギャラリービューで開く",
-        "editing": "編集",
-        "editingDesc": "コントロールレイヤキャンバスで編集",
         "toResolve": "解決方法"
     },
     "gallery": {
         "galleryImageSize": "画像のサイズ",
         "gallerySettings": "ギャラリーの設定",
-        "loadMore": "さらに読み込む",
         "noImagesInGallery": "表示する画像がありません",
         "autoSwitchNewImages": "新しい画像に自動切替",
         "copy": "コピー",
         "image": "画像",
-        "setCurrentImage": "現在の画像としてセット",
         "autoAssignBoardOnClick": "クリックしたボードに自動追加",
         "featuresWillReset": "この画像を削除すると、これらの機能は即座にリセットされます。",
         "unstarImage": "スターを外す",
         "loading": "ロード中",
         "assets": "アセット",
         "currentlyInUse": "この画像は現在下記の機能を使用しています:",
-        "problemDeletingImages": "画像の削除中に問題が発生",
         "drop": "ドロップ",
         "dropOrUpload": "$t(gallery.drop) またはアップロード",
         "deleteImage_other": "画像を削除",
@@ -116,7 +105,6 @@
         "bulkDownloadRequestedDesc": "ダウンロードの準備中です。しばらくお待ちください。",
         "bulkDownloadRequestFailed": "ダウンロード準備中に問題が発生",
         "bulkDownloadFailed": "ダウンロード失敗",
-        "problemDeletingImagesDesc": "1つ以上の画像を削除できませんでした",
         "alwaysShowImageSizeBadge": "画像サイズバッジを常に表示",
         "dropToUpload": "$t(gallery.drop) してアップロード",
         "noImageSelected": "画像が選択されていません",
@@ -132,7 +120,6 @@
         "sideBySide": "横並び",
         "hover": "ホバー",
         "swapImages": "画像を入れ替える",
-        "compareOptions": "比較オプション",
         "stretchToFit": "画面に合わせる",
         "exitCompare": "比較を終了する",
         "compareHelp1": "<Kbd>Alt</Kbd> キーを押しながらギャラリー画像をクリックするか、矢印キーを使用して比較画像を変更します。",
@@ -141,227 +128,9 @@
         "compareHelp2": "<Kbd>M</Kbd> キーを押して比較モードを切り替えます。"
     },
     "hotkeys": {
-        "keyboardShortcuts": "ホットキー",
-        "appHotkeys": "アプリケーション",
-        "generalHotkeys": "一般",
-        "galleryHotkeys": "ギャラリー",
-        "unifiedCanvasHotkeys": "Unified Canvasのホットキー",
-        "invoke": {
-            "desc": "画像を生成",
-            "title": "Invoke"
-        },
-        "cancel": {
-            "title": "キャンセル",
-            "desc": "現在のキューをキャンセル"
-        },
-        "focusPrompt": {
-            "desc": "プロンプトテキストボックスにフォーカス",
-            "title": "プロンプトにフォーカス"
-        },
-        "toggleOptions": {
-            "title": "オプションパネルのトグル",
-            "desc": "オプションパネルの開閉"
-        },
-        "pinOptions": {
-            "title": "ピン",
-            "desc": "オプションパネルを固定"
-        },
-        "toggleGallery": {
-            "title": "ギャラリーのトグル",
-            "desc": "ギャラリードロワーの開閉"
-        },
-        "maximizeWorkSpace": {
-            "title": "作業領域の最大化",
-            "desc": "パネルを閉じて、作業領域を最大に"
-        },
-        "changeTabs": {
-            "title": "タブの切替",
-            "desc": "他の作業領域と切替"
-        },
-        "consoleToggle": {
-            "title": "コンソールのトグル",
-            "desc": "コンソールの開閉"
-        },
-        "setPrompt": {
-            "title": "プロンプトをセット",
-            "desc": "現在の画像のプロンプトを使用"
-        },
-        "setSeed": {
-            "title": "シード値をセット",
-            "desc": "現在の画像のシード値を使用"
-        },
-        "setParameters": {
-            "title": "パラメータをセット",
-            "desc": "現在の画像のすべてのパラメータを使用"
-        },
-        "restoreFaces": {
-            "title": "顔の修復",
-            "desc": "現在の画像を修復"
-        },
-        "showInfo": {
-            "title": "情報を見る",
-            "desc": "現在の画像のメタデータ情報を表示"
-        },
-        "sendToImageToImage": {
-            "title": "Image To Imageに転送",
-            "desc": "現在の画像をImage to Imageに転送"
-        },
-        "deleteImage": {
-            "title": "画像を削除",
-            "desc": "現在の画像を削除"
-        },
-        "closePanels": {
-            "title": "パネルを閉じる",
-            "desc": "開いているパネルを閉じる"
-        },
-        "previousImage": {
-            "title": "前の画像",
-            "desc": "ギャラリー内の1つ前の画像を表示"
-        },
-        "nextImage": {
-            "title": "次の画像",
-            "desc": "ギャラリー内の1つ後の画像を表示"
-        },
-        "increaseGalleryThumbSize": {
-            "title": "ギャラリーの画像を拡大",
-            "desc": "ギャラリーのサムネイル画像を拡大"
-        },
-        "decreaseGalleryThumbSize": {
-            "title": "ギャラリーの画像サイズを縮小",
-            "desc": "ギャラリーのサムネイル画像を縮小"
-        },
-        "selectBrush": {
-            "title": "ブラシを選択",
-            "desc": "ブラシを選択"
-        },
-        "selectEraser": {
-            "title": "消しゴムを選択",
-            "desc": "消しゴムを選択"
-        },
-        "decreaseBrushSize": {
-            "title": "ブラシサイズを縮小",
-            "desc": "ブラシ/消しゴムのサイズを縮小"
-        },
-        "increaseBrushSize": {
-            "title": "ブラシサイズを拡大",
-            "desc": "ブラシ/消しゴムのサイズを拡大"
-        },
-        "decreaseBrushOpacity": {
-            "title": "ブラシの不透明度を下げる",
-            "desc": "キャンバスブラシの不透明度を下げる"
-        },
-        "increaseBrushOpacity": {
-            "title": "ブラシの不透明度を上げる",
-            "desc": "キャンバスブラシの不透明度を上げる"
-        },
-        "fillBoundingBox": {
-            "title": "バウンディングボックスを塗りつぶす",
-            "desc": "ブラシの色でバウンディングボックス領域を塗りつぶす"
-        },
-        "eraseBoundingBox": {
-            "title": "バウンディングボックスを消す",
-            "desc": "バウンディングボックス領域を消す"
-        },
-        "colorPicker": {
-            "title": "カラーピッカーを選択",
-            "desc": "カラーピッカーを選択"
-        },
-        "toggleLayer": {
-            "title": "レイヤーを切替",
-            "desc": "マスク/ベースレイヤの選択を切替"
-        },
-        "clearMask": {
-            "title": "マスクを消す",
-            "desc": "マスク全体を消す"
-        },
-        "hideMask": {
-            "title": "マスクを非表示",
-            "desc": "マスクを表示/非表示"
-        },
-        "showHideBoundingBox": {
-            "title": "バウンディングボックスを表示/非表示",
-            "desc": "バウンディングボックスの表示/非表示を切替"
-        },
-        "saveToGallery": {
-            "title": "ギャラリーに保存",
-            "desc": "現在のキャンバスをギャラリーに保存"
-        },
-        "copyToClipboard": {
-            "title": "クリップボードにコピー",
-            "desc": "現在のキャンバスをクリップボードにコピー"
-        },
-        "downloadImage": {
-            "title": "画像をダウンロード",
-            "desc": "現在の画像をダウンロード"
-        },
-        "resetView": {
-            "title": "キャンバスをリセット",
-            "desc": "キャンバスをリセット"
-        },
-        "acceptStagingImage": {
-            "title": "プレビュー画像の採用",
-            "desc": "現在のプレビュー画像を採用する"
-        },
-        "addNodes": {
-            "desc": "ノード追加メニューを開く",
-            "title": "ノードを追加"
-        },
-        "moveTool": {
-            "desc": "キャンバスを移動する",
-            "title": "手のひらツール"
-        },
-        "nextStagingImage": {
-            "desc": "次のプレビュー画像",
-            "title": "次のステージング画像"
-        },
-        "cancelAndClear": {
-            "desc": "生成をキャンセルしキューもクリアします",
-            "title": "キャンセルとクリア"
-        },
-        "mergeVisible": {
-            "title": "表示レイヤーを統合",
-            "desc": "全ての表示レイヤーを統合"
-        },
         "searchHotkeys": "ホットキーを検索",
         "clearSearch": "検索をクリア",
-        "noHotkeysFound": "ホットキーが見つかりません",
-        "remixImage": {
-            "title": "画像をリミックス",
-            "desc": "現在の画像のシード値を除く全パラメータを使用"
-        },
-        "redoStroke": {
-            "title": "ストロークをやり直す",
-            "desc": "ブラシストロークのやり直し"
-        },
-        "resetOptionsAndGallery": {
-            "title": "オプションとギャラリーをリセット",
-            "desc": "オプションとギャラリーパネルをリセット"
-        },
-        "quickToggleMove": {
-            "title": "高速トグル切り替え",
-            "desc": "一時的に移動モードを切り替える"
-        },
-        "toggleSnap": {
-            "title": "スナップの切り替え",
-            "desc": "グリッドへのスナップの切り替え"
-        },
-        "previousStagingImage": {
-            "desc": "ステージング領域の前の画像",
-            "title": "前のステージング画像"
-        },
-        "nodesHotkeys": "ノード",
-        "toggleOptionsAndGallery": {
-            "desc": "オプションとギャラリーパネルのオンオフを切り替える",
-            "title": "オプションとギャラリーを切り替える"
-        },
-        "undoStroke": {
-            "desc": "ブラシストロークの取り消し",
-            "title": "ストロークの取り消し"
-        },
-        "toggleViewer": {
-            "desc": "イメージ ビューアーと現在のタブのワークスペースを切り替えます。",
-            "title": "画像ビューアの切り替え"
-        }
+        "noHotkeysFound": "ホットキーが見つかりません"
     },
     "modelManager": {
         "modelManager": "モデルマネージャ",
@@ -398,7 +167,6 @@
         "modelConverted": "モデル変換が完了しました",
         "predictionType": "予測タイプ（安定したディフュージョン 2.x モデルおよび一部の安定したディフュージョン 1.x モデル用）",
         "selectModel": "モデルを選択",
-        "modelSyncFailed": "モデルの同期に失敗しました",
         "advanced": "高度な設定",
         "modelDeleted": "モデルが削除されました",
         "convertToDiffusersHelpText2": "このプロセスでは、モデルマネージャーのエントリーを同じモデルのディフューザーバージョンに置き換えます。",
@@ -408,7 +176,6 @@
         "syncModels": "モデルを同期",
         "modelType": "モデルタイプ",
         "convertToDiffusersHelpText1": "このモデルは 🧨 Diffusers フォーマットに変換されます。",
-        "modelsSynced": "モデルが同期されました",
         "convertToDiffusersHelpText3": "チェックポイントファイルは、InvokeAIルートフォルダ内にある場合、ディスクから削除されます。カスタムロケーションにある場合は、削除されません。",
         "convertToDiffusersHelpText4": "これは一回限りのプロセスです。コンピュータの仕様によっては、約30秒から60秒かかる可能性があります。",
         "cancel": "キャンセル"
@@ -426,18 +193,12 @@
         "scaleBeforeProcessing": "処理前のスケール",
         "scaledWidth": "幅のスケール",
         "scaledHeight": "高さのスケール",
-        "sendToImg2Img": "Image to Imageに転送",
-        "sendToUnifiedCanvas": "Unified Canvasに転送",
         "downloadImage": "画像をダウンロード",
         "usePrompt": "プロンプトを使用",
         "useSeed": "シード値を使用",
         "useAll": "すべてを使用",
         "info": "情報",
         "showOptionsPanel": "オプションパネルを表示",
-        "invoke": {
-            "noControlImageForControlAdapter": "コントロールアダプター #{{number}} に画像がありません",
-            "noModelForControlAdapter": "コントロールアダプター #{{number}} のモデルが選択されていません。"
-        },
         "iterations": "生成回数",
         "general": "基本設定"
     },
@@ -445,7 +206,6 @@
         "models": "モデル",
         "displayInProgress": "生成中の画像を表示する",
         "confirmOnDelete": "削除時に確認",
-        "enableImageDebugging": "画像のデバッグを有効化",
         "resetWebUI": "WebUIをリセット",
         "resetWebUIDesc1": "WebUIのリセットは、画像と保存された設定のキャッシュをリセットするだけです。画像を削除するわけではありません。",
         "resetWebUIDesc2": "もしギャラリーに画像が表示されないなど、何か問題が発生した場合はGitHubにissueを提出する前にリセットを試してください。",
@@ -453,63 +213,7 @@
     },
     "toast": {
         "uploadFailed": "アップロード失敗",
-        "imageCopied": "画像をコピー",
-        "imageNotLoadedDesc": "Image To Imageに転送する画像が見つかりません。",
-        "canvasMerged": "Canvas Merged",
-        "sentToImageToImage": "Image To Imageに転送",
-        "sentToUnifiedCanvas": "Unified Canvasに転送",
-        "metadataLoadFailed": "メタデータの読み込みに失敗。"
-    },
-    "tooltip": {
-        "feature": {
-            "prompt": "これはプロンプトフィールドです。プロンプトには生成オブジェクトや文法用語が含まれます。プロンプトにも重み(Tokenの重要度)を付けることができますが、CLIコマンドやパラメータは機能しません。",
-            "gallery": "ギャラリーは、出力先フォルダから生成物を表示します。設定はファイル内に保存され、コンテキストメニューからアクセスできます。.",
-            "seed": "シード値は、画像が形成される際の初期ノイズに影響します。以前の画像から既に存在するシードを使用することができます。ノイズしきい値は高いCFG値でのアーティファクトを軽減するために使用され、Perlinは生成中にPerlinノイズを追加します(0-10の範囲を試してみてください): どちらも出力にバリエーションを追加するのに役立ちます。",
-            "upscale": "生成直後の画像をアップスケールするには、ESRGANを使用します。",
-            "boundingBox": "バウンディングボックスは、Text To ImageまたはImage To Imageの幅/高さの設定と同じです。ボックス内の領域のみが処理されます。"
-        }
-    },
-    "unifiedCanvas": {
-        "mask": "マスク",
-        "maskingOptions": "マスクのオプション",
-        "enableMask": "マスクを有効化",
-        "preserveMaskedArea": "マスク領域の保存",
-        "clearMask": "マスクを解除",
-        "brush": "ブラシ",
-        "eraser": "消しゴム",
-        "fillBoundingBox": "バウンディングボックスの塗りつぶし",
-        "eraseBoundingBox": "バウンディングボックスの消去",
-        "colorPicker": "カラーピッカー",
-        "brushOptions": "ブラシオプション",
-        "brushSize": "サイズ",
-        "saveToGallery": "ギャラリーに保存",
-        "copyToClipboard": "クリップボードにコピー",
-        "downloadAsImage": "画像としてダウンロード",
-        "undo": "取り消し",
-        "redo": "やり直し",
-        "clearCanvas": "キャンバスを片付ける",
-        "canvasSettings": "キャンバスの設定",
-        "showGrid": "グリッドを表示",
-        "darkenOutsideSelection": "外周を暗くする",
-        "autoSaveToGallery": "ギャラリーに自動保存",
-        "saveBoxRegionOnly": "ボックス領域のみ保存",
-        "showCanvasDebugInfo": "キャンバスのデバッグ情報を表示",
-        "clearCanvasHistory": "キャンバスの履歴を削除",
-        "clearHistory": "履歴を削除",
-        "clearCanvasHistoryMessage": "履歴を消去すると現在のキャンバスは残りますが、取り消しややり直しの履歴は不可逆的に消去されます。",
-        "clearCanvasHistoryConfirm": "履歴を削除しますか?",
-        "activeLayer": "Active Layer",
-        "canvasScale": "Canvas Scale",
-        "boundingBox": "バウンディングボックス",
-        "boundingBoxPosition": "バウンディングボックスの位置",
-        "canvasDimensions": "キャンバスの大きさ",
-        "canvasPosition": "キャンバスの位置",
-        "cursorPosition": "カーソルの位置",
-        "previous": "前",
-        "next": "次",
-        "accept": "同意",
-        "discardAll": "すべて破棄",
-        "snapToGrid": "グリッドにスナップ"
+        "imageCopied": "画像をコピー"
     },
     "accessibility": {
         "invokeProgressBar": "進捗バー",
@@ -517,105 +221,12 @@
         "uploadImage": "画像をアップロード",
         "previousImage": "前の画像",
         "nextImage": "次の画像",
-        "showOptionsPanel": "サイドパネルを表示",
-        "showGalleryPanel": "ギャラリーパネルを表示",
         "menu": "メニュー",
-        "loadMore": "さらに読み込む",
         "createIssue": "問題を報告",
         "resetUI": "$t(accessibility.reset) UI",
         "mode": "モード:",
         "about": "Invoke について",
         "submitSupportTicket": "サポート依頼を送信する"
-    },
-    "controlnet": {
-        "resize": "リサイズ",
-        "showAdvanced": "高度な設定を表示",
-        "addT2IAdapter": "$t(common.t2iAdapter)を追加",
-        "importImageFromCanvas": "キャンバスから画像をインポート",
-        "lineartDescription": "画像を線画に変換",
-        "importMaskFromCanvas": "キャンバスからマスクをインポート",
-        "hideAdvanced": "高度な設定を非表示",
-        "resetControlImage": "コントロール画像をリセット",
-        "beginEndStepPercent": "開始 / 終了ステップパーセンテージ",
-        "duplicate": "複製",
-        "balanced": "バランス",
-        "prompt": "プロンプト",
-        "depthMidasDescription": "Midasを使用して深度マップを生成",
-        "control": "コントロール",
-        "resizeMode": "リサイズモード",
-        "weight": "重み",
-        "selectModel": "モデルを選択",
-        "crop": "切り抜き",
-        "w": "幅",
-        "processor": "プロセッサー",
-        "addControlNet": "$t(common.controlNet)を追加",
-        "none": "なし",
-        "detectResolution": "検出解像度",
-        "pidiDescription": "PIDI画像処理",
-        "controlMode": "コントロールモード",
-        "fill": "塗りつぶし",
-        "cannyDescription": "Canny 境界検出",
-        "addIPAdapter": "$t(common.ipAdapter)を追加",
-        "colorMapDescription": "画像からカラーマップを生成",
-        "lineartAnimeDescription": "アニメスタイルの線画処理",
-        "imageResolution": "画像解像度",
-        "megaControl": "メガコントロール",
-        "lowThreshold": "最低閾値",
-        "autoConfigure": "プロセッサーを自動設定",
-        "highThreshold": "最大閾値",
-        "saveControlImage": "コントロール画像を保存",
-        "toggleControlNet": "このコントロールネットを切り替え",
-        "delete": "削除",
-        "controlAdapter_other": "コントロールアダプター",
-        "colorMapTileSize": "タイルサイズ",
-        "mediapipeFaceDescription": "Mediapipeを使用して顔を検出",
-        "depthZoeDescription": "Zoeを使用して深度マップを生成",
-        "setControlImageDimensions": "コントロール画像のサイズを幅と高さにセット",
-        "amult": "a_mult",
-        "contentShuffleDescription": "画像の内容をシャッフルします",
-        "bgth": "bg_th",
-        "controlnet": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.controlNet))",
-        "ip_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.ipAdapter))",
-        "t2i_adapter": "$t(controlnet.controlAdapter_one) #{{number}} ($t(common.t2iAdapter))",
-        "minConfidence": "最小確信度",
-        "colorMap": "Color",
-        "noneDescription": "処理は行われていません",
-        "canny": "Canny",
-        "hedDescription": "階層的エッジ検出",
-        "maxFaces": "顔の最大数",
-        "depthMidas": "深度 (Midas)",
-        "f": "F",
-        "h": "H",
-        "lineart": "線画",
-        "depthAnythingDescription": "Depth Anything 技術を使って深度マップを生成します",
-        "hed": "HED",
-        "normalBaeDescription": "法線 BAE 処理中",
-        "pidi": "PIDI",
-        "resizeSimple": "リサイズ(シンプル)",
-        "scribble": "らくがき",
-        "small": "小型",
-        "mediapipeFace": "Mediapipe 顔",
-        "mlsd": "M-LSD",
-        "normalBae": "法線 BAE",
-        "base": "ベース",
-        "contentShuffle": "シャッフル",
-        "modelSize": "モデルサイズ",
-        "safe": "セーフモード",
-        "depthZoe": "深度 (Zoe)",
-        "face": "顔",
-        "body": "体",
-        "hands": "手",
-        "large": "大型",
-        "lineartAnime": "アニメ線画",
-        "mlsdDescription": "最小線分検知",
-        "dwOpenpose": "DW オープンポーズ",
-        "dwOpenposeDescription": "DW オープンポーズによる人体ポーズの推定",
-        "ipAdapterMethod": "方式",
-        "setControlImageDimensionsForce": "モデルを無視してサイズを W/H にコピー",
-        "style": "スタイルのみ",
-        "selectCLIPVisionModel": "CLIP Visionのモデルを選択",
-        "composition": "構図のみ",
-        "beginEndStepPercentShort": "開始 / 終了 %"
     },
     "metadata": {
         "seamless": "シームレス",

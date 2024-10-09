@@ -5,32 +5,18 @@ from __future__ import annotations
 
 import pickle
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
-from diffusers import OnnxRuntimeModel, UNet2DConditionModel
+from diffusers import UNet2DConditionModel
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from invokeai.app.shared.models import FreeUConfig
-from invokeai.backend.lora import LoRAModelRaw
-from invokeai.backend.model_manager import AnyModel
+from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.onnx.onnx_runtime import IAIOnnxRuntimeModel
-from invokeai.backend.stable_diffusion.extensions.lora import LoRAExt
 from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
-from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
-
-"""
-loras = [
-    (lora_model1, 0.7),
-    (lora_model2, 0.4),
-]
-with LoRAHelper.apply_lora_unet(unet, loras):
-    # unet with applied loras
-# unmodified unet
-
-"""
 
 
 class ModelPatcher:
@@ -53,95 +39,6 @@ class ModelPatcher:
 
         finally:
             unet.set_attn_processor(unet_orig_processors)
-
-    @staticmethod
-    def _resolve_lora_key(model: torch.nn.Module, lora_key: str, prefix: str) -> Tuple[str, torch.nn.Module]:
-        assert "." not in lora_key
-
-        if not lora_key.startswith(prefix):
-            raise Exception(f"lora_key with invalid prefix: {lora_key}, {prefix}")
-
-        module = model
-        module_key = ""
-        key_parts = lora_key[len(prefix) :].split("_")
-
-        submodule_name = key_parts.pop(0)
-
-        while len(key_parts) > 0:
-            try:
-                module = module.get_submodule(submodule_name)
-                module_key += "." + submodule_name
-                submodule_name = key_parts.pop(0)
-            except Exception:
-                submodule_name += "_" + key_parts.pop(0)
-
-        module = module.get_submodule(submodule_name)
-        module_key = (module_key + "." + submodule_name).lstrip(".")
-
-        return (module_key, module)
-
-    @classmethod
-    @contextmanager
-    def apply_lora_unet(
-        cls,
-        unet: UNet2DConditionModel,
-        loras: Iterator[Tuple[LoRAModelRaw, float]],
-        cached_weights: Optional[Dict[str, torch.Tensor]] = None,
-    ) -> Generator[None, None, None]:
-        with cls.apply_lora(
-            unet,
-            loras=loras,
-            prefix="lora_unet_",
-            cached_weights=cached_weights,
-        ):
-            yield
-
-    @classmethod
-    @contextmanager
-    def apply_lora_text_encoder(
-        cls,
-        text_encoder: CLIPTextModel,
-        loras: Iterator[Tuple[LoRAModelRaw, float]],
-        cached_weights: Optional[Dict[str, torch.Tensor]] = None,
-    ) -> Generator[None, None, None]:
-        with cls.apply_lora(text_encoder, loras=loras, prefix="lora_te_", cached_weights=cached_weights):
-            yield
-
-    @classmethod
-    @contextmanager
-    def apply_lora(
-        cls,
-        model: AnyModel,
-        loras: Iterator[Tuple[LoRAModelRaw, float]],
-        prefix: str,
-        cached_weights: Optional[Dict[str, torch.Tensor]] = None,
-    ) -> Generator[None, None, None]:
-        """
-        Apply one or more LoRAs to a model.
-
-        :param model: The model to patch.
-        :param loras: An iterator that returns the LoRA to patch in and its patch weight.
-        :param prefix: A string prefix that precedes keys used in the LoRAs weight layers.
-        :cached_weights: Read-only copy of the model's state dict in CPU, for unpatching purposes.
-        """
-        original_weights = OriginalWeightsStorage(cached_weights)
-        try:
-            for lora_model, lora_weight in loras:
-                LoRAExt.patch_model(
-                    model=model,
-                    prefix=prefix,
-                    lora=lora_model,
-                    lora_weight=lora_weight,
-                    original_weights=original_weights,
-                )
-                del lora_model
-
-            yield
-
-        finally:
-            with torch.no_grad():
-                for param_key, weight in original_weights.get_changed_weights():
-                    model.get_parameter(param_key).copy_(weight)
 
     @classmethod
     @contextmanager
@@ -282,26 +179,6 @@ class ModelPatcher:
 
 
 class ONNXModelPatcher:
-    @classmethod
-    @contextmanager
-    def apply_lora_unet(
-        cls,
-        unet: OnnxRuntimeModel,
-        loras: Iterator[Tuple[LoRAModelRaw, float]],
-    ) -> None:
-        with cls.apply_lora(unet, loras, "lora_unet_"):
-            yield
-
-    @classmethod
-    @contextmanager
-    def apply_lora_text_encoder(
-        cls,
-        text_encoder: OnnxRuntimeModel,
-        loras: List[Tuple[LoRAModelRaw, float]],
-    ) -> None:
-        with cls.apply_lora(text_encoder, loras, "lora_te_"):
-            yield
-
     # based on
     # https://github.com/ssube/onnx-web/blob/ca2e436f0623e18b4cfe8a0363fcfcf10508acf7/api/onnx_web/convert/diffusion/lora.py#L323
     @classmethod

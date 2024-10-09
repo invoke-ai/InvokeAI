@@ -1,22 +1,31 @@
 import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowMode, workflowModeChanged } from 'features/nodes/store/workflowSlice';
+import type { MouseEventHandler } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold, PiPencilBold } from 'react-icons/pi';
 
 export const ModeToggle = () => {
   const dispatch = useAppDispatch();
-  const mode = useAppSelector((s) => s.workflow.mode);
+  const mode = useAppSelector(selectWorkflowMode);
   const { t } = useTranslation();
 
-  const onClickEdit = useCallback(() => {
-    dispatch(workflowModeChanged('edit'));
-  }, [dispatch]);
+  const onClickEdit = useCallback<MouseEventHandler<HTMLButtonElement>>(
+    (e) => {
+      e.stopPropagation();
+      dispatch(workflowModeChanged('edit'));
+    },
+    [dispatch]
+  );
 
-  const onClickView = useCallback(() => {
-    dispatch(workflowModeChanged('view'));
-  }, [dispatch]);
+  const onClickView = useCallback<MouseEventHandler<HTMLButtonElement>>(
+    (e) => {
+      e.stopPropagation();
+      dispatch(workflowModeChanged('view'));
+    },
+    [dispatch]
+  );
 
   return (
     <Flex justifyContent="flex-end">
@@ -26,7 +35,8 @@ export const ModeToggle = () => {
           tooltip={t('nodes.editMode')}
           onClick={onClickEdit}
           icon={<PiPencilBold />}
-          colorScheme="invokeBlue"
+          variant="outline"
+          size="sm"
         />
       )}
       {mode === 'edit' && (
@@ -35,7 +45,8 @@ export const ModeToggle = () => {
           tooltip={t('nodes.viewMode')}
           onClick={onClickView}
           icon={<PiEyeBold />}
-          colorScheme="invokeBlue"
+          variant="outline"
+          size="sm"
         />
       )}
     </Flex>

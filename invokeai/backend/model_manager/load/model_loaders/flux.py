@@ -26,13 +26,18 @@ from invokeai.backend.model_manager.config import (
     CLIPEmbedDiffusersConfig,
     MainBnbQuantized4bCheckpointConfig,
     MainCheckpointConfig,
+    MainGGUFCheckpointConfig,
     T5EncoderBnbQuantizedLlmInt8bConfig,
     T5EncoderConfig,
     VAECheckpointConfig,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
-from invokeai.backend.model_manager.util.model_util import convert_bundle_to_flux_transformer_checkpoint
+from invokeai.backend.model_manager.util.model_util import (
+    convert_bundle_to_flux_transformer_checkpoint,
+)
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 try:
@@ -193,7 +198,58 @@ class FluxCheckpointModel(ModelLoader):
             sd = load_file(model_path)
             if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
                 sd = convert_bundle_to_flux_transformer_checkpoint(sd)
+            new_sd_size = sum([ten.nelement() * torch.bfloat16.itemsize for ten in sd.values()])
+            self._ram_cache.make_room(new_sd_size)
+            for k in sd.keys():
+                # We need to cast to bfloat16 due to it being the only currently supported dtype for inference
+                sd[k] = sd[k].to(torch.bfloat16)
             model.load_state_dict(sd, assign=True)
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
+class FluxGGUFCheckpointModel(ModelLoader):
+    """Class to load GGUF main models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, CheckpointConfigBase):
+            raise ValueError("Only CheckpointConfigBase models are currently supported here.")
+
+        match submodel_type:
+            case SubModelType.Transformer:
+                return self._load_from_singlefile(config)
+
+        raise ValueError(
+            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_from_singlefile(
+        self,
+        config: AnyModelConfig,
+    ) -> AnyModel:
+        assert isinstance(config, MainGGUFCheckpointConfig)
+        model_path = Path(config.path)
+
+        with SilenceWarnings():
+            model = Flux(params[config.config_path])
+
+            # HACK(ryand): We shouldn't be hard-coding the compute_dtype here.
+            sd = gguf_sd_loader(model_path, compute_dtype=torch.bfloat16)
+
+        # HACK(ryand): There are some broken GGUF models in circulation that have the wrong shape for img_in.weight.
+        # We override the shape here to fix the issue.
+        # Example model with this issue (Q4_K_M): https://civitai.com/models/705823/ggufk-flux-unchained-km-quants
+        img_in_weight = sd.get("img_in.weight", None)
+        if img_in_weight is not None and img_in_weight._ggml_quantization_type in TORCH_COMPATIBLE_QTYPES:
+            expected_img_in_weight_shape = model.img_in.weight.shape
+            img_in_weight.quantized_data = img_in_weight.quantized_data.view(expected_img_in_weight_shape)
+            img_in_weight.tensor_shape = expected_img_in_weight_shape
+
+        model.load_state_dict(sd, assign=True)
         return model
 
 

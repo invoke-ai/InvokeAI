@@ -70,12 +70,54 @@ export const queueApi = api.injectEndpoints({
         body: arg,
         method: 'POST',
       }),
-      invalidatesTags: ['SessionQueueStatus', 'CurrentSessionQueueItem', 'NextSessionQueueItem'],
+      invalidatesTags: ['CurrentSessionQueueItem', 'NextSessionQueueItem', 'QueueCountsByDestination'],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
         try {
-          await queryFulfilled;
+          const { data } = await queryFulfilled;
           resetListQueryData(dispatch);
+          /**
+           * When a batch is enqueued, we need to update the queue status. While it might be templting to invalidate the
+           * `SessionQueueStatus` tag here, this can introduce a race condition when the queue item executes quickly:
+           *
+           * - Enqueue via this query
+           * - On success, we invalidate `SessionQueueStatus` tag - network request sent to server
+           * - The server gets the queue status request and responds, but this takes some time... in the meantime:
+           *   - The new queue item starts executing, and we receive a socket queue item status changed event
+           *   - We optimistically update the queue status in the queue item status changed socket handler
+           *   - At this point, the queue status is correct
+           * - Finally, we get the queue status from the tag invalidation request - but it's reporting the queue status
+           *   from _before_ the last queue event
+           * - The queue status is now incorrect!
+           *
+           * Ok, what if we just never did optimistic updates and invalidated the tag in the queue event handlers instead?
+           * It's much simpler that way, but it causes a lot of network requests - 3 per queue item, as it moves from
+           * pending -> in_progress -> completed/failed/canceled.
+           *
+           * We can do a bit of extra work here, incrementing the pending and total counts in the queue status, and do
+           * similar optimistic updates in the socket handler. Because this optimistic update runs immediately after the
+           * enqueue network request, it should always occur _before_ the next queue event, so no race condition:
+           *
+           * - Enqueue batch via this query
+           * - On success, optimistically update - this happens immediately on the HTTP OK - before the next queue event
+           * - At this point, the queue status is correct
+           * - A queue item status changes and we receive a socket event w/ updated status
+           * - Update status optimistically in socket handler
+           * - Queue status is still correct
+           *
+           * This problem occurs most commonly with canvas filters like Canny edge detection, which are single-node
+           * graphs that execute very quickly. Image generation graphs take long enough to not trigger this race
+           * condition - even when all nodes are cached on the server.
+           */
+          dispatch(
+            queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
+              if (!draft) {
+                return;
+              }
+              draft.queue.pending += data.enqueued;
+              draft.queue.total += data.enqueued;
+            })
+          );
         } catch {
           // no-op
         }
@@ -134,6 +176,7 @@ export const queueApi = api.injectEndpoints({
         'BatchStatus',
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
+        'QueueCountsByDestination',
       ],
       onQueryStarted: async (arg, api) => {
         const { dispatch, queryFulfilled } = api;
@@ -250,10 +293,14 @@ export const queueApi = api.injectEndpoints({
         if (!result) {
           return [];
         }
-        return [
+        const tags: ApiTagDescription[] = [
           { type: 'SessionQueueItem', id: result.item_id },
           { type: 'BatchStatus', id: result.batch_id },
         ];
+        if (result.destination) {
+          tags.push({ type: 'QueueCountsByDestination', id: result.destination });
+        }
+        return tags;
       },
     }),
     cancelByBatchIds: build.mutation<
@@ -274,7 +321,32 @@ export const queueApi = api.injectEndpoints({
           // no-op
         }
       },
-      invalidatesTags: ['SessionQueueStatus', 'BatchStatus'],
+      invalidatesTags: ['SessionQueueStatus', 'BatchStatus', 'QueueCountsByDestination'],
+    }),
+    cancelByBatchDestination: build.mutation<
+      paths['/api/v1/queue/{queue_id}/cancel_by_destination']['put']['responses']['200']['content']['application/json'],
+      paths['/api/v1/queue/{queue_id}/cancel_by_destination']['put']['parameters']['query']
+    >({
+      query: (params) => ({
+        url: buildQueueUrl('cancel_by_destination'),
+        method: 'PUT',
+        params,
+      }),
+      onQueryStarted: async (arg, api) => {
+        const { dispatch, queryFulfilled } = api;
+        try {
+          await queryFulfilled;
+          resetListQueryData(dispatch);
+        } catch {
+          // no-op
+        }
+      },
+      invalidatesTags: (result, error, { destination }) => {
+        if (!result) {
+          return [];
+        }
+        return ['SessionQueueStatus', 'BatchStatus', { type: 'QueueCountsByDestination', id: destination }];
+      },
     }),
     listQueueItems: build.query<
       EntityState<components['schemas']['SessionQueueItemDTO'], string> & {
@@ -304,6 +376,16 @@ export const queueApi = api.injectEndpoints({
       keepUnusedDataFor: 60 * 5, // 5 minutes
       providesTags: ['FetchOnReconnect'],
     }),
+    getQueueCountsByDestination: build.query<
+      paths['/api/v1/queue/{queue_id}/counts_by_destination']['get']['responses']['200']['content']['application/json'],
+      paths['/api/v1/queue/{queue_id}/counts_by_destination']['get']['parameters']['query']
+    >({
+      query: (params) => ({ url: buildQueueUrl('counts_by_destination'), method: 'GET', params }),
+      providesTags: (result, error, { destination }) => [
+        'FetchOnReconnect',
+        { type: 'QueueCountsByDestination', id: destination },
+      ],
+    }),
   }),
 });
 
@@ -319,9 +401,12 @@ export const {
   useListQueueItemsQuery,
   useCancelQueueItemMutation,
   useGetBatchStatusQuery,
+  useGetCurrentQueueItemQuery,
+  useGetQueueCountsByDestinationQuery,
 } = queueApi;
 
 export const selectQueueStatus = queueApi.endpoints.getQueueStatus.select();
+export const selectCanvasQueueCounts = queueApi.endpoints.getQueueCountsByDestination.select({ destination: 'canvas' });
 
 const resetListQueryData = (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

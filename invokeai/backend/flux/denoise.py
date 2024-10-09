@@ -22,7 +22,18 @@ def denoise(
     guidance: float,
     inpaint_extension: InpaintExtension | None,
 ):
-    step = 0
+    # step 0 is the initial state
+    total_steps = len(timesteps) - 1
+    step_callback(
+        PipelineIntermediateState(
+            step=0,
+            order=1,
+            total_steps=total_steps,
+            timestep=int(timesteps[0]),
+            latents=img,
+        ),
+    )
+    step = 1
     # guidance_vec is ignored for schnell.
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
     for t_curr, t_prev in tqdm(list(zip(timesteps[:-1], timesteps[1:], strict=True))):
@@ -36,17 +47,19 @@ def denoise(
             timesteps=t_vec,
             guidance=guidance_vec,
         )
+
         preview_img = img - t_curr * pred
         img = img + (t_prev - t_curr) * pred
 
         if inpaint_extension is not None:
             img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+            preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
 
         step_callback(
             PipelineIntermediateState(
                 step=step,
                 order=1,
-                total_steps=len(timesteps),
+                total_steps=total_steps,
                 timestep=int(t_curr),
                 latents=preview_img,
             ),

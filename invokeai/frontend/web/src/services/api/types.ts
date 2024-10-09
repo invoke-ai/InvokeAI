@@ -1,3 +1,4 @@
+import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { components, paths } from 'services/api/schema';
 import type { O } from 'ts-toolbelt';
 
@@ -51,7 +52,7 @@ export type VAEModelConfig = S['VAECheckpointConfig'] | S['VAEDiffusersConfig'];
 export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlNetCheckpointConfig'];
 export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
 export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
-export type ClipEmbedModelConfig = S['CLIPEmbedDiffusersConfig'];
+export type CLIPEmbedModelConfig = S['CLIPEmbedDiffusersConfig'];
 export type T5EncoderModelConfig = S['T5EncoderConfig'];
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = S['T5EncoderBnbQuantizedLlmInt8bConfig'];
 export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
@@ -67,7 +68,7 @@ export type AnyModelConfig =
   | IPAdapterModelConfig
   | T5EncoderModelConfig
   | T5EncoderBnbQuantizedLlmInt8bModelConfig
-  | ClipEmbedModelConfig
+  | CLIPEmbedModelConfig
   | T2IAdapterModelConfig
   | SpandrelImageToImageModelConfig
   | TextualInversionModelConfig
@@ -82,6 +83,10 @@ export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConf
   return config.type === 'vae';
 };
 
+export const isNonFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return config.type === 'vae' && config.base !== 'flux';
+};
+
 export const isFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
   return config.type === 'vae' && config.base === 'flux';
 };
@@ -94,6 +99,10 @@ export const isIPAdapterModelConfig = (config: AnyModelConfig): config is IPAdap
   return config.type === 'ip_adapter';
 };
 
+export const isCLIPVisionModelConfig = (config: AnyModelConfig): config is CLIPVisionDiffusersConfig => {
+  return config.type === 'clip_vision';
+};
+
 export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {
   return config.type === 't2i_adapter';
 };
@@ -104,7 +113,7 @@ export const isT5EncoderModelConfig = (
   return config.type === 't5_encoder';
 };
 
-export const isClipEmbedModelConfig = (config: AnyModelConfig): config is ClipEmbedModelConfig => {
+export const isCLIPEmbedModelConfig = (config: AnyModelConfig): config is CLIPEmbedModelConfig => {
   return config.type === 'clip_embed';
 };
 
@@ -112,12 +121,6 @@ export const isSpandrelImageToImageModelConfig = (
   config: AnyModelConfig
 ): config is SpandrelImageToImageModelConfig => {
   return config.type === 'spandrel_image_to_image';
-};
-
-export const isControlAdapterModelConfig = (
-  config: AnyModelConfig
-): config is ControlNetModelConfig | T2IAdapterModelConfig | IPAdapterModelConfig => {
-  return isControlNetModelConfig(config) || isT2IAdapterModelConfig(config) || isIPAdapterModelConfig(config);
 };
 
 export const isControlNetOrT2IAdapterModelConfig = (
@@ -130,8 +133,8 @@ export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is M
   return config.type === 'main' && config.base !== 'sdxl-refiner';
 };
 
-export const isNonRefinerNonFluxMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base !== 'sdxl-refiner' && config.base !== 'flux';
+export const isCheckpointMainModelConfig = (config: AnyModelConfig): config is CheckpointModelConfig => {
+  return config.type === 'main' && (config.format === 'checkpoint' || config.format === 'bnb_quantized_nf4b');
 };
 
 export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
@@ -195,42 +198,21 @@ export type OutputFields<T extends AnyInvocation> = Extract<
 // Node Outputs
 export type ImageOutput = S['ImageOutput'];
 
-// Post-image upload actions, controls workflows when images are uploaded
-
-type ControlAdapterAction = {
-  type: 'SET_CONTROL_ADAPTER_IMAGE';
+export type IPALayerImagePostUploadAction = {
+  type: 'SET_IPA_IMAGE';
   id: string;
 };
 
-export type CALayerImagePostUploadAction = {
-  type: 'SET_CA_LAYER_IMAGE';
-  layerId: string;
-};
-
-export type IPALayerImagePostUploadAction = {
-  type: 'SET_IPA_LAYER_IMAGE';
-  layerId: string;
-};
-
-export type RGLayerIPAdapterImagePostUploadAction = {
-  type: 'SET_RG_LAYER_IP_ADAPTER_IMAGE';
-  layerId: string;
-  ipAdapterId: string;
-};
-
-export type IILayerImagePostUploadAction = {
-  type: 'SET_II_LAYER_IMAGE';
-  layerId: string;
+export type RGIPAdapterImagePostUploadAction = {
+  type: 'SET_RG_IP_ADAPTER_IMAGE';
+  id: string;
+  referenceImageId: string;
 };
 
 type NodesAction = {
   type: 'SET_NODES_IMAGE';
   nodeId: string;
   fieldName: string;
-};
-
-type CanvasInitialImageAction = {
-  type: 'SET_CANVAS_INITIAL_IMAGE';
 };
 
 type UpscaleInitialImageAction = {
@@ -246,14 +228,16 @@ type AddToBatchAction = {
   type: 'ADD_TO_BATCH';
 };
 
+type ReplaceLayerWithImagePostUploadAction = {
+  type: 'REPLACE_LAYER_WITH_IMAGE';
+  entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer'>;
+};
+
 export type PostUploadAction =
-  | ControlAdapterAction
   | NodesAction
-  | CanvasInitialImageAction
   | ToastAction
   | AddToBatchAction
-  | CALayerImagePostUploadAction
   | IPALayerImagePostUploadAction
-  | RGLayerIPAdapterImagePostUploadAction
-  | IILayerImagePostUploadAction
-  | UpscaleInitialImageAction;
+  | RGIPAdapterImagePostUploadAction
+  | UpscaleInitialImageAction
+  | ReplaceLayerWithImagePostUploadAction;

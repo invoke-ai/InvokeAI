@@ -1,4 +1,5 @@
 import type { PopoverProps } from '@invoke-ai/ui-library';
+import commercialLicenseBg from 'public/assets/images/commercial-license-bg.png';
 
 export type Feature =
   | 'clipSkip'
@@ -30,6 +31,7 @@ export type Feature =
   | 'noiseUseCPU'
   | 'paramAspect'
   | 'paramCFGScale'
+  | 'paramGuidance'
   | 'paramCFGRescaleMultiplier'
   | 'paramDenoisingStrength'
   | 'paramHeight'
@@ -57,7 +59,9 @@ export type Feature =
   | 'upscaleModel'
   | 'scale'
   | 'creativity'
-  | 'structure';
+  | 'structure'
+  | 'optimizedDenoising'
+  | 'fluxDevLicense';
 
 export type PopoverData = PopoverProps & {
   image?: string;
@@ -184,6 +188,10 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   seamlessTilingYAxis: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings',
+  },
+  fluxDevLicense: {
+    href: 'https://www.invoke.com/get-a-commercial-license-for-flux',
+    image: commercialLicenseBg,
   },
 } as const;
 

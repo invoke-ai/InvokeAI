@@ -1,33 +1,30 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import {
-  canvasBatchIdsReset,
-  commitStagingAreaImage,
-  discardStagedImages,
-  resetCanvas,
-  setInitialCanvasImage,
-} from 'features/canvas/store/canvasSlice';
+import { canvasReset, newSessionRequested } from 'features/controlLayers/store/actions';
+import { stagingAreaReset } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 
-const matcher = isAnyOf(commitStagingAreaImage, discardStagedImages, resetCanvas, setInitialCanvasImage);
+const log = logger('canvas');
 
-export const addCommitStagingAreaImageListener = (startAppListening: AppStartListening) => {
+const matchCanvasOrStagingAreaReset = isAnyOf(stagingAreaReset, canvasReset, newSessionRequested);
+
+export const addStagingListeners = (startAppListening: AppStartListening) => {
   startAppListening({
-    matcher,
-    effect: async (_, { dispatch, getState }) => {
-      const log = logger('canvas');
-      const state = getState();
-      const { batchIds } = state.canvas;
-
+    matcher: matchCanvasOrStagingAreaReset,
+    effect: async (_, { dispatch }) => {
       try {
         const req = dispatch(
-          queueApi.endpoints.cancelByBatchIds.initiate({ batch_ids: batchIds }, { fixedCacheKey: 'cancelByBatchIds' })
+          queueApi.endpoints.cancelByBatchDestination.initiate(
+            { destination: 'canvas' },
+            { fixedCacheKey: 'cancelByBatchOrigin' }
+          )
         );
         const { canceled } = await req.unwrap();
         req.reset();
+
         if (canceled > 0) {
           log.debug(`Canceled ${canceled} canvas batches`);
           toast({
@@ -36,7 +33,6 @@ export const addCommitStagingAreaImageListener = (startAppListening: AppStartLis
             status: 'success',
           });
         }
-        dispatch(canvasBatchIdsReset());
       } catch {
         log.error('Failed to cancel canvas batches');
         toast({

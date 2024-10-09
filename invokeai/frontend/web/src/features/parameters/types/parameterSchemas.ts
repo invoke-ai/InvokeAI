@@ -56,6 +56,13 @@ export const isParameterCFGScale = (val: unknown): val is ParameterCFGScale =>
   zParameterCFGScale.safeParse(val).success;
 // #endregion
 
+// #region Guidance parameter
+const zParameterGuidance = z.number().min(1);
+export type ParameterGuidance = z.infer<typeof zParameterGuidance>;
+export const isParameterGuidance = (val: unknown): val is ParameterGuidance =>
+  zParameterGuidance.safeParse(val).success;
+// #endregion
+
 // #region CFG Rescale Multiplier
 const zParameterCFGRescaleMultiplier = z.number().gte(0).lt(1);
 export type ParameterCFGRescaleMultiplier = z.infer<typeof zParameterCFGRescaleMultiplier>;
@@ -77,18 +84,19 @@ export const isParameterSeed = (val: unknown): val is ParameterSeed => zParamete
 // #endregion
 
 // #region Width
-const zParameterWidth = z
+export const zParameterImageDimension = z
   .number()
   .min(64)
   .transform((val) => roundToMultiple(val, 8));
-export type ParameterWidth = z.infer<typeof zParameterWidth>;
-export const isParameterWidth = (val: unknown): val is ParameterWidth => zParameterWidth.safeParse(val).success;
+export type ParameterWidth = z.infer<typeof zParameterImageDimension>;
+export const isParameterWidth = (val: unknown): val is ParameterWidth =>
+  zParameterImageDimension.safeParse(val).success;
 // #endregion
 
 // #region Height
-const zParameterHeight = zParameterWidth;
-export type ParameterHeight = z.infer<typeof zParameterHeight>;
-export const isParameterHeight = (val: unknown): val is ParameterHeight => zParameterHeight.safeParse(val).success;
+export type ParameterHeight = z.infer<typeof zParameterImageDimension>;
+export const isParameterHeight = (val: unknown): val is ParameterHeight =>
+  zParameterImageDimension.safeParse(val).success;
 // #endregion
 
 // #region Model
@@ -106,33 +114,28 @@ export const zParameterVAEModel = zModelIdentifierField;
 export type ParameterVAEModel = z.infer<typeof zParameterVAEModel>;
 // #endregion
 
+// #region T5Encoder Model
+export const zParameterT5EncoderModel = zModelIdentifierField;
+export type ParameterT5EncoderModel = z.infer<typeof zParameterT5EncoderModel>;
+// #endregion
+
+// #region CLIP embed Model
+export const zParameterCLIPEmbedModel = zModelIdentifierField;
+export type ParameterCLIPEmbedModel = z.infer<typeof zParameterCLIPEmbedModel>;
+// #endregion
+
 // #region LoRA Model
 const zParameterLoRAModel = zModelIdentifierField;
 export type ParameterLoRAModel = z.infer<typeof zParameterLoRAModel>;
 // #endregion
 
-// #region ControlNet Model
-const zParameterControlNetModel = zModelIdentifierField;
-export type ParameterControlNetModel = z.infer<typeof zParameterControlNetModel>;
-// #endregion
-
-// #region IP Adapter Model
-const zParameterIPAdapterModel = zModelIdentifierField;
-export type ParameterIPAdapterModel = z.infer<typeof zParameterIPAdapterModel>;
-// #endregion
-
-// #region T2I Adapter Model
-const zParameterT2IAdapterModel = zModelIdentifierField;
-export type ParameterT2IAdapterModel = z.infer<typeof zParameterT2IAdapterModel>;
-// #endregion
-
 // #region VAE Model
-const zParameterSpandrelImageToImageModel = zModelIdentifierField;
+export const zParameterSpandrelImageToImageModel = zModelIdentifierField;
 export type ParameterSpandrelImageToImageModel = z.infer<typeof zParameterSpandrelImageToImageModel>;
 // #endregion
 
 // #region Strength (l2l strength)
-export const zParameterStrength = z.number().min(0).max(1);
+const zParameterStrength = z.number().min(0).max(1);
 export type ParameterStrength = z.infer<typeof zParameterStrength>;
 export const isParameterStrength = (val: unknown): val is ParameterStrength =>
   zParameterStrength.safeParse(val).success;
@@ -200,9 +203,4 @@ export const isParameterCanvasCoherenceMode = (val: unknown): val is ParameterCa
 const zLoRAWeight = z.number();
 type ParameterLoRAWeight = z.infer<typeof zLoRAWeight>;
 export const isParameterLoRAWeight = (val: unknown): val is ParameterLoRAWeight => zLoRAWeight.safeParse(val).success;
-// #endregion
-
-// #region Regional Prompts AutoNegative
-export const zAutoNegative = z.enum(['off', 'invert']);
-export type ParameterAutoNegative = z.infer<typeof zAutoNegative>;
 // #endregion

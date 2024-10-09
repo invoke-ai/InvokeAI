@@ -421,7 +421,7 @@ def get_torch_source() -> Tuple[str | None, str | None]:
             optional_modules = "[xformers,onnx-cuda]"
     elif OS == "Windows":
         if device.value == "cuda":
-            url = "https://download.pytorch.org/whl/cu121"
+            url = "https://download.pytorch.org/whl/cu124"
             optional_modules = "[xformers,onnx-cuda]"
         elif device.value == "cpu":
             # CPU  uses the default PyPi index, no optional modules

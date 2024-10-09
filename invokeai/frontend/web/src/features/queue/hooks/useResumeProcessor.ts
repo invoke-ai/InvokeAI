@@ -1,11 +1,12 @@
-import { useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetQueueStatusQuery, useResumeProcessorMutation } from 'services/api/endpoints/queue';
+import { $isConnected } from 'services/events/stores';
 
 export const useResumeProcessor = () => {
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const { data: queueStatus } = useGetQueueStatusQuery();
   const { t } = useTranslation();
   const [trigger, { isLoading }] = useResumeProcessorMutation({

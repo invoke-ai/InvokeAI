@@ -1,20 +1,17 @@
 import { MenuItem } from '@invoke-ai/ui-library';
-import WorkflowEditorSettings from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
+import { useWorkflowEditorSettingsModal } from 'features/nodes/components/flow/panels/TopRightPanel/WorkflowEditorSettings';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RiSettings4Line } from 'react-icons/ri';
+import { PiGearSixFill } from 'react-icons/pi';
 
 const DownloadWorkflowMenuItem = () => {
   const { t } = useTranslation();
+  const modal = useWorkflowEditorSettingsModal();
 
   return (
-    <WorkflowEditorSettings>
-      {({ onOpen }) => (
-        <MenuItem as="button" icon={<RiSettings4Line />} onClick={onOpen}>
-          {t('nodes.workflowSettings')}
-        </MenuItem>
-      )}
-    </WorkflowEditorSettings>
+    <MenuItem as="button" icon={<PiGearSixFill />} onClick={modal.setTrue}>
+      {t('nodes.workflowSettings')}
+    </MenuItem>
   );
 };
 

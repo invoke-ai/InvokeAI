@@ -1,17 +1,20 @@
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import { heightChanged, widthChanged } from 'features/controlLayers/store/controlLayersSlice';
-import { setDefaultSettings } from 'features/parameters/store/actions';
+import { bboxHeightChanged, bboxWidthChanged } from 'features/controlLayers/store/canvasSlice';
+import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   setCfgRescaleMultiplier,
   setCfgScale,
+  setGuidance,
   setScheduler,
   setSteps,
   vaePrecisionChanged,
   vaeSelected,
-} from 'features/parameters/store/generationSlice';
+} from 'features/controlLayers/store/paramsSlice';
+import { setDefaultSettings } from 'features/parameters/store/actions';
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
+  isParameterGuidance,
   isParameterHeight,
   isParameterPrecision,
   isParameterScheduler,
@@ -30,7 +33,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
     effect: async (action, { dispatch, getState }) => {
       const state = getState();
 
-      const currentModel = state.generation.model;
+      const currentModel = state.params.model;
 
       if (!currentModel) {
         return;
@@ -48,7 +51,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
       }
 
       if (isNonRefinerMainModelConfig(modelConfig) && modelConfig.default_settings) {
-        const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler, width, height } =
+        const { vae, vae_precision, cfg_scale, cfg_rescale_multiplier, steps, scheduler, width, height, guidance } =
           modelConfig.default_settings;
 
         if (vae) {
@@ -69,6 +72,12 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
         if (vae_precision) {
           if (isParameterPrecision(vae_precision)) {
             dispatch(vaePrecisionChanged(vae_precision));
+          }
+        }
+
+        if (guidance) {
+          if (isParameterGuidance(guidance)) {
+            dispatch(setGuidance(guidance));
           }
         }
 
@@ -96,15 +105,17 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           }
         }
         const setSizeOptions = { updateAspectRatio: true, clamp: true };
-        if (width) {
+
+        const isStaging = selectIsStaging(getState());
+        if (!isStaging && width) {
           if (isParameterWidth(width)) {
-            dispatch(widthChanged({ width, ...setSizeOptions }));
+            dispatch(bboxWidthChanged({ width, ...setSizeOptions }));
           }
         }
 
-        if (height) {
+        if (!isStaging && height) {
           if (isParameterHeight(height)) {
-            dispatch(heightChanged({ height, ...setSizeOptions }));
+            dispatch(bboxHeightChanged({ height, ...setSizeOptions }));
           }
         }
 

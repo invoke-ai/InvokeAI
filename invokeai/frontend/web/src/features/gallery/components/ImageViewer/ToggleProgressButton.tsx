@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import { setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +8,7 @@ import { PiHourglassHighBold } from 'react-icons/pi';
 
 export const ToggleProgressButton = memo(() => {
   const dispatch = useAppDispatch();
-  const shouldShowProgressInViewer = useAppSelector((s) => s.ui.shouldShowProgressInViewer);
+  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const { t } = useTranslation();
 
   const onClick = useCallback(() => {

@@ -1,11 +1,16 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import type { FilterableModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import {
+  type FilterableModelType,
+  selectFilteredModelType,
+  selectSearchTerm,
+} from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  useClipEmbedModels,
+  useCLIPEmbedModels,
+  useCLIPVisionModels,
   useControlNetModels,
   useEmbeddingModels,
   useIPAdapterModels,
@@ -23,8 +28,8 @@ import { FetchingModelsLoader } from './FetchingModelsLoader';
 import { ModelListWrapper } from './ModelListWrapper';
 
 const ModelList = () => {
-  const filteredModelType = useAppSelector((s) => s.modelmanagerV2.filteredModelType);
-  const searchTerm = useAppSelector((s) => s.modelmanagerV2.searchTerm);
+  const filteredModelType = useAppSelector(selectFilteredModelType);
+  const searchTerm = useAppSelector(selectSearchTerm);
   const { t } = useTranslation();
 
   const [mainModels, { isLoading: isLoadingMainModels }] = useMainModels();
@@ -69,6 +74,12 @@ const ModelList = () => {
     [ipAdapterModels, searchTerm, filteredModelType]
   );
 
+  const [clipVisionModels, { isLoading: isLoadingCLIPVisionModels }] = useCLIPVisionModels();
+  const filteredCLIPVisionModels = useMemo(
+    () => modelsFilter(clipVisionModels, searchTerm, filteredModelType),
+    [clipVisionModels, searchTerm, filteredModelType]
+  );
+
   const [vaeModels, { isLoading: isLoadingVAEModels }] = useVAEModels();
   const filteredVAEModels = useMemo(
     () => modelsFilter(vaeModels, searchTerm, filteredModelType),
@@ -81,7 +92,7 @@ const ModelList = () => {
     [t5EncoderModels, searchTerm, filteredModelType]
   );
 
-  const [clipEmbedModels, { isLoading: isLoadingClipEmbedModels }] = useClipEmbedModels();
+  const [clipEmbedModels, { isLoading: isLoadingClipEmbedModels }] = useCLIPEmbedModels();
   const filteredClipEmbedModels = useMemo(
     () => modelsFilter(clipEmbedModels, searchTerm, filteredModelType),
     [clipEmbedModels, searchTerm, filteredModelType]
@@ -103,6 +114,7 @@ const ModelList = () => {
       filteredControlNetModels.length +
       filteredT2IAdapterModels.length +
       filteredIPAdapterModels.length +
+      filteredCLIPVisionModels.length +
       filteredVAEModels.length +
       filteredSpandrelImageToImageModels.length +
       t5EncoderModels.length +
@@ -112,6 +124,7 @@ const ModelList = () => {
     filteredControlNetModels.length,
     filteredEmbeddingModels.length,
     filteredIPAdapterModels.length,
+    filteredCLIPVisionModels.length,
     filteredLoRAModels.length,
     filteredMainModels.length,
     filteredRefinerModels.length,
@@ -166,6 +179,11 @@ const ModelList = () => {
         {isLoadingIPAdapterModels && <FetchingModelsLoader loadingMessage="Loading IP Adapters..." />}
         {!isLoadingIPAdapterModels && filteredIPAdapterModels.length > 0 && (
           <ModelListWrapper title={t('common.ipAdapter')} modelList={filteredIPAdapterModels} key="ip-adapters" />
+        )}
+        {/* CLIP Vision List */}
+        {isLoadingCLIPVisionModels && <FetchingModelsLoader loadingMessage="Loading CLIP Vision Models..." />}
+        {!isLoadingCLIPVisionModels && filteredCLIPVisionModels.length > 0 && (
+          <ModelListWrapper title="CLIP Vision" modelList={filteredCLIPVisionModels} key="clip-vision" />
         )}
         {/* T2I Adapters List */}
         {isLoadingT2IAdapterModels && <FetchingModelsLoader loadingMessage="Loading T2I Adapters..." />}

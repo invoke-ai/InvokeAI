@@ -1,6 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { $builtWorkflow } from 'features/nodes/hooks/useWorkflowWatcher';
+import { selectWorkflowIsTouched } from 'features/nodes/store/workflowSlice';
 import { useSaveWorkflowAsDialog } from 'features/workflowLibrary/components/SaveWorkflowAsDialog/useSaveWorkflowAsDialog';
 import { isWorkflowWithID, useSaveLibraryWorkflow } from 'features/workflowLibrary/hooks/useSaveWorkflow';
 import { memo, useCallback } from 'react';
@@ -9,11 +10,11 @@ import { PiFloppyDiskBold } from 'react-icons/pi';
 
 const SaveWorkflowButton = () => {
   const { t } = useTranslation();
-  const isTouched = useAppSelector((s) => s.workflow.isTouched);
+  const isTouched = useAppSelector(selectWorkflowIsTouched);
   const { onOpen } = useSaveWorkflowAsDialog();
   const { saveWorkflow } = useSaveLibraryWorkflow();
 
-  const handleClickSave = useCallback(async () => {
+  const handleClickSave = useCallback(() => {
     const builtWorkflow = $builtWorkflow.get();
     if (!builtWorkflow) {
       return;

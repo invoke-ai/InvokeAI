@@ -105,7 +105,7 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 ### Other features
 
 - Support for both ckpt and diffusers models
-- SD1.5, SD2.0, and SDXL support
+- SD1.5, SD2.0, SDXL, and FLUX support
 - Upscaling Tools
 - Embedding Manager & Support
 - Model Manager & Support
@@ -126,15 +126,15 @@ Invoke is a combined effort of [passionate and talented people from across the w
 
 Original portions of the software are Copyright © 2024 by respective contributors.
 
-[features docs]: https://invoke-ai.github.io/InvokeAI/features/
-[faq]: https://invoke-ai.github.io/InvokeAI/help/FAQ/
-[contributors]: https://invoke-ai.github.io/InvokeAI/other/CONTRIBUTORS/
+[features docs]: https://invoke-ai.github.io/InvokeAI/features/database/
+[faq]: https://invoke-ai.github.io/InvokeAI/faq/
+[contributors]: https://invoke-ai.github.io/InvokeAI/contributing/contributors/
 [invoke.com]: https://www.invoke.com/about
 [github issues]: https://github.com/invoke-ai/InvokeAI/issues
 [docs home]: https://invoke-ai.github.io/InvokeAI
-[installation docs]: https://invoke-ai.github.io/InvokeAI/installation/INSTALLATION/
+[installation docs]: https://invoke-ai.github.io/InvokeAI/installation/
 [#dev-chat]: https://discord.com/channels/1020123559063990373/1049495067846524939
-[contributing docs]: https://invoke-ai.github.io/InvokeAI/contributing/CONTRIBUTING/
+[contributing docs]: https://invoke-ai.github.io/InvokeAI/contributing/
 [CI checks on main badge]: https://flat.badgen.net/github/checks/invoke-ai/InvokeAI/main?label=CI%20status%20on%20main&cache=900&icon=github
 [CI checks on main link]: https://github.com/invoke-ai/InvokeAI/actions?query=branch%3Amain
 [discord badge]: https://flat.badgen.net/discord/members/ZmtBAhwWhy?icon=discord

@@ -56,7 +56,7 @@ export const DefaultPreprocessor = memo((props: UseControllerProps<ControlNetOrT
     <FormControl flexDir="column" gap={2} alignItems="flex-start">
       <Flex justifyContent="space-between" w="full">
         <InformationalPopover feature="controlNetProcessor">
-          <FormLabel>{t('controlnet.processor')}</FormLabel>
+          <FormLabel>{t('controlLayers.filter.filter')}</FormLabel>
         </InformationalPopover>
         <SettingToggle control={props.control} name="preprocessor" />
       </Flex>

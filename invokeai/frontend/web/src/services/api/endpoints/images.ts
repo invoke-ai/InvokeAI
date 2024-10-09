@@ -1,5 +1,6 @@
+import type { StartQueryActionCreatorOptions } from '@reduxjs/toolkit/dist/query/core/buildInitiate';
 import { getStore } from 'app/store/nanostores/store';
-import type { JSONObject } from 'common/types';
+import type { SerializableObject } from 'common/types';
 import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
@@ -52,7 +53,7 @@ export const imagesApi = api.injectEndpoints({
           'FetchOnReconnect',
         ];
       },
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+      onQueryStarted(_, { dispatch, queryFulfilled }) {
         // Populate the getImageDTO cache with these images. This makes image selection smoother, because it doesn't
         // need to re-fetch image data when the user selects an image. The getImageDTO cache keeps data for the default
         // of 60s, so this data won't stick around too long.
@@ -75,7 +76,7 @@ export const imagesApi = api.injectEndpoints({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}`) }),
       providesTags: (result, error, image_name) => [{ type: 'Image', id: image_name }],
     }),
-    getImageMetadata: build.query<JSONObject | undefined, string>({
+    getImageMetadata: build.query<SerializableObject | undefined, string>({
       query: (image_name) => ({ url: buildImagesUrl(`i/${image_name}/metadata`) }),
       providesTags: (result, error, image_name) => [{ type: 'ImageMetadata', id: image_name }],
     }),
@@ -162,7 +163,7 @@ export const imagesApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, { imageDTO }) => {
         const categories = getCategories(imageDTO);
-        const boardId = imageDTO.board_id ?? undefined;
+        const boardId = imageDTO.board_id ?? 'none';
 
         return [
           { type: 'Image', id: imageDTO.image_name },
@@ -270,7 +271,7 @@ export const imagesApi = api.injectEndpoints({
         session_id?: string;
         board_id?: string;
         crop_visible?: boolean;
-        metadata?: JSONObject;
+        metadata?: SerializableObject;
       }
     >({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
@@ -549,6 +550,7 @@ export const imagesApi = api.injectEndpoints({
 export const {
   useGetIntermediatesCountQuery,
   useListImagesQuery,
+  useGetImageDTOQuery,
   useGetImageMetadataQuery,
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
@@ -556,8 +558,6 @@ export const {
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,
-  useAddImageToBoardMutation,
-  useRemoveImageFromBoardMutation,
   useChangeImageIsIntermediateMutation,
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
@@ -566,25 +566,86 @@ export const {
   useBulkDownloadImagesMutation,
 } = imagesApi;
 
-export const useGetImageDTOQuery = (...args: Parameters<typeof imagesApi.useGetImageDTOQuery>) => {
-  return imagesApi.useGetImageDTOQuery(...args);
-};
-
 /**
  * Imperative RTKQ helper to fetch an ImageDTO.
  * @param image_name The name of the image to fetch
- * @param forceRefetch Whether to force a refetch of the image
- * @returns
+ * @param options The options for the query. By default, the query will not subscribe to the store.
+ * @returns The ImageDTO if found, otherwise null
  */
-export const getImageDTO = async (image_name: string, forceRefetch?: boolean): Promise<ImageDTO | null> => {
-  const options = {
+export const getImageDTOSafe = async (
+  image_name: string,
+  options?: StartQueryActionCreatorOptions
+): Promise<ImageDTO | null> => {
+  const _options = {
     subscribe: false,
-    forceRefetch,
+    ...options,
   };
-  const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, options));
+  const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, _options));
   try {
     return await req.unwrap();
   } catch {
     return null;
   }
+};
+
+/**
+ * Imperative RTKQ helper to fetch an ImageDTO.
+ * @param image_name The name of the image to fetch
+ * @param options The options for the query. By default, the query will not subscribe to the store.
+ * @raises Error if the image is not found or there is an error fetching the image
+ */
+export const getImageDTO = (image_name: string, options?: StartQueryActionCreatorOptions): Promise<ImageDTO> => {
+  const _options = {
+    subscribe: false,
+    ...options,
+  };
+  const req = getStore().dispatch(imagesApi.endpoints.getImageDTO.initiate(image_name, _options));
+  return req.unwrap();
+};
+
+/**
+ * Imperative RTKQ helper to fetch an image's metadata.
+ * @param image_name The name of the image
+ * @param options The options for the query. By default, the query will not subscribe to the store.
+ * @raises Error if the image metadata is not found or there is an error fetching the image metadata. Images without
+ * metadata will return undefined.
+ */
+export const getImageMetadata = (
+  image_name: string,
+  options?: StartQueryActionCreatorOptions
+): Promise<SerializableObject | undefined> => {
+  const _options = {
+    subscribe: false,
+    ...options,
+  };
+  const req = getStore().dispatch(imagesApi.endpoints.getImageMetadata.initiate(image_name, _options));
+  return req.unwrap();
+};
+
+export type UploadOptions = {
+  blob: Blob;
+  fileName: string;
+  image_category: ImageCategory;
+  is_intermediate: boolean;
+  crop_visible?: boolean;
+  board_id?: BoardId;
+  metadata?: SerializableObject;
+};
+export const uploadImage = (arg: UploadOptions): Promise<ImageDTO> => {
+  const { blob, fileName, image_category, is_intermediate, crop_visible = false, board_id, metadata } = arg;
+
+  const { dispatch } = getStore();
+  const file = new File([blob], fileName, { type: 'image/png' });
+  const req = dispatch(
+    imagesApi.endpoints.uploadImage.initiate({
+      file,
+      image_category,
+      is_intermediate,
+      crop_visible,
+      board_id,
+      metadata,
+    })
+  );
+  req.reset();
+  return req.unwrap();
 };

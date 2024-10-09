@@ -2,31 +2,30 @@ import type { ContextMenuProps } from '@invoke-ai/ui-library';
 import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { autoAddBoardIdChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { $boardToDelete } from 'features/gallery/components/Boards/DeleteBoardModal';
+import { selectAutoAddBoardId, selectAutoAssignBoardOnClick } from 'features/gallery/store/gallerySelectors';
+import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArchiveBold, PiArchiveFill, PiDownloadBold, PiPlusBold } from 'react-icons/pi';
+import { PiArchiveBold, PiArchiveFill, PiDownloadBold, PiPlusBold, PiTrashSimpleBold } from 'react-icons/pi';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useBulkDownloadImagesMutation } from 'services/api/endpoints/images';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import type { BoardDTO } from 'services/api/types';
 
-import GalleryBoardContextMenuItems from './GalleryBoardContextMenuItems';
-
 type Props = {
   board: BoardDTO;
   children: ContextMenuProps<HTMLDivElement>['children'];
-  setBoardToDelete: (board?: BoardDTO) => void;
 };
 
-const BoardContextMenu = ({ board, setBoardToDelete, children }: Props) => {
+const BoardContextMenu = ({ board, children }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const autoAssignBoardOnClick = useAppSelector((s) => s.gallery.autoAssignBoardOnClick);
+  const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectIsSelectedForAutoAdd = useMemo(
-    () => createSelector(selectGallerySlice, (gallery) => board.board_id === gallery.autoAddBoardId),
+    () => createSelector(selectAutoAddBoardId, (autoAddBoardId) => board.board_id === autoAddBoardId),
     [board.board_id]
   );
 
@@ -67,6 +66,10 @@ const BoardContextMenu = ({ board, setBoardToDelete, children }: Props) => {
     });
   }, [board.board_id, updateBoard]);
 
+  const setAsBoardToDelete = useCallback(() => {
+    $boardToDelete.set(board);
+  }, [board]);
+
   const renderMenuFunc = useCallback(
     () => (
       <MenuList visibility="visible">
@@ -94,22 +97,24 @@ const BoardContextMenu = ({ board, setBoardToDelete, children }: Props) => {
             </MenuItem>
           )}
 
-          <GalleryBoardContextMenuItems board={board} setBoardToDelete={setBoardToDelete} />
+          <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClick={setAsBoardToDelete} isDestructive>
+            {t('boards.deleteBoard')}
+          </MenuItem>
         </MenuGroup>
       </MenuList>
     ),
     [
-      autoAssignBoardOnClick,
-      board,
       boardName,
-      handleBulkDownload,
-      handleSetAutoAdd,
-      isBulkDownloadEnabled,
+      autoAssignBoardOnClick,
       isSelectedForAutoAdd,
-      setBoardToDelete,
+      handleSetAutoAdd,
       t,
-      handleArchive,
+      isBulkDownloadEnabled,
+      handleBulkDownload,
+      board.archived,
       handleUnarchive,
+      handleArchive,
+      setAsBoardToDelete,
     ]
   );
 

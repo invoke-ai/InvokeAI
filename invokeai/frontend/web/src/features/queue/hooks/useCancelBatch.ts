@@ -1,11 +1,12 @@
-import { useAppSelector } from 'app/store/storeHooks';
+import { useStore } from '@nanostores/react';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCancelByBatchIdsMutation, useGetBatchStatusQuery } from 'services/api/endpoints/queue';
+import { $isConnected } from 'services/events/stores';
 
 export const useCancelBatch = (batch_id: string) => {
-  const isConnected = useAppSelector((s) => s.system.isConnected);
+  const isConnected = useStore($isConnected);
   const { isCanceled } = useGetBatchStatusQuery(
     { batch_id },
     {

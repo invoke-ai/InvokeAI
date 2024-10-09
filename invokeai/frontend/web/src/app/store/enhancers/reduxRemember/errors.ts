@@ -1,5 +1,4 @@
 import { logger } from 'app/logging/logger';
-import { parseify } from 'common/util/serialize';
 import { PersistError, RehydrateError } from 'redux-remember';
 import { serializeError } from 'serialize-error';
 
@@ -41,6 +40,6 @@ export const errorHandler = (err: PersistError | RehydrateError) => {
   } else if (err instanceof RehydrateError) {
     log.error({ error: serializeError(err) }, 'Problem rehydrating state');
   } else {
-    log.error({ error: parseify(err) }, 'Problem in persistence layer');
+    log.error({ error: serializeError(err) }, 'Problem in persistence layer');
   }
 };
