@@ -90,6 +90,7 @@
         "batch": "Batch Manager",
         "beta": "Beta",
         "cancel": "Cancel",
+        "close": "Close",
         "copy": "Copy",
         "copyError": "$t(gallery.copy) Error",
         "on": "On",
@@ -1125,6 +1126,7 @@
         "canceled": "Processing Canceled",
         "connected": "Connected to Server",
         "imageCopied": "Image Copied",
+        "linkCopied": "Link Copied",
         "unableToLoadImage": "Unable to Load Image",
         "unableToLoadImageMetadata": "Unable to Load Image Metadata",
         "unableToLoadStylePreset": "Unable to Load Style Preset",
@@ -1559,7 +1561,12 @@
         "loadFromGraph": "Load Workflow from Graph",
         "convertGraph": "Convert Graph",
         "loadWorkflow": "$t(common.load) Workflow",
-        "autoLayout": "Auto Layout"
+        "autoLayout": "Auto Layout",
+        "edit": "Edit",
+        "download": "Download",
+        "copyShareLink": "Copy Share Link",
+        "copyShareLinkForWorkflow": "Copy Share Link for Workflow",
+        "delete": "Delete"
     },
     "controlLayers": {
         "regional": "Regional",
