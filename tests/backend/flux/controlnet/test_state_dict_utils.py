@@ -48,8 +48,7 @@ def test_convert_diffusers_instantx_state_dict_to_bfl_format():
 
 def test_infer_flux_params_from_state_dict():
     # Construct a dummy state_dict with tensors of the correct shape on the meta device.
-    with torch.device("meta"):
-        sd = {k: torch.zeros(v) for k, v in instantx_sd_shapes.items()}
+    sd = {k: torch.zeros(v, device="meta") for k, v in instantx_sd_shapes.items()}
 
     sd = convert_diffusers_instantx_state_dict_to_bfl_format(sd)
     flux_params = infer_flux_params_from_state_dict(sd)
@@ -70,8 +69,7 @@ def test_infer_flux_params_from_state_dict():
 
 def test_infer_instantx_num_control_modes_from_state_dict():
     # Construct a dummy state_dict with tensors of the correct shape on the meta device.
-    with torch.device("meta"):
-        sd = {k: torch.zeros(v) for k, v in instantx_sd_shapes.items()}
+    sd = {k: torch.zeros(v, device="meta") for k, v in instantx_sd_shapes.items()}
 
     sd = convert_diffusers_instantx_state_dict_to_bfl_format(sd)
     num_control_modes = infer_instantx_num_control_modes_from_state_dict(sd)
@@ -81,8 +79,7 @@ def test_infer_instantx_num_control_modes_from_state_dict():
 
 def test_load_instantx_from_state_dict():
     # Construct a dummy state_dict with tensors of the correct shape on the meta device.
-    with torch.device("meta"):
-        sd = {k: torch.zeros(v) for k, v in instantx_sd_shapes.items()}
+    sd = {k: torch.zeros(v, device="meta") for k, v in instantx_sd_shapes.items()}
 
     sd = convert_diffusers_instantx_state_dict_to_bfl_format(sd)
     flux_params = infer_flux_params_from_state_dict(sd)
