@@ -22,6 +22,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiShootingStarBold, PiUploadBold } from 'react-icons/pi';
 import type { ControlNetModelConfig, PostUploadAction, T2IAdapterModelConfig } from 'services/api/types';
+import { selectIsFLUX } from '../../store/paramsSlice';
 
 const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) => {
   const selectControlAdapter = useMemo(
@@ -42,6 +43,7 @@ export const ControlLayerControlAdapter = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('control_layer');
   const controlAdapter = useControlLayerControlAdapter(entityIdentifier);
   const filter = useEntityFilter(entityIdentifier);
+  const isFLUX = useAppSelector(selectIsFLUX);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
@@ -117,7 +119,7 @@ export const ControlLayerControlAdapter = memo(() => {
       </Flex>
       <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
       <BeginEndStepPct beginEndStepPct={controlAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
-      {controlAdapter.type === 'controlnet' && (
+      {controlAdapter.type === 'controlnet' && !isFLUX && (
         <ControlLayerControlAdapterControlMode
           controlMode={controlAdapter.controlMode}
           onChange={onChangeControlMode}
