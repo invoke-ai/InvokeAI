@@ -68,7 +68,7 @@ export abstract class CanvasEntityAdapterBase<
    *
    * If `prevState` is undefined, this is the first time the entity is being synced.
    */
-  abstract sync: (state: T | undefined, prevState: T | undefined) => void;
+  abstract sync: (state: T | undefined, prevState: T | undefined) => Promise<void>;
 
   /**
    * Gets the canvas element for the entity. If `rect` is provided, the canvas will be clipped to that rectangle.
