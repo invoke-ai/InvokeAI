@@ -81,6 +81,15 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
     [copyWorkflowLinkModal]
   );
 
+  const handleClickDownload = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      setIsHovered(false);
+      downloadWorkflow();
+    },
+    [downloadWorkflow]
+  );
+
   return (
     <>
       <Flex
@@ -139,7 +148,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
               size="sm"
               variant="ghost"
               aria-label={t('workflows.download')}
-              onClick={downloadWorkflow}
+              onClick={handleClickDownload}
               icon={<PiDownloadSimpleBold />}
             />
           </Tooltip>
