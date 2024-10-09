@@ -644,7 +644,12 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.$isProcessing.set(true);
     const rect = this.getRelativeRect();
     const rasterizeResult = await withResultAsync(() =>
-      this.parent.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1, filters: [] } })
+      this.parent.renderer.rasterize({
+        rect,
+        replaceObjects: true,
+        ignoreCache: true,
+        attrs: { opacity: 1, filters: [] },
+      })
     );
     if (rasterizeResult.isErr()) {
       this.log.error({ error: serializeError(rasterizeResult.error) }, 'Failed to rasterize entity');
