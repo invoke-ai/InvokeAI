@@ -132,7 +132,7 @@ export const CanvasToolbarScale = memo(() => {
             onKeyDown={onKeyDown}
             clampValueOnBlur={false}
           >
-            <NumberInputField paddingInlineEnd={7} />
+            <NumberInputField paddingInlineEnd={7} title="" _focusVisible={{ zIndex: 0 }} />
             <PopoverTrigger>
               <IconButton
                 aria-label="open-slider"
