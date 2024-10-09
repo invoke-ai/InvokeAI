@@ -114,8 +114,8 @@ class InstantXControlNetExtension(BaseControlNetExtension):
                 single_block_residuals.append(single_block_samples[i // interval_control])
 
         return ControlNetFluxOutput(
-            double_block_residuals=double_block_residuals,
-            single_block_residuals=single_block_residuals,
+            double_block_residuals=double_block_residuals or None,
+            single_block_residuals=single_block_residuals or None,
         )
 
     def run_controlnet(
