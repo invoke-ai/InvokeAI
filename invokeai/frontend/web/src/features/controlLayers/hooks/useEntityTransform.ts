@@ -53,5 +53,24 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
     adapter.transformer.startTransform();
   }, [isDisabled, entityIdentifier, canvasManager]);
 
-  return { isDisabled, start } as const;
+  const fitToBbox = useCallback(() => {
+    if (isDisabled) {
+      return;
+    }
+    if (!entityIdentifier) {
+      return;
+    }
+    if (!isTransformableEntityIdentifier(entityIdentifier)) {
+      return;
+    }
+    const adapter = canvasManager.getAdapter(entityIdentifier);
+    if (!adapter) {
+      return;
+    }
+    adapter.transformer.startTransform({ silent: true });
+    adapter.transformer.fitToBboxContain();
+    adapter.transformer.applyTransform();
+  }, [canvasManager, entityIdentifier, isDisabled]);
+
+  return { isDisabled, start, fitToBbox } as const;
 };
