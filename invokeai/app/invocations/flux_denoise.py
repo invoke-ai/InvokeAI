@@ -244,7 +244,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise ValueError(f"Unsupported model format: {config.format}")
 
             # Prepare ControlNet extensions.
-            (xlabs_controlnet_extensions, instantx_controlnet_extensions) = self._prep_controlnet_extensions(
+            controlnet_extensions = self._prep_controlnet_extensions(
                 context=context,
                 exit_stack=exit_stack,
                 latent_height=latent_h,
@@ -264,8 +264,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 step_callback=self._build_step_callback(context),
                 guidance=self.guidance,
                 inpaint_extension=inpaint_extension,
-                xlabs_controlnet_extensions=xlabs_controlnet_extensions,
-                instantx_controlnet_extensions=instantx_controlnet_extensions,
+                controlnet_extensions=controlnet_extensions,
             )
 
         x = unpack(x.float(), self.height, self.width)
@@ -320,7 +319,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         latent_width: int,
         dtype: torch.dtype,
         device: torch.device,
-    ) -> tuple[list[XLabsControlNetExtension], list[InstantXControlNetExtension]]:
+    ) -> list[XLabsControlNetExtension | InstantXControlNetExtension]:
         # Normalize the controlnet input to list[ControlField].
         controlnets: list[FluxControlNetField]
         if self.controlnet is None:
@@ -336,14 +335,13 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # before loading the models. Then make sure that all VAE encoding is done before loading the ControlNets to
         # minimize peak memory.
 
-        xlabs_controlnet_extensions: list[XLabsControlNetExtension] = []
-        instantx_controlnet_extensions: list[InstantXControlNetExtension] = []
+        controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension] = []
         for controlnet in controlnets:
             model = exit_stack.enter_context(context.models.load(controlnet.controlnet_model))
             image = context.images.get_pil(controlnet.image.image_name)
 
             if isinstance(model, XLabsControlNetFlux):
-                xlabs_controlnet_extensions.append(
+                controlnet_extensions.append(
                     XLabsControlNetExtension.from_controlnet_image(
                         model=model,
                         controlnet_image=image,
@@ -365,7 +363,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     raise ValueError("A ControlNet VAE is required when using an InstantX FLUX ControlNet.")
                 vae_info = context.models.load(self.controlnet_vae.vae)
 
-                instantx_controlnet_extensions.append(
+                controlnet_extensions.append(
                     InstantXControlNetExtension.from_controlnet_image(
                         model=model,
                         controlnet_image=image,
@@ -384,7 +382,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             else:
                 raise ValueError(f"Unsupported ControlNet model type: {type(model)}")
 
-        return (xlabs_controlnet_extensions, instantx_controlnet_extensions)
+        return controlnet_extensions
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
         for lora in self.transformer.loras:

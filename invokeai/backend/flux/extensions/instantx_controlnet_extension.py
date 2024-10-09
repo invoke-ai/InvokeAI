@@ -1,3 +1,4 @@
+import math
 from typing import List, Union
 
 import torch
@@ -6,10 +7,11 @@ from PIL.Image import Image
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.util.controlnet_utils import CONTROLNET_RESIZE_VALUES, prepare_control_image
+from invokeai.backend.flux.controlnet.controlnet_flux_output import ControlNetFluxOutput
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import (
     InstantXControlNetFlux,
+    InstantXControlNetFluxOutput,
 )
-from invokeai.backend.flux.controlnet.instantx_controlnet_flux_output import InstantXControlNetFluxOutput
 from invokeai.backend.flux.extensions.base_controlnet_extension import BaseControlNetExtension
 from invokeai.backend.flux.sampling_utils import pack
 from invokeai.backend.model_manager.load.load_base import LoadedModel
@@ -39,6 +41,10 @@ class InstantXControlNetExtension(BaseControlNetExtension):
         # Expected shape: (batch_size, 1)
         # Expected dtype: torch.long
         self._instantx_control_mode = instantx_control_mode
+
+        # TODO(ryand): Pass in these params if a new base transformer / InstantX ControlNet pair get released.
+        self._flux_transformer_num_double_blocks = 19
+        self._flux_transformer_num_single_blocks = 38
 
     @classmethod
     def from_controlnet_image(
@@ -83,6 +89,35 @@ class InstantXControlNetExtension(BaseControlNetExtension):
             end_step_percent=end_step_percent,
         )
 
+    def _instantx_output_to_controlnet_output(
+        self, instantx_output: InstantXControlNetFluxOutput
+    ) -> ControlNetFluxOutput:
+        # The `interval_control` logic here is based on
+        # https://github.com/huggingface/diffusers/blob/31058cdaef63ca660a1a045281d156239fba8192/src/diffusers/models/transformers/transformer_flux.py#L507-L511
+
+        # Handle double block residuals.
+        double_block_residuals: list[torch.Tensor] = []
+        double_block_samples = instantx_output.controlnet_block_samples
+        if double_block_samples:
+            interval_control = self._flux_transformer_num_double_blocks / len(double_block_samples)
+            interval_control = int(math.ceil(interval_control))
+            for i in range(self._flux_transformer_num_double_blocks):
+                double_block_residuals.append(double_block_samples[i // interval_control])
+
+        # Handle single block residuals.
+        single_block_residuals: list[torch.Tensor] = []
+        single_block_samples = instantx_output.controlnet_single_block_samples
+        if single_block_samples:
+            interval_control = self._flux_transformer_num_single_blocks / len(single_block_samples)
+            interval_control = int(math.ceil(interval_control))
+            for i in range(self._flux_transformer_num_single_blocks):
+                single_block_residuals.append(single_block_samples[i // interval_control])
+
+        return ControlNetFluxOutput(
+            double_block_residuals=double_block_residuals,
+            single_block_residuals=single_block_residuals,
+        )
+
     def run_controlnet(
         self,
         timestep_index: int,
@@ -94,10 +129,10 @@ class InstantXControlNetExtension(BaseControlNetExtension):
         y: torch.Tensor,
         timesteps: torch.Tensor,
         guidance: torch.Tensor | None,
-    ) -> InstantXControlNetFluxOutput | None:
+    ) -> ControlNetFluxOutput:
         weight = self._get_weight(timestep_index=timestep_index, total_num_timesteps=total_num_timesteps)
         if weight < 1e-6:
-            return None
+            return ControlNetFluxOutput(single_block_residuals=None, double_block_residuals=None)
 
         # Make sure inputs have correct device and dtype.
         self._controlnet_cond = self._controlnet_cond.to(device=img.device, dtype=img.dtype)
@@ -105,7 +140,7 @@ class InstantXControlNetExtension(BaseControlNetExtension):
             self._instantx_control_mode.to(device=img.device) if self._instantx_control_mode is not None else None
         )
 
-        output: InstantXControlNetFluxOutput = self._model(
+        instantx_output: InstantXControlNetFluxOutput = self._model(
             controlnet_cond=self._controlnet_cond,
             controlnet_mode=self._instantx_control_mode,
             img=img,
@@ -117,5 +152,6 @@ class InstantXControlNetExtension(BaseControlNetExtension):
             guidance=guidance,
         )
 
-        output.apply_weight(weight)
-        return output
+        controlnet_output = self._instantx_output_to_controlnet_output(instantx_output)
+        controlnet_output.apply_weight(weight)
+        return controlnet_output

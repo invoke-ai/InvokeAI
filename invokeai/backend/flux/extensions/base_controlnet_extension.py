@@ -4,8 +4,7 @@ from typing import List, Union
 
 import torch
 
-from invokeai.backend.flux.controlnet.instantx_controlnet_flux_output import InstantXControlNetFluxOutput
-from invokeai.backend.flux.controlnet.xlabs_controlnet_flux_output import XLabsControlNetFluxOutput
+from invokeai.backend.flux.controlnet.controlnet_flux_output import ControlNetFluxOutput
 
 
 class BaseControlNetExtension(ABC):
@@ -43,4 +42,4 @@ class BaseControlNetExtension(ABC):
         y: torch.Tensor,
         timesteps: torch.Tensor,
         guidance: torch.Tensor | None,
-    ) -> InstantXControlNetFluxOutput | XLabsControlNetFluxOutput | None: ...
+    ) -> ControlNetFluxOutput: ...
