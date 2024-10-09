@@ -49,25 +49,40 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
     return workflowId === workflow.workflow_id;
   }, [workflowId, workflow.workflow_id]);
 
-  const handleClickLoad = useCallback(() => {
-    getAndLoadWorkflow(workflow.workflow_id);
-    workflowListMenu.close();
-  }, [getAndLoadWorkflow, workflow.workflow_id, workflowListMenu]);
+  const handleClickLoad = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      getAndLoadWorkflow(workflow.workflow_id);
+      workflowListMenu.close();
+    },
+    [getAndLoadWorkflow, workflow.workflow_id, workflowListMenu]
+  );
 
-  const handleClickEdit = useCallback(async () => {
-    await getAndLoadWorkflow(workflow.workflow_id);
-    dispatch(workflowModeChanged('edit'));
-    workflowListMenu.close();
-  }, [getAndLoadWorkflow, workflow.workflow_id, dispatch, workflowListMenu]);
+  const handleClickEdit = useCallback(
+    async (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      setIsHovered(false);
+      await getAndLoadWorkflow(workflow.workflow_id);
+      dispatch(workflowModeChanged('edit'));
+      workflowListMenu.close();
+    },
+    [getAndLoadWorkflow, workflow.workflow_id, dispatch, workflowListMenu]
+  );
 
-  const handleDeleteWorklow = useCallback(() => {
-    deleteWorkflow(workflow.workflow_id);
-    deleteConfirmationDialog.close();
-  }, [deleteWorkflow, workflow.workflow_id, deleteConfirmationDialog]);
+  const handleDeleteWorklow = useCallback(
+    (e?: MouseEvent<HTMLButtonElement>) => {
+      e?.stopPropagation();
+      setIsHovered(false);
+      deleteWorkflow(workflow.workflow_id);
+      deleteConfirmationDialog.close();
+    },
+    [deleteWorkflow, workflow.workflow_id, deleteConfirmationDialog]
+  );
 
   const handleClickDelete = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
+      setIsHovered(false);
       deleteConfirmationDialog.open();
     },
     [deleteConfirmationDialog]
@@ -76,6 +91,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
   const handleClickShare = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation();
+      setIsHovered(false);
       copyWorkflowLinkModal.open();
     },
     [copyWorkflowLinkModal]
@@ -133,7 +149,11 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
         <Spacer />
 
         <Flex alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>
-          <Tooltip label={t('workflows.edit')}>
+          <Tooltip
+            label={t('workflows.edit')}
+            // This prevents an issue where the tooltip isn't closed after the modal is opened
+            isOpen={!isHovered ? false : undefined}
+          >
             <IconButton
               size="sm"
               variant="ghost"
@@ -143,7 +163,11 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
               icon={<PiPencilBold />}
             />
           </Tooltip>
-          <Tooltip label={t('workflows.download')}>
+          <Tooltip
+            label={t('workflows.download')}
+            // This prevents an issue where the tooltip isn't closed after the modal is opened
+            isOpen={!isHovered ? false : undefined}
+          >
             <IconButton
               size="sm"
               variant="ghost"
@@ -153,7 +177,11 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
             />
           </Tooltip>
           {!!projectUrl && workflow.workflow_id && (
-            <Tooltip label={t('workflows.copyShareLink')}>
+            <Tooltip
+              label={t('workflows.copyShareLink')}
+              // This prevents an issue where the tooltip isn't closed after the modal is opened
+              isOpen={!isHovered ? false : undefined}
+            >
               <IconButton
                 size="sm"
                 variant="ghost"
@@ -164,7 +192,11 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
             </Tooltip>
           )}
           {workflow.category !== 'default' && (
-            <Tooltip label={t('workflows.delete')}>
+            <Tooltip
+              label={t('workflows.delete')}
+              // This prevents an issue where the tooltip isn't closed after the modal is opened
+              isOpen={!isHovered ? false : undefined}
+            >
               <IconButton
                 size="sm"
                 variant="ghost"
