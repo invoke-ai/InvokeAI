@@ -1,11 +1,9 @@
-import itertools
 from typing import Callable
 
 import torch
 from tqdm import tqdm
 
-from invokeai.backend.flux.controlnet.instantx_controlnet_flux_output import InstantXControlNetFluxOutput
-from invokeai.backend.flux.controlnet.xlabs_controlnet_flux_output import XLabsControlNetFluxOutput
+from invokeai.backend.flux.controlnet.controlnet_flux_output import ControlNetFluxOutput, sum_controlnet_flux_outputs
 from invokeai.backend.flux.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
@@ -26,8 +24,7 @@ def denoise(
     step_callback: Callable[[PipelineIntermediateState], None],
     guidance: float,
     inpaint_extension: InpaintExtension | None,
-    xlabs_controlnet_extensions: list[XLabsControlNetExtension],
-    instantx_controlnet_extensions: list[InstantXControlNetExtension],
+    controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension],
 ):
     # step 0 is the initial state
     total_steps = len(timesteps) - 1
@@ -47,8 +44,8 @@ def denoise(
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
 
         # Run ControlNet models.
-        controlnet_residuals: list[XLabsControlNetFluxOutput | InstantXControlNetFluxOutput | None] = []
-        for controlnet_extension in itertools.chain(xlabs_controlnet_extensions, instantx_controlnet_extensions):
+        controlnet_residuals: list[ControlNetFluxOutput] = []
+        for controlnet_extension in controlnet_extensions:
             controlnet_residuals.append(
                 controlnet_extension.run_controlnet(
                     timestep_index=step - 1,
@@ -62,10 +59,9 @@ def denoise(
                     guidance=guidance_vec,
                 )
             )
-        xlabs_controlnet_residuals = [res for res in controlnet_residuals if isinstance(res, XLabsControlNetFluxOutput)]
-        instantx_controlnet_residuals = [
-            res for res in controlnet_residuals if isinstance(res, InstantXControlNetFluxOutput)
-        ]
+
+        # Merge the ControlNet residuals from multiple ControlNets.
+        merged_controlnet_residuals = sum_controlnet_flux_outputs(controlnet_residuals)
 
         pred = model(
             img=img,
@@ -75,8 +71,8 @@ def denoise(
             y=vec,
             timesteps=t_vec,
             guidance=guidance_vec,
-            xlabs_controlnet_residuals=xlabs_controlnet_residuals,
-            instantx_controlnet_residuals=instantx_controlnet_residuals,
+            controlnet_double_block_residuals=merged_controlnet_residuals.double_block_residuals,
+            controlnet_single_block_residuals=merged_controlnet_residuals.single_block_residuals,
         )
 
         preview_img = img - t_curr * pred
