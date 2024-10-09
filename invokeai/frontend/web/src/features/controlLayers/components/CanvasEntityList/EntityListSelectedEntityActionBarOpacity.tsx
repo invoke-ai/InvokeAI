@@ -157,7 +157,7 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
             clampValueOnBlur={false}
             variant="outline"
           >
-            <NumberInputField paddingInlineEnd={7} _focusVisible={{ zIndex: 0 }} />
+            <NumberInputField paddingInlineEnd={7} _focusVisible={{ zIndex: 0 }} title="" />
             <PopoverTrigger>
               <IconButton
                 aria-label="open-slider"

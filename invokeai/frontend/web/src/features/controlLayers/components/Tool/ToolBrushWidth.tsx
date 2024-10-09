@@ -164,7 +164,7 @@ export const ToolBrushWidth = memo(() => {
             onKeyDown={onKeyDown}
             clampValueOnBlur={false}
           >
-            <NumberInputField paddingInlineEnd={7} />
+            <NumberInputField _focusVisible={{ zIndex: 0 }} title="" paddingInlineEnd={7} />
             <PopoverTrigger>
               <IconButton
                 aria-label="open-slider"
