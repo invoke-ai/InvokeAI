@@ -625,12 +625,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   /**
    * Starts the transformation of the entity.
    */
-  startTransform = () => {
+  startTransform = (silent: boolean = false) => {
     const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
     if (transformingAdapter) {
       assert(false, `Already transforming an entity: ${transformingAdapter.id}`);
     }
     this.log.debug('Starting transform');
+    this.$silentTransform.set(silent);
     this.$isTransforming.set(true);
     this.manager.stateApi.$transformingAdapter.set(this.parent);
     this.syncInteractionState();
@@ -642,6 +643,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   applyTransform = async () => {
     this.log.debug('Applying transform');
     this.$isProcessing.set(true);
+    this._setInteractionMode('off');
     const rect = this.getRelativeRect();
     const rasterizeResult = await withResultAsync(() =>
       this.parent.renderer.rasterize({
