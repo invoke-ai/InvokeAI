@@ -404,19 +404,25 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     replaceObjects?: boolean;
     attrs?: GroupConfig;
     bg?: string;
+    ignoreCache?: boolean;
   }): Promise<ImageDTO> => {
     const rasterizingAdapter = this.manager.stateApi.$rasterizingAdapter.get();
     if (rasterizingAdapter) {
       assert(false, `Already rasterizing an entity: ${rasterizingAdapter.id}`);
     }
 
-    const { rect, replaceObjects, attrs, bg } = { replaceObjects: false, attrs: {}, ...options };
+    const { rect, replaceObjects, attrs, bg, ignoreCache } = {
+      replaceObjects: false,
+      ignoreCache: false,
+      attrs: {},
+      ...options,
+    };
     let imageDTO: ImageDTO | null = null;
     const rasterizeArgs = { rect, attrs, bg };
     const hash = this.parent.hash(rasterizeArgs);
     const cachedImageName = this.manager.cache.imageNameCache.get(hash);
 
-    if (cachedImageName) {
+    if (cachedImageName && !ignoreCache) {
       imageDTO = await getImageDTOSafe(cachedImageName);
       if (imageDTO) {
         this.log.trace({ rect, cachedImageName, imageDTO }, 'Using cached rasterized image');
