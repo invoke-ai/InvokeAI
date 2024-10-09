@@ -47,6 +47,32 @@ export const buildUseBoolean = (initialValue: boolean): [() => UseBoolean, Writa
   return [useBoolean, $boolean] as const;
 };
 
+/**
+ * Hook to manage a boolean state. Use this for a local boolean state.
+ * @param initialValue Initial value of the boolean
+ */
+export const useBoolean = (initialValue: boolean): UseBoolean => {
+  const [isTrue, set] = useState(initialValue);
+
+  const setTrue = useCallback(() => {
+    set(true);
+  }, [set]);
+  const setFalse = useCallback(() => {
+    set(false);
+  }, [set]);
+  const toggle = useCallback(() => {
+    set((val) => !val);
+  }, [set]);
+
+  return {
+    isTrue,
+    setTrue,
+    setFalse,
+    set,
+    toggle,
+  };
+};
+
 type UseDisclosure = {
   isOpen: boolean;
   open: () => void;
@@ -96,16 +122,19 @@ export const buildUseDisclosure = (defaultIsOpen: boolean): [() => UseDisclosure
 };
 
 /**
+ * This is the same as `useBoolean`, but the method names are more descriptive,
+ * serving the semantics of a disclosure state.
+ *
  * Hook to manage a boolean state. Use this for a local boolean state.
- * @param initialValue Initial value of the boolean
+ * @param defaultIsOpen Initial state of the disclosure
  */
-export const useBoolean = (initialValue: boolean) => {
-  const [isTrue, set] = useState(initialValue);
+export const useDisclosure = (defaultIsOpen: boolean): UseDisclosure => {
+  const [isOpen, set] = useState(defaultIsOpen);
 
-  const setTrue = useCallback(() => {
+  const open = useCallback(() => {
     set(true);
   }, [set]);
-  const setFalse = useCallback(() => {
+  const close = useCallback(() => {
     set(false);
   }, [set]);
   const toggle = useCallback(() => {
@@ -113,9 +142,9 @@ export const useBoolean = (initialValue: boolean) => {
   }, [set]);
 
   return {
-    isTrue,
-    setTrue,
-    setFalse,
+    isOpen,
+    open,
+    close,
     set,
     toggle,
   };
