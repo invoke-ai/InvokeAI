@@ -455,6 +455,7 @@ MODEL_NAME_TO_PREPROCESSOR = {
     "lineart": "lineart_image_processor",
     "lineart_anime": "lineart_anime_image_processor",
     "softedge": "hed_image_processor",
+    "hed": "hed_image_processor",
     "shuffle": "content_shuffle_image_processor",
     "pose": "dw_openpose_image_processor",
     "mediapipe": "mediapipe_face_processor",
@@ -466,7 +467,8 @@ MODEL_NAME_TO_PREPROCESSOR = {
 
 def get_default_settings_controlnet_t2i_adapter(model_name: str) -> Optional[ControlAdapterDefaultSettings]:
     for k, v in MODEL_NAME_TO_PREPROCESSOR.items():
-        if k in model_name:
+        model_name_lower = model_name.lower()
+        if k in model_name_lower:
             return ControlAdapterDefaultSettings(preprocessor=v)
     return None
 
