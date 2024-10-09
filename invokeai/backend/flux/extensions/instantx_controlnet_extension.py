@@ -76,6 +76,9 @@ class InstantXControlNetExtension(BaseControlNetExtension):
             resize_mode=resize_mode,
         )
 
+        # Shift the image from [0, 1] to [-1, 1].
+        resized_controlnet_image = resized_controlnet_image * 2 - 1
+
         # Run VAE encoder.
         controlnet_cond = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=resized_controlnet_image)
         controlnet_cond = pack(controlnet_cond)
