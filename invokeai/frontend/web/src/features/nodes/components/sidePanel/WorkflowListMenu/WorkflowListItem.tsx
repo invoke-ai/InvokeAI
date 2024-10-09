@@ -8,9 +8,12 @@ import {
   Tooltip,
   useDisclosure,
 } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { EMPTY_OBJECT } from 'app/store/constants';
+import { $projectUrl } from 'app/store/nanostores/projectId';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import dateFormat, { masks } from 'dateformat';
+import { useCopyWorkflowLinkModal } from 'features/nodes/hooks/useCopyWorkflowLinkModal';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { selectWorkflowId, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { useDeleteLibraryWorkflow } from 'features/workflowLibrary/hooks/useDeleteLibraryWorkflow';
@@ -19,15 +22,17 @@ import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/use
 import type { MouseEvent } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiDownloadSimpleBold, PiPencilBold, PiTrashBold } from 'react-icons/pi';
+import { PiDownloadSimpleBold, PiPencilBold, PiShareFatBold, PiTrashBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemDTO } from 'services/api/types';
 
+import { CopyWorkflowLinkModal } from './CopyWorkflowLinkModal';
 import { WorkflowListItemTooltip } from './WorkflowListItemTooltip';
 
 export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemDTO }) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const projectUrl = useStore($projectUrl);
 
   const [isHovered, setIsHovered] = useState(false);
 
@@ -41,6 +46,8 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
 
   const workflowId = useAppSelector(selectWorkflowId);
   const downloadWorkflow = useDownloadWorkflow();
+
+  const { onOpen: onOpenCopyWorkflowLinkModal } = useCopyWorkflowLinkModal();
 
   const { deleteWorkflow, deleteWorkflowResult } = useDeleteLibraryWorkflow(EMPTY_OBJECT);
   const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow({
@@ -73,6 +80,14 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
       onOpen();
     },
     [onOpen]
+  );
+
+  const handleClickShare = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      onOpenCopyWorkflowLinkModal();
+    },
+    [onOpenCopyWorkflowLinkModal]
   );
 
   return (
@@ -118,31 +133,48 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
         <Spacer />
 
         <Flex alignItems="center" gap={1} opacity={isHovered ? 1 : 0}>
-          <IconButton
-            size="sm"
-            variant="ghost"
-            aria-label="Edit"
-            onClick={handleClickEdit}
-            isLoading={deleteWorkflowResult.isLoading}
-            icon={<PiPencilBold />}
-          />
-          <IconButton
-            size="sm"
-            variant="ghost"
-            aria-label="Download"
-            onClick={downloadWorkflow}
-            icon={<PiDownloadSimpleBold />}
-          />
-          {workflow.category !== 'default' && (
+          <Tooltip label={t('workflows.edit')}>
             <IconButton
               size="sm"
               variant="ghost"
-              aria-label={t('stylePresets.deleteTemplate')}
-              onClick={handleClickDelete}
+              aria-label={t('workflows.edit')}
+              onClick={handleClickEdit}
               isLoading={deleteWorkflowResult.isLoading}
-              colorScheme="error"
-              icon={<PiTrashBold />}
+              icon={<PiPencilBold />}
             />
+          </Tooltip>
+          <Tooltip label={t('workflows.download')}>
+            <IconButton
+              size="sm"
+              variant="ghost"
+              aria-label={t('workflows.download')}
+              onClick={downloadWorkflow}
+              icon={<PiDownloadSimpleBold />}
+            />
+          </Tooltip>
+          {!!projectUrl && workflow.workflow_id && (
+            <Tooltip label={t('workflows.copyShareLink')}>
+              <IconButton
+                size="sm"
+                variant="ghost"
+                aria-label={t('workflows.copyShareLink')}
+                onClick={handleClickShare}
+                icon={<PiShareFatBold />}
+              />
+            </Tooltip>
+          )}
+          {workflow.category !== 'default' && (
+            <Tooltip label={t('workflows.delete')}>
+              <IconButton
+                size="sm"
+                variant="ghost"
+                aria-label={t('workflows.delete')}
+                onClick={handleClickDelete}
+                isLoading={deleteWorkflowResult.isLoading}
+                colorScheme="error"
+                icon={<PiTrashBold />}
+              />
+            </Tooltip>
           )}
         </Flex>
       </Flex>
@@ -157,6 +189,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
       >
         <p>{t('workflows.deleteWorkflow2')}</p>
       </ConfirmationAlertDialog>
+      <CopyWorkflowLinkModal workflowId={workflow.workflow_id} workflowName={workflow.name} />
     </>
   );
 };
