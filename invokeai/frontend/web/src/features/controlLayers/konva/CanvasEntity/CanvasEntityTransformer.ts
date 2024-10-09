@@ -147,6 +147,18 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   $isProcessing = atom(false);
 
+  /**
+   * Whether the transformer is currently in silent mode. In silent mode, the transform operation should not show any
+   * visual feedback.
+   *
+   * This is set every time a transform is started.
+   *
+   * This is used for transform operations like directly fitting the entity to the bbox, which should not show the
+   * transform controls, Transform react component or have any other visual feedback. The transform should just happen
+   * silently.
+   */
+  $silentTransform = atom(false);
+
   konva: {
     transformer: Konva.Transformer;
     proxyRect: Konva.Rect;
@@ -624,13 +636,17 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   /**
    * Starts the transformation of the entity.
+   * @param arg Options for starting the transformation
+   * @param arg.silent Whether the transformation should be silent. If silent, the transform controls will not be shown,
+   * so you _must_ immediately call `applyTransform` or `stopTransform` to complete the transformation.
    */
-  startTransform = (silent: boolean = false) => {
+  startTransform = (arg?: { silent: boolean }) => {
     const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
     if (transformingAdapter) {
       assert(false, `Already transforming an entity: ${transformingAdapter.id}`);
     }
     this.log.debug('Starting transform');
+    const { silent } = { silent: false, ...arg };
     this.$silentTransform.set(silent);
     this.$isTransforming.set(true);
     this.manager.stateApi.$transformingAdapter.set(this.parent);
