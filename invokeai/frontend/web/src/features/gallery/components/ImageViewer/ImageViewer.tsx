@@ -89,7 +89,7 @@ const ImageViewerCloseButton = memo(() => {
       aria-label={t('gallery.closeViewer')}
       icon={<PiXBold />}
       variant="ghost"
-      onPointerUp={imageViewer.close}
+      onClick={imageViewer.close}
     />
   );
 });
