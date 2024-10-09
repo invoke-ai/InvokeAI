@@ -1,6 +1,6 @@
-import { MenuItem } from '@invoke-ai/ui-library';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useIsEntityInteractable } from 'features/controlLayers/hooks/useEntityIsInteractable';
 import {
@@ -88,36 +88,36 @@ export const CanvasEntityMenuItemsArrange = memo(() => {
 
   return (
     <>
-      <MenuItem
+      <IconMenuItem
+        aria-label={t('controlLayers.moveToFront')}
+        tooltip={t('controlLayers.moveToFront')}
         onClick={moveToFront}
         isDisabled={!validActions.canMoveToFront || !isInteractable}
         icon={<PiArrowLineUpBold />}
-      >
-        {t('controlLayers.moveToFront')}
-      </MenuItem>
-      <MenuItem
+      />
+      <IconMenuItem
+        aria-label={t('controlLayers.moveForward')}
+        tooltip={t('controlLayers.moveForward')}
         onClick={moveForwardOne}
         isDisabled={!validActions.canMoveForwardOne || !isInteractable}
         icon={<PiArrowUpBold />}
-      >
-        {t('controlLayers.moveForward')}
-      </MenuItem>
-      <MenuItem
+      />
+      <IconMenuItem
+        aria-label={t('controlLayers.moveBackward')}
+        tooltip={t('controlLayers.moveBackward')}
         onClick={moveBackwardOne}
         isDisabled={!validActions.canMoveBackwardOne || !isInteractable}
         icon={<PiArrowDownBold />}
-      >
-        {t('controlLayers.moveBackward')}
-      </MenuItem>
-      <MenuItem
+      />
+      <IconMenuItem
+        aria-label={t('controlLayers.moveToBack')}
+        tooltip={t('controlLayers.moveToBack')}
         onClick={moveToBack}
         isDisabled={!validActions.canMoveToBack || !isInteractable}
         icon={<PiArrowLineDownBold />}
-      >
-        {t('controlLayers.moveToBack')}
-      </MenuItem>
+      />
     </>
   );
 });
 
-CanvasEntityMenuItemsArrange.displayName = 'CanvasEntityArrangeMenuItems';
+CanvasEntityMenuItemsArrange.displayName = 'CanvasEntityMenuItemsArrange';
