@@ -25,6 +25,7 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
   const onChangeIsolatedPreview = useCallback(() => {
     dispatch(settingsIsolatedTransformingPreviewToggled());
   }, [dispatch]);
+  const silentTransform = useStore(adapter.transformer.$silentTransform);
 
   useRegisteredHotkeys({
     id: 'applyTransform',
@@ -41,6 +42,10 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
     options: { enabled: !isProcessing && isCanvasFocused },
     dependencies: [adapter.transformer, isProcessing, isCanvasFocused],
   });
+
+  if (silentTransform) {
+    return null;
+  }
 
   return (
     <Flex
