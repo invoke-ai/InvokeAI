@@ -1,4 +1,5 @@
-import { Flex, MenuDivider } from '@invoke-ai/ui-library';
+import { MenuDivider } from '@invoke-ai/ui-library';
+import { IconMenuItemGroup } from 'common/components/IconMenuItem';
 import { ImageMenuItemChangeBoard } from 'features/gallery/components/ImageContextMenu/ImageMenuItemChangeBoard';
 import { ImageMenuItemCopy } from 'features/gallery/components/ImageContextMenu/ImageMenuItemCopy';
 import { ImageMenuItemDelete } from 'features/gallery/components/ImageContextMenu/ImageMenuItemDelete';
@@ -23,14 +24,14 @@ type SingleSelectionMenuItemsProps = {
 const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) => {
   return (
     <ImageDTOContextProvider value={imageDTO}>
-      <Flex gap={2}>
+      <IconMenuItemGroup>
         <ImageMenuItemOpenInNewTab />
         <ImageMenuItemCopy />
         <ImageMenuItemDownload />
         <ImageMenuItemOpenInViewer />
         <ImageMenuItemSelectForCompare />
         <ImageMenuItemDelete />
-      </Flex>
+      </IconMenuItemGroup>
       <MenuDivider />
       <ImageMenuItemLoadWorkflow />
       <ImageMenuItemMetadataRecallActions />

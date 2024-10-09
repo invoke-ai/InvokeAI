@@ -1,6 +1,6 @@
-import { IconButton, MenuItem } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -22,19 +22,12 @@ export const ImageMenuItemSelectForCompare = memo(() => {
   }, [dispatch, imageDTO]);
 
   return (
-    <IconButton
-      as={MenuItem}
+    <IconMenuItem
       icon={<PiImagesBold />}
       isDisabled={!maySelectForCompare}
       onClick={onClick}
       aria-label={t('gallery.selectForCompare')}
       tooltip={t('gallery.selectForCompare')}
-      variant="unstyled"
-      colorScheme="base"
-      w="min-content"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
     />
   );
 });
