@@ -1,4 +1,4 @@
-import { IconButton, MenuItem } from '@invoke-ai/ui-library';
+import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useCopyImageToClipboard } from 'common/hooks/useCopyImageToClipboard';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
@@ -19,18 +19,11 @@ export const ImageMenuItemCopy = memo(() => {
   }
 
   return (
-    <IconButton
-      as={MenuItem}
+    <IconMenuItem
       icon={<PiCopyBold />}
       aria-label={t('parameters.copyImage')}
       tooltip={t('parameters.copyImage')}
       onClickCapture={onClick}
-      variant="unstyled"
-      colorScheme="base"
-      w="min-content"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
     />
   );
 });

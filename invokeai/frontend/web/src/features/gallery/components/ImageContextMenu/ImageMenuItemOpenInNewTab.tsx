@@ -1,4 +1,4 @@
-import { IconButton, MenuItem } from '@invoke-ai/ui-library';
+import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,18 +12,11 @@ export const ImageMenuItemOpenInNewTab = memo(() => {
   }, [imageDTO.image_url]);
 
   return (
-    <IconButton
-      as={MenuItem}
+    <IconMenuItem
       onClickCapture={onClick}
       aria-label={t('common.openInNewTab')}
       tooltip={t('common.openInNewTab')}
       icon={<PiArrowSquareOutBold />}
-      variant="unstyled"
-      colorScheme="base"
-      w="min-content"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
     />
   );
 });
