@@ -34,8 +34,6 @@ def is_state_dict_instantx_controlnet(sd: Dict[str, Any]) -> bool:
     expected_keys = {
         "controlnet_blocks.0.bias",
         "controlnet_blocks.0.weight",
-        "controlnet_single_blocks.0.bias",
-        "controlnet_single_blocks.0.weight",
         "controlnet_x_embedder.bias",
         "controlnet_x_embedder.weight",
     }
