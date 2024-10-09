@@ -5,7 +5,7 @@ import { $projectUrl } from 'app/store/nanostores/projectId';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import dateFormat, { masks } from 'dateformat';
-import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
+import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
 import { selectWorkflowId, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import { useDeleteLibraryWorkflow } from 'features/workflowLibrary/hooks/useDeleteLibraryWorkflow';
 import { useDownloadWorkflow } from 'features/workflowLibrary/hooks/useDownloadWorkflow';
@@ -24,7 +24,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const projectUrl = useStore($projectUrl);
-
+  const workflowListMenu = useWorkflowListMenu();
   const [isHovered, setIsHovered] = useState(false);
 
   const handleMouseOver = useCallback(() => {
@@ -42,7 +42,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
 
   const { deleteWorkflow, deleteWorkflowResult } = useDeleteLibraryWorkflow(EMPTY_OBJECT);
   const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow({
-    onSuccess: () => $isWorkflowListMenuIsOpen.set(false),
+    onSuccess: workflowListMenu.close,
   });
 
   const isActive = useMemo(() => {
@@ -51,14 +51,14 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
 
   const handleClickLoad = useCallback(() => {
     getAndLoadWorkflow(workflow.workflow_id);
-    $isWorkflowListMenuIsOpen.set(false);
-  }, [workflow.workflow_id, getAndLoadWorkflow]);
+    workflowListMenu.close();
+  }, [getAndLoadWorkflow, workflow.workflow_id, workflowListMenu]);
 
   const handleClickEdit = useCallback(async () => {
     await getAndLoadWorkflow(workflow.workflow_id);
     dispatch(workflowModeChanged('edit'));
-    $isWorkflowListMenuIsOpen.set(false);
-  }, [workflow.workflow_id, dispatch, getAndLoadWorkflow]);
+    workflowListMenu.close();
+  }, [getAndLoadWorkflow, workflow.workflow_id, dispatch, workflowListMenu]);
 
   const handleDeleteWorklow = useCallback(() => {
     deleteWorkflow(workflow.workflow_id);
