@@ -410,16 +410,18 @@ def get_torch_source() -> Tuple[str | None, str | None]:
             url = "https://download.pytorch.org/whl/rocm5.6"
         elif device == GpuType.CPU:
             url = "https://download.pytorch.org/whl/cpu"
-        # CUDA uses the default PyPi index
         elif device == GpuType.CUDA:
+            url = "https://download.pytorch.org/whl/cu124"
             optional_modules = "[onnx-cuda]"
         elif device == GpuType.CUDA_WITH_XFORMERS:
+            url = "https://download.pytorch.org/whl/cu124"
             optional_modules = "[xformers,onnx-cuda]"
     elif OS == "Windows":
         if device == GpuType.CUDA:
             url = "https://download.pytorch.org/whl/cu124"
             optional_modules = "[onnx-cuda]"
         elif device == GpuType.CUDA_WITH_XFORMERS:
+            url = "https://download.pytorch.org/whl/cu124"
             optional_modules = "[xformers,onnx-cuda]"
         elif device.value == "cpu":
             # CPU  uses the default PyPi index, no optional modules
