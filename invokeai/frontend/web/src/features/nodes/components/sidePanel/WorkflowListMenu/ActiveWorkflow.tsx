@@ -2,7 +2,7 @@ import { Flex, IconButton, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { ModeToggle } from 'features/nodes/components/sidePanel/ModeToggle';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
-import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
+import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
 import { selectWorkflowDescription, selectWorkflowMode, selectWorkflowName } from 'features/nodes/store/workflowSlice';
 import type { MouseEventHandler } from 'react';
 import { useCallback } from 'react';
@@ -15,6 +15,7 @@ export const ActiveWorkflow = () => {
   const activeWorkflowName = useAppSelector(selectWorkflowName);
   const activeWorkflowDescription = useAppSelector(selectWorkflowDescription);
   const mode = useAppSelector(selectWorkflowMode);
+  const workflowListMenu = useWorkflowListMenu();
 
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -23,9 +24,9 @@ export const ActiveWorkflow = () => {
     (e) => {
       e.stopPropagation();
       dispatch(nodeEditorReset());
-      $isWorkflowListMenuIsOpen.set(false);
+      workflowListMenu.close();
     },
-    [dispatch]
+    [dispatch, workflowListMenu]
   );
 
   return (

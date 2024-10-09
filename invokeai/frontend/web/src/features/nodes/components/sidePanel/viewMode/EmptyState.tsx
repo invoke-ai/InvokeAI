@@ -1,6 +1,6 @@
 import { Button, Flex, Image, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
+import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
 import { selectCleanEditor, workflowModeChanged } from 'features/nodes/store/workflowSlice';
 import InvokeLogoSVG from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { useCallback } from 'react';
@@ -9,16 +9,12 @@ import { Trans, useTranslation } from 'react-i18next';
 export const EmptyState = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-
+  const workflowListMenu = useWorkflowListMenu();
   const isCleanEditor = useAppSelector(selectCleanEditor);
 
   const onClick = useCallback(() => {
     dispatch(workflowModeChanged('edit'));
   }, [dispatch]);
-
-  const onClickLoadWorkflow = useCallback(() => {
-    $isWorkflowListMenuIsOpen.set(true);
-  }, []);
 
   const onClickNewWorkflow = useCallback(() => {
     dispatch(workflowModeChanged('edit'));
@@ -52,7 +48,7 @@ export const EmptyState = () => {
               <Button size="sm" onClick={onClickNewWorkflow}>
                 {t('nodes.newWorkflow')}
               </Button>
-              <Button size="sm" colorScheme="invokeBlue" onClick={onClickLoadWorkflow}>
+              <Button size="sm" colorScheme="invokeBlue" onClick={workflowListMenu.open}>
                 {t('nodes.loadWorkflow')}
               </Button>
             </Flex>

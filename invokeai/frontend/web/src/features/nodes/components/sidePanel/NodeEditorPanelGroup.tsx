@@ -1,10 +1,9 @@
 import 'reactflow/dist/style.css';
 
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
+import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
 import { selectCleanEditor, selectWorkflowMode } from 'features/nodes/store/workflowSlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
@@ -29,15 +28,15 @@ const overlayScrollbarsStyles: CSSProperties = {
 const NodeEditorPanelGroup = () => {
   const mode = useAppSelector(selectWorkflowMode);
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
-  const isWorkflowListMenuOpen = useStore($isWorkflowListMenuIsOpen);
+  const workflowListMenu = useWorkflowListMenu();
 
   const isCleanEditor = useAppSelector(selectCleanEditor);
 
   useEffect(() => {
     if (isCleanEditor) {
-      $isWorkflowListMenuIsOpen.set(true);
+      workflowListMenu.open();
     }
-  }, [isCleanEditor]);
+  }, [isCleanEditor, workflowListMenu]);
 
   const handleDoubleClickHandle = useCallback(() => {
     if (!panelGroupRef.current) {
@@ -51,7 +50,7 @@ const NodeEditorPanelGroup = () => {
       <WorkflowListMenuTrigger />
       <Flex w="full" h="full" position="relative">
         <Box position="absolute" top={0} left={0} right={0} bottom={0}>
-          {isWorkflowListMenuOpen && (
+          {workflowListMenu.isOpen && (
             <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
               <Flex gap={2} flexDirection="column" h="full" w="full">
                 <WorkflowListMenu />
