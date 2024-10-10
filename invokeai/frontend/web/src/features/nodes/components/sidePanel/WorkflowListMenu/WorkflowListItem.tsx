@@ -175,7 +175,7 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
               icon={<PiDownloadSimpleBold />}
             />
           </Tooltip>
-          {!!projectUrl && workflow.workflow_id && (
+          {!!projectUrl && workflow.workflow_id && workflow.category !== 'user' && (
             <Tooltip
               label={t('workflows.copyShareLink')}
               // This prevents an issue where the tooltip isn't closed after the modal is opened
