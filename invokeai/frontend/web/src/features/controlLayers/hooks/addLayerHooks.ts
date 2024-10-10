@@ -3,6 +3,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { canvasReset } from 'features/controlLayers/store/actions';
 import {
   controlLayerAdded,
   inpaintMaskAdded,
@@ -14,19 +15,25 @@ import {
   rgPositivePromptChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import { selectBboxRect, selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
+  CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   ControlNetConfig,
   IPAdapterConfig,
   T2IAdapterConfig,
 } from 'features/controlLayers/store/types';
-import { initialControlNet, initialIPAdapter, initialT2IAdapter } from 'features/controlLayers/store/util';
+import {
+  imageDTOToImageObject,
+  initialControlNet,
+  initialIPAdapter,
+  initialT2IAdapter,
+} from 'features/controlLayers/store/util';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { useCallback } from 'react';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import type { ControlNetModelConfig, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { isControlNetOrT2IAdapterModelConfig, isIPAdapterModelConfig } from 'services/api/types';
 
 export const selectDefaultControlAdapter = createSelector(
@@ -86,6 +93,43 @@ export const useAddRasterLayer = () => {
   const func = useCallback(() => {
     dispatch(rasterLayerAdded({ isSelected: true }));
   }, [dispatch]);
+
+  return func;
+};
+
+export const useNewRasterLayerFromImage = () => {
+  const dispatch = useAppDispatch();
+  const bboxRect = useAppSelector(selectBboxRect);
+  const func = useCallback(
+    (imageDTO: ImageDTO) => {
+      const imageObject = imageDTOToImageObject(imageDTO);
+      const overrides: Partial<CanvasRasterLayerState> = {
+        position: { x: bboxRect.x, y: bboxRect.y },
+        objects: [imageObject],
+      };
+      dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+    },
+    [bboxRect.x, bboxRect.y, dispatch]
+  );
+
+  return func;
+};
+
+export const useNewCanvasFromImage = () => {
+  const dispatch = useAppDispatch();
+  const bboxRect = useAppSelector(selectBboxRect);
+  const func = useCallback(
+    (imageDTO: ImageDTO) => {
+      const imageObject = imageDTOToImageObject(imageDTO);
+      const overrides: Partial<CanvasRasterLayerState> = {
+        position: { x: bboxRect.x, y: bboxRect.y },
+        objects: [imageObject],
+      };
+      dispatch(canvasReset());
+      dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+    },
+    [bboxRect.x, bboxRect.y, dispatch]
+  );
 
   return func;
 };
