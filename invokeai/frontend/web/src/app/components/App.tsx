@@ -23,6 +23,7 @@ import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModa
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { CopyWorkflowLinkModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/CopyWorkflowLinkModal';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { configChanged } from 'features/system/store/configSlice';
@@ -111,6 +112,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <StylePresetModal />
       <ClearQueueConfirmationsAlertDialog />
       <NewWorkflowConfirmationAlertDialog />
+      <DeleteStylePresetDialog />
       <DeleteWorkflowDialog />
       <CopyWorkflowLinkModal />
       <RefreshAfterResetModal />
