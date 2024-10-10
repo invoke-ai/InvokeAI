@@ -179,7 +179,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       didRender = (await this.renderObject(obj)) || didRender;
     }
 
-    this.syncCache(didRender);
+    this.syncKonvaCache(didRender);
 
     return didRender;
   };
@@ -189,7 +189,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     renderer.konva.group.moveTo(this.konva.objectGroup);
   };
 
-  syncCache = (force: boolean = false) => {
+  syncKonvaCache = (force: boolean = false) => {
     if (this.renderers.size === 0) {
       this.log.trace('Clearing object group cache');
       this.konva.objectGroup.clearCache();
