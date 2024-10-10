@@ -9,6 +9,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
+  ModalOverlay,
   Text,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
@@ -57,6 +58,7 @@ export const CopyWorkflowLinkModal = () => {
 
   return (
     <Modal isOpen={workflowToShare !== null} onClose={clearWorkflowToShare} isCentered size="lg" useInert={false}>
+      <ModalOverlay />
       <ModalContent>
         <ModalHeader>
           <Flex flexDir="column" gap={2}>
