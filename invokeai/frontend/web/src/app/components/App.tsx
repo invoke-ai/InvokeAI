@@ -27,6 +27,7 @@ import RefreshAfterResetModal from 'features/system/components/SettingsModal/Ref
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
+import { DeleteWorkflowDialog } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
 import { NewWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
@@ -109,6 +110,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <StylePresetModal />
       <ClearQueueConfirmationsAlertDialog />
       <NewWorkflowConfirmationAlertDialog />
+      <DeleteWorkflowDialog />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
       <GlobalImageHotkeys />
