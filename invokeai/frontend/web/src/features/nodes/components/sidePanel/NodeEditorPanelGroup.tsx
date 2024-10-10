@@ -4,11 +4,11 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
 import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
-import { selectCleanEditor, selectWorkflowMode } from 'features/nodes/store/workflowSlice';
+import { selectWorkflowMode } from 'features/nodes/store/workflowSlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -29,14 +29,6 @@ const NodeEditorPanelGroup = () => {
   const mode = useAppSelector(selectWorkflowMode);
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const workflowListMenu = useWorkflowListMenu();
-
-  const isCleanEditor = useAppSelector(selectCleanEditor);
-
-  useEffect(() => {
-    if (isCleanEditor) {
-      workflowListMenu.open();
-    }
-  }, [isCleanEditor, workflowListMenu]);
 
   const handleDoubleClickHandle = useCallback(() => {
     if (!panelGroupRef.current) {
