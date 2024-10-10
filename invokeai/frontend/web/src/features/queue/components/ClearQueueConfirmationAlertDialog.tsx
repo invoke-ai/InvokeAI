@@ -1,6 +1,7 @@
 import { ConfirmationAlertDialog, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { listCursorChanged, listPriorityChanged } from 'features/queue/store/queueSlice';
 import { toast } from 'features/toast/toast';
@@ -58,6 +59,7 @@ export const useClearQueue = () => {
 };
 
 export const ClearQueueConfirmationsAlertDialog = memo(() => {
+  useAssertSingleton('ClearQueueConfirmationsAlertDialog');
   const { t } = useTranslation();
   const clearQueue = useClearQueue();
 

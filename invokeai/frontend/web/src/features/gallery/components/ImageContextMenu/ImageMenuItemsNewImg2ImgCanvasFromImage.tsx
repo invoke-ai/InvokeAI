@@ -1,27 +1,25 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
-import { useNewRasterLayerFromImage } from 'features/controlLayers/hooks/addLayerHooks';
+import { useNewImg2ImgCanvasFromImage } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
-import { sentImageToCanvas } from 'features/gallery/store/actions';
 import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiFileImageBold } from 'react-icons/pi';
 
-export const ImageMenuItemNewLayerFromImage = memo(() => {
+export const ImageMenuItemsNewImg2ImgCanvasFromImage = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const imageDTO = useImageDTOContext();
   const imageViewer = useImageViewer();
-  const newRasterLayerFromImage = useNewRasterLayerFromImage();
+  const newImg2ImgCanvasFromImage = useNewImg2ImgCanvasFromImage();
   const isBusy = useCanvasIsBusy();
 
   const onClick = useCallback(() => {
-    dispatch(sentImageToCanvas());
-    newRasterLayerFromImage(imageDTO);
+    newImg2ImgCanvasFromImage(imageDTO);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -29,13 +27,13 @@ export const ImageMenuItemNewLayerFromImage = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newRasterLayerFromImage, t]);
+  }, [dispatch, imageDTO, imageViewer, newImg2ImgCanvasFromImage, t]);
 
   return (
-    <MenuItem icon={<NewLayerIcon />} onClickCapture={onClick} isDisabled={isBusy}>
-      {t('controlLayers.newLayerFromImage')}
+    <MenuItem icon={<PiFileImageBold />} onClickCapture={onClick} isDisabled={isBusy}>
+      {t('controlLayers.newImg2ImgCanvasFromImage')}
     </MenuItem>
   );
 });
 
-ImageMenuItemNewLayerFromImage.displayName = 'ImageMenuItemNewLayerFromImage';
+ImageMenuItemsNewImg2ImgCanvasFromImage.displayName = 'ImageMenuItemsNewImg2ImgCanvasFromImage';

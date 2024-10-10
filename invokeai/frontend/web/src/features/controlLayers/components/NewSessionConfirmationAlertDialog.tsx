@@ -1,5 +1,6 @@
 import { Checkbox, ConfirmationAlertDialog, Flex, FormControl, FormLabel, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { newCanvasSessionRequested, newGallerySessionRequested } from 'features/controlLayers/store/actions';
 import {
@@ -65,6 +66,7 @@ export const useNewCanvasSession = () => {
 };
 
 export const NewGallerySessionDialog = memo(() => {
+  useAssertSingleton('NewGallerySessionDialog');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -100,6 +102,7 @@ export const NewGallerySessionDialog = memo(() => {
 NewGallerySessionDialog.displayName = 'NewGallerySessionDialog';
 
 export const NewCanvasSessionDialog = memo(() => {
+  useAssertSingleton('NewCanvasSessionDialog');
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();

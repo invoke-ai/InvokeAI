@@ -40,7 +40,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     elif [ "$GPU_DRIVER" = "rocm" ]; then \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm5.6"; \
     else \
-        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu121"; \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu124"; \
     fi &&\
 
     # xformers + triton fails to install on arm64

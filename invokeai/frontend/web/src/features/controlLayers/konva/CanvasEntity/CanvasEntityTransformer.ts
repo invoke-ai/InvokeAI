@@ -1,3 +1,4 @@
+import { Mutex } from 'async-mutex';
 import { withResultAsync } from 'common/util/result';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
@@ -96,14 +97,21 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   config: CanvasEntityTransformerConfig = DEFAULT_CONFIG;
 
   /**
-   * The rect of the parent, _including_ transparent regions.
+   * The rect of the parent, _including_ transparent regions, **relative to the parent's position**. To get the rect
+   * relative to the _stage_, add the parent's position.
+   *
    * It is calculated via Konva's getClientRect method, which is fast but includes transparent regions.
+   *
+   * This rect is relative _to the parent's position_, not the stage.
    */
   $nodeRect = atom<Rect>(getEmptyRect());
 
   /**
-   * The rect of the parent, _excluding_ transparent regions.
+   * The rect of the parent, _excluding_ transparent regions, **relative to the parent's position**. To get the rect
+   * relative to the _stage_, add the parent's position.
+   *
    * If the parent's nodes have no possibility of transparent regions, this will be calculated the same way as nodeRect.
+   *
    * If the parent's nodes may have transparent regions, this will be calculated manually by rasterizing the parent and
    * checking the pixel data.
    */
@@ -159,6 +167,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   $silentTransform = atom(false);
 
+  /**
+   * A mutex to prevent concurrent operations.
+   *
+   * The mutex is locked during transformation and during rect calculations which are handled in a web worker.
+   */
+  transformMutex = new Mutex();
+
   konva: {
     transformer: Konva.Transformer;
     proxyRect: Konva.Rect;
@@ -182,7 +197,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
         name: `${this.type}:outline_rect`,
         stroke: this.config.OUTLINE_COLOR,
         perfectDrawEnabled: false,
-        strokeHitEnabled: false,
+        hitStrokeWidth: 0,
       }),
       transformer: new Konva.Transformer({
         name: `${this.type}:transformer`,
@@ -417,6 +432,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
     const { rect } = this.manager.stateApi.getBbox();
+    const gridSize = this.manager.stateApi.getGridSize();
     const width = this.konva.proxyRect.width();
     const height = this.konva.proxyRect.height();
     const scaleX = rect.width / width;
@@ -430,8 +446,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const offsetY = (rect.height - height * scale) / 2;
 
     this.konva.proxyRect.setAttrs({
-      x: clamp(Math.round(rect.x + offsetX), rect.x, rect.x + rect.width),
-      y: clamp(Math.round(rect.y + offsetY), rect.y, rect.y + rect.height),
+      x: clamp(roundToMultiple(rect.x + offsetX, gridSize), rect.x, rect.x + rect.width),
+      y: clamp(roundToMultiple(rect.y + offsetY, gridSize), rect.y, rect.y + rect.height),
       scaleX: scale,
       scaleY: scale,
       rotation: 0,
@@ -448,6 +464,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
     const { rect } = this.manager.stateApi.getBbox();
+    const gridSize = this.manager.stateApi.getGridSize();
     const width = this.konva.proxyRect.width();
     const height = this.konva.proxyRect.height();
     const scaleX = rect.width / width;
@@ -461,8 +478,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const offsetY = (rect.height - height * scale) / 2;
 
     this.konva.proxyRect.setAttrs({
-      x: Math.round(rect.x + offsetX),
-      y: Math.round(rect.y + offsetY),
+      x: roundToMultiple(rect.x + offsetX, gridSize),
+      y: roundToMultiple(rect.y + offsetY, gridSize),
       scaleX: scale,
       scaleY: scale,
       rotation: 0,
@@ -640,11 +657,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * @param arg.silent Whether the transformation should be silent. If silent, the transform controls will not be shown,
    * so you _must_ immediately call `applyTransform` or `stopTransform` to complete the transformation.
    */
-  startTransform = (arg?: { silent: boolean }) => {
+  startTransform = async (arg?: { silent: boolean }) => {
     const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
     if (transformingAdapter) {
       assert(false, `Already transforming an entity: ${transformingAdapter.id}`);
     }
+    // This will be released when the transformation is stopped
+    await this.transformMutex.acquire();
     this.log.debug('Starting transform');
     const { silent } = { silent: false, ...arg };
     this.$silentTransform.set(silent);
@@ -697,6 +716,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.syncInteractionState();
     this.manager.stateApi.$transformingAdapter.set(null);
     this.$isProcessing.set(false);
+    this.transformMutex.release();
   };
 
   /**
@@ -795,21 +815,21 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
       this.parent.bufferRenderer.konva.group.setAttrs(groupAttrs);
     }
-
-    this.parent.renderer.updatePreviewCanvas();
   };
 
   calculateRect = debounce(() => {
     this.log.debug('Calculating bbox');
 
-    this.$isPendingRectCalculation.set(true);
+    const canvas = this.parent.getCanvas();
 
     if (!this.parent.renderer.hasObjects()) {
       this.log.trace('No objects, resetting bbox');
       this.$nodeRect.set(getEmptyRect());
       this.$pixelRect.set(getEmptyRect());
+      this.parent.$canvasCache.set(canvas);
       this.$isPendingRectCalculation.set(false);
       this.updateBbox();
+      this.transformMutex.release();
       return;
     }
 
@@ -819,13 +839,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       this.$nodeRect.set({ ...rect });
       this.$pixelRect.set({ ...rect });
       this.log.trace({ nodeRect: this.$nodeRect.get(), pixelRect: this.$pixelRect.get() }, 'Got bbox from client rect');
+      this.parent.$canvasCache.set(canvas);
       this.$isPendingRectCalculation.set(false);
       this.updateBbox();
+      this.transformMutex.release();
       return;
     }
 
     // We have eraser strokes - we must calculate the bbox using pixel data
-    const canvas = this.parent.renderer.getCanvas({ attrs: { opacity: 1, filters: [] } });
     const imageData = canvasToImageData(canvas);
     this.manager.worker.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
@@ -847,13 +868,17 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
           { nodeRect: this.$nodeRect.get(), pixelRect: this.$pixelRect.get(), extents },
           `Got bbox from worker`
         );
+        this.parent.$canvasCache.set(canvas);
         this.$isPendingRectCalculation.set(false);
         this.updateBbox();
+        this.transformMutex.release();
       }
     );
   }, this.config.RECT_CALC_DEBOUNCE_MS);
 
-  requestRectCalculation = () => {
+  requestRectCalculation = async () => {
+    // This will be released when the rect calculation is complete
+    await this.transformMutex.acquire();
     this.$isPendingRectCalculation.set(true);
     this.syncInteractionState();
     this.calculateRect();

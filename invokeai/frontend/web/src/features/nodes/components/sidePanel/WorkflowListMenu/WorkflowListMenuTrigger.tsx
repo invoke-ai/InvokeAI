@@ -1,8 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, IconButton } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
-import { useCallback } from 'react';
+import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold } from 'react-icons/pi';
 
@@ -13,16 +11,12 @@ const _hover: SystemStyleObject = {
 };
 
 export const WorkflowListMenuTrigger = () => {
-  const isMenuOpen = useStore($isWorkflowListMenuIsOpen);
+  const workflowListMenu = useWorkflowListMenu();
   const { t } = useTranslation();
-
-  const handleToggle = useCallback(() => {
-    $isWorkflowListMenuIsOpen.set(!isMenuOpen);
-  }, [isMenuOpen]);
 
   return (
     <Flex
-      onClick={handleToggle}
+      onClick={workflowListMenu.toggle}
       backgroundColor="base.800"
       justifyContent="space-between"
       alignItems="center"

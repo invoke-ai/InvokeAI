@@ -71,6 +71,7 @@ export class CanvasToolBrush extends CanvasModuleBase {
         name: `${this.type}:brush_fill_circle`,
         listening: false,
         strokeEnabled: false,
+        perfectDrawEnabled: false,
       }),
       innerBorder: new Konva.Ring({
         name: `${this.type}:brush_inner_border_ring`,
@@ -79,6 +80,7 @@ export class CanvasToolBrush extends CanvasModuleBase {
         outerRadius: 0,
         fill: this.config.BORDER_INNER_COLOR,
         strokeEnabled: false,
+        perfectDrawEnabled: false,
       }),
       outerBorder: new Konva.Ring({
         name: `${this.type}:brush_outer_border_ring`,
@@ -87,6 +89,7 @@ export class CanvasToolBrush extends CanvasModuleBase {
         outerRadius: 0,
         fill: this.config.BORDER_OUTER_COLOR,
         strokeEnabled: false,
+        perfectDrawEnabled: false,
       }),
     };
     this.konva.group.add(this.konva.fillCircle, this.konva.innerBorder, this.konva.outerBorder);

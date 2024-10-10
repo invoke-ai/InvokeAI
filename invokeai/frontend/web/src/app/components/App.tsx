@@ -21,12 +21,16 @@ import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageMo
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
+import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
+import { DeleteWorkflowDialog } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
+import { NewWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
 import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
@@ -107,6 +111,10 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <DynamicPromptsModal />
       <StylePresetModal />
       <ClearQueueConfirmationsAlertDialog />
+      <NewWorkflowConfirmationAlertDialog />
+      <DeleteStylePresetDialog />
+      <DeleteWorkflowDialog />
+      <ShareWorkflowModal />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
       <GlobalImageHotkeys />

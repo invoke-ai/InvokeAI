@@ -1,13 +1,12 @@
 import { Flex, IconButton, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { ModeToggle } from 'features/nodes/components/sidePanel/ModeToggle';
-import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
-import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { selectWorkflowDescription, selectWorkflowMode, selectWorkflowName } from 'features/nodes/store/workflowSlice';
-import type { MouseEventHandler } from 'react';
+import { useNewWorkflow } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
+import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi';
+import { PiFilePlusBold } from 'react-icons/pi';
 
 import SaveWorkflowButton from './SaveWorkflowButton';
 
@@ -15,17 +14,17 @@ export const ActiveWorkflow = () => {
   const activeWorkflowName = useAppSelector(selectWorkflowName);
   const activeWorkflowDescription = useAppSelector(selectWorkflowDescription);
   const mode = useAppSelector(selectWorkflowMode);
+  const newWorkflow = useNewWorkflow();
 
-  const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const handleNewWorkflow = useCallback<MouseEventHandler<HTMLButtonElement>>(
-    (e) => {
+  const onClickNewWorkflow = useCallback(
+    (e: MouseEvent<HTMLButtonElement>) => {
+      // We need to stop the event from propagating to the parent element, else the click will open the list menu
       e.stopPropagation();
-      dispatch(nodeEditorReset());
-      $isWorkflowListMenuIsOpen.set(false);
+      newWorkflow.createWithDialog();
     },
-    [dispatch]
+    [newWorkflow]
   );
 
   return (
@@ -44,16 +43,14 @@ export const ActiveWorkflow = () => {
       <Spacer />
       {mode === 'edit' && <SaveWorkflowButton />}
       <ModeToggle />
-      <Tooltip label={t('nodes.clearWorkflow')}>
-        <IconButton
-          onClick={handleNewWorkflow}
-          variant="outline"
-          size="sm"
-          aria-label={t('nodes.clearWorkflow')}
-          icon={<PiXBold />}
-          colorScheme="error"
-        />
-      </Tooltip>
+      <IconButton
+        onClick={onClickNewWorkflow}
+        variant="outline"
+        size="sm"
+        aria-label={t('nodes.newWorkflow')}
+        tooltip={t('nodes.newWorkflow')}
+        icon={<PiFilePlusBold />}
+      />
     </Flex>
   );
 };
