@@ -1730,7 +1730,8 @@
             "mlsd_detection": {
                 "score_threshold": "Soglia di punteggio",
                 "distance_threshold": "Soglia di distanza",
-                "description": "Genera una mappa dei segmenti di linea dal livello selezionato utilizzando il modello di rilevamento dei segmenti di linea MLSD."
+                "description": "Genera una mappa dei segmenti di linea dal livello selezionato utilizzando il modello di rilevamento dei segmenti di linea MLSD.",
+                "label": "Rilevamento segmenti di linea"
             },
             "content_shuffle": {
                 "label": "Mescola contenuto",
