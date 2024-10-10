@@ -2,9 +2,11 @@ import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { deepClone } from 'common/util/deepClone';
+import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import {
+  bboxChangedFromCanvas,
   controlLayerAdded,
   inpaintMaskAdded,
   rasterLayerAdded,
@@ -15,7 +17,12 @@ import {
   rgPositivePromptChanged,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
-import { selectBboxRect, selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
+import {
+  selectBboxModelBase,
+  selectBboxRect,
+  selectCanvasSlice,
+  selectEntityOrThrow,
+} from 'features/controlLayers/store/selectors';
 import type {
   CanvasEntityIdentifier,
   CanvasRasterLayerState,
@@ -30,7 +37,9 @@ import {
   initialIPAdapter,
   initialT2IAdapter,
 } from 'features/controlLayers/store/util';
+import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { useCallback } from 'react';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
@@ -129,6 +138,56 @@ export const useNewCanvasFromImage = () => {
       dispatch(rasterLayerAdded({ overrides, isSelected: true }));
     },
     [bboxRect.x, bboxRect.y, dispatch]
+  );
+
+  return func;
+};
+
+/**
+ * Returns a function that adds a new canvas with the given image as the initial image, replicating the img2img flow:
+ * - Reset the canvas
+ * - Resize the bbox to the image's aspect ratio at the optimal size for the selected model
+ * - Add the image as a raster layer
+ * - Resizes the layer to fit the bbox using the 'fill' strategy
+ *
+ * This allows the user to immediately generate a new image from the given image without any additional steps.
+ */
+export const useNewImg2ImgCanvasFromImage = () => {
+  const dispatch = useAppDispatch();
+  const bboxRect = useAppSelector(selectBboxRect);
+  const base = useAppSelector(selectBboxModelBase);
+  const func = useCallback(
+    (imageDTO: ImageDTO) => {
+      // Calculate the new bbox dimensions to fit the image's aspect ratio at the optimal size
+      const ratio = imageDTO.width / imageDTO.height;
+      const optimalDimension = getOptimalDimension(base);
+      const { width, height } = calculateNewSize(ratio, optimalDimension ** 2, base);
+
+      // The overrides need to include the layer's ID so we can transform the layer it is initialized
+      const overrides = {
+        id: getPrefixedId('raster_layer'),
+        position: { x: bboxRect.x, y: bboxRect.y },
+        objects: [imageDTOToImageObject(imageDTO)],
+      } satisfies Partial<CanvasRasterLayerState>;
+
+      CanvasEntityAdapterBase.registerInitCallback(async (adapter) => {
+        // Skip the callback if the adapter is not the one we are creating
+        if (adapter.id !== overrides.id) {
+          return false;
+        }
+        // Fit the layer to the bbox w/ fill strategy
+        await adapter.transformer.startTransform({ silent: true });
+        adapter.transformer.fitToBboxFill();
+        await adapter.transformer.applyTransform();
+        return true;
+      });
+
+      dispatch(canvasReset());
+      // The `bboxChangedFromCanvas` reducer does no validation! Careful!
+      dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
+      dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+    },
+    [base, bboxRect.x, bboxRect.y, dispatch]
   );
 
   return func;
