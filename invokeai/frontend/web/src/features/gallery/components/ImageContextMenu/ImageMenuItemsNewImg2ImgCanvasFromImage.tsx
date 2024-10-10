@@ -1,6 +1,7 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useNewImg2ImgCanvasFromImage } from 'features/controlLayers/hooks/addLayerHooks';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { toast } from 'features/toast/toast';
@@ -15,6 +16,7 @@ export const ImageMenuItemsNewImg2ImgCanvasFromImage = memo(() => {
   const imageDTO = useImageDTOContext();
   const imageViewer = useImageViewer();
   const newImg2ImgCanvasFromImage = useNewImg2ImgCanvasFromImage();
+  const isBusy = useCanvasIsBusy();
 
   const onClick = useCallback(() => {
     newImg2ImgCanvasFromImage(imageDTO);
@@ -28,7 +30,7 @@ export const ImageMenuItemsNewImg2ImgCanvasFromImage = memo(() => {
   }, [dispatch, imageDTO, imageViewer, newImg2ImgCanvasFromImage, t]);
 
   return (
-    <MenuItem icon={<PiFileImageBold />} onClickCapture={onClick}>
+    <MenuItem icon={<PiFileImageBold />} onClickCapture={onClick} isDisabled={isBusy}>
       {t('controlLayers.newImg2ImgCanvasFromImage')}
     </MenuItem>
   );

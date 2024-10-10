@@ -2,6 +2,7 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useNewRasterLayerFromImage } from 'features/controlLayers/hooks/addLayerHooks';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
@@ -16,6 +17,7 @@ export const ImageMenuItemNewLayerFromImage = memo(() => {
   const imageDTO = useImageDTOContext();
   const imageViewer = useImageViewer();
   const newRasterLayerFromImage = useNewRasterLayerFromImage();
+  const isBusy = useCanvasIsBusy();
 
   const onClick = useCallback(() => {
     dispatch(sentImageToCanvas());
@@ -30,7 +32,7 @@ export const ImageMenuItemNewLayerFromImage = memo(() => {
   }, [dispatch, imageDTO, imageViewer, newRasterLayerFromImage, t]);
 
   return (
-    <MenuItem icon={<NewLayerIcon />} onClickCapture={onClick}>
+    <MenuItem icon={<NewLayerIcon />} onClickCapture={onClick} isDisabled={isBusy}>
       {t('controlLayers.newLayerFromImage')}
     </MenuItem>
   );
