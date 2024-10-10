@@ -47,6 +47,40 @@ class InstantXControlNetExtension(BaseControlNetExtension):
         self._flux_transformer_num_single_blocks = 38
 
     @classmethod
+    def prepare_controlnet_cond(
+        cls,
+        controlnet_image: Image,
+        vae_info: LoadedModel,
+        latent_height: int,
+        latent_width: int,
+        dtype: torch.dtype,
+        device: torch.device,
+        resize_mode: CONTROLNET_RESIZE_VALUES,
+    ):
+        image_height = latent_height * LATENT_SCALE_FACTOR
+        image_width = latent_width * LATENT_SCALE_FACTOR
+
+        resized_controlnet_image = prepare_control_image(
+            image=controlnet_image,
+            do_classifier_free_guidance=False,
+            width=image_width,
+            height=image_height,
+            device=device,
+            dtype=dtype,
+            control_mode="balanced",
+            resize_mode=resize_mode,
+        )
+
+        # Shift the image from [0, 1] to [-1, 1].
+        resized_controlnet_image = resized_controlnet_image * 2 - 1
+
+        # Run VAE encoder.
+        controlnet_cond = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=resized_controlnet_image)
+        controlnet_cond = pack(controlnet_cond)
+
+        return controlnet_cond
+
+    @classmethod
     def from_controlnet_image(
         cls,
         model: InstantXControlNetFlux,
