@@ -9,7 +9,7 @@ import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/Ca
 import type { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
-import { getRectIntersection } from 'features/controlLayers/konva/util';
+import { getKonvaNodeDebugAttrs, getRectIntersection } from 'features/controlLayers/konva/util';
 import {
   selectIsolatedFilteringPreview,
   selectIsolatedTransformingPreview,
@@ -453,6 +453,14 @@ export abstract class CanvasEntityAdapterBase<
       bufferRenderer: this.bufferRenderer.repr(),
       filterer: this.filterer?.repr(),
       hasCache: this.$canvasCache.get() !== null,
+      isLocked: this.$isLocked.get(),
+      isDisabled: this.$isDisabled.get(),
+      isHidden: this.$isHidden.get(),
+      isEmpty: this.$isEmpty.get(),
+      isInteractable: this.$isInteractable.get(),
+      isOnScreen: this.$isOnScreen.get(),
+      intersectsBbox: this.$intersectsBbox.get(),
+      konva: getKonvaNodeDebugAttrs(this.konva.layer),
     };
   };
 }

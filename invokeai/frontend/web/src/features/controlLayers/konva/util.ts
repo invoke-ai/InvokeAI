@@ -612,6 +612,9 @@ export const getKonvaNodeDebugAttrs = (node: Konva.Node) => {
     offsetX: node.offsetX(),
     offsetY: node.offsetY(),
     rotation: node.rotation(),
+    isCached: node.isCached(),
+    visible: node.visible(),
+    listening: node.listening(),
   };
 };
 
