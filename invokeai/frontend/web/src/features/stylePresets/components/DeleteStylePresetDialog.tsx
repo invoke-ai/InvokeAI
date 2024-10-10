@@ -1,5 +1,6 @@
 import { ConfirmationAlertDialog, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { toast } from 'features/toast/toast';
 import { atom } from 'nanostores';
 import { memo, useCallback } from 'react';
@@ -19,6 +20,7 @@ export const useDeleteStylePreset = () => {
 };
 
 export const DeleteStylePresetDialog = memo(() => {
+  useAssertSingleton('DeleteStylePresetDialog');
   const { t } = useTranslation();
   const presetToDelete = useStore($presetToDelete);
   const [_deleteStylePreset] = useDeleteStylePresetMutation();
