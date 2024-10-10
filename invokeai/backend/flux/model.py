@@ -87,7 +87,9 @@ class Flux(nn.Module):
         txt_ids: Tensor,
         timesteps: Tensor,
         y: Tensor,
-        guidance: Tensor | None = None,
+        guidance: Tensor | None,
+        controlnet_double_block_residuals: list[Tensor] | None,
+        controlnet_single_block_residuals: list[Tensor] | None,
     ) -> Tensor:
         if img.ndim != 3 or txt.ndim != 3:
             raise ValueError("Input img and txt tensors must have 3 dimensions.")
@@ -105,12 +107,27 @@ class Flux(nn.Module):
         ids = torch.cat((txt_ids, img_ids), dim=1)
         pe = self.pe_embedder(ids)
 
-        for block in self.double_blocks:
+        # Validate double_block_residuals shape.
+        if controlnet_double_block_residuals is not None:
+            assert len(controlnet_double_block_residuals) == len(self.double_blocks)
+        for block_index, block in enumerate(self.double_blocks):
             img, txt = block(img=img, txt=txt, vec=vec, pe=pe)
 
+            if controlnet_double_block_residuals is not None:
+                img += controlnet_double_block_residuals[block_index]
+
         img = torch.cat((txt, img), 1)
-        for block in self.single_blocks:
+
+        # Validate single_block_residuals shape.
+        if controlnet_single_block_residuals is not None:
+            assert len(controlnet_single_block_residuals) == len(self.single_blocks)
+
+        for block_index, block in enumerate(self.single_blocks):
             img = block(img, vec=vec, pe=pe)
+
+            if controlnet_single_block_residuals is not None:
+                img[:, txt.shape[1] :, ...] += controlnet_single_block_residuals[block_index]
+
         img = img[:, txt.shape[1] :, ...]
 
         img = self.final_layer(img, vec)  # (N, T, patch_size ** 2 * out_channels)

@@ -16,11 +16,16 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
-from invokeai.app.invocations.model import TransformerField
+from invokeai.app.invocations.flux_controlnet import FluxControlNetField
+from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
+from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
 from invokeai.backend.flux.denoise import denoise
-from invokeai.backend.flux.inpaint_extension import InpaintExtension
+from invokeai.backend.flux.extensions.inpaint_extension import InpaintExtension
+from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
+from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
     clip_timestep_schedule_fractional,
@@ -44,7 +49,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="3.0.0",
+    version="3.1.0",
     classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -87,6 +92,13 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description="The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images. FLUX dev only, ignored for schnell.",
     )
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
+    control: FluxControlNetField | list[FluxControlNetField] | None = InputField(
+        default=None, input=Input.Connection, description="ControlNet models."
+    )
+    controlnet_vae: VAEField | None = InputField(
+        description=FieldDescriptions.vae,
+        input=Input.Connection,
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
@@ -167,8 +179,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         inpaint_mask = self._prep_inpaint_mask(context, x)
 
-        b, _c, h, w = x.shape
-        img_ids = generate_img_ids(h=h, w=w, batch_size=b, device=x.device, dtype=x.dtype)
+        b, _c, latent_h, latent_w = x.shape
+        img_ids = generate_img_ids(h=latent_h, w=latent_w, batch_size=b, device=x.device, dtype=x.dtype)
 
         bs, t5_seq_len, _ = t5_embeddings.shape
         txt_ids = torch.zeros(bs, t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device())
@@ -192,12 +204,21 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 noise=noise,
             )
 
-        with (
-            transformer_info.model_on_device() as (cached_weights, transformer),
-            ExitStack() as exit_stack,
-        ):
-            assert isinstance(transformer, Flux)
+        with ExitStack() as exit_stack:
+            # Prepare ControlNet extensions.
+            # Note: We do this before loading the transformer model to minimize peak memory (see implementation).
+            controlnet_extensions = self._prep_controlnet_extensions(
+                context=context,
+                exit_stack=exit_stack,
+                latent_height=latent_h,
+                latent_width=latent_w,
+                dtype=inference_dtype,
+                device=x.device,
+            )
 
+            # Load the transformer model.
+            (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+            assert isinstance(transformer, Flux)
             config = transformer_info.config
             assert config is not None
 
@@ -242,6 +263,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 step_callback=self._build_step_callback(context),
                 guidance=self.guidance,
                 inpaint_extension=inpaint_extension,
+                controlnet_extensions=controlnet_extensions,
             )
 
         x = unpack(x.float(), self.height, self.width)
@@ -287,6 +309,104 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Expand the inpaint mask to the same shape as `latents` so that when we 'pack' `mask` it lines up with
         # `latents`.
         return mask.expand_as(latents)
+
+    def _prep_controlnet_extensions(
+        self,
+        context: InvocationContext,
+        exit_stack: ExitStack,
+        latent_height: int,
+        latent_width: int,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> list[XLabsControlNetExtension | InstantXControlNetExtension]:
+        # Normalize the controlnet input to list[ControlField].
+        controlnets: list[FluxControlNetField]
+        if self.control is None:
+            controlnets = []
+        elif isinstance(self.control, FluxControlNetField):
+            controlnets = [self.control]
+        elif isinstance(self.control, list):
+            controlnets = self.control
+        else:
+            raise ValueError(f"Unsupported controlnet type: {type(self.control)}")
+
+        # TODO(ryand): Add a field to the model config so that we can distinguish between XLabs and InstantX ControlNets
+        # before loading the models. Then make sure that all VAE encoding is done before loading the ControlNets to
+        # minimize peak memory.
+
+        # First, load the ControlNet models so that we can determine the ControlNet types.
+        controlnet_models = [context.models.load(controlnet.control_model) for controlnet in controlnets]
+
+        # Calculate the controlnet conditioning tensors.
+        # We do this before loading the ControlNet models because it may require running the VAE, and we are trying to
+        # keep peak memory down.
+        controlnet_conds: list[torch.Tensor] = []
+        for controlnet, controlnet_model in zip(controlnets, controlnet_models, strict=True):
+            image = context.images.get_pil(controlnet.image.image_name)
+            if isinstance(controlnet_model.model, InstantXControlNetFlux):
+                if self.controlnet_vae is None:
+                    raise ValueError("A ControlNet VAE is required when using an InstantX FLUX ControlNet.")
+                vae_info = context.models.load(self.controlnet_vae.vae)
+                controlnet_conds.append(
+                    InstantXControlNetExtension.prepare_controlnet_cond(
+                        controlnet_image=image,
+                        vae_info=vae_info,
+                        latent_height=latent_height,
+                        latent_width=latent_width,
+                        dtype=dtype,
+                        device=device,
+                        resize_mode=controlnet.resize_mode,
+                    )
+                )
+            elif isinstance(controlnet_model.model, XLabsControlNetFlux):
+                controlnet_conds.append(
+                    XLabsControlNetExtension.prepare_controlnet_cond(
+                        controlnet_image=image,
+                        latent_height=latent_height,
+                        latent_width=latent_width,
+                        dtype=dtype,
+                        device=device,
+                        resize_mode=controlnet.resize_mode,
+                    )
+                )
+
+        # Finally, load the ControlNet models and initialize the ControlNet extensions.
+        controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension] = []
+        for controlnet, controlnet_cond, controlnet_model in zip(
+            controlnets, controlnet_conds, controlnet_models, strict=True
+        ):
+            model = exit_stack.enter_context(controlnet_model)
+
+            if isinstance(model, XLabsControlNetFlux):
+                controlnet_extensions.append(
+                    XLabsControlNetExtension(
+                        model=model,
+                        controlnet_cond=controlnet_cond,
+                        weight=controlnet.control_weight,
+                        begin_step_percent=controlnet.begin_step_percent,
+                        end_step_percent=controlnet.end_step_percent,
+                    )
+                )
+            elif isinstance(model, InstantXControlNetFlux):
+                instantx_control_mode: torch.Tensor | None = None
+                if controlnet.instantx_control_mode is not None and controlnet.instantx_control_mode >= 0:
+                    instantx_control_mode = torch.tensor(controlnet.instantx_control_mode, dtype=torch.long)
+                    instantx_control_mode = instantx_control_mode.reshape([-1, 1])
+
+                controlnet_extensions.append(
+                    InstantXControlNetExtension(
+                        model=model,
+                        controlnet_cond=controlnet_cond,
+                        instantx_control_mode=instantx_control_mode,
+                        weight=controlnet.control_weight,
+                        begin_step_percent=controlnet.begin_step_percent,
+                        end_step_percent=controlnet.end_step_percent,
+                    )
+                )
+            else:
+                raise ValueError(f"Unsupported ControlNet model type: {type(model)}")
+
+        return controlnet_extensions
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
         for lora in self.transformer.loras:

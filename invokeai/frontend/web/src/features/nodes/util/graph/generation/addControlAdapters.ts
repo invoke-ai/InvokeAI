@@ -110,10 +110,10 @@ const addControlNetToGraph = (
 
   const controlNet = g.addNode({
     id: `control_net_${id}`,
-    type: 'controlnet',
+    type: model.base === 'flux' ? 'flux_controlnet' : 'controlnet',
     begin_step_percent: beginEndStepPct[0],
     end_step_percent: beginEndStepPct[1],
-    control_mode: controlMode,
+    control_mode: model.base === 'flux' ? undefined : controlMode,
     resize_mode: 'just_resize',
     control_model: model,
     control_weight: weight,
