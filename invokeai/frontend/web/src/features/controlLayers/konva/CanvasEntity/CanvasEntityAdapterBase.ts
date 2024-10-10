@@ -7,6 +7,7 @@ import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/ko
 import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
 import type { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
+import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getKonvaNodeDebugAttrs, getRectIntersection } from 'features/controlLayers/konva/util';
@@ -28,6 +29,11 @@ import type { Logger } from 'roarr';
 import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
+
+// Ideally, we'd type `adapter` as `CanvasEntityAdapterBase`, but the generics make this tricky. `CanvasEntityAdapter`
+// is a union of all entity adapters and is functionally identical to `CanvasEntityAdapterBase`. We'll need to do a
+// type assertion below in the `onInit` method, which calls these callbacks.
+type InitCallback = (adapter: CanvasEntityAdapter) => Promise<boolean>;
 
 export abstract class CanvasEntityAdapterBase<
   T extends CanvasRenderableEntityState,
@@ -86,6 +92,77 @@ export abstract class CanvasEntityAdapterBase<
    * Gets a hashable representation of the entity's state.
    */
   abstract getHashableState: () => SerializableObject;
+
+  /**
+   * Callbacks that are executed when the module is initialized.
+   */
+  private static initCallbacks = new Set<InitCallback>();
+
+  /**
+   * Register a callback to be run when an entity adapter is initialized.
+   *
+   * The callback is called for every adapter that is initialized with the adapter as its only argument. Use an early
+   * return to skip entities that are not of interest, returning `false` to keep the callback registered. Return `true`
+   * to unregister the callback after it is called.
+   *
+   * @param callback The callback to register.
+   *
+   * @example
+   * ```ts
+   * // A callback that is executed once for a specific entity:
+   * const myId = 'my_id';
+   * canvasManager.entityRenderer.registerOnInitCallback(async (adapter) => {
+   *   if (adapter.id !== myId) {
+   *     // These are not the droids you are looking for, move along
+   *     return false;
+   *   }
+   *
+   *   doSomething();
+   *
+   *   // Remove the callback
+   *   return true;
+   * });
+   * ```
+   *
+   * @example
+   * ```ts
+   * // A callback that is executed once for the next entity that is initialized:
+   * canvasManager.entityRenderer.registerOnInitCallback(async (adapter) => {
+   *   doSomething();
+   *
+   *   // Remove the callback
+   *   return true;
+   * });
+   * ```
+   *
+   * @example
+   * ```ts
+   * // A callback that is executed for every entity and is never removed:
+   * canvasManager.entityRenderer.registerOnInitCallback(async (adapter) => {
+   *   // Do something with the adapter
+   *   return false;
+   * });
+   */
+  static registerInitCallback = (callback: InitCallback) => {
+    const wrapped = async (adapter: CanvasEntityAdapter) => {
+      const result = await callback(adapter);
+      if (result) {
+        this.initCallbacks.delete(wrapped);
+      }
+      return result;
+    };
+    this.initCallbacks.add(wrapped);
+  };
+
+  /**
+   * Runs all init callbacks with the given entity adapter.
+   * @param adapter The adapter of the entity that was initialized.
+   */
+  private static runInitCallbacks = (adapter: CanvasEntityAdapter) => {
+    for (const callback of this.initCallbacks) {
+      callback(adapter);
+    }
+  };
 
   selectIsHidden: Selector<RootState, boolean>;
 
@@ -299,6 +376,10 @@ export abstract class CanvasEntityAdapterBase<
     await this.renderer.initialize();
     this.syncZIndices();
     this.syncVisibility();
+
+    // Call the init callbacks.
+    // TODO(psyche): Get rid of the cast - see note in type def for `InitCallback`.
+    CanvasEntityAdapterBase.runInitCallbacks(this as CanvasEntityAdapter);
   };
 
   syncZIndices = () => {
