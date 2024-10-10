@@ -18,7 +18,7 @@ export const ControlLayerMenuItems = memo(() => {
       <IconMenuItemGroup>
         <CanvasEntityMenuItemsArrange />
         <CanvasEntityMenuItemsDuplicate />
-        <CanvasEntityMenuItemsDelete />
+        <CanvasEntityMenuItemsDelete asIcon />
       </IconMenuItemGroup>
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />

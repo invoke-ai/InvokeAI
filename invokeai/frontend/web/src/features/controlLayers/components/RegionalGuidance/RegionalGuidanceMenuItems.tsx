@@ -14,7 +14,7 @@ export const RegionalGuidanceMenuItems = memo(() => {
       <Flex gap={2}>
         <CanvasEntityMenuItemsArrange />
         <CanvasEntityMenuItemsDuplicate />
-        <CanvasEntityMenuItemsDelete />
+        <CanvasEntityMenuItemsDelete asIcon />
       </Flex>
       <MenuDivider />
       <RegionalGuidanceMenuItemsAddPromptsAndIPAdapter />

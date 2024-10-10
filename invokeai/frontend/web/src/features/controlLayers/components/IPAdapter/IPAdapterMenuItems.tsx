@@ -9,7 +9,7 @@ export const IPAdapterMenuItems = memo(() => {
     <IconMenuItemGroup>
       <CanvasEntityMenuItemsArrange />
       <CanvasEntityMenuItemsDuplicate />
-      <CanvasEntityMenuItemsDelete />
+      <CanvasEntityMenuItemsDelete asIcon />
     </IconMenuItemGroup>
   );
 });

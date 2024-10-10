@@ -13,7 +13,7 @@ export const InpaintMaskMenuItems = memo(() => {
       <IconMenuItemGroup>
         <CanvasEntityMenuItemsArrange />
         <CanvasEntityMenuItemsDuplicate />
-        <CanvasEntityMenuItemsDelete />
+        <CanvasEntityMenuItemsDelete asIcon />
       </IconMenuItemGroup>
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />
