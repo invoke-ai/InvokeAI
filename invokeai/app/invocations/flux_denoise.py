@@ -389,9 +389,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
             elif isinstance(model, InstantXControlNetFlux):
                 instantx_control_mode: torch.Tensor | None = None
-                # if controlnet.instantx_control_mode is not None:
-                #     instantx_control_mode = torch.tensor(controlnet.instantx_control_mode, dtype=torch.long)
-                #     instantx_control_mode = instantx_control_mode.reshape([-1, 1])
+                if controlnet.instantx_control_mode is not None and controlnet.instantx_control_mode >= 0:
+                    instantx_control_mode = torch.tensor(controlnet.instantx_control_mode, dtype=torch.long)
+                    instantx_control_mode = instantx_control_mode.reshape([-1, 1])
 
                 controlnet_extensions.append(
                     InstantXControlNetExtension(

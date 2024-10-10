@@ -25,6 +25,7 @@ class FluxControlNetField(BaseModel):
         default=1, ge=0, le=1, description="When the ControlNet is last applied (% of total steps)"
     )
     resize_mode: CONTROLNET_RESIZE_VALUES = Field(default="just_resize", description="The resize mode to use")
+    instantx_control_mode: int | None = Field(default=-1, description=FieldDescriptions.instantx_control_mode)
 
     @field_validator("control_weight")
     @classmethod
@@ -70,6 +71,8 @@ class FluxControlNetInvocation(BaseInvocation):
         default=1, ge=0, le=1, description="When the ControlNet is last applied (% of total steps)"
     )
     resize_mode: CONTROLNET_RESIZE_VALUES = InputField(default="just_resize", description="The resize mode used")
+    # Note: We default to -1 instead of None, because in the workflow editor UI None is not currently supported.
+    instantx_control_mode: int | None = InputField(default=-1, description=FieldDescriptions.instantx_control_mode)
 
     @field_validator("control_weight")
     @classmethod
@@ -91,5 +94,6 @@ class FluxControlNetInvocation(BaseInvocation):
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
                 resize_mode=self.resize_mode,
+                instantx_control_mode=self.instantx_control_mode,
             ),
         )

@@ -6323,6 +6323,12 @@ export type components = {
              * @enum {string}
              */
             resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+            /**
+             * Instantx Control Mode
+             * @description The control mode for InstantX ControlNet union models. Ignored for other ControlNet models. The standard mapping is: canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6). Negative values will be treated as 'None'.
+             * @default -1
+             */
+            instantx_control_mode?: number | null;
         };
         /**
          * FLUX ControlNet
@@ -6381,6 +6387,12 @@ export type components = {
              * @enum {string}
              */
             resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+            /**
+             * Instantx Control Mode
+             * @description The control mode for InstantX ControlNet union models. Ignored for other ControlNet models. The standard mapping is: canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6). Negative values will be treated as 'None'.
+             * @default -1
+             */
+            instantx_control_mode?: number | null;
             /**
              * type
              * @default flux_controlnet
