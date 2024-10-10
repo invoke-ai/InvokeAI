@@ -17,7 +17,7 @@ export const RasterLayerMenuItems = memo(() => {
       <IconMenuItemGroup>
         <CanvasEntityMenuItemsArrange />
         <CanvasEntityMenuItemsDuplicate />
-        <CanvasEntityMenuItemsDelete />
+        <CanvasEntityMenuItemsDelete asIcon />
       </IconMenuItemGroup>
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />
