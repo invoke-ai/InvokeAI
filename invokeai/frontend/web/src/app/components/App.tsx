@@ -21,7 +21,7 @@ import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageMo
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
-import { CopyWorkflowLinkModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/CopyWorkflowLinkModal';
+import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
 import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
@@ -114,7 +114,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <NewWorkflowConfirmationAlertDialog />
       <DeleteStylePresetDialog />
       <DeleteWorkflowDialog />
-      <CopyWorkflowLinkModal />
+      <ShareWorkflowModal />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
       <GlobalImageHotkeys />
