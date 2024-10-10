@@ -99,6 +99,7 @@ const PanelTabs = memo(() => {
         <Box as="span" w="full">
           {layersTabLabel}
         </Box>
+        {dndCtx.active && <Box position="absolute" top={0} left={0} right={0} bottom={0} border="2px solid red" />}
       </Tab>
       <Tab position="relative" onMouseOver={onOnMouseOverGalleryTab} onMouseOut={onMouseOut}>
         {t('gallery.gallery')}
