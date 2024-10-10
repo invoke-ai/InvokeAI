@@ -35,6 +35,35 @@ class XLabsControlNetExtension(BaseControlNetExtension):
         self._flux_transformer_num_single_blocks = 38
 
     @classmethod
+    def prepare_controlnet_cond(
+        cls,
+        controlnet_image: Image,
+        latent_height: int,
+        latent_width: int,
+        dtype: torch.dtype,
+        device: torch.device,
+        resize_mode: CONTROLNET_RESIZE_VALUES,
+    ):
+        image_height = latent_height * LATENT_SCALE_FACTOR
+        image_width = latent_width * LATENT_SCALE_FACTOR
+
+        controlnet_cond = prepare_control_image(
+            image=controlnet_image,
+            do_classifier_free_guidance=False,
+            width=image_width,
+            height=image_height,
+            device=device,
+            dtype=dtype,
+            control_mode="balanced",
+            resize_mode=resize_mode,
+        )
+
+        # Map pixel values from [0, 1] to [-1, 1].
+        controlnet_cond = controlnet_cond * 2 - 1
+
+        return controlnet_cond
+
+    @classmethod
     def from_controlnet_image(
         cls,
         model: XLabsControlNetFlux,

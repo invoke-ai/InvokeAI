@@ -204,12 +204,21 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 noise=noise,
             )
 
-        with (
-            transformer_info.model_on_device() as (cached_weights, transformer),
-            ExitStack() as exit_stack,
-        ):
-            assert isinstance(transformer, Flux)
+        with ExitStack() as exit_stack:
+            # Prepare ControlNet extensions.
+            # Note: We do this before loading the transformer model to minimize peak memory (see implementation).
+            controlnet_extensions = self._prep_controlnet_extensions(
+                context=context,
+                exit_stack=exit_stack,
+                latent_height=latent_h,
+                latent_width=latent_w,
+                dtype=inference_dtype,
+                device=x.device,
+            )
 
+            # Load the transformer model.
+            (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+            assert isinstance(transformer, Flux)
             config = transformer_info.config
             assert config is not None
 
@@ -242,16 +251,6 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
             else:
                 raise ValueError(f"Unsupported model format: {config.format}")
-
-            # Prepare ControlNet extensions.
-            controlnet_extensions = self._prep_controlnet_extensions(
-                context=context,
-                exit_stack=exit_stack,
-                latent_height=latent_h,
-                latent_width=latent_w,
-                dtype=inference_dtype,
-                device=x.device,
-            )
 
             x = denoise(
                 model=transformer,
@@ -335,21 +334,54 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # before loading the models. Then make sure that all VAE encoding is done before loading the ControlNets to
         # minimize peak memory.
 
-        controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension] = []
-        for controlnet in controlnets:
-            model = exit_stack.enter_context(context.models.load(controlnet.control_model))
-            image = context.images.get_pil(controlnet.image.image_name)
+        # First, load the ControlNet models so that we can determine the ControlNet types.
+        controlnet_models = [context.models.load(controlnet.control_model) for controlnet in controlnets]
 
-            if isinstance(model, XLabsControlNetFlux):
-                controlnet_extensions.append(
-                    XLabsControlNetExtension.from_controlnet_image(
-                        model=model,
+        # Calculate the controlnet conditioning tensors.
+        # We do this before loading the ControlNet models because it may require running the VAE, and we are trying to
+        # keep peak memory down.
+        controlnet_conds: list[torch.Tensor] = []
+        for controlnet, controlnet_model in zip(controlnets, controlnet_models, strict=True):
+            image = context.images.get_pil(controlnet.image.image_name)
+            if isinstance(controlnet_model.model, InstantXControlNetFlux):
+                if self.controlnet_vae is None:
+                    raise ValueError("A ControlNet VAE is required when using an InstantX FLUX ControlNet.")
+                vae_info = context.models.load(self.controlnet_vae.vae)
+                controlnet_conds.append(
+                    InstantXControlNetExtension.prepare_controlnet_cond(
+                        controlnet_image=image,
+                        vae_info=vae_info,
+                        latent_height=latent_height,
+                        latent_width=latent_width,
+                        dtype=dtype,
+                        device=device,
+                        resize_mode=controlnet.resize_mode,
+                    )
+                )
+            elif isinstance(controlnet_model.model, XLabsControlNetFlux):
+                controlnet_conds.append(
+                    XLabsControlNetExtension.prepare_controlnet_cond(
                         controlnet_image=image,
                         latent_height=latent_height,
                         latent_width=latent_width,
                         dtype=dtype,
                         device=device,
                         resize_mode=controlnet.resize_mode,
+                    )
+                )
+
+        # Finally, load the ControlNet models and initialize the ControlNet extensions.
+        controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension] = []
+        for controlnet, controlnet_cond, controlnet_model in zip(
+            controlnets, controlnet_conds, controlnet_models, strict=True
+        ):
+            model = exit_stack.enter_context(controlnet_model)
+
+            if isinstance(model, XLabsControlNetFlux):
+                controlnet_extensions.append(
+                    XLabsControlNetExtension(
+                        model=model,
+                        controlnet_cond=controlnet_cond,
                         weight=controlnet.control_weight,
                         begin_step_percent=controlnet.begin_step_percent,
                         end_step_percent=controlnet.end_step_percent,
@@ -361,21 +393,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 #     instantx_control_mode = torch.tensor(controlnet.instantx_control_mode, dtype=torch.long)
                 #     instantx_control_mode = instantx_control_mode.reshape([-1, 1])
 
-                if self.controlnet_vae is None:
-                    raise ValueError("A ControlNet VAE is required when using an InstantX FLUX ControlNet.")
-                vae_info = context.models.load(self.controlnet_vae.vae)
-
                 controlnet_extensions.append(
-                    InstantXControlNetExtension.from_controlnet_image(
+                    InstantXControlNetExtension(
                         model=model,
-                        controlnet_image=image,
+                        controlnet_cond=controlnet_cond,
                         instantx_control_mode=instantx_control_mode,
-                        vae_info=vae_info,
-                        latent_height=latent_height,
-                        latent_width=latent_width,
-                        dtype=dtype,
-                        device=device,
-                        resize_mode=controlnet.resize_mode,
                         weight=controlnet.control_weight,
                         begin_step_percent=controlnet.begin_step_percent,
                         end_step_percent=controlnet.end_step_percent,
