@@ -432,6 +432,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
     const { rect } = this.manager.stateApi.getBbox();
+    const gridSize = this.manager.stateApi.getGridSize();
     const width = this.konva.proxyRect.width();
     const height = this.konva.proxyRect.height();
     const scaleX = rect.width / width;
@@ -445,8 +446,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const offsetY = (rect.height - height * scale) / 2;
 
     this.konva.proxyRect.setAttrs({
-      x: clamp(Math.round(rect.x + offsetX), rect.x, rect.x + rect.width),
-      y: clamp(Math.round(rect.y + offsetY), rect.y, rect.y + rect.height),
+      x: clamp(roundToMultiple(rect.x + offsetX, gridSize), rect.x, rect.x + rect.width),
+      y: clamp(roundToMultiple(rect.y + offsetY, gridSize), rect.y, rect.y + rect.height),
       scaleX: scale,
       scaleY: scale,
       rotation: 0,
@@ -463,6 +464,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
     const { rect } = this.manager.stateApi.getBbox();
+    const gridSize = this.manager.stateApi.getGridSize();
     const width = this.konva.proxyRect.width();
     const height = this.konva.proxyRect.height();
     const scaleX = rect.width / width;
@@ -476,8 +478,8 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const offsetY = (rect.height - height * scale) / 2;
 
     this.konva.proxyRect.setAttrs({
-      x: Math.round(rect.x + offsetX),
-      y: Math.round(rect.y + offsetY),
+      x: roundToMultiple(rect.x + offsetX, gridSize),
+      y: roundToMultiple(rect.y + offsetY, gridSize),
       scaleX: scale,
       scaleY: scale,
       rotation: 0,
