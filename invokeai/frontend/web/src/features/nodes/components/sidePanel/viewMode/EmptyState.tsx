@@ -1,4 +1,4 @@
-import { Button, Flex, Image, Text } from '@invoke-ai/ui-library';
+import { Button, Flex, Image, Link, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
 import { selectCleanEditor, workflowModeChanged } from 'features/nodes/store/workflowSlice';
@@ -53,22 +53,7 @@ export const EmptyState = () => {
               </Button>
             </Flex>
             <Text textAlign="center" fontSize="md">
-              <Trans
-                i18nKey="nodes.workflowHelpText"
-                size="sm"
-                components={{
-                  LinkComponent: (
-                    <Text
-                      as="a"
-                      color="white"
-                      fontSize="md"
-                      fontWeight="semibold"
-                      href="https://support.invoke.ai/support/solutions/articles/151000159663-example-workflows"
-                      target="_blank"
-                    />
-                  ),
-                }}
-              />
+              <Trans i18nKey="nodes.workflowHelpText" size="sm" components={workflowHelpTextComponents} />
             </Text>
           </>
         ) : (
@@ -84,4 +69,15 @@ export const EmptyState = () => {
       </Flex>
     </Flex>
   );
+};
+
+const workflowHelpTextComponents = {
+  LinkComponent: (
+    <Link
+      fontSize="md"
+      fontWeight="semibold"
+      href="https://support.invoke.ai/support/solutions/articles/151000159663-example-workflows"
+      target="_blank"
+    />
+  ),
 };
