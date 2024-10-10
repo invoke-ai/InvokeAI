@@ -320,7 +320,7 @@ export abstract class CanvasEntityAdapterBase<
   syncIsEnabled = () => {
     this.log.trace('Updating visibility');
     this.konva.layer.visible(this.state.isEnabled);
-    this.renderer.syncCache(this.state.isEnabled);
+    this.renderer.syncKonvaCache(this.state.isEnabled);
     this.transformer.syncInteractionState();
     this.$isDisabled.set(!this.state.isEnabled);
   };
@@ -401,7 +401,7 @@ export abstract class CanvasEntityAdapterBase<
     this.$isHidden.set(!isVisible);
     this.konva.layer.visible(isVisible);
 
-    this.renderer.syncCache();
+    this.renderer.syncKonvaCache();
   };
 
   /**
