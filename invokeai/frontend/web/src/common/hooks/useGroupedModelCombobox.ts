@@ -51,7 +51,9 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
           options: val.map((model) => ({
             label: model.name,
             value: model.key,
+            previewImage: model.cover_image ? model.cover_image : undefined,
             isDisabled: getIsDisabled ? getIsDisabled(model) : false,
+            withPreviewImage: true,
           })),
         });
         return acc;
