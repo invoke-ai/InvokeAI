@@ -181,7 +181,7 @@ export const StylePresetListItem = ({ preset }: { preset: StylePresetRecordWithI
         cancelButtonText={t('common.cancel')}
         useInert={false}
       >
-        <p>{t('stylePresets.deleteTemplate2')}</p>
+        <Text>{t('stylePresets.deleteTemplate2')}</Text>
       </ConfirmationAlertDialog>
     </>
   );
