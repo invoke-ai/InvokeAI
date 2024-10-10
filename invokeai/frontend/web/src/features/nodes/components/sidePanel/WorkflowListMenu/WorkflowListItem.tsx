@@ -16,11 +16,12 @@ import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold, PiPencilBold, PiShareFatBold, PiTrashBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemDTO } from 'services/api/types';
 
-import { CopyWorkflowLinkModal, useCopyWorkflowLinkModal } from './CopyWorkflowLinkModal';
+import { CopyWorkflowLinkModal } from './CopyWorkflowLinkModal';
 import { WorkflowListItemTooltip } from './WorkflowListItemTooltip';
 
 export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemDTO }) => {
   const deleteConfirmationDialog = useDisclosure(false);
+  const copyWorkflowLinkModal = useDisclosure(false);
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const projectUrl = useStore($projectUrl);
@@ -37,8 +38,6 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
 
   const workflowId = useAppSelector(selectWorkflowId);
   const downloadWorkflow = useDownloadWorkflow();
-
-  const copyWorkflowLinkModal = useCopyWorkflowLinkModal();
 
   const { deleteWorkflow, deleteWorkflowResult } = useDeleteLibraryWorkflow(EMPTY_OBJECT);
   const { getAndLoadWorkflow } = useGetAndLoadLibraryWorkflow({
@@ -221,7 +220,12 @@ export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListIte
       >
         <p>{t('workflows.deleteWorkflow2')}</p>
       </ConfirmationAlertDialog>
-      <CopyWorkflowLinkModal workflowId={workflow.workflow_id} workflowName={workflow.name} />
+      <CopyWorkflowLinkModal
+        isOpen={copyWorkflowLinkModal.isOpen}
+        onClose={copyWorkflowLinkModal.close}
+        workflowId={workflow.workflow_id}
+        workflowName={workflow.name}
+      />
     </>
   );
 };
