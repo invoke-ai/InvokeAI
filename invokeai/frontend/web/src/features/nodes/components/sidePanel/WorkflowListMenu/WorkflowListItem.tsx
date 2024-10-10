@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold, PiPencilBold, PiShareFatBold, PiTrashBold } from 'react-icons/pi';
 import type { WorkflowRecordListItemDTO } from 'services/api/types';
 
-import { useShareWorkflow } from './CopyWorkflowLinkModal';
+import { useShareWorkflow } from './ShareWorkflowModal';
 import { WorkflowListItemTooltip } from './WorkflowListItemTooltip';
 
 export const WorkflowListItem = ({ workflow }: { workflow: WorkflowRecordListItemDTO }) => {

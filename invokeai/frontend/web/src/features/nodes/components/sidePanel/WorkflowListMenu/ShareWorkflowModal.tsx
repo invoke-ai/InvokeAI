@@ -32,7 +32,7 @@ export const useShareWorkflow = () => {
   return copyWorkflowLink;
 };
 
-export const CopyWorkflowLinkModal = () => {
+export const ShareWorkflowModal = () => {
   const workflowToShare = useStore($workflowToShare);
   const projectUrl = useStore($projectUrl);
   const { t } = useTranslation();
