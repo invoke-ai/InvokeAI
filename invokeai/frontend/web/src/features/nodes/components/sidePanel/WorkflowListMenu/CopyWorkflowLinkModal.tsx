@@ -14,41 +14,54 @@ import {
 import { useStore } from '@nanostores/react';
 import { $projectUrl } from 'app/store/nanostores/projectId';
 import { toast } from 'features/toast/toast';
+import { atom } from 'nanostores';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCopyBold } from 'react-icons/pi';
+import type { WorkflowRecordListItemDTO } from 'services/api/types';
 
-type Arg = {
-  isOpen: boolean;
-  onClose: () => void;
-  workflowId: string;
-  workflowName: string;
+const $workflowToShare = atom<WorkflowRecordListItemDTO | null>(null);
+const clearWorkflowToShare = () => $workflowToShare.set(null);
+
+export const useShareWorkflow = () => {
+  const copyWorkflowLink = useCallback((workflow: WorkflowRecordListItemDTO) => {
+    $workflowToShare.set(workflow);
+  }, []);
+
+  return copyWorkflowLink;
 };
 
-export const CopyWorkflowLinkModal = ({ isOpen, onClose, workflowId, workflowName }: Arg) => {
+export const CopyWorkflowLinkModal = () => {
+  const workflowToShare = useStore($workflowToShare);
   const projectUrl = useStore($projectUrl);
   const { t } = useTranslation();
 
   const workflowLink = useMemo(() => {
-    return `${projectUrl}/studio?selectedWorkflowId=${workflowId}`;
-  }, [projectUrl, workflowId]);
+    if (!workflowToShare || !projectUrl) {
+      return null;
+    }
+    return `${projectUrl}/studio?selectedWorkflowId=${workflowToShare.workflow_id}`;
+  }, [projectUrl, workflowToShare]);
 
   const handleCopy = useCallback(() => {
+    if (!workflowLink) {
+      return;
+    }
     navigator.clipboard.writeText(workflowLink);
     toast({
       status: 'success',
       title: t('toast.linkCopied'),
     });
-    onClose();
-  }, [workflowLink, t, onClose]);
+    $workflowToShare.set(null);
+  }, [workflowLink, t]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg" useInert={false}>
+    <Modal isOpen={workflowToShare !== null} onClose={clearWorkflowToShare} isCentered size="lg" useInert={false}>
       <ModalContent>
         <ModalHeader>
           <Flex flexDir="column" gap={2}>
             <Heading fontSize="xl">{t('workflows.copyShareLinkForWorkflow')}</Heading>
-            <Text fontSize="md">{workflowName}</Text>
+            <Text fontSize="md">{workflowToShare?.name}</Text>
           </Flex>
         </ModalHeader>
         <ModalCloseButton />
@@ -66,7 +79,7 @@ export const CopyWorkflowLinkModal = ({ isOpen, onClose, workflowId, workflowNam
         </ModalBody>
 
         <ModalFooter>
-          <Button onClick={onClose}>{t('common.close')}</Button>
+          <Button onClick={clearWorkflowToShare}>{t('common.close')}</Button>
         </ModalFooter>
       </ModalContent>
     </Modal>
