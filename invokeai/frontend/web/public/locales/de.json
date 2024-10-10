@@ -936,7 +936,8 @@
         },
         "paramScheduler": {
             "paragraphs": [
-                "\"Planer\" definiert, wie iterativ Rauschen zu einem Bild hinzugefügt wird, oder wie ein Sample bei der Ausgabe eines Modells aktualisiert wird."
+                "Verwendeter Planer währende des Generierungsprozesses.",
+                "Jeder Planer definiert, wie einem Bild iterativ Rauschen hinzugefügt wird, oder wie ein Sample basierend auf der Ausgabe eines Modells aktualisiert wird."
             ],
             "heading": "Planer"
         },
@@ -962,6 +963,61 @@
         },
         "ipAdapterMethod": {
             "heading": "Methode"
+        },
+        "refinerScheduler": {
+            "heading": "Planer",
+            "paragraphs": [
+                "Planer, der während der Veredelungsphase des Generierungsprozesses verwendet wird.",
+                "Ähnlich wie der Generierungsplaner."
+            ]
+        },
+        "compositingCoherenceMode": {
+            "paragraphs": [
+                "Verwendete Methode zur Erstellung eines kohärenten Bildes mit dem neu generierten maskierten Bereich."
+            ],
+            "heading": "Modus"
+        },
+        "compositingCoherencePass": {
+            "heading": "Kohärenzdurchlauf"
+        },
+        "controlNet": {
+            "heading": "ControlNet"
+        },
+        "compositingMaskAdjustments": {
+            "paragraphs": [
+                "Die Maske anpassen."
+            ],
+            "heading": "Maskenanpassungen"
+        },
+        "compositingMaskBlur": {
+            "paragraphs": [
+                "Der Unschärferadius der Maske."
+            ],
+            "heading": "Maskenunschärfe"
+        },
+        "compositingBlurMethod": {
+            "paragraphs": [
+                "Die auf den maskierten Bereich angewendete Unschärfemethode."
+            ],
+            "heading": "Unschärfemethode"
+        },
+        "controlNetResizeMode": {
+            "heading": "Größenänderungsmodus"
+        },
+        "paramWidth": {
+            "heading": "Breite",
+            "paragraphs": [
+                "Breite des generierten Bildes. Muss ein Vielfaches von 8 sein."
+            ]
+        },
+        "controlNetControlMode": {
+            "heading": "Kontrollmodus"
+        },
+        "controlNetProcessor": {
+            "heading": "Prozessor"
+        },
+        "patchmatchDownScaleSize": {
+            "heading": "Herunterskalieren"
         }
     },
     "invocationCache": {
@@ -1080,7 +1136,8 @@
         "workflowContact": "Kontaktdaten",
         "workflowNotes": "Notizen",
         "workflowTags": "Tags",
-        "workflowVersion": "Version"
+        "workflowVersion": "Version",
+        "saveToGallery": "In Galerie speichern"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
@@ -1250,7 +1307,16 @@
         "searchByName": "Nach Name suchen",
         "promptTemplateCleared": "Promptvorlage gelöscht",
         "preview": "Vorschau",
-        "positivePrompt": "Positiv-Prompt"
+        "positivePrompt": "Positiv-Prompt",
+        "active": "Aktiv",
+        "deleteTemplate2": "Sind Sie sicher, dass Sie diese Vorlage löschen möchten? Dies kann nicht rückgängig gemacht werden.",
+        "deleteTemplate": "Vorlage löschen",
+        "copyTemplate": "Vorlage kopieren",
+        "editTemplate": "Vorlage bearbeiten",
+        "deleteImage": "Bild löschen",
+        "defaultTemplates": "Standardvorlagen",
+        "nameColumn": "'name'",
+        "exportDownloaded": "Export heruntergeladen"
     },
     "newUserExperience": {
         "gettingStartedSeries": "Wünschen Sie weitere Anleitungen? In unserer <LinkComponent>Einführungsserie</LinkComponent> finden Sie Tipps, wie Sie das Potenzial von Invoke Studio voll ausschöpfen können.",
@@ -1263,13 +1329,22 @@
             "bbox": "Bbox"
         },
         "transform": {
-            "fitToBbox": "An Bbox anpassen"
+            "fitToBbox": "An Bbox anpassen",
+            "reset": "Zurücksetzen",
+            "apply": "Anwenden",
+            "cancel": "Abbrechen"
         },
         "pullBboxIntoLayerError": "Problem, Bbox in die Ebene zu ziehen",
         "pullBboxIntoLayer": "Bbox in Ebene ziehen",
         "HUD": {
             "bbox": "Bbox",
-            "scaledBbox": "Skalierte Bbox"
+            "scaledBbox": "Skalierte Bbox",
+            "entityStatus": {
+                "isHidden": "{{title}} ist ausgeblendet",
+                "isDisabled": "{{title}} ist deaktiviert",
+                "isLocked": "{{title}} ist gesperrt",
+                "isEmpty": "{{title}} ist leer"
+            }
         },
         "fitBboxToLayers": "Bbox an Ebenen anpassen",
         "pullBboxIntoReferenceImage": "Bbox ins Referenzbild ziehen",
@@ -1279,7 +1354,12 @@
         "clipToBbox": "Pinselstriche auf Bbox beschränken",
         "canvasContextMenu": {
             "saveBboxToGallery": "Bbox in Galerie speichern",
-            "bboxGroup": "Aus Bbox erstellen"
+            "bboxGroup": "Aus Bbox erstellen",
+            "canvasGroup": "Leinwand",
+            "newGlobalReferenceImage": "Neues globales Referenzbild",
+            "newRegionalReferenceImage": "Neues regionales Referenzbild",
+            "newControlLayer": "Neue Kontroll-Ebene",
+            "newRasterLayer": "Neue Raster-Ebene"
         },
         "rectangle": "Rechteck",
         "saveCanvasToGallery": "Leinwand in Galerie speichern",
@@ -1310,7 +1390,7 @@
         "regional": "Regional",
         "newGlobalReferenceImageOk": "Globales Referenzbild erstellt",
         "savedToGalleryError": "Fehler beim Speichern in der Galerie",
-        "savedToGalleryOk": "In Galerie speichern",
+        "savedToGalleryOk": "In Galerie gespeichert",
         "newGlobalReferenceImageError": "Problem beim Erstellen eines globalen Referenzbilds",
         "newRegionalReferenceImageOk": "Regionales Referenzbild erstellt",
         "duplicate": "Duplizieren",
@@ -1343,12 +1423,39 @@
         "showProgressOnCanvas": "Fortschritt auf Leinwand anzeigen",
         "controlMode": {
             "balanced": "Ausgewogen"
-        }
+        },
+        "globalReferenceImages_withCount_hidden": "Globale Referenzbilder ({{count}} ausgeblendet)",
+        "sendToGallery": "An Galerie senden",
+        "stagingArea": {
+            "accept": "Annehmen",
+            "next": "Nächste",
+            "discardAll": "Alle verwerfen",
+            "discard": "Verwerfen",
+            "previous": "Vorherige"
+        },
+        "regionalGuidance_withCount_visible": "Regionale Führung ({{count}})",
+        "regionalGuidance_withCount_hidden": "Regionale Führung ({{count}} ausgeblendet)",
+        "settings": {
+            "snapToGrid": {
+                "on": "Ein",
+                "off": "Aus",
+                "label": "Am Raster ausrichten"
+            }
+        },
+        "layer_one": "Ebene",
+        "layer_other": "Ebenen",
+        "layer_withCount_one": "Ebene ({{count}})",
+        "layer_withCount_other": "Ebenen ({{count}})"
     },
     "upsell": {
         "shareAccess": "Zugang teilen",
         "professional": "Professionell",
         "inviteTeammates": "Teamkollegen einladen",
         "professionalUpsell": "Verfügbar in der Professional Edition von Invoke. Klicken Sie hier oder besuchen Sie invoke.com/pricing für weitere Details."
+    },
+    "upscaling": {
+        "creativity": "Kreativität",
+        "structure": "Struktur",
+        "scale": "Maßstab"
     }
 }
