@@ -124,25 +124,6 @@ export const useNewRasterLayerFromImage = () => {
   return func;
 };
 
-export const useNewCanvasFromImage = () => {
-  const dispatch = useAppDispatch();
-  const bboxRect = useAppSelector(selectBboxRect);
-  const func = useCallback(
-    (imageDTO: ImageDTO) => {
-      const imageObject = imageDTOToImageObject(imageDTO);
-      const overrides: Partial<CanvasRasterLayerState> = {
-        position: { x: bboxRect.x, y: bboxRect.y },
-        objects: [imageObject],
-      };
-      dispatch(canvasReset());
-      dispatch(rasterLayerAdded({ overrides, isSelected: true }));
-    },
-    [bboxRect.x, bboxRect.y, dispatch]
-  );
-
-  return func;
-};
-
 /**
  * Returns a function that adds a new canvas with the given image as the initial image, replicating the img2img flow:
  * - Reset the canvas
@@ -152,7 +133,7 @@ export const useNewCanvasFromImage = () => {
  *
  * This allows the user to immediately generate a new image from the given image without any additional steps.
  */
-export const useNewImg2ImgCanvasFromImage = () => {
+export const useNewCanvasFromImage = () => {
   const dispatch = useAppDispatch();
   const bboxRect = useAppSelector(selectBboxRect);
   const base = useAppSelector(selectBboxModelBase);

@@ -13,7 +13,6 @@ import { ImageMenuItemOpenInNewTab } from 'features/gallery/components/ImageCont
 import { ImageMenuItemOpenInViewer } from 'features/gallery/components/ImageContextMenu/ImageMenuItemOpenInViewer';
 import { ImageMenuItemSelectForCompare } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSelectForCompare';
 import { ImageMenuItemSendToUpscale } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSendToUpscale';
-import { ImageMenuItemsNewImg2ImgCanvasFromImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemsNewImg2ImgCanvasFromImage';
 import { ImageMenuItemStarUnstar } from 'features/gallery/components/ImageContextMenu/ImageMenuItemStarUnstar';
 import { ImageDTOContextProvider } from 'features/gallery/contexts/ImageDTOContext';
 import { memo } from 'react';
@@ -42,7 +41,6 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       <CanvasManagerProviderGate>
         <ImageMenuItemNewLayerFromImage />
         <ImageMenuItemNewCanvasFromImage />
-        <ImageMenuItemsNewImg2ImgCanvasFromImage />
       </CanvasManagerProviderGate>
       <MenuDivider />
       <ImageMenuItemChangeBoard />
