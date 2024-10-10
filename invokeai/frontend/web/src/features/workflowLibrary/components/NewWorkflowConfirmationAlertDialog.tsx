@@ -1,5 +1,6 @@
 import { ConfirmationAlertDialog, Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { buildUseDisclosure } from 'common/hooks/useBoolean';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { selectWorkflowIsTouched, workflowModeChanged } from 'features/nodes/store/workflowSlice';
@@ -43,6 +44,7 @@ export const useNewWorkflow = () => {
 };
 
 export const NewWorkflowConfirmationAlertDialog = memo(() => {
+  useAssertSingleton('NewWorkflowConfirmationAlertDialog');
   const { t } = useTranslation();
   const dialog = useDialogState();
   const newWorkflow = useNewWorkflow();

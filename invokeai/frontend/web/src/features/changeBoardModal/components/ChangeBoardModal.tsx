@@ -3,6 +3,7 @@ import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@inv
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import {
   changeBoardReset,
   isModalOpenChanged,
@@ -25,6 +26,7 @@ const selectIsModalOpen = createSelector(
 );
 
 const ChangeBoardModal = () => {
+  useAssertSingleton('ChangeBoardModal');
   const dispatch = useAppDispatch();
   const [selectedBoard, setSelectedBoard] = useState<string | null>();
   const queryArgs = useAppSelector(selectListBoardsQueryArgs);

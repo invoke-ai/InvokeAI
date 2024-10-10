@@ -14,6 +14,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $projectUrl } from 'app/store/nanostores/projectId';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { toast } from 'features/toast/toast';
 import { atom } from 'nanostores';
 import { useCallback, useMemo } from 'react';
@@ -33,6 +34,7 @@ export const useShareWorkflow = () => {
 };
 
 export const ShareWorkflowModal = () => {
+  useAssertSingleton('ShareWorkflowModal');
   const workflowToShare = useStore($workflowToShare);
   const projectUrl = useStore($projectUrl);
   const { t } = useTranslation();

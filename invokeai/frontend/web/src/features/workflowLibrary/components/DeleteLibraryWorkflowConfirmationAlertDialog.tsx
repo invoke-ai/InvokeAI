@@ -1,5 +1,6 @@
 import { ConfirmationAlertDialog, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { toast } from 'features/toast/toast';
 import { atom } from 'nanostores';
 import { useCallback } from 'react';
@@ -19,6 +20,7 @@ export const useDeleteWorkflow = () => {
 };
 
 export const DeleteWorkflowDialog = () => {
+  useAssertSingleton('DeleteWorkflowDialog');
   const { t } = useTranslation();
   const workflowToDelete = useStore($workflowToDelete);
   const [_deleteWorkflow] = useDeleteWorkflowMutation();
