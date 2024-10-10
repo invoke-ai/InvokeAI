@@ -193,7 +193,14 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     if (this.renderers.size === 0) {
       this.log.trace('Clearing object group cache');
       this.konva.objectGroup.clearCache();
-    } else if (force || !this.konva.objectGroup.isCached()) {
+      return;
+    }
+
+    // We should never cache the entity if it is not visible - it will cache as a transparent image.
+    const isVisible = this.parent.konva.layer.visible();
+    const isCached = this.konva.objectGroup.isCached();
+
+    if (isVisible && (force || !isCached)) {
       this.log.trace('Caching object group');
       this.konva.objectGroup.clearCache();
       this.konva.objectGroup.cache({ pixelRatio: 1, imageSmoothingEnabled: false });

@@ -390,12 +390,18 @@ export abstract class CanvasEntityAdapterBase<
   });
 
   setVisibility = (isVisible: boolean) => {
-    if (this.$isHidden.get() === !isVisible && this.konva.layer.visible() === isVisible) {
+    const isHidden = this.$isHidden.get();
+    const isLayerVisible = this.konva.layer.visible();
+
+    if (isHidden === !isVisible && isLayerVisible === isVisible) {
+      // No change
       return;
     }
     this.log.trace(isVisible ? 'Showing' : 'Hiding');
     this.$isHidden.set(!isVisible);
     this.konva.layer.visible(isVisible);
+
+    this.renderer.syncCache();
   };
 
   /**
