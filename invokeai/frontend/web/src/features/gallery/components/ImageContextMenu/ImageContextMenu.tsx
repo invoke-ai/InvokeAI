@@ -11,28 +11,55 @@ import type { RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
+/**
+ * The delay in milliseconds before the context menu opens on long press.
+ */
 const LONGPRESS_DELAY_MS = 500;
+/**
+ * The threshold in pixels that the pointer must move before the long press is cancelled.
+ */
 const LONGPRESS_MOVE_THRESHOLD_PX = 10;
 
-type ImageContextMenuState = {
+/**
+ * The singleton state of the context menu.
+ */
+const $imageContextMenuState = map<{
   isOpen: boolean;
   imageDTO: ImageDTO | null;
   position: { x: number; y: number };
-};
-
-const $imageContextMenuState = map<ImageContextMenuState>({
+}>({
   isOpen: false,
   imageDTO: null,
   position: { x: -1, y: -1 },
 });
+
+/**
+ * Convenience function to close the context menu.
+ */
 const onClose = () => {
   $imageContextMenuState.setKey('isOpen', false);
 };
+
+/**
+ * Map of elements to image DTOs. This is used to determine which image DTO to show the context menu for, depending on
+ * the target of the context menu or long press event.
+ */
 const elToImageMap = new Map<HTMLDivElement, ImageDTO>();
+
+/**
+ * Given a target node, find the first registered parent element that contains the target node and return the imageDTO
+ * associated with it.
+ */
 const getImageDTOFromMap = (target: Node): ImageDTO | undefined => {
   const entry = Array.from(elToImageMap.entries()).find((entry) => entry[0].contains(target));
   return entry?.[1];
 };
+
+/**
+ * Register a context menu for an image DTO on a target element.
+ * @param imageDTO The image DTO to register the context menu for.
+ * @param targetRef The ref of the target element that should trigger the context menu.
+ */
 export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: RefObject<HTMLDivElement>) => {
   useEffect(() => {
     if (!targetRef.current || !imageDTO) {
@@ -46,6 +73,9 @@ export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: R
   }, [imageDTO, targetRef]);
 };
 
+/**
+ * Singleton component that renders the context menu for images.
+ */
 export const ImageContextMenu = memo(() => {
   useAssertSingleton('ImageContextMenu');
   const state = useStore($imageContextMenuState);
@@ -77,6 +107,10 @@ ImageContextMenu.displayName = 'ImageContextMenu';
 
 const _hover: ChakraProps['_hover'] = { bg: 'transparent' };
 
+/**
+ * A logical component that listens for context menu events and opens the context menu. It's separate from
+ * ImageContextMenu component to avoid re-rendering the whole context menu on every context menu event.
+ */
 const ImageContextMenuEventLogical = memo(() => {
   const lastPositionRef = useRef<{ x: number; y: number }>({ x: -1, y: -1 });
   const longPressTimeoutRef = useRef(0);
@@ -84,6 +118,7 @@ const ImageContextMenuEventLogical = memo(() => {
 
   const onContextMenu = useCallback((e: MouseEvent | PointerEvent) => {
     if (e.shiftKey) {
+      // This is a shift + right click event, which should open the native context menu
       onClose();
       return;
     }
@@ -91,9 +126,11 @@ const ImageContextMenuEventLogical = memo(() => {
     const imageDTO = getImageDTOFromMap(e.target as Node);
 
     if (!imageDTO) {
+      // Can't find the image DTO, close the context menu
       onClose();
       return;
     }
+
     // clear pending delayed open
     window.clearTimeout(animationTimeoutRef.current);
     e.preventDefault();
@@ -104,6 +141,7 @@ const ImageContextMenuEventLogical = memo(() => {
         onClose();
       }
       animationTimeoutRef.current = window.setTimeout(() => {
+        // Open the menu after the animation with the new state
         $imageContextMenuState.set({
           isOpen: true,
           position: { x: e.pageX, y: e.pageY },
@@ -111,7 +149,7 @@ const ImageContextMenuEventLogical = memo(() => {
         });
       }, 100);
     } else {
-      // else we can just open the menu at the current position
+      // else we can just open the menu at the current position w/ new state
       $imageContextMenuState.set({
         isOpen: true,
         position: { x: e.pageX, y: e.pageY },
@@ -119,6 +157,7 @@ const ImageContextMenuEventLogical = memo(() => {
       });
     }
 
+    // Always sync the last position
     lastPositionRef.current = { x: e.pageX, y: e.pageY };
   }, []);
 
@@ -148,6 +187,7 @@ const ImageContextMenuEventLogical = memo(() => {
       return;
     }
 
+    // If the pointer has moved more than the threshold, cancel the long press
     const lastPosition = lastPositionRef.current;
 
     const distanceFromLastPosition = Math.hypot(e.pageX - lastPosition.x, e.pageY - lastPosition.y);
@@ -196,6 +236,7 @@ const ImageContextMenuEventLogical = memo(() => {
 
   useEffect(
     () => () => {
+      // Clean up any timeouts when we unmount
       window.clearTimeout(animationTimeoutRef.current);
       window.clearTimeout(longPressTimeoutRef.current);
     },
@@ -207,6 +248,8 @@ const ImageContextMenuEventLogical = memo(() => {
 
 ImageContextMenuEventLogical.displayName = 'ImageContextMenuEventLogical';
 
+// The content of the context menu, which changes based on the selection count. Split out and memoized to avoid
+// re-rendering the whole context menu too often.
 const MenuContent = memo(() => {
   const selectionCount = useAppSelector(selectSelectionCount);
   const state = useStore($imageContextMenuState);
