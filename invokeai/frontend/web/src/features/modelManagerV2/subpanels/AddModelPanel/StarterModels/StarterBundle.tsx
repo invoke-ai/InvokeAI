@@ -1,11 +1,11 @@
 import { Button, Flex, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useBuildModelsToInstall } from 'features/modelManagerV2/hooks/useBuildModelsToInstall';
+import { isMainModelBase } from 'features/nodes/types/common';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { type GetStarterModelsResponse, useInstallModelMutation } from 'services/api/endpoints/models';
-import { isMainModelBase } from '../../../../nodes/types/common';
 
 export const StarterBundle = ({
   bundleName,
