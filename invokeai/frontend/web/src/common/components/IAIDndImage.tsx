@@ -4,9 +4,9 @@ import { IAILoadingImageFallback, IAINoContentFallback } from 'common/components
 import ImageMetadataOverlay from 'common/components/ImageMetadataOverlay';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
-import ImageContextMenu from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
+import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import type { MouseEvent, ReactElement, ReactNode, SyntheticEvent } from 'react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { PiImageBold, PiUploadSimpleBold } from 'react-icons/pi';
 import type { ImageDTO, PostUploadAction } from 'services/api/types';
 
@@ -17,7 +17,14 @@ const defaultUploadElement = <Icon as={PiUploadSimpleBold} boxSize={16} />;
 
 const defaultNoContentFallback = <IAINoContentFallback icon={PiImageBold} />;
 
+const baseStyles: SystemStyleObject = {
+  touchAction: 'none',
+  userSelect: 'none',
+  webkitUserSelect: 'none',
+};
+
 const sx: SystemStyleObject = {
+  ...baseStyles,
   '.gallery-image-container::before': {
     content: '""',
     display: 'inline-block',
@@ -168,75 +175,74 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     [imageDTO]
   );
 
+  const ref = useRef<HTMLDivElement>(null);
+  useImageContextMenu(imageDTO, ref);
+
   return (
-    <ImageContextMenu imageDTO={imageDTO}>
-      {(ref) => (
+    <Flex
+      ref={ref}
+      onMouseOver={handleMouseOver}
+      onMouseOut={handleMouseOut}
+      width="full"
+      height="full"
+      alignItems="center"
+      justifyContent="center"
+      position="relative"
+      minW={minSize ? minSize : undefined}
+      minH={minSize ? minSize : undefined}
+      userSelect="none"
+      cursor={isDragDisabled || !imageDTO ? 'default' : 'pointer'}
+      sx={withHoverOverlay ? sx : baseStyles}
+      data-selected={isSelectedForCompare ? 'selectedForCompare' : isSelected ? 'selected' : undefined}
+      {...rest}
+    >
+      {imageDTO && (
         <Flex
-          ref={ref}
-          onMouseOver={handleMouseOver}
-          onMouseOut={handleMouseOut}
-          width="full"
-          height="full"
+          className="gallery-image-container"
+          w="full"
+          h="full"
+          position={fitContainer ? 'absolute' : 'relative'}
           alignItems="center"
           justifyContent="center"
-          position="relative"
-          minW={minSize ? minSize : undefined}
-          minH={minSize ? minSize : undefined}
-          userSelect="none"
-          cursor={isDragDisabled || !imageDTO ? 'default' : 'pointer'}
-          sx={withHoverOverlay ? sx : undefined}
-          data-selected={isSelectedForCompare ? 'selectedForCompare' : isSelected ? 'selected' : undefined}
-          {...rest}
         >
-          {imageDTO && (
-            <Flex
-              className="gallery-image-container"
-              w="full"
-              h="full"
-              position={fitContainer ? 'absolute' : 'relative'}
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Image
-                src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
-                fallbackStrategy="beforeLoadOrError"
-                fallbackSrc={useThumbailFallback ? imageDTO.thumbnail_url : undefined}
-                fallback={useThumbailFallback ? undefined : <IAILoadingImageFallback image={imageDTO} />}
-                onError={onError}
-                draggable={false}
-                w={imageDTO.width}
-                objectFit="contain"
-                maxW="full"
-                maxH="full"
-                borderRadius="base"
-                sx={imageSx}
-                data-testid={dataTestId}
-              />
-              {withMetadataOverlay && <ImageMetadataOverlay imageDTO={imageDTO} />}
-            </Flex>
-          )}
-          {!imageDTO && !isUploadDisabled && (
-            <>
-              <Flex sx={uploadButtonStyles} {...getUploadButtonProps()}>
-                <input {...getUploadInputProps()} />
-                {uploadElement}
-              </Flex>
-            </>
-          )}
-          {!imageDTO && isUploadDisabled && noContentFallback}
-          {imageDTO && !isDragDisabled && (
-            <IAIDraggable
-              data={draggableData}
-              disabled={isDragDisabled || !imageDTO}
-              onClick={onClick}
-              onAuxClick={openInNewTab}
-            />
-          )}
-          {children}
-          {!isDropDisabled && <IAIDroppable data={droppableData} disabled={isDropDisabled} dropLabel={dropLabel} />}
+          <Image
+            src={thumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
+            fallbackStrategy="beforeLoadOrError"
+            fallbackSrc={useThumbailFallback ? imageDTO.thumbnail_url : undefined}
+            fallback={useThumbailFallback ? undefined : <IAILoadingImageFallback image={imageDTO} />}
+            onError={onError}
+            draggable={false}
+            w={imageDTO.width}
+            objectFit="contain"
+            maxW="full"
+            maxH="full"
+            borderRadius="base"
+            sx={imageSx}
+            data-testid={dataTestId}
+          />
+          {withMetadataOverlay && <ImageMetadataOverlay imageDTO={imageDTO} />}
         </Flex>
       )}
-    </ImageContextMenu>
+      {!imageDTO && !isUploadDisabled && (
+        <>
+          <Flex sx={uploadButtonStyles} {...getUploadButtonProps()}>
+            <input {...getUploadInputProps()} />
+            {uploadElement}
+          </Flex>
+        </>
+      )}
+      {!imageDTO && isUploadDisabled && noContentFallback}
+      {imageDTO && !isDragDisabled && (
+        <IAIDraggable
+          data={draggableData}
+          disabled={isDragDisabled || !imageDTO}
+          onClick={onClick}
+          onAuxClick={openInNewTab}
+        />
+      )}
+      {children}
+      {!isDropDisabled && <IAIDroppable data={droppableData} disabled={isDropDisabled} dropLabel={dropLabel} />}
+    </Flex>
   );
 };
 
