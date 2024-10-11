@@ -70,11 +70,16 @@ export const BoardsListSortControls = () => {
     <Flex flexDir="column" gap={4}>
       <FormControl orientation="horizontal" gap={1}>
         <FormLabel>{t('common.orderBy')}</FormLabel>
-        <Combobox value={valueOrderBy} options={ORDER_BY_OPTIONS} onChange={onChangeOrderBy} />
+        <Combobox isSearchable={false} value={valueOrderBy} options={ORDER_BY_OPTIONS} onChange={onChangeOrderBy} />
       </FormControl>
       <FormControl orientation="horizontal" gap={1}>
         <FormLabel>{t('common.direction')}</FormLabel>
-        <Combobox value={valueDirection} options={DIRECTION_OPTIONS} onChange={onChangeDirection} />
+        <Combobox
+          isSearchable={false}
+          value={valueDirection}
+          options={DIRECTION_OPTIONS}
+          onChange={onChangeDirection}
+        />
       </FormControl>
     </Flex>
   );
