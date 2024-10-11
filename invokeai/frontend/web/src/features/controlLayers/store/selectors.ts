@@ -339,6 +339,16 @@ export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdenti
   );
 };
 
+/**
+ * Builds a selector taht selects if the entity is selected.
+ */
+export const buildSelectIsSelected = (entityIdentifier: CanvasEntityIdentifier) => {
+  return createSelector(
+    selectSelectedEntityIdentifier,
+    (selectedEntityIdentifier) => selectedEntityIdentifier?.id === entityIdentifier.id
+  );
+};
+
 export const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);
 export const selectHeight = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.height);
 export const selectAspectRatioID = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.id);
