@@ -1,5 +1,4 @@
 import { getStore } from 'app/store/nanostores/store';
-import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
@@ -46,7 +45,7 @@ export const checkImageAccess = async (name: string): Promise<boolean> => {
 export const checkBoardAccess = async (id: string): Promise<boolean> => {
   const { dispatch } = getStore();
   try {
-    const req = dispatch(boardsApi.endpoints.listAllBoards.initiate({include_archived: true}));
+    const req = dispatch(boardsApi.endpoints.listAllBoards.initiate({ include_archived: true }));
     req.unsubscribe();
     const result = await req.unwrap();
     return result.some((b) => b.board_id === id);

@@ -1,10 +1,20 @@
-import { Box, Divider, Flex, IconButton, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Divider,
+  Flex,
+  IconButton,
+  Popover,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+} from '@invoke-ai/ui-library';
 import BoardAutoAddSelect from 'features/gallery/components/Boards/BoardAutoAddSelect';
 import AutoAssignBoardCheckbox from 'features/gallery/components/GallerySettingsPopover/AutoAssignBoardCheckbox';
 import ShowArchivedBoardsCheckbox from 'features/gallery/components/GallerySettingsPopover/ShowArchivedBoardsCheckbox';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearSixFill } from 'react-icons/pi';
+
 import { BoardsListSortControls } from './BoardsListSortControls';
 
 const BoardsSettingsPopover = () => {
@@ -28,8 +38,10 @@ const BoardsSettingsPopover = () => {
             <AutoAssignBoardCheckbox />
             <ShowArchivedBoardsCheckbox />
             <BoardAutoAddSelect />
-            <Box py={2}><Divider /></Box>
-            
+            <Box py={2}>
+              <Divider />
+            </Box>
+
             <BoardsListSortControls />
           </Flex>
         </PopoverBody>

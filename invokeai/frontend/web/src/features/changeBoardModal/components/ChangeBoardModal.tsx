@@ -28,7 +28,7 @@ const ChangeBoardModal = () => {
   useAssertSingleton('ChangeBoardModal');
   const dispatch = useAppDispatch();
   const [selectedBoard, setSelectedBoard] = useState<string | null>();
-  const { data: boards, isFetching } = useListAllBoardsQuery({include_archived: true});
+  const { data: boards, isFetching } = useListAllBoardsQuery({ include_archived: true });
   const isModalOpen = useAppSelector(selectIsModalOpen);
   const imagesToChange = useAppSelector(selectImagesToChange);
   const [addImagesToBoard] = useAddImagesToBoardMutation();

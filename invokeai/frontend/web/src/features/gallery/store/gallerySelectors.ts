@@ -49,7 +49,6 @@ export const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => 
 export const selectBoardsListOrderBy = createSelector(selectGallerySlice, (gallery) => gallery.boardsListOrderBy);
 export const selectBoardsListOrderDir = createSelector(selectGallerySlice, (gallery) => gallery.boardsListOrderDir);
 
-
 export const selectSelectionCount = createSelector(selectGallerySlice, (gallery) => gallery.selection.length);
 export const selectHasMultipleImagesSelected = createSelector(selectSelectionCount, (count) => count > 1);
 export const selectGalleryImageMinimumWidth = createSelector(

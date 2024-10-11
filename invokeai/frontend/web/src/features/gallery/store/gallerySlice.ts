@@ -26,7 +26,7 @@ const initialGalleryState: GalleryState = {
   comparisonFit: 'fill',
   shouldShowArchivedBoards: false,
   boardsListOrderBy: 'created_at',
-  boardsListOrderDir: "DESC",
+  boardsListOrderDir: 'DESC',
 };
 
 export const gallerySlice = createSlice({
@@ -195,7 +195,7 @@ export const {
   shouldShowArchivedBoardsChanged,
   searchTermChanged,
   boardsListOrderByChanged,
-  boardsListOrderDirChanged
+  boardsListOrderDirChanged,
 } = gallerySlice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;
