@@ -5,9 +5,10 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.board_records.board_records_common import BoardChanges
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 boards_router = APIRouter(prefix="/v1/boards", tags=["boards"])
 
@@ -115,6 +116,10 @@ async def delete_board(
     response_model=Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]],
 )
 async def list_boards(
+    order_by: BoardRecordOrderBy = Query(
+        default=BoardRecordOrderBy.CreatedAt, description="The attribute to order by"
+    ),
+    direction: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The direction to order by"),
     all: Optional[bool] = Query(default=None, description="Whether to list all boards"),
     offset: Optional[int] = Query(default=None, description="The page offset"),
     limit: Optional[int] = Query(default=None, description="The number of boards per page"),
@@ -122,9 +127,9 @@ async def list_boards(
 ) -> Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]]:
     """Gets a list of boards"""
     if all:
-        return ApiDependencies.invoker.services.boards.get_all(include_archived)
+        return ApiDependencies.invoker.services.boards.get_all(order_by, direction, include_archived)
     elif offset is not None and limit is not None:
-        return ApiDependencies.invoker.services.boards.get_many(offset, limit, include_archived)
+        return ApiDependencies.invoker.services.boards.get_many(order_by, direction, offset, limit, include_archived)
     else:
         raise HTTPException(
             status_code=400,
