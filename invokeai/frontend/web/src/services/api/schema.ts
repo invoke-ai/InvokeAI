@@ -20040,7 +20040,7 @@ export interface operations {
                 /** @description The direction to order by */
                 direction?: components["schemas"]["SQLiteDirection"];
                 /** @description The category of workflow to get */
-                category?: components["schemas"]["WorkflowCategory"] | null;
+                category?: components["schemas"]["WorkflowCategory"];
                 /** @description The text to query by (matches name and description) */
                 query?: string | null;
             };
