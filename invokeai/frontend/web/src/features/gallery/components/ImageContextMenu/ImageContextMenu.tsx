@@ -34,21 +34,14 @@ export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: R
   const longPressTimeoutRef = useRef(0);
   const animationTimeoutRef = useRef(0);
 
-  const activate = useCallback(
-    (x: number, y: number) => {
-      $imageContextMenuState.set({
-        isOpen: true,
-        position: { x, y },
-        imageDTO: imageDTO ?? null,
-      });
-    },
-    [imageDTO]
-  );
-
   const onContextMenu = useCallback(
     (e: MouseEvent | PointerEvent) => {
       if (e.shiftKey) {
         onClose();
+        return;
+      }
+
+      if (!imageDTO) {
         return;
       }
 
@@ -62,17 +55,25 @@ export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: R
             onClose();
           }
           animationTimeoutRef.current = window.setTimeout(() => {
-            activate(e.pageX, e.pageY);
+            $imageContextMenuState.set({
+              isOpen: true,
+              position: { x: e.pageX, y: e.pageY },
+              imageDTO,
+            });
           }, 100);
         } else {
           // else we can just open the menu at the current position
-          activate(e.pageX, e.pageY);
+          $imageContextMenuState.set({
+            isOpen: true,
+            position: { x: e.pageX, y: e.pageY },
+            imageDTO,
+          });
         }
       }
 
       lastPositionRef.current = { x: e.pageX, y: e.pageY };
     },
-    [activate, targetRef]
+    [imageDTO, targetRef]
   );
 
   // Use a long press to open the context menu on touch devices
