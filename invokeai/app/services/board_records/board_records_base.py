@@ -40,12 +40,19 @@ class BoardRecordStorageBase(ABC):
 
     @abstractmethod
     def get_many(
-        self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, offset: int = 0, limit: int = 10, include_archived: bool = False, 
+        self,
+        order_by: BoardRecordOrderBy,
+        direction: SQLiteDirection,
+        offset: int = 0,
+        limit: int = 10,
+        include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardRecord]:
         """Gets many board records."""
         pass
 
     @abstractmethod
-    def get_all(self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False) -> list[BoardRecord]:
+    def get_all(
+        self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
+    ) -> list[BoardRecord]:
         """Gets all board records."""
         pass

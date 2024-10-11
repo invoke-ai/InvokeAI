@@ -116,9 +116,7 @@ async def delete_board(
     response_model=Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]],
 )
 async def list_boards(
-    order_by: BoardRecordOrderBy = Query(
-        default=BoardRecordOrderBy.CreatedAt, description="The attribute to order by"
-    ),
+    order_by: BoardRecordOrderBy = Query(default=BoardRecordOrderBy.CreatedAt, description="The attribute to order by"),
     direction: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The direction to order by"),
     all: Optional[bool] = Query(default=None, description="Whether to list all boards"),
     offset: Optional[int] = Query(default=None, description="The page offset"),

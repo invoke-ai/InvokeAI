@@ -61,11 +61,13 @@ class BoardChanges(BaseModel, extra="forbid"):
     cover_image_name: Optional[str] = Field(default=None, description="The name of the board's new cover image.")
     archived: Optional[bool] = Field(default=None, description="Whether or not the board is archived")
 
+
 class BoardRecordOrderBy(str, Enum, metaclass=MetaEnum):
     """The order by options for board records"""
 
     CreatedAt = "created_at"
     Name = "board_name"
+
 
 class BoardRecordNotFoundException(Exception):
     """Raised when an board record is not found."""

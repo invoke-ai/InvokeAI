@@ -146,7 +146,12 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         return self.get(board_id)
 
     def get_many(
-        self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, offset: int = 0, limit: int = 10, include_archived: bool = False
+        self,
+        order_by: BoardRecordOrderBy,
+        direction: SQLiteDirection,
+        offset: int = 0,
+        limit: int = 10,
+        include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardRecord]:
         try:
             self._lock.acquire()
@@ -163,11 +168,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             # Determine archived filter condition
             archived_filter = "" if include_archived else "WHERE archived = 0"
 
-            final_query = base_query.format(
-                archived_filter=archived_filter,
-                order_by=order_by,
-                direction=direction
-            )
+            final_query = base_query.format(archived_filter=archived_filter, order_by=order_by, direction=direction)
 
             # Execute query to fetch boards
             self._cursor.execute(final_query, (limit, offset))
@@ -201,7 +202,9 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         finally:
             self._lock.release()
 
-    def get_all(self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False) -> list[BoardRecord]:
+    def get_all(
+        self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
+    ) -> list[BoardRecord]:
         try:
             self._lock.acquire()
 
@@ -222,11 +225,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
 
             archived_filter = "" if include_archived else "WHERE archived = 0"
 
-            final_query = base_query.format(
-                archived_filter=archived_filter,
-                order_by=order_by,
-                direction=direction
-            )
+            final_query = base_query.format(archived_filter=archived_filter, order_by=order_by, direction=direction)
 
             self._cursor.execute(final_query)
 
