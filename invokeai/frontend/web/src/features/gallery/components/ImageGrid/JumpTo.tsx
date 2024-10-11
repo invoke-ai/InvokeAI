@@ -11,11 +11,11 @@ import {
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
-export const JumpTo = () => {
+export const JumpTo = memo(() => {
   const { t } = useTranslation();
   const { goToPage, currentPage, pages } = useGalleryPagination();
   const [newPage, setNewPage] = useState(currentPage);
@@ -64,7 +64,7 @@ export const JumpTo = () => {
   }, [currentPage]);
 
   return (
-    <Popover isOpen={isOpen} onClose={onClose} onOpen={onOpen}>
+    <Popover isOpen={isOpen} onClose={onClose} onOpen={onOpen} isLazy lazyBehavior="unmount">
       <PopoverTrigger>
         <Button aria-label={t('gallery.jump')} size="sm" onClick={onToggle} variant="outline">
           {t('gallery.jump')}
@@ -94,4 +94,6 @@ export const JumpTo = () => {
       </PopoverContent>
     </Popover>
   );
-};
+});
+
+JumpTo.displayName = 'JumpTo';
