@@ -242,4 +242,4 @@ export type PostUploadAction =
   | UpscaleInitialImageAction
   | ReplaceLayerWithImagePostUploadAction;
 
-export type BoardRecordOrderBy = S["BoardRecordOrderBy"]
+export type BoardRecordOrderBy = S['BoardRecordOrderBy'];

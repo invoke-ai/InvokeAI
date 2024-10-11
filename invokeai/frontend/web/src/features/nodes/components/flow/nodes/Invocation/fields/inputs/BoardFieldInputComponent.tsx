@@ -13,25 +13,28 @@ const BoardFieldInputComponent = (props: FieldComponentProps<BoardFieldInputInst
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { options, hasBoards } = useListAllBoardsQuery({include_archived: true}, {
-    selectFromResult: ({ data }) => {
-      const options: ComboboxOption[] = [
-        {
-          label: 'None',
-          value: 'none',
-        },
-      ].concat(
-        (data ?? []).map(({ board_id, board_name }) => ({
-          label: board_name,
-          value: board_id,
-        }))
-      );
-      return {
-        options,
-        hasBoards: options.length > 1,
-      };
-    },
-  });
+  const { options, hasBoards } = useListAllBoardsQuery(
+    { include_archived: true },
+    {
+      selectFromResult: ({ data }) => {
+        const options: ComboboxOption[] = [
+          {
+            label: 'None',
+            value: 'none',
+          },
+        ].concat(
+          (data ?? []).map(({ board_id, board_name }) => ({
+            label: board_name,
+            value: board_id,
+          }))
+        );
+        return {
+          options,
+          hasBoards: options.length > 1,
+        };
+      },
+    }
+  );
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {

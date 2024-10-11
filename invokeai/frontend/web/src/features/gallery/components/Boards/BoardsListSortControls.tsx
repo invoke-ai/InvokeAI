@@ -1,16 +1,11 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
-import {
-  Combobox,
-  Flex,
-  FormControl,
-  FormLabel,
-} from '@invoke-ai/ui-library';
+import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectBoardsListOrderBy, selectBoardsListOrderDir } from 'features/gallery/store/gallerySelectors';
+import { boardsListOrderByChanged, boardsListOrderDirChanged } from 'features/gallery/store/gallerySlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { boardsListOrderByChanged, boardsListOrderDirChanged } from '../../store/gallerySlice';
-import { selectBoardsListOrderBy, selectBoardsListOrderDir } from '../../store/gallerySelectors';
 
 const zOrderBy = z.enum(['created_at', 'board_name']);
 type OrderBy = z.infer<typeof zOrderBy>;
@@ -54,9 +49,7 @@ export const BoardsListSortControls = () => {
     [orderBy, dispatch]
   );
   const valueOrderBy = useMemo(() => {
-    const orderByValue =  ORDER_BY_OPTIONS.find((o) => o.value === orderBy) || ORDER_BY_OPTIONS[0];
-    console.log({orderByValue})
-    return orderByValue
+    return ORDER_BY_OPTIONS.find((o) => o.value === orderBy) || ORDER_BY_OPTIONS[0];
   }, [orderBy, ORDER_BY_OPTIONS]);
 
   const onChangeDirection = useCallback<ComboboxOnChange>(

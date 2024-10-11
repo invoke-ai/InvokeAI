@@ -28,6 +28,6 @@ export type GalleryState = {
   comparisonMode: ComparisonMode;
   comparisonFit: ComparisonFit;
   shouldShowArchivedBoards: boolean;
-  boardsListOrderBy: BoardRecordOrderBy,
-  boardsListOrderDir: OrderDir
+  boardsListOrderBy: BoardRecordOrderBy;
+  boardsListOrderDir: OrderDir;
 };
