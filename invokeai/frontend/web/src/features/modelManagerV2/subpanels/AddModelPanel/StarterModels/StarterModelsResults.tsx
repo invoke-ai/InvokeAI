@@ -1,9 +1,19 @@
-import { Flex, IconButton, Input, InputGroup, InputRightElement, Text } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Flex,
+  Icon,
+  IconButton,
+  Input,
+  InputGroup,
+  InputRightElement,
+  Text,
+  Tooltip,
+} from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiXBold } from 'react-icons/pi';
+import { PiInfoBold, PiXBold } from 'react-icons/pi';
 import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
 
 import { StarterBundle } from './StarterBundle';
@@ -47,17 +57,28 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
     <Flex flexDir="column" gap={3} height="100%">
       <Flex justifyContent="space-between" alignItems="center">
         {!!Object.keys(results.starter_bundles).length && (
-          <Flex gap={2} alignItems="center">
-            <Text fontWeight="semibold">{t('modelManager.starterBundles')}:</Text>
-            {Object.keys(results.starter_bundles).map((bundleName) => (
-              <>
-                {results.starter_bundles[bundleName] ? (
-                  <StarterBundle bundleName={bundleName} bundle={results.starter_bundles[bundleName]} />
-                ) : (
-                  <></>
-                )}
-              </>
-            ))}
+          <Flex gap={4} alignItems="center">
+            <Flex gap={1} alignItems="center">
+              <Text color="base.200" fontWeight="semibold">
+                {t('modelManager.starterBundles')}
+              </Text>
+              <Tooltip label={t('modelManager.starterBundleHelpText')}>
+                <Box>
+                  <Icon as={PiInfoBold} color="base.200" />
+                </Box>
+              </Tooltip>
+            </Flex>
+            <Flex gap={2}>
+              {Object.keys(results.starter_bundles).map((bundleName) => (
+                <>
+                  {results.starter_bundles[bundleName] ? (
+                    <StarterBundle bundleName={bundleName} bundle={results.starter_bundles[bundleName]} />
+                  ) : (
+                    <></>
+                  )}
+                </>
+              ))}
+            </Flex>
           </Flex>
         )}
         <InputGroup w={64} size="xs">

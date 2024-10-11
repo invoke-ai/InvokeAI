@@ -1,13 +1,28 @@
-import { Flex, Spinner, Text } from '@invoke-ai/ui-library';
+import { Button, Divider, Flex, Spinner, Text } from '@invoke-ai/ui-library';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvokeLogoIcon } from 'common/components/InvokeLogoIcon';
 import { LOADING_SYMBOL, useHasImages } from 'features/gallery/hooks/useHasImages';
+import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallModels';
+import { setActiveTab } from 'features/ui/store/uiSlice';
+import { useCallback } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
 
 export const NoContentForViewer = () => {
   const hasImages = useHasImages();
   const { t } = useTranslation();
+  const dispatch = useAppDispatch()
+
+  const handleClickDownloadStarterModels= useCallback(() => {
+    dispatch(setActiveTab('models'));
+    $installModelsTab.set(3);
+  }, [dispatch])
+
+  const handleClickImportModels= useCallback(() => {
+    dispatch(setActiveTab('models'));
+    $installModelsTab.set(0);
+  }, [dispatch])
 
   if (hasImages === LOADING_SYMBOL) {
     return (
@@ -28,32 +43,47 @@ export const NoContentForViewer = () => {
   return (
     <Flex flexDir="column" gap={4} alignItems="center" textAlign="center" maxW="600px">
       <InvokeLogoIcon w={40} h={40} />
-      <Text fontSize="md" color="base.200" pt={16}>
-        <Trans
-          i18nKey="newUserExperience.toGetStarted"
-          components={{
-            StrongComponent: <Text as="span" color="white" fontSize="md" fontWeight="semibold" />,
-          }}
-        />
-      </Text>
+      <Flex flexDir="column" gap={8} alignItems="center" textAlign="center">
+        <Text fontSize="md" color="base.200" pt={16}>
+          <Trans
+            i18nKey="newUserExperience.toGetStarted"
+            components={{
+              StrongComponent: <Text as="span" color="white" fontSize="md" fontWeight="semibold" />,
+            }}
+          />
+        </Text>
 
-      <Text fontSize="md" color="base.200">
-        <Trans
-          i18nKey="newUserExperience.gettingStartedSeries"
-          components={{
-            LinkComponent: (
-              <Text
-                as="a"
-                color="white"
-                fontSize="md"
-                fontWeight="semibold"
-                href="https://www.youtube.com/playlist?list=PLvWK1Kc8iXGrQy8r9TYg6QdUuJ5MMx-ZO"
-                target="_blank"
-              />
-            ),
-          }}
-        />
-      </Text>
+        <Flex flexDir="column" gap={2} alignItems="center">
+          <Text fontSize="md" color="base.200">
+            {t("newUserExperience.noModelsInstalled")}
+          </Text>
+          <Flex gap={3} alignItems="center">
+            <Button size="sm" onClick={handleClickDownloadStarterModels}>{t('newUserExperience.downloadStarterModels')}</Button>
+            <Text fontSize="sm" color="base.200">{t("common.or")}</Text>
+            <Button size="sm" onClick={handleClickImportModels}>{t('newUserExperience.importModels')}</Button>
+          </Flex>
+        </Flex>
+
+        <Divider />
+
+        <Text fontSize="md" color="base.200">
+          <Trans
+            i18nKey="newUserExperience.gettingStartedSeries"
+            components={{
+              LinkComponent: (
+                <Text
+                  as="a"
+                  color="white"
+                  fontSize="md"
+                  fontWeight="semibold"
+                  href="https://www.youtube.com/playlist?list=PLvWK1Kc8iXGrQy8r9TYg6QdUuJ5MMx-ZO"
+                  target="_blank"
+                />
+              ),
+            }}
+          />
+        </Text>
+      </Flex>
     </Flex>
   );
 };
