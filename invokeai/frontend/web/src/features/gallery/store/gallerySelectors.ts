@@ -32,6 +32,8 @@ export const selectListImagesQueryArgs = createMemoizedSelector(
 export const selectListBoardsQueryArgs = createMemoizedSelector(
   selectGallerySlice,
   (gallery): ListBoardsArgs => ({
+    order_by: gallery.boardsListOrderBy,
+    direction: gallery.boardsListOrderDir,
     include_archived: gallery.shouldShowArchivedBoards ? true : undefined,
   })
 );
@@ -44,6 +46,10 @@ export const selectAutoAssignBoardOnClick = createSelector(
 );
 export const selectBoardSearchText = createSelector(selectGallerySlice, (gallery) => gallery.boardSearchText);
 export const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
+export const selectBoardsListOrderBy = createSelector(selectGallerySlice, (gallery) => gallery.boardsListOrderBy);
+export const selectBoardsListOrderDir = createSelector(selectGallerySlice, (gallery) => gallery.boardsListOrderDir);
+
+
 export const selectSelectionCount = createSelector(selectGallerySlice, (gallery) => gallery.selection.length);
 export const selectHasMultipleImagesSelected = createSelector(selectSelectionCount, (count) => count > 1);
 export const selectGalleryImageMinimumWidth = createSelector(

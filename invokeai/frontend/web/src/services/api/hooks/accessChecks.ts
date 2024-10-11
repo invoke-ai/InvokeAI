@@ -44,10 +44,9 @@ export const checkImageAccess = async (name: string): Promise<boolean> => {
  * @returns A promise that resolves to true if the client has access, else false.
  */
 export const checkBoardAccess = async (id: string): Promise<boolean> => {
-  const { dispatch, getState } = getStore();
+  const { dispatch } = getStore();
   try {
-    const queryArgs = selectListBoardsQueryArgs(getState());
-    const req = dispatch(boardsApi.endpoints.listAllBoards.initiate(queryArgs));
+    const req = dispatch(boardsApi.endpoints.listAllBoards.initiate({include_archived: true}));
     req.unsubscribe();
     const result = await req.unwrap();
     return result.some((b) => b.board_id === id);

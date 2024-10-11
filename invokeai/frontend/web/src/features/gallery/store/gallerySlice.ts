@@ -2,7 +2,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
 import type { PersistConfig, RootState } from 'app/store/store';
 import { isEqual, uniqBy } from 'lodash-es';
-import type { ImageDTO } from 'services/api/types';
+import type { BoardRecordOrderBy, ImageDTO } from 'services/api/types';
 
 import type { BoardId, ComparisonMode, GalleryState, GalleryView, OrderDir } from './types';
 
@@ -25,6 +25,8 @@ const initialGalleryState: GalleryState = {
   comparisonMode: 'slider',
   comparisonFit: 'fill',
   shouldShowArchivedBoards: false,
+  boardsListOrderBy: 'created_at',
+  boardsListOrderDir: "DESC",
 };
 
 export const gallerySlice = createSlice({
@@ -161,6 +163,12 @@ export const gallerySlice = createSlice({
       state.searchTerm = action.payload;
       state.offset = 0;
     },
+    boardsListOrderByChanged: (state, action: PayloadAction<BoardRecordOrderBy>) => {
+      state.boardsListOrderBy = action.payload;
+    },
+    boardsListOrderDirChanged: (state, action: PayloadAction<OrderDir>) => {
+      state.boardsListOrderDir = action.payload;
+    },
   },
 });
 
@@ -186,6 +194,8 @@ export const {
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
   searchTermChanged,
+  boardsListOrderByChanged,
+  boardsListOrderDirChanged
 } = gallerySlice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;

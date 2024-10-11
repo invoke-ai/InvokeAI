@@ -1,7 +1,6 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldBoardValueChanged } from 'features/nodes/store/nodesSlice';
 import type { BoardFieldInputInstance, BoardFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
@@ -14,8 +13,7 @@ const BoardFieldInputComponent = (props: FieldComponentProps<BoardFieldInputInst
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const queryArgs = useAppSelector(selectListBoardsQueryArgs);
-  const { options, hasBoards } = useListAllBoardsQuery(queryArgs, {
+  const { options, hasBoards } = useListAllBoardsQuery({include_archived: true}, {
     selectFromResult: ({ data }) => {
       const options: ComboboxOption[] = [
         {
