@@ -24,6 +24,15 @@ export default defineConfig(({ mode }) => {
         cssInjectedByJsPlugin(),
       ],
       build: {
+        /**
+         * zone.js (via faro) requires max ES2015 to prevent spamming unhandled promise rejections.
+         *
+         * See:
+         * - https://github.com/grafana/faro-web-sdk/issues/566
+         * - https://github.com/angular/angular/issues/51328
+         * - https://github.com/open-telemetry/opentelemetry-js/issues/3030
+         */
+        target: 'ES2015',
         cssCodeSplit: true,
         lib: {
           entry: path.resolve(__dirname, './src/index.ts'),
