@@ -241,3 +241,5 @@ export type PostUploadAction =
   | RGIPAdapterImagePostUploadAction
   | UpscaleInitialImageAction
   | ReplaceLayerWithImagePostUploadAction;
+
+export type BoardRecordOrderBy = S['BoardRecordOrderBy'];

@@ -15,8 +15,8 @@ import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import BoardsListWrapper from './Boards/BoardsList/BoardsListWrapper';
 import BoardsSearch from './Boards/BoardsList/BoardsSearch';
+import BoardsSettingsPopover from './Boards/BoardsSettingsPopover';
 import { Gallery } from './Gallery';
-import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 
@@ -64,7 +64,7 @@ const GalleryPanelContent = () => {
         </Flex>
         <GalleryHeader />
         <Flex h="full" w="25%" justifyContent="flex-end">
-          <GallerySettingsPopover />
+          <BoardsSettingsPopover />
           <IconButton
             size="sm"
             variant="link"
