@@ -728,6 +728,7 @@
         "huggingFaceHelper": "If multiple models are found in this repo, you will be prompted to select one to install.",
         "hfToken": "HuggingFace Token",
         "imageEncoderModelId": "Image Encoder Model ID",
+        "includesNModels": "Includes {{n}} models and their dependencies",
         "installQueue": "Install Queue",
         "inplaceInstall": "In-place install",
         "inplaceInstallDesc": "Install models without copying the files. When using the model, it will be loaded from its this location. If disabled, the model file(s) will be copied into the Invoke-managed models directory during installation.",
@@ -781,6 +782,7 @@
         "simpleModelPlaceholder": "URL or path to a local file or diffusers folder",
         "source": "Source",
         "spandrelImageToImage": "Image to Image (Spandrel)",
+        "starterBundles": "Starter Bundles",
         "starterModels": "Starter Models",
         "starterModelsInModelManager": "Starter Models can be found in Model Manager",
         "syncModels": "Sync Models",
@@ -1990,7 +1992,7 @@
         }
     },
     "newUserExperience": {
-        "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
+        "toGetStarted": "To get started, make sure to download or import models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio."
     },
     "whatsNew": {
