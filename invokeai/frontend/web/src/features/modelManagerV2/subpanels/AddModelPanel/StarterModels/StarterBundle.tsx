@@ -71,8 +71,11 @@ export const StarterBundle = ({
         </Flex>
       }
     >
-      <Button flexDir="column" size="sm" onClick={handleClickBundle}>
-        {isMainModelBase(bundleName) && MODEL_TYPE_SHORT_MAP[bundleName]}
+      <Button  size="sm" onClick={handleClickBundle}  py={6} >
+        <Flex flexDir="column">
+        <Text>{isMainModelBase(bundleName) && MODEL_TYPE_SHORT_MAP[bundleName]}</Text>
+        <Text fontSize="xs">({bundle.length} {t("settings.models")})</Text>
+        </Flex>
       </Button>
     </Tooltip>
   );
