@@ -16,7 +16,7 @@ import {
   selectIsolatedTransformingPreview,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
-  buildEntityIsHiddenSelector,
+  buildSelectIsHidden,
   buildSelectIsSelected,
   selectBboxRect,
   selectCanvasSlice,
@@ -250,7 +250,7 @@ export abstract class CanvasEntityAdapterBase<
     assert(state !== undefined, 'Missing entity state on creation');
     this.state = state;
 
-    this.selectIsHidden = buildEntityIsHiddenSelector(this.entityIdentifier);
+    this.selectIsHidden = buildSelectIsHidden(this.entityIdentifier);
     this.selectIsSelected = buildSelectIsSelected(this.entityIdentifier);
 
     /**
