@@ -63,7 +63,6 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
     () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name === imageDTO.image_name),
     [imageDTO.image_name]
   );
-  const alwaysShowImageSizeBadge = useAppSelector(selectAlwaysShouldImageSizeBadge);
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
 
@@ -120,6 +119,8 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
         justifyContent="center"
         alignItems="center"
         aspectRatio="1/1"
+        onMouseOver={handleMouseOver}
+        onMouseOut={handleMouseOut}
       >
         <IAIDndImage
           onClick={handleClick}
@@ -134,15 +135,8 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
           isUploadDisabled={true}
           thumbnail={true}
           withHoverOverlay
-          onMouseOver={handleMouseOver}
-          onMouseOut={handleMouseOut}
         >
-          <>
-            {(isHovered || alwaysShowImageSizeBadge) && <SizeBadge imageDTO={imageDTO} />}
-            {(isHovered || imageDTO.starred) && <StarIcon imageDTO={imageDTO} />}
-            {isHovered && <DeleteIcon imageDTO={imageDTO} />}
-            {isHovered && <OpenInViewerIconButton imageDTO={imageDTO} />}
-          </>
+          <HoverIcons imageDTO={imageDTO} isHovered={isHovered} />
         </IAIDndImage>
       </Flex>
     </Box>
@@ -150,6 +144,20 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
 });
 
 GalleryImageContent.displayName = 'GalleryImageContent';
+
+const HoverIcons = memo(({ imageDTO, isHovered }: { imageDTO: ImageDTO; isHovered: boolean }) => {
+  const alwaysShowImageSizeBadge = useAppSelector(selectAlwaysShouldImageSizeBadge);
+
+  return (
+    <>
+      {(isHovered || alwaysShowImageSizeBadge) && <SizeBadge imageDTO={imageDTO} />}
+      {(isHovered || imageDTO.starred) && <StarIcon imageDTO={imageDTO} />}
+      {isHovered && <DeleteIcon imageDTO={imageDTO} />}
+      {isHovered && <OpenInViewerIconButton imageDTO={imageDTO} />}
+    </>
+  );
+});
+HoverIcons.displayName = 'HoverIcons';
 
 const DeleteIcon = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const shift = useShiftModifier();
