@@ -243,3 +243,4 @@ export type PostUploadAction =
   | ReplaceLayerWithImagePostUploadAction;
 
 export type BoardRecordOrderBy = S['BoardRecordOrderBy'];
+export type StarterModel = S['StarterModel'];

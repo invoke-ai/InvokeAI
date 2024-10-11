@@ -1,25 +1,24 @@
-import { Flex, IconButton, Input, InputGroup, InputRightElement } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Input, InputGroup, InputRightElement, Text } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
-import type { AnyModelConfig } from 'services/api/types';
 
+import { StarterBundle } from './StarterBundle';
 import { StarterModelsResultItem } from './StartModelsResultItem';
 
 type StarterModelsResultsProps = {
   results: NonNullable<GetStarterModelsResponse>;
-  modelList: AnyModelConfig[];
 };
 
-export const StarterModelsResults = memo(({ results, modelList }: StarterModelsResultsProps) => {
+export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredResults = useMemo(() => {
-    return results.filter((result) => {
+    return results.starter_models.filter((result) => {
       const trimmedSearchTerm = searchTerm.trim().toLowerCase();
       const matchStrings = [
         result.name.toLowerCase(),
@@ -46,7 +45,21 @@ export const StarterModelsResults = memo(({ results, modelList }: StarterModelsR
 
   return (
     <Flex flexDir="column" gap={3} height="100%">
-      <Flex justifyContent="flex-end" alignItems="center">
+      <Flex justifyContent="space-between" alignItems="center">
+        {!!Object.keys(results.starter_bundles).length && (
+          <Flex gap={2} alignItems="center">
+            <Text fontWeight="semibold">{t('modelManager.starterBundles')}:</Text>
+            {Object.keys(results.starter_bundles).map((bundleName) => (
+              <>
+                {results.starter_bundles[bundleName] ? (
+                  <StarterBundle bundleName={bundleName} bundle={results.starter_bundles[bundleName]} />
+                ) : (
+                  <></>
+                )}
+              </>
+            ))}
+          </Flex>
+        )}
         <InputGroup w={64} size="xs">
           <Input
             placeholder={t('modelManager.search')}
@@ -74,7 +87,7 @@ export const StarterModelsResults = memo(({ results, modelList }: StarterModelsR
         <ScrollableContent>
           <Flex flexDir="column" gap={3}>
             {filteredResults.map((result) => (
-              <StarterModelsResultItem key={result.source} result={result} modelList={modelList} />
+              <StarterModelsResultItem key={result.source} model={result} />
             ))}
           </Flex>
         </ScrollableContent>
