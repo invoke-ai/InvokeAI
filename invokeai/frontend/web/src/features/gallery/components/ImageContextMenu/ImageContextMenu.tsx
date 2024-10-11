@@ -29,11 +29,10 @@ const onClose = () => {
   $imageContextMenuState.setKey('isOpen', false);
 };
 const elToImageMap = new Map<HTMLDivElement, ImageDTO>();
-const getImageDTOFromMap = (target: Node) => {
-  const parent = elToImageMap.keys().find((el) => el.contains(target));
-  return parent ? elToImageMap.get(parent) : undefined;
+const getImageDTOFromMap = (target: Node): ImageDTO | undefined => {
+  const entry = Array.from(elToImageMap.entries()).find((entry) => entry[0].contains(target));
+  return entry?.[1];
 };
-
 export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: RefObject<HTMLDivElement>) => {
   useEffect(() => {
     if (!targetRef.current || !imageDTO) {
