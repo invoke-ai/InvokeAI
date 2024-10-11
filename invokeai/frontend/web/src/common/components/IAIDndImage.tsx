@@ -132,36 +132,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     [onMouseOut]
   );
 
-  const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
-    postUploadAction,
-    isDisabled: isUploadDisabled,
-  });
-
-  const uploadButtonStyles = useMemo<SystemStyleObject>(() => {
-    const styles: SystemStyleObject = {
-      minH: minSize,
-      w: 'full',
-      h: 'full',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 'base',
-      transitionProperty: 'common',
-      transitionDuration: '0.1s',
-      color: 'base.500',
-    };
-    if (!isUploadDisabled) {
-      Object.assign(styles, {
-        cursor: 'pointer',
-        bg: 'base.700',
-        _hover: {
-          bg: 'base.650',
-          color: 'base.300',
-        },
-      });
-    }
-    return styles;
-  }, [isUploadDisabled, minSize]);
-
   const openInNewTab = useCallback(
     (e: MouseEvent) => {
       if (!imageDTO) {
@@ -224,12 +194,12 @@ const IAIDndImage = (props: IAIDndImageProps) => {
         </Flex>
       )}
       {!imageDTO && !isUploadDisabled && (
-        <>
-          <Flex sx={uploadButtonStyles} {...getUploadButtonProps()}>
-            <input {...getUploadInputProps()} />
-            {uploadElement}
-          </Flex>
-        </>
+        <UploadButton
+          isUploadDisabled={isUploadDisabled}
+          postUploadAction={postUploadAction}
+          uploadElement={uploadElement}
+          minSize={minSize}
+        />
       )}
       {!imageDTO && isUploadDisabled && noContentFallback}
       {imageDTO && !isDragDisabled && (
@@ -247,3 +217,56 @@ const IAIDndImage = (props: IAIDndImageProps) => {
 };
 
 export default memo(IAIDndImage);
+
+const UploadButton = memo(
+  ({
+    isUploadDisabled,
+    postUploadAction,
+    uploadElement,
+    minSize,
+  }: {
+    isUploadDisabled: boolean;
+    postUploadAction?: PostUploadAction;
+    uploadElement: ReactNode;
+    minSize: number;
+  }) => {
+    const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
+      postUploadAction,
+      isDisabled: isUploadDisabled,
+    });
+
+    const uploadButtonStyles = useMemo<SystemStyleObject>(() => {
+      const styles: SystemStyleObject = {
+        minH: minSize,
+        w: 'full',
+        h: 'full',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 'base',
+        transitionProperty: 'common',
+        transitionDuration: '0.1s',
+        color: 'base.500',
+      };
+      if (!isUploadDisabled) {
+        Object.assign(styles, {
+          cursor: 'pointer',
+          bg: 'base.700',
+          _hover: {
+            bg: 'base.650',
+            color: 'base.300',
+          },
+        });
+      }
+      return styles;
+    }, [isUploadDisabled, minSize]);
+
+    return (
+      <Flex sx={uploadButtonStyles} {...getUploadButtonProps()}>
+        <input {...getUploadInputProps()} />
+        {uploadElement}
+      </Flex>
+    );
+  }
+);
+
+UploadButton.displayName = 'UploadButton';
