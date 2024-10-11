@@ -1,4 +1,4 @@
-import type { ImageCategory, ImageDTO } from 'services/api/types';
+import type { BoardRecordOrderBy, ImageCategory, ImageDTO } from 'services/api/types';
 
 export const IMAGE_CATEGORIES: ImageCategory[] = ['general'];
 export const ASSETS_CATEGORIES: ImageCategory[] = ['control', 'mask', 'user', 'other'];
@@ -28,4 +28,6 @@ export type GalleryState = {
   comparisonMode: ComparisonMode;
   comparisonFit: ComparisonFit;
   shouldShowArchivedBoards: boolean;
+  boardsListOrderBy: BoardRecordOrderBy,
+  boardsListOrderDir: OrderDir
 };
