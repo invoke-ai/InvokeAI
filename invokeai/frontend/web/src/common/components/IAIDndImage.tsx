@@ -115,23 +115,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     ...rest
   } = props;
 
-  const handleMouseOver = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      if (onMouseOver) {
-        onMouseOver(e);
-      }
-    },
-    [onMouseOver]
-  );
-  const handleMouseOut = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      if (onMouseOut) {
-        onMouseOut(e);
-      }
-    },
-    [onMouseOut]
-  );
-
   const openInNewTab = useCallback(
     (e: MouseEvent) => {
       if (!imageDTO) {
@@ -151,8 +134,8 @@ const IAIDndImage = (props: IAIDndImageProps) => {
   return (
     <Flex
       ref={ref}
-      onMouseOver={handleMouseOver}
-      onMouseOut={handleMouseOut}
+      onMouseOver={onMouseOver}
+      onMouseOut={onMouseOut}
       width="full"
       height="full"
       alignItems="center"
