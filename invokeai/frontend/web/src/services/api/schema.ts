@@ -2033,6 +2033,12 @@ export type components = {
              */
             board_id: string;
         };
+        /**
+         * BoardRecordOrderBy
+         * @description The order by options for board records
+         * @enum {string}
+         */
+        BoardRecordOrderBy: "created_at" | "board_name";
         /** Body_add_image_to_board */
         Body_add_image_to_board: {
             /**
@@ -18884,6 +18890,10 @@ export interface operations {
     list_boards: {
         parameters: {
             query?: {
+                /** @description The attribute to order by */
+                order_by?: components["schemas"]["BoardRecordOrderBy"];
+                /** @description The direction to order by */
+                direction?: components["schemas"]["SQLiteDirection"];
                 /** @description Whether to list all boards */
                 all?: boolean | null;
                 /** @description The page offset */
