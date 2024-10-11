@@ -28,53 +28,100 @@ const $imageContextMenuState = map<ImageContextMenuState>({
 const onClose = () => {
   $imageContextMenuState.setKey('isOpen', false);
 };
+const elToImageMap = new Map<HTMLDivElement, ImageDTO>();
+const getImageDTOFromMap = (target: Node) => {
+  const parent = elToImageMap.keys().find((el) => el.contains(target));
+  return parent ? elToImageMap.get(parent) : undefined;
+};
 
 export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: RefObject<HTMLDivElement>) => {
+  useEffect(() => {
+    if (!targetRef.current || !imageDTO) {
+      return;
+    }
+    const el = targetRef.current;
+    elToImageMap.set(el, imageDTO);
+    return () => {
+      elToImageMap.delete(el);
+    };
+  }, [imageDTO, targetRef]);
+};
+
+export const ImageContextMenu = memo(() => {
+  useAssertSingleton('ImageContextMenu');
+  const state = useStore($imageContextMenuState);
+  useGlobalMenuClose(onClose);
+
+  return (
+    <Portal>
+      <Menu isOpen={state.isOpen} gutter={0} placement="auto-end" onClose={onClose}>
+        <MenuButton
+          aria-hidden={true}
+          w={1}
+          h={1}
+          position="absolute"
+          left={state.position.x}
+          top={state.position.y}
+          cursor="default"
+          bg="transparent"
+          _hover={_hover}
+          pointerEvents="none"
+        />
+        <MenuContent />
+      </Menu>
+      <ImageContextMenuEventLogical />
+    </Portal>
+  );
+});
+
+ImageContextMenu.displayName = 'ImageContextMenu';
+
+const _hover: ChakraProps['_hover'] = { bg: 'transparent' };
+
+const ImageContextMenuEventLogical = memo(() => {
   const lastPositionRef = useRef<{ x: number; y: number }>({ x: -1, y: -1 });
   const longPressTimeoutRef = useRef(0);
   const animationTimeoutRef = useRef(0);
 
-  const onContextMenu = useCallback(
-    (e: MouseEvent | PointerEvent) => {
-      if (e.shiftKey) {
+  const onContextMenu = useCallback((e: MouseEvent | PointerEvent) => {
+    if (e.shiftKey) {
+      onClose();
+      return;
+    }
+
+    const imageDTO = getImageDTOFromMap(e.target as Node);
+
+    if (!imageDTO) {
+      onClose();
+      return;
+    }
+    // clear pending delayed open
+    window.clearTimeout(animationTimeoutRef.current);
+    e.preventDefault();
+
+    if (lastPositionRef.current.x !== e.pageX || lastPositionRef.current.y !== e.pageY) {
+      // if the mouse moved, we need to close, wait for animation and reopen the menu at the new position
+      if ($imageContextMenuState.get().isOpen) {
         onClose();
-        return;
       }
+      animationTimeoutRef.current = window.setTimeout(() => {
+        $imageContextMenuState.set({
+          isOpen: true,
+          position: { x: e.pageX, y: e.pageY },
+          imageDTO,
+        });
+      }, 100);
+    } else {
+      // else we can just open the menu at the current position
+      $imageContextMenuState.set({
+        isOpen: true,
+        position: { x: e.pageX, y: e.pageY },
+        imageDTO,
+      });
+    }
 
-      if (!imageDTO) {
-        return;
-      }
-
-      if (targetRef.current?.contains(e.target as Node) || e.target === targetRef.current) {
-        // clear pending delayed open
-        window.clearTimeout(animationTimeoutRef.current);
-        e.preventDefault();
-        if (lastPositionRef.current.x !== e.pageX || lastPositionRef.current.y !== e.pageY) {
-          // if the mouse moved, we need to close, wait for animation and reopen the menu at the new position
-          if ($imageContextMenuState.get().isOpen) {
-            onClose();
-          }
-          animationTimeoutRef.current = window.setTimeout(() => {
-            $imageContextMenuState.set({
-              isOpen: true,
-              position: { x: e.pageX, y: e.pageY },
-              imageDTO,
-            });
-          }, 100);
-        } else {
-          // else we can just open the menu at the current position
-          $imageContextMenuState.set({
-            isOpen: true,
-            position: { x: e.pageX, y: e.pageY },
-            imageDTO,
-          });
-        }
-      }
-
-      lastPositionRef.current = { x: e.pageX, y: e.pageY };
-    },
-    [imageDTO, targetRef]
-  );
+    lastPositionRef.current = { x: e.pageX, y: e.pageY };
+  }, []);
 
   // Use a long press to open the context menu on touch devices
   const onPointerDown = useCallback(
@@ -132,25 +179,21 @@ export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: R
   }, []);
 
   useEffect(() => {
-    if (!targetRef.current) {
-      return;
-    }
-
     const controller = new AbortController();
 
     // Context menu events
     window.addEventListener('contextmenu', onContextMenu, { signal: controller.signal });
 
     // Long press events
-    targetRef.current.addEventListener('pointerdown', onPointerDown, { signal: controller.signal });
-    targetRef.current.addEventListener('pointerup', onPointerUp, { signal: controller.signal });
-    targetRef.current.addEventListener('pointercancel', onPointerCancel, { signal: controller.signal });
-    targetRef.current.addEventListener('pointermove', onPointerMove, { signal: controller.signal });
+    window.addEventListener('pointerdown', onPointerDown, { signal: controller.signal });
+    window.addEventListener('pointerup', onPointerUp, { signal: controller.signal });
+    window.addEventListener('pointercancel', onPointerCancel, { signal: controller.signal });
+    window.addEventListener('pointermove', onPointerMove, { signal: controller.signal });
 
     return () => {
       controller.abort();
     };
-  }, [onContextMenu, onPointerCancel, onPointerDown, onPointerMove, onPointerUp, targetRef]);
+  }, [onContextMenu, onPointerCancel, onPointerDown, onPointerMove, onPointerUp]);
 
   useEffect(
     () => () => {
@@ -159,37 +202,11 @@ export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: R
     },
     []
   );
-};
 
-export const ImageContextMenu = memo(() => {
-  useAssertSingleton('ImageContextMenu');
-  const state = useStore($imageContextMenuState);
-  useGlobalMenuClose(onClose);
-
-  return (
-    <Portal>
-      <Menu isOpen={state.isOpen} gutter={0} placement="auto-end" onClose={onClose}>
-        <MenuButton
-          aria-hidden={true}
-          w={1}
-          h={1}
-          position="absolute"
-          left={state.position.x}
-          top={state.position.y}
-          cursor="default"
-          bg="transparent"
-          _hover={_hover}
-          pointerEvents="none"
-        />
-        <MenuContent />
-      </Menu>
-    </Portal>
-  );
+  return null;
 });
 
-ImageContextMenu.displayName = 'ImageContextMenu';
-
-const _hover: ChakraProps['_hover'] = { bg: 'transparent' };
+ImageContextMenuEventLogical.displayName = 'ImageContextMenuEventLogical';
 
 const MenuContent = memo(() => {
   const selectionCount = useAppSelector(selectSelectionCount);
