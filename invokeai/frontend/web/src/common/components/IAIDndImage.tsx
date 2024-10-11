@@ -109,8 +109,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
     useThumbailFallback,
     withHoverOverlay = false,
     children,
-    onMouseOver,
-    onMouseOut,
     dataTestId,
     ...rest
   } = props;
@@ -134,8 +132,6 @@ const IAIDndImage = (props: IAIDndImageProps) => {
   return (
     <Flex
       ref={ref}
-      onMouseOver={onMouseOver}
-      onMouseOut={onMouseOut}
       width="full"
       height="full"
       alignItems="center"
