@@ -18,8 +18,9 @@ const GallerySettingsPopover = () => {
           size="sm"
           variant="link"
           alignSelf="stretch"
-          aria-label={t('gallery.gallerySettings')}
+          aria-label={t('gallery.imagesSettings')}
           icon={<PiGearSixFill />}
+          tooltip={t('gallery.imagesSettings')}
         />
       </PopoverTrigger>
       <PopoverContent>
