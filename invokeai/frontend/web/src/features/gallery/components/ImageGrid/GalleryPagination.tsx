@@ -1,11 +1,11 @@
 import { Button, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
 import { ELLIPSIS, useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 import { JumpTo } from './JumpTo';
 
-export const GalleryPagination = () => {
+export const GalleryPagination = memo(() => {
   const { goPrev, goNext, isPrevEnabled, isNextEnabled, pageButtons, goToPage, currentPage, total } =
     useGalleryPagination();
 
@@ -47,7 +47,9 @@ export const GalleryPagination = () => {
       <JumpTo />
     </Flex>
   );
-};
+});
+
+GalleryPagination.displayName = 'GalleryPagination';
 
 type PageButtonProps = {
   page: number | typeof ELLIPSIS;
@@ -55,7 +57,7 @@ type PageButtonProps = {
   goToPage: (page: number) => void;
 };
 
-const PageButton = ({ page, currentPage, goToPage }: PageButtonProps) => {
+const PageButton = memo(({ page, currentPage, goToPage }: PageButtonProps) => {
   if (page === ELLIPSIS) {
     return (
       <Button size="sm" variant="link" isDisabled>
@@ -68,4 +70,6 @@ const PageButton = ({ page, currentPage, goToPage }: PageButtonProps) => {
       {page}
     </Button>
   );
-};
+});
+
+PageButton.displayName = 'PageButton';
