@@ -308,7 +308,7 @@ const getSelectIsTypeHidden = (type: CanvasEntityType) => {
 /**
  * Builds a selector taht selects if the entity is hidden.
  */
-export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdentifier) => {
+export const buildSelectIsHidden = (entityIdentifier: CanvasEntityIdentifier) => {
   const selectIsTypeHidden = getSelectIsTypeHidden(entityIdentifier.type);
   return createSelector(
     [selectCanvasSlice, selectIsTypeHidden, selectIsStaging, selectIsolatedStagingPreview],
