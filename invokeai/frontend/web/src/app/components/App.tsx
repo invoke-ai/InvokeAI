@@ -20,6 +20,7 @@ import {
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
+import { ImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
@@ -120,6 +121,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <GlobalImageHotkeys />
       <NewGallerySessionDialog />
       <NewCanvasSessionDialog />
+      <ImageContextMenu />
     </ErrorBoundary>
   );
 };
