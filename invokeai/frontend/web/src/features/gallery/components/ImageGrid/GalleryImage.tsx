@@ -67,8 +67,6 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
 
-  const customStarUi = useStore($customStarUI);
-
   const imageContainerRef = useScrollIntoView(isSelected, index, areMultiplesSelected);
 
   const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
@@ -91,20 +89,6 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
     }
   }, [imageDTO, selectedBoardId, areMultiplesSelected]);
 
-  const [starImages] = useStarImagesMutation();
-  const [unstarImages] = useUnstarImagesMutation();
-
-  const toggleStarredState = useCallback(() => {
-    if (imageDTO) {
-      if (imageDTO.starred) {
-        unstarImages({ imageDTOs: [imageDTO] });
-      }
-      if (!imageDTO.starred) {
-        starImages({ imageDTOs: [imageDTO] });
-      }
-    }
-  }, [starImages, unstarImages, imageDTO]);
-
   const [isHovered, setIsHovered] = useState(false);
 
   const handleMouseOver = useCallback(() => {
@@ -120,25 +104,6 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
   const handleMouseOut = useCallback(() => {
     setIsHovered(false);
   }, []);
-
-  const starIcon = useMemo(() => {
-    if (imageDTO.starred) {
-      return customStarUi ? customStarUi.on.icon : <PiStarFill />;
-    }
-    if (!imageDTO.starred && isHovered) {
-      return customStarUi ? customStarUi.off.icon : <PiStarBold />;
-    }
-  }, [imageDTO.starred, isHovered, customStarUi]);
-
-  const starTooltip = useMemo(() => {
-    if (imageDTO.starred) {
-      return customStarUi ? customStarUi.off.text : 'Unstar';
-    }
-    if (!imageDTO.starred) {
-      return customStarUi ? customStarUi.on.text : 'Star';
-    }
-    return '';
-  }, [imageDTO.starred, customStarUi]);
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
 
@@ -173,31 +138,8 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
           onMouseOut={handleMouseOut}
         >
           <>
-            {(isHovered || alwaysShowImageSizeBadge) && (
-              <Text
-                position="absolute"
-                background="base.900"
-                color="base.50"
-                fontSize="sm"
-                fontWeight="semibold"
-                bottom={1}
-                left={1}
-                opacity={0.7}
-                px={2}
-                lineHeight={1.25}
-                borderTopEndRadius="base"
-                sx={badgeSx}
-                pointerEvents="none"
-              >{`${imageDTO.width}x${imageDTO.height}`}</Text>
-            )}
-            <IAIDndImageIcon
-              onClick={toggleStarredState}
-              icon={starIcon}
-              tooltip={starTooltip}
-              position="absolute"
-              top={2}
-              insetInlineEnd={2}
-            />
+            {(isHovered || alwaysShowImageSizeBadge) && <SizeBadge imageDTO={imageDTO} />}
+            {(isHovered || imageDTO.starred) && <StarIcon imageDTO={imageDTO} />}
             {isHovered && <DeleteIcon imageDTO={imageDTO} />}
             {isHovered && <OpenInViewerIconButton imageDTO={imageDTO} />}
           </>
@@ -209,7 +151,7 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
 
 GalleryImageContent.displayName = 'GalleryImageContent';
 
-const DeleteIcon = ({ imageDTO }: { imageDTO: ImageDTO }) => {
+const DeleteIcon = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -238,9 +180,11 @@ const DeleteIcon = ({ imageDTO }: { imageDTO: ImageDTO }) => {
       insetInlineEnd={2}
     />
   );
-};
+});
 
-const OpenInViewerIconButton = ({ imageDTO }: { imageDTO: ImageDTO }) => {
+DeleteIcon.displayName = 'DeleteIcon';
+
+const OpenInViewerIconButton = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const imageViewer = useImageViewer();
   const { t } = useTranslation();
 
@@ -258,4 +202,77 @@ const OpenInViewerIconButton = ({ imageDTO }: { imageDTO: ImageDTO }) => {
       insetInlineStart={2}
     />
   );
-};
+});
+
+OpenInViewerIconButton.displayName = 'OpenInViewerIconButton';
+
+const StarIcon = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
+  const customStarUi = useStore($customStarUI);
+  const [starImages] = useStarImagesMutation();
+  const [unstarImages] = useUnstarImagesMutation();
+
+  const toggleStarredState = useCallback(() => {
+    if (imageDTO) {
+      if (imageDTO.starred) {
+        unstarImages({ imageDTOs: [imageDTO] });
+      }
+      if (!imageDTO.starred) {
+        starImages({ imageDTOs: [imageDTO] });
+      }
+    }
+  }, [starImages, unstarImages, imageDTO]);
+
+  const starIcon = useMemo(() => {
+    if (imageDTO.starred) {
+      return customStarUi ? customStarUi.on.icon : <PiStarFill />;
+    }
+    if (!imageDTO.starred) {
+      return customStarUi ? customStarUi.off.icon : <PiStarBold />;
+    }
+  }, [imageDTO.starred, customStarUi]);
+
+  const starTooltip = useMemo(() => {
+    if (imageDTO.starred) {
+      return customStarUi ? customStarUi.off.text : 'Unstar';
+    }
+    if (!imageDTO.starred) {
+      return customStarUi ? customStarUi.on.text : 'Star';
+    }
+    return '';
+  }, [imageDTO.starred, customStarUi]);
+
+  return (
+    <IAIDndImageIcon
+      onClick={toggleStarredState}
+      icon={starIcon}
+      tooltip={starTooltip}
+      position="absolute"
+      top={2}
+      insetInlineEnd={2}
+    />
+  );
+});
+
+StarIcon.displayName = 'StarIcon';
+
+const SizeBadge = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
+  return (
+    <Text
+      position="absolute"
+      background="base.900"
+      color="base.50"
+      fontSize="sm"
+      fontWeight="semibold"
+      bottom={1}
+      left={1}
+      opacity={0.7}
+      px={2}
+      lineHeight={1.25}
+      borderTopEndRadius="base"
+      sx={badgeSx}
+      pointerEvents="none"
+    >{`${imageDTO.width}x${imageDTO.height}`}</Text>
+  );
+});
+
+SizeBadge.displayName = 'SizeBadge';
