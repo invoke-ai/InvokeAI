@@ -17,6 +17,7 @@ import {
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   buildEntityIsHiddenSelector,
+  buildSelectIsSelected,
   selectBboxRect,
   selectCanvasSlice,
   selectEntity,
@@ -165,6 +166,7 @@ export abstract class CanvasEntityAdapterBase<
   };
 
   selectIsHidden: Selector<RootState, boolean>;
+  selectIsSelected: Selector<RootState, boolean>;
 
   /**
    * The Konva nodes that make up the entity adapter:
@@ -249,6 +251,7 @@ export abstract class CanvasEntityAdapterBase<
     this.state = state;
 
     this.selectIsHidden = buildEntityIsHiddenSelector(this.entityIdentifier);
+    this.selectIsSelected = buildSelectIsSelected(this.entityIdentifier);
 
     /**
      * There are a number of reason we may need to show or hide a layer:
@@ -257,6 +260,7 @@ export abstract class CanvasEntityAdapterBase<
      * - Staging status changes and `isolatedStagingPreview` is enabled
      * - Global filtering status changes and `isolatedFilteringPreview` is enabled
      * - Global transforming status changes and `isolatedTransformingPreview` is enabled
+     * - The entity is selected or deselected (only selected and onscreen entities are rendered)
      */
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsHidden, this.syncVisibility));
     this.subscriptions.add(
@@ -267,6 +271,7 @@ export abstract class CanvasEntityAdapterBase<
       this.manager.stateApi.createStoreSubscription(selectIsolatedTransformingPreview, this.syncVisibility)
     );
     this.subscriptions.add(this.manager.stateApi.$transformingAdapter.listen(this.syncVisibility));
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsSelected, this.syncVisibility));
 
     /**
      * The tool preview may need to be updated when the entity is locked or disabled. For example, when we disable the
@@ -305,21 +310,8 @@ export abstract class CanvasEntityAdapterBase<
 
   syncIsOnscreen = () => {
     const stageRect = this.manager.stage.getScaledStageRect();
-    const entityRect = this.transformer.$pixelRect.get();
-    const position = this.manager.stateApi.runSelector(this.selectPosition);
-    if (!position) {
-      return;
-    }
-    const entityRectRelativeToStage = {
-      x: entityRect.x + position.x,
-      y: entityRect.y + position.y,
-      width: entityRect.width,
-      height: entityRect.height,
-    };
-
-    const intersection = getRectIntersection(stageRect, entityRectRelativeToStage);
+    const isOnScreen = this.checkIntersection(stageRect);
     const prevIsOnScreen = this.$isOnScreen.get();
-    const isOnScreen = intersection.width > 0 && intersection.height > 0;
     this.$isOnScreen.set(isOnScreen);
     if (prevIsOnScreen !== isOnScreen) {
       this.log.trace(`Moved ${isOnScreen ? 'on-screen' : 'off-screen'}`);
@@ -329,10 +321,19 @@ export abstract class CanvasEntityAdapterBase<
 
   syncIntersectsBbox = () => {
     const bboxRect = this.manager.stateApi.getBbox().rect;
+    const intersectsBbox = this.checkIntersection(bboxRect);
+    const prevIntersectsBbox = this.$intersectsBbox.get();
+    this.$intersectsBbox.set(intersectsBbox);
+    if (prevIntersectsBbox !== intersectsBbox) {
+      this.log.trace(`Moved ${intersectsBbox ? 'into bbox' : 'out of bbox'}`);
+    }
+  };
+
+  checkIntersection = (rect: Rect): boolean => {
     const entityRect = this.transformer.$pixelRect.get();
     const position = this.manager.stateApi.runSelector(this.selectPosition);
     if (!position) {
-      return;
+      return false;
     }
     const entityRectRelativeToStage = {
       x: entityRect.x + position.x,
@@ -340,14 +341,9 @@ export abstract class CanvasEntityAdapterBase<
       width: entityRect.width,
       height: entityRect.height,
     };
-
-    const intersection = getRectIntersection(bboxRect, entityRectRelativeToStage);
-    const prevIntersectsBbox = this.$intersectsBbox.get();
-    const intersectsBbox = intersection.width > 0 && intersection.height > 0;
-    this.$intersectsBbox.set(intersectsBbox);
-    if (prevIntersectsBbox !== intersectsBbox) {
-      this.log.trace(`Moved ${intersectsBbox ? 'into bbox' : 'out of bbox'}`);
-    }
+    const intersection = getRectIntersection(rect, entityRectRelativeToStage);
+    const doesIntersect = intersection.width > 0 && intersection.height > 0;
+    return doesIntersect;
   };
 
   initialize = async () => {
