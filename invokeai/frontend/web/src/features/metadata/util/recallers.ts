@@ -9,6 +9,7 @@ import {
   refinerModelChanged,
   setCfgRescaleMultiplier,
   setCfgScale,
+  setGuidance,
   setImg2imgStrength,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
@@ -29,6 +30,7 @@ import { modelSelected } from 'features/parameters/store/actions';
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
+  ParameterGuidance,
   ParameterHeight,
   ParameterHRFEnabled,
   ParameterHRFMethod,
@@ -72,6 +74,10 @@ const recallSeed: MetadataRecallFunc<ParameterSeed> = (seed) => {
 
 const recallCFGScale: MetadataRecallFunc<ParameterCFGScale> = (cfgScale) => {
   getStore().dispatch(setCfgScale(cfgScale));
+};
+
+const recallGuidance: MetadataRecallFunc<ParameterGuidance> = (guidance) => {
+  getStore().dispatch(setGuidance(guidance));
 };
 
 const recallCFGRescaleMultiplier: MetadataRecallFunc<ParameterCFGRescaleMultiplier> = (cfgRescaleMultiplier) => {
@@ -198,6 +204,7 @@ export const recallers = {
   sdxlNegativeStylePrompt: recallSDXLNegativeStylePrompt,
   seed: recallSeed,
   cfgScale: recallCFGScale,
+  guidance: recallGuidance,
   cfgRescaleMultiplier: recallCFGRescaleMultiplier,
   scheduler: recallScheduler,
   width: recallWidth,
