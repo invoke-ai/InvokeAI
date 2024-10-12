@@ -138,7 +138,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             assert order_by in WorkflowRecordOrderBy
             assert direction in SQLiteDirection
             assert category in WorkflowCategory
-            count_query = "SELECT COUNT(*) FROM workflow_library"
+            count_query = "SELECT COUNT(*) FROM workflow_library WHERE category = ?"
             main_query = """
                 SELECT
                     workflow_id,
