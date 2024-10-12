@@ -168,7 +168,9 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             # Determine archived filter condition
             archived_filter = "" if include_archived else "WHERE archived = 0"
 
-            final_query = base_query.format(archived_filter=archived_filter, order_by=order_by, direction=direction)
+            final_query = base_query.format(
+                archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
+            )
 
             # Execute query to fetch boards
             self._cursor.execute(final_query, (limit, offset))
@@ -208,7 +210,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         try:
             self._lock.acquire()
 
-            if order_by == "board_name":
+            if order_by == BoardRecordOrderBy.Name:
                 base_query = """
                     SELECT *
                     FROM boards
@@ -225,7 +227,9 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
 
             archived_filter = "" if include_archived else "WHERE archived = 0"
 
-            final_query = base_query.format(archived_filter=archived_filter, order_by=order_by, direction=direction)
+            final_query = base_query.format(
+                archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
+            )
 
             self._cursor.execute(final_query)
 
