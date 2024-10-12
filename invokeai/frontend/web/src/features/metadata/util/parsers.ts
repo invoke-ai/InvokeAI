@@ -27,6 +27,7 @@ import { zControlField, zIPAdapterField, zModelIdentifierField, zT2IAdapterField
 import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
+  ParameterGuidance,
   ParameterHeight,
   ParameterHRFEnabled,
   ParameterHRFMethod,
@@ -49,6 +50,7 @@ import type {
 import {
   isParameterCFGRescaleMultiplier,
   isParameterCFGScale,
+  isParameterGuidance,
   isParameterHeight,
   isParameterHRFEnabled,
   isParameterHRFMethod,
@@ -141,6 +143,9 @@ const parseCFGScale: MetadataParseFunc<ParameterCFGScale> = (metadata) =>
 
 const parseCFGRescaleMultiplier: MetadataParseFunc<ParameterCFGRescaleMultiplier> = (metadata) =>
   getProperty(metadata, 'cfg_rescale_multiplier', isParameterCFGRescaleMultiplier);
+
+const parseGuidance: MetadataParseFunc<ParameterGuidance> = (metadata) =>
+  getProperty(metadata, 'guidance', isParameterGuidance);
 
 const parseScheduler: MetadataParseFunc<ParameterScheduler> = (metadata) =>
   getProperty(metadata, 'scheduler', isParameterScheduler);
@@ -636,6 +641,7 @@ export const parsers = {
   seed: parseSeed,
   cfgScale: parseCFGScale,
   cfgRescaleMultiplier: parseCFGRescaleMultiplier,
+  guidance: parseGuidance,
   scheduler: parseScheduler,
   width: parseWidth,
   height: parseHeight,

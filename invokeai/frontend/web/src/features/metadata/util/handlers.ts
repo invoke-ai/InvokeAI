@@ -168,6 +168,11 @@ export const handlers = {
     parser: parsers.cfgScale,
     recaller: recallers.cfgScale,
   }),
+  guidance: buildHandlers({
+    getLabel: () => t('metadata.guidance'),
+    parser: parsers.guidance,
+    recaller: recallers.guidance,
+  }),
   height: buildHandlers({ getLabel: () => t('metadata.height'), parser: parsers.height, recaller: recallers.height }),
   negativePrompt: buildHandlers({
     getLabel: () => t('metadata.negativePrompt'),
