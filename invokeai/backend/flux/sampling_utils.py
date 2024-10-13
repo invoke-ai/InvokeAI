@@ -168,8 +168,17 @@ def generate_img_ids(h: int, w: int, batch_size: int, device: torch.device, dtyp
     Returns:
         torch.Tensor: Image position ids.
     """
+
+    if device.type == "mps":
+        orig_dtype = dtype
+        dtype = torch.float16
+
     img_ids = torch.zeros(h // 2, w // 2, 3, device=device, dtype=dtype)
     img_ids[..., 1] = img_ids[..., 1] + torch.arange(h // 2, device=device, dtype=dtype)[:, None]
     img_ids[..., 2] = img_ids[..., 2] + torch.arange(w // 2, device=device, dtype=dtype)[None, :]
     img_ids = repeat(img_ids, "h w c -> b (h w) c", b=batch_size)
+
+    if device.type == "mps":
+        img_ids.to(orig_dtype)
+
     return img_ids
