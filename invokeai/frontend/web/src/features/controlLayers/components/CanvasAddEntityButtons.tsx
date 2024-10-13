@@ -80,7 +80,6 @@ export const CanvasAddEntityButtons = memo(() => {
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
             onClick={addControlLayer}
-            isDisabled={isFLUX}
           >
             {t('controlLayers.controlLayer')}
           </Button>

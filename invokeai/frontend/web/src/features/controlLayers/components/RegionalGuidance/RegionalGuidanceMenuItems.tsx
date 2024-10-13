@@ -1,4 +1,4 @@
-import { MenuDivider } from '@invoke-ai/ui-library';
+import { Flex, MenuDivider } from '@invoke-ai/ui-library';
 import { CanvasEntityMenuItemsArrange } from 'features/controlLayers/components/common/CanvasEntityMenuItemsArrange';
 import { CanvasEntityMenuItemsCropToBbox } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCropToBbox';
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
@@ -11,16 +11,18 @@ import { memo } from 'react';
 export const RegionalGuidanceMenuItems = memo(() => {
   return (
     <>
+      <Flex gap={2}>
+        <CanvasEntityMenuItemsArrange />
+        <CanvasEntityMenuItemsDuplicate />
+        <CanvasEntityMenuItemsDelete asIcon />
+      </Flex>
+      <MenuDivider />
       <RegionalGuidanceMenuItemsAddPromptsAndIPAdapter />
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />
       <RegionalGuidanceMenuItemsAutoNegative />
       <MenuDivider />
-      <CanvasEntityMenuItemsArrange />
-      <MenuDivider />
       <CanvasEntityMenuItemsCropToBbox />
-      <CanvasEntityMenuItemsDuplicate />
-      <CanvasEntityMenuItemsDelete />
     </>
   );
 });

@@ -1,15 +1,14 @@
 import 'reactflow/dist/style.css';
 
 import { Box, Flex } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
-import { selectCleanEditor, selectWorkflowMode } from 'features/nodes/store/workflowSlice';
+import { useWorkflowListMenu } from 'features/nodes/store/workflowListMenu';
+import { selectWorkflowMode } from 'features/nodes/store/workflowSlice';
 import ResizeHandle from 'features/ui/components/tabs/ResizeHandle';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import type { ImperativePanelGroupHandle } from 'react-resizable-panels';
 import { Panel, PanelGroup } from 'react-resizable-panels';
 
@@ -29,15 +28,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 const NodeEditorPanelGroup = () => {
   const mode = useAppSelector(selectWorkflowMode);
   const panelGroupRef = useRef<ImperativePanelGroupHandle>(null);
-  const isWorkflowListMenuOpen = useStore($isWorkflowListMenuIsOpen);
-
-  const isCleanEditor = useAppSelector(selectCleanEditor);
-
-  useEffect(() => {
-    if (isCleanEditor) {
-      $isWorkflowListMenuIsOpen.set(true);
-    }
-  }, [isCleanEditor]);
+  const workflowListMenu = useWorkflowListMenu();
 
   const handleDoubleClickHandle = useCallback(() => {
     if (!panelGroupRef.current) {
@@ -51,7 +42,7 @@ const NodeEditorPanelGroup = () => {
       <WorkflowListMenuTrigger />
       <Flex w="full" h="full" position="relative">
         <Box position="absolute" top={0} left={0} right={0} bottom={0}>
-          {isWorkflowListMenuOpen && (
+          {workflowListMenu.isOpen && (
             <OverlayScrollbarsComponent defer style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
               <Flex gap={2} flexDirection="column" h="full" w="full">
                 <WorkflowListMenu />

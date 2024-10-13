@@ -63,11 +63,8 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
     () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name === imageDTO.image_name),
     [imageDTO.image_name]
   );
-  const alwaysShowImageSizeBadge = useAppSelector(selectAlwaysShouldImageSizeBadge);
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
-
-  const customStarUi = useStore($customStarUI);
 
   const imageContainerRef = useScrollIntoView(isSelected, index, areMultiplesSelected);
 
@@ -91,20 +88,6 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
     }
   }, [imageDTO, selectedBoardId, areMultiplesSelected]);
 
-  const [starImages] = useStarImagesMutation();
-  const [unstarImages] = useUnstarImagesMutation();
-
-  const toggleStarredState = useCallback(() => {
-    if (imageDTO) {
-      if (imageDTO.starred) {
-        unstarImages({ imageDTOs: [imageDTO] });
-      }
-      if (!imageDTO.starred) {
-        starImages({ imageDTOs: [imageDTO] });
-      }
-    }
-  }, [starImages, unstarImages, imageDTO]);
-
   const [isHovered, setIsHovered] = useState(false);
 
   const handleMouseOver = useCallback(() => {
@@ -121,25 +104,6 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
     setIsHovered(false);
   }, []);
 
-  const starIcon = useMemo(() => {
-    if (imageDTO.starred) {
-      return customStarUi ? customStarUi.on.icon : <PiStarFill />;
-    }
-    if (!imageDTO.starred && isHovered) {
-      return customStarUi ? customStarUi.off.icon : <PiStarBold />;
-    }
-  }, [imageDTO.starred, isHovered, customStarUi]);
-
-  const starTooltip = useMemo(() => {
-    if (imageDTO.starred) {
-      return customStarUi ? customStarUi.off.text : 'Unstar';
-    }
-    if (!imageDTO.starred) {
-      return customStarUi ? customStarUi.on.text : 'Star';
-    }
-    return '';
-  }, [imageDTO.starred, customStarUi]);
-
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
 
   if (!imageDTO) {
@@ -155,6 +119,8 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
         justifyContent="center"
         alignItems="center"
         aspectRatio="1/1"
+        onMouseOver={handleMouseOver}
+        onMouseOut={handleMouseOut}
       >
         <IAIDndImage
           onClick={handleClick}
@@ -169,38 +135,8 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
           isUploadDisabled={true}
           thumbnail={true}
           withHoverOverlay
-          onMouseOver={handleMouseOver}
-          onMouseOut={handleMouseOut}
         >
-          <>
-            {(isHovered || alwaysShowImageSizeBadge) && (
-              <Text
-                position="absolute"
-                background="base.900"
-                color="base.50"
-                fontSize="sm"
-                fontWeight="semibold"
-                bottom={1}
-                left={1}
-                opacity={0.7}
-                px={2}
-                lineHeight={1.25}
-                borderTopEndRadius="base"
-                sx={badgeSx}
-                pointerEvents="none"
-              >{`${imageDTO.width}x${imageDTO.height}`}</Text>
-            )}
-            <IAIDndImageIcon
-              onClick={toggleStarredState}
-              icon={starIcon}
-              tooltip={starTooltip}
-              position="absolute"
-              top={2}
-              insetInlineEnd={2}
-            />
-            {isHovered && <DeleteIcon imageDTO={imageDTO} />}
-            {isHovered && <OpenInViewerIconButton imageDTO={imageDTO} />}
-          </>
+          <HoverIcons imageDTO={imageDTO} isHovered={isHovered} />
         </IAIDndImage>
       </Flex>
     </Box>
@@ -209,7 +145,21 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
 
 GalleryImageContent.displayName = 'GalleryImageContent';
 
-const DeleteIcon = ({ imageDTO }: { imageDTO: ImageDTO }) => {
+const HoverIcons = memo(({ imageDTO, isHovered }: { imageDTO: ImageDTO; isHovered: boolean }) => {
+  const alwaysShowImageSizeBadge = useAppSelector(selectAlwaysShouldImageSizeBadge);
+
+  return (
+    <>
+      {(isHovered || alwaysShowImageSizeBadge) && <SizeBadge imageDTO={imageDTO} />}
+      {(isHovered || imageDTO.starred) && <StarIcon imageDTO={imageDTO} />}
+      {isHovered && <DeleteIcon imageDTO={imageDTO} />}
+      {isHovered && <OpenInViewerIconButton imageDTO={imageDTO} />}
+    </>
+  );
+});
+HoverIcons.displayName = 'HoverIcons';
+
+const DeleteIcon = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const shift = useShiftModifier();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -238,9 +188,11 @@ const DeleteIcon = ({ imageDTO }: { imageDTO: ImageDTO }) => {
       insetInlineEnd={2}
     />
   );
-};
+});
 
-const OpenInViewerIconButton = ({ imageDTO }: { imageDTO: ImageDTO }) => {
+DeleteIcon.displayName = 'DeleteIcon';
+
+const OpenInViewerIconButton = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const imageViewer = useImageViewer();
   const { t } = useTranslation();
 
@@ -258,4 +210,77 @@ const OpenInViewerIconButton = ({ imageDTO }: { imageDTO: ImageDTO }) => {
       insetInlineStart={2}
     />
   );
-};
+});
+
+OpenInViewerIconButton.displayName = 'OpenInViewerIconButton';
+
+const StarIcon = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
+  const customStarUi = useStore($customStarUI);
+  const [starImages] = useStarImagesMutation();
+  const [unstarImages] = useUnstarImagesMutation();
+
+  const toggleStarredState = useCallback(() => {
+    if (imageDTO) {
+      if (imageDTO.starred) {
+        unstarImages({ imageDTOs: [imageDTO] });
+      }
+      if (!imageDTO.starred) {
+        starImages({ imageDTOs: [imageDTO] });
+      }
+    }
+  }, [starImages, unstarImages, imageDTO]);
+
+  const starIcon = useMemo(() => {
+    if (imageDTO.starred) {
+      return customStarUi ? customStarUi.on.icon : <PiStarFill />;
+    }
+    if (!imageDTO.starred) {
+      return customStarUi ? customStarUi.off.icon : <PiStarBold />;
+    }
+  }, [imageDTO.starred, customStarUi]);
+
+  const starTooltip = useMemo(() => {
+    if (imageDTO.starred) {
+      return customStarUi ? customStarUi.off.text : 'Unstar';
+    }
+    if (!imageDTO.starred) {
+      return customStarUi ? customStarUi.on.text : 'Star';
+    }
+    return '';
+  }, [imageDTO.starred, customStarUi]);
+
+  return (
+    <IAIDndImageIcon
+      onClick={toggleStarredState}
+      icon={starIcon}
+      tooltip={starTooltip}
+      position="absolute"
+      top={2}
+      insetInlineEnd={2}
+    />
+  );
+});
+
+StarIcon.displayName = 'StarIcon';
+
+const SizeBadge = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
+  return (
+    <Text
+      position="absolute"
+      background="base.900"
+      color="base.50"
+      fontSize="sm"
+      fontWeight="semibold"
+      bottom={1}
+      left={1}
+      opacity={0.7}
+      px={2}
+      lineHeight={1.25}
+      borderTopEndRadius="base"
+      sx={badgeSx}
+      pointerEvents="none"
+    >{`${imageDTO.width}x${imageDTO.height}`}</Text>
+  );
+});
+
+SizeBadge.displayName = 'SizeBadge';

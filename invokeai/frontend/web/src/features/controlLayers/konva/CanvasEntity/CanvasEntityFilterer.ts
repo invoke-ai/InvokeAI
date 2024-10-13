@@ -216,7 +216,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.abortController = null;
     this.parent.bufferRenderer.clearBuffer();
     this.parent.transformer.updatePosition();
-    this.parent.renderer.syncCache(true);
+    this.parent.renderer.syncKonvaCache(true);
     this.imageState = null;
     this.$hasProcessed.set(false);
   };

@@ -422,6 +422,13 @@ STARTER_MODELS: list[StarterModel] = [
         description="ControlNet weights trained on sdxl-1.0 with tiled image conditioning",
         type=ModelType.ControlNet,
     ),
+    StarterModel(
+        name="FLUX.1-dev-Controlnet-Union-Pro",
+        base=BaseModelType.Flux,
+        source="Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro",
+        description="A unified ControlNet for FLUX.1-dev model that supports 7 control modes, including canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6)",
+        type=ModelType.ControlNet,
+    ),
     # endregion
     # region T2I Adapter
     StarterModel(

@@ -159,7 +159,12 @@ export const workflowSlice = createSlice({
       };
     });
 
-    builder.addCase(nodeEditorReset, () => deepClone(initialWorkflowState));
+    builder.addCase(nodeEditorReset, (state) => {
+      const mode = state.mode;
+      const newState = deepClone(initialWorkflowState);
+      newState.mode = mode;
+      return newState;
+    });
 
     builder.addCase(nodesChanged, (state, action) => {
       // If a node was removed, we should remove any exposed fields that were associated with it. However, node changes

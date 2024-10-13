@@ -10,6 +10,10 @@ from picklescan.scanner import scan_file_path
 
 import invokeai.backend.util.logging as logger
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.flux.controlnet.state_dict_utils import (
+    is_state_dict_instantx_controlnet,
+    is_state_dict_xlabs_controlnet,
+)
 from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
 )
@@ -116,6 +120,7 @@ class ModelProbe(object):
         "CLIPModel": ModelType.CLIPEmbed,
         "CLIPTextModel": ModelType.CLIPEmbed,
         "T5EncoderModel": ModelType.T5Encoder,
+        "FluxControlNetModel": ModelType.ControlNet,
     }
 
     @classmethod
@@ -255,7 +260,19 @@ class ModelProbe(object):
             # LoRA models, but as of the time of writing, we support Diffusers FLUX PEFT LoRA models.
             elif key.endswith(("to_k_lora.up.weight", "to_q_lora.down.weight", "lora_A.weight", "lora_B.weight")):
                 return ModelType.LoRA
-            elif key.startswith(("controlnet", "control_model", "input_blocks")):
+            elif key.startswith(
+                (
+                    "controlnet",
+                    "control_model",
+                    "input_blocks",
+                    # XLabs FLUX ControlNet models have keys starting with "controlnet_blocks."
+                    # For example: https://huggingface.co/XLabs-AI/flux-controlnet-collections/blob/86ab1e915a389d5857135c00e0d350e9e38a9048/flux-canny-controlnet_v2.safetensors
+                    # TODO(ryand): This is very fragile. XLabs FLUX ControlNet models also contain keys starting with
+                    # "double_blocks.", which we check for above. But, I'm afraid to modify this logic because it is so
+                    # delicate.
+                    "controlnet_blocks",
+                )
+            ):
                 return ModelType.ControlNet
             elif key.startswith(("image_proj.", "ip_adapter.")):
                 return ModelType.IPAdapter
@@ -438,6 +455,7 @@ MODEL_NAME_TO_PREPROCESSOR = {
     "lineart": "lineart_image_processor",
     "lineart_anime": "lineart_anime_image_processor",
     "softedge": "hed_image_processor",
+    "hed": "hed_image_processor",
     "shuffle": "content_shuffle_image_processor",
     "pose": "dw_openpose_image_processor",
     "mediapipe": "mediapipe_face_processor",
@@ -449,7 +467,8 @@ MODEL_NAME_TO_PREPROCESSOR = {
 
 def get_default_settings_controlnet_t2i_adapter(model_name: str) -> Optional[ControlAdapterDefaultSettings]:
     for k, v in MODEL_NAME_TO_PREPROCESSOR.items():
-        if k in model_name:
+        model_name_lower = model_name.lower()
+        if k in model_name_lower:
             return ControlAdapterDefaultSettings(preprocessor=v)
     return None
 
@@ -623,6 +642,11 @@ class ControlNetCheckpointProbe(CheckpointProbeBase):
 
     def get_base_type(self) -> BaseModelType:
         checkpoint = self.checkpoint
+        if is_state_dict_xlabs_controlnet(checkpoint) or is_state_dict_instantx_controlnet(checkpoint):
+            # TODO(ryand): Should I distinguish between XLabs, InstantX and other ControlNet models by implementing
+            # get_format()?
+            return BaseModelType.Flux
+
         for key_name in (
             "control_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
             "controlnet_mid_block.bias",
@@ -844,22 +868,19 @@ class ControlNetFolderProbe(FolderProbeBase):
             raise InvalidModelConfigException(f"Cannot determine base type for {self.model_path}")
         with open(config_file, "r") as file:
             config = json.load(file)
+
+        if config.get("_class_name", None) == "FluxControlNetModel":
+            return BaseModelType.Flux
+
         # no obvious way to distinguish between sd2-base and sd2-768
         dimension = config["cross_attention_dim"]
-        base_model = (
-            BaseModelType.StableDiffusion1
-            if dimension == 768
-            else (
-                BaseModelType.StableDiffusion2
-                if dimension == 1024
-                else BaseModelType.StableDiffusionXL
-                if dimension == 2048
-                else None
-            )
-        )
-        if not base_model:
-            raise InvalidModelConfigException(f"Unable to determine model base for {self.model_path}")
-        return base_model
+        if dimension == 768:
+            return BaseModelType.StableDiffusion1
+        if dimension == 1024:
+            return BaseModelType.StableDiffusion2
+        if dimension == 2048:
+            return BaseModelType.StableDiffusionXL
+        raise InvalidModelConfigException(f"Unable to determine model base for {self.model_path}")
 
 
 class LoRAFolderProbe(FolderProbeBase):

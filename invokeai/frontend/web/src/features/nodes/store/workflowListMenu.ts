@@ -1,6 +1,6 @@
-import { atom } from 'nanostores';
+import { buildUseDisclosure } from 'common/hooks/useBoolean';
 
 /**
  * Tracks the state for the workflow list menu.
  */
-export const $isWorkflowListMenuIsOpen = atom<boolean>(false);
+export const [useWorkflowListMenu, $isWorkflowListMenuIsOpen] = buildUseDisclosure(false);

@@ -2,6 +2,7 @@ import { ConfirmationAlertDialog, Divider, Flex, FormControl, FormLabel, Switch,
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { imageDeletionConfirmed } from 'features/deleteImageModal/store/actions';
 import { getImageUsage, selectImageUsage } from 'features/deleteImageModal/store/selectors';
@@ -55,6 +56,7 @@ const selectIsModalOpen = createSelector(
 );
 
 const DeleteImageModal = () => {
+  useAssertSingleton('DeleteImageModal');
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const shouldConfirmOnDelete = useAppSelector(selectShouldConfirmOnDelete);

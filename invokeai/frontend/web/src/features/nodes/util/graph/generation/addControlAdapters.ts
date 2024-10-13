@@ -36,8 +36,6 @@ export const addControlNets = async (
   };
 
   for (const layer of validControlLayers) {
-    result.addedControlNets++;
-
     const getImageDTOResult = await withResultAsync(() => {
       const adapter = manager.adapters.controlLayers.get(layer.id);
       assert(adapter, 'Adapter not found');
@@ -50,6 +48,7 @@ export const addControlNets = async (
 
     const imageDTO = getImageDTOResult.value;
     addControlNetToGraph(g, layer, imageDTO, collector);
+    result.addedControlNets++;
   }
 
   return result;
@@ -77,8 +76,6 @@ export const addT2IAdapters = async (
   };
 
   for (const layer of validControlLayers) {
-    result.addedT2IAdapters++;
-
     const getImageDTOResult = await withResultAsync(() => {
       const adapter = manager.adapters.controlLayers.get(layer.id);
       assert(adapter, 'Adapter not found');
@@ -91,6 +88,7 @@ export const addT2IAdapters = async (
 
     const imageDTO = getImageDTOResult.value;
     addT2IAdapterToGraph(g, layer, imageDTO, collector);
+    result.addedT2IAdapters++;
   }
 
   return result;
@@ -110,10 +108,10 @@ const addControlNetToGraph = (
 
   const controlNet = g.addNode({
     id: `control_net_${id}`,
-    type: 'controlnet',
+    type: model.base === 'flux' ? 'flux_controlnet' : 'controlnet',
     begin_step_percent: beginEndStepPct[0],
     end_step_percent: beginEndStepPct[1],
-    control_mode: controlMode,
+    control_mode: model.base === 'flux' ? undefined : controlMode,
     resize_mode: 'just_resize',
     control_model: model,
     control_weight: weight,

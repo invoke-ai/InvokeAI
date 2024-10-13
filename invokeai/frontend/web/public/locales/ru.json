@@ -158,7 +158,9 @@
         "move": "Двигать",
         "gallery": "Галерея",
         "openViewer": "Открыть просмотрщик",
-        "closeViewer": "Закрыть просмотрщик"
+        "closeViewer": "Закрыть просмотрщик",
+        "imagesTab": "Изображения, созданные и сохраненные в Invoke.",
+        "assetsTab": "Файлы, которые вы загрузили для использования в своих проектах."
     },
     "hotkeys": {
         "searchHotkeys": "Поиск горячих клавиш",
@@ -928,7 +930,10 @@
         "imageAccessError": "Невозможно найти изображение {{image_name}}, сбрасываем на значение по умолчанию",
         "boardAccessError": "Невозможно найти доску {{board_id}}, сбрасываем на значение по умолчанию",
         "modelAccessError": "Невозможно найти модель {{key}}, сброс на модель по умолчанию",
-        "saveToGallery": "Сохранить в галерею"
+        "saveToGallery": "Сохранить в галерею",
+        "noWorkflows": "Нет рабочих процессов",
+        "noMatchingWorkflows": "Нет совпадающих рабочих процессов",
+        "workflowHelpText": "Нужна помощь? Ознакомьтесь с нашим руководством <LinkComponent>Getting Started with Workflows</LinkComponent>"
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
@@ -1553,7 +1558,10 @@
         "autoLayout": "Автоматическое расположение",
         "userWorkflows": "Пользовательские рабочие процессы",
         "projectWorkflows": "Рабочие процессы проекта",
-        "defaultWorkflows": "Стандартные рабочие процессы"
+        "defaultWorkflows": "Стандартные рабочие процессы",
+        "deleteWorkflow2": "Вы уверены, что хотите удалить этот рабочий процесс? Это нельзя отменить.",
+        "chooseWorkflowFromLibrary": "Выбрать рабочий процесс из библиотеки",
+        "uploadAndSaveWorkflow": "Загрузить в библиотеку"
     },
     "hrf": {
         "enableHrf": "Включить исправление высокого разрешения",
@@ -1872,8 +1880,8 @@
         "duplicate": "Дублировать",
         "inpaintMasks_withCount_visible": "Маски перерисовки ({{count}})",
         "layer_one": "Слой",
-        "layer_few": "",
-        "layer_many": "",
+        "layer_few": "Слоя",
+        "layer_many": "Слоев",
         "prompt": "Запрос",
         "negativePrompt": "Исключающий запрос",
         "beginEndStepPercentShort": "Начало/конец %",
@@ -2035,7 +2043,7 @@
         "whatsNewInInvoke": "Что нового в Invoke"
     },
     "newUserExperience": {
-        "toGetStarted": "Чтобы начать работу, введите в поле запрос и нажмите <StrongComponent>Invoke</StrongComponent>, чтобы сгенерировать первое изображение. Вы можете сохранить изображения непосредственно в <StrongComponent>Галерею</StrongComponent> или отредактировать их на <StrongComponent>Холсте</StrongComponent>.",
+        "toGetStarted": "Чтобы начать работу, введите в поле запрос и нажмите <StrongComponent>Invoke</StrongComponent>, чтобы сгенерировать первое изображение. Выберите шаблон запроса, чтобы улучшить результаты. Вы можете сохранить изображения непосредственно в <StrongComponent>Галерею</StrongComponent> или отредактировать их на <StrongComponent>Холсте</StrongComponent>.",
         "gettingStartedSeries": "Хотите получить больше рекомендаций? Ознакомьтесь с нашей серией <LinkComponent>Getting Started Series</LinkComponent> для получения советов по раскрытию всего потенциала Invoke Studio."
     }
 }

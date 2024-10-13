@@ -1,11 +1,7 @@
 import { MenuItem } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { canvasReset } from 'features/controlLayers/store/actions';
-import { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { CanvasRasterLayerState } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject } from 'features/controlLayers/store/util';
+import { useAppDispatch } from 'app/store/storeHooks';
+import { useNewCanvasFromImage } from 'features/controlLayers/hooks/addLayerHooks';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { toast } from 'features/toast/toast';
@@ -14,23 +10,16 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiFileBold } from 'react-icons/pi';
 
-const selectBboxRect = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect);
-
 export const ImageMenuItemNewCanvasFromImage = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const imageDTO = useImageDTOContext();
-  const bboxRect = useAppSelector(selectBboxRect);
   const imageViewer = useImageViewer();
+  const newCanvasFromImage = useNewCanvasFromImage();
+  const isBusy = useCanvasIsBusy();
 
-  const handleSendToCanvas = useCallback(() => {
-    const imageObject = imageDTOToImageObject(imageDTO);
-    const overrides: Partial<CanvasRasterLayerState> = {
-      position: { x: bboxRect.x, y: bboxRect.y },
-      objects: [imageObject],
-    };
-    dispatch(canvasReset());
-    dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+  const onClick = useCallback(() => {
+    newCanvasFromImage(imageDTO);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -38,10 +27,10 @@ export const ImageMenuItemNewCanvasFromImage = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [bboxRect.x, bboxRect.y, dispatch, imageDTO, imageViewer, t]);
+  }, [dispatch, imageDTO, imageViewer, newCanvasFromImage, t]);
 
   return (
-    <MenuItem icon={<PiFileBold />} onClickCapture={handleSendToCanvas}>
+    <MenuItem icon={<PiFileBold />} onClickCapture={onClick} isDisabled={isBusy}>
       {t('controlLayers.newCanvasFromImage')}
     </MenuItem>
   );

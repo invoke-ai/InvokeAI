@@ -25,7 +25,6 @@ import {
   getScaledBoundingBoxDimensions,
 } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
-import type { MainModelBase } from 'features/nodes/types/common';
 import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
@@ -770,11 +769,6 @@ export const canvasSlice = createSlice({
         state.bbox.rect.height = optimalDimension;
       }
 
-      syncScaledSize(state);
-    },
-    bboxModelBaseChanged: (state, action: PayloadAction<{ modelBase: MainModelBase }>) => {
-      const { modelBase } = action.payload;
-      state.bbox.modelBase = modelBase;
       syncScaledSize(state);
     },
     bboxSyncedToOptimalDimension: (state) => {

@@ -2,6 +2,7 @@ import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Swi
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
+import { TransformFitToBboxButtons } from 'features/controlLayers/components/Transform/TransformFitToBboxButtons';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import {
@@ -11,7 +12,7 @@ import {
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiArrowsOutBold, PiCheckBold, PiXBold } from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiCheckBold, PiXBold } from 'react-icons/pi';
 
 const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
   const { t } = useTranslation();
@@ -24,6 +25,7 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
   const onChangeIsolatedPreview = useCallback(() => {
     dispatch(settingsIsolatedTransformingPreviewToggled());
   }, [dispatch]);
+  const silentTransform = useStore(adapter.transformer.$silentTransform);
 
   useRegisteredHotkeys({
     id: 'applyTransform',
@@ -41,6 +43,10 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
     dependencies: [adapter.transformer, isProcessing, isCanvasFocused],
   });
 
+  if (silentTransform) {
+    return null;
+  }
+
   return (
     <Flex
       ref={ref}
@@ -49,7 +55,7 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
       p={4}
       flexDir="column"
       gap={4}
-      w={420}
+      minW={420}
       h="auto"
       shadow="dark-lg"
       transitionProperty="height"
@@ -65,16 +71,10 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
           <Switch size="sm" isChecked={isolatedTransformingPreview} onChange={onChangeIsolatedPreview} />
         </FormControl>
       </Flex>
+
+      <TransformFitToBboxButtons adapter={adapter} />
+
       <ButtonGroup isAttached={false} size="sm" w="full">
-        <Button
-          leftIcon={<PiArrowsOutBold />}
-          onClick={adapter.transformer.fitProxyRectToBbox}
-          isLoading={isProcessing}
-          loadingText={t('controlLayers.transform.fitToBbox')}
-          variant="ghost"
-        >
-          {t('controlLayers.transform.fitToBbox')}
-        </Button>
         <Spacer />
         <Button
           leftIcon={<PiArrowsCounterClockwiseBold />}

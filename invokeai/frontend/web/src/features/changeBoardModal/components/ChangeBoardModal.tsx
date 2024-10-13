@@ -3,12 +3,12 @@ import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@inv
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import {
   changeBoardReset,
   isModalOpenChanged,
   selectChangeBoardModalSlice,
 } from 'features/changeBoardModal/store/slice';
-import { selectListBoardsQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
@@ -25,10 +25,10 @@ const selectIsModalOpen = createSelector(
 );
 
 const ChangeBoardModal = () => {
+  useAssertSingleton('ChangeBoardModal');
   const dispatch = useAppDispatch();
   const [selectedBoard, setSelectedBoard] = useState<string | null>();
-  const queryArgs = useAppSelector(selectListBoardsQueryArgs);
-  const { data: boards, isFetching } = useListAllBoardsQuery(queryArgs);
+  const { data: boards, isFetching } = useListAllBoardsQuery({ include_archived: true });
   const isModalOpen = useAppSelector(selectIsModalOpen);
   const imagesToChange = useAppSelector(selectImagesToChange);
   const [addImagesToBoard] = useAddImagesToBoardMutation();

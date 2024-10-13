@@ -256,3 +256,5 @@ export interface SystemStats {
   ram_usage: number;
   gpu_usage: GPUStat[];
 }
+
+export type BoardRecordOrderBy = S['BoardRecordOrderBy'];

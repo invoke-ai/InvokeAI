@@ -83,6 +83,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
         stroke: 'rgb(42,42,42)',
         strokeWidth: 1,
         strokeScaleEnabled: false,
+        perfectDrawEnabled: false,
       }),
       overlayGroup: new Konva.Group({
         name: `${this.type}:overlayGroup`,
@@ -123,6 +124,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
         strokeEnabled: false,
         draggable: false,
         fill: 'hsl(220 12% 10% / 0.8)',
+        perfectDrawEnabled: false,
       }),
       transformer: new Konva.Transformer({
         name: `${this.type}:transformer`,
