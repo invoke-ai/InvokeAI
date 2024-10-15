@@ -27,6 +27,7 @@ const initialGalleryState: GalleryState = {
   shouldShowArchivedBoards: false,
   boardsListOrderBy: 'created_at',
   boardsListOrderDir: 'DESC',
+  uploadingBatch: false,
 };
 
 export const gallerySlice = createSlice({
@@ -169,6 +170,14 @@ export const gallerySlice = createSlice({
     boardsListOrderDirChanged: (state, action: PayloadAction<OrderDir>) => {
       state.boardsListOrderDir = action.payload;
     },
+    uploadingBatchChanged: (state, action: PayloadAction<{uploadingBatch: boolean; batchTotal?: number}>) => {
+      const {uploadingBatch, batchTotal} = action.payload
+      state.uploadingBatch = uploadingBatch
+      state.batchTotal = batchTotal
+    },
+    batchIndexIncremented: (state ) => {
+      state.batchIndex = (state.batchIndex || 0) + 1
+    },
   },
 });
 
@@ -196,6 +205,8 @@ export const {
   searchTermChanged,
   boardsListOrderByChanged,
   boardsListOrderDirChanged,
+  uploadingBatchChanged,
+  batchIndexIncremented
 } = gallerySlice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;

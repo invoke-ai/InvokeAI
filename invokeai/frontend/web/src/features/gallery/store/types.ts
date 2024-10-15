@@ -30,4 +30,7 @@ export type GalleryState = {
   shouldShowArchivedBoards: boolean;
   boardsListOrderBy: BoardRecordOrderBy;
   boardsListOrderDir: OrderDir;
+  uploadingBatch: boolean;
+  batchTotal?: number;
+  batchIndex?: number;
 };

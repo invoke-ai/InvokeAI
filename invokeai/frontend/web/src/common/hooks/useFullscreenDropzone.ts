@@ -1,4 +1,5 @@
-import { useAppSelector } from 'app/store/storeHooks';
+import { Text } from '@invoke-ai/ui-library';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -8,6 +9,7 @@ import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
+import {  batchIndexIncremented, uploadingBatchChanged } from '../../features/gallery/store/gallerySlice';
 
 const accept: Accept = {
   'image/png': ['.png'],
@@ -20,12 +22,13 @@ export const useFullscreenDropzone = () => {
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
   const [uploadImage] = useUploadImageMutation();
   const activeTabName = useAppSelector(selectActiveTab);
+  const dispatch = useAppDispatch()
 
   const getPostUploadAction = useCallback(
-    (singleImage: boolean): PostUploadAction => {
+    (singleImage: boolean): PostUploadAction | undefined => {
       if (singleImage && activeTabName === 'upscaling') {
         return { type: 'SET_UPSCALE_INITIAL_IMAGE' };
-      } else {
+      } else if (singleImage) {
         return { type: 'TOAST' };
       }
     },
@@ -47,7 +50,7 @@ export const useFullscreenDropzone = () => {
   );
 
   const fileAcceptedCallback = useCallback(
-    (file: File, postUploadAction: PostUploadAction) => {
+    (file: File, postUploadAction: PostUploadAction | undefined) => {
       uploadImage({
         file,
         image_category: 'user',
@@ -77,9 +80,37 @@ export const useFullscreenDropzone = () => {
 
       const postUploadAction = getPostUploadAction(acceptedFiles.length === 1);
 
-      acceptedFiles.forEach((file: File) => {
-        fileAcceptedCallback(file, postUploadAction);
+      if (acceptedFiles.length === 1) {
+        acceptedFiles.forEach((file: File) => {
+          fileAcceptedCallback(file, postUploadAction);
+        });
+      } else {
+        const batchTotal = acceptedFiles.length
+        let index = 0
+        // dispatch(uploadingBatchChanged({uploadingBatch: true, batchTotal: acceptedFiles.length}))
+     
+
+      toast({
+        id: 'BATCH_UPLOADING',
+        title: "Batch uploading",
+        status: 'info',
+        updateDescription: true,
+        description: `Uploading ${index} or ${batchTotal}`,
+        duration: null
       });
+
+      acceptedFiles.forEach((file: File) => {
+        fileAcceptedCallback(file, undefined);
+        toast({
+          id: 'BATCH_UPLOADING',
+          title: "Batch uploading",
+          status: 'info',
+          updateDescription: true,
+          description: `Uploading ${index} of ${batchTotal}`,
+          duration: null
+        });
+      });
+    }
     },
     [t, fileAcceptedCallback, fileRejectionCallback, getPostUploadAction]
   );
@@ -121,3 +152,5 @@ export const useFullscreenDropzone = () => {
 
   return { dropzone, isHandlingUpload, setIsHandlingUpload };
 };
+
+

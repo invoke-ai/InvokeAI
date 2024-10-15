@@ -47,11 +47,24 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         status: 'success',
       } as const;
 
+      const BATCH_UPLOADED_TOAST = {
+        id: 'BATCH_UPLOADED',
+        title: t('toast.imageUploaded'),
+        status: 'info',
+        withCount: true,
+        duration: null
+      } as const;
+
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {
         if (!autoAddBoardId || autoAddBoardId === 'none') {
           const title = postUploadAction.title || DEFAULT_UPLOADED_TOAST.title;
-          toast({ ...DEFAULT_UPLOADED_TOAST, title });
+          if (postUploadAction.batchCount) {
+            toast({ ...BATCH_UPLOADED_TOAST, title });
+          } else {
+            toast({ ...DEFAULT_UPLOADED_TOAST, title });
+          }
+          
           dispatch(boardIdSelected({ boardId: 'none' }));
           dispatch(galleryViewChanged('assets'));
         } else {
