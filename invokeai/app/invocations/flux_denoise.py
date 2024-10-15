@@ -4,12 +4,14 @@ from typing import Callable, Iterator, Optional, Tuple
 import torch
 import torchvision.transforms as tv_transforms
 from torchvision.transforms.functional import resize as tv_resize
+from transformers import CLIPVisionModelWithProjection
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
     FluxConditioningField,
+    ImageField,
     Input,
     InputField,
     LatentsField,
@@ -17,6 +19,7 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.flux_controlnet import FluxControlNetField
+from invokeai.app.invocations.ip_adapter import IPAdapterField
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -26,6 +29,8 @@ from invokeai.backend.flux.denoise import denoise
 from invokeai.backend.flux.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
+from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
+from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import XlabsIpAdapterFlux
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.sampling_utils import (
     clip_timestep_schedule_fractional,
@@ -116,6 +121,10 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     controlnet_vae: VAEField | None = InputField(
         description=FieldDescriptions.vae,
         input=Input.Connection,
+    )
+
+    ip_adapter: IPAdapterField | list[IPAdapterField] | None = InputField(
+        description=FieldDescriptions.ip_adapter, title="IP-Adapter", default=None, input=Input.Connection
     )
 
     @torch.no_grad()
@@ -245,6 +254,12 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 noise=noise,
             )
 
+        # Compute the IP-Adapter image prompt clip embeddings.
+        # We do this before loading other models to minimize peak memory.
+        # TODO(ryand): We should really do this in a separate invocation to benefit from caching.
+        ip_adapter_fields = self._normalize_ip_adapter_fields()
+        image_prompt_clip_embeds = self._prep_ip_adapter_image_prompt_clip_embeds(ip_adapter_fields, context)
+
         cfg_scale = self.prep_cfg_scale(
             cfg_scale=self.cfg_scale,
             timesteps=timesteps,
@@ -300,6 +315,15 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             else:
                 raise ValueError(f"Unsupported model format: {config.format}")
 
+            # Prepare IP-Adapter extensions.
+            ip_adapter_extensions = self._prep_ip_adapter_extensions(
+                image_prompt_clip_embeds=image_prompt_clip_embeds,
+                ip_adapter_fields=ip_adapter_fields,
+                context=context,
+                exit_stack=exit_stack,
+                dtype=inference_dtype,
+            )
+
             x = denoise(
                 model=transformer,
                 img=x,
@@ -316,6 +340,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 cfg_scale=cfg_scale,
                 inpaint_extension=inpaint_extension,
                 controlnet_extensions=controlnet_extensions,
+                ip_adapter_extensions=ip_adapter_extensions,
             )
 
         x = unpack(x.float(), self.height, self.width)
@@ -508,6 +533,73 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 raise ValueError(f"Unsupported ControlNet model type: {type(model)}")
 
         return controlnet_extensions
+
+    def _normalize_ip_adapter_fields(self) -> list[IPAdapterField]:
+        if self.ip_adapter is None:
+            return []
+        elif isinstance(self.ip_adapter, IPAdapterField):
+            return [self.ip_adapter]
+        elif isinstance(self.ip_adapter, list):
+            return self.ip_adapter
+        else:
+            raise ValueError(f"Unsupported IP-Adapter type: {type(self.ip_adapter)}")
+
+    def _prep_ip_adapter_image_prompt_clip_embeds(
+        self,
+        ip_adapter_fields: list[IPAdapterField],
+        context: InvocationContext,
+    ) -> list[torch.Tensor]:
+        """Run the IPAdapter CLIPVisionModel, returning image prompt embeddings."""
+        image_prompt_clip_embeds: list[torch.Tensor] = []
+        for ip_adapter_field in ip_adapter_fields:
+            # `ip_adapter_field.image` could be a list or a single ImageField. Normalize to a list here.
+            ipa_image_fields: list[ImageField]
+            if isinstance(ip_adapter_field.image, ImageField):
+                ipa_image_fields = [ip_adapter_field.image]
+            elif isinstance(ip_adapter_field.image, list):
+                ipa_image_fields = ip_adapter_field.image
+            else:
+                raise ValueError(f"Unsupported IP-Adapter image type: {type(ip_adapter_field.image)}")
+
+            ipa_images = [context.images.get_pil(image.image_name) for image in ipa_image_fields]
+
+            with context.models.load(ip_adapter_field.image_encoder_model) as image_encoder_model:
+                assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
+                image_prompt_clip_embeds.append(
+                    XLabsIPAdapterExtension.run_clip_image_encoder(
+                        pil_image=ipa_images,
+                        image_encoder=image_encoder_model,
+                    )
+                )
+        return image_prompt_clip_embeds
+
+    def _prep_ip_adapter_extensions(
+        self,
+        ip_adapter_fields: list[IPAdapterField],
+        image_prompt_clip_embeds: list[torch.Tensor],
+        context: InvocationContext,
+        exit_stack: ExitStack,
+        dtype: torch.dtype,
+    ) -> list[XLabsIPAdapterExtension]:
+        ip_adapter_extensions: list[XLabsIPAdapterExtension] = []
+        for ip_adapter_field, image_prompt_clip_embed in zip(ip_adapter_fields, image_prompt_clip_embeds, strict=True):
+            ip_adapter_model = exit_stack.enter_context(context.models.load(ip_adapter_field.ip_adapter_model))
+            assert isinstance(ip_adapter_model, XlabsIpAdapterFlux)
+            ip_adapter_model = ip_adapter_model.to(dtype=dtype)
+            if ip_adapter_field.mask is not None:
+                raise ValueError("IP-Adapter masks are not yet supported in Flux.")
+            ip_adapter_extension = XLabsIPAdapterExtension(
+                model=ip_adapter_model,
+                image_prompt_clip_embed=image_prompt_clip_embed,
+                weight=ip_adapter_field.weight,
+                begin_step_percent=ip_adapter_field.begin_step_percent,
+                end_step_percent=ip_adapter_field.end_step_percent,
+            )
+
+            ip_adapter_extension.run_image_proj(dtype=dtype)
+            ip_adapter_extensions.append(ip_adapter_extension)
+
+        return ip_adapter_extensions
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
         for lora in self.transformer.loras:
