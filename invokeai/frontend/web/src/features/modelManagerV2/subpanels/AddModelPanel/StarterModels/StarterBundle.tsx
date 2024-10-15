@@ -14,42 +14,34 @@ export const StarterBundle = ({ bundleName, bundle }: { bundleName: string; bund
   const { t } = useTranslation();
 
   const modelsToInstall = useMemo(() => {
-    const _modelsToInstall = [];
-    const _modelsToSkip = [];
-    for (let index = 0; index < bundle.length; index++) {
-      const starterModel = bundle[index];
-      if (!starterModel) {
-        continue;
-      }
-
+    const install = [];
+    const skip = [];
+    for (const starterModel of bundle) {
       const result = buildModelToInstall(starterModel);
       if (result) {
-        _modelsToInstall.push(result);
+        install.push(result);
       } else {
-        _modelsToSkip.push(result);
+        skip.push(result);
       }
 
       if (starterModel.dependencies) {
         for (const d of starterModel.dependencies) {
           const result = buildModelToInstall(d);
           if (result) {
-            _modelsToInstall.push(result);
+            install.push(result);
           } else {
-            _modelsToSkip.push(result);
+            skip.push(result);
           }
         }
       }
     }
 
-    return { install: _modelsToInstall, skip: _modelsToSkip };
+    return { install, skip };
   }, [bundle, buildModelToInstall]);
 
   const handleClickBundle = useCallback(async () => {
-    for (let index = 0; index < modelsToInstall.install.length; index++) {
-      const model = modelsToInstall.install[index];
-      if (model) {
-        await installModel(model).unwrap();
-      }
+    for (const model of modelsToInstall.install) {
+      await installModel(model).unwrap();
     }
     toast({
       status: 'info',
