@@ -12,17 +12,17 @@ import { PiImageBold } from 'react-icons/pi';
 export const NoContentForViewer = () => {
   const hasImages = useHasImages();
   const { t } = useTranslation();
-  const dispatch = useAppDispatch()
+  const dispatch = useAppDispatch();
 
-  const handleClickDownloadStarterModels= useCallback(() => {
+  const handleClickDownloadStarterModels = useCallback(() => {
     dispatch(setActiveTab('models'));
     $installModelsTab.set(3);
-  }, [dispatch])
+  }, [dispatch]);
 
-  const handleClickImportModels= useCallback(() => {
+  const handleClickImportModels = useCallback(() => {
     dispatch(setActiveTab('models'));
     $installModelsTab.set(0);
-  }, [dispatch])
+  }, [dispatch]);
 
   if (hasImages === LOADING_SYMBOL) {
     return (
@@ -55,12 +55,18 @@ export const NoContentForViewer = () => {
 
         <Flex flexDir="column" gap={2} alignItems="center">
           <Text fontSize="md" color="base.200">
-            {t("newUserExperience.noModelsInstalled")}
+            {t('newUserExperience.noModelsInstalled')}
           </Text>
           <Flex gap={3} alignItems="center">
-            <Button size="sm" onClick={handleClickDownloadStarterModels}>{t('newUserExperience.downloadStarterModels')}</Button>
-            <Text fontSize="sm" color="base.200">{t("common.or")}</Text>
-            <Button size="sm" onClick={handleClickImportModels}>{t('newUserExperience.importModels')}</Button>
+            <Button size="sm" onClick={handleClickDownloadStarterModels}>
+              {t('newUserExperience.downloadStarterModels')}
+            </Button>
+            <Text fontSize="sm" color="base.200">
+              {t('common.or')}
+            </Text>
+            <Button size="sm" onClick={handleClickImportModels}>
+              {t('newUserExperience.importModels')}
+            </Button>
           </Flex>
         </Flex>
 
