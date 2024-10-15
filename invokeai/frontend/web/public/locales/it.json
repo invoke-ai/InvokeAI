@@ -91,7 +91,8 @@
         "reset": "Reimposta",
         "none": "Niente",
         "new": "Nuovo",
-        "view": "Vista"
+        "view": "Vista",
+        "close": "Chiudi"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -157,7 +158,9 @@
         "openViewer": "Apri visualizzatore",
         "closeViewer": "Chiudi visualizzatore",
         "imagesTab": "Immagini create e salvate in Invoke.",
-        "assetsTab": "File che hai caricato per usarli nei tuoi progetti."
+        "assetsTab": "File che hai caricato per usarli nei tuoi progetti.",
+        "boardsSettings": "Impostazioni Bacheche",
+        "imagesSettings": "Impostazioni Immagini Galleria"
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -766,7 +769,8 @@
         "imageSaved": "Immagine salvata",
         "imageSavingFailed": "Salvataggio dell'immagine non riuscito",
         "layerCopiedToClipboard": "Livello copiato negli appunti",
-        "imageNotLoadedDesc": "Impossibile trovare l'immagine"
+        "imageNotLoadedDesc": "Impossibile trovare l'immagine",
+        "linkCopied": "Collegamento copiato"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -922,7 +926,7 @@
         "saveToGallery": "Salva nella Galleria",
         "noMatchingWorkflows": "Nessun flusso di lavoro corrispondente",
         "noWorkflows": "Nessun flusso di lavoro",
-        "workflowHelpText": "Hai bisogno di aiuto? Consulta la nostra guida <LinkComponent>Introduzione ai flussi di lavoro</LinkComponent>"
+        "workflowHelpText": "Hai bisogno di aiuto? Consulta la nostra guida <LinkComponent>Introduzione ai flussi di lavoro</LinkComponent>."
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1519,7 +1523,8 @@
         "parameterSet": "Parametro {{parameter}} impostato",
         "parsingFailed": "Analisi non riuscita",
         "recallParameter": "Richiama {{label}}",
-        "canvasV2Metadata": "Tela"
+        "canvasV2Metadata": "Tela",
+        "guidance": "Guida"
     },
     "hrf": {
         "enableHrf": "Abilita Correzione Alta Risoluzione",
@@ -1570,7 +1575,12 @@
         "defaultWorkflows": "Flussi di lavoro predefiniti",
         "uploadAndSaveWorkflow": "Carica nella libreria",
         "chooseWorkflowFromLibrary": "Scegli il flusso di lavoro dalla libreria",
-        "deleteWorkflow2": "Vuoi davvero eliminare questo flusso di lavoro? Questa operazione non può essere annullata."
+        "deleteWorkflow2": "Vuoi davvero eliminare questo flusso di lavoro? Questa operazione non può essere annullata.",
+        "edit": "Modifica",
+        "download": "Scarica",
+        "copyShareLink": "Copia Condividi Link",
+        "copyShareLinkForWorkflow": "Copia Condividi Link del Flusso di lavoro",
+        "delete": "Elimina"
     },
     "accordions": {
         "compositing": {
@@ -1870,7 +1880,11 @@
             "fitToBbox": "Adatta al Riquadro",
             "transform": "Trasforma",
             "apply": "Applica",
-            "cancel": "Annulla"
+            "cancel": "Annulla",
+            "fitMode": "Adattamento",
+            "fitModeContain": "Contieni",
+            "fitModeFill": "Riempi",
+            "fitModeCover": "Copri"
         },
         "stagingArea": {
             "next": "Successiva",
@@ -1905,7 +1919,8 @@
             "newRasterLayer": "Nuovo Livello Raster",
             "saveCanvasToGallery": "Salva la Tela nella Galleria",
             "saveToGalleryGroup": "Salva nella Galleria"
-        }
+        },
+        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine"
     },
     "ui": {
         "tabs": {
