@@ -17,7 +17,9 @@ export const useBuildModelsToInstall = () => {
     (starterModel: StarterModel) => {
       if (
         modelList.some(
-          (mc) => starterModel.base === mc.base && starterModel.name === mc.name && starterModel.type === mc.type
+          (mc) =>
+            starterModel.source === mc.source ||
+            (starterModel.base === mc.base && starterModel.name === mc.name && starterModel.type === mc.type)
         )
       ) {
         return undefined;
