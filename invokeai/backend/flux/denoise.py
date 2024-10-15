@@ -7,6 +7,7 @@ from invokeai.backend.flux.controlnet.controlnet_flux_output import ControlNetFl
 from invokeai.backend.flux.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
+from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
@@ -25,6 +26,7 @@ def denoise(
     guidance: float,
     inpaint_extension: InpaintExtension | None,
     controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension],
+    ip_adapter_extensions: list[XLabsIPAdapterExtension],
 ):
     # step 0 is the initial state
     total_steps = len(timesteps) - 1
@@ -43,12 +45,14 @@ def denoise(
     for t_curr, t_prev in tqdm(list(zip(timesteps[:-1], timesteps[1:], strict=True))):
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
 
+        timestep_index = step - 1
+
         # Run ControlNet models.
         controlnet_residuals: list[ControlNetFluxOutput] = []
         for controlnet_extension in controlnet_extensions:
             controlnet_residuals.append(
                 controlnet_extension.run_controlnet(
-                    timestep_index=step - 1,
+                    timestep_index=timestep_index,
                     total_num_timesteps=total_steps,
                     img=img,
                     img_ids=img_ids,
@@ -74,8 +78,11 @@ def denoise(
             y=vec,
             timesteps=t_vec,
             guidance=guidance_vec,
+            timestep_index=timestep_index,
+            total_num_timesteps=total_steps,
             controlnet_double_block_residuals=merged_controlnet_residuals.double_block_residuals,
             controlnet_single_block_residuals=merged_controlnet_residuals.single_block_residuals,
+            ip_adapter_extensions=ip_adapter_extensions,
         )
 
         preview_img = img - t_curr * pred
