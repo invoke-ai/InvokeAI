@@ -23,7 +23,6 @@ export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?
     case 'REPLACE_LAYER_WITH_IMAGE':
     case 'ADD_GLOBAL_REFERENCE_IMAGE_FROM_IMAGE':
     case 'ADD_REGIONAL_REFERENCE_IMAGE_FROM_IMAGE':
-    case 'DRAG_TO_LAYERS_TAB':
       return payloadType === 'IMAGE_DTO';
     case 'ADD_TO_BOARD': {
       // If the board is the same, don't allow the drop
