@@ -1,42 +1,47 @@
 import { EMPTY_ARRAY } from 'app/store/constants';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
 import type { StarterModel } from 'services/api/types';
 
-export const useBuildModelsToInstall = () => {
-  const { data: modelListRes } = useGetModelConfigsQuery();
-  const modelList = useMemo(() => {
-    if (!modelListRes) {
-      return EMPTY_ARRAY;
-    }
+export type ModelInstallArg = {
+  config: Pick<StarterModel, 'name' | 'base' | 'type' | 'description' | 'format'>;
+  source: string;
+};
 
-    return modelConfigsAdapterSelectors.selectAll(modelListRes);
-  }, [modelListRes]);
+/**
+ * Flattens a starter model and its dependencies into a list of models, including the starter model itself.
+ */
+export const flattenStarterModel = (starterModel: StarterModel): StarterModel[] => {
+  return [starterModel, ...(starterModel.dependencies || [])];
+};
 
-  const buildModelToInstall = useCallback(
-    (starterModel: StarterModel) => {
-      if (
-        modelList.some(
-          (mc) =>
-            starterModel.source === mc.source ||
-            (starterModel.base === mc.base && starterModel.name === mc.name && starterModel.type === mc.type)
-        )
-      ) {
-        return undefined;
-      }
+export const useBuildModelInstallArg = () => {
+  const { modelList } = useGetModelConfigsQuery(undefined, {
+    selectFromResult: ({ data }) => ({ modelList: data ? modelConfigsAdapterSelectors.selectAll(data) : EMPTY_ARRAY }),
+  });
 
-      const source = starterModel.source;
-      const config = {
-        name: starterModel.name,
-        description: starterModel.description,
-        type: starterModel.type,
-        base: starterModel.base,
-        format: starterModel.format,
-      };
-      return { config, source };
-    },
+  const getIsInstalled = useCallback(
+    ({ source, name, base, type, is_installed }: StarterModel): boolean =>
+      modelList.some(
+        (mc) => is_installed || source === mc.source || (base === mc.base && name === mc.name && type === mc.type)
+      ),
     [modelList]
   );
 
-  return buildModelToInstall;
+  const buildModelInstallArg = useCallback((starterModel: StarterModel): ModelInstallArg => {
+    const { name, base, type, source, description, format } = starterModel;
+
+    return {
+      config: {
+        name,
+        base,
+        type,
+        description,
+        format,
+      },
+      source,
+    };
+  }, []);
+
+  return { getIsInstalled, buildModelInstallArg };
 };

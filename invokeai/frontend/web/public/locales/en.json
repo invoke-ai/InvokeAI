@@ -800,7 +800,13 @@
         "vae": "VAE",
         "vaePrecision": "VAE Precision",
         "variant": "Variant",
-        "width": "Width"
+        "width": "Width",
+        "installingBundle": "Installing Bundle",
+        "installingModel": "Installing Model",
+        "installingXModels_one": "Installing {{count}} model",
+        "installingXModels_other": "Installing {{count}} models",
+        "skippingXDuplicates_one": ", skipping {{count}} duplicate",
+        "skippingXDuplicates_other": ", skipping {{count}} duplicates"
     },
     "models": {
         "addLora": "Add LoRA",
