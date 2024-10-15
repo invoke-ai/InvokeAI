@@ -16,6 +16,14 @@ class IPDoubleStreamBlock(torch.nn.Module):
         self.ip_adapter_double_stream_v_proj = torch.nn.Linear(context_dim, hidden_dim, bias=True)
 
 
+class IPAdapterDoubleBlocks(torch.nn.Module):
+    def __init__(self, num_double_blocks: int, context_dim: int, hidden_dim: int):
+        super().__init__()
+        self.double_blocks = torch.nn.ModuleList(
+            [IPDoubleStreamBlock(context_dim, hidden_dim) for _ in range(num_double_blocks)]
+        )
+
+
 @dataclass
 class XlabsIpAdapterParams:
     num_double_blocks: int
@@ -31,8 +39,8 @@ class XlabsIpAdapterFlux(torch.nn.Module):
         self.image_proj = ImageProjModel(
             cross_attention_dim=params.context_dim, clip_embeddings_dim=params.clip_embeddings_dim
         )
-        self.double_blocks = torch.nn.ModuleList(
-            [IPDoubleStreamBlock(params.context_dim, params.hidden_dim) for _ in range(params.num_double_blocks)]
+        self.ip_adapter_double_blocks = IPAdapterDoubleBlocks(
+            num_double_blocks=params.num_double_blocks, context_dim=params.context_dim, hidden_dim=params.hidden_dim
         )
 
     def load_xlabs_state_dict(self, state_dict: dict[str, torch.Tensor], assign: bool = False):
@@ -55,19 +63,5 @@ class XlabsIpAdapterFlux(torch.nn.Module):
         self.image_proj.load_state_dict(image_proj_sd, assign=assign)
 
         # Initialize the double blocks.
-        for i, double_block in enumerate(self.double_blocks):
-            double_block_sd: dict[str, torch.Tensor] = {
-                "ip_adapter_double_stream_k_proj.bias": double_blocks_sd[
-                    f"double_blocks.{i}.processor.ip_adapter_double_stream_k_proj.bias"
-                ],
-                "ip_adapter_double_stream_k_proj.weight": double_blocks_sd[
-                    f"double_blocks.{i}.processor.ip_adapter_double_stream_k_proj.weight"
-                ],
-                "ip_adapter_double_stream_v_proj.bias": double_blocks_sd[
-                    f"double_blocks.{i}.processor.ip_adapter_double_stream_v_proj.bias"
-                ],
-                "ip_adapter_double_stream_v_proj.weight": double_blocks_sd[
-                    f"double_blocks.{i}.processor.ip_adapter_double_stream_v_proj.weight"
-                ],
-            }
-            double_block.load_state_dict(double_block_sd, assign=assign)
+        double_blocks_sd = {k.replace("processor.", ""): v for k, v in double_blocks_sd.items()}
+        self.ip_adapter_double_blocks.load_state_dict(double_blocks_sd, assign=assign)
