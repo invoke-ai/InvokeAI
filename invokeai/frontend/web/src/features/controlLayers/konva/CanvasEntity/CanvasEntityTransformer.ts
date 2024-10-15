@@ -653,9 +653,20 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   /**
    * Starts the transformation of the entity.
+   *
+   * This method will asynchronously acquire a mutex to prevent concurrent operations. If you need to perform an
+   * operation after the transformation is started, you should await this method.
+   *
    * @param arg Options for starting the transformation
    * @param arg.silent Whether the transformation should be silent. If silent, the transform controls will not be shown,
-   * so you _must_ immediately call `applyTransform` or `stopTransform` to complete the transformation.
+   * so you _must_ call `applyTransform` or `stopTransform` to complete the transformation.
+   *
+   * @example
+   * ```ts
+   * await adapter.transformer.startTransform({ silent: true });
+   * adapter.transformer.fitToBboxContain();
+   * await adapter.transformer.applyTransform();
+   * ```
    */
   startTransform = async (arg?: { silent: boolean }) => {
     const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
