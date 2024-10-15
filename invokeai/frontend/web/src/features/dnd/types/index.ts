@@ -86,6 +86,10 @@ export type SelectForCompareDropData = BaseDropData & {
   };
 };
 
+export type DragToLayersTabDropData = BaseDropData & {
+  actionType: 'DRAG_TO_LAYERS_TAB';
+};
+
 export type TypesafeDroppableData =
   | NodesImageDropData
   | AddToBoardDropData
@@ -98,7 +102,8 @@ export type TypesafeDroppableData =
   | AddControlLayerFromImageDropData
   | ReplaceLayerImageDropData
   | AddRegionalReferenceImageFromImageDropData
-  | AddGlobalReferenceImageFromImageDropData;
+  | AddGlobalReferenceImageFromImageDropData
+  | DragToLayersTabDropData;
 
 type BaseDragData = {
   id: string;
