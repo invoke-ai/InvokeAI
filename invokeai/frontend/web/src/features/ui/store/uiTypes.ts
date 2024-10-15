@@ -1,4 +1,5 @@
 export type TabName = 'canvas' | 'upscaling' | 'workflows' | 'models' | 'queue';
+export type CanvasRightPanelTabName = 'layers' | 'gallery';
 
 export interface UIState {
   /**
@@ -9,6 +10,10 @@ export interface UIState {
    * The currently active tab.
    */
   activeTab: TabName;
+  /**
+   * The currently active right panel canvas tab
+   */
+  activeTabCanvasRightPanel: CanvasRightPanelTabName;
   /**
    * Whether or not to show image details, e.g. metadata, workflow, etc.
    */
