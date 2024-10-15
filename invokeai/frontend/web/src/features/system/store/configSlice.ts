@@ -220,4 +220,3 @@ export const selectMetadataFetchDebounce = createConfigSelector((config) => conf
 export const selectIsModelsTabDisabled = createConfigSelector((config) => config.disabledTabs.includes('models'));
 
 export const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLocal);
-
