@@ -1,14 +1,12 @@
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { $canvasRightPanelTab } from 'features/controlLayers/store/ephemeral';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { useGalleryNavigation } from 'features/gallery/hooks/useGalleryNavigation';
 import { useGalleryPagination } from 'features/gallery/hooks/useGalleryPagination';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { selectActiveTab, selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
 import { useMemo } from 'react';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
@@ -22,7 +20,7 @@ export const useGalleryHotkeys = () => {
   const selection = useAppSelector((s) => s.gallery.selection);
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const queryResult = useListImagesQuery(queryArgs);
-  const canvasRightPanelTab = useStore($canvasRightPanelTab);
+  const canvasRightPanelTab = useAppSelector(selectActiveTabCanvasRightPanel);
   const appTab = useAppSelector(selectActiveTab);
   const isWorkflowsFocused = useIsRegionFocused('workflows');
   const isGalleryFocused = useIsRegionFocused('gallery');
