@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
 import type { StarterModel } from 'services/api/types';
 
-export type ModelInstallArg = {
+type ModelInstallArg = {
   config: Pick<StarterModel, 'name' | 'base' | 'type' | 'description' | 'format'>;
   source: string;
 };
