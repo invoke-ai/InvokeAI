@@ -1,4 +1,3 @@
-import type { TextProps } from '@invoke-ai/ui-library';
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,12 +5,11 @@ import { useTranslation } from 'react-i18next';
 type Props = {
   isOver: boolean;
   label?: string;
-  textStyleOverrides?: Partial<TextProps>;
 };
 
 const IAIDropOverlay = (props: Props) => {
   const { t } = useTranslation();
-  const { isOver, textStyleOverrides, label = t('gallery.drop') } = props;
+  const { isOver, label = t('gallery.drop') } = props;
   return (
     <Flex position="absolute" top={0} right={0} bottom={0} left={0}>
       <Flex
@@ -54,7 +52,6 @@ const IAIDropOverlay = (props: Props) => {
           transitionProperty="common"
           transitionDuration="0.1s"
           textAlign="center"
-          {...textStyleOverrides}
         >
           {label}
         </Text>

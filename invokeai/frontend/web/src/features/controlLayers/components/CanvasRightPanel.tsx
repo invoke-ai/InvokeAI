@@ -1,11 +1,9 @@
 import { useDndContext } from '@dnd-kit/core';
 import { Box, Button, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDroppable from 'common/components/IAIDroppable';
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
-import type { DragToLayersTabDropData } from 'features/dnd/types';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -80,19 +78,10 @@ CanvasRightPanel.displayName = 'CanvasRightPanel';
 
 const PanelTabs = memo(() => {
   const { t } = useTranslation();
-  const activeTab = useAppSelector(selectActiveTabCanvasRightPanel);
   const activeEntityCount = useAppSelector(selectEntityCountActive);
   const tabTimeout = useRef<number | null>(null);
   const dndCtx = useDndContext();
   const dispatch = useAppDispatch();
-
-  const droppableData: DragToLayersTabDropData = useMemo(
-    () => ({
-      id: 'DRAG_TO_LAYERS_TAB',
-      actionType: 'DRAG_TO_LAYERS_TAB',
-    }),
-    []
-  );
 
   const onOnMouseOverLayersTab = useCallback(() => {
     tabTimeout.current = window.setTimeout(() => {
@@ -129,13 +118,6 @@ const PanelTabs = memo(() => {
         <Box as="span" w="full">
           {layersTabLabel}
         </Box>
-        {activeTab === 'gallery' && (
-          <IAIDroppable
-            data={droppableData}
-            dropLabel={t('controlLayers.replaceLayer')}
-            textStyleOverrides={{ fontSize: 'sm' }}
-          />
-        )}
       </Tab>
       <Tab position="relative" onMouseOver={onOnMouseOverGalleryTab} onMouseOut={onMouseOut}>
         {t('gallery.gallery')}
