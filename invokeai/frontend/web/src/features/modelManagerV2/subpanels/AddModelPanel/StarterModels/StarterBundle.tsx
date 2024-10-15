@@ -49,12 +49,15 @@ export const StarterBundle = ({ bundleName, bundle }: { bundleName: string; bund
         </Flex>
       }
     >
-      <Button size="sm" onClick={handleClickBundle} py={6}>
+      <Button size="sm" onClick={handleClickBundle} py={6} isDisabled={modelsToInstall.install.length === 0}>
         <Flex flexDir="column">
           <Text>{isMainModelBase(bundleName) ? MODEL_TYPE_SHORT_MAP[bundleName] : bundleName}</Text>
-          <Text fontSize="xs">
-            ({bundle.length} {t('settings.models')})
-          </Text>
+          {modelsToInstall.install.length > 0 && (
+            <Text fontSize="xs">
+              ({bundle.length} {t('settings.models')})
+            </Text>
+          )}
+          {modelsToInstall.install.length === 0 && <Text fontSize="xs">{t('common.installed')}</Text>}
         </Flex>
       </Button>
     </Tooltip>
