@@ -5,15 +5,10 @@ import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type GetStarterModelsResponse, useInstallModelMutation } from 'services/api/endpoints/models';
+import { useInstallModelMutation } from 'services/api/endpoints/models';
+import type { StarterModel } from 'services/api/types';
 
-export const StarterBundle = ({
-  bundleName,
-  bundle,
-}: {
-  bundleName: string;
-  bundle: GetStarterModelsResponse['starter_bundles'][number];
-}) => {
+export const StarterBundle = ({ bundleName, bundle }: { bundleName: string; bundle: StarterModel[] }) => {
   const [installModel] = useInstallModelMutation();
   const buildModelToInstall = useBuildModelsToInstall();
   const { t } = useTranslation();
@@ -71,10 +66,12 @@ export const StarterBundle = ({
         </Flex>
       }
     >
-      <Button  size="sm" onClick={handleClickBundle}  py={6} >
+      <Button size="sm" onClick={handleClickBundle} py={6}>
         <Flex flexDir="column">
-        <Text>{isMainModelBase(bundleName) && MODEL_TYPE_SHORT_MAP[bundleName]}</Text>
-        <Text fontSize="xs">({bundle.length} {t("settings.models")})</Text>
+          <Text>{isMainModelBase(bundleName) && MODEL_TYPE_SHORT_MAP[bundleName]}</Text>
+          <Text fontSize="xs">
+            ({bundle.length} {t('settings.models')})
+          </Text>
         </Flex>
       </Button>
     </Tooltip>

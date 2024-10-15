@@ -5,10 +5,10 @@ import ModelBaseBadge from 'features/modelManagerV2/subpanels/ModelManagerPanel/
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
-import type { GetStarterModelsResponse } from 'services/api/endpoints/models';
+import type { StarterModel } from 'services/api/types';
 
 type Props = {
-  model: GetStarterModelsResponse['starter_models'][number];
+  model: StarterModel;
 };
 export const StarterModelsResultItem = memo(({ model }: Props) => {
   const { t } = useTranslation();
