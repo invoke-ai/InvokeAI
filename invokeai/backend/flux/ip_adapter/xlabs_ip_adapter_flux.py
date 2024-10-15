@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import accelerate
 import torch
 
 from invokeai.backend.ip_adapter.ip_adapter import ImageProjModel
@@ -95,13 +94,3 @@ def infer_xlabs_ip_adapter_params_from_state_dict(state_dict: dict[str, torch.Te
         hidden_dim=hidden_dim,
         clip_embeddings_dim=clip_embeddings_dim,
     )
-
-
-def load_xlabs_ip_adapter_flux(state_dict: dict[str, torch.Tensor]) -> XlabsIpAdapterFlux:
-    params = infer_xlabs_ip_adapter_params_from_state_dict(state_dict)
-
-    with accelerate.init_empty_weights():
-        model = XlabsIpAdapterFlux(params=params)
-
-    model.load_xlabs_state_dict(state_dict)
-    return model

@@ -19,6 +19,10 @@ from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_xlabs_controlnet,
 )
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
+from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import (
+    XlabsIpAdapterFlux,
+    infer_xlabs_ip_adapter_params_from_state_dict,
+)
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.util import ae_params, params
@@ -35,6 +39,7 @@ from invokeai.backend.model_manager.config import (
     CLIPEmbedDiffusersConfig,
     ControlNetCheckpointConfig,
     ControlNetDiffusersConfig,
+    IPAdapterCheckpointConfig,
     MainBnbQuantized4bCheckpointConfig,
     MainCheckpointConfig,
     MainGGUFCheckpointConfig,
@@ -351,4 +356,27 @@ class FluxControlnetModel(ModelLoader):
             model = InstantXControlNetFlux(flux_params, num_control_modes)
 
         model.load_state_dict(sd, assign=True)
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.IPAdapter, format=ModelFormat.Checkpoint)
+class FluxIpAdapterModel(ModelLoader):
+    """Class to load FLUX IP-Adapter models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, IPAdapterCheckpointConfig):
+            raise ValueError(f"Unexpected model config type: {type(config)}.")
+
+        sd = load_file(Path(config.path))
+
+        params = infer_xlabs_ip_adapter_params_from_state_dict(sd)
+
+        with accelerate.init_empty_weights():
+            model = XlabsIpAdapterFlux(params=params)
+
+        model.load_xlabs_state_dict(sd, assign=True)
         return model
