@@ -1,3 +1,4 @@
+import type { TextProps } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
 import { useDroppableTypesafe } from 'features/dnd/hooks/typesafeHooks';
 import type { TypesafeDroppableData } from 'features/dnd/types';
@@ -12,10 +13,11 @@ type IAIDroppableProps = {
   dropLabel?: string;
   disabled?: boolean;
   data?: TypesafeDroppableData;
+  textStyleOverrides?: Partial<TextProps>;
 };
 
 const IAIDroppable = (props: IAIDroppableProps) => {
-  const { dropLabel, data, disabled } = props;
+  const { dropLabel, data, disabled, textStyleOverrides } = props;
   const dndId = useRef(uuidv4());
 
   const { isOver, setNodeRef, active } = useDroppableTypesafe({
@@ -37,7 +39,9 @@ const IAIDroppable = (props: IAIDroppableProps) => {
       pointerEvents={active ? 'auto' : 'none'}
     >
       <AnimatePresence>
-        {isValidDrop(data, active?.data.current) && <IAIDropOverlay isOver={isOver} label={dropLabel} />}
+        {isValidDrop(data, active?.data.current) && (
+          <IAIDropOverlay isOver={isOver} label={dropLabel} textStyleOverrides={textStyleOverrides} />
+        )}
       </AnimatePresence>
     </Box>
   );
