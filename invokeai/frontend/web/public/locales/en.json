@@ -664,6 +664,7 @@
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "createdBy": "Created By",
         "generationMode": "Generation Mode",
+        "guidance": "Guidance",
         "height": "Height",
         "imageDetails": "Image Details",
         "imageDimensions": "Image Dimensions",
