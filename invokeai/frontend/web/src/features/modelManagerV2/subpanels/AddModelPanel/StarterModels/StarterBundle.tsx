@@ -1,8 +1,9 @@
 import { Button, Flex, Text, Tooltip } from '@invoke-ai/ui-library';
-import { useBuildModelsToInstall } from 'features/modelManagerV2/hooks/useBuildModelsToInstall';
+import { flattenStarterModel, useBuildModelInstallArg } from 'features/modelManagerV2/hooks/useBuildModelsToInstall';
 import { isMainModelBase } from 'features/nodes/types/common';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
 import { toast } from 'features/toast/toast';
+import { flatMap, negate, uniqWith } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInstallModelMutation } from 'services/api/endpoints/models';
@@ -10,45 +11,35 @@ import type { StarterModel } from 'services/api/types';
 
 export const StarterBundle = ({ bundleName, bundle }: { bundleName: string; bundle: StarterModel[] }) => {
   const [installModel] = useInstallModelMutation();
-  const buildModelToInstall = useBuildModelsToInstall();
+  const { getIsInstalled, buildModelInstallArg } = useBuildModelInstallArg();
   const { t } = useTranslation();
 
   const modelsToInstall = useMemo(() => {
-    const install = [];
-    const skip = [];
-    for (const starterModel of bundle) {
-      const result = buildModelToInstall(starterModel);
-      if (result) {
-        install.push(result);
-      } else {
-        skip.push(result);
-      }
-
-      if (starterModel.dependencies) {
-        for (const d of starterModel.dependencies) {
-          const result = buildModelToInstall(d);
-          if (result) {
-            install.push(result);
-          } else {
-            skip.push(result);
-          }
-        }
-      }
-    }
+    // Flatten the models and remove duplicates, which is expected as models can have the same dependencies
+    const flattenedModels = flatMap(bundle, flattenStarterModel);
+    const uniqueModels = uniqWith(
+      flattenedModels,
+      (m1, m2) => m1.source === m2.source || (m1.name === m2.name && m1.base === m2.base && m1.type === m2.type)
+    );
+    // We want to install models that are not installed and skip models that are already installed
+    const install = uniqueModels.filter(negate(getIsInstalled)).map(buildModelInstallArg);
+    const skip = uniqueModels.filter(getIsInstalled).map(buildModelInstallArg);
 
     return { install, skip };
-  }, [bundle, buildModelToInstall]);
+  }, [buildModelInstallArg, bundle, getIsInstalled]);
 
-  const handleClickBundle = useCallback(async () => {
-    for (const model of modelsToInstall.install) {
-      await installModel(model).unwrap();
+  const handleClickBundle = useCallback(() => {
+    modelsToInstall.install.forEach(installModel);
+    let description = t('modelManager.installingXModels', { count: modelsToInstall.install.length });
+    if (modelsToInstall.skip.length > 1) {
+      description += t('modelManager.skippingXDuplicates', { count: modelsToInstall.skip.length - 1 });
     }
     toast({
       status: 'info',
-      title: 'Bundle Installing',
-      description: `Installing ${modelsToInstall.install.length}, skipping ${modelsToInstall.skip.length} duplicates`,
+      title: t('modelManager.installingBundle'),
+      description,
     });
-  }, [modelsToInstall, installModel]);
+  }, [modelsToInstall.install, modelsToInstall.skip.length, installModel, t]);
 
   return (
     <Tooltip
@@ -60,7 +51,7 @@ export const StarterBundle = ({ bundleName, bundle }: { bundleName: string; bund
     >
       <Button size="sm" onClick={handleClickBundle} py={6}>
         <Flex flexDir="column">
-          <Text>{isMainModelBase(bundleName) && MODEL_TYPE_SHORT_MAP[bundleName]}</Text>
+          <Text>{isMainModelBase(bundleName) ? MODEL_TYPE_SHORT_MAP[bundleName] : bundleName}</Text>
           <Text fontSize="xs">
             ({bundle.length} {t('settings.models')})
           </Text>
