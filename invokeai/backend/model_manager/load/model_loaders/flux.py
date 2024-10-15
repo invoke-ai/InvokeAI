@@ -19,9 +19,9 @@ from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_xlabs_controlnet,
 )
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
+from invokeai.backend.flux.ip_adapter.state_dict_utils import infer_xlabs_ip_adapter_params_from_state_dict
 from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import (
     XlabsIpAdapterFlux,
-    infer_xlabs_ip_adapter_params_from_state_dict,
 )
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
