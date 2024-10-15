@@ -407,7 +407,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   fitToBboxFill = () => {
     if (!this.$isTransformEnabled.get()) {
-      this.log.warn('Cannot fit to bbox contain when transform is disabled');
+      this.log.warn(
+        'Cannot fit to bbox contain when transform is disabled. Did you forget to call `await adapter.transformer.startTransform()`?'
+      );
       return;
     }
     const { rect } = this.manager.stateApi.getBbox();
@@ -428,7 +430,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   fitToBboxContain = () => {
     if (!this.$isTransformEnabled.get()) {
-      this.log.warn('Cannot fit to bbox contain when transform is disabled');
+      this.log.warn(
+        'Cannot fit to bbox contain when transform is disabled. Did you forget to call `await adapter.transformer.startTransform()`?'
+      );
       return;
     }
     const { rect } = this.manager.stateApi.getBbox();
@@ -460,7 +464,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   fitToBboxCover = () => {
     if (!this.$isTransformEnabled.get()) {
-      this.log.warn('Cannot fit to bbox contain when transform is disabled');
+      this.log.warn(
+        'Cannot fit to bbox contain when transform is disabled. Did you forget to call `await adapter.transformer.startTransform()`?'
+      );
       return;
     }
     const { rect } = this.manager.stateApi.getBbox();
@@ -687,6 +693,12 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * Applies the transformation of the entity.
    */
   applyTransform = async () => {
+    if (!this.$isTransforming.get()) {
+      this.log.warn(
+        'Cannot apply transform when not transforming. Did you forget to call `await adapter.transformer.startTransform()`?'
+      );
+      return;
+    }
     this.log.debug('Applying transform');
     this.$isProcessing.set(true);
     this._setInteractionMode('off');
