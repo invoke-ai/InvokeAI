@@ -16,13 +16,19 @@ def denoise(
     # model input
     img: torch.Tensor,
     img_ids: torch.Tensor,
+    # positive text conditioning
     txt: torch.Tensor,
     txt_ids: torch.Tensor,
     vec: torch.Tensor,
+    # negative text conditioning
+    neg_txt: torch.Tensor,
+    neg_txt_ids: torch.Tensor,
+    neg_vec: torch.Tensor,
     # sampling parameters
     timesteps: list[float],
     step_callback: Callable[[PipelineIntermediateState], None],
     guidance: float,
+    cfg_scale: float,
     inpaint_extension: InpaintExtension | None,
     controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension],
 ):
@@ -77,6 +83,22 @@ def denoise(
             controlnet_double_block_residuals=merged_controlnet_residuals.double_block_residuals,
             controlnet_single_block_residuals=merged_controlnet_residuals.single_block_residuals,
         )
+
+        # TODO(ryand): Add option to apply controlnet to negative conditioning as well.
+        # TODO(ryand): Add option to run positive and negative predictions in a single batch for better performance on
+        # systems with sufficient VRAM.
+        neg_pred = model(
+            img=img,
+            img_ids=img_ids,
+            txt=neg_txt,
+            txt_ids=neg_txt_ids,
+            y=neg_vec,
+            timesteps=t_vec,
+            guidance=guidance_vec,
+            controlnet_double_block_residuals=None,
+            controlnet_single_block_residuals=None,
+        )
+        pred = neg_pred + cfg_scale * (pred - neg_pred)
 
         preview_img = img - t_curr * pred
         img = img + (t_prev - t_curr) * pred

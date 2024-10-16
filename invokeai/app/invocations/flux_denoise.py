@@ -49,7 +49,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="3.1.0",
+    version="3.2.0",
     classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -82,6 +82,12 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     positive_text_conditioning: FluxConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
+    negative_text_conditioning: FluxConditioningField = InputField(
+        description=FieldDescriptions.negative_cond, input=Input.Connection
+    )
+    # TODO(ryand): Add support for cfg_scale to be a list of floats: one for each step.
+    # TODO(ryand): Add cfg_scale range validation.
+    cfg_scale: float = InputField(default=3.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
     num_steps: int = InputField(
@@ -108,6 +114,19 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         name = context.tensors.save(tensor=latents)
         return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
 
+    def _load_text_conditioning(
+        self, context: InvocationContext, conditioning_name: str, dtype: torch.dtype
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        # Load the conditioning data.
+        cond_data = context.conditioning.load(conditioning_name)
+        assert len(cond_data.conditionings) == 1
+        flux_conditioning = cond_data.conditionings[0]
+        assert isinstance(flux_conditioning, FLUXConditioningInfo)
+        flux_conditioning = flux_conditioning.to(dtype=dtype)
+        t5_embeddings = flux_conditioning.t5_embeds
+        clip_embeddings = flux_conditioning.clip_embeds
+        return t5_embeddings, clip_embeddings
+
     def _run_diffusion(
         self,
         context: InvocationContext,
@@ -115,13 +134,12 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         inference_dtype = torch.bfloat16
 
         # Load the conditioning data.
-        cond_data = context.conditioning.load(self.positive_text_conditioning.conditioning_name)
-        assert len(cond_data.conditionings) == 1
-        flux_conditioning = cond_data.conditionings[0]
-        assert isinstance(flux_conditioning, FLUXConditioningInfo)
-        flux_conditioning = flux_conditioning.to(dtype=inference_dtype)
-        t5_embeddings = flux_conditioning.t5_embeds
-        clip_embeddings = flux_conditioning.clip_embeds
+        pos_t5_embeddings, pos_clip_embeddings = self._load_text_conditioning(
+            context, self.positive_text_conditioning.conditioning_name, inference_dtype
+        )
+        neg_t5_embeddings, neg_clip_embeddings = self._load_text_conditioning(
+            context, self.negative_text_conditioning.conditioning_name, inference_dtype
+        )
 
         # Load the input latents, if provided.
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
@@ -182,8 +200,14 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         b, _c, latent_h, latent_w = x.shape
         img_ids = generate_img_ids(h=latent_h, w=latent_w, batch_size=b, device=x.device, dtype=x.dtype)
 
-        bs, t5_seq_len, _ = t5_embeddings.shape
-        txt_ids = torch.zeros(bs, t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device())
+        pos_bs, pos_t5_seq_len, _ = pos_t5_embeddings.shape
+        pos_txt_ids = torch.zeros(
+            pos_bs, pos_t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device()
+        )
+        neg_bs, neg_t5_seq_len, _ = neg_t5_embeddings.shape
+        neg_txt_ids = torch.zeros(
+            neg_bs, neg_t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device()
+        )
 
         # Pack all latent tensors.
         init_latents = pack(init_latents) if init_latents is not None else None
@@ -256,12 +280,16 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 model=transformer,
                 img=x,
                 img_ids=img_ids,
-                txt=t5_embeddings,
-                txt_ids=txt_ids,
-                vec=clip_embeddings,
+                txt=pos_t5_embeddings,
+                txt_ids=pos_txt_ids,
+                vec=pos_clip_embeddings,
+                neg_txt=neg_t5_embeddings,
+                neg_txt_ids=neg_txt_ids,
+                neg_vec=neg_clip_embeddings,
                 timesteps=timesteps,
                 step_callback=self._build_step_callback(context),
                 guidance=self.guidance,
+                cfg_scale=self.cfg_scale,
                 inpaint_extension=inpaint_extension,
                 controlnet_extensions=controlnet_extensions,
             )
