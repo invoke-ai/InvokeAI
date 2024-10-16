@@ -43,7 +43,7 @@ export const ShareWorkflowModal = () => {
     if (!workflowToShare || !projectUrl) {
       return null;
     }
-    return `${window.location.origin}/${projectUrl}/studio?selectedWorkflowId=${workflowToShare.workflow_id}`;
+    return `${window.location.origin}${projectUrl}/studio?selectedWorkflowId=${workflowToShare.workflow_id}`;
   }, [projectUrl, workflowToShare]);
 
   const handleCopy = useCallback(() => {
