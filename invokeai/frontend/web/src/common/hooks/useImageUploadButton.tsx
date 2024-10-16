@@ -8,6 +8,7 @@ import type { PostUploadAction } from 'services/api/types';
 type UseImageUploadButtonArgs = {
   postUploadAction?: PostUploadAction;
   isDisabled?: boolean;
+  allowMultiple?: boolean;
 };
 
 /**
@@ -29,26 +30,43 @@ type UseImageUploadButtonArgs = {
  * <Button {...getUploadButtonProps()} /> // will open the file dialog on click
  * <input {...getUploadInputProps()} /> // hidden, handles native upload functionality
  */
-export const useImageUploadButton = ({ postUploadAction, isDisabled }: UseImageUploadButtonArgs) => {
+export const useImageUploadButton = ({
+  postUploadAction,
+  isDisabled,
+  allowMultiple = false,
+}: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [uploadImage] = useUploadImageMutation();
+
   const onDropAccepted = useCallback(
     (files: File[]) => {
-      const file = files[0];
+      if (allowMultiple) {
+        for (const file of files) {
+          uploadImage({
+            file,
+            image_category: 'user',
+            is_intermediate: false,
+            postUploadAction: postUploadAction ?? { type: 'TOAST' },
+            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+          });
+        }
+      } else {
+        const file = files[0];
 
-      if (!file) {
-        return;
+        if (!file) {
+          return;
+        }
+
+        uploadImage({
+          file,
+          image_category: 'user',
+          is_intermediate: false,
+          postUploadAction: postUploadAction ?? { type: 'TOAST' },
+          board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+        });
       }
-
-      uploadImage({
-        file,
-        image_category: 'user',
-        is_intermediate: false,
-        postUploadAction: postUploadAction ?? { type: 'TOAST' },
-        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-      });
     },
-    [autoAddBoardId, postUploadAction, uploadImage]
+    [autoAddBoardId, postUploadAction, uploadImage, allowMultiple]
   );
 
   const {
@@ -60,7 +78,7 @@ export const useImageUploadButton = ({ postUploadAction, isDisabled }: UseImageU
     onDropAccepted,
     disabled: isDisabled,
     noDrag: true,
-    multiple: false,
+    multiple: allowMultiple,
   });
 
   return { getUploadButtonProps, getUploadInputProps, openUploader };

@@ -12,7 +12,8 @@
         "resetUI": "$t(accessibility.reset) UI",
         "toggleRightPanel": "Toggle Right Panel (G)",
         "toggleLeftPanel": "Toggle Left Panel (T)",
-        "uploadImage": "Upload Image"
+        "uploadImage": "Upload Image",
+        "uploadImages": "Upload Image(s)"
     },
     "boards": {
         "addBoard": "Add Board",

@@ -222,6 +222,7 @@ type UpscaleInitialImageAction = {
 type ToastAction = {
   type: 'TOAST';
   title?: string;
+  duration?: number | null;
 };
 
 type AddToBatchAction = {

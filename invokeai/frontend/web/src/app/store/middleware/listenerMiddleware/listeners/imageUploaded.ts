@@ -51,22 +51,17 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
       if (postUploadAction?.type === 'TOAST') {
         if (!autoAddBoardId || autoAddBoardId === 'none') {
           const title = postUploadAction.title || DEFAULT_UPLOADED_TOAST.title;
-          toast({ ...DEFAULT_UPLOADED_TOAST, title });
+          const duration = postUploadAction.duration !== undefined ? postUploadAction.duration : undefined;
+          toast({ ...DEFAULT_UPLOADED_TOAST, title, duration });
           dispatch(boardIdSelected({ boardId: 'none' }));
           dispatch(galleryViewChanged('assets'));
         } else {
-          // Add this image to the board
-          dispatch(
-            imagesApi.endpoints.addImageToBoard.initiate({
-              board_id: autoAddBoardId,
-              imageDTO,
-            })
-          );
-
           // Attempt to get the board's name for the toast
           const queryArgs = selectListBoardsQueryArgs(state);
           const { data } = boardsApi.endpoints.listAllBoards.select(queryArgs)(state);
 
+          const title = postUploadAction.title || DEFAULT_UPLOADED_TOAST.title;
+          const duration = postUploadAction.duration !== undefined ? postUploadAction.duration : undefined;
           // Fall back to just the board id if we can't find the board for some reason
           const board = data?.find((b) => b.board_id === autoAddBoardId);
           const description = board
@@ -76,6 +71,8 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
           toast({
             ...DEFAULT_UPLOADED_TOAST,
             description,
+            title,
+            duration,
           });
           dispatch(boardIdSelected({ boardId: autoAddBoardId }));
           dispatch(galleryViewChanged('assets'));
