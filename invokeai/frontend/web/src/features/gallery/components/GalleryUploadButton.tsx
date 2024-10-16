@@ -3,8 +3,10 @@ import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { t } from 'i18next';
 import { PiUploadBold } from 'react-icons/pi';
 
+const options = { postUploadAction: { type: 'TOAST' }, allowMultiple: true } as const;
+
 export const GalleryUploadButton = () => {
-  const uploadApi = useImageUploadButton({ postUploadAction: { type: 'TOAST', duration: null }, allowMultiple: true });
+  const uploadApi = useImageUploadButton(options);
   return (
     <>
       <IconButton
