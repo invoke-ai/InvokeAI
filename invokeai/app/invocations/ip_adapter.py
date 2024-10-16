@@ -9,6 +9,7 @@ from invokeai.app.invocations.fields import FieldDescriptions, InputField, Outpu
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageField
 from invokeai.app.invocations.util import validate_begin_end_step, validate_weights
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
@@ -55,10 +56,14 @@ class IPAdapterOutput(BaseInvocationOutput):
     ip_adapter: IPAdapterField = OutputField(description=FieldDescriptions.ip_adapter, title="IP-Adapter")
 
 
-CLIP_VISION_MODEL_MAP = {"ViT-H": "ip_adapter_sd_image_encoder", "ViT-G": "ip_adapter_sdxl_image_encoder"}
+CLIP_VISION_MODEL_MAP = {
+    "ViT-L": ("InvokeAI/clip-vit-large-patch14", "clip-vit-large-patch14-full"),
+    "ViT-H": ("InvokeAI/ip_adapter_sd_image_encoder", "ip_adapter_sd_image_encoder"),
+    "ViT-G": ("InvokeAI/ip_adapter_sdxl_image_encoder", "ip_adapter_sdxl_image_encoder"),
+}
 
 
-@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.4.1")
+@invocation("ip_adapter", title="IP-Adapter", tags=["ip_adapter", "control"], category="ip_adapter", version="1.5.0")
 class IPAdapterInvocation(BaseInvocation):
     """Collects IP-Adapter info to pass to other nodes."""
 
@@ -70,7 +75,7 @@ class IPAdapterInvocation(BaseInvocation):
         ui_order=-1,
         ui_type=UIType.IPAdapterModel,
     )
-    clip_vision_model: Literal["ViT-H", "ViT-G"] = InputField(
+    clip_vision_model: Literal["ViT-L", "ViT-H", "ViT-G"] = InputField(
         description="CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.",
         default="ViT-H",
         ui_order=2,
@@ -111,9 +116,9 @@ class IPAdapterInvocation(BaseInvocation):
             image_encoder_model_id = ip_adapter_info.image_encoder_model_id
             image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         else:
-            image_encoder_model_name = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
+            image_encoder_model_id, image_encoder_model_name = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
 
-        image_encoder_model = self._get_image_encoder(context, image_encoder_model_name)
+        image_encoder_model = self._get_image_encoder(context, image_encoder_model_id, image_encoder_model_name)
 
         if self.method == "style":
             if ip_adapter_info.base == "sd-1":
@@ -147,7 +152,9 @@ class IPAdapterInvocation(BaseInvocation):
             ),
         )
 
-    def _get_image_encoder(self, context: InvocationContext, image_encoder_model_name: str) -> AnyModelConfig:
+    def _get_image_encoder(
+        self, context: InvocationContext, image_encoder_model_id: str, image_encoder_model_name: str
+    ) -> AnyModelConfig:
         image_encoder_models = context.models.search_by_attrs(
             name=image_encoder_model_name, base=BaseModelType.Any, type=ModelType.CLIPVision
         )
@@ -159,7 +166,11 @@ class IPAdapterInvocation(BaseInvocation):
             )
 
             installer = context._services.model_manager.install
-            job = installer.heuristic_import(f"InvokeAI/{image_encoder_model_name}")
+            # Note: We hard-code the type to CLIPVision here because if the model contains both a CLIPVision and a
+            # CLIPText model, the probe may treat it as a CLIPText model.
+            job = installer.heuristic_import(
+                image_encoder_model_id, ModelRecordChanges(name=image_encoder_model_name, type=ModelType.CLIPVision)
+            )
             installer.wait_for_job(job, timeout=600)  # Wait for up to 10 minutes
             image_encoder_models = context.models.search_by_attrs(
                 name=image_encoder_model_name, base=BaseModelType.Any, type=ModelType.CLIPVision
