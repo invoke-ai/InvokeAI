@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { selectMaxImageUploadCount } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
@@ -25,6 +26,7 @@ export const useFullscreenDropzone = () => {
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
   const [uploadImage] = useUploadImageMutation();
   const activeTabName = useAppSelector(selectActiveTab);
+  const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
 
   const getPostUploadAction = useCallback(
     (isSingleImage: boolean, isLastImage: boolean): PostUploadAction => {
@@ -49,12 +51,19 @@ export const useFullscreenDropzone = () => {
           file: rejection.file.path,
         }));
         log.error({ errors }, 'Invalid upload');
+        const description =
+          maxImageUploadCount === undefined
+            ? t('toast.uploadFailedInvalidUploadDesc')
+            : t('toast.uploadFailedInvalidUploadDesc_withCount', { count: maxImageUploadCount });
+
         toast({
           id: 'UPLOAD_FAILED',
           title: t('toast.uploadFailed'),
-          description: t('toast.uploadFailedInvalidUploadDesc'),
+          description,
           status: 'error',
         });
+
+        setIsHandlingUpload(false);
         return;
       }
 
@@ -73,12 +82,18 @@ export const useFullscreenDropzone = () => {
           isFirstUploadOfBatch: i === 0,
         });
       }
+
+      setIsHandlingUpload(false);
     },
-    [t, uploadImage, getPostUploadAction, autoAddBoardId]
+    [t, maxImageUploadCount, uploadImage, getPostUploadAction, autoAddBoardId]
   );
 
   const onDragOver = useCallback(() => {
     setIsHandlingUpload(true);
+  }, []);
+
+  const onDragLeave = useCallback(() => {
+    setIsHandlingUpload(false);
   }, []);
 
   const dropzone = useDropzone({
@@ -86,7 +101,10 @@ export const useFullscreenDropzone = () => {
     noClick: true,
     onDrop,
     onDragOver,
+    onDragLeave,
     noKeyboard: true,
+    multiple: maxImageUploadCount === undefined || maxImageUploadCount > 1,
+    maxFiles: maxImageUploadCount,
   });
 
   useEffect(() => {

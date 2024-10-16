@@ -79,6 +79,7 @@ export type AppConfig = {
   metadataFetchDebounce?: number;
   workflowFetchDebounce?: number;
   isLocal?: boolean;
+  maxImageUploadCount?: number;
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];

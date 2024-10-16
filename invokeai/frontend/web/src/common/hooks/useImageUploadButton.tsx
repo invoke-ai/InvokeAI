@@ -1,5 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { selectMaxImageUploadCount } from 'features/system/store/configSlice';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
@@ -37,6 +38,7 @@ export const useImageUploadButton = ({
 }: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [uploadImage] = useUploadImageMutation();
+  const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
 
   const onDropAccepted = useCallback(
     (files: File[]) => {
@@ -62,7 +64,8 @@ export const useImageUploadButton = ({
     onDropAccepted,
     disabled: isDisabled,
     noDrag: true,
-    multiple: allowMultiple,
+    multiple: allowMultiple && (maxImageUploadCount === undefined || maxImageUploadCount > 1),
+    maxFiles: maxImageUploadCount,
   });
 
   return { getUploadButtonProps, getUploadInputProps, openUploader };
