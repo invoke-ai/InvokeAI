@@ -51,12 +51,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
 
       const { postUploadAction } = action.meta.arg.originalArgs;
 
-      if (
-        // No further actions needed for intermediate images,
-        action.payload.is_intermediate &&
-        // unless they have an explicit post-upload action
-        !postUploadAction
-      ) {
+      if (!postUploadAction) {
         return;
       }
 
@@ -67,7 +62,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
       } as const;
 
       // default action - just upload and alert user
-      if (postUploadAction?.type === 'TOAST') {
+      if (postUploadAction.type === 'TOAST') {
         const boardId = imageDTO.board_id ?? 'none';
         toast({
           ...DEFAULT_UPLOADED_TOAST,
@@ -80,7 +75,7 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
-      if (postUploadAction?.type === 'SET_UPSCALE_INITIAL_IMAGE') {
+      if (postUploadAction.type === 'SET_UPSCALE_INITIAL_IMAGE') {
         dispatch(upscaleInitialImageChanged(imageDTO));
         toast({
           ...DEFAULT_UPLOADED_TOAST,
@@ -89,21 +84,14 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
-      // if (postUploadAction?.type === 'SET_CA_IMAGE') {
-      //   const { id } = postUploadAction;
-      //   dispatch(caImageChanged({ id, imageDTO }));
-      //   toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
-      //   return;
-      // }
-
-      if (postUploadAction?.type === 'SET_IPA_IMAGE') {
+      if (postUploadAction.type === 'SET_IPA_IMAGE') {
         const { id } = postUploadAction;
         dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier: { id, type: 'reference_image' }, imageDTO }));
         toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
         return;
       }
 
-      if (postUploadAction?.type === 'SET_RG_IP_ADAPTER_IMAGE') {
+      if (postUploadAction.type === 'SET_RG_IP_ADAPTER_IMAGE') {
         const { id, referenceImageId } = postUploadAction;
         dispatch(
           rgIPAdapterImageChanged({ entityIdentifier: { id, type: 'regional_guidance' }, referenceImageId, imageDTO })
@@ -112,14 +100,14 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
-      if (postUploadAction?.type === 'SET_NODES_IMAGE') {
+      if (postUploadAction.type === 'SET_NODES_IMAGE') {
         const { nodeId, fieldName } = postUploadAction;
         dispatch(fieldImageValueChanged({ nodeId, fieldName, value: imageDTO }));
         toast({ ...DEFAULT_UPLOADED_TOAST, description: `${t('toast.setNodeField')} ${fieldName}` });
         return;
       }
 
-      if (postUploadAction?.type === 'REPLACE_LAYER_WITH_IMAGE') {
+      if (postUploadAction.type === 'REPLACE_LAYER_WITH_IMAGE') {
         const { entityIdentifier } = postUploadAction;
 
         const state = getState();
