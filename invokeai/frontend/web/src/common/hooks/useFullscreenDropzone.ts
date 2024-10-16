@@ -68,6 +68,9 @@ export const useFullscreenDropzone = () => {
           is_intermediate: false,
           postUploadAction: getPostUploadAction(isSingleImage, isLastImage),
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+          // The `imageUploaded` listener does some extra logic, like switching to the asset view on upload on the
+          // first upload of a "batch".
+          isFirstUploadOfBatch: i === 0,
         });
       }
     },
