@@ -40,6 +40,8 @@ const getUploadedToastDescription = (boardId: string, state: RootState) => {
   return t('toast.addedToBoard', { name: board?.board_name ?? boardId });
 };
 
+let lastUploadedToastTimeout: number | null = null;
+
 export const addImageUploadedFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
@@ -64,12 +66,18 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
       // default action - just upload and alert user
       if (postUploadAction.type === 'TOAST') {
         const boardId = imageDTO.board_id ?? 'none';
-        toast({
+        if (lastUploadedToastTimeout !== null) {
+          window.clearTimeout(lastUploadedToastTimeout);
+        }
+        const toastApi = toast({
           ...DEFAULT_UPLOADED_TOAST,
           title: postUploadAction.title || DEFAULT_UPLOADED_TOAST.title,
-          duration: postUploadAction.duration !== undefined ? postUploadAction.duration : undefined,
           description: getUploadedToastDescription(boardId, state),
+          duration: null, // we will close the toast manually
         });
+        lastUploadedToastTimeout = window.setTimeout(() => {
+          toastApi.close();
+        }, 3000);
         /**
          * We only want to change the board and view if this is the first upload of a batch, else we end up hijacking
          * the user's gallery board and view selection:

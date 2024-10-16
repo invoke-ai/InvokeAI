@@ -28,20 +28,13 @@ export const useFullscreenDropzone = () => {
   const activeTabName = useAppSelector(selectActiveTab);
   const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
 
-  const getPostUploadAction = useCallback(
-    (isSingleImage: boolean, isLastImage: boolean): PostUploadAction => {
-      if (isSingleImage && activeTabName === 'upscaling') {
-        return { type: 'SET_UPSCALE_INITIAL_IMAGE' };
-      } else if (isSingleImage || isLastImage) {
-        // Omit the duration if it's the last image - this allows the toast to auto-close
-        return { type: 'TOAST' };
-      } else {
-        // Set duration to `null` to prevent auto-close on any toast that is not the last image
-        return { type: 'TOAST', duration: null };
-      }
-    },
-    [activeTabName]
-  );
+  const getPostUploadAction = useCallback((): PostUploadAction => {
+    if (activeTabName === 'upscaling') {
+      return { type: 'SET_UPSCALE_INITIAL_IMAGE' };
+    } else {
+      return { type: 'TOAST' };
+    }
+  }, [activeTabName]);
 
   const onDrop = useCallback(
     (acceptedFiles: Array<File>, fileRejections: Array<FileRejection>) => {
@@ -67,15 +60,12 @@ export const useFullscreenDropzone = () => {
         return;
       }
 
-      const isSingleImage = acceptedFiles.length === 1;
-
       for (const [i, file] of acceptedFiles.entries()) {
-        const isLastImage = i === acceptedFiles.length - 1;
         uploadImage({
           file,
           image_category: 'user',
           is_intermediate: false,
-          postUploadAction: getPostUploadAction(isSingleImage, isLastImage),
+          postUploadAction: getPostUploadAction(),
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
           // The `imageUploaded` listener does some extra logic, like switching to the asset view on upload on the
           // first upload of a "batch".
