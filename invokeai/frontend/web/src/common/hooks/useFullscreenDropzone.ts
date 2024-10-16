@@ -1,4 +1,3 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
@@ -15,22 +14,12 @@ const accept: Accept = {
   'image/jpeg': ['.jpg', '.jpeg', '.png'],
 };
 
-const selectPostUploadAction = createMemoizedSelector(selectActiveTab, (activeTabName) => {
-  let postUploadAction: PostUploadAction = { type: 'TOAST' };
-
-  if (activeTabName === 'upscaling') {
-    postUploadAction = { type: 'SET_UPSCALE_INITIAL_IMAGE' };
-  }
-
-  return postUploadAction;
-});
-
 export const useFullscreenDropzone = () => {
   const { t } = useTranslation();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
-  const postUploadAction = useAppSelector(selectPostUploadAction);
   const [uploadImage] = useUploadImageMutation();
+  const activeTabName = useAppSelector(selectActiveTab);
 
   const fileRejectionCallback = useCallback(
     (rejection: FileRejection) => {
@@ -46,8 +35,21 @@ export const useFullscreenDropzone = () => {
     [t]
   );
 
+  const getPostUploadAction = useCallback(
+    (singleImage: boolean): PostUploadAction => {
+      if (singleImage && activeTabName === 'upscaling') {
+        return { type: 'SET_UPSCALE_INITIAL_IMAGE' };
+      } else if (singleImage) {
+        return { type: 'TOAST' };
+      } else {
+        return { type: 'TOAST', duration: null };
+      }
+    },
+    [activeTabName]
+  );
+
   const fileAcceptedCallback = useCallback(
-    (file: File) => {
+    (file: File, postUploadAction: PostUploadAction) => {
       uploadImage({
         file,
         image_category: 'user',
@@ -56,7 +58,7 @@ export const useFullscreenDropzone = () => {
         board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
       });
     },
-    [autoAddBoardId, postUploadAction, uploadImage]
+    [autoAddBoardId, uploadImage]
   );
 
   const onDrop = useCallback(
@@ -75,11 +77,13 @@ export const useFullscreenDropzone = () => {
         fileRejectionCallback(rejection);
       });
 
+      const postUploadAction = getPostUploadAction(acceptedFiles.length === 1);
+
       acceptedFiles.forEach((file: File) => {
-        fileAcceptedCallback(file);
+        fileAcceptedCallback(file, postUploadAction);
       });
     },
-    [t, fileAcceptedCallback, fileRejectionCallback]
+    [t, fileAcceptedCallback, fileRejectionCallback, getPostUploadAction]
   );
 
   const onDragOver = useCallback(() => {
@@ -91,7 +95,6 @@ export const useFullscreenDropzone = () => {
     noClick: true,
     onDrop,
     onDragOver,
-    multiple: false,
     noKeyboard: true,
   });
 
