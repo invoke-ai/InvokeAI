@@ -4,15 +4,15 @@ import { t } from 'i18next';
 import { PiUploadBold } from 'react-icons/pi';
 
 export const GalleryUploadButton = () => {
-  const uploadApi = useImageUploadButton({ postUploadAction: { type: 'TOAST' } });
+  const uploadApi = useImageUploadButton({ postUploadAction: { type: 'TOAST', duration: null }, allowMultiple: true });
   return (
     <>
       <IconButton
         size="sm"
         alignSelf="stretch"
         variant="link"
-        aria-label={t('accessibility.uploadImage')}
-        tooltip={t('accessibility.uploadImage')}
+        aria-label={t('accessibility.uploadImages')}
+        tooltip={t('accessibility.uploadImages')}
         icon={<PiUploadBold />}
         {...uploadApi.getUploadButtonProps()}
       />
