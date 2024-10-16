@@ -2033,6 +2033,12 @@ export type components = {
              */
             board_id: string;
         };
+        /**
+         * BoardRecordOrderBy
+         * @description The order by options for board records
+         * @enum {string}
+         */
+        BoardRecordOrderBy: "created_at" | "board_name";
         /** Body_add_image_to_board */
         Body_add_image_to_board: {
             /**
@@ -15160,6 +15166,15 @@ export type components = {
             /** Dependencies */
             dependencies?: components["schemas"]["StarterModelWithoutDependencies"][] | null;
         };
+        /** StarterModelResponse */
+        StarterModelResponse: {
+            /** Starter Models */
+            starter_models: components["schemas"]["StarterModel"][];
+            /** Starter Bundles */
+            starter_bundles: {
+                [key: string]: components["schemas"]["StarterModel"][];
+            };
+        };
         /** StarterModelWithoutDependencies */
         StarterModelWithoutDependencies: {
             /** Description */
@@ -17966,7 +17981,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StarterModel"][];
+                    "application/json": components["schemas"]["StarterModelResponse"];
                 };
             };
         };
@@ -18884,6 +18899,10 @@ export interface operations {
     list_boards: {
         parameters: {
             query?: {
+                /** @description The attribute to order by */
+                order_by?: components["schemas"]["BoardRecordOrderBy"];
+                /** @description The direction to order by */
+                direction?: components["schemas"]["SQLiteDirection"];
                 /** @description Whether to list all boards */
                 all?: boolean | null;
                 /** @description The page offset */
@@ -20040,7 +20059,7 @@ export interface operations {
                 /** @description The direction to order by */
                 direction?: components["schemas"]["SQLiteDirection"];
                 /** @description The category of workflow to get */
-                category?: components["schemas"]["WorkflowCategory"] | null;
+                category?: components["schemas"]["WorkflowCategory"];
                 /** @description The text to query by (matches name and description) */
                 query?: string | null;
             };

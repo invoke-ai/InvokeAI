@@ -12,7 +12,8 @@
         "resetUI": "$t(accessibility.reset) UI",
         "toggleRightPanel": "Toggle Right Panel (G)",
         "toggleLeftPanel": "Toggle Left Panel (T)",
-        "uploadImage": "Upload Image"
+        "uploadImage": "Upload Image",
+        "uploadImages": "Upload Image(s)"
     },
     "boards": {
         "addBoard": "Add Board",
@@ -285,6 +286,7 @@
         "assetsTab": "Files you’ve uploaded for use in your projects.",
         "autoAssignBoardOnClick": "Auto-Assign Board on Click",
         "autoSwitchNewImages": "Auto-Switch to New Images",
+        "boardsSettings": "Boards Settings",
         "copy": "Copy",
         "currentlyInUse": "This image is currently in use in the following features:",
         "drop": "Drop",
@@ -304,6 +306,7 @@
         "go": "Go",
         "image": "image",
         "imagesTab": "Images you’ve created and saved within Invoke.",
+        "imagesSettings": "Gallery Images Settings",
         "jump": "Jump",
         "loading": "Loading",
         "newestFirst": "Newest First",
@@ -662,6 +665,7 @@
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "createdBy": "Created By",
         "generationMode": "Generation Mode",
+        "guidance": "Guidance",
         "height": "Height",
         "imageDetails": "Image Details",
         "imageDimensions": "Image Dimensions",
@@ -725,6 +729,7 @@
         "huggingFaceHelper": "If multiple models are found in this repo, you will be prompted to select one to install.",
         "hfToken": "HuggingFace Token",
         "imageEncoderModelId": "Image Encoder Model ID",
+        "includesNModels": "Includes {{n}} models and their dependencies",
         "installQueue": "Install Queue",
         "inplaceInstall": "In-place install",
         "inplaceInstallDesc": "Install models without copying the files. When using the model, it will be loaded from its this location. If disabled, the model file(s) will be copied into the Invoke-managed models directory during installation.",
@@ -778,6 +783,8 @@
         "simpleModelPlaceholder": "URL or path to a local file or diffusers folder",
         "source": "Source",
         "spandrelImageToImage": "Image to Image (Spandrel)",
+        "starterBundles": "Starter Bundles",
+        "starterBundleHelpText": "Easily install all models needed to get started with a base model, including a main model, controlnets, IP adapters, and more. Selecting a bundle will skip any models that you already have installed.",
         "starterModels": "Starter Models",
         "starterModelsInModelManager": "Starter Models can be found in Model Manager",
         "syncModels": "Sync Models",
@@ -795,7 +802,13 @@
         "vae": "VAE",
         "vaePrecision": "VAE Precision",
         "variant": "Variant",
-        "width": "Width"
+        "width": "Width",
+        "installingBundle": "Installing Bundle",
+        "installingModel": "Installing Model",
+        "installingXModels_one": "Installing {{count}} model",
+        "installingXModels_other": "Installing {{count}} models",
+        "skippingXDuplicates_one": ", skipping {{count}} duplicate",
+        "skippingXDuplicates_other": ", skipping {{count}} duplicates"
     },
     "models": {
         "addLora": "Add LoRA",
@@ -1119,7 +1132,8 @@
         "reloadingIn": "Reloading in"
     },
     "toast": {
-        "addedToBoard": "Added to board",
+        "addedToBoard": "Added to board {{name}}'s assets",
+        "addedToUncategorized": "Added to board $t(boards.uncategorized)'s assets",
         "baseModelChanged": "Base Model Changed",
         "baseModelChangedCleared_one": "Cleared or disabled {{count}} incompatible submodel",
         "baseModelChangedCleared_other": "Cleared or disabled {{count}} incompatible submodels",
@@ -1168,7 +1182,10 @@
         "setNodeField": "Set as node field",
         "somethingWentWrong": "Something Went Wrong",
         "uploadFailed": "Upload failed",
-        "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
+        "imagesWillBeAddedTo": "Uploaded images will be added to board {{boardName}}'s assets.",
+        "uploadFailedInvalidUploadDesc_withCount_one": "Must be maximum of 1 PNG or JPEG image.",
+        "uploadFailedInvalidUploadDesc_withCount_other": "Must be maximum of {{count}} PNG or JPEG images.",
+        "uploadFailedInvalidUploadDesc": "Must be PNG or JPEG images.",
         "workflowLoaded": "Workflow Loaded",
         "problemRetrievingWorkflow": "Problem Retrieving Workflow",
         "workflowDeleted": "Workflow Deleted",
@@ -1749,7 +1766,7 @@
                 "label": "Canny Edge Detection",
                 "description": "Generates an edge map from the selected layer using the Canny edge detection algorithm.",
                 "low_threshold": "Low Threshold",
-                "high_threshold": "Hight Threshold"
+                "high_threshold": "High Threshold"
             },
             "color_map": {
                 "label": "Color Map",
@@ -1987,8 +2004,12 @@
         }
     },
     "newUserExperience": {
+        "toGetStartedLocal": "To get started, make sure to download or import models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
-        "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio."
+        "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio.",
+        "downloadStarterModels": "Download Starter Models",
+        "importModels": "Import Models",
+        "noModelsInstalled": "It looks like you don't have any models installed"
     },
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",

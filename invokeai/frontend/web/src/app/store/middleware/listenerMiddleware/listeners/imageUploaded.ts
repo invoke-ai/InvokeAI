@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { RootState } from 'app/store/store';
 import {
   entityRasterized,
   entitySelected,
@@ -20,24 +21,39 @@ import { imagesApi } from 'services/api/endpoints/images';
 
 const log = logger('gallery');
 
+/**
+ * Gets the description for the toast that is shown when an image is uploaded.
+ * @param boardId The board id of the uploaded image
+ * @param state The current state of the app
+ * @returns
+ */
+const getUploadedToastDescription = (boardId: string, state: RootState) => {
+  if (boardId === 'none') {
+    return t('toast.addedToUncategorized');
+  }
+  // Attempt to get the board's name for the toast
+  const queryArgs = selectListBoardsQueryArgs(state);
+  const { data } = boardsApi.endpoints.listAllBoards.select(queryArgs)(state);
+  // Fall back to just the board id if we can't find the board for some reason
+  const board = data?.find((b) => b.board_id === boardId);
+
+  return t('toast.addedToBoard', { name: board?.board_name ?? boardId });
+};
+
+let lastUploadedToastTimeout: number | null = null;
+
 export const addImageUploadedFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
       const imageDTO = action.payload;
       const state = getState();
-      const { autoAddBoardId } = state.gallery;
 
       log.debug({ imageDTO }, 'Image uploaded');
 
       const { postUploadAction } = action.meta.arg.originalArgs;
 
-      if (
-        // No further actions needed for intermediate images,
-        action.payload.is_intermediate &&
-        // unless they have an explicit post-upload action
-        !postUploadAction
-      ) {
+      if (!postUploadAction) {
         return;
       }
 
@@ -48,42 +64,40 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
       } as const;
 
       // default action - just upload and alert user
-      if (postUploadAction?.type === 'TOAST') {
-        if (!autoAddBoardId || autoAddBoardId === 'none') {
-          const title = postUploadAction.title || DEFAULT_UPLOADED_TOAST.title;
-          toast({ ...DEFAULT_UPLOADED_TOAST, title });
-          dispatch(boardIdSelected({ boardId: 'none' }));
-          dispatch(galleryViewChanged('assets'));
-        } else {
-          // Add this image to the board
-          dispatch(
-            imagesApi.endpoints.addImageToBoard.initiate({
-              board_id: autoAddBoardId,
-              imageDTO,
-            })
-          );
-
-          // Attempt to get the board's name for the toast
-          const queryArgs = selectListBoardsQueryArgs(state);
-          const { data } = boardsApi.endpoints.listAllBoards.select(queryArgs)(state);
-
-          // Fall back to just the board id if we can't find the board for some reason
-          const board = data?.find((b) => b.board_id === autoAddBoardId);
-          const description = board
-            ? `${t('toast.addedToBoard')} ${board.board_name}`
-            : `${t('toast.addedToBoard')} ${autoAddBoardId}`;
-
-          toast({
-            ...DEFAULT_UPLOADED_TOAST,
-            description,
-          });
-          dispatch(boardIdSelected({ boardId: autoAddBoardId }));
+      if (postUploadAction.type === 'TOAST') {
+        const boardId = imageDTO.board_id ?? 'none';
+        if (lastUploadedToastTimeout !== null) {
+          window.clearTimeout(lastUploadedToastTimeout);
+        }
+        const toastApi = toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          title: postUploadAction.title || DEFAULT_UPLOADED_TOAST.title,
+          description: getUploadedToastDescription(boardId, state),
+          duration: null, // we will close the toast manually
+        });
+        lastUploadedToastTimeout = window.setTimeout(() => {
+          toastApi.close();
+        }, 3000);
+        /**
+         * We only want to change the board and view if this is the first upload of a batch, else we end up hijacking
+         * the user's gallery board and view selection:
+         * - User uploads multiple images
+         * - A couple uploads finish, but others are pending still
+         * - User changes the board selection
+         * - Pending uploads finish and change the board back to the original board
+         * - User is confused as to why the board changed
+         *
+         * Default to true to not require _all_ image upload handlers to set this value
+         */
+        const isFirstUploadOfBatch = action.meta.arg.originalArgs.isFirstUploadOfBatch ?? true;
+        if (isFirstUploadOfBatch) {
+          dispatch(boardIdSelected({ boardId }));
           dispatch(galleryViewChanged('assets'));
         }
         return;
       }
 
-      if (postUploadAction?.type === 'SET_UPSCALE_INITIAL_IMAGE') {
+      if (postUploadAction.type === 'SET_UPSCALE_INITIAL_IMAGE') {
         dispatch(upscaleInitialImageChanged(imageDTO));
         toast({
           ...DEFAULT_UPLOADED_TOAST,
@@ -92,21 +106,14 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
-      // if (postUploadAction?.type === 'SET_CA_IMAGE') {
-      //   const { id } = postUploadAction;
-      //   dispatch(caImageChanged({ id, imageDTO }));
-      //   toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
-      //   return;
-      // }
-
-      if (postUploadAction?.type === 'SET_IPA_IMAGE') {
+      if (postUploadAction.type === 'SET_IPA_IMAGE') {
         const { id } = postUploadAction;
         dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier: { id, type: 'reference_image' }, imageDTO }));
         toast({ ...DEFAULT_UPLOADED_TOAST, description: t('toast.setControlImage') });
         return;
       }
 
-      if (postUploadAction?.type === 'SET_RG_IP_ADAPTER_IMAGE') {
+      if (postUploadAction.type === 'SET_RG_IP_ADAPTER_IMAGE') {
         const { id, referenceImageId } = postUploadAction;
         dispatch(
           rgIPAdapterImageChanged({ entityIdentifier: { id, type: 'regional_guidance' }, referenceImageId, imageDTO })
@@ -115,14 +122,14 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         return;
       }
 
-      if (postUploadAction?.type === 'SET_NODES_IMAGE') {
+      if (postUploadAction.type === 'SET_NODES_IMAGE') {
         const { nodeId, fieldName } = postUploadAction;
         dispatch(fieldImageValueChanged({ nodeId, fieldName, value: imageDTO }));
         toast({ ...DEFAULT_UPLOADED_TOAST, description: `${t('toast.setNodeField')} ${fieldName}` });
         return;
       }
 
-      if (postUploadAction?.type === 'REPLACE_LAYER_WITH_IMAGE') {
+      if (postUploadAction.type === 'REPLACE_LAYER_WITH_IMAGE') {
         const { entityIdentifier } = postUploadAction;
 
         const state = getState();

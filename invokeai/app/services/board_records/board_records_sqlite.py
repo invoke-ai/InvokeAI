@@ -8,10 +8,12 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecord,
     BoardRecordDeleteException,
     BoardRecordNotFoundException,
+    BoardRecordOrderBy,
     BoardRecordSaveException,
     deserialize_board_record,
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.util.misc import uuid_string
 
@@ -144,7 +146,12 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         return self.get(board_id)
 
     def get_many(
-        self, offset: int = 0, limit: int = 10, include_archived: bool = False
+        self,
+        order_by: BoardRecordOrderBy,
+        direction: SQLiteDirection,
+        offset: int = 0,
+        limit: int = 10,
+        include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardRecord]:
         try:
             self._lock.acquire()
@@ -154,17 +161,16 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                 SELECT *
                 FROM boards
                 {archived_filter}
-                ORDER BY created_at DESC
+                ORDER BY {order_by} {direction}
                 LIMIT ? OFFSET ?;
             """
 
             # Determine archived filter condition
-            if include_archived:
-                archived_filter = ""
-            else:
-                archived_filter = "WHERE archived = 0"
+            archived_filter = "" if include_archived else "WHERE archived = 0"
 
-            final_query = base_query.format(archived_filter=archived_filter)
+            final_query = base_query.format(
+                archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
+            )
 
             # Execute query to fetch boards
             self._cursor.execute(final_query, (limit, offset))
@@ -198,23 +204,32 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         finally:
             self._lock.release()
 
-    def get_all(self, include_archived: bool = False) -> list[BoardRecord]:
+    def get_all(
+        self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
+    ) -> list[BoardRecord]:
         try:
             self._lock.acquire()
 
-            base_query = """
-                SELECT *
-                FROM boards
-                {archived_filter}
-                ORDER BY created_at DESC
-            """
-
-            if include_archived:
-                archived_filter = ""
+            if order_by == BoardRecordOrderBy.Name:
+                base_query = """
+                    SELECT *
+                    FROM boards
+                    {archived_filter}
+                    ORDER BY LOWER(board_name) {direction}
+                """
             else:
-                archived_filter = "WHERE archived = 0"
+                base_query = """
+                    SELECT *
+                    FROM boards
+                    {archived_filter}
+                    ORDER BY {order_by} {direction}
+                """
 
-            final_query = base_query.format(archived_filter=archived_filter)
+            archived_filter = "" if include_archived else "WHERE archived = 0"
+
+            final_query = base_query.format(
+                archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
+            )
 
             self._cursor.execute(final_query)
 

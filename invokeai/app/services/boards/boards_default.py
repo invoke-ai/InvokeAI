@@ -1,8 +1,9 @@
-from invokeai.app.services.board_records.board_records_common import BoardChanges
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_base import BoardServiceABC
 from invokeai.app.services.boards.boards_common import BoardDTO, board_record_to_dto
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 
 class BoardService(BoardServiceABC):
@@ -47,9 +48,16 @@ class BoardService(BoardServiceABC):
         self.__invoker.services.board_records.delete(board_id)
 
     def get_many(
-        self, offset: int = 0, limit: int = 10, include_archived: bool = False
+        self,
+        order_by: BoardRecordOrderBy,
+        direction: SQLiteDirection,
+        offset: int = 0,
+        limit: int = 10,
+        include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardDTO]:
-        board_records = self.__invoker.services.board_records.get_many(offset, limit, include_archived)
+        board_records = self.__invoker.services.board_records.get_many(
+            order_by, direction, offset, limit, include_archived
+        )
         board_dtos = []
         for r in board_records.items:
             cover_image = self.__invoker.services.image_records.get_most_recent_image_for_board(r.board_id)
@@ -63,8 +71,10 @@ class BoardService(BoardServiceABC):
 
         return OffsetPaginatedResults[BoardDTO](items=board_dtos, offset=offset, limit=limit, total=len(board_dtos))
 
-    def get_all(self, include_archived: bool = False) -> list[BoardDTO]:
-        board_records = self.__invoker.services.board_records.get_all(include_archived)
+    def get_all(
+        self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
+    ) -> list[BoardDTO]:
+        board_records = self.__invoker.services.board_records.get_all(order_by, direction, include_archived)
         board_dtos = []
         for r in board_records:
             cover_image = self.__invoker.services.image_records.get_most_recent_image_for_board(r.board_id)

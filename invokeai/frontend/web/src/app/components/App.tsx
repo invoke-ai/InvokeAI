@@ -20,6 +20,7 @@ import {
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
+import { ImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
 import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
@@ -31,7 +32,6 @@ import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
 import { DeleteWorkflowDialog } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
 import { NewWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
-import { AnimatePresence } from 'framer-motion';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
@@ -100,11 +100,9 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       >
         <input {...dropzone.getInputProps()} />
         <AppContent />
-        <AnimatePresence>
-          {dropzone.isDragActive && isHandlingUpload && (
-            <ImageUploadOverlay dropzone={dropzone} setIsHandlingUpload={setIsHandlingUpload} />
-          )}
-        </AnimatePresence>
+        {dropzone.isDragActive && isHandlingUpload && (
+          <ImageUploadOverlay dropzone={dropzone} setIsHandlingUpload={setIsHandlingUpload} />
+        )}
       </Box>
       <DeleteImageModal />
       <ChangeBoardModal />
@@ -120,6 +118,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <GlobalImageHotkeys />
       <NewGallerySessionDialog />
       <NewCanvasSessionDialog />
+      <ImageContextMenu />
     </ErrorBoundary>
   );
 };

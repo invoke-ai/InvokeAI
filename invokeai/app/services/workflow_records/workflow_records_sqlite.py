@@ -127,9 +127,9 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         self,
         order_by: WorkflowRecordOrderBy,
         direction: SQLiteDirection,
+        category: WorkflowCategory,
         page: int = 0,
         per_page: Optional[int] = None,
-        category: Optional[WorkflowCategory] = None,
         query: Optional[str] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         try:
@@ -137,7 +137,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             # sanitize!
             assert order_by in WorkflowRecordOrderBy
             assert direction in SQLiteDirection
-            count_query = "SELECT COUNT(*) FROM workflow_library"
+            assert category in WorkflowCategory
+            count_query = "SELECT COUNT(*) FROM workflow_library WHERE category = ?"
             main_query = """
                 SELECT
                     workflow_id,
@@ -148,26 +149,16 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                     updated_at,
                     opened_at
                 FROM workflow_library
+                WHERE category = ?
                 """
-            main_params: list[int | str] = []
-            count_params: list[int | str] = []
-
-            if category:
-                assert category in WorkflowCategory
-                main_query += " WHERE category = ?"
-                count_query += " WHERE category = ?"
-                main_params.append(category.value)
-                count_params.append(category.value)
+            main_params: list[int | str] = [category.value]
+            count_params: list[int | str] = [category.value]
 
             stripped_query = query.strip() if query else None
             if stripped_query:
                 wildcard_query = "%" + stripped_query + "%"
-                if "WHERE" in main_query:
-                    main_query += " AND (name LIKE ? OR description LIKE ?)"
-                    count_query += " AND (name LIKE ? OR description LIKE ?)"
-                else:
-                    main_query += " WHERE name LIKE ? OR description LIKE ?"
-                    count_query += " WHERE name LIKE ? OR description LIKE ?"
+                main_query += " AND name LIKE ? OR description LIKE ? "
+                count_query += " AND name LIKE ? OR description LIKE ?;"
                 main_params.extend([wildcard_query, wildcard_query])
                 count_params.extend([wildcard_query, wildcard_query])
 
