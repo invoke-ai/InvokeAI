@@ -1132,7 +1132,8 @@
         "reloadingIn": "Reloading in"
     },
     "toast": {
-        "addedToBoard": "Added to board",
+        "addedToBoard": "Added to board {{name}}'s assets",
+        "addedToUncategorized": "Added to board $t(boards.uncategorized)'s assets",
         "baseModelChanged": "Base Model Changed",
         "baseModelChangedCleared_one": "Cleared or disabled {{count}} incompatible submodel",
         "baseModelChangedCleared_other": "Cleared or disabled {{count}} incompatible submodels",
