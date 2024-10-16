@@ -1,5 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
+import type { RootState } from 'app/store/store';
 import {
   entityRasterized,
   entitySelected,
@@ -20,13 +21,31 @@ import { imagesApi } from 'services/api/endpoints/images';
 
 const log = logger('gallery');
 
+/**
+ * Gets the description for the toast that is shown when an image is uploaded.
+ * @param boardId The board id of the uploaded image
+ * @param state The current state of the app
+ * @returns
+ */
+const getUploadedToastDescription = (boardId: string, state: RootState) => {
+  if (boardId === 'none') {
+    return t('toast.addedToUncategorized');
+  }
+  // Attempt to get the board's name for the toast
+  const queryArgs = selectListBoardsQueryArgs(state);
+  const { data } = boardsApi.endpoints.listAllBoards.select(queryArgs)(state);
+  // Fall back to just the board id if we can't find the board for some reason
+  const board = data?.find((b) => b.board_id === boardId);
+
+  return t('toast.addedToBoard', { name: board?.board_name ?? boardId });
+};
+
 export const addImageUploadedFulfilledListener = (startAppListening: AppStartListening) => {
   startAppListening({
     matcher: imagesApi.endpoints.uploadImage.matchFulfilled,
     effect: (action, { dispatch, getState }) => {
       const imageDTO = action.payload;
       const state = getState();
-      const { autoAddBoardId } = state.gallery;
 
       log.debug({ imageDTO }, 'Image uploaded');
 
@@ -49,34 +68,15 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
 
       // default action - just upload and alert user
       if (postUploadAction?.type === 'TOAST') {
-        if (!autoAddBoardId || autoAddBoardId === 'none') {
-          const title = postUploadAction.title || DEFAULT_UPLOADED_TOAST.title;
-          const duration = postUploadAction.duration !== undefined ? postUploadAction.duration : undefined;
-          toast({ ...DEFAULT_UPLOADED_TOAST, title, duration });
-          dispatch(boardIdSelected({ boardId: 'none' }));
-          dispatch(galleryViewChanged('assets'));
-        } else {
-          // Attempt to get the board's name for the toast
-          const queryArgs = selectListBoardsQueryArgs(state);
-          const { data } = boardsApi.endpoints.listAllBoards.select(queryArgs)(state);
-
-          const title = postUploadAction.title || DEFAULT_UPLOADED_TOAST.title;
-          const duration = postUploadAction.duration !== undefined ? postUploadAction.duration : undefined;
-          // Fall back to just the board id if we can't find the board for some reason
-          const board = data?.find((b) => b.board_id === autoAddBoardId);
-          const description = board
-            ? `${t('toast.addedToBoard')} ${board.board_name}`
-            : `${t('toast.addedToBoard')} ${autoAddBoardId}`;
-
-          toast({
-            ...DEFAULT_UPLOADED_TOAST,
-            description,
-            title,
-            duration,
-          });
-          dispatch(boardIdSelected({ boardId: autoAddBoardId }));
-          dispatch(galleryViewChanged('assets'));
-        }
+        const boardId = imageDTO.board_id ?? 'none';
+        toast({
+          ...DEFAULT_UPLOADED_TOAST,
+          title: postUploadAction.title || DEFAULT_UPLOADED_TOAST.title,
+          duration: postUploadAction.duration !== undefined ? postUploadAction.duration : undefined,
+          description: getUploadedToastDescription(boardId, state),
+        });
+        dispatch(boardIdSelected({ boardId }));
+        dispatch(galleryViewChanged('assets'));
         return;
       }
 
