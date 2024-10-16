@@ -32,7 +32,8 @@ def denoise(
     cfg_scale: float,
     inpaint_extension: InpaintExtension | None,
     controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension],
-    ip_adapter_extensions: list[XLabsIPAdapterExtension],
+    pos_ip_adapter_extensions: list[XLabsIPAdapterExtension],
+    neg_ip_adapter_extensions: list[XLabsIPAdapterExtension],
 ):
     # step 0 is the initial state
     total_steps = len(timesteps) - 1
@@ -88,24 +89,28 @@ def denoise(
             total_num_timesteps=total_steps,
             controlnet_double_block_residuals=merged_controlnet_residuals.double_block_residuals,
             controlnet_single_block_residuals=merged_controlnet_residuals.single_block_residuals,
-            ip_adapter_extensions=ip_adapter_extensions,
+            ip_adapter_extensions=pos_ip_adapter_extensions,
         )
 
         # TODO(ryand): Add option to apply controlnet to negative conditioning as well.
         # TODO(ryand): Add option to run positive and negative predictions in a single batch for better performance on
         # systems with sufficient VRAM.
-        neg_pred = model(
-            img=img,
-            img_ids=img_ids,
-            txt=neg_txt,
-            txt_ids=neg_txt_ids,
-            y=neg_vec,
-            timesteps=t_vec,
-            guidance=guidance_vec,
-            controlnet_double_block_residuals=None,
-            controlnet_single_block_residuals=None,
-        )
-        pred = neg_pred + cfg_scale * (pred - neg_pred)
+        if step > 1:
+            neg_pred = model(
+                img=img,
+                img_ids=img_ids,
+                txt=neg_txt,
+                txt_ids=neg_txt_ids,
+                y=neg_vec,
+                timesteps=t_vec,
+                guidance=guidance_vec,
+                timestep_index=timestep_index,
+                total_num_timesteps=total_steps,
+                controlnet_double_block_residuals=None,
+                controlnet_single_block_residuals=None,
+                ip_adapter_extensions=neg_ip_adapter_extensions,
+            )
+            pred = neg_pred + cfg_scale * (pred - neg_pred)
 
         preview_img = img - t_curr * pred
         img = img + (t_prev - t_curr) * pred
