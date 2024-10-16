@@ -40,23 +40,7 @@ export const useImageUploadButton = ({
 
   const onDropAccepted = useCallback(
     (files: File[]) => {
-      if (allowMultiple) {
-        for (const file of files) {
-          uploadImage({
-            file,
-            image_category: 'user',
-            is_intermediate: false,
-            postUploadAction: postUploadAction ?? { type: 'TOAST' },
-            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          });
-        }
-      } else {
-        const file = files[0];
-
-        if (!file) {
-          return;
-        }
-
+      for (const file of files) {
         uploadImage({
           file,
           image_category: 'user',
@@ -66,7 +50,7 @@ export const useImageUploadButton = ({
         });
       }
     },
-    [autoAddBoardId, postUploadAction, uploadImage, allowMultiple]
+    [autoAddBoardId, postUploadAction, uploadImage]
   );
 
   const {
