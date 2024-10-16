@@ -1,4 +1,6 @@
+import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -9,61 +11,44 @@ import { useTranslation } from 'react-i18next';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
 
+const log = logger('gallery');
+
 const accept: Accept = {
   'image/png': ['.png'],
   'image/jpeg': ['.jpg', '.jpeg', '.png'],
 };
 
 export const useFullscreenDropzone = () => {
+  useAssertSingleton('useFullscreenDropzone');
   const { t } = useTranslation();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
   const [uploadImage] = useUploadImageMutation();
   const activeTabName = useAppSelector(selectActiveTab);
 
-  const fileRejectionCallback = useCallback(
-    (rejection: FileRejection) => {
-      setIsHandlingUpload(true);
-
-      toast({
-        id: 'UPLOAD_FAILED',
-        title: t('toast.uploadFailed'),
-        description: rejection.errors.map((error) => error.message).join('\n'),
-        status: 'error',
-      });
-    },
-    [t]
-  );
-
   const getPostUploadAction = useCallback(
-    (singleImage: boolean): PostUploadAction => {
-      if (singleImage && activeTabName === 'upscaling') {
+    (isSingleImage: boolean, isLastImage: boolean): PostUploadAction => {
+      if (isSingleImage && activeTabName === 'upscaling') {
         return { type: 'SET_UPSCALE_INITIAL_IMAGE' };
-      } else if (singleImage) {
+      } else if (isSingleImage || isLastImage) {
+        // Omit the duration if it's the last image - this allows the toast to auto-close
         return { type: 'TOAST' };
       } else {
+        // Set duration to `null` to prevent auto-close on any toast that is not the last image
         return { type: 'TOAST', duration: null };
       }
     },
     [activeTabName]
   );
 
-  const fileAcceptedCallback = useCallback(
-    (file: File, postUploadAction: PostUploadAction) => {
-      uploadImage({
-        file,
-        image_category: 'user',
-        is_intermediate: false,
-        postUploadAction,
-        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-      });
-    },
-    [autoAddBoardId, uploadImage]
-  );
-
   const onDrop = useCallback(
     (acceptedFiles: Array<File>, fileRejections: Array<FileRejection>) => {
-      if (fileRejections.length > 1) {
+      if (fileRejections.length > 0) {
+        const errors = fileRejections.map((rejection) => ({
+          errors: rejection.errors.map(({ message }) => message),
+          file: rejection.file.path,
+        }));
+        log.error({ errors }, 'Invalid upload');
         toast({
           id: 'UPLOAD_FAILED',
           title: t('toast.uploadFailed'),
@@ -73,17 +58,20 @@ export const useFullscreenDropzone = () => {
         return;
       }
 
-      fileRejections.forEach((rejection: FileRejection) => {
-        fileRejectionCallback(rejection);
-      });
+      const isSingleImage = acceptedFiles.length === 1;
 
-      const postUploadAction = getPostUploadAction(acceptedFiles.length === 1);
-
-      acceptedFiles.forEach((file: File) => {
-        fileAcceptedCallback(file, postUploadAction);
-      });
+      for (const [i, file] of acceptedFiles.entries()) {
+        const isLastImage = i === acceptedFiles.length - 1;
+        uploadImage({
+          file,
+          image_category: 'user',
+          is_intermediate: false,
+          postUploadAction: getPostUploadAction(isSingleImage, isLastImage),
+          board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+        });
+      }
     },
-    [t, fileAcceptedCallback, fileRejectionCallback, getPostUploadAction]
+    [t, uploadImage, getPostUploadAction, autoAddBoardId]
   );
 
   const onDragOver = useCallback(() => {
