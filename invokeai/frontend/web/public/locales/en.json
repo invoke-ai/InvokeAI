@@ -1181,7 +1181,7 @@
         "setNodeField": "Set as node field",
         "somethingWentWrong": "Something Went Wrong",
         "uploadFailed": "Upload failed",
-        "uploadFailedInvalidUploadDesc": "Must be single PNG or JPEG image",
+        "uploadFailedInvalidUploadDesc": "Must be PNG or JPEG image(s)",
         "workflowLoaded": "Workflow Loaded",
         "problemRetrievingWorkflow": "Problem Retrieving Workflow",
         "workflowDeleted": "Workflow Deleted",
