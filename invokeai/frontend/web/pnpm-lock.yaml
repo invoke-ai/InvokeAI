@@ -247,9 +247,9 @@ devDependencies:
   csstype:
     specifier: ^3.1.3
     version: 3.1.3
-  dpdm:
-    specifier: ^3.14.0
-    version: 3.14.0
+  dpdm-fast:
+    specifier: ^1.0.7
+    version: 1.0.7
   eslint:
     specifier: ^8.57.1
     version: 8.57.1
@@ -4993,8 +4993,8 @@ packages:
       csstype: 3.1.3
     dev: false
 
-  /dpdm@3.14.0:
-    resolution: {integrity: sha512-YJzsFSyEtj88q5eTELg3UWU7TVZkG1dpbF4JDQ3t1b07xuzXmdoGeSz9TKOke1mUuOpWlk4q+pBh+aHzD6GBTg==}
+  /dpdm-fast@1.0.7:
+    resolution: {integrity: sha512-HyyRAksopumPaDEpijVn0a0gzrQUoGLNmm/5d5PSMw8Wot/VKeZuw4+P4jN30RVwzzvY3I8yMACzWmhWraNi5A==}
     hasBin: true
     dependencies:
       chalk: 4.1.2
@@ -5002,7 +5002,7 @@ packages:
       glob: 10.4.5
       ora: 5.4.1
       tslib: 2.7.0
-      typescript: 5.6.2
+      typescript: 5.6.3
       yargs: 17.7.2
     dev: true
 
@@ -8976,6 +8976,12 @@ packages:
 
   /typescript@5.6.2:
     resolution: {integrity: sha512-NW8ByodCSNCwZeghjN3o+JX5OFH0Ojg6sadjEKY4huZ52TqbJTJnDo5+Tw98lSy63NZvi4n+ez5m2u5d4PkZyw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+    dev: true
+
+  /typescript@5.6.3:
+    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
     engines: {node: '>=14.17'}
     hasBin: true
     dev: true
