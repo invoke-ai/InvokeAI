@@ -6,7 +6,7 @@ configuration variable, that allows the watermarking to be supressed.
 
 import cv2
 import numpy as np
-from imwatermark import WatermarkEncoder
+from imwatermark import WatermarkDecoder, WatermarkEncoder
 from PIL import Image
 
 import invokeai.backend.util.logging as logger
@@ -28,3 +28,10 @@ class InvisibleWatermark:
         encoder.set_watermark("bytes", watermark_text.encode("utf-8"))
         bgr_encoded = encoder.encode(bgr, "dwtDct")
         return Image.fromarray(cv2.cvtColor(bgr_encoded, cv2.COLOR_BGR2RGB)).convert("RGBA")
+
+    @classmethod
+    def read_watermark(cls, image: Image.Image, length: int = 64) -> str:
+        bgr = cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2BGR)
+        decoder = WatermarkDecoder("bytes", length)
+        watermark = decoder.decode(bgr, "dwtDct")
+        return watermark.decode("utf-8")
