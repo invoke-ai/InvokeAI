@@ -90,6 +90,16 @@ const zCoordinate = z.object({
 });
 export type Coordinate = z.infer<typeof zCoordinate>;
 
+const zSAMPointLabel = z.enum(['foreground', 'background', 'neutral']);
+export type SAMPointLabel = z.infer<typeof zSAMPointLabel>;
+
+export const zSAMPoint = z.object({
+  x: z.number().int().gte(0),
+  y: z.number().int().gte(0),
+  label: zSAMPointLabel,
+});
+export type SAMPoint = z.infer<typeof zSAMPoint>;
+
 const zRect = z.object({
   x: z.number(),
   y: z.number(),

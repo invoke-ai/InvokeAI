@@ -613,9 +613,19 @@ export class CanvasStateApiModule extends CanvasModuleBase {
   $rasterizingAdapter = atom<CanvasEntityAdapter | null>(null);
 
   /**
-   * Whether an entity is currently being transformed. Derived from `$transformingAdapter`.
+   * Whether an entity is currently being rasterized. Derived from `$rasterizingAdapter`.
    */
   $isRasterizing = computed(this.$rasterizingAdapter, (rasterizingAdapter) => Boolean(rasterizingAdapter));
+
+  /**
+   * The entity adapter being segmented, if any.
+   */
+  $segmentingAdapter = atom<CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer | null>(null);
+
+  /**
+   * Whether an entity is currently being segmented. Derived from `$segmentingAdapter`.
+   */
+  $isSegmenting = computed(this.$segmentingAdapter, (segmentingAdapter) => Boolean(segmentingAdapter));
 
   /**
    * Whether the space key is currently pressed.

@@ -5,6 +5,7 @@ import { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/
 import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
 import { CanvasEntityTransformer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
+import { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
 import type { CanvasEntityIdentifier, CanvasRasterLayerState, Rect } from 'features/controlLayers/store/types';
 import type { GroupConfig } from 'konva/lib/Group';
 import { omit } from 'lodash-es';
@@ -17,6 +18,7 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
   bufferRenderer: CanvasEntityBufferObjectRenderer;
   transformer: CanvasEntityTransformer;
   filterer: CanvasEntityFilterer;
+  segmentAnything: CanvasSegmentAnythingModule;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'raster_layer'>, manager: CanvasManager) {
     super(entityIdentifier, manager, 'raster_layer_adapter');
@@ -25,6 +27,7 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
     this.bufferRenderer = new CanvasEntityBufferObjectRenderer(this);
     this.transformer = new CanvasEntityTransformer(this);
     this.filterer = new CanvasEntityFilterer(this);
+    this.segmentAnything = new CanvasSegmentAnythingModule(this);
 
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectState, this.sync));
   }
