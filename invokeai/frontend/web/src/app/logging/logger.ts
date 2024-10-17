@@ -34,18 +34,15 @@ export const zLogLevel = z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fat
 export type LogLevel = z.infer<typeof zLogLevel>;
 export const isLogLevel = (v: unknown): v is LogLevel => zLogLevel.safeParse(v).success;
 
+/**
+ * Override logging settings.
+ * @property logIsEnabled Override the enabled log state. Omit to use the user's settings.
+ * @property logNamespaces Override the enabled log namespaces. Use `"*"` for all namespaces. Omit to use the user's settings.
+ * @property logLevel Override the log level. Omit to use the user's settings.
+ */
 export type LoggingOverrides = {
-  /**
-   * Override the enabled log state. Omit to use the user's settings.
-   */
   logIsEnabled?: boolean;
-  /**
-   * Override the enabled log namespaces. Use `"*"` for all namespaces. Omit to use the user's settings.
-   */
   logNamespaces?: LogNamespace[] | '*';
-  /**
-   * Override the log level. Omit to use the user's settings.
-   */
   logLevel?: LogLevel;
 };
 
