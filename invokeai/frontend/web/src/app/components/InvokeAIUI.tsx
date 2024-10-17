@@ -2,6 +2,8 @@ import 'i18n';
 
 import type { Middleware } from '@reduxjs/toolkit';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
+import type { LoggingOverrides } from 'app/logging/logger';
+import { $loggingOverrides, configureLogging } from 'app/logging/logger';
 import { $authToken } from 'app/store/nanostores/authToken';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
 import { $customNavComponent } from 'app/store/nanostores/customNavComponent';
@@ -20,7 +22,7 @@ import Loading from 'common/components/Loading/Loading';
 import AppDndContext from 'features/dnd/components/AppDndContext';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import type { PropsWithChildren, ReactNode } from 'react';
-import React, { lazy, memo, useEffect, useMemo } from 'react';
+import React, { lazy, memo, useEffect, useLayoutEffect, useMemo } from 'react';
 import { Provider } from 'react-redux';
 import { addMiddleware, resetMiddlewares } from 'redux-dynamic-middlewares';
 import { $socketOptions } from 'services/events/stores';
@@ -46,6 +48,7 @@ interface Props extends PropsWithChildren {
   isDebugging?: boolean;
   logo?: ReactNode;
   workflowCategories?: WorkflowCategory[];
+  loggingOverrides?: LoggingOverrides;
 }
 
 const InvokeAIUI = ({
@@ -65,7 +68,26 @@ const InvokeAIUI = ({
   isDebugging = false,
   logo,
   workflowCategories,
+  loggingOverrides,
 }: Props) => {
+  useLayoutEffect(() => {
+    /*
+     * We need to configure logging before anything else happens - useLayoutEffect ensures we set this at the first
+     * possible opportunity.
+     *
+     * Once redux initializes, we will check the user's settings and update the logging config accordingly. See
+     * `useSyncLoggingConfig`.
+     */
+    $loggingOverrides.set(loggingOverrides);
+
+    // Until we get the user's settings, we will use the overrides OR default values.
+    configureLogging(
+      loggingOverrides?.logIsEnabled ?? true,
+      loggingOverrides?.logLevel ?? 'debug',
+      loggingOverrides?.logNamespaces ?? '*'
+    );
+  }, [loggingOverrides]);
+
   useEffect(() => {
     // configure API client token
     if (token) {
