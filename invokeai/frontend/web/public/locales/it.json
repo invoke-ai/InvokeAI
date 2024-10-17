@@ -577,7 +577,18 @@
         "noMatchingModels": "Nessun modello corrispondente",
         "starterModelsInModelManager": "I modelli iniziali possono essere trovati in Gestione Modelli",
         "spandrelImageToImage": "Immagine a immagine (Spandrel)",
-        "learnMoreAboutSupportedModels": "Scopri di più sui modelli che supportiamo"
+        "learnMoreAboutSupportedModels": "Scopri di più sui modelli che supportiamo",
+        "starterBundles": "Pacchetti per iniziare",
+        "installingBundle": "Installazione del pacchetto",
+        "skippingXDuplicates_one": ", saltando {{count}} duplicato",
+        "skippingXDuplicates_many": ", saltando {{count}} duplicati",
+        "skippingXDuplicates_other": ", saltando {{count}} duplicati",
+        "installingModel": "Installazione del modello",
+        "installingXModels_one": "Installazione di {{count}} modello",
+        "installingXModels_many": "Installazione di {{count}} modelli",
+        "installingXModels_other": "Installazione di {{count}} modelli",
+        "includesNModels": "Include {{n}} modelli e le loro dipendenze",
+        "starterBundleHelpText": "Installa facilmente tutti i modelli necessari per iniziare con un modello base, tra cui un modello principale, controlnet, adattatori IP e altro. Selezionando un pacchetto salterai tutti i modelli che hai già installato."
     },
     "parameters": {
         "images": "Immagini",
@@ -722,7 +733,7 @@
         "serverError": "Errore del Server",
         "connected": "Connesso al server",
         "canceled": "Elaborazione annullata",
-        "uploadFailedInvalidUploadDesc": "Deve essere una singola immagine PNG o JPEG",
+        "uploadFailedInvalidUploadDesc": "Devono essere immagini PNG o JPEG.",
         "parameterSet": "Parametro richiamato",
         "parameterNotSet": "Parametro non richiamato",
         "problemCopyingImage": "Impossibile copiare l'immagine",
@@ -731,7 +742,7 @@
         "baseModelChangedCleared_other": "Cancellati o disabilitati {{count}} sottomodelli incompatibili",
         "loadedWithWarnings": "Flusso di lavoro caricato con avvisi",
         "imageUploaded": "Immagine caricata",
-        "addedToBoard": "Aggiunto alla bacheca",
+        "addedToBoard": "Aggiunto alle risorse della bacheca {{name}}",
         "modelAddedSimple": "Modello aggiunto alla Coda",
         "imageUploadFailed": "Caricamento immagine non riuscito",
         "setControlImage": "Imposta come immagine di controllo",
@@ -770,7 +781,12 @@
         "imageSavingFailed": "Salvataggio dell'immagine non riuscito",
         "layerCopiedToClipboard": "Livello copiato negli appunti",
         "imageNotLoadedDesc": "Impossibile trovare l'immagine",
-        "linkCopied": "Collegamento copiato"
+        "linkCopied": "Collegamento copiato",
+        "addedToUncategorized": "Aggiunto alle risorse della bacheca $t(boards.uncategorized)",
+        "imagesWillBeAddedTo": "Le immagini caricate verranno aggiunte alle risorse della bacheca {{boardName}}.",
+        "uploadFailedInvalidUploadDesc_withCount_one": "Devi caricare al massimo 1 immagine PNG o JPEG.",
+        "uploadFailedInvalidUploadDesc_withCount_many": "Devi caricare al massimo {{count}} immagini PNG o JPEG.",
+        "uploadFailedInvalidUploadDesc_withCount_other": "Devi caricare al massimo {{count}} immagini PNG o JPEG."
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -785,7 +801,8 @@
         "about": "Informazioni",
         "submitSupportTicket": "Invia ticket di supporto",
         "toggleLeftPanel": "Attiva/disattiva il pannello sinistro (T)",
-        "toggleRightPanel": "Attiva/disattiva il pannello destro (G)"
+        "toggleRightPanel": "Attiva/disattiva il pannello destro (G)",
+        "uploadImages": "Carica immagine(i)"
     },
     "nodes": {
         "zoomOutNodes": "Rimpicciolire",
@@ -2006,7 +2023,11 @@
     },
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
-        "toGetStarted": "Per iniziare, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
+        "toGetStarted": "Per iniziare, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
+        "importModels": "Importa modelli",
+        "downloadStarterModels": "Scarica i modelli per iniziare",
+        "noModelsInstalled": "Sembra che tu non abbia installato alcun modello",
+        "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
     },
     "whatsNew": {
         "canvasV2Announcement": {
