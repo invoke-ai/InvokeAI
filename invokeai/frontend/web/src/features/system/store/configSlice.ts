@@ -218,3 +218,6 @@ export const selectWorkflowFetchDebounce = createConfigSelector((config) => conf
 export const selectMetadataFetchDebounce = createConfigSelector((config) => config.metadataFetchDebounce ?? 300);
 
 export const selectIsModelsTabDisabled = createConfigSelector((config) => config.disabledTabs.includes('models'));
+export const selectMaxImageUploadCount = createConfigSelector((config) => config.maxImageUploadCount);
+
+export const selectIsLocal = createSelector(selectConfigSlice, (config) => config.isLocal);

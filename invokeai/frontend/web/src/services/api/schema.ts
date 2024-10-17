@@ -15166,6 +15166,15 @@ export type components = {
             /** Dependencies */
             dependencies?: components["schemas"]["StarterModelWithoutDependencies"][] | null;
         };
+        /** StarterModelResponse */
+        StarterModelResponse: {
+            /** Starter Models */
+            starter_models: components["schemas"]["StarterModel"][];
+            /** Starter Bundles */
+            starter_bundles: {
+                [key: string]: components["schemas"]["StarterModel"][];
+            };
+        };
         /** StarterModelWithoutDependencies */
         StarterModelWithoutDependencies: {
             /** Description */
@@ -17972,7 +17981,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StarterModel"][];
+                    "application/json": components["schemas"]["StarterModelResponse"];
                 };
             };
         };

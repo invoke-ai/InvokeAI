@@ -258,3 +258,4 @@ export interface SystemStats {
 }
 
 export type BoardRecordOrderBy = S['BoardRecordOrderBy'];
+export type StarterModel = S['StarterModel'];

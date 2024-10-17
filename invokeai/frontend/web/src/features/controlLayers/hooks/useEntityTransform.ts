@@ -36,7 +36,7 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
     return false;
   }, [entityIdentifier, adapter, isBusy, isInteractable, isEmpty]);
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     if (isDisabled) {
       return;
     }
@@ -50,10 +50,10 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
     if (!adapter) {
       return;
     }
-    adapter.transformer.startTransform();
+    await adapter.transformer.startTransform();
   }, [isDisabled, entityIdentifier, canvasManager]);
 
-  const fitToBbox = useCallback(() => {
+  const fitToBbox = useCallback(async () => {
     if (isDisabled) {
       return;
     }
@@ -67,9 +67,9 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
     if (!adapter) {
       return;
     }
-    adapter.transformer.startTransform({ silent: true });
+    await adapter.transformer.startTransform({ silent: true });
     adapter.transformer.fitToBboxContain();
-    adapter.transformer.applyTransform();
+    await adapter.transformer.applyTransform();
   }, [canvasManager, entityIdentifier, isDisabled]);
 
   return { isDisabled, start, fitToBbox } as const;

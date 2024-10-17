@@ -5,11 +5,12 @@ import { newSessionRequested } from 'features/controlLayers/store/actions';
 import { workflowLoadRequested } from 'features/nodes/store/actions';
 import { atom } from 'nanostores';
 
-import type { TabName, UIState } from './uiTypes';
+import type { CanvasRightPanelTabName, TabName, UIState } from './uiTypes';
 
 const initialUIState: UIState = {
   _version: 3,
   activeTab: 'canvas',
+  activeTabCanvasRightPanel: 'gallery',
   shouldShowImageDetails: false,
   shouldShowProgressInViewer: true,
   accordions: {},
@@ -23,6 +24,9 @@ export const uiSlice = createSlice({
   reducers: {
     setActiveTab: (state, action: PayloadAction<TabName>) => {
       state.activeTab = action.payload;
+    },
+    activeTabCanvasRightPanelChanged: (state, action: PayloadAction<CanvasRightPanelTabName>) => {
+      state.activeTabCanvasRightPanel = action.payload;
     },
     setShouldShowImageDetails: (state, action: PayloadAction<boolean>) => {
       state.shouldShowImageDetails = action.payload;
@@ -54,6 +58,7 @@ export const uiSlice = createSlice({
 
 export const {
   setActiveTab,
+  activeTabCanvasRightPanelChanged,
   setShouldShowImageDetails,
   setShouldShowProgressInViewer,
   accordionStateChanged,

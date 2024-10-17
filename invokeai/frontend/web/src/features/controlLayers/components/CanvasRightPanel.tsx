@@ -1,31 +1,50 @@
 import { useDndContext } from '@dnd-kit/core';
 import { Box, Button, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import IAIDropOverlay from 'common/components/IAIDropOverlay';
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import {
-  $canvasRightPanelTabIndex,
-  selectCanvasRightPanelGalleryTab,
-  selectCanvasRightPanelLayersTab,
-} from 'features/controlLayers/store/ephemeral';
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
+import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const CanvasRightPanel = memo(() => {
   const { t } = useTranslation();
-  const tabIndex = useStore($canvasRightPanelTabIndex);
+  const activeTab = useAppSelector(selectActiveTabCanvasRightPanel);
   const imageViewer = useImageViewer();
+  const dispatch = useAppDispatch();
+
+  const tabIndex = useMemo(() => {
+    if (activeTab === 'gallery') {
+      return 1;
+    } else {
+      return 0;
+    }
+  }, [activeTab]);
+
   const onClickViewerToggleButton = useCallback(() => {
-    if ($canvasRightPanelTabIndex.get() !== 1) {
-      $canvasRightPanelTabIndex.set(1);
+    if (activeTab !== 'gallery') {
+      dispatch(activeTabCanvasRightPanelChanged('gallery'));
     }
     imageViewer.toggle();
-  }, [imageViewer]);
+  }, [imageViewer, activeTab, dispatch]);
+
+  const onChangeTab = useCallback(
+    (index: number) => {
+      if (index === 0) {
+        dispatch(activeTabCanvasRightPanelChanged('layers'));
+      } else {
+        dispatch(activeTabCanvasRightPanelChanged('gallery'));
+      }
+    },
+    [dispatch]
+  );
+
   useRegisteredHotkeys({
     id: 'toggleViewer',
     category: 'viewer',
@@ -34,7 +53,7 @@ export const CanvasRightPanel = memo(() => {
   });
 
   return (
-    <Tabs index={tabIndex} onChange={$canvasRightPanelTabIndex.set} w="full" h="full" display="flex" flexDir="column">
+    <Tabs index={tabIndex} onChange={onChangeTab} w="full" h="full" display="flex" flexDir="column">
       <TabList alignItems="center">
         <PanelTabs />
         <Spacer />
@@ -60,27 +79,33 @@ CanvasRightPanel.displayName = 'CanvasRightPanel';
 
 const PanelTabs = memo(() => {
   const { t } = useTranslation();
+  const activeTab = useAppSelector(selectActiveTabCanvasRightPanel);
   const activeEntityCount = useAppSelector(selectEntityCountActive);
   const tabTimeout = useRef<number | null>(null);
   const dndCtx = useDndContext();
+  const dispatch = useAppDispatch();
+  const [mouseOverTab, setMouseOverTab] = useState<'layers' | 'gallery' | null>(null);
 
   const onOnMouseOverLayersTab = useCallback(() => {
+    setMouseOverTab('layers');
     tabTimeout.current = window.setTimeout(() => {
       if (dndCtx.active) {
-        selectCanvasRightPanelLayersTab();
+        dispatch(activeTabCanvasRightPanelChanged('layers'));
       }
     }, 300);
-  }, [dndCtx.active]);
+  }, [dndCtx.active, dispatch]);
 
   const onOnMouseOverGalleryTab = useCallback(() => {
+    setMouseOverTab('gallery');
     tabTimeout.current = window.setTimeout(() => {
       if (dndCtx.active) {
-        selectCanvasRightPanelGalleryTab();
+        dispatch(activeTabCanvasRightPanelChanged('gallery'));
       }
     }, 300);
-  }, [dndCtx.active]);
+  }, [dndCtx.active, dispatch]);
 
   const onMouseOut = useCallback(() => {
+    setMouseOverTab(null);
     if (tabTimeout.current) {
       clearTimeout(tabTimeout.current);
     }
@@ -99,9 +124,17 @@ const PanelTabs = memo(() => {
         <Box as="span" w="full">
           {layersTabLabel}
         </Box>
+        {dndCtx.active && activeTab !== 'layers' && (
+          <IAIDropOverlay isOver={mouseOverTab === 'layers'} withBackdrop={false} />
+        )}
       </Tab>
-      <Tab position="relative" onMouseOver={onOnMouseOverGalleryTab} onMouseOut={onMouseOut}>
-        {t('gallery.gallery')}
+      <Tab position="relative" onMouseOver={onOnMouseOverGalleryTab} onMouseOut={onMouseOut} w={32}>
+        <Box as="span" w="full">
+          {t('gallery.gallery')}
+        </Box>
+        {dndCtx.active && activeTab !== 'gallery' && (
+          <IAIDropOverlay isOver={mouseOverTab === 'gallery'} withBackdrop={false} />
+        )}
       </Tab>
     </>
   );

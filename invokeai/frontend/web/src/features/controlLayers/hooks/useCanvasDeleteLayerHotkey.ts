@@ -1,13 +1,11 @@
-import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
-import { $canvasRightPanelTab } from 'features/controlLayers/store/ephemeral';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
+import { selectActiveTab, selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
 import { useCallback, useMemo } from 'react';
 
 export function useCanvasDeleteLayerHotkey() {
@@ -15,7 +13,7 @@ export function useCanvasDeleteLayerHotkey() {
   const dispatch = useAppDispatch();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const isBusy = useCanvasIsBusy();
-  const canvasRightPanelTab = useStore($canvasRightPanelTab);
+  const canvasRightPanelTab = useAppSelector(selectActiveTabCanvasRightPanel);
   const appTab = useAppSelector(selectActiveTab);
 
   const imageViewer = useImageViewer();

@@ -24,6 +24,7 @@ import { PiMagnifyingGlassBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
+import { GalleryUploadButton } from './GalleryUploadButton';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
 import { GallerySearch } from './ImageGrid/GallerySearch';
@@ -87,6 +88,7 @@ export const Gallery = () => {
             </Tab>
           </Tooltip>
           <Flex h="full" justifyContent="flex-end">
+            <GalleryUploadButton />
             <GallerySettingsPopover />
             <IconButton
               size="sm"
