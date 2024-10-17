@@ -111,6 +111,7 @@ export class CanvasManager extends CanvasModuleBase {
         this.stateApi.$isFiltering,
         this.stateApi.$isTransforming,
         this.stateApi.$isRasterizing,
+        this.stateApi.$isSegmenting,
         this.stagingArea.$isStaging,
         this.compositor.$isBusy,
       ],

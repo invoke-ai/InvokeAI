@@ -10,6 +10,7 @@ import type { CanvasEntityTransformer } from 'features/controlLayers/konva/Canva
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import type { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
 import { getKonvaNodeDebugAttrs, getRectIntersection } from 'features/controlLayers/konva/util';
 import {
   selectIsolatedFilteringPreview,
@@ -71,6 +72,15 @@ export abstract class CanvasEntityAdapterBase<
   // method. If it wasn't in this ABC, we'd get a TS error in `destroy`. Maybe there's a better way to handle this
   // without requiring all adapters to implement this property and their own `destroy`?
   abstract filterer?: CanvasEntityFilterer;
+
+  /**
+   * The segment anything module for this entity adapter. Entities that support segment anything should implement
+   * this property.
+   */
+  // TODO(psyche): This is in the ABC and not in the concrete classes to allow all adapters to share the `destroy`
+  // method. If it wasn't in this ABC, we'd get a TS error in `destroy`. Maybe there's a better way to handle this
+  // without requiring all adapters to implement this property and their own `destroy`?
+  abstract segmentAnything?: CanvasSegmentAnythingModule;
 
   /**
    * Synchronizes the entity state with the canvas. This includes rendering the entity's objects, handling visibility,
@@ -517,8 +527,17 @@ export abstract class CanvasEntityAdapterBase<
       this.transformer.stopTransform();
     }
     this.transformer.destroy();
-    if (this.filterer?.$isFiltering.get()) {
-      this.filterer.cancel();
+    if (this.filterer) {
+      if (this.filterer.$isFiltering.get()) {
+        this.filterer.cancel();
+      }
+      this.filterer?.destroy();
+    }
+    if (this.segmentAnything) {
+      if (this.segmentAnything.$isSegmenting.get()) {
+        this.segmentAnything.cancel();
+      }
+      this.segmentAnything.destroy();
     }
     this.konva.layer.destroy();
     this.manager.deleteAdapter(this.entityIdentifier);

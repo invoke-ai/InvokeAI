@@ -15,7 +15,6 @@ import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
 import { buildSelectModelConfig } from 'services/api/hooks/modelsByType';
 import { isControlNetOrT2IAdapterModelConfig } from 'services/api/types';
-import { assert } from 'tsafe';
 
 type CanvasEntityFiltererConfig = {
   processDebounceMs: number;
@@ -76,7 +75,8 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   start = (config?: FilterConfig) => {
     const filteringAdapter = this.manager.stateApi.$filteringAdapter.get();
     if (filteringAdapter) {
-      assert(false, `Already filtering an entity: ${filteringAdapter.id}`);
+      this.log.error(`Already filtering an entity: ${filteringAdapter.id}`);
+      return;
     }
 
     this.log.trace('Initializing filter');
