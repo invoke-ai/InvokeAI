@@ -1,6 +1,6 @@
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { components, paths } from 'services/api/schema';
-import type { O } from 'ts-toolbelt';
+import type { SetRequired } from 'type-fest';
 
 export type S = components['schemas'];
 
@@ -162,7 +162,7 @@ export type ModelInstallStatus = S['InstallStatus'];
 
 // Graphs
 export type Graph = S['Graph'];
-export type NonNullableGraph = O.Required<Graph, 'nodes' | 'edges'>;
+export type NonNullableGraph = SetRequired<Graph, 'nodes' | 'edges'>;
 export type Batch = S['Batch'];
 export type SessionQueueItemDTO = S['SessionQueueItemDTO'];
 export type WorkflowRecordOrderBy = S['WorkflowRecordOrderBy'];
