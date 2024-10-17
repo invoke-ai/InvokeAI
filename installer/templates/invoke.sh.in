@@ -68,7 +68,7 @@ do_line_input() {
     printf "2: Open the developer console\n"
     printf "3: Command-line help\n"
     printf "Q: Quit\n\n"
-    printf "To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest.\n\n"
+    printf "To update, download and run the installer from https://github.com/invoke-ai/InvokeAI/releases/latest\n\n"
     read -p "Please enter 1-4, Q: [1] " yn
     choice=${yn:='1'}
     do_choice $choice
