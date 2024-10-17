@@ -277,12 +277,12 @@ devDependencies:
   storybook:
     specifier: ^8.3.4
     version: 8.3.4
-  ts-toolbelt:
-    specifier: ^9.6.0
-    version: 9.6.0
   tsafe:
     specifier: ^1.7.5
     version: 1.7.5
+  type-fest:
+    specifier: ^4.26.1
+    version: 4.26.1
   typescript:
     specifier: ^5.6.2
     version: 5.6.2
@@ -8829,10 +8829,6 @@ packages:
   /ts-error@1.0.6:
     resolution: {integrity: sha512-tLJxacIQUM82IR7JO1UUkKlYuUTmoY9HBJAmNWFzheSlDS5SPMcNIepejHJa4BpPQLAcbRhRf3GDJzyj6rbKvA==}
     dev: false
-
-  /ts-toolbelt@9.6.0:
-    resolution: {integrity: sha512-nsZd8ZeNUzukXPlJmTBwUAuABDe/9qtVDelJeT/qW0ow3ZS3BsQJtNkan1802aM9Uf68/Y8ljw86Hu0h5IUW3w==}
-    dev: true
 
   /tsafe@1.7.5:
     resolution: {integrity: sha512-tbNyyBSbwfbilFfiuXkSOj82a6++ovgANwcoqBAcO9/REPoZMEQoE8kWPeO0dy5A2D/2Lajr8Ohue5T0ifIvLQ==}
