@@ -1850,7 +1850,8 @@
             "neutral": "Neutral",
             "reset": "Reset",
             "apply": "Apply",
-            "cancel": "Cancel"
+            "cancel": "Cancel",
+            "process": "Process"
         },
         "settings": {
             "snapToGrid": {
