@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     if [ "$TARGETPLATFORM" = "linux/arm64" ] || [ "$GPU_DRIVER" = "cpu" ]; then \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cpu"; \
     elif [ "$GPU_DRIVER" = "rocm" ]; then \
-        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm5.6"; \
+        extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/rocm6.1"; \
     else \
         extra_index_url_arg="--extra-index-url https://download.pytorch.org/whl/cu124"; \
     fi &&\
