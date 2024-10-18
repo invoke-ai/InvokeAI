@@ -1,10 +1,10 @@
 import { Mutex } from 'async-mutex';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
-import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
 import type { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import type { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
 import type { CanvasStagingAreaModule } from 'features/controlLayers/konva/CanvasStagingAreaModule';
 import { loadImage } from 'features/controlLayers/konva/util';
 import type { CanvasImageState } from 'features/controlLayers/store/types';
@@ -21,7 +21,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
     | CanvasEntityObjectRenderer
     | CanvasEntityBufferObjectRenderer
     | CanvasStagingAreaModule
-    | CanvasEntityFilterer;
+    | CanvasSegmentAnythingModule;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
@@ -42,7 +42,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
       | CanvasEntityObjectRenderer
       | CanvasEntityBufferObjectRenderer
       | CanvasStagingAreaModule
-      | CanvasEntityFilterer
+      | CanvasSegmentAnythingModule
   ) {
     super();
     this.id = state.id;

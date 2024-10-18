@@ -10,6 +10,7 @@ import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
+import { SegmentAnything } from 'features/controlLayers/components/SegmentAnything/SegmentAnything';
 import { StagingAreaIsStagingGate } from 'features/controlLayers/components/StagingArea/StagingAreaIsStagingGate';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
@@ -101,6 +102,7 @@ export const CanvasMainPanelContent = memo(() => {
         <CanvasManagerProviderGate>
           <Filter />
           <Transform />
+          <SegmentAnything />
         </CanvasManagerProviderGate>
       </Flex>
       <CanvasDropArea />

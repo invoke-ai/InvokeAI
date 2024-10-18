@@ -1842,6 +1842,16 @@
             "apply": "Apply",
             "cancel": "Cancel"
         },
+        "segment": {
+            "segment": "Segment",
+            "pointType": "Point Type",
+            "foreground": "Foreground",
+            "background": "Background",
+            "neutral": "Neutral",
+            "reset": "Reset",
+            "apply": "Apply",
+            "cancel": "Cancel"
+        },
         "settings": {
             "snapToGrid": {
                 "label": "Snap to Grid",
