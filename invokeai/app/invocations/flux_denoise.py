@@ -82,8 +82,10 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     positive_text_conditioning: FluxConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
-    negative_text_conditioning: FluxConditioningField = InputField(
-        description=FieldDescriptions.negative_cond, input=Input.Connection
+    negative_text_conditioning: FluxConditioningField | None = InputField(
+        default=None,
+        description="Negative conditioning tensor. Can be None if cfg_scale is 1.0.",
+        input=Input.Connection,
     )
     # TODO(ryand): Add cfg_scale range validation.
     cfg_scale: float | list[float] = InputField(default=1.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
@@ -136,9 +138,12 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         pos_t5_embeddings, pos_clip_embeddings = self._load_text_conditioning(
             context, self.positive_text_conditioning.conditioning_name, inference_dtype
         )
-        neg_t5_embeddings, neg_clip_embeddings = self._load_text_conditioning(
-            context, self.negative_text_conditioning.conditioning_name, inference_dtype
-        )
+        neg_t5_embeddings: torch.Tensor | None = None
+        neg_clip_embeddings: torch.Tensor | None = None
+        if self.negative_text_conditioning is not None:
+            neg_t5_embeddings, neg_clip_embeddings = self._load_text_conditioning(
+                context, self.negative_text_conditioning.conditioning_name, inference_dtype
+            )
 
         # Load the input latents, if provided.
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
@@ -203,10 +208,12 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         pos_txt_ids = torch.zeros(
             pos_bs, pos_t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device()
         )
-        neg_bs, neg_t5_seq_len, _ = neg_t5_embeddings.shape
-        neg_txt_ids = torch.zeros(
-            neg_bs, neg_t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device()
-        )
+        neg_txt_ids: torch.Tensor | None = None
+        if neg_t5_embeddings is not None:
+            neg_bs, neg_t5_seq_len, _ = neg_t5_embeddings.shape
+            neg_txt_ids = torch.zeros(
+                neg_bs, neg_t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device()
+            )
 
         # Pack all latent tensors.
         init_latents = pack(init_latents) if init_latents is not None else None
