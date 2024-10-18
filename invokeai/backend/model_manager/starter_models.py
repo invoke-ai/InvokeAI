@@ -555,6 +555,7 @@ STARTER_MODELS: list[StarterModel] = [
     deliberate_inpainting_sd1,
     juggernaut_sdxl,
     dreamshaper_sdxl,
+    archvis_sdxl,
     sdxl_refiner,
     sdxl_fp16_vae_fix,
     flux_vae,
