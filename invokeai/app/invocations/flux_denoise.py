@@ -85,9 +85,8 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     negative_text_conditioning: FluxConditioningField = InputField(
         description=FieldDescriptions.negative_cond, input=Input.Connection
     )
-    # TODO(ryand): Add support for cfg_scale to be a list of floats: one for each step.
     # TODO(ryand): Add cfg_scale range validation.
-    cfg_scale: float = InputField(default=3.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
+    cfg_scale: float | list[float] = InputField(default=1.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
     num_steps: int = InputField(
