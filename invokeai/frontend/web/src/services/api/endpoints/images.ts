@@ -5,6 +5,7 @@ import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
 import type {
+  BulkUploadImageResponse,
   DeleteBoardResult,
   GraphAndWorkflowResponse,
   ImageCategory,
@@ -321,6 +322,30 @@ export const imagesApi = api.injectEndpoints({
         ];
       },
     }),
+    bulkUploadImages: build.mutation<
+      BulkUploadImageResponse,
+      {
+        files: File[];
+        board_id?: string;
+      }
+    >({
+      query: ({ files, board_id }) => {
+        const formData = new FormData();
+        for(const file of files) {
+          formData.append('files', file);
+        }
+        
+        return {
+          url: buildImagesUrl('bulk-upload'),
+          method: 'POST',
+          body: formData,
+          params: {
+            board_id: board_id === 'none' ? undefined : board_id,
+          },
+        };
+      },
+    }),
+
 
     deleteBoard: build.mutation<DeleteBoardResult, string>({
       query: (board_id) => ({ url: buildBoardsUrl(board_id), method: 'DELETE' }),
@@ -556,6 +581,7 @@ export const {
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
   useUploadImageMutation,
+  useBulkUploadImagesMutation,
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,

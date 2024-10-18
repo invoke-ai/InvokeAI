@@ -20,6 +20,8 @@ import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
+import { v4 as uuidv4 } from 'uuid';
+
 
 import { $lastProgressEvent } from './stores';
 
@@ -42,6 +44,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(socketConnected());
     const queue_id = $queueId.get();
     socket.emit('subscribe_queue', { queue_id });
+    socket.emit('subscribe_bulk_upload', { bulk_upload_id: uuidv4() });
     if (!$baseUrl.get()) {
       const bulk_download_id = $bulkDownloadId.get();
       socket.emit('subscribe_bulk_download', { bulk_download_id });
