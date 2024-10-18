@@ -8,7 +8,7 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiCheckBold, PiXBold } from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiCheckBold, PiStarBold, PiXBold } from 'react-icons/pi';
 
 const SegmentAnythingContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
@@ -58,6 +58,15 @@ const SegmentAnythingContent = memo(
 
         <ButtonGroup isAttached={false} size="sm" w="full">
           <Spacer />
+          <Button
+            leftIcon={<PiStarBold />}
+            onClick={adapter.segmentAnything.process}
+            isLoading={isProcessing}
+            loadingText={t('controlLayers.segment.process')}
+            variant="ghost"
+          >
+            {t('controlLayers.segment.process')}
+          </Button>
           <Button
             leftIcon={<PiArrowsCounterClockwiseBold />}
             onClick={adapter.segmentAnything.reset}
