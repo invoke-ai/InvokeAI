@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.invocations.upscale import ESRGAN_MODELS
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
+from invokeai.app.services.system_stats.system_stats import SystemStats, get_system_stats
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.util.logging import logging
 from invokeai.version import __version__
@@ -182,3 +183,10 @@ async def disable_invocation_cache() -> None:
 async def get_invocation_cache_status() -> InvocationCacheStatus:
     """Clears the invocation cache"""
     return ApiDependencies.invoker.services.invocation_cache.get_status()
+
+
+@app_router.get("/system-stats", operation_id="get_system_stats", status_code=200, response_model=SystemStats)
+async def get_stats() -> SystemStats:
+    """Fetches and returns the system statistics, including CPU, RAM, and GPU stats."""
+    stats = get_system_stats()
+    return stats
