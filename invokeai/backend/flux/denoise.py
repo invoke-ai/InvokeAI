@@ -22,9 +22,9 @@ def denoise(
     txt_ids: torch.Tensor,
     vec: torch.Tensor,
     # negative text conditioning
-    neg_txt: torch.Tensor,
-    neg_txt_ids: torch.Tensor,
-    neg_vec: torch.Tensor,
+    neg_txt: torch.Tensor | None,
+    neg_txt_ids: torch.Tensor | None,
+    neg_vec: torch.Tensor | None,
     # sampling parameters
     timesteps: list[float],
     step_callback: Callable[[PipelineIntermediateState], None],
@@ -90,6 +90,10 @@ def denoise(
         if not math.isclose(step_cfg_scale, 1.0):
             # TODO(ryand): Add option to run positive and negative predictions in a single batch for better performance on
             # systems with sufficient VRAM.
+
+            if neg_txt is None or neg_txt_ids is None or neg_vec is None:
+                raise ValueError("Negative text conditioning is required when cfg_scale is not 1.0.")
+
             neg_pred = model(
                 img=img,
                 img_ids=img_ids,
