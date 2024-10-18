@@ -162,6 +162,8 @@ export class CanvasToolModule extends CanvasModuleBase {
       stage.setCursor('grabbing');
     } else if (this.manager.stateApi.$isTransforming.get()) {
       stage.setCursor('default');
+    } else if (this.manager.stateApi.$isSegmenting.get()) {
+      stage.setCursor('default');
     } else if (this.manager.stateApi.$isFiltering.get()) {
       stage.setCursor('not-allowed');
     } else if (this.manager.stagingArea.$isStaging.get()) {
@@ -540,6 +542,9 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStagePointerUp = (e: KonvaEventObject<PointerEvent>) => {
+    if (e.target !== this.konva.stage) {
+      return;
+    }
     try {
       this.$lastPointerType.set(e.evt.pointerType);
 
@@ -614,12 +619,12 @@ export class CanvasToolModule extends CanvasModuleBase {
   onStagePointerMove = async (e: KonvaEventObject<PointerEvent>) => {
     try {
       this.$lastPointerType.set(e.evt.pointerType);
+      this.syncCursorPositions();
 
       if (!this.getCanDraw()) {
         return;
       }
 
-      this.syncCursorPositions();
       const cursorPos = this.$cursorPos.get();
 
       if (!cursorPos) {

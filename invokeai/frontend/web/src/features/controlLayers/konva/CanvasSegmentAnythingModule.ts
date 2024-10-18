@@ -5,11 +5,13 @@ import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/kon
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasImageState, RgbaColor, SAMPoint, SAMPointLabel } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
@@ -27,10 +29,10 @@ type CanvasSegmentAnythingModuleConfig = {
 const DEFAULT_CONFIG: CanvasSegmentAnythingModuleConfig = {
   SAM_POINT_RADIUS: 5,
   SAM_POINT_BORDER_WIDTH: 2,
-  SAM_POINT_BORDER_COLOR: { r: 0, g: 0, b: 0, a: 1 },
-  SAM_POINT_FOREGROUND_COLOR: { r: 0, g: 200, b: 0, a: 1 },
-  SAM_POINT_BACKGROUND_COLOR: { r: 200, g: 0, b: 0, a: 1 },
-  SAM_POINT_NEUTRAL_COLOR: { r: 0, g: 0, b: 200, a: 1 },
+  SAM_POINT_BORDER_COLOR: { r: 0, g: 0, b: 0, a: 0.7 },
+  SAM_POINT_FOREGROUND_COLOR: { r: 0, g: 200, b: 0, a: 0.7 },
+  SAM_POINT_BACKGROUND_COLOR: { r: 200, g: 0, b: 0, a: 0.7 },
+  SAM_POINT_NEUTRAL_COLOR: { r: 0, g: 0, b: 200, a: 0.7 },
   PROCESS_DEBOUNCE_MS: 300,
 };
 
@@ -63,13 +65,19 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   $hasProcessed = atom<boolean>(false);
   $isProcessing = atom<boolean>(false);
 
+  $pointType = atom<SAMPointLabel>('background');
+
   imageState: CanvasImageState | null = null;
 
   points: SAMPointState[] = [];
+  maskedImage: CanvasObjectImage | null = null;
 
   konva: {
     group: Konva.Group;
+    compositingRect: Konva.Rect;
   };
+
+  KONVA_CIRCLE_NAME = `${this.type}:circle`;
 
   constructor(parent: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer) {
     super();
@@ -83,29 +91,37 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:group` }),
+      compositingRect: new Konva.Rect({
+        name: `${this.type}:compositingRect`,
+        fill: rgbaColorToString({ r: 0, g: 0, b: 0, a: 0.5 }),
+        globalCompositeOperation: 'source-in',
+        listening: false,
+        strokeEnabled: false,
+        perfectDrawEnabled: false,
+      }),
     };
   }
 
   createPoint(x: number, y: number, label: SAMPointLabel): SAMPointState {
     const id = getPrefixedId('sam_point');
     const circle = new Konva.Circle({
-      name: `${this.type}:circle`,
+      name: this.KONVA_CIRCLE_NAME,
       x,
       y,
       radius: this.config.SAM_POINT_RADIUS,
       fill: rgbaColorToString(this.getSAMPointColor(label)),
       stroke: rgbaColorToString(this.config.SAM_POINT_BORDER_COLOR),
       strokeWidth: this.config.SAM_POINT_BORDER_WIDTH,
-      strokeScaleEnabled: false,
-      draggable: true,
     });
 
-    circle.on('mousedown', () => {
-      this.points = this.points.filter((point) => point.id !== id);
+    circle.on('pointerup', (e) => {
+      e.cancelBubble = true;
       circle.destroy();
+      this.points = this.points.filter((point) => point.id !== id);
     });
 
     // circle.on('dragend', (e) => {
+    //   e.cancelBubble = true;
     //   console.log('dragend', circle.x(), circle.y(), e);
     // });
 
@@ -132,6 +148,23 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }));
   };
 
+  onPointerUp = (_: KonvaEventObject<PointerEvent>) => {
+    const cursorPos = this.manager.tool.$cursorPos.get();
+    if (!cursorPos) {
+      return;
+    }
+
+    this.createPoint(cursorPos.relative.x, cursorPos.relative.y, this.$pointType.get());
+  };
+
+  setSegmentingEventListeners = () => {
+    this.manager.stage.konva.stage.on('pointerup', this.onPointerUp);
+  };
+
+  removeSegmentingEventListeners = () => {
+    this.manager.stage.konva.stage.off('pointerup', this.onPointerUp);
+  };
+
   start = () => {
     const segmentingAdapter = this.manager.stateApi.$segmentingAdapter.get();
     if (segmentingAdapter) {
@@ -141,9 +174,30 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.log.trace('Starting segment anything');
     this.$isSegmenting.set(true);
     this.manager.stateApi.$segmentingAdapter.set(this.parent);
+    for (const point of this.points) {
+      point.konva.circle.destroy();
+    }
+    this.points = [];
+    this.parent.konva.layer.add(this.konva.group);
+    this.parent.konva.layer.listening(true);
+
+    this.setSegmentingEventListeners();
   };
 
   process = async () => {
+    this.log.trace({ points: this.getSAMPoints() }, 'Segmenting');
+    const rect = this.parent.transformer.getRelativeRect();
+
+    const rasterizeResult = await withResultAsync(() =>
+      this.parent.renderer.rasterize({ rect, attrs: { filters: [], opacity: 1 } })
+    );
+
+    if (rasterizeResult.isErr()) {
+      this.log.error({ error: serializeError(rasterizeResult.error) }, 'Error rasterizing entity');
+      this.$isProcessing.set(false);
+      return;
+    }
+
     this.$isProcessing.set(true);
 
     const controller = new AbortController();
@@ -167,7 +221,15 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     this.log.trace({ imageDTO: segmentResult.value }, 'Segmented');
     this.imageState = imageDTOToImageObject(segmentResult.value);
-    await this.parent.bufferRenderer.setBuffer(this.imageState, true);
+    if (this.maskedImage) {
+      this.maskedImage.destroy();
+    }
+    this.maskedImage = new CanvasObjectImage(this.imageState, this);
+    await this.maskedImage.update(this.imageState, true);
+    this.konva.compositingRect.width(this.imageState.image.width);
+    this.konva.compositingRect.height(this.imageState.image.height);
+    this.konva.group.add(this.maskedImage.konva.group);
+    this.konva.compositingRect.moveToTop();
 
     this.$isProcessing.set(false);
     this.$hasProcessed.set(true);
@@ -196,6 +258,8 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.$isSegmenting.set(false);
     this.$hasProcessed.set(false);
     this.manager.stateApi.$segmentingAdapter.set(null);
+    this.konva.group.remove();
+    this.removeSegmentingEventListeners();
   };
 
   reset = () => {
@@ -209,6 +273,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.parent.bufferRenderer.clearBuffer();
     this.parent.transformer.updatePosition();
     this.parent.renderer.syncKonvaCache(true);
+    this.parent.konva.layer.listening(false);
     this.imageState = null;
     this.$hasProcessed.set(false);
   };
@@ -220,6 +285,8 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.$isSegmenting.set(false);
     this.$hasProcessed.set(false);
     this.manager.stateApi.$segmentingAdapter.set(null);
+    this.konva.group.remove();
+    this.removeSegmentingEventListeners();
   };
 
   getSAMPointColor(label: SAMPointLabel): RgbaColor {
@@ -247,6 +314,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   destroy = () => {
     this.log.debug('Destroying module');
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.removeSegmentingEventListeners();
     this.konva.group.destroy();
   };
 }

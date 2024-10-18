@@ -90,7 +90,7 @@ const zCoordinate = z.object({
 });
 export type Coordinate = z.infer<typeof zCoordinate>;
 
-const zSAMPointLabel = z.enum(['foreground', 'background', 'neutral']);
+export const zSAMPointLabel = z.enum(['foreground', 'background', 'neutral']);
 export type SAMPointLabel = z.infer<typeof zSAMPointLabel>;
 
 export const zSAMPoint = z.object({
@@ -455,6 +455,12 @@ export function isRegionalGuidanceEntityIdentifier(
 }
 
 export function isFilterableEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> | CanvasEntityIdentifier<'control_layer'> {
+  return isRasterLayerEntityIdentifier(entityIdentifier) || isControlLayerEntityIdentifier(entityIdentifier);
+}
+
+export function isSegmentableEntityIdentifier(
   entityIdentifier: CanvasEntityIdentifier
 ): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> | CanvasEntityIdentifier<'control_layer'> {
   return isRasterLayerEntityIdentifier(entityIdentifier) || isControlLayerEntityIdentifier(entityIdentifier);
