@@ -27,7 +27,14 @@ class SegmentAnythingPipeline(RawModel):
 
         return calc_module_size(self._sam_model)
 
-    def segment(self, image: Image.Image, bounding_boxes: list[list[int]]) -> torch.Tensor:
+    def segment(
+        self,
+        image: Image.Image,
+        bounding_boxes: list[tuple[int, int, int, int]] | None = None,
+        points: list[list[tuple[int, int]]] | None = None,
+        labels: list[list[int]] | None = None,
+        multimask_output: bool = True,
+    ) -> torch.Tensor:
         """Run the SAM model.
 
         Args:
@@ -38,9 +45,22 @@ class SegmentAnythingPipeline(RawModel):
         Returns:
             torch.Tensor: The segmentation masks. dtype: torch.bool. shape: [num_masks, channels, height, width].
         """
-        # Add batch dimension of 1 to the bounding boxes.
-        boxes = [bounding_boxes]
-        inputs = self._sam_processor(images=image, input_boxes=boxes, return_tensors="pt").to(self._sam_model.device)
+        input_kwargs = {}
+
+        if bounding_boxes:
+            # Add batch dimension of 1 to the inputs.
+            input_kwargs["input_boxes"] = [bounding_boxes]
+        if points and labels and len(points) == len(labels):
+            # Add batch dimension of 1 to the inputs.
+            input_kwargs["input_points"] = [points]
+            input_kwargs["input_labels"] = [labels]
+
+        inputs = self._sam_processor(
+            images=image,
+            **input_kwargs,
+            return_tensors="pt",
+            multimask_output=multimask_output,
+        ).to(self._sam_model.device)
         outputs = self._sam_model(**inputs)
         masks = self._sam_processor.post_process_masks(
             masks=outputs.pred_masks,
