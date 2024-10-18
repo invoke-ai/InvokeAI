@@ -93,7 +93,9 @@
         "placeholderSelectAModel": "Modell auswählen",
         "reset": "Zurücksetzen",
         "none": "Keine",
-        "new": "Neu"
+        "new": "Neu",
+        "ok": "OK",
+        "close": "Schließen"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -156,7 +158,11 @@
         "displayBoardSearch": "Board durchsuchen",
         "displaySearch": "Bild suchen",
         "go": "Los",
-        "jump": "Springen"
+        "jump": "Springen",
+        "assetsTab": "Dateien, die Sie zur Verwendung in Ihren Projekten hochgeladen haben.",
+        "imagesTab": "Bilder, die Sie in Invoke erstellt und gespeichert haben.",
+        "boardsSettings": "Ordnereinstellungen",
+        "imagesSettings": "Galeriebildereinstellungen"
     },
     "hotkeys": {
         "noHotkeysFound": "Kein Hotkey gefunden",
@@ -267,6 +273,18 @@
             "applyFilter": {
                 "title": "Filter anwenden",
                 "desc": "Wende den ausstehenden Filter auf die ausgewählte Ebene an."
+            },
+            "cancelFilter": {
+                "title": "Filter abbrechen",
+                "desc": "Den ausstehenden Filter abbrechen."
+            },
+            "applyTransform": {
+                "desc": "Die ausstehende Transformation auf die ausgewählte Ebene anwenden.",
+                "title": "Transformation anwenden"
+            },
+            "cancelTransform": {
+                "title": "Transformation abbrechen",
+                "desc": "Die ausstehende Transformation abbrechen."
             }
         },
         "viewer": {
@@ -563,7 +581,18 @@
         "scanResults": "Ergebnisse des Scans",
         "urlOrLocalPathHelper": "URLs sollten auf eine einzelne Datei deuten. Lokale Pfade können zusätzlich auch auf einen Ordner für ein einzelnes Diffusers-Modell hinweisen.",
         "inplaceInstallDesc": "Installieren Sie Modelle, ohne die Dateien zu kopieren. Wenn Sie das Modell verwenden, wird es direkt von seinem Speicherort geladen. Wenn deaktiviert, werden die Dateien während der Installation in das von Invoke verwaltete Modellverzeichnis kopiert.",
-        "scanFolderHelper": "Der Ordner wird rekursiv nach Modellen durchsucht. Dies kann bei sehr großen Ordnern etwas dauern."
+        "scanFolderHelper": "Der Ordner wird rekursiv nach Modellen durchsucht. Dies kann bei sehr großen Ordnern etwas dauern.",
+        "includesNModels": "Enthält {{n}} Modelle und deren Abhängigkeiten",
+        "starterBundles": "Starterpakete",
+        "installingXModels_one": "{{count}} Modell wird installiert",
+        "installingXModels_other": "{{count}} Modelle werden installiert",
+        "skippingXDuplicates_one": ", überspringe {{count}} Duplikat",
+        "skippingXDuplicates_other": ", überspringe {{count}} Duplikate",
+        "installingModel": "Modell wird installiert",
+        "loraTriggerPhrases": "LoRA-Auslösephrasen",
+        "installingBundle": "Bündel wird installiert",
+        "triggerPhrases": "Auslösephrasen",
+        "mainModelTriggerPhrases": "Hauptmodell-Auslösephrasen"
     },
     "parameters": {
         "images": "Bilder",
@@ -667,7 +696,8 @@
         "about": "Über",
         "submitSupportTicket": "Support-Ticket senden",
         "toggleRightPanel": "Rechtes Bedienfeld umschalten (G)",
-        "toggleLeftPanel": "Linkes Bedienfeld umschalten (T)"
+        "toggleLeftPanel": "Linkes Bedienfeld umschalten (T)",
+        "uploadImages": "Bild(er) hochladen"
     },
     "boards": {
         "autoAddBoard": "Board automatisch erstellen",
@@ -702,7 +732,7 @@
         "shared": "Geteilte Ordner",
         "archiveBoard": "Ordner archivieren",
         "archived": "Archiviert",
-        "noBoards": "Kein {boardType}} Ordner",
+        "noBoards": "Kein {{boardType}} Ordner",
         "hideBoards": "Ordner verstecken",
         "viewBoards": "Ordner ansehen",
         "deletedPrivateBoardsCannotbeRestored": "Gelöschte Boards können nicht wiederhergestellt werden. Wenn Sie „Nur Board löschen“ wählen, werden die Bilder in einen privaten, nicht kategorisierten Status für den Ersteller des Bildes versetzt.",
@@ -811,7 +841,8 @@
         "parameterSet": "Parameter {{parameter}} setzen",
         "recallParameter": "{{label}} Abrufen",
         "parsingFailed": "Parsing Fehlgeschlagen",
-        "canvasV2Metadata": "Leinwand"
+        "canvasV2Metadata": "Leinwand",
+        "guidance": "Führung"
     },
     "popovers": {
         "noiseUseCPU": {
@@ -1137,7 +1168,9 @@
         "workflowNotes": "Notizen",
         "workflowTags": "Tags",
         "workflowVersion": "Version",
-        "saveToGallery": "In Galerie speichern"
+        "saveToGallery": "In Galerie speichern",
+        "noWorkflows": "Keine Arbeitsabläufe",
+        "noMatchingWorkflows": "Keine passenden Arbeitsabläufe"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
