@@ -12,6 +12,7 @@ type ModelManagerState = {
   searchTerm: string;
   filteredModelType: FilterableModelType | null;
   scanPath: string | undefined;
+  shouldInstallInPlace: boolean;
 };
 
 const initialModelManagerState: ModelManagerState = {
@@ -21,6 +22,7 @@ const initialModelManagerState: ModelManagerState = {
   filteredModelType: null,
   searchTerm: '',
   scanPath: undefined,
+  shouldInstallInPlace: true,
 };
 
 export const modelManagerV2Slice = createSlice({
@@ -37,18 +39,26 @@ export const modelManagerV2Slice = createSlice({
     setSearchTerm: (state, action: PayloadAction<string>) => {
       state.searchTerm = action.payload;
     },
-
     setFilteredModelType: (state, action: PayloadAction<FilterableModelType | null>) => {
       state.filteredModelType = action.payload;
     },
     setScanPath: (state, action: PayloadAction<string | undefined>) => {
       state.scanPath = action.payload;
     },
+    shouldInstallInPlaceChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldInstallInPlace = action.payload;
+    },
   },
 });
 
-export const { setSelectedModelKey, setSearchTerm, setFilteredModelType, setSelectedModelMode, setScanPath } =
-  modelManagerV2Slice.actions;
+export const {
+  setSelectedModelKey,
+  setSearchTerm,
+  setFilteredModelType,
+  setSelectedModelMode,
+  setScanPath,
+  shouldInstallInPlaceChanged,
+} = modelManagerV2Slice.actions;
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const migrateModelManagerState = (state: any): any => {
@@ -74,3 +84,4 @@ export const selectSelectedModelKey = createModelManagerSelector((modelManager) 
 export const selectSelectedModelMode = createModelManagerSelector((modelManager) => modelManager.selectedModelMode);
 export const selectSearchTerm = createModelManagerSelector((mm) => mm.searchTerm);
 export const selectFilteredModelType = createModelManagerSelector((mm) => mm.filteredModelType);
+export const selectShouldInstallInPlace = createModelManagerSelector((mm) => mm.shouldInstallInPlace);
