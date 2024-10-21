@@ -57,7 +57,7 @@ class IPAdapterOutput(BaseInvocationOutput):
 
 
 CLIP_VISION_MODEL_MAP = {
-    "ViT-L": ("InvokeAI/clip-vit-large-patch14", "clip-vit-large-patch14-full"),
+    "ViT-L": ("InvokeAI/clip-vit-large-patch14", "clip-vit-large-patch14"),
     "ViT-H": ("InvokeAI/ip_adapter_sd_image_encoder", "ip_adapter_sd_image_encoder"),
     "ViT-G": ("InvokeAI/ip_adapter_sdxl_image_encoder", "ip_adapter_sdxl_image_encoder"),
 }
@@ -75,7 +75,7 @@ class IPAdapterInvocation(BaseInvocation):
         ui_order=-1,
         ui_type=UIType.IPAdapterModel,
     )
-    clip_vision_model: Literal["ViT-L", "ViT-H", "ViT-G"] = InputField(
+    clip_vision_model: Literal["ViT-H", "ViT-G"] = InputField(
         description="CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.",
         default="ViT-H",
         ui_order=2,
@@ -118,7 +118,7 @@ class IPAdapterInvocation(BaseInvocation):
         else:
             image_encoder_model_id, image_encoder_model_name = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
 
-        image_encoder_model = self._get_image_encoder(context, image_encoder_model_id, image_encoder_model_name)
+        image_encoder_model = self.get_clip_image_encoder(context, image_encoder_model_id, image_encoder_model_name)
 
         if self.method == "style":
             if ip_adapter_info.base == "sd-1":
@@ -152,8 +152,9 @@ class IPAdapterInvocation(BaseInvocation):
             ),
         )
 
-    def _get_image_encoder(
-        self, context: InvocationContext, image_encoder_model_id: str, image_encoder_model_name: str
+    @classmethod
+    def get_clip_image_encoder(
+        cls, context: InvocationContext, image_encoder_model_id: str, image_encoder_model_name: str
     ) -> AnyModelConfig:
         image_encoder_models = context.models.search_by_attrs(
             name=image_encoder_model_name, base=BaseModelType.Any, type=ModelType.CLIPVision
