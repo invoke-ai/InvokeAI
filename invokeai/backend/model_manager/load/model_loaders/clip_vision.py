@@ -29,7 +29,7 @@ class ClipVisionLoader(ModelLoader):
             raise ValueError("Only DiffusersConfigBase models are currently supported here.")
 
         if submodel_type is not None:
-            raise Exception(f"There are no submodels in models of type {model_class}")
+            raise Exception("There are no submodels in CLIP Vision models.")
 
         model_path = Path(config.path)
 
