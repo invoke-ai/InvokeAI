@@ -75,20 +75,28 @@ export type AnyModelConfig =
   | MainModelConfig
   | CLIPVisionDiffusersConfig;
 
+const check_submodels = (model_type: string, config: AnyModelConfig): boolean => {
+  return (config.format === 'checkpoint' &&
+    config.type === 'main' &&
+    config?.submodels &&
+    model_type in config.submodels) ||
+  false
+}
+
 export const isLoRAModelConfig = (config: AnyModelConfig): config is LoRAModelConfig => {
   return config.type === 'lora';
 };
 
 export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
-  return config.type === 'vae';
+  return config.type === 'vae' || check_submodels('vae', config);
 };
 
 export const isNonFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
-  return config.type === 'vae' && config.base !== 'flux';
+  return (config.type === 'vae' || check_submodels('vae', config)) && config.base !== 'flux';
 };
 
 export const isFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
-  return config.type === 'vae' && config.base === 'flux';
+  return (config.type === 'vae' || check_submodels('vae', config)) && config.base === 'flux';
 };
 
 export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
@@ -109,12 +117,12 @@ export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAd
 
 export const isT5EncoderModelConfig = (
   config: AnyModelConfig
-): config is T5EncoderModelConfig | T5EncoderBnbQuantizedLlmInt8bModelConfig => {
-  return config.type === 't5_encoder';
+): config is T5EncoderModelConfig | T5EncoderBnbQuantizedLlmInt8bModelConfig | CheckpointModelConfig => {
+  return config.type === 't5_encoder' || check_submodels('t5_encoder', config);
 };
 
 export const isCLIPEmbedModelConfig = (config: AnyModelConfig): config is CLIPEmbedModelConfig => {
-  return config.type === 'clip_embed';
+  return config.type === 'clip_embed' || check_submodels('clip_embed', config);
 };
 
 export const isSpandrelImageToImageModelConfig = (

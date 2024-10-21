@@ -215,6 +215,9 @@ class ModelProbe(object):
                 fields["base"] == BaseModelType.StableDiffusion2
                 and fields["prediction_type"] == SchedulerPredictionType.VPrediction
             )
+        get_submodels = getattr(probe, "get_submodels", None)
+        if callable(get_submodels):
+            fields["submodels"] = get_submodels()
 
         model_info = ModelConfigFactory.make_config(fields)  # , key=fields.get("key", None))
         return model_info
@@ -442,6 +445,12 @@ class ModelProbe(object):
         if scan_result.infected_files != 0:
             raise Exception("The model {model_name} is potentially infected by malware. Aborting import.")
 
+PREFIX_MAP = {
+    "text_encoders.t5xxl.transformer.": ModelType.T5Encoder,
+    "model.diffusion_model.": ModelType.Main,
+    "text_encoders.clip_l.": ModelType.CLIPEmbed,
+    "vae": ModelType.VAE,
+}
 
 # Probing utilities
 MODEL_NAME_TO_PREPROCESSOR = {
@@ -491,6 +500,16 @@ class CheckpointProbeBase(ProbeBase):
     def __init__(self, model_path: Path):
         super().__init__(model_path)
         self.checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
+    
+    def get_submodels(self) -> dict[ModelType, str]:
+        state_dict = self.checkpoint.get("state_dict") or self.checkpoint
+        submodels: dict[ModelType, str] = {}
+        submodels = {
+            model_type: prefix
+            for prefix, model_type in PREFIX_MAP.items()
+            if any(key.startswith(prefix) for key in state_dict.keys() if isinstance(key, str))
+        }
+        return submodels
 
     def get_format(self) -> ModelFormat:
         state_dict = self.checkpoint.get("state_dict") or self.checkpoint

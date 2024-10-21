@@ -343,6 +343,7 @@ class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):
 
     prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
     upcast_attention: bool = False
+    submodels: dict[ModelType, str] = {}
 
     @staticmethod
     def get_tag() -> Tag:

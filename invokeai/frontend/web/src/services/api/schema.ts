@@ -11061,6 +11061,13 @@ export type components = {
              * @default false
              */
             upcast_attention?: boolean;
+            /**
+             * Submodels
+             * @default {}
+             */
+            submodels?: {
+                [key: string]: string;
+            };
         };
         /**
          * MainDiffusersConfig

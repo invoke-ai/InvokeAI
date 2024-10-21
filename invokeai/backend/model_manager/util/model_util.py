@@ -2,7 +2,8 @@
 
 import json
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, TypeVar, Iterator, Generic, Iterable, Tuple
+from collections.abc import MutableMapping
 
 import safetensors
 import torch
@@ -165,3 +166,71 @@ def convert_bundle_to_flux_transformer_checkpoint(
         del transformer_state_dict[k]
 
     return original_state_dict
+
+_KT = TypeVar('_KT', bound=str)
+_VT = TypeVar('_VT')
+
+class FilteredStringDict(MutableMapping[_KT, _VT], Generic[_KT, _VT]):
+    def __init__(
+        self,
+        original_dict: Dict[_KT, _VT],
+        keys: Iterable[_KT],
+        prefix: Optional[_KT] = None
+    ) -> None:
+        self._original_dict: Dict[_KT, _VT] = original_dict
+        self.prefix = prefix
+        self._keys = set(keys)  # Keys without the prefix
+
+    def _get_prefixed_key(self, key: _KT) -> _KT:
+        if self.prefix:
+            prefixed_key = self.prefix + key
+            if not isinstance(prefixed_key, type(key)):
+                raise ValueError("Unable to prefix keys")
+            return prefixed_key
+        return key
+
+    def __getitem__(self, key: _KT) -> _VT:
+        if key in self._keys:
+            prefixed_key = self._get_prefixed_key(key)
+            return self._original_dict[prefixed_key]
+        else:
+            raise KeyError(key)
+
+    def __setitem__(self, key: _KT, value: _VT) -> None:
+        if key in self._keys:
+            prefixed_key = self._get_prefixed_key(key)
+            self._original_dict[prefixed_key] = value
+        else:
+            raise KeyError(f"Key {key} not allowed in FilteredDict")
+
+    def __delitem__(self, key: _KT) -> None:
+        if key in self._keys:
+            prefixed_key = self._get_prefixed_key(key)
+            del self._original_dict[prefixed_key]
+            self._keys.remove(key)
+        else:
+            raise KeyError(key)
+
+    def __iter__(self) -> Iterator[_KT]:
+        return iter(self._keys)
+
+    def __len__(self) -> int:
+        return len(self._keys)
+
+    def __repr__(self) -> str:
+        items = ', '.join(
+            f"{k}: {self._original_dict[self._get_prefixed_key(k)]!r}"
+            for k in self._keys
+        )
+        return f"{{{items}}}"
+
+    def keys(self) -> Iterator[_KT]:
+        return iter(self._keys)
+
+    def values(self) -> Iterator[_VT]:
+        for key in self._keys:
+            yield self[key]  # Access values lazily
+
+    def items(self) -> Iterator[Tuple[_KT, _VT]]:
+        for key in self._keys:
+            yield key, self[key]  # Access values lazily

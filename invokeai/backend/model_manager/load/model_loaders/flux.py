@@ -7,7 +7,7 @@ from typing import Optional
 import accelerate
 import torch
 from safetensors.torch import load_file
-from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
+from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer, T5Config
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
@@ -46,6 +46,7 @@ from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
+    FilteredStringDict,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
@@ -186,10 +187,30 @@ class FluxCheckpointModel(ModelLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if not isinstance(config, CheckpointConfigBase):
-            raise ValueError("Only CheckpointConfigBase models are currently supported here.")
+        if not isinstance(config, MainCheckpointConfig):
+            raise ValueError("Only MainCheckpointConfig models are currently supported here.")
 
         match submodel_type:
+            case SubModelType.Tokenizer2:
+                prefix = config.submodels.get(ModelType.T5Encoder)
+                return T5Tokenizer.from_pretrained(Path("C:\\Users\\brandon\\invokeai\\models\\any\\t5_encoder\\t5_8b_quantized_encoder\\tokenizer_2"), max_length=512)
+            case SubModelType.TextEncoder2:
+                if not (prefix := config.submodels.get(ModelType.T5Encoder)):
+                    raise ValueError(f"This model does not contain a {ModelType.T5Encoder} prefix")
+                sd = load_file(Path(config.path))
+                encoder_keys = [k[len(prefix):] for k in sd.keys() if k.startswith(prefix)]
+                model = T5EncoderModel(T5Config(
+                    d_model=4096,
+                    d_ff=10240,
+                    num_layers=24,
+                    num_decoder_layers=24,
+                    num_heads=64,
+                    feed_forward_proj="gated-gelu",
+                    is_encoder_decoder=False,
+                ))
+                t5_sd = FilteredStringDict(sd, encoder_keys, prefix)
+                model.load_state_dict(state_dict=t5_sd)
+                return model
             case SubModelType.Transformer:
                 return self._load_from_singlefile(config)
 
@@ -231,6 +252,11 @@ class FluxGGUFCheckpointModel(ModelLoader):
             raise ValueError("Only CheckpointConfigBase models are currently supported here.")
 
         match submodel_type:
+            case SubModelType.Tokenizer2:
+                sd = gguf_sd_loader(Path(config.path), compute_dtype=torch.bfloat16)
+                return T5Tokenizer.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
+            case SubModelType.TextEncoder2:
+                return T5EncoderModel.from_pretrained(Path(config.path) / "text_encoder_2")
             case SubModelType.Transformer:
                 return self._load_from_singlefile(config)
 
