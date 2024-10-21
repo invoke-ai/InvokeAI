@@ -29,7 +29,7 @@ def denoise(
     timesteps: list[float],
     step_callback: Callable[[PipelineIntermediateState], None],
     guidance: float,
-    cfg_scale: float | list[float],
+    cfg_scale: list[float],
     inpaint_extension: InpaintExtension | None,
     controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension],
 ):
@@ -84,7 +84,7 @@ def denoise(
             controlnet_single_block_residuals=merged_controlnet_residuals.single_block_residuals,
         )
 
-        step_cfg_scale = cfg_scale[step_index] if isinstance(cfg_scale, list) else cfg_scale
+        step_cfg_scale = cfg_scale[step_index]
 
         # If step_cfg_scale, is 1.0, then we don't need to run the negative prediction.
         if not math.isclose(step_cfg_scale, 1.0):
