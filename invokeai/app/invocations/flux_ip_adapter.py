@@ -39,11 +39,8 @@ class FluxIPAdapterInvocation(BaseInvocation):
     ip_adapter_model: ModelIdentifierField = InputField(
         description="The IP-Adapter model.", title="IP-Adapter Model", ui_type=UIType.IPAdapterModel
     )
-    clip_vision_model: Literal["ViT-L"] = InputField(
-        description="CLIP Vision model to use. Only applied if the correct CLIP Vision model cannot be detected from "
-        + "the model config.",
-        default="ViT-L",
-    )
+    # Currently, the only known ViT model used by FLUX IP-Adapters is ViT-L.
+    clip_vision_model: Literal["ViT-L"] = InputField(description="CLIP Vision model to use.", default="ViT-L")
     weight: Union[float, List[float]] = InputField(
         default=1, description="The weight given to the IP-Adapter", title="Weight"
     )
@@ -70,11 +67,8 @@ class FluxIPAdapterInvocation(BaseInvocation):
         ip_adapter_info = context.models.get_config(self.ip_adapter_model.key)
         assert isinstance(ip_adapter_info, (IPAdapterInvokeAIConfig, IPAdapterCheckpointConfig))
 
-        if isinstance(ip_adapter_info, IPAdapterInvokeAIConfig):
-            image_encoder_model_id = ip_adapter_info.image_encoder_model_id
-            image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
-        else:
-            image_encoder_model_id, image_encoder_model_name = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
+        # Note: There is a IPAdapterInvokeAIConfig.image_encoder_model_id field, but it isn't trustworthy.
+        image_encoder_model_id, image_encoder_model_name = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
 
         image_encoder_model = IPAdapterInvocation.get_clip_image_encoder(
             context, image_encoder_model_id, image_encoder_model_name
