@@ -49,7 +49,8 @@ if TYPE_CHECKING:
     )
     from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
 
-UploadStatusType = Literal['started', 'processing', 'done', 'error']
+UploadStatusType = Literal["started", "processing", "done", "error"]
+
 
 class EventServiceBase:
     """Basic event bus, to have an empty stand-in when not needed"""
@@ -206,30 +207,20 @@ class EventServiceBase:
 
     # region Bulk image upload
 
-    def emit_bulk_upload_started(
-        self, bulk_download_id: str,total: int
-    ) -> None:
+    def emit_bulk_upload_started(self, bulk_upload_id: str, total: int) -> None:
         """Emitted when a bulk image upload is started"""
-        self.dispatch(BulkUploadStartedEvent.build(bulk_download_id,total))
+        self.dispatch(BulkUploadStartedEvent.build(bulk_upload_id, total))
 
-    def emit_bulk_upload_progress(
-        self, bulk_download_id: str,completed: int, total: int, image_DTO: ImageDTO
-    ) -> None:
+    def emit_bulk_upload_progress(self, bulk_upload_id: str, completed: int, total: int, image_DTO: ImageDTO) -> None:
         """Emitted when a bulk image upload is started"""
-        self.dispatch(BulkUploadProgressEvent.build(bulk_download_id,completed, total, image_DTO))
+        self.dispatch(BulkUploadProgressEvent.build(bulk_upload_id, completed, total, image_DTO))
 
-    def emit_bulk_upload_complete(
-        self, bulk_download_id: str,total: int
-    ) -> None:
+    def emit_bulk_upload_complete(self, bulk_upload_id: str, total: int) -> None:
         """Emitted when a bulk image upload is complete"""
-        self.dispatch(BulkUploadCompletedEvent.build(bulk_download_id,total=total))
+        self.dispatch(BulkUploadCompletedEvent.build(bulk_upload_id, total=total))
 
-    def emit_bulk_upload_error(
-        self, bulk_download_id: str,error: str
-    ) -> None:
+    def emit_bulk_upload_error(self, bulk_upload_id: str, error: str) -> None:
         """Emitted when a bulk image upload has an error"""
-        self.dispatch(
-            BulkUploadErrorEvent.build(bulk_download_id,error)
-        )
+        self.dispatch(BulkUploadErrorEvent.build(bulk_upload_id, error))
 
     # endregion

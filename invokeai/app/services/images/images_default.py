@@ -2,6 +2,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from typing import List, Optional
+from uuid import uuid4
 
 from PIL.Image import Image as PILImageType
 from tqdm import tqdm
@@ -100,18 +101,20 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
 
-    def create_many(self, upload_data_list: list[ImageBulkUploadData]):
+    def create_many(self, upload_data_list: List[ImageBulkUploadData]) -> None:
         total_images = len(upload_data_list)
         processed_counter = 0  # Local counter
-        images_DTOs:list[ImageDTO] = []  # Collect ImageDTOs for successful uploads
+        images_DTOs: list[ImageDTO] = []  # Collect ImageDTOs for successful uploads
         progress_lock = Lock()
+        bulk_upload_id = uuid4().hex
 
         self.__invoker.services.events.emit_bulk_upload_started(
+            bulk_upload_id=bulk_upload_id,
             total=total_images,
         )
 
         def process_and_save_image(image_data: ImageBulkUploadData):
-            nonlocal processed_counter # refer to the counter in the enclosing scope
+            nonlocal processed_counter  # refer to the counter in the enclosing scope
             try:
                 # processing and saving each image
                 width, height = image_data.image.size
@@ -131,10 +134,16 @@ class ImageService(ImageServiceABC):
                 )
 
                 if image_data.board_id is not None:
-                    self.__invoker.services.board_image_records.add_image_to_board(board_id=image_data.board_id, image_name=image_data.image_name)
+                    self.__invoker.services.board_image_records.add_image_to_board(
+                        board_id=image_data.board_id, image_name=image_data.image_name
+                    )
 
                 self.__invoker.services.image_files.save(
-                    image_name=image_data.image_name, image=image_data.image, metadata=image_data.metadata, workflow=image_data.workflow, graph=image_data.graph
+                    image_name=image_data.image_name,
+                    image=image_data.image,
+                    metadata=image_data.metadata,
+                    workflow=image_data.workflow,
+                    graph=image_data.graph,
                 )
 
                 image_dto = self.get_dto(image_data.image_name)
@@ -170,18 +179,17 @@ class ImageService(ImageServiceABC):
                     pbar.update(1)  # Update progress bar
 
                     self.__invoker.services.events.emit_bulk_upload_progress(
-                        completed=processed_counter, total=total_images, image_DTO=image_DTO
+                        bulk_upload_id=bulk_upload_id,
+                        completed=processed_counter,
+                        total=total_images,
+                        image_DTO=image_DTO,
                     )
                 except Exception as e:
                     self.__invoker.services.logger.error(f"Error in processing image: {str(e)}")
-                    self.__invoker.services.events.emit_bulk_upload_error(
-                        error=str(e)
-                    )
+                    self.__invoker.services.events.emit_bulk_upload_error(bulk_upload_id=bulk_upload_id, error=str(e))
 
         pbar.close()
-        self.__invoker.services.events.emit_bulk_upload_complete(
-            total=len(images_DTOs)
-        )
+        self.__invoker.services.events.emit_bulk_upload_complete(bulk_upload_id=bulk_upload_id, total=len(images_DTOs))
 
     def update(
         self,

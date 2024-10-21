@@ -1,6 +1,6 @@
 import io
 import traceback
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -25,9 +25,11 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
 
+
 class BulkUploadImageResponse(BaseModel):
     sent: int
     uploading: int
+
 
 @images_router.post(
     "/bulk-upload",
@@ -36,8 +38,8 @@ class BulkUploadImageResponse(BaseModel):
         201: {"description": "The images are being prepared for upload"},
         415: {"description": "Images upload failed"},
     },
-    status_code=201,  
-    response_model=BulkUploadImageResponse
+    status_code=201,
+    response_model=BulkUploadImageResponse,
 )
 async def bulk_upload(
     files: list[UploadFile],
@@ -47,7 +49,7 @@ async def bulk_upload(
     board_id: Optional[str] = Query(default=None, description="The board to add this images to, if any"),
 ) -> BulkUploadImageResponse:
     """Uploads multiple images"""
-    upload_data_list = []
+    upload_data_list: List[ImageBulkUploadData] = []
 
     # loop to handle multiple files
     for file in files:

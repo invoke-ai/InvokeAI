@@ -59,7 +59,7 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    async def create_many(self, upload_data_list: List[ImageBulkUploadData]):
+    def create_many(self, upload_data_list: List[ImageBulkUploadData]):
         """Creates an images array DTO out of an array of images, storing the images and their metadata"""
         pass
 
