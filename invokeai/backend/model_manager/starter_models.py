@@ -25,22 +25,6 @@ class StarterModelBundles(BaseModel):
     models: list[StarterModel]
 
 
-ip_adapter_sd_image_encoder = StarterModel(
-    name="IP Adapter SD1.5 Image Encoder",
-    base=BaseModelType.StableDiffusion1,
-    source="InvokeAI/ip_adapter_sd_image_encoder",
-    description="IP Adapter SD Image Encoder",
-    type=ModelType.CLIPVision,
-)
-
-ip_adapter_sdxl_image_encoder = StarterModel(
-    name="IP Adapter SDXL Image Encoder",
-    base=BaseModelType.StableDiffusionXL,
-    source="InvokeAI/ip_adapter_sdxl_image_encoder",
-    description="IP Adapter SDXL Image Encoder",
-    type=ModelType.CLIPVision,
-)
-
 cyberrealistic_negative = StarterModel(
     name="CyberRealistic Negative v3",
     base=BaseModelType.StableDiffusion1,
@@ -48,6 +32,32 @@ cyberrealistic_negative = StarterModel(
     description="Negative embedding specifically for use with CyberRealistic.",
     type=ModelType.TextualInversion,
 )
+
+# region CLIP Image Encoders
+ip_adapter_sd_image_encoder = StarterModel(
+    name="IP Adapter SD1.5 Image Encoder",
+    base=BaseModelType.StableDiffusion1,
+    source="InvokeAI/ip_adapter_sd_image_encoder",
+    description="IP Adapter SD Image Encoder",
+    type=ModelType.CLIPVision,
+)
+ip_adapter_sdxl_image_encoder = StarterModel(
+    name="IP Adapter SDXL Image Encoder",
+    base=BaseModelType.StableDiffusionXL,
+    source="InvokeAI/ip_adapter_sdxl_image_encoder",
+    description="IP Adapter SDXL Image Encoder",
+    type=ModelType.CLIPVision,
+)
+# Note: This model is installed from the same source as the CLIPEmbed model below. The model contains both the image
+# encoder and the text encoder, but we need separate model entries so that they get loaded correctly.
+clip_vit_l_image_encoder = StarterModel(
+    name="clip-vit-large-patch14",
+    base=BaseModelType.Any,
+    source="InvokeAI/clip-vit-large-patch14",
+    description="CLIP ViT-L Image Encoder",
+    type=ModelType.CLIPVision,
+)
+# endregion
 
 # region TextEncoders
 t5_base_encoder = StarterModel(
@@ -253,6 +263,14 @@ ip_adapter_sdxl = StarterModel(
     description="IP-Adapter for SDXL models",
     type=ModelType.IPAdapter,
     dependencies=[ip_adapter_sdxl_image_encoder],
+)
+ip_adapter_flux = StarterModel(
+    name="XLabs FLUX IP-Adapter",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/XLabs-AI/flux-ip-adapter/resolve/main/flux-ip-adapter.safetensors",
+    description="FLUX IP-Adapter",
+    type=ModelType.IPAdapter,
+    dependencies=[clip_vit_l_image_encoder],
 )
 # endregion
 # region ControlNet
@@ -555,6 +573,7 @@ STARTER_MODELS: list[StarterModel] = [
     ip_adapter_plus_sd1,
     ip_adapter_plus_face_sd1,
     ip_adapter_sdxl,
+    ip_adapter_flux,
     qr_code_cnet_sd1,
     qr_code_cnet_sdxl,
     canny_sd1,
@@ -642,6 +661,7 @@ flux_bundle: list[StarterModel] = [
     t5_8b_quantized_encoder,
     clip_l_encoder,
     union_cnet_flux,
+    ip_adapter_flux,
 ]
 
 STARTER_BUNDLES: dict[str, list[StarterModel]] = {

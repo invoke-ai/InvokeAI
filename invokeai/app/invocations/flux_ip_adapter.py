@@ -68,8 +68,9 @@ class FluxIPAdapterInvocation(BaseInvocation):
         assert isinstance(ip_adapter_info, (IPAdapterInvokeAIConfig, IPAdapterCheckpointConfig))
 
         # Note: There is a IPAdapterInvokeAIConfig.image_encoder_model_id field, but it isn't trustworthy.
-        image_encoder_model_id, image_encoder_model_name = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
-
+        image_encoder_starter_model = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
+        image_encoder_model_id = image_encoder_starter_model.source
+        image_encoder_model_name = image_encoder_starter_model.name
         image_encoder_model = IPAdapterInvocation.get_clip_image_encoder(
             context, image_encoder_model_id, image_encoder_model_name
         )

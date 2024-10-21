@@ -18,6 +18,12 @@ from invokeai.backend.model_manager.config import (
     IPAdapterInvokeAIConfig,
     ModelType,
 )
+from invokeai.backend.model_manager.starter_models import (
+    StarterModel,
+    clip_vit_l_image_encoder,
+    ip_adapter_sd_image_encoder,
+    ip_adapter_sdxl_image_encoder,
+)
 
 
 class IPAdapterField(BaseModel):
@@ -56,10 +62,10 @@ class IPAdapterOutput(BaseInvocationOutput):
     ip_adapter: IPAdapterField = OutputField(description=FieldDescriptions.ip_adapter, title="IP-Adapter")
 
 
-CLIP_VISION_MODEL_MAP = {
-    "ViT-L": ("InvokeAI/clip-vit-large-patch14", "clip-vit-large-patch14"),
-    "ViT-H": ("InvokeAI/ip_adapter_sd_image_encoder", "ip_adapter_sd_image_encoder"),
-    "ViT-G": ("InvokeAI/ip_adapter_sdxl_image_encoder", "ip_adapter_sdxl_image_encoder"),
+CLIP_VISION_MODEL_MAP: dict[Literal["ViT-L", "ViT-H", "ViT-G"], StarterModel] = {
+    "ViT-L": clip_vit_l_image_encoder,
+    "ViT-H": ip_adapter_sd_image_encoder,
+    "ViT-G": ip_adapter_sdxl_image_encoder,
 }
 
 
@@ -116,7 +122,9 @@ class IPAdapterInvocation(BaseInvocation):
             image_encoder_model_id = ip_adapter_info.image_encoder_model_id
             image_encoder_model_name = image_encoder_model_id.split("/")[-1].strip()
         else:
-            image_encoder_model_id, image_encoder_model_name = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
+            image_encoder_starter_model = CLIP_VISION_MODEL_MAP[self.clip_vision_model]
+            image_encoder_model_id = image_encoder_starter_model.source
+            image_encoder_model_name = image_encoder_starter_model.name
 
         image_encoder_model = self.get_clip_image_encoder(context, image_encoder_model_id, image_encoder_model_name)
 
