@@ -5,7 +5,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { noop } from 'lodash-es';
 import type { Logger } from 'roarr';
 
-export class CanvasToolMove extends CanvasModuleBase {
+export class CanvasMoveToolModule extends CanvasModuleBase {
   readonly type = 'move_tool';
   readonly id: string;
   readonly path: string[];
