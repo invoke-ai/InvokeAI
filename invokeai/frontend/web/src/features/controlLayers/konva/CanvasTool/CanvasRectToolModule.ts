@@ -5,7 +5,7 @@ import { floorCoord, getPrefixedId, offsetCoord } from 'features/controlLayers/k
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
 
-export class CanvasToolRect extends CanvasModuleBase {
+export class CanvasRectToolModule extends CanvasModuleBase {
   readonly type = 'rect_tool';
   readonly id: string;
   readonly path: string[];
