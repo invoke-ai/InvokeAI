@@ -2,8 +2,13 @@ import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { getColorAtCoordinate, getPrefixedId } from 'features/controlLayers/konva/util';
+import type { RgbColor } from 'features/controlLayers/store/types';
+import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
+import { atom } from 'nanostores';
+import rafThrottle from 'raf-throttle';
 import type { Logger } from 'roarr';
 
 type CanvasToolColorPickerConfig = {
@@ -74,6 +79,11 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
   readonly log: Logger;
 
   config: CanvasToolColorPickerConfig = DEFAULT_CONFIG;
+
+  /**
+   * The color currently under the cursor. Only has a value when the color picker tool is active.
+   */
+  $colorUnderCursor = atom<RgbColor>(RGBA_BLACK);
 
   /**
    * The Konva objects that make up the color picker tool preview:
@@ -222,7 +232,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
     const { x, y } = cursorPos.relative;
 
     const settings = this.manager.stateApi.getSettings();
-    const colorUnderCursor = this.parent.$colorUnderCursor.get();
+    const colorUnderCursor = this.$colorUnderCursor.get();
     const colorPickerInnerRadius = this.manager.stage.unscale(this.config.RING_INNER_RADIUS);
     const colorPickerOuterRadius = this.manager.stage.unscale(this.config.RING_OUTER_RADIUS);
     const onePixel = this.manager.stage.unscale(1);
@@ -299,12 +309,38 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
     this.konva.group.visible(visible);
   };
 
+  onStagePointerUp = (_e: KonvaEventObject<PointerEvent>) => {
+    const color = this.$colorUnderCursor.get();
+    if (color) {
+      const settings = this.manager.stateApi.getSettings();
+      // This will update the color but not the alpha value
+      this.manager.stateApi.setColor({ ...settings.color, ...color });
+    }
+  };
+
+  onStagePointerMove = (_e: KonvaEventObject<PointerEvent>) => {
+    this.syncColorUnderCursor();
+  };
+
+  syncColorUnderCursor = rafThrottle(() => {
+    const cursorPos = this.parent.$cursorPos.get();
+    if (!cursorPos) {
+      return;
+    }
+
+    const color = getColorAtCoordinate(this.manager.stage.konva.stage, cursorPos.absolute);
+    if (color) {
+      this.$colorUnderCursor.set(color);
+    }
+  });
+
   repr = () => {
     return {
       id: this.id,
       type: this.type,
       path: this.path,
       config: this.config,
+      $colorUnderCursor: this.$colorUnderCursor.get(),
     };
   };
 
