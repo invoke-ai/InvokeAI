@@ -8,6 +8,7 @@ from invokeai.backend.flux.controlnet.controlnet_flux_output import ControlNetFl
 from invokeai.backend.flux.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
+from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
@@ -32,6 +33,8 @@ def denoise(
     cfg_scale: list[float],
     inpaint_extension: InpaintExtension | None,
     controlnet_extensions: list[XLabsControlNetExtension | InstantXControlNetExtension],
+    pos_ip_adapter_extensions: list[XLabsIPAdapterExtension],
+    neg_ip_adapter_extensions: list[XLabsIPAdapterExtension],
 ):
     # step 0 is the initial state
     total_steps = len(timesteps) - 1
@@ -67,7 +70,7 @@ def denoise(
             )
 
         # Merge the ControlNet residuals from multiple ControlNets.
-        # TODO(ryand): We may want to alculate the sum just-in-time to keep peak memory low. Keep in mind, that the
+        # TODO(ryand): We may want to calculate the sum just-in-time to keep peak memory low. Keep in mind, that the
         # controlnet_residuals datastructure is efficient in that it likely contains multiple references to the same
         # tensors. Calculating the sum materializes each tensor into its own instance.
         merged_controlnet_residuals = sum_controlnet_flux_outputs(controlnet_residuals)
@@ -80,16 +83,19 @@ def denoise(
             y=vec,
             timesteps=t_vec,
             guidance=guidance_vec,
+            timestep_index=step_index,
+            total_num_timesteps=total_steps,
             controlnet_double_block_residuals=merged_controlnet_residuals.double_block_residuals,
             controlnet_single_block_residuals=merged_controlnet_residuals.single_block_residuals,
+            ip_adapter_extensions=pos_ip_adapter_extensions,
         )
 
         step_cfg_scale = cfg_scale[step_index]
 
         # If step_cfg_scale, is 1.0, then we don't need to run the negative prediction.
         if not math.isclose(step_cfg_scale, 1.0):
-            # TODO(ryand): Add option to run positive and negative predictions in a single batch for better performance on
-            # systems with sufficient VRAM.
+            # TODO(ryand): Add option to run positive and negative predictions in a single batch for better performance
+            # on systems with sufficient VRAM.
 
             if neg_txt is None or neg_txt_ids is None or neg_vec is None:
                 raise ValueError("Negative text conditioning is required when cfg_scale is not 1.0.")
@@ -102,8 +108,11 @@ def denoise(
                 y=neg_vec,
                 timesteps=t_vec,
                 guidance=guidance_vec,
+                timestep_index=step_index,
+                total_num_timesteps=total_steps,
                 controlnet_double_block_residuals=None,
                 controlnet_single_block_residuals=None,
+                ip_adapter_extensions=neg_ip_adapter_extensions,
             )
             pred = neg_pred + step_cfg_scale * (pred - neg_pred)
 

@@ -40,7 +40,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
       />
       <MenuList>
         <MenuGroup title={t('controlLayers.global')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addGlobalReferenceImage} isDisabled={isFLUX}>
+          <MenuItem icon={<PiPlusBold />} onClick={addGlobalReferenceImage}>
             {t('controlLayers.globalReferenceImage')}
           </MenuItem>
         </MenuGroup>
