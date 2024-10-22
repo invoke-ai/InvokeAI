@@ -3,7 +3,7 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { CanvasBboxToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasBboxToolModule';
 import { CanvasBrushToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasBrushToolModule';
 import { CanvasColorPickerToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasColorPickerToolModule';
-import { CanvasToolEraser } from 'features/controlLayers/konva/CanvasTool/CanvasToolEraser';
+import { CanvasEraserToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasEraserToolModule';
 import { CanvasToolMove } from 'features/controlLayers/konva/CanvasTool/CanvasToolMove';
 import { CanvasToolRect } from 'features/controlLayers/konva/CanvasTool/CanvasToolRect';
 import { CanvasToolView } from 'features/controlLayers/konva/CanvasTool/CanvasToolView';
@@ -58,7 +58,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   tools: {
     brush: CanvasBrushToolModule;
-    eraser: CanvasToolEraser;
+    eraser: CanvasEraserToolModule;
     rect: CanvasToolRect;
     colorPicker: CanvasColorPickerToolModule;
     bbox: CanvasBboxToolModule;
@@ -114,7 +114,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     this.tools = {
       brush: new CanvasBrushToolModule(this),
-      eraser: new CanvasToolEraser(this),
+      eraser: new CanvasEraserToolModule(this),
       rect: new CanvasToolRect(this),
       colorPicker: new CanvasColorPickerToolModule(this),
       bbox: new CanvasBboxToolModule(this),

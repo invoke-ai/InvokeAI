@@ -14,7 +14,7 @@ import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
 
-type CanvasToolEraserConfig = {
+type CanvasEraserToolModuleConfig = {
   /**
    * The inner border color for the eraser tool preview.
    */
@@ -25,12 +25,12 @@ type CanvasToolEraserConfig = {
   BORDER_OUTER_COLOR: string;
 };
 
-const DEFAULT_CONFIG: CanvasToolEraserConfig = {
+const DEFAULT_CONFIG: CanvasEraserToolModuleConfig = {
   BORDER_INNER_COLOR: 'rgba(0,0,0,1)',
   BORDER_OUTER_COLOR: 'rgba(255,255,255,0.8)',
 };
 
-export class CanvasToolEraser extends CanvasModuleBase {
+export class CanvasEraserToolModule extends CanvasModuleBase {
   readonly type = 'eraser_tool';
   readonly id: string;
   readonly path: string[];
@@ -38,7 +38,7 @@ export class CanvasToolEraser extends CanvasModuleBase {
   readonly manager: CanvasManager;
   readonly log: Logger;
 
-  config: CanvasToolEraserConfig = DEFAULT_CONFIG;
+  config: CanvasEraserToolModuleConfig = DEFAULT_CONFIG;
 
   konva: {
     group: Konva.Group;
