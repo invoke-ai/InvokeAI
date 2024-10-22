@@ -356,6 +356,10 @@ export class CanvasToolBrush extends CanvasModuleBase {
       return;
     }
 
+    if (!this.parent.$isMouseDown.get()) {
+      return;
+    }
+
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
     if (!selectedEntity) {
