@@ -4,6 +4,7 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { CanvasToolBrush } from 'features/controlLayers/konva/CanvasTool/CanvasToolBrush';
 import { CanvasToolColorPicker } from 'features/controlLayers/konva/CanvasTool/CanvasToolColorPicker';
 import { CanvasToolEraser } from 'features/controlLayers/konva/CanvasTool/CanvasToolEraser';
+import { CanvasToolMove } from 'features/controlLayers/konva/CanvasTool/CanvasToolMove';
 import { CanvasToolRect } from 'features/controlLayers/konva/CanvasTool/CanvasToolRect';
 import {
   calculateNewBrushSizeFromWheelDelta,
@@ -60,6 +61,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     rect: CanvasToolRect;
     colorPicker: CanvasToolColorPicker;
     bbox: CanvasBboxModule;
+    move: CanvasToolMove;
   };
 
   /**
@@ -114,6 +116,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       rect: new CanvasToolRect(this),
       colorPicker: new CanvasToolColorPicker(this),
       bbox: new CanvasBboxModule(this),
+      move: new CanvasToolMove(this),
     };
 
     this.konva = {
