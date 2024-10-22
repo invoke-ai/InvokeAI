@@ -1,4 +1,7 @@
+import sys
+
 import accelerate
+import pytest
 import torch
 
 from invokeai.backend.flux.ip_adapter.state_dict_utils import (
@@ -18,6 +21,7 @@ def test_is_state_dict_xlabs_ip_adapter():
     assert is_state_dict_xlabs_ip_adapter(sd)
 
 
+@pytest.mark.skipif(sys.platform == "darwin", reason="Skipping on macOS")
 def test_infer_xlabs_ip_adapter_params_from_state_dict():
     # Construct a dummy state_dict with tensors of the correct shape on the meta device.
     with torch.device("meta"):
@@ -31,6 +35,7 @@ def test_infer_xlabs_ip_adapter_params_from_state_dict():
     assert params.clip_embeddings_dim == 768
 
 
+@pytest.mark.skipif(sys.platform == "darwin", reason="Skipping on macOS")
 def test_initialize_xlabs_ip_adapter_flux_from_state_dict():
     # Construct a dummy state_dict with tensors of the correct shape on the meta device.
     with torch.device("meta"):
