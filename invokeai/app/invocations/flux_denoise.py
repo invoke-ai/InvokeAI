@@ -49,7 +49,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="3.1.0",
+    version="3.2.0",
     classification=Classification.Prototype,
 )
 class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -82,6 +82,24 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     positive_text_conditioning: FluxConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
+    negative_text_conditioning: FluxConditioningField | None = InputField(
+        default=None,
+        description="Negative conditioning tensor. Can be None if cfg_scale is 1.0.",
+        input=Input.Connection,
+    )
+    cfg_scale: float | list[float] = InputField(default=1.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
+    cfg_scale_start_step: int = InputField(
+        default=0,
+        title="CFG Scale Start Step",
+        description="Index of the first step to apply cfg_scale. Negative indices count backwards from the "
+        + "the last step (e.g. a value of -1 refers to the final step).",
+    )
+    cfg_scale_end_step: int = InputField(
+        default=-1,
+        title="CFG Scale End Step",
+        description="Index of the last step to apply cfg_scale. Negative indices count backwards from the "
+        + "last step (e.g. a value of -1 refers to the final step).",
+    )
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
     num_steps: int = InputField(
@@ -109,6 +127,19 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         name = context.tensors.save(tensor=latents)
         return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
 
+    def _load_text_conditioning(
+        self, context: InvocationContext, conditioning_name: str, dtype: torch.dtype
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        # Load the conditioning data.
+        cond_data = context.conditioning.load(conditioning_name)
+        assert len(cond_data.conditionings) == 1
+        flux_conditioning = cond_data.conditionings[0]
+        assert isinstance(flux_conditioning, FLUXConditioningInfo)
+        flux_conditioning = flux_conditioning.to(dtype=dtype)
+        t5_embeddings = flux_conditioning.t5_embeds
+        clip_embeddings = flux_conditioning.clip_embeds
+        return t5_embeddings, clip_embeddings
+
     def _run_diffusion(
         self,
         context: InvocationContext,
@@ -116,13 +147,15 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         inference_dtype = torch.bfloat16
 
         # Load the conditioning data.
-        cond_data = context.conditioning.load(self.positive_text_conditioning.conditioning_name)
-        assert len(cond_data.conditionings) == 1
-        flux_conditioning = cond_data.conditionings[0]
-        assert isinstance(flux_conditioning, FLUXConditioningInfo)
-        flux_conditioning = flux_conditioning.to(dtype=inference_dtype)
-        t5_embeddings = flux_conditioning.t5_embeds
-        clip_embeddings = flux_conditioning.clip_embeds
+        pos_t5_embeddings, pos_clip_embeddings = self._load_text_conditioning(
+            context, self.positive_text_conditioning.conditioning_name, inference_dtype
+        )
+        neg_t5_embeddings: torch.Tensor | None = None
+        neg_clip_embeddings: torch.Tensor | None = None
+        if self.negative_text_conditioning is not None:
+            neg_t5_embeddings, neg_clip_embeddings = self._load_text_conditioning(
+                context, self.negative_text_conditioning.conditioning_name, inference_dtype
+            )
 
         # Load the input latents, if provided.
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
@@ -183,8 +216,16 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         b, _c, latent_h, latent_w = x.shape
         img_ids = generate_img_ids(h=latent_h, w=latent_w, batch_size=b, device=x.device, dtype=x.dtype)
 
-        bs, t5_seq_len, _ = t5_embeddings.shape
-        txt_ids = torch.zeros(bs, t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device())
+        pos_bs, pos_t5_seq_len, _ = pos_t5_embeddings.shape
+        pos_txt_ids = torch.zeros(
+            pos_bs, pos_t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device()
+        )
+        neg_txt_ids: torch.Tensor | None = None
+        if neg_t5_embeddings is not None:
+            neg_bs, neg_t5_seq_len, _ = neg_t5_embeddings.shape
+            neg_txt_ids = torch.zeros(
+                neg_bs, neg_t5_seq_len, 3, dtype=inference_dtype, device=TorchDevice.choose_torch_device()
+            )
 
         # Pack all latent tensors.
         init_latents = pack(init_latents) if init_latents is not None else None
@@ -204,6 +245,13 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 inpaint_mask=inpaint_mask,
                 noise=noise,
             )
+
+        cfg_scale = self.prep_cfg_scale(
+            cfg_scale=self.cfg_scale,
+            timesteps=timesteps,
+            cfg_scale_start_step=self.cfg_scale_start_step,
+            cfg_scale_end_step=self.cfg_scale_end_step,
+        )
 
         with ExitStack() as exit_stack:
             # Prepare ControlNet extensions.
@@ -257,18 +305,71 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 model=transformer,
                 img=x,
                 img_ids=img_ids,
-                txt=t5_embeddings,
-                txt_ids=txt_ids,
-                vec=clip_embeddings,
+                txt=pos_t5_embeddings,
+                txt_ids=pos_txt_ids,
+                vec=pos_clip_embeddings,
+                neg_txt=neg_t5_embeddings,
+                neg_txt_ids=neg_txt_ids,
+                neg_vec=neg_clip_embeddings,
                 timesteps=timesteps,
                 step_callback=self._build_step_callback(context),
                 guidance=self.guidance,
+                cfg_scale=cfg_scale,
                 inpaint_extension=inpaint_extension,
                 controlnet_extensions=controlnet_extensions,
             )
 
         x = unpack(x.float(), self.height, self.width)
         return x
+
+    @classmethod
+    def prep_cfg_scale(
+        cls, cfg_scale: float | list[float], timesteps: list[float], cfg_scale_start_step: int, cfg_scale_end_step: int
+    ) -> list[float]:
+        """Prepare the cfg_scale schedule.
+
+        - Clips the cfg_scale schedule based on cfg_scale_start_step and cfg_scale_end_step.
+        - If cfg_scale is a list, then it is assumed to be a schedule and is returned as-is.
+        - If cfg_scale is a scalar, then a linear schedule is created from cfg_scale_start_step to cfg_scale_end_step.
+        """
+        # num_steps is the number of denoising steps, which is one less than the number of timesteps.
+        num_steps = len(timesteps) - 1
+
+        # Normalize cfg_scale to a list if it is a scalar.
+        cfg_scale_list: list[float]
+        if isinstance(cfg_scale, float):
+            cfg_scale_list = [cfg_scale] * num_steps
+        elif isinstance(cfg_scale, list):
+            cfg_scale_list = cfg_scale
+        else:
+            raise ValueError(f"Unsupported cfg_scale type: {type(cfg_scale)}")
+        assert len(cfg_scale_list) == num_steps
+
+        # Handle negative indices for cfg_scale_start_step and cfg_scale_end_step.
+        start_step_index = cfg_scale_start_step
+        if start_step_index < 0:
+            start_step_index = num_steps + start_step_index
+        end_step_index = cfg_scale_end_step
+        if end_step_index < 0:
+            end_step_index = num_steps + end_step_index
+
+        # Validate the start and end step indices.
+        if not (0 <= start_step_index < num_steps):
+            raise ValueError(f"Invalid cfg_scale_start_step. Out of range: {cfg_scale_start_step}.")
+        if not (0 <= end_step_index < num_steps):
+            raise ValueError(f"Invalid cfg_scale_end_step. Out of range: {cfg_scale_end_step}.")
+        if start_step_index > end_step_index:
+            raise ValueError(
+                f"cfg_scale_start_step ({cfg_scale_start_step}) must be before cfg_scale_end_step "
+                + f"({cfg_scale_end_step})."
+            )
+
+        # Set values outside the start and end step indices to 1.0. This is equivalent to disabling cfg_scale for those
+        # steps.
+        clipped_cfg_scale = [1.0] * num_steps
+        clipped_cfg_scale[start_step_index : end_step_index + 1] = cfg_scale_list[start_step_index : end_step_index + 1]
+
+        return clipped_cfg_scale
 
     def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
         """Prepare the inpaint mask.
