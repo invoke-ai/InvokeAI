@@ -282,11 +282,6 @@ class FluxGGUFCheckpointModel(ModelLoader):
             raise ValueError("Only CheckpointConfigBase models are currently supported here.")
 
         match submodel_type:
-            case SubModelType.Tokenizer2:
-                sd = gguf_sd_loader(Path(config.path), compute_dtype=torch.bfloat16)
-                return T5Tokenizer.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
-            case SubModelType.TextEncoder2:
-                return T5EncoderModel.from_pretrained(Path(config.path) / "text_encoder_2")
             case SubModelType.Transformer:
                 return self._load_from_singlefile(config)
 

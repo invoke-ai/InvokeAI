@@ -205,6 +205,7 @@ class CheckpointConfigBase(ModelConfigBase):
     converted_at: Optional[float] = Field(
         description="When this model was last converted to diffusers", default_factory=time.time
     )
+    submodels: dict[ModelType, str] = {}
 
 
 class DiffusersConfigBase(ModelConfigBase):
@@ -343,7 +344,6 @@ class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):
 
     prediction_type: SchedulerPredictionType = SchedulerPredictionType.Epsilon
     upcast_attention: bool = False
-    submodels: dict[ModelType, str] = {}
 
     @staticmethod
     def get_tag() -> Tag:
