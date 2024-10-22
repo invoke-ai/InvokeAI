@@ -34,19 +34,43 @@ const addIPAdapter = (entity: CanvasReferenceImageState, g: Graph, collector: In
   assert(image, 'IP Adapter image is required');
   assert(model, 'IP Adapter model is required');
 
-  const ipAdapterNode = g.addNode({
-    id: `ip_adapter_${id}`,
-    type: 'ip_adapter',
-    weight,
-    method,
-    ip_adapter_model: model,
-    clip_vision_model: clipVisionModel,
-    begin_step_percent: beginEndStepPct[0],
-    end_step_percent: beginEndStepPct[1],
-    image: {
-      image_name: image.image_name,
-    },
-  });
+  let ipAdapterNode: Invocation<'flux_ip_adapter' | 'ip_adapter'>;
+
+  if (model.base === 'flux') {
+    assert(clipVisionModel === 'ViT-L', 'ViT-L is the only supported CLIP Vision model for FLUX IP adapter');
+    ipAdapterNode = g.addNode({
+      id: `ip_adapter_${id}`,
+      type: 'flux_ip_adapter',
+      weight,
+      ip_adapter_model: model,
+      clip_vision_model: clipVisionModel,
+      begin_step_percent: beginEndStepPct[0],
+      end_step_percent: beginEndStepPct[1],
+      image: {
+        image_name: image.image_name,
+      },
+    });
+  } else {
+    // model.base === SD1.5 or SDXL
+    assert(
+      clipVisionModel === 'ViT-H' || clipVisionModel === 'ViT-G',
+      'ViT-G and ViT-H are the only supported CLIP Vision models for SD1.5 and SDXL IP adapters'
+    );
+    ipAdapterNode = g.addNode({
+      id: `ip_adapter_${id}`,
+      type: 'ip_adapter',
+      weight,
+      method,
+      ip_adapter_model: model,
+      clip_vision_model: clipVisionModel,
+      begin_step_percent: beginEndStepPct[0],
+      end_step_percent: beginEndStepPct[1],
+      image: {
+        image_name: image.image_name,
+      },
+    });
+  }
+
   g.addEdge(ipAdapterNode, 'ip_adapter', collector, 'item');
 };
 
