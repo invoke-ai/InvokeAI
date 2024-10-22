@@ -15,7 +15,7 @@ import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
 
-type CanvasToolBrushConfig = {
+type CanvasBrushToolModuleConfig = {
   /**
    * The inner border color for the brush tool preview.
    */
@@ -30,7 +30,7 @@ type CanvasToolBrushConfig = {
   HIDE_FILL_TIMEOUT_MS: number;
 };
 
-const DEFAULT_CONFIG: CanvasToolBrushConfig = {
+const DEFAULT_CONFIG: CanvasBrushToolModuleConfig = {
   BORDER_INNER_COLOR: 'rgba(0,0,0,1)',
   BORDER_OUTER_COLOR: 'rgba(255,255,255,0.8)',
   HIDE_FILL_TIMEOUT_MS: 1500, // same as Affinity
@@ -39,7 +39,7 @@ const DEFAULT_CONFIG: CanvasToolBrushConfig = {
 /**
  * Renders a preview of the brush tool on the canvas.
  */
-export class CanvasToolBrush extends CanvasModuleBase {
+export class CanvasBrushToolModule extends CanvasModuleBase {
   readonly type = 'brush_tool';
   readonly id: string;
   readonly path: string[];
@@ -47,7 +47,7 @@ export class CanvasToolBrush extends CanvasModuleBase {
   readonly manager: CanvasManager;
   readonly log: Logger;
 
-  config: CanvasToolBrushConfig = DEFAULT_CONFIG;
+  config: CanvasBrushToolModuleConfig = DEFAULT_CONFIG;
   hideFillTimeoutId: number | null = null;
 
   /**
