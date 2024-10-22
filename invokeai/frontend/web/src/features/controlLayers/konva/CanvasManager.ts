@@ -2,7 +2,6 @@ import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
-import { CanvasBboxModule } from 'features/controlLayers/konva/CanvasBboxModule';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import { CanvasCompositorModule } from 'features/controlLayers/konva/CanvasCompositorModule';
 import { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
@@ -62,7 +61,6 @@ export class CanvasManager extends CanvasModuleBase {
   entityRenderer: CanvasEntityRendererModule;
   compositor: CanvasCompositorModule;
   tool: CanvasToolModule;
-  bbox: CanvasBboxModule;
   stagingArea: CanvasStagingAreaModule;
   progressImage: CanvasProgressImageModule;
 
@@ -124,18 +122,16 @@ export class CanvasManager extends CanvasModuleBase {
     this.stage.addLayer(this.background.konva.layer);
 
     this.konva = {
-      previewLayer: new Konva.Layer({ listening: false, imageSmoothingEnabled: false }),
+      previewLayer: new Konva.Layer({ listening: true, imageSmoothingEnabled: false }),
     };
     this.stage.addLayer(this.konva.previewLayer);
 
     this.tool = new CanvasToolModule(this);
     this.progressImage = new CanvasProgressImageModule(this);
-    this.bbox = new CanvasBboxModule(this);
 
     // Must add in this order for correct z-index
     this.konva.previewLayer.add(this.stagingArea.konva.group);
     this.konva.previewLayer.add(this.progressImage.konva.group);
-    this.konva.previewLayer.add(this.bbox.konva.group);
     this.konva.previewLayer.add(this.tool.konva.group);
   }
 
@@ -233,7 +229,6 @@ export class CanvasManager extends CanvasModuleBase {
 
   getAllModules = (): CanvasModuleBase[] => {
     return [
-      this.bbox,
       this.stagingArea,
       this.tool,
       this.progressImage,
@@ -281,7 +276,6 @@ export class CanvasManager extends CanvasModuleBase {
       inpaintMasks: Array.from(this.adapters.inpaintMasks.values()).map((adapter) => adapter.repr()),
       regionMasks: Array.from(this.adapters.regionMasks.values()).map((adapter) => adapter.repr()),
       stateApi: this.stateApi.repr(),
-      bbox: this.bbox.repr(),
       stagingArea: this.stagingArea.repr(),
       tool: this.tool.repr(),
       progressImage: this.progressImage.repr(),

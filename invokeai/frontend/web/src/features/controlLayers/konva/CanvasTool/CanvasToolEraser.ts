@@ -78,6 +78,7 @@ export class CanvasToolEraser extends CanvasModuleBase {
         perfectDrawEnabled: false,
       }),
       outerBorder: new Konva.Ring({
+        listening: false,
         name: `${this.type}:eraser_outer_border_ring`,
         innerRadius: 0,
         outerRadius: 0,

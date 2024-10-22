@@ -120,6 +120,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:color_picker_group`, listening: false }),
       ringCandidateColor: new Konva.Ring({
+        listening: false,
         name: `${this.type}:color_picker_candidate_color_ring`,
         innerRadius: 0,
         outerRadius: 0,
@@ -127,6 +128,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
         perfectDrawEnabled: false,
       }),
       ringCurrentColor: new Konva.Arc({
+        listening: false,
         name: `${this.type}:color_picker_current_color_arc`,
         innerRadius: 0,
         outerRadius: 0,
@@ -135,6 +137,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
         perfectDrawEnabled: false,
       }),
       ringInnerBorder: new Konva.Ring({
+        listening: false,
         name: `${this.type}:color_picker_inner_border_ring`,
         innerRadius: 0,
         outerRadius: 0,
@@ -143,6 +146,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
         perfectDrawEnabled: false,
       }),
       ringOuterBorder: new Konva.Ring({
+        listening: false,
         name: `${this.type}:color_picker_outer_border_ring`,
         innerRadius: 0,
         outerRadius: 0,
@@ -151,41 +155,49 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
         perfectDrawEnabled: false,
       }),
       crosshairNorthInner: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_north1_line`,
         stroke: this.config.CROSSHAIR_LINE_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairNorthOuter: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_north2_line`,
         stroke: this.config.CROSSHAIR_BORDER_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairEastInner: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_east1_line`,
         stroke: this.config.CROSSHAIR_LINE_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairEastOuter: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_east2_line`,
         stroke: this.config.CROSSHAIR_BORDER_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairSouthInner: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_south1_line`,
         stroke: this.config.CROSSHAIR_LINE_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairSouthOuter: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_south2_line`,
         stroke: this.config.CROSSHAIR_BORDER_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairWestInner: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_west1_line`,
         stroke: this.config.CROSSHAIR_LINE_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairWestOuter: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_west2_line`,
         stroke: this.config.CROSSHAIR_BORDER_COLOR,
         perfectDrawEnabled: false,
