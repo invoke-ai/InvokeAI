@@ -241,6 +241,11 @@ class ModelProbe(object):
         for key in [str(k) for k in ckpt.keys()]:
             if key.startswith(
                 (
+                    # The following prefixes appear when multiple models have been bundled together in a single file (I
+                    # believe the format originated in ComfyUI).
+                    # first_stage_model = VAE
+                    # cond_stage_model = Text Encoder
+                    # model.diffusion_model = UNet / Transformer
                     "cond_stage_model.",
                     "first_stage_model.",
                     "model.diffusion_model.",
