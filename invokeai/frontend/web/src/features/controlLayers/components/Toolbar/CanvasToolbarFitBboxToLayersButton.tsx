@@ -10,8 +10,8 @@ export const CanvasToolbarFitBboxToLayersButton = memo(() => {
   const canvasManager = useCanvasManager();
   const isBusy = useCanvasIsBusy();
   const onClick = useCallback(() => {
-    canvasManager.bbox.fitToLayers();
-  }, [canvasManager.bbox]);
+    canvasManager.tool.tools.bbox.fitToLayers();
+  }, [canvasManager.tool.tools.bbox]);
 
   return (
     <IconButton

@@ -1,3 +1,4 @@
+import { CanvasBboxModule } from 'features/controlLayers/konva/CanvasBboxModule';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasToolBrush } from 'features/controlLayers/konva/CanvasTool/CanvasToolBrush';
@@ -58,6 +59,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     eraser: CanvasToolEraser;
     rect: CanvasToolRect;
     colorPicker: CanvasToolColorPicker;
+    bbox: CanvasBboxModule;
   };
 
   /**
@@ -111,16 +113,18 @@ export class CanvasToolModule extends CanvasModuleBase {
       eraser: new CanvasToolEraser(this),
       rect: new CanvasToolRect(this),
       colorPicker: new CanvasToolColorPicker(this),
+      bbox: new CanvasBboxModule(this),
     };
 
     this.konva = {
       stage: this.manager.stage.konva.stage,
-      group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
+      group: new Konva.Group({ name: `${this.type}:group`, listening: true }),
     };
 
     this.konva.group.add(this.tools.brush.konva.group);
     this.konva.group.add(this.tools.eraser.konva.group);
     this.konva.group.add(this.tools.colorPicker.konva.group);
+    this.konva.group.add(this.tools.bbox.konva.group);
 
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
@@ -143,12 +147,6 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.log.debug('Initializing module');
     this.render();
     this.syncCursorStyle();
-  };
-
-  setToolVisibility = (tool: Tool, isDrawable: boolean) => {
-    this.tools.brush.setVisibility(isDrawable && tool === 'brush');
-    this.tools.eraser.setVisibility(isDrawable && tool === 'eraser');
-    this.tools.colorPicker.setVisibility(tool === 'colorPicker');
   };
 
   syncCursorStyle = () => {
@@ -191,6 +189,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.tools.brush.render();
     this.tools.eraser.render();
     this.tools.colorPicker.render();
+    this.tools.bbox.render();
   };
 
   syncCursorPositions = () => {
@@ -588,9 +587,13 @@ export class CanvasToolModule extends CanvasModuleBase {
       $toolBuffer: this.$toolBuffer.get(),
       $isMouseDown: this.$isMouseDown.get(),
       $cursorPos: this.$cursorPos.get(),
-      brushToolPreview: this.tools.brush.repr(),
-      eraserToolPreview: this.tools.eraser.repr(),
-      colorPickerToolPreview: this.tools.colorPicker.repr(),
+      tools: {
+        brush: this.tools.brush.repr(),
+        eraser: this.tools.eraser.repr(),
+        colorPicker: this.tools.colorPicker.repr(),
+        rect: this.tools.rect.repr(),
+        bbox: this.tools.bbox.repr(),
+      },
     };
   };
 
