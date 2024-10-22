@@ -212,17 +212,19 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
    * Renders the color picker tool preview on the canvas.
    */
   render = () => {
-    const tool = this.parent.$tool.get();
+    if (this.parent.$tool.get() !== 'colorPicker') {
+      this.setVisibility(false);
+      return;
+    }
 
-    if (tool !== 'colorPicker') {
+    if (!this.parent.getCanDraw()) {
       this.setVisibility(false);
       return;
     }
 
     const cursorPos = this.parent.$cursorPos.get();
-    const canDraw = this.parent.getCanDraw();
 
-    if (!cursorPos || tool !== 'colorPicker' || !canDraw) {
+    if (!cursorPos) {
       this.setVisibility(false);
       return;
     }

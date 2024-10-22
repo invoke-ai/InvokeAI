@@ -186,32 +186,11 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   render = () => {
-    const renderedEntityCount = this.manager.stateApi.getRenderedEntityCount();
-    const cursorPos = this.$cursorPos.get();
-    const isFiltering = this.manager.stateApi.$isFiltering.get();
-    const isStaging = this.manager.stagingArea.$isStaging.get();
-    const isStageDragging = this.manager.stage.konva.stage.isDragging();
-
     this.syncCursorStyle();
 
-    /**
-     * The tool should not be rendered when:
-     * - There is no cursor position (i.e. the cursor is outside of the stage)
-     * - The user is filtering, in which case the user is not allowed to use the tools. Note that we do not disable
-     * the group while transforming, bc that requires use of the move tool.
-     * - The canvas is staging, in which case the user is not allowed to use the tools.
-     * - There are no entities rendered on the canvas. Maybe we should allow the user to draw on an empty canvas,
-     * creating a new layer when they start?
-     * - The stage is being dragged, in which case the user is not allowed to use the tools.
-     */
-    if (!cursorPos || isFiltering || isStaging || renderedEntityCount === 0 || isStageDragging) {
-      this.konva.group.visible(false);
-    } else {
-      this.konva.group.visible(true);
-      this.tools.brush.render();
-      this.tools.eraser.render();
-      this.tools.colorPicker.render();
-    }
+    this.tools.brush.render();
+    this.tools.eraser.render();
+    this.tools.colorPicker.render();
   };
 
   syncCursorPositions = () => {
@@ -298,6 +277,10 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     if (this.manager.$isBusy.get()) {
+      return false;
+    }
+
+    if (this.manager.stage.konva.stage.isDragging()) {
       return false;
     }
 
