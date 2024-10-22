@@ -104,17 +104,19 @@ export class CanvasToolBrush extends CanvasModuleBase {
     this.konva.group.add(this.konva.fillCircle, this.konva.innerBorder, this.konva.outerBorder);
   }
   render = () => {
-    const tool = this.parent.$tool.get();
+    if (this.parent.$tool.get() !== 'brush') {
+      this.setVisibility(false);
+      return;
+    }
 
-    if (tool !== 'brush') {
+    if (!this.parent.getCanDraw()) {
       this.setVisibility(false);
       return;
     }
 
     const cursorPos = this.parent.$cursorPos.get();
-    const canDraw = this.parent.getCanDraw();
 
-    if (!cursorPos || !canDraw) {
+    if (!cursorPos) {
       this.setVisibility(false);
       return;
     }

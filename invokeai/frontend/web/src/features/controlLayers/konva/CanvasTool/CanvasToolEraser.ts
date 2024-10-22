@@ -90,17 +90,19 @@ export class CanvasToolEraser extends CanvasModuleBase {
   }
 
   render = () => {
-    const tool = this.parent.$tool.get();
+    if (this.parent.$tool.get() !== 'eraser') {
+      this.setVisibility(false);
+      return;
+    }
 
-    if (tool !== 'eraser') {
+    if (!this.parent.getCanDraw()) {
       this.setVisibility(false);
       return;
     }
 
     const cursorPos = this.parent.$cursorPos.get();
-    const canDraw = this.parent.getCanDraw();
 
-    if (!cursorPos || !canDraw) {
+    if (!cursorPos) {
       this.setVisibility(false);
       return;
     }
