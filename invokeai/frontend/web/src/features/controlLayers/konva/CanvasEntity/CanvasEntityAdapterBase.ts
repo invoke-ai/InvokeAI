@@ -553,6 +553,7 @@ export abstract class CanvasEntityAdapterBase<
       transformer: this.transformer.repr(),
       renderer: this.renderer.repr(),
       bufferRenderer: this.bufferRenderer.repr(),
+      segmentAnything: this.segmentAnything?.repr(),
       filterer: this.filterer?.repr(),
       hasCache: this.$canvasCache.get() !== null,
       isLocked: this.$isLocked.get(),

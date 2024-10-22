@@ -6,7 +6,13 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
-import { floorCoord, getKonvaNodeDebugAttrs, getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
+import {
+  addCoords,
+  floorCoord,
+  getKonvaNodeDebugAttrs,
+  getPrefixedId,
+  offsetCoord,
+} from 'features/controlLayers/konva/util';
 import type {
   CanvasImageState,
   Coordinate,
@@ -227,9 +233,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
 
+    // We need to offset the cursor position by the parent entity's position + pixel rect to get the correct position
     const pixelRect = this.parent.transformer.$pixelRect.get();
+    const position = addCoords(this.parent.state.position, pixelRect);
 
-    const normalizedPoint = offsetCoord(cursorPos.relative, { x: pixelRect.x, y: pixelRect.y });
+    const normalizedPoint = offsetCoord(cursorPos.relative, position);
     const samPoint = this.createPoint(normalizedPoint, this.$pointType.get());
     this.points.push(samPoint);
   };
@@ -256,15 +264,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       point.konva.circle.destroy();
     }
     this.points = [];
-    this.parent.konva.layer.add(this.konva.group);
-    console.log({
-      position: this.parent.state.position,
-      pixelRect: this.parent.transformer.$pixelRect.get(),
-      nodeRect: this.parent.transformer.$nodeRect.get(),
-      getRelativeRect: this.parent.transformer.getRelativeRect(),
-    });
+    // Update the konva group's position to match the parent entity
     const pixelRect = this.parent.transformer.$pixelRect.get();
-    this.konva.group.setAttrs({ x: pixelRect.x, y: pixelRect.y });
+    const position = addCoords(this.parent.state.position, pixelRect);
+    this.konva.group.setAttrs(position);
+    this.parent.konva.layer.add(this.konva.group);
     this.parent.konva.layer.listening(true);
 
     this.setSegmentingEventListeners();
@@ -369,12 +373,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
     this.konva.compositingRect.visible(false);
     this.konva.maskGroup.clearCache();
-    this.$pointType.set(1);
-    this.$isSegmenting.set(false);
     this.$hasProcessed.set(false);
     this.manager.stateApi.$segmentingAdapter.set(null);
     this.konva.group.remove();
+    this.parent.konva.layer.listening(false);
     this.removeSegmentingEventListeners();
+    this.$isSegmenting.set(false);
   };
 
   reset = () => {
@@ -395,7 +399,6 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.parent.bufferRenderer.clearBuffer();
     this.parent.transformer.updatePosition();
     this.parent.renderer.syncKonvaCache(true);
-    this.parent.konva.layer.listening(false);
     this.imageState = null;
     this.$hasProcessed.set(false);
   };
@@ -404,11 +407,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.log.trace('Stopping segment anything');
     this.reset();
     this.$isProcessing.set(false);
-    this.$isSegmenting.set(false);
     this.$hasProcessed.set(false);
     this.manager.stateApi.$segmentingAdapter.set(null);
     this.konva.group.remove();
+    this.parent.konva.layer.listening(false);
     this.removeSegmentingEventListeners();
+    this.$isSegmenting.set(false);
   };
 
   getSAMPointColor(label: SAMPointLabel): RgbaColor {
@@ -428,12 +432,18 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       type: this.type,
       path: this.path,
       parent: this.parent.id,
-      points: this.getSAMPoints(),
+      points: this.points.map(({ id, konva, label }) => ({
+        id,
+        label,
+        circle: getKonvaNodeDebugAttrs(konva.circle),
+      })),
       config: deepClone(this.config),
       isSegmenting: this.$isSegmenting.get(),
       konva: {
         group: getKonvaNodeDebugAttrs(this.konva.group),
         compositingRect: getKonvaNodeDebugAttrs(this.konva.compositingRect),
+        maskGroup: getKonvaNodeDebugAttrs(this.konva.maskGroup),
+        pointGroup: getKonvaNodeDebugAttrs(this.konva.pointGroup),
       },
     };
   };

@@ -81,6 +81,18 @@ export const offsetCoord = (coord: Coordinate, offset: Coordinate): Coordinate =
 };
 
 /**
+ * Adds two coordinates together.
+ * @param a The first coordinate
+ * @param b The second coordinate
+ */
+export const addCoords = (a: Coordinate, b: Coordinate): Coordinate => {
+  return {
+    x: a.x + b.x,
+    y: a.y + b.y,
+  };
+};
+
+/**
  * Snaps a position to the edge of the stage if within a threshold of the edge
  * @param pos The position to snap
  * @param stage The konva stage
@@ -616,6 +628,7 @@ export const getKonvaNodeDebugAttrs = (node: Konva.Node) => {
     isCached: node.isCached(),
     visible: node.visible(),
     listening: node.listening(),
+    zIndex: node.zIndex(),
   };
 };
 
