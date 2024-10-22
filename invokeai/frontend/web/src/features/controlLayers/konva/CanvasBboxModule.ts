@@ -12,6 +12,7 @@ import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSl
 import { selectBbox } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { noop } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { assert } from 'tsafe';
@@ -150,9 +151,18 @@ export class CanvasBboxModule extends CanvasModuleBase {
     };
 
     this.konva.proxyRect.on('dragmove', this.onDragMove);
+    this.konva.proxyRect.on('pointerenter', () => {
+      this.manager.stage.setCursor('move');
+    });
+    this.konva.proxyRect.on('pointerleave', () => {
+      this.manager.stage.setCursor('default');
+    });
     this.konva.transformer.on('transform', this.onTransform);
     this.konva.transformer.on('transformend', this.onTransformEnd);
-
+    this.subscriptions.add(() => {
+      this.konva.proxyRect.off('dragmove pointerenter pointerleave');
+      this.konva.transformer.off('transform transformend');
+    });
     // The transformer will always be transforming the proxy rect
     this.konva.transformer.nodes([this.konva.proxyRect]);
 
@@ -176,6 +186,9 @@ export class CanvasBboxModule extends CanvasModuleBase {
     // Update on busy state changes
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
   }
+
+  // This is a noop. The cursor is changed when the cursor enters or leaves the bbox.
+  syncCursorStyle = noop;
 
   initialize = () => {
     this.log.debug('Initializing module');

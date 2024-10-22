@@ -220,6 +220,10 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
     );
   }
 
+  syncCursorStyle = () => {
+    this.manager.stage.setCursor('none');
+  };
+
   /**
    * Renders the color picker tool preview on the canvas.
    */

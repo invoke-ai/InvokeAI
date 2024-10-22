@@ -158,14 +158,9 @@ export class CanvasToolModule extends CanvasModuleBase {
   syncCursorStyle = () => {
     const stage = this.manager.stage;
     const tool = this.$tool.get();
-    const isStageDragging = this.manager.stage.konva.stage.isDragging();
 
-    if (tool === 'view' && !isStageDragging) {
-      stage.setCursor('grab');
-    } else if (this.manager.stage.konva.stage.isDragging()) {
-      stage.setCursor('grabbing');
-    } else if (this.manager.stateApi.$isTransforming.get()) {
-      stage.setCursor('default');
+    if (this.manager.stage.konva.stage.isDragging() || tool === 'view') {
+      this.tools.view.syncCursorStyle();
     } else if (this.manager.stateApi.$isSegmenting.get()) {
       stage.setCursor('default');
     } else if (this.manager.stateApi.$isFiltering.get()) {
@@ -173,17 +168,21 @@ export class CanvasToolModule extends CanvasModuleBase {
     } else if (this.manager.stagingArea.$isStaging.get()) {
       stage.setCursor('not-allowed');
     } else if (tool === 'bbox') {
-      stage.setCursor('default');
+      this.tools.bbox.syncCursorStyle();
     } else if (this.manager.stateApi.getRenderedEntityCount() === 0) {
       stage.setCursor('not-allowed');
     } else if (!this.manager.stateApi.getSelectedEntityAdapter()?.$isInteractable.get()) {
       stage.setCursor('not-allowed');
-    } else if (tool === 'colorPicker' || tool === 'brush' || tool === 'eraser') {
-      stage.setCursor('none');
+    } else if (tool === 'brush') {
+      this.tools.brush.syncCursorStyle();
+    } else if (tool === 'eraser') {
+      this.tools.eraser.syncCursorStyle();
+    } else if (tool === 'colorPicker') {
+      this.tools.colorPicker.syncCursorStyle();
     } else if (tool === 'move') {
-      stage.setCursor('default');
+      this.tools.move.syncCursorStyle();
     } else if (tool === 'rect') {
-      stage.setCursor('crosshair');
+      this.tools.rect.syncCursorStyle();
     } else {
       stage.setCursor('not-allowed');
     }

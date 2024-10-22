@@ -24,6 +24,10 @@ export class CanvasToolRect extends CanvasModuleBase {
     this.log.debug('Creating module');
   }
 
+  syncCursorStyle = () => {
+    this.manager.stage.setCursor('crosshair');
+  };
+
   onStagePointerDown = async (_e: KonvaEventObject<PointerEvent>) => {
     const cursorPos = this.parent.$cursorPos.get();
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();

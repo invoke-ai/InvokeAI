@@ -103,6 +103,11 @@ export class CanvasToolBrush extends CanvasModuleBase {
     };
     this.konva.group.add(this.konva.fillCircle, this.konva.innerBorder, this.konva.outerBorder);
   }
+
+  syncCursorStyle = () => {
+    this.manager.stage.setCursor('none');
+  };
+
   render = () => {
     if (this.parent.$tool.get() !== 'brush') {
       this.setVisibility(false);
