@@ -71,19 +71,15 @@ export const IPAdapterModel = memo(({ modelKey, onChangeModel, clipVisionModel, 
   });
 
   const clipVisionOptions = useMemo(() => {
-    if (isFLUX) {
-      return CLIP_VISION_OPTIONS.map((option) => ({ ...option, isDisabled: option.value !== FLUX_CLIP_VISION }));
-    } else {
-      return CLIP_VISION_OPTIONS;
-    }
+    return CLIP_VISION_OPTIONS.map((option) => ({
+      ...option,
+      isDisabled: isFLUX && option.value !== FLUX_CLIP_VISION,
+    }));
   }, [isFLUX]);
 
   const clipVisionModelValue = useMemo(() => {
-    if (isFLUX) {
-      return CLIP_VISION_OPTIONS.find((o) => o.value === FLUX_CLIP_VISION);
-    }
     return CLIP_VISION_OPTIONS.find((o) => o.value === clipVisionModel);
-  }, [clipVisionModel, isFLUX]);
+  }, [clipVisionModel]);
 
   return (
     <Flex gap={2}>
