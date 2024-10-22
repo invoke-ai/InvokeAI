@@ -7,7 +7,7 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFluxVAEModels } from 'services/api/hooks/modelsByType';
-import type { VAEModelConfig } from 'services/api/types';
+import type { CheckpointModelConfig, VAEModelConfig } from 'services/api/types';
 
 const ParamFLUXVAEModelSelect = () => {
   const dispatch = useAppDispatch();
@@ -16,7 +16,7 @@ const ParamFLUXVAEModelSelect = () => {
   const [modelConfigs, { isLoading }] = useFluxVAEModels();
 
   const _onChange = useCallback(
-    (vae: VAEModelConfig | null) => {
+    (vae: VAEModelConfig | CheckpointModelConfig | null) => {
       if (vae) {
         dispatch(fluxVAESelected(zModelIdentifierField.parse(vae)));
       }
