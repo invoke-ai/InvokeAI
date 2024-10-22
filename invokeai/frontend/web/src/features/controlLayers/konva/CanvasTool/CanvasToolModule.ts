@@ -4,16 +4,11 @@ import { CanvasToolBrush } from 'features/controlLayers/konva/CanvasTool/CanvasT
 import { CanvasToolColorPicker } from 'features/controlLayers/konva/CanvasTool/CanvasToolColorPicker';
 import { CanvasToolEraser } from 'features/controlLayers/konva/CanvasTool/CanvasToolEraser';
 import {
-  alignCoordForTool,
   calculateNewBrushSizeFromWheelDelta,
   floorCoord,
   getColorAtCoordinate,
   getIsPrimaryMouseDown,
-  getLastPointOfLastLine,
-  getLastPointOfLastLineWithPressure,
-  getLastPointOfLine,
   getPrefixedId,
-  isDistanceMoreThanMin,
   offsetCoord,
 } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
@@ -327,18 +322,11 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       this.syncCursorPositions();
-      const cursorPos = this.$cursorPos.get();
 
-      const isMouseDown = this.$isMouseDown.get();
-      const settings = this.manager.stateApi.getSettings();
       const tool = this.$tool.get();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-      if (!cursorPos || !isMouseDown || !selectedEntity?.$isInteractable.get()) {
-        return;
-      }
-
-      if (selectedEntity.bufferRenderer.state?.type !== 'rect' && selectedEntity.bufferRenderer.hasBuffer()) {
+      if (selectedEntity?.bufferRenderer.state?.type !== 'rect' && selectedEntity?.bufferRenderer.hasBuffer()) {
         selectedEntity.bufferRenderer.commitBuffer();
         return;
       }
@@ -349,28 +337,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'eraser') {
-        const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
-        const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-        if (selectedEntity.bufferRenderer.state && selectedEntity.bufferRenderer.hasBuffer()) {
-          selectedEntity.bufferRenderer.commitBuffer();
-        }
-        if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
-          await selectedEntity.bufferRenderer.setBuffer({
-            id: getPrefixedId('eraser_line_with_pressure'),
-            type: 'eraser_line_with_pressure',
-            points: [alignedPoint.x, alignedPoint.y],
-            strokeWidth: settings.eraserWidth,
-            clip: this.getClip(selectedEntity.state),
-          });
-        } else {
-          await selectedEntity.bufferRenderer.setBuffer({
-            id: getPrefixedId('eraser_line'),
-            type: 'eraser_line',
-            points: [alignedPoint.x, alignedPoint.y],
-            strokeWidth: settings.eraserWidth,
-            clip: this.getClip(selectedEntity.state),
-          });
-        }
+        await this.tools.eraser.onStagePointerEnter(e);
         return;
       }
     } finally {
@@ -392,7 +359,6 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.syncCursorPositions();
       const cursorPos = this.$cursorPos.get();
       const tool = this.$tool.get();
-      const settings = this.manager.stateApi.getSettings();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
       if (!cursorPos || !isMouseDown || !selectedEntity?.$isInteractable.get()) {
@@ -407,60 +373,8 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'eraser') {
-        if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
-          const lastLinePoint = getLastPointOfLastLineWithPressure(
-            selectedEntity.state.objects,
-            'eraser_line_with_pressure'
-          );
-          const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
-          if (selectedEntity.bufferRenderer.hasBuffer()) {
-            selectedEntity.bufferRenderer.commitBuffer();
-          }
-          let points: number[];
-          if (e.evt.shiftKey && lastLinePoint) {
-            // Create a straight line from the last line point
-            points = [
-              lastLinePoint.x,
-              lastLinePoint.y,
-              lastLinePoint.pressure,
-              alignedPoint.x,
-              alignedPoint.y,
-              e.evt.pressure,
-            ];
-          } else {
-            points = [alignedPoint.x, alignedPoint.y, e.evt.pressure];
-          }
-          await selectedEntity.bufferRenderer.setBuffer({
-            id: getPrefixedId('eraser_line_with_pressure'),
-            type: 'eraser_line_with_pressure',
-            points,
-            strokeWidth: settings.eraserWidth,
-            clip: this.getClip(selectedEntity.state),
-          });
-        } else {
-          const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'eraser_line');
-          const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
-
-          if (selectedEntity.bufferRenderer.hasBuffer()) {
-            selectedEntity.bufferRenderer.commitBuffer();
-          }
-
-          let points: number[];
-          if (e.evt.shiftKey && lastLinePoint) {
-            // Create a straight line from the last line point
-            points = [lastLinePoint.x, lastLinePoint.y, alignedPoint.x, alignedPoint.y];
-          } else {
-            points = [alignedPoint.x, alignedPoint.y];
-          }
-
-          await selectedEntity.bufferRenderer.setBuffer({
-            id: getPrefixedId('eraser_line'),
-            type: 'eraser_line',
-            points,
-            strokeWidth: settings.eraserWidth,
-            clip: this.getClip(selectedEntity.state),
-          });
-        }
+        await this.tools.eraser.onStagePointerDown(e);
+        return;
       }
 
       if (tool === 'rect') {
@@ -512,15 +426,8 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'eraser') {
-        if (
-          (selectedEntity.bufferRenderer.state?.type === 'eraser_line' ||
-            selectedEntity.bufferRenderer.state?.type === 'eraser_line_with_pressure') &&
-          selectedEntity.bufferRenderer.hasBuffer()
-        ) {
-          selectedEntity.bufferRenderer.commitBuffer();
-        } else {
-          selectedEntity.bufferRenderer.clearBuffer();
-        }
+        this.tools.eraser.onStagePointerUp(e);
+        return;
       }
 
       if (tool === 'rect') {
@@ -581,38 +488,13 @@ export class CanvasToolModule extends CanvasModuleBase {
         return;
       }
 
-      const settings = this.manager.stateApi.getSettings();
-
       if (tool === 'brush') {
         await this.tools.brush.onStagePointerMove(e);
         return;
       }
 
-      if (
-        tool === 'eraser' &&
-        (bufferState.type === 'eraser_line' || bufferState.type === 'eraser_line_with_pressure')
-      ) {
-        const lastPoint = getLastPointOfLine(bufferState.points);
-        const minDistance = settings.eraserWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
-        if (!lastPoint || !isDistanceMoreThanMin(cursorPos.relative, lastPoint, minDistance)) {
-          return;
-        }
-
-        const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
-        const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
-
-        if (lastPoint.x === alignedPoint.x && lastPoint.y === alignedPoint.y) {
-          // Do not add duplicate points
-          return;
-        }
-
-        bufferState.points.push(alignedPoint.x, alignedPoint.y);
-
-        if (bufferState.type === 'eraser_line_with_pressure') {
-          bufferState.points.push(e.evt.pressure);
-        }
-
-        await selectedEntity.bufferRenderer.setBuffer(bufferState);
+      if (tool === 'eraser') {
+        await this.tools.eraser.onStagePointerMove(e);
         return;
       }
 
