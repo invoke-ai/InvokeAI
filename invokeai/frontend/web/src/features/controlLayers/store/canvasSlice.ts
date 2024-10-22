@@ -381,6 +381,13 @@ export const canvasSlice = createSlice({
         return;
       }
       entity.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
+      // Ensure that the IP Adapter model is compatible with the CLIP Vision model
+      if (entity.ipAdapter.model?.base === 'flux') {
+        entity.ipAdapter.clipVisionModel = 'ViT-L';
+      } else if (entity.ipAdapter.clipVisionModel === 'ViT-L') {
+        // Fall back to ViT-H (ViT-G would also work)
+        entity.ipAdapter.clipVisionModel = 'ViT-H';
+      }
     },
     referenceImageIPAdapterCLIPVisionModelChanged: (
       state,
@@ -577,6 +584,13 @@ export const canvasSlice = createSlice({
         return;
       }
       referenceImage.ipAdapter.model = modelConfig ? zModelIdentifierField.parse(modelConfig) : null;
+      // Ensure that the IP Adapter model is compatible with the CLIP Vision model
+      if (referenceImage.ipAdapter.model?.base === 'flux') {
+        referenceImage.ipAdapter.clipVisionModel = 'ViT-L';
+      } else if (referenceImage.ipAdapter.clipVisionModel === 'ViT-L') {
+        // Fall back to ViT-H (ViT-G would also work)
+        referenceImage.ipAdapter.clipVisionModel = 'ViT-H';
+      }
     },
     rgIPAdapterCLIPVisionModelChanged: (
       state,
