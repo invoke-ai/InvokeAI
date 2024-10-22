@@ -336,27 +336,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'brush') {
-        const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
-        const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-        if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
-          await selectedEntity.bufferRenderer.setBuffer({
-            id: getPrefixedId('brush_line_with_pressure'),
-            type: 'brush_line_with_pressure',
-            points: [alignedPoint.x, alignedPoint.y, e.evt.pressure],
-            strokeWidth: settings.brushWidth,
-            color: this.manager.stateApi.getCurrentColor(),
-            clip: this.getClip(selectedEntity.state),
-          });
-        } else {
-          await selectedEntity.bufferRenderer.setBuffer({
-            id: getPrefixedId('brush_line'),
-            type: 'brush_line',
-            points: [alignedPoint.x, alignedPoint.y],
-            strokeWidth: settings.brushWidth,
-            color: this.manager.stateApi.getCurrentColor(),
-            clip: this.getClip(selectedEntity.state),
-          });
-        }
+        await this.tools.brush.onStagePointerEnter(e);
         return;
       }
 
@@ -414,62 +394,8 @@ export class CanvasToolModule extends CanvasModuleBase {
       const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
 
       if (tool === 'brush') {
-        if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
-          const lastLinePoint = getLastPointOfLastLineWithPressure(
-            selectedEntity.state.objects,
-            'brush_line_with_pressure'
-          );
-          const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-          if (selectedEntity.bufferRenderer.hasBuffer()) {
-            selectedEntity.bufferRenderer.commitBuffer();
-          }
-          let points: number[];
-          if (e.evt.shiftKey && lastLinePoint) {
-            // Create a straight line from the last line point
-            points = [
-              lastLinePoint.x,
-              lastLinePoint.y,
-              lastLinePoint.pressure,
-              alignedPoint.x,
-              alignedPoint.y,
-              e.evt.pressure,
-            ];
-          } else {
-            points = [alignedPoint.x, alignedPoint.y, e.evt.pressure];
-          }
-          await selectedEntity.bufferRenderer.setBuffer({
-            id: getPrefixedId('brush_line_with_pressure'),
-            type: 'brush_line_with_pressure',
-            points,
-            strokeWidth: settings.brushWidth,
-            color: this.manager.stateApi.getCurrentColor(),
-            clip: this.getClip(selectedEntity.state),
-          });
-        } else {
-          const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'brush_line');
-          const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-
-          if (selectedEntity.bufferRenderer.hasBuffer()) {
-            selectedEntity.bufferRenderer.commitBuffer();
-          }
-
-          let points: number[];
-          if (e.evt.shiftKey && lastLinePoint) {
-            // Create a straight line from the last line point
-            points = [lastLinePoint.x, lastLinePoint.y, alignedPoint.x, alignedPoint.y];
-          } else {
-            points = [alignedPoint.x, alignedPoint.y];
-          }
-
-          await selectedEntity.bufferRenderer.setBuffer({
-            id: getPrefixedId('brush_line'),
-            type: 'brush_line',
-            points,
-            strokeWidth: settings.brushWidth,
-            color: this.manager.stateApi.getCurrentColor(),
-            clip: this.getClip(selectedEntity.state),
-          });
-        }
+        await this.tools.brush.onStagePointerDown(e);
+        return;
       }
 
       if (tool === 'eraser') {
@@ -573,15 +499,8 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       if (tool === 'brush') {
-        if (
-          (selectedEntity.bufferRenderer.state?.type === 'brush_line' ||
-            selectedEntity.bufferRenderer.state?.type === 'brush_line_with_pressure') &&
-          selectedEntity.bufferRenderer.hasBuffer()
-        ) {
-          selectedEntity.bufferRenderer.commitBuffer();
-        } else {
-          selectedEntity.bufferRenderer.clearBuffer();
-        }
+        this.tools.brush.onStagePointerUp(e);
+        return;
       }
 
       if (tool === 'eraser') {
@@ -656,29 +575,12 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       const settings = this.manager.stateApi.getSettings();
 
-      if (tool === 'brush' && (bufferState.type === 'brush_line' || bufferState.type === 'brush_line_with_pressure')) {
-        const lastPoint = getLastPointOfLine(bufferState.points);
-        const minDistance = settings.brushWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
-        if (!lastPoint || !isDistanceMoreThanMin(cursorPos.relative, lastPoint, minDistance)) {
-          return;
-        }
+      if (tool === 'brush') {
+        await this.tools.brush.onStagePointerMove(e);
+        return;
+      }
 
-        const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
-        const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
-
-        if (lastPoint.x === alignedPoint.x && lastPoint.y === alignedPoint.y) {
-          // Do not add duplicate points
-          return;
-        }
-
-        bufferState.points.push(alignedPoint.x, alignedPoint.y);
-
-        if (bufferState.type === 'brush_line_with_pressure') {
-          bufferState.points.push(e.evt.pressure);
-        }
-
-        await selectedEntity.bufferRenderer.setBuffer(bufferState);
-      } else if (
+      if (
         tool === 'eraser' &&
         (bufferState.type === 'eraser_line' || bufferState.type === 'eraser_line_with_pressure')
       ) {
@@ -703,15 +605,19 @@ export class CanvasToolModule extends CanvasModuleBase {
         }
 
         await selectedEntity.bufferRenderer.setBuffer(bufferState);
-      } else if (tool === 'rect' && bufferState.type === 'rect') {
+        return;
+      }
+
+      if (tool === 'rect' && bufferState.type === 'rect') {
         const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
         const alignedPoint = floorCoord(normalizedPoint);
         bufferState.rect.width = Math.round(alignedPoint.x - bufferState.rect.x);
         bufferState.rect.height = Math.round(alignedPoint.y - bufferState.rect.y);
         await selectedEntity.bufferRenderer.setBuffer(bufferState);
-      } else {
-        selectedEntity?.bufferRenderer.clearBuffer();
+        return;
       }
+
+      selectedEntity?.bufferRenderer.clearBuffer();
     } finally {
       this.render();
     }

@@ -2,8 +2,17 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { alignCoordForTool, getPrefixedId } from 'features/controlLayers/konva/util';
+import {
+  alignCoordForTool,
+  getLastPointOfLastLine,
+  getLastPointOfLastLineWithPressure,
+  getLastPointOfLine,
+  getPrefixedId,
+  isDistanceMoreThanMin,
+  offsetCoord,
+} from 'features/controlLayers/konva/util';
 import Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
 
 type CanvasToolBrushConfig = {
@@ -19,12 +28,18 @@ type CanvasToolBrushConfig = {
    * The number of milliseconds to wait before hiding the brush preview's fill circle after the mouse is released.
    */
   HIDE_FILL_TIMEOUT_MS: number;
+  /**
+   * The scale factor to use when determining if a new point should be added to the brush line. This is multiplied by the
+   * brush width to determine the minimum distance between points.
+   */
+  BRUSH_SPACING_TARGET_SCALE: number;
 };
 
 const DEFAULT_CONFIG: CanvasToolBrushConfig = {
   BORDER_INNER_COLOR: 'rgba(0,0,0,1)',
   BORDER_OUTER_COLOR: 'rgba(255,255,255,0.8)',
   HIDE_FILL_TIMEOUT_MS: 1500, // same as Affinity
+  BRUSH_SPACING_TARGET_SCALE: 0.1,
 };
 
 /**
@@ -164,6 +179,266 @@ export class CanvasToolBrush extends CanvasModuleBase {
 
   setVisibility = (visible: boolean) => {
     this.konva.group.visible(visible);
+  };
+
+  /**
+   * Handles the pointer enter event on the stage, when the brush tool is active. This may create a new brush line if
+   * the mouse is down as the cursor enters the stage.
+   *
+   * The tool module will pass on the event to this method if the tool is 'brush', after doing any necessary checks
+   * and non-tool-specific handling.
+   *
+   * @param e The Konva event object.
+   */
+  onStagePointerEnter = async (e: KonvaEventObject<PointerEvent>) => {
+    if (this.parent.$tool.get() !== 'brush') {
+      // This should never happen, but just in case
+      return;
+    }
+
+    if (!this.parent.getCanDraw()) {
+      // We can't draw, so don't do anything
+      return;
+    }
+
+    const cursorPos = this.parent.$cursorPos.get();
+    const isMouseDown = this.parent.$isMouseDown.get();
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+
+    if (!cursorPos || !isMouseDown || !selectedEntity) {
+      /**
+       * Can't do anything without:
+       * - A cursor position: the cursor is not on the stage
+       * - The mouse is down: the user is not drawing
+       * - A selected entity: there is no entity to draw on
+       */
+      return;
+    }
+
+    const settings = this.manager.stateApi.getSettings();
+
+    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
+    const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
+
+    if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
+      // If the pen is down and pressure sensitivity is enabled, add the point with pressure
+      await selectedEntity.bufferRenderer.setBuffer({
+        id: getPrefixedId('brush_line_with_pressure'),
+        type: 'brush_line_with_pressure',
+        points: [alignedPoint.x, alignedPoint.y, e.evt.pressure],
+        strokeWidth: settings.brushWidth,
+        color: this.manager.stateApi.getCurrentColor(),
+        clip: this.parent.getClip(selectedEntity.state),
+      });
+    } else {
+      // Else, add the point without pressure
+      await selectedEntity.bufferRenderer.setBuffer({
+        id: getPrefixedId('brush_line'),
+        type: 'brush_line',
+        points: [alignedPoint.x, alignedPoint.y],
+        strokeWidth: settings.brushWidth,
+        color: this.manager.stateApi.getCurrentColor(),
+        clip: this.parent.getClip(selectedEntity.state),
+      });
+    }
+  };
+
+  /**
+   * Handles the pointer down event on the stage, when the brush tool is active. If the shift key is held, this will
+   * create a straight line from the last point of the last line to the current point. Else, it will create a new line
+   * with the current point.
+   *
+   * The tool module will pass on the event to this method if the tool is 'brush', after doing any necessary checks
+   * and non-tool-specific handling.
+   *
+   * @param e The Konva event object.
+   */
+  onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
+    if (this.parent.$tool.get() !== 'brush') {
+      // This should never happen, but just in case
+      return;
+    }
+
+    if (!this.parent.getCanDraw()) {
+      // We can't draw, so don't do anything
+      return;
+    }
+
+    const cursorPos = this.parent.$cursorPos.get();
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+
+    if (!cursorPos || !selectedEntity) {
+      /**
+       * Can't do anything without:
+       * - A cursor position: the cursor is not on the stage
+       * - A selected entity: there is no entity to draw on
+       */
+      return;
+    }
+
+    if (selectedEntity.bufferRenderer.hasBuffer()) {
+      selectedEntity.bufferRenderer.commitBuffer();
+    }
+
+    const settings = this.manager.stateApi.getSettings();
+
+    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
+    const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
+
+    if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
+      // We need to get the last point of the last line to create a straight line if shift is held
+      const lastLinePoint = getLastPointOfLastLineWithPressure(
+        selectedEntity.state.objects,
+        'brush_line_with_pressure'
+      );
+
+      let points: number[];
+
+      if (e.evt.shiftKey && lastLinePoint) {
+        // Create a straight line from the last line point
+        points = [
+          lastLinePoint.x,
+          lastLinePoint.y,
+          lastLinePoint.pressure,
+          alignedPoint.x,
+          alignedPoint.y,
+          e.evt.pressure,
+        ];
+      } else {
+        // Create a new line with the current point
+        points = [alignedPoint.x, alignedPoint.y, e.evt.pressure];
+      }
+
+      await selectedEntity.bufferRenderer.setBuffer({
+        id: getPrefixedId('brush_line_with_pressure'),
+        type: 'brush_line_with_pressure',
+        points,
+        strokeWidth: settings.brushWidth,
+        color: this.manager.stateApi.getCurrentColor(),
+        clip: this.parent.getClip(selectedEntity.state),
+      });
+    } else {
+      const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'brush_line');
+
+      let points: number[];
+
+      if (e.evt.shiftKey && lastLinePoint) {
+        // Create a straight line from the last line point
+        points = [lastLinePoint.x, lastLinePoint.y, alignedPoint.x, alignedPoint.y];
+      } else {
+        // Create a new line with the current point
+        points = [alignedPoint.x, alignedPoint.y];
+      }
+
+      await selectedEntity.bufferRenderer.setBuffer({
+        id: getPrefixedId('brush_line'),
+        type: 'brush_line',
+        points,
+        strokeWidth: settings.brushWidth,
+        color: this.manager.stateApi.getCurrentColor(),
+        clip: this.parent.getClip(selectedEntity.state),
+      });
+    }
+  };
+
+  /**
+   * Handles the pointer up event on the stage, when the brush tool is active. This handles finalizing the brush line
+   * that was being drawn (if any).
+   *
+   * The tool module will pass on the event to this method if the tool is 'brush', after doing any necessary checks
+   * and non-tool-specific handling.
+   *
+   * @param e The Konva event object.
+   */
+  onStagePointerUp = (e: KonvaEventObject<PointerEvent>) => {
+    if (e.target !== this.parent.konva.stage) {
+      return;
+    }
+    if (this.parent.$tool.get() !== 'brush') {
+      return;
+    }
+    if (!this.parent.getCanDraw()) {
+      return;
+    }
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+    if (!selectedEntity) {
+      return;
+    }
+    if (
+      (selectedEntity.bufferRenderer.state?.type === 'brush_line' ||
+        selectedEntity.bufferRenderer.state?.type === 'brush_line_with_pressure') &&
+      selectedEntity.bufferRenderer.hasBuffer()
+    ) {
+      selectedEntity.bufferRenderer.commitBuffer();
+    } else {
+      selectedEntity.bufferRenderer.clearBuffer();
+    }
+  };
+
+  /**
+   * Handles the pointer move event on the stage, when the brush tool is active. This handles extending the brush line
+   * that is being drawn (if any).
+   *
+   * The tool module will pass on the event to this method if the tool is 'brush', after doing any necessary checks
+   * and non-tool-specific handling.
+   *
+   * @param e The Konva event object.
+   */
+  onStagePointerMove = async (e: KonvaEventObject<PointerEvent>) => {
+    if (this.parent.$tool.get() !== 'brush') {
+      return;
+    }
+
+    if (!this.parent.getCanDraw()) {
+      return;
+    }
+
+    const cursorPos = this.parent.$cursorPos.get();
+
+    if (!cursorPos) {
+      return;
+    }
+
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+
+    if (!selectedEntity) {
+      return;
+    }
+
+    const bufferState = selectedEntity.bufferRenderer.state;
+
+    if (!bufferState) {
+      return;
+    }
+
+    const settings = this.manager.stateApi.getSettings();
+
+    if (bufferState.type !== 'brush_line' && bufferState.type !== 'brush_line_with_pressure') {
+      return;
+    }
+
+    const lastPoint = getLastPointOfLine(bufferState.points);
+    const minDistance = settings.brushWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
+    if (!lastPoint || !isDistanceMoreThanMin(cursorPos.relative, lastPoint, minDistance)) {
+      return;
+    }
+
+    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
+    const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
+
+    if (lastPoint.x === alignedPoint.x && lastPoint.y === alignedPoint.y) {
+      // Do not add duplicate points
+      return;
+    }
+
+    bufferState.points.push(alignedPoint.x, alignedPoint.y);
+
+    // Add pressure if the pen is down and pressure sensitivity is enabled
+    if (bufferState.type === 'brush_line_with_pressure') {
+      bufferState.points.push(e.evt.pressure);
+    }
+
+    await selectedEntity.bufferRenderer.setBuffer(bufferState);
   };
 
   repr = () => {
