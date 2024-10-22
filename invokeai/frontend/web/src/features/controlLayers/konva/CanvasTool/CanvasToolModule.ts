@@ -158,11 +158,12 @@ export class CanvasToolModule extends CanvasModuleBase {
   syncCursorStyle = () => {
     const stage = this.manager.stage;
     const tool = this.$tool.get();
+    const segmentingAdapter = this.manager.stateApi.$segmentingAdapter.get();
 
-    if (this.manager.stage.konva.stage.isDragging() || tool === 'view') {
+    if (this.manager.stage.getIsDragging() || tool === 'view') {
       this.tools.view.syncCursorStyle();
-    } else if (this.manager.stateApi.$isSegmenting.get()) {
-      stage.setCursor('default');
+    } else if (segmentingAdapter) {
+      segmentingAdapter.segmentAnything.syncCursorStyle();
     } else if (this.manager.stateApi.$isFiltering.get()) {
       stage.setCursor('not-allowed');
     } else if (this.manager.stagingArea.$isStaging.get()) {
@@ -284,7 +285,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return false;
     }
 
-    if (this.manager.stage.konva.stage.isDragging()) {
+    if (this.manager.stage.getIsDragging()) {
       return false;
     }
 

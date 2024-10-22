@@ -311,7 +311,7 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.setIsDraggable(true);
 
     // Then start dragging the stage if it's not already being dragged
-    if (!this.konva.stage.isDragging()) {
+    if (!this.getIsDragging()) {
       this.konva.stage.startDrag();
     }
 
@@ -328,7 +328,7 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.setIsDraggable(this.manager.tool.$tool.get() === 'view');
 
     // Stop dragging the stage if it's being dragged
-    if (this.konva.stage.isDragging()) {
+    if (this.getIsDragging()) {
       this.konva.stage.stopDrag();
     }
 
@@ -402,6 +402,10 @@ export class CanvasStageModule extends CanvasModuleBase {
 
   setIsDraggable = (isDraggable: boolean) => {
     this.konva.stage.draggable(isDraggable);
+  };
+
+  getIsDragging = () => {
+    return this.konva.stage.isDragging();
   };
 
   addLayer = (layer: Konva.Layer) => {

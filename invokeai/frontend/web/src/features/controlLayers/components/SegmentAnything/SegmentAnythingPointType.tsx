@@ -3,14 +3,14 @@ import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
-import { zSAMPointLabel } from 'features/controlLayers/store/types';
+import { SAM_POINT_LABEL_STRING_TO_NUMBER, zSAMPointLabelString } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const SegmentAnythingPointType = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
     const { t } = useTranslation();
-    const pointType = useStore(adapter.segmentAnything.$pointType);
+    const pointType = useStore(adapter.segmentAnything.$pointTypeEnglish);
 
     const options = useMemo(() => {
       return [
@@ -28,7 +28,9 @@ export const SegmentAnythingPointType = memo(
           return;
         }
 
-        adapter.segmentAnything.$pointType.set(zSAMPointLabel.parse(v.value));
+        const labelAsString = zSAMPointLabelString.parse(v.value);
+        const labelAsNumber = SAM_POINT_LABEL_STRING_TO_NUMBER[labelAsString];
+        adapter.segmentAnything.$pointType.set(labelAsNumber);
       },
       [adapter.segmentAnything.$pointType]
     );

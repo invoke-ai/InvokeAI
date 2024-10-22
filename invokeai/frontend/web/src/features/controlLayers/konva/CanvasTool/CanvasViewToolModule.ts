@@ -24,6 +24,6 @@ export class CanvasViewToolModule extends CanvasModuleBase {
   }
 
   syncCursorStyle = () => {
-    this.manager.stage.setCursor(this.manager.stage.konva.stage.isDragging() ? 'grabbing' : 'grab');
+    this.manager.stage.setCursor(this.manager.stage.getIsDragging() ? 'grabbing' : 'grab');
   };
 }
