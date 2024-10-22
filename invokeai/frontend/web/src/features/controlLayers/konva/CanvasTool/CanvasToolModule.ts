@@ -3,12 +3,11 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import { CanvasToolBrush } from 'features/controlLayers/konva/CanvasTool/CanvasToolBrush';
 import { CanvasToolColorPicker } from 'features/controlLayers/konva/CanvasTool/CanvasToolColorPicker';
 import { CanvasToolEraser } from 'features/controlLayers/konva/CanvasTool/CanvasToolEraser';
+import { CanvasToolRect } from 'features/controlLayers/konva/CanvasTool/CanvasToolRect';
 import {
   calculateNewBrushSizeFromWheelDelta,
-  floorCoord,
   getIsPrimaryMouseDown,
   getPrefixedId,
-  offsetCoord,
 } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
@@ -57,6 +56,7 @@ export class CanvasToolModule extends CanvasModuleBase {
   tools: {
     brush: CanvasToolBrush;
     eraser: CanvasToolEraser;
+    rect: CanvasToolRect;
     colorPicker: CanvasToolColorPicker;
   };
 
@@ -109,6 +109,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.tools = {
       brush: new CanvasToolBrush(this),
       eraser: new CanvasToolEraser(this),
+      rect: new CanvasToolRect(this),
       colorPicker: new CanvasToolColorPicker(this),
     };
 
@@ -325,12 +326,8 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       if (tool === 'brush') {
         await this.tools.brush.onStagePointerEnter(e);
-        return;
-      }
-
-      if (tool === 'eraser') {
+      } else if (tool === 'eraser') {
         await this.tools.eraser.onStagePointerEnter(e);
-        return;
       }
     } finally {
       this.render();
@@ -345,40 +342,18 @@ export class CanvasToolModule extends CanvasModuleBase {
         return;
       }
 
-      const isMouseDown = getIsPrimaryMouseDown(e);
-      this.$isMouseDown.set(isMouseDown);
+      this.$isMouseDown.set(getIsPrimaryMouseDown(e));
 
       this.syncCursorPositions();
-      const cursorPos = this.$cursorPos.get();
+
       const tool = this.$tool.get();
-      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-
-      if (!cursorPos || !isMouseDown || !selectedEntity?.$isInteractable.get()) {
-        return;
-      }
-
-      const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
 
       if (tool === 'brush') {
         await this.tools.brush.onStagePointerDown(e);
-        return;
-      }
-
-      if (tool === 'eraser') {
+      } else if (tool === 'eraser') {
         await this.tools.eraser.onStagePointerDown(e);
-        return;
-      }
-
-      if (tool === 'rect') {
-        if (selectedEntity.bufferRenderer.hasBuffer()) {
-          selectedEntity.bufferRenderer.commitBuffer();
-        }
-        await selectedEntity.bufferRenderer.setBuffer({
-          id: getPrefixedId('rect'),
-          type: 'rect',
-          rect: { x: Math.round(normalizedPoint.x), y: Math.round(normalizedPoint.y), width: 0, height: 0 },
-          color: this.manager.stateApi.getCurrentColor(),
-        });
+      } else if (tool === 'rect') {
+        await this.tools.rect.onStagePointerDown(e);
       }
     } finally {
       this.render();
@@ -400,30 +375,12 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       if (tool === 'colorPicker') {
         this.tools.colorPicker.onStagePointerUp(e);
-        return;
-      }
-
-      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-      if (!selectedEntity?.$isInteractable.get()) {
-        return;
-      }
-
-      if (tool === 'brush') {
+      } else if (tool === 'brush') {
         this.tools.brush.onStagePointerUp(e);
-        return;
-      }
-
-      if (tool === 'eraser') {
+      } else if (tool === 'eraser') {
         this.tools.eraser.onStagePointerUp(e);
-        return;
-      }
-
-      if (tool === 'rect') {
-        if (selectedEntity.bufferRenderer.state?.type === 'rect' && selectedEntity.bufferRenderer.hasBuffer()) {
-          selectedEntity.bufferRenderer.commitBuffer();
-        } else {
-          selectedEntity.bufferRenderer.clearBuffer();
-        }
+      } else if (tool === 'rect') {
+        this.tools.rect.onStagePointerUp(e);
       }
     } finally {
       this.render();
@@ -439,51 +396,19 @@ export class CanvasToolModule extends CanvasModuleBase {
         return;
       }
 
-      const cursorPos = this.$cursorPos.get();
-
-      if (!cursorPos) {
-        return;
-      }
-
       const tool = this.$tool.get();
 
       if (tool === 'colorPicker') {
         this.tools.colorPicker.onStagePointerMove(e);
-      }
-
-      const isMouseDown = this.$isMouseDown.get();
-      const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-
-      if (!isMouseDown || !selectedEntity?.$isInteractable.get()) {
-        return;
-      }
-
-      const bufferState = selectedEntity.bufferRenderer.state;
-
-      if (!bufferState) {
-        return;
-      }
-
-      if (tool === 'brush') {
+      } else if (tool === 'brush') {
         await this.tools.brush.onStagePointerMove(e);
-        return;
-      }
-
-      if (tool === 'eraser') {
+      } else if (tool === 'eraser') {
         await this.tools.eraser.onStagePointerMove(e);
-        return;
+      } else if (tool === 'rect') {
+        await this.tools.rect.onStagePointerMove(e);
+      } else {
+        this.manager.stateApi.getSelectedEntityAdapter()?.bufferRenderer.clearBuffer();
       }
-
-      if (tool === 'rect' && bufferState.type === 'rect') {
-        const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
-        const alignedPoint = floorCoord(normalizedPoint);
-        bufferState.rect.width = Math.round(alignedPoint.x - bufferState.rect.x);
-        bufferState.rect.height = Math.round(alignedPoint.y - bufferState.rect.y);
-        await selectedEntity.bufferRenderer.setBuffer(bufferState);
-        return;
-      }
-
-      selectedEntity?.bufferRenderer.clearBuffer();
     } finally {
       this.render();
     }
