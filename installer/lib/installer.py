@@ -245,6 +245,9 @@ class InvokeAiInstance:
 
         pip = local[self.pip]
 
+        # Uninstall xformers if it is present; the correct version of it will be reinstalled if needed
+        _ = pip["uninstall", "-yqq", "xformers"] & FG
+
         pipeline = pip[
             "install",
             "--require-virtualenv",
