@@ -1,8 +1,17 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { alignCoordForTool, getPrefixedId } from 'features/controlLayers/konva/util';
+import {
+  alignCoordForTool,
+  getLastPointOfLastLine,
+  getLastPointOfLastLineWithPressure,
+  getLastPointOfLine,
+  getPrefixedId,
+  isDistanceMoreThanMin,
+  offsetCoord,
+} from 'features/controlLayers/konva/util';
 import Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
 
 type CanvasToolEraserConfig = {
@@ -137,6 +146,226 @@ export class CanvasToolEraser extends CanvasModuleBase {
 
   setVisibility = (visible: boolean) => {
     this.konva.group.visible(visible);
+  };
+
+  /**
+   * Handles the pointer enter event on the stage, when the eraser tool is active. This may create a new eraser line if
+   * the mouse is down as the cursor enters the stage.
+   *
+   * The tool module will pass on the event to this method if the tool is 'eraser', after doing any necessary checks
+   * and non-tool-specific handling.
+   *
+   * @param e The Konva event object.
+   */
+  onStagePointerEnter = async (e: KonvaEventObject<PointerEvent>) => {
+    const cursorPos = this.parent.$cursorPos.get();
+
+    const isMouseDown = this.parent.$isMouseDown.get();
+    const settings = this.manager.stateApi.getSettings();
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+
+    if (!cursorPos || !isMouseDown || !selectedEntity) {
+      /**
+       * Can't do anything without:
+       * - A cursor position: the cursor is not on the stage
+       * - The mouse is down: the user is not drawing
+       * - A selected entity: there is no entity to draw on
+       */
+      return;
+    }
+
+    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
+    const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
+
+    if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
+      // If the pen is down and pressure sensitivity is enabled, add the point with pressure
+      await selectedEntity.bufferRenderer.setBuffer({
+        id: getPrefixedId('eraser_line_with_pressure'),
+        type: 'eraser_line_with_pressure',
+        points: [alignedPoint.x, alignedPoint.y, e.evt.pressure],
+        strokeWidth: settings.eraserWidth,
+        clip: this.parent.getClip(selectedEntity.state),
+      });
+    } else {
+      // Else, add the point without pressure
+      await selectedEntity.bufferRenderer.setBuffer({
+        id: getPrefixedId('eraser_line'),
+        type: 'eraser_line',
+        points: [alignedPoint.x, alignedPoint.y],
+        strokeWidth: settings.eraserWidth,
+        clip: this.parent.getClip(selectedEntity.state),
+      });
+    }
+  };
+
+  /**
+   * Handles the pointer down event on the stage, when the eraser tool is active. If the shift key is held, this will
+   * create a straight line from the last point of the last line to the current point. Else, it will create a new line
+   * with the current point.
+   *
+   * The tool module will pass on the event to this method if the tool is 'eraser', after doing any necessary checks
+   * and non-tool-specific handling.
+   *
+   * @param e The Konva event object.
+   */
+  onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
+    const cursorPos = this.parent.$cursorPos.get();
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+
+    if (!cursorPos || !selectedEntity) {
+      /**
+       * Can't do anything without:
+       * - A cursor position: the cursor is not on the stage
+       * - A selected entity: there is no entity to draw on
+       */
+      return;
+    }
+
+    const settings = this.manager.stateApi.getSettings();
+
+    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
+
+    if (e.evt.pointerType === 'pen' && settings.pressureSensitivity) {
+      // We need to get the last point of the last line to create a straight line if shift is held
+      const lastLinePoint = getLastPointOfLastLineWithPressure(
+        selectedEntity.state.objects,
+        'eraser_line_with_pressure'
+      );
+      const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
+      if (selectedEntity.bufferRenderer.hasBuffer()) {
+        selectedEntity.bufferRenderer.commitBuffer();
+      }
+      let points: number[];
+      if (e.evt.shiftKey && lastLinePoint) {
+        // Create a straight line from the last line point
+        points = [
+          lastLinePoint.x,
+          lastLinePoint.y,
+          lastLinePoint.pressure,
+          alignedPoint.x,
+          alignedPoint.y,
+          e.evt.pressure,
+        ];
+      } else {
+        // Create a new line with the current point
+        points = [alignedPoint.x, alignedPoint.y, e.evt.pressure];
+      }
+      await selectedEntity.bufferRenderer.setBuffer({
+        id: getPrefixedId('eraser_line_with_pressure'),
+        type: 'eraser_line_with_pressure',
+        points,
+        strokeWidth: settings.eraserWidth,
+        clip: this.parent.getClip(selectedEntity.state),
+      });
+    } else {
+      // We need to get the last point of the last line to create a straight line if shift is held
+      const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'eraser_line');
+      const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
+
+      if (selectedEntity.bufferRenderer.hasBuffer()) {
+        selectedEntity.bufferRenderer.commitBuffer();
+      }
+
+      let points: number[];
+      if (e.evt.shiftKey && lastLinePoint) {
+        // Create a straight line from the last line point
+        points = [lastLinePoint.x, lastLinePoint.y, alignedPoint.x, alignedPoint.y];
+      } else {
+        // Create a new line with the current point
+        points = [alignedPoint.x, alignedPoint.y];
+      }
+
+      await selectedEntity.bufferRenderer.setBuffer({
+        id: getPrefixedId('eraser_line'),
+        type: 'eraser_line',
+        points,
+        strokeWidth: settings.eraserWidth,
+        clip: this.parent.getClip(selectedEntity.state),
+      });
+    }
+  };
+
+  /**
+   * Handles the pointer up event on the stage, when the eraser tool is active. This handles finalizing the eraser line
+   * that was being drawn (if any).
+   *
+   * The tool module will pass on the event to this method if the tool is 'eraser', after doing any necessary checks
+   * and non-tool-specific handling.
+   *
+   * @param e The Konva event object.
+   */
+  onStagePointerUp = (_e: KonvaEventObject<PointerEvent>) => {
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+    if (!selectedEntity) {
+      return;
+    }
+
+    if (
+      (selectedEntity.bufferRenderer.state?.type === 'eraser_line' ||
+        selectedEntity.bufferRenderer.state?.type === 'eraser_line_with_pressure') &&
+      selectedEntity.bufferRenderer.hasBuffer()
+    ) {
+      selectedEntity.bufferRenderer.commitBuffer();
+    } else {
+      selectedEntity.bufferRenderer.clearBuffer();
+    }
+  };
+
+  /**
+   * Handles the pointer move event on the stage, when the brush tool is active. This handles extending the brush line
+   * that is being drawn (if any).
+   *
+   * The tool module will pass on the event to this method if the tool is 'brush', after doing any necessary checks
+   * and non-tool-specific handling.
+   *
+   * @param e The Konva event object.
+   */
+  onStagePointerMove = async (e: KonvaEventObject<PointerEvent>) => {
+    const cursorPos = this.parent.$cursorPos.get();
+
+    if (!cursorPos) {
+      return;
+    }
+
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+
+    if (!selectedEntity) {
+      return;
+    }
+
+    const bufferState = selectedEntity.bufferRenderer.state;
+
+    if (!bufferState) {
+      return;
+    }
+
+    if (bufferState.type !== 'eraser_line' && bufferState.type !== 'eraser_line_with_pressure') {
+      return;
+    }
+    const settings = this.manager.stateApi.getSettings();
+
+    const lastPoint = getLastPointOfLine(bufferState.points);
+    const minDistance = settings.eraserWidth * this.parent.config.BRUSH_SPACING_TARGET_SCALE;
+    if (!lastPoint || !isDistanceMoreThanMin(cursorPos.relative, lastPoint, minDistance)) {
+      return;
+    }
+
+    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
+    const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
+
+    if (lastPoint.x === alignedPoint.x && lastPoint.y === alignedPoint.y) {
+      // Do not add duplicate points
+      return;
+    }
+
+    bufferState.points.push(alignedPoint.x, alignedPoint.y);
+
+    // Add pressure if the pen is down and pressure sensitivity is enabled
+    if (bufferState.type === 'eraser_line_with_pressure' && settings.pressureSensitivity) {
+      bufferState.points.push(e.evt.pressure);
+    }
+
+    await selectedEntity.bufferRenderer.setBuffer(bufferState);
   };
 
   repr = () => {
