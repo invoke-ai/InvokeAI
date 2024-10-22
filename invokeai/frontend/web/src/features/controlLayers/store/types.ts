@@ -46,7 +46,7 @@ const zControlModeV2 = z.enum(['balanced', 'more_prompt', 'more_control', 'unbal
 export type ControlModeV2 = z.infer<typeof zControlModeV2>;
 export const isControlModeV2 = (v: unknown): v is ControlModeV2 => zControlModeV2.safeParse(v).success;
 
-const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G']);
+const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G', 'ViT-L']);
 export type CLIPVisionModelV2 = z.infer<typeof zCLIPVisionModelV2>;
 export const isCLIPVisionModelV2 = (v: unknown): v is CLIPVisionModelV2 => zCLIPVisionModelV2.safeParse(v).success;
 

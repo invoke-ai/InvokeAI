@@ -81,7 +81,7 @@ class IPAdapterInvocation(BaseInvocation):
         ui_order=-1,
         ui_type=UIType.IPAdapterModel,
     )
-    clip_vision_model: Literal["ViT-H", "ViT-G"] = InputField(
+    clip_vision_model: Literal["ViT-H", "ViT-G", "ViT-L"] = InputField(
         description="CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.",
         default="ViT-H",
         ui_order=2,

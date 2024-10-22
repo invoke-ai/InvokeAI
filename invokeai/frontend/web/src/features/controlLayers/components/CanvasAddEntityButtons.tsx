@@ -34,7 +34,6 @@ export const CanvasAddEntityButtons = memo(() => {
             justifyContent="flex-start"
             leftIcon={<PiPlusBold />}
             onClick={addGlobalReferenceImage}
-            isDisabled={isFLUX}
           >
             {t('controlLayers.globalReferenceImage')}
           </Button>
