@@ -1,4 +1,4 @@
-import { ExternalLink } from '@invoke-ai/ui-library';
+import { ExternalLink, Flex, Progress, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
@@ -20,8 +20,6 @@ import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
-import { v4 as uuidv4 } from 'uuid';
-
 
 import { $lastProgressEvent } from './stores';
 
@@ -44,7 +42,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(socketConnected());
     const queue_id = $queueId.get();
     socket.emit('subscribe_queue', { queue_id });
-    socket.emit('subscribe_bulk_upload', { bulk_upload_id: uuidv4() });
+    socket.emit('subscribe_bulk_upload', { bulk_upload_id: $queueId.get() });
     if (!$baseUrl.get()) {
       const bulk_download_id = $bulkDownloadId.get();
       socket.emit('subscribe_bulk_download', { bulk_download_id });
@@ -484,6 +482,82 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       id: bulk_download_item_name,
       title: t('gallery.bulkDownloadFailed'),
       status: 'error',
+      description: error,
+      duration: null,
+    });
+  });
+
+  socket.on('bulk_upload_started', (data) => {
+    log.debug({ data }, 'Bulk gallery upload started');
+    const { total } = data;
+
+    toast({
+      id: 'BULK_UPLOAD',
+      title: t('gallery.bulkUploadStarted'),
+      status: 'info',
+      updateDescription: true,
+      withCount: false,
+      description: (
+        <Flex flexDir="column" gap={2}>
+          <Text>{t('gallery.bulkUploadStartedDesc', { x: total })}</Text>
+          <Progress value={0} />
+        </Flex>
+      ),
+      duration: null,
+    });
+  });
+
+  socket.on('bulk_upload_progress', (data) => {
+    log.debug({ data }, 'Bulk gallery upload ready');
+    const { completed, total } = data;
+
+    toast({
+      id: 'BULK_UPLOAD',
+      title: t('gallery.bulkUploadStarted'),
+      status: 'info',
+      updateDescription: true,
+      withCount: false,
+      description: (
+        <Flex flexDir="column" gap={2}>
+          <Text>{t('gallery.bulkUploadProgressDesc', { x: total, y: completed })}</Text>
+          <Progress value={(completed / total) * 100} />
+        </Flex>
+      ),
+      duration: null,
+    });
+  });
+
+  socket.on('bulk_upload_completed', (data) => {
+    log.debug({ data }, 'Bulk gallery upload ready');
+    const { total } = data;
+
+    toast({
+      id: 'BULK_UPLOAD',
+      title: t('gallery.bulkUploadComplete'),
+      status: 'success',
+      updateDescription: true,
+      withCount: false,
+      description: (
+        <Flex flexDir="column" gap={2}>
+          <Text>{t('gallery.bulkUploadCompleteDesc', { x: total })}</Text>
+          <Progress value={100} />
+        </Flex>
+      ),
+      duration: null,
+    });
+  });
+
+  socket.on('bulk_upload_error', (data) => {
+    log.error({ data }, 'Bulk gallery download error');
+
+    const { error } = data;
+
+    toast({
+      id: 'BULK_UPLOAD',
+      title: t('gallery.bulkUploadFailed'),
+      status: 'error',
+      updateDescription: true,
+      withCount: false,
       description: error,
       duration: null,
     });

@@ -273,7 +273,6 @@ export const imagesApi = api.injectEndpoints({
         board_id?: string;
         crop_visible?: boolean;
         metadata?: SerializableObject;
-        isFirstUploadOfBatch?: boolean;
       }
     >({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
@@ -325,27 +324,28 @@ export const imagesApi = api.injectEndpoints({
     bulkUploadImages: build.mutation<
       BulkUploadImageResponse,
       {
+        bulk_upload_id: string;
         files: File[];
         board_id?: string;
       }
     >({
-      query: ({ files, board_id }) => {
+      query: ({ bulk_upload_id, files, board_id }) => {
         const formData = new FormData();
-        for(const file of files) {
+        for (const file of files) {
           formData.append('files', file);
         }
-        
+
         return {
           url: buildImagesUrl('bulk-upload'),
           method: 'POST',
           body: formData,
           params: {
+            bulk_upload_id,
             board_id: board_id === 'none' ? undefined : board_id,
           },
         };
       },
     }),
-
 
     deleteBoard: build.mutation<DeleteBoardResult, string>({
       query: (board_id) => ({ url: buildBoardsUrl(board_id), method: 'DELETE' }),

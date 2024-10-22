@@ -245,4 +245,4 @@ export type PostUploadAction =
 export type BoardRecordOrderBy = S['BoardRecordOrderBy'];
 export type StarterModel = S['StarterModel'];
 
-export type BulkUploadImageResponse = S['BulkUploadImageResponse']
+export type BulkUploadImageResponse = S['BulkUploadImageResponse'];

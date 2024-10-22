@@ -34,7 +34,7 @@ export type ServerToClientEvents = {
   bulk_download_complete: (payload: S['BulkDownloadCompleteEvent']) => void;
   bulk_download_error: (payload: S['BulkDownloadErrorEvent']) => void;
   bulk_upload_started: (payload: S['BulkUploadStartedEvent']) => void;
-  bulk_upload_complete: (payload: S['BulkUploadCompletedEvent']) => void;
+  bulk_upload_completed: (payload: S['BulkUploadCompletedEvent']) => void;
   bulk_upload_progress: (payload: S['BulkUploadProgressEvent']) => void;
   bulk_upload_error: (payload: S['BulkUploadErrorEvent']) => void;
 };

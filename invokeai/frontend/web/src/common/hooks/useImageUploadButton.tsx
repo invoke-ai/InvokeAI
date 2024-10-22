@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import { $queueId } from 'app/store/nanostores/queueId';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { selectMaxImageUploadCount } from 'features/system/store/configSlice';
@@ -7,7 +8,7 @@ import { useCallback } from 'react';
 import type { FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { useUploadImageMutation } from 'services/api/endpoints/images';
+import { useBulkUploadImagesMutation, useUploadImageMutation } from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
 
 type UseImageUploadButtonArgs = {
@@ -46,21 +47,41 @@ export const useImageUploadButton = ({
   const [uploadImage] = useUploadImageMutation();
   const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
   const { t } = useTranslation();
+  const [bulkUploadImages] = useBulkUploadImagesMutation();
 
   const onDropAccepted = useCallback(
-    (files: File[]) => {
-      for (const [i, file] of files.entries()) {
+    async (files: File[]) => {
+      if (files.length > 1) {
+        try {
+          toast({
+            id: 'BULK_UPLOAD',
+            title: t('gallery.bulkUploadRequested'),
+            status: 'info',
+            duration: null,
+          });
+          await bulkUploadImages({
+            bulk_upload_id: $queueId.get(),
+            files,
+            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+          }).unwrap();
+        } catch (error) {
+          toast({
+            status: 'error',
+            title: t('gallery.bulkUploadRequestFailed'),
+          });
+          throw error;
+        }
+      } else if (files[0]) {
         uploadImage({
-          file,
+          file: files[0],
           image_category: 'user',
           is_intermediate: false,
           postUploadAction: postUploadAction ?? { type: 'TOAST' },
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          isFirstUploadOfBatch: i === 0,
         });
       }
     },
-    [autoAddBoardId, postUploadAction, uploadImage]
+    [autoAddBoardId, postUploadAction, uploadImage, bulkUploadImages, t]
   );
 
   const onDropRejected = useCallback(

@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import { $queueId } from 'app/store/nanostores/queueId';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
@@ -25,7 +26,7 @@ export const useFullscreenDropzone = () => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
   const [uploadImage] = useUploadImageMutation();
-  const [bulkUploadImages] = useBulkUploadImagesMutation()
+  const [bulkUploadImages] = useBulkUploadImagesMutation();
   const activeTabName = useAppSelector(selectActiveTab);
   const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
 
@@ -63,19 +64,24 @@ export const useFullscreenDropzone = () => {
 
       if (acceptedFiles.length > 1) {
         try {
-          const response = await bulkUploadImages({files: acceptedFiles, board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId}).unwrap()
           toast({
-            status: "success",
-            title: `Uplaoding ${response.uploading} of ${response.sent}`
-          })
+            id: 'BULK_UPLOAD',
+            title: t('gallery.bulkUploadRequested'),
+            status: 'info',
+            duration: null,
+          });
+          await bulkUploadImages({
+            bulk_upload_id: $queueId.get(),
+            files: acceptedFiles,
+            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+          }).unwrap();
         } catch (error) {
           toast({
-            status: "error",
-            title: "Could not upload images"
-          })
-          throw error
+            status: 'error',
+            title: t('gallery.bulkUploadRequestFailed'),
+          });
+          throw error;
         }
-        
       } else if (acceptedFiles[0]) {
         uploadImage({
           file: acceptedFiles[0],
@@ -83,14 +89,12 @@ export const useFullscreenDropzone = () => {
           is_intermediate: false,
           postUploadAction: getPostUploadAction(),
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
- 
         });
       }
-      
 
       setIsHandlingUpload(false);
     },
-    [t, maxImageUploadCount, uploadImage, getPostUploadAction, autoAddBoardId]
+    [t, maxImageUploadCount, uploadImage, getPostUploadAction, autoAddBoardId, bulkUploadImages]
   );
 
   const onDragOver = useCallback(() => {

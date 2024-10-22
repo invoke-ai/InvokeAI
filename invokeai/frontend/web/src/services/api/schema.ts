@@ -432,7 +432,7 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/images/bulk_upload": {
+    "/api/v1/images/bulk-upload": {
         parameters: {
             query?: never;
             header?: never;
@@ -2591,6 +2591,11 @@ export type components = {
              */
             timestamp: number;
             /**
+             * Bulk Upload Id
+             * @description The ID of the bulk image download
+             */
+            bulk_upload_id: string;
+            /**
              * Total
              * @description The total numberof images
              */
@@ -2606,6 +2611,11 @@ export type components = {
              * @description The timestamp of the event
              */
             timestamp: number;
+            /**
+             * Bulk Upload Id
+             * @description The ID of the bulk image download
+             */
+            bulk_upload_id: string;
             /**
              * Error
              * @description The error message
@@ -2630,6 +2640,11 @@ export type components = {
              */
             timestamp: number;
             /**
+             * Bulk Upload Id
+             * @description The ID of the bulk image download
+             */
+            bulk_upload_id: string;
+            /**
              * Completed
              * @description The completed number of images
              */
@@ -2639,8 +2654,6 @@ export type components = {
              * @description The total number of images
              */
             total: number;
-            /** @description The uploaded image */
-            image_DTO: components["schemas"]["ImageDTO"];
         };
         /**
          * BulkUploadStartedEvent
@@ -2652,6 +2665,11 @@ export type components = {
              * @description The timestamp of the event
              */
             timestamp: number;
+            /**
+             * Bulk Upload Id
+             * @description The ID of the bulk image download
+             */
+            bulk_upload_id: string;
             /**
              * Total
              * @description The total numberof images
@@ -18378,7 +18396,8 @@ export interface operations {
     };
     bulk_upload: {
         parameters: {
-            query?: {
+            query: {
+                bulk_upload_id: string;
                 /** @description The board to add this images to, if any */
                 board_id?: string | null;
             };
