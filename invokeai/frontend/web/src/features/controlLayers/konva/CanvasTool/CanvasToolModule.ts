@@ -63,9 +63,11 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   config: CanvasToolModuleConfig = DEFAULT_CONFIG;
 
-  brushToolPreview: CanvasToolBrush;
-  eraserToolPreview: CanvasToolEraser;
-  colorPickerToolPreview: CanvasToolColorPicker;
+  tools: {
+    brush: CanvasToolBrush;
+    eraser: CanvasToolEraser;
+    colorPicker: CanvasToolColorPicker;
+  };
 
   /**
    * The currently selected tool.
@@ -109,18 +111,20 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     this.log.debug('Creating tool module');
 
-    this.brushToolPreview = new CanvasToolBrush(this);
-    this.eraserToolPreview = new CanvasToolEraser(this);
-    this.colorPickerToolPreview = new CanvasToolColorPicker(this);
+    this.tools = {
+      brush: new CanvasToolBrush(this),
+      eraser: new CanvasToolEraser(this),
+      colorPicker: new CanvasToolColorPicker(this),
+    };
 
     this.konva = {
       stage: this.manager.stage.konva.stage,
       group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
     };
 
-    this.konva.group.add(this.brushToolPreview.konva.group);
-    this.konva.group.add(this.eraserToolPreview.konva.group);
-    this.konva.group.add(this.colorPickerToolPreview.konva.group);
+    this.konva.group.add(this.tools.brush.konva.group);
+    this.konva.group.add(this.tools.eraser.konva.group);
+    this.konva.group.add(this.tools.colorPicker.konva.group);
 
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
@@ -146,9 +150,9 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   setToolVisibility = (tool: Tool, isDrawable: boolean) => {
-    this.brushToolPreview.setVisibility(isDrawable && tool === 'brush');
-    this.eraserToolPreview.setVisibility(isDrawable && tool === 'eraser');
-    this.colorPickerToolPreview.setVisibility(tool === 'colorPicker');
+    this.tools.brush.setVisibility(isDrawable && tool === 'brush');
+    this.tools.eraser.setVisibility(isDrawable && tool === 'eraser');
+    this.tools.colorPicker.setVisibility(tool === 'colorPicker');
   };
 
   syncCursorStyle = () => {
@@ -208,9 +212,9 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.konva.group.visible(false);
     } else {
       this.konva.group.visible(true);
-      this.brushToolPreview.render();
-      this.eraserToolPreview.render();
-      this.colorPickerToolPreview.render();
+      this.tools.brush.render();
+      this.tools.eraser.render();
+      this.tools.colorPicker.render();
     }
   };
 
@@ -880,9 +884,9 @@ export class CanvasToolModule extends CanvasModuleBase {
       $isMouseDown: this.$isMouseDown.get(),
       $cursorPos: this.$cursorPos.get(),
       $colorUnderCursor: this.$colorUnderCursor.get(),
-      brushToolPreview: this.brushToolPreview.repr(),
-      eraserToolPreview: this.eraserToolPreview.repr(),
-      colorPickerToolPreview: this.colorPickerToolPreview.repr(),
+      brushToolPreview: this.tools.brush.repr(),
+      eraserToolPreview: this.tools.eraser.repr(),
+      colorPickerToolPreview: this.tools.colorPicker.repr(),
     };
   };
 
