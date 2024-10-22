@@ -28,18 +28,12 @@ type CanvasToolBrushConfig = {
    * The number of milliseconds to wait before hiding the brush preview's fill circle after the mouse is released.
    */
   HIDE_FILL_TIMEOUT_MS: number;
-  /**
-   * The scale factor to use when determining if a new point should be added to the brush line. This is multiplied by the
-   * brush width to determine the minimum distance between points.
-   */
-  BRUSH_SPACING_TARGET_SCALE: number;
 };
 
 const DEFAULT_CONFIG: CanvasToolBrushConfig = {
   BORDER_INNER_COLOR: 'rgba(0,0,0,1)',
   BORDER_OUTER_COLOR: 'rgba(255,255,255,0.8)',
   HIDE_FILL_TIMEOUT_MS: 1500, // same as Affinity
-  BRUSH_SPACING_TARGET_SCALE: 0.1,
 };
 
 /**
@@ -350,10 +344,7 @@ export class CanvasToolBrush extends CanvasModuleBase {
    *
    * @param e The Konva event object.
    */
-  onStagePointerUp = (e: KonvaEventObject<PointerEvent>) => {
-    if (e.target !== this.parent.konva.stage) {
-      return;
-    }
+  onStagePointerUp = (_e: KonvaEventObject<PointerEvent>) => {
     if (this.parent.$tool.get() !== 'brush') {
       return;
     }
@@ -411,14 +402,14 @@ export class CanvasToolBrush extends CanvasModuleBase {
       return;
     }
 
-    const settings = this.manager.stateApi.getSettings();
-
     if (bufferState.type !== 'brush_line' && bufferState.type !== 'brush_line_with_pressure') {
       return;
     }
 
+    const settings = this.manager.stateApi.getSettings();
+
     const lastPoint = getLastPointOfLine(bufferState.points);
-    const minDistance = settings.brushWidth * this.config.BRUSH_SPACING_TARGET_SCALE;
+    const minDistance = settings.brushWidth * this.parent.config.BRUSH_SPACING_TARGET_SCALE;
     if (!lastPoint || !isDistanceMoreThanMin(cursorPos.relative, lastPoint, minDistance)) {
       return;
     }
