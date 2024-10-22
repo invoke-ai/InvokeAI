@@ -284,6 +284,14 @@ export class CanvasToolModule extends CanvasModuleBase {
     };
   };
 
+  /**
+   * Gets whether the user is allowed to draw on the canvas.
+   * - There must be at least one entity rendered on the canvas.
+   * - The canvas must not be busy (e.g. transforming, filtering, rasterizing, staging, compositing, segment-anything-ing).
+   * - There must be a selected entity.
+   * - The selected entity must be interactable (e.g. not hidden, disabled or locked).
+   * @returns Whether the user is allowed to draw on the canvas.
+   */
   getCanDraw = (): boolean => {
     if (this.manager.stateApi.getRenderedEntityCount() === 0) {
       return false;
@@ -335,6 +343,10 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
+    if (e.target !== this.konva.stage) {
+      return;
+    }
+
     try {
       this.$lastPointerType.set(e.evt.pointerType);
 
@@ -364,6 +376,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     if (e.target !== this.konva.stage) {
       return;
     }
+
     try {
       this.$lastPointerType.set(e.evt.pointerType);
 
@@ -388,6 +401,10 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStagePointerMove = async (e: KonvaEventObject<PointerEvent>) => {
+    if (e.target !== this.konva.stage) {
+      return;
+    }
+
     try {
       this.$lastPointerType.set(e.evt.pointerType);
       this.syncCursorPositions();
@@ -415,6 +432,10 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStagePointerLeave = (e: PointerEvent) => {
+    if (e.target !== this.manager.stage.container) {
+      return;
+    }
+
     try {
       this.$lastPointerType.set(e.pointerType);
       this.$cursorPos.set(null);
@@ -438,6 +459,10 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onStageMouseWheel = (e: KonvaEventObject<WheelEvent>) => {
+    if (e.target !== this.konva.stage) {
+      return;
+    }
+
     if (!this.getCanDraw()) {
       return;
     }
