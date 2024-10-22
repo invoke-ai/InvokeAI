@@ -27,7 +27,6 @@ import { SettingsDeveloperLogNamespaces } from 'features/system/components/Setti
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
-  logIsEnabledChanged,
   selectSystemShouldAntialiasProgressImage,
   selectSystemShouldConfirmOnDelete,
   selectSystemShouldConfirmOnNewSession,
@@ -75,12 +74,6 @@ const [useSettingsModal] = buildUseBoolean(false);
 const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  useEffect(() => {
-    if (!config?.shouldShowDeveloperSettings) {
-      dispatch(logIsEnabledChanged(false));
-    }
-  }, [dispatch, config?.shouldShowDeveloperSettings]);
 
   const { isNSFWCheckerAvailable, isWatermarkerAvailable } = useGetAppConfigQuery(undefined, {
     selectFromResult: ({ data }) => ({

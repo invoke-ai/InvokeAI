@@ -196,6 +196,16 @@ dreamshaper_sdxl = StarterModel(
     type=ModelType.Main,
     dependencies=[sdxl_fp16_vae_fix],
 )
+
+archvis_sdxl = StarterModel(
+    name="Architecture (RealVisXL5)",
+    base=BaseModelType.StableDiffusionXL,
+    source="SG161222/RealVisXL_V5.0",
+    description="A photorealistic model, with architecture among its many use cases",
+    type=ModelType.Main,
+    dependencies=[sdxl_fp16_vae_fix],
+)
+
 sdxl_refiner = StarterModel(
     name="SDXL Refiner",
     base=BaseModelType.StableDiffusionXLRefiner,
@@ -563,6 +573,7 @@ STARTER_MODELS: list[StarterModel] = [
     deliberate_inpainting_sd1,
     juggernaut_sdxl,
     dreamshaper_sdxl,
+    archvis_sdxl,
     sdxl_refiner,
     sdxl_fp16_vae_fix,
     flux_vae,

@@ -121,6 +121,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         default=None, input=Input.Connection, description="ControlNet models."
     )
     controlnet_vae: VAEField | None = InputField(
+        default=None,
         description=FieldDescriptions.vae,
         input=Input.Connection,
     )
