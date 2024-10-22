@@ -79,7 +79,15 @@ export class CanvasToolModule extends CanvasModuleBase {
    */
   $toolBuffer = atom<Tool | null>(null);
   /**
-   * Whether the mouse is currently down.
+   * Whether the pointer is currently down on the stage.
+   *
+   * For example, the pointer down was fired on the stage and then moves the cursor outside of the stage, this will
+   * still be true. When the cursor moves back onto the stage, if there has not been an pointer up fired, this will
+   * still be true.
+   *
+   * However, if the pointer down was fired _outside_ the stage, and the cursor moves onto the stage, this will be false.
+   *
+   * TODO(psyche): Give this a more accurate name.
    */
   $isMouseDown = atom<boolean>(false);
   /**
