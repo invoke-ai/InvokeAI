@@ -11,7 +11,7 @@ import { atom } from 'nanostores';
 import rafThrottle from 'raf-throttle';
 import type { Logger } from 'roarr';
 
-type CanvasToolColorPickerConfig = {
+type CanvasColorPickerToolModuleConfig = {
   /**
    * The inner radius of the ring.
    */
@@ -54,7 +54,7 @@ type CanvasToolColorPickerConfig = {
   CROSSHAIR_BORDER_COLOR: string;
 };
 
-const DEFAULT_CONFIG: CanvasToolColorPickerConfig = {
+const DEFAULT_CONFIG: CanvasColorPickerToolModuleConfig = {
   RING_INNER_RADIUS: 25,
   RING_OUTER_RADIUS: 35,
   RING_BORDER_INNER_COLOR: 'rgba(0,0,0,1)',
@@ -70,7 +70,7 @@ const DEFAULT_CONFIG: CanvasToolColorPickerConfig = {
 /**
  * Renders a preview of the color picker tool on the canvas.
  */
-export class CanvasToolColorPicker extends CanvasModuleBase {
+export class CanvasColorPickerToolModule extends CanvasModuleBase {
   readonly type = 'color_picker_tool';
   readonly id: string;
   readonly path: string[];
@@ -78,7 +78,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
   readonly manager: CanvasManager;
   readonly log: Logger;
 
-  config: CanvasToolColorPickerConfig = DEFAULT_CONFIG;
+  config: CanvasColorPickerToolModuleConfig = DEFAULT_CONFIG;
 
   /**
    * The color currently under the cursor. Only has a value when the color picker tool is active.
