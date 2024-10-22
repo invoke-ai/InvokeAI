@@ -445,6 +445,7 @@ class ModelProbe(object):
         if scan_result.infected_files != 0:
             raise Exception("The model {model_name} is potentially infected by malware. Aborting import.")
 
+
 PREFIX_MAP = {
     "text_encoders.t5xxl.transformer.": ModelType.T5Encoder,
     "model.diffusion_model.": ModelType.Main,
@@ -500,7 +501,7 @@ class CheckpointProbeBase(ProbeBase):
     def __init__(self, model_path: Path):
         super().__init__(model_path)
         self.checkpoint = ModelProbe._scan_and_load_checkpoint(model_path)
-    
+
     def get_submodels(self) -> dict[ModelType, str]:
         state_dict = self.checkpoint.get("state_dict") or self.checkpoint
         submodels: dict[ModelType, str] = {}

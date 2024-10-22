@@ -7,7 +7,16 @@ from typing import Optional
 import accelerate
 import torch
 from safetensors.torch import load_file
-from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer, T5Config, CLIPTextConfig
+from transformers import (
+    AutoConfig,
+    AutoModelForTextEncoding,
+    CLIPTextConfig,
+    CLIPTextModel,
+    CLIPTokenizer,
+    T5Config,
+    T5EncoderModel,
+    T5Tokenizer,
+)
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
@@ -45,8 +54,8 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.util.model_util import (
-    convert_bundle_to_flux_transformer_checkpoint,
     FilteredStringDict,
+    convert_bundle_to_flux_transformer_checkpoint,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
@@ -191,41 +200,53 @@ class FluxCheckpointModel(ModelLoader):
             raise ValueError("Only MainCheckpointConfig models are currently supported here.")
         match submodel_type:
             case SubModelType.Tokenizer:
-                return CLIPTokenizer.from_pretrained("InvokeAI/clip-vit-large-patch14-text-encoder", subfolder="bfloat16/tokenizer")
+                return CLIPTokenizer.from_pretrained(
+                    "InvokeAI/clip-vit-large-patch14-text-encoder", subfolder="bfloat16/tokenizer"
+                )
             case SubModelType.TextEncoder:
                 if not (prefix := config.submodels.get(ModelType.CLIPEmbed)):
                     raise ValueError(f"This model does not contain a {ModelType.T5Encoder} prefix")
-                model = CLIPTextModel(CLIPTextConfig(
-                    hidden_size=768,
-                    intermediate_size=3072,
-                    projection_dim=768,
-                ))
+                model = CLIPTextModel(
+                    CLIPTextConfig(
+                        hidden_size=768,
+                        intermediate_size=3072,
+                        projection_dim=768,
+                    )
+                )
                 sd = load_file(Path(config.path))
-                encoder_keys = [k[len(prefix):] for k in sd.keys() if k.startswith(prefix) and not k.endswith("text_projection.weight")]
+                encoder_keys = [
+                    k[len(prefix) :]
+                    for k in sd.keys()
+                    if k.startswith(prefix) and not k.endswith("text_projection.weight")
+                ]
                 clip_sd = FilteredStringDict(sd, encoder_keys, prefix)
                 model.load_state_dict(state_dict=clip_sd)
                 return model
             case SubModelType.Tokenizer2:
                 prefix = config.submodels.get(ModelType.T5Encoder)
-                return T5Tokenizer.from_pretrained("InvokeAI/t5-v1_1-xxl", subfolder="bfloat16/tokenizer_2", max_length=512)
+                return T5Tokenizer.from_pretrained(
+                    "InvokeAI/t5-v1_1-xxl", subfolder="bfloat16/tokenizer_2", max_length=512
+                )
             case SubModelType.TextEncoder2:
                 if not (prefix := config.submodels.get(ModelType.T5Encoder)):
                     raise ValueError(f"This model does not contain a {ModelType.T5Encoder} prefix")
                 sd = load_file(Path(config.path))
-                model = T5EncoderModel(T5Config(
-                    d_model=4096,
-                    d_ff=10240,
-                    num_layers=24,
-                    num_decoder_layers=24,
-                    num_heads=64,
-                    feed_forward_proj="gated-gelu",
-                    is_encoder_decoder=False,
-                ))
-                embeds = model.get_input_embeddings() # type: ignore
+                model = T5EncoderModel(
+                    T5Config(
+                        d_model=4096,
+                        d_ff=10240,
+                        num_layers=24,
+                        num_decoder_layers=24,
+                        num_heads=64,
+                        feed_forward_proj="gated-gelu",
+                        is_encoder_decoder=False,
+                    )
+                )
+                embeds = model.get_input_embeddings()  # type: ignore
                 if not isinstance(embeds, torch.nn.Embedding):
                     raise ValueError("Unable to load given T5 Encoder")
                 sd[f"{prefix}encoder.embed_tokens.weight"] = embeds.weight
-                encoder_keys = [k[len(prefix):] for k in sd.keys() if k.startswith(prefix)]
+                encoder_keys = [k[len(prefix) :] for k in sd.keys() if k.startswith(prefix)]
                 t5_sd = FilteredStringDict(sd, encoder_keys, prefix)
                 model.load_state_dict(state_dict=t5_sd)
                 return model
@@ -238,7 +259,7 @@ class FluxCheckpointModel(ModelLoader):
                 with SilenceWarnings():
                     model = AutoEncoder(ae_params["flux"])
                     sd = load_file(model_path)
-                    encoder_keys = [k[len(prefix):] for k in sd.keys() if k.startswith(prefix)]
+                    encoder_keys = [k[len(prefix) :] for k in sd.keys() if k.startswith(prefix)]
                     t5_sd = FilteredStringDict(sd, encoder_keys, prefix)
                     model.load_state_dict(sd, assign=True)
                     model.to(dtype=self._torch_dtype)
