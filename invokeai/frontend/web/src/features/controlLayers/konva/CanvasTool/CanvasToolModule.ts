@@ -1,6 +1,6 @@
-import { CanvasBboxModule } from 'features/controlLayers/konva/CanvasBboxModule';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import { CanvasBboxToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasBboxToolModule';
 import { CanvasToolBrush } from 'features/controlLayers/konva/CanvasTool/CanvasToolBrush';
 import { CanvasToolColorPicker } from 'features/controlLayers/konva/CanvasTool/CanvasToolColorPicker';
 import { CanvasToolEraser } from 'features/controlLayers/konva/CanvasTool/CanvasToolEraser';
@@ -61,7 +61,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     eraser: CanvasToolEraser;
     rect: CanvasToolRect;
     colorPicker: CanvasToolColorPicker;
-    bbox: CanvasBboxModule;
+    bbox: CanvasBboxToolModule;
     view: CanvasToolView;
     move: CanvasToolMove;
   };
@@ -117,7 +117,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       eraser: new CanvasToolEraser(this),
       rect: new CanvasToolRect(this),
       colorPicker: new CanvasToolColorPicker(this),
-      bbox: new CanvasBboxModule(this),
+      bbox: new CanvasBboxToolModule(this),
       view: new CanvasToolView(this),
       move: new CanvasToolMove(this),
     };

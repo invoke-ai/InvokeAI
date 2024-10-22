@@ -33,7 +33,7 @@ const NO_ANCHORS: string[] = [];
 /**
  * Renders the bounding box. The bounding box can be transformed by the user.
  */
-export class CanvasBboxModule extends CanvasModuleBase {
+export class CanvasBboxToolModule extends CanvasModuleBase {
   readonly type = 'bbox';
   readonly id: string;
   readonly path: string[];
