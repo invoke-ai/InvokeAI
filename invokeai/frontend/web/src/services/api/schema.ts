@@ -2600,6 +2600,8 @@ export type components = {
              * @description The total numberof images
              */
             total: number;
+            /** @description An image from the upload so client can refetch correctly */
+            image_DTO: components["schemas"]["ImageDTO"];
         };
         /**
          * BulkUploadErrorEvent

@@ -15,8 +15,11 @@ import { t } from 'i18next';
 import { forEach, isNil, round } from 'lodash-es';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_TAG } from 'services/api';
+import { boardsApi } from 'services/api/endpoints/boards';
+import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
+import { getCategories, getListImagesUrl } from 'services/api/util';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
@@ -529,7 +532,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('bulk_upload_completed', (data) => {
     log.debug({ data }, 'Bulk gallery upload ready');
-    const { total } = data;
+    const { total, image_DTO: imageDTO } = data;
 
     toast({
       id: 'BULK_UPLOAD',
@@ -545,6 +548,26 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       ),
       duration: null,
     });
+
+    // update the total images for the board
+    dispatch(
+      boardsApi.util.updateQueryData('getBoardImagesTotal', imageDTO.board_id ?? 'none', (draft) => {
+        draft.total += 1;
+      })
+    );
+
+    dispatch(
+      imagesApi.util.invalidateTags([
+        { type: 'Board', id: imageDTO.board_id ?? 'none' },
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: imageDTO.board_id ?? 'none',
+            categories: getCategories(imageDTO),
+          }),
+        },
+      ])
+    );
   });
 
   socket.on('bulk_upload_error', (data) => {

@@ -4,6 +4,7 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
 from pydantic import BaseModel, ConfigDict, Field
 
+from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
@@ -656,14 +657,11 @@ class BulkUploadCompletedEvent(BulkUploadEventBase):
     __event_name__ = "bulk_upload_completed"
 
     total: int = Field(description="The total numberof images")
+    image_DTO: ImageDTO = Field(description="An image from the upload so client can refetch correctly")
 
     @classmethod
-    def build(
-        cls,
-        bulk_upload_id: str,
-        total: int,
-    ) -> "BulkUploadCompletedEvent":
-        return cls(bulk_upload_id=bulk_upload_id, total=total)
+    def build(cls, bulk_upload_id: str, total: int, image_DTO: ImageDTO) -> "BulkUploadCompletedEvent":
+        return cls(bulk_upload_id=bulk_upload_id, total=total, image_DTO=image_DTO)
 
 
 @payload_schema.register

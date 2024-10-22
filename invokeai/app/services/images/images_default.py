@@ -186,7 +186,9 @@ class ImageService(ImageServiceABC):
                     self.__invoker.services.events.emit_bulk_upload_error(bulk_upload_id=bulk_upload_id, error=str(e))
 
         pbar.close()
-        self.__invoker.services.events.emit_bulk_upload_complete(bulk_upload_id=bulk_upload_id, total=len(images_DTOs))
+        self.__invoker.services.events.emit_bulk_upload_complete(
+            bulk_upload_id=bulk_upload_id, total=len(images_DTOs), image_DTO=images_DTOs[0]
+        )
 
     def update(
         self,
