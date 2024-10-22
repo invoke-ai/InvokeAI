@@ -547,7 +547,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 if not isinstance(single_ipa_image_fields, list):
                     single_ipa_image_fields = [single_ipa_image_fields]
 
-                single_ipa_images = [context.images.get_pil(image.image_name) for image in single_ipa_image_fields]
+                single_ipa_images = [
+                    context.images.get_pil(image.image_name, mode="RGB") for image in single_ipa_image_fields
+                ]
                 with image_encoder_model_info as image_encoder_model:
                     assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
                     # Get image embeddings from CLIP and ImageProjModel.

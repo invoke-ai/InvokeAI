@@ -576,7 +576,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     f"FLUX IP-Adapter only supports a single image prompt (received {len(ipa_image_fields)})."
                 )
 
-            ipa_images = [context.images.get_pil(image.image_name) for image in ipa_image_fields]
+            ipa_images = [context.images.get_pil(image.image_name, mode="RGB") for image in ipa_image_fields]
 
             pos_images: list[npt.NDArray[np.uint8]] = []
             neg_images: list[npt.NDArray[np.uint8]] = []
