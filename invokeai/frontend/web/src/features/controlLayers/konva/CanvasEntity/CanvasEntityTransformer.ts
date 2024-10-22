@@ -591,9 +591,10 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
 
-    if (this.manager.$isBusy.get() && !this.$isTransforming.get()) {
-      // The canvas is busy, we can't interact with the transformer
-      this.parent.konva.layer.listening(false);
+    if (this.parent.segmentAnything?.$isSegmenting.get()) {
+      // When segmenting, the layer should listen but the transformer should not be interactable
+      console.log('segmenting');
+      this.parent.konva.layer.listening(true);
       this._setInteractionMode('off');
       return;
     }
@@ -601,6 +602,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     // Not all entities have a filterer - only raster layer and control layer adapters
     if (this.parent.filterer?.$isFiltering.get()) {
       // May not interact with the entity when the filter is active
+      console.log('filtering');
       this.parent.konva.layer.listening(false);
       this._setInteractionMode('off');
       return;
@@ -608,6 +610,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     if (this.manager.stateApi.$isTransforming.get() && !this.$isTransforming.get()) {
       // If another entity is being transformed, we can't interact with this transformer
+      console.log('other entity transforming');
       this.parent.konva.layer.listening(false);
       this._setInteractionMode('off');
       return;
@@ -618,6 +621,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     if (isPendingRectCalculation || pixelRect.width === 0 || pixelRect.height === 0) {
       // If the rect is being calculated, or if the rect has no width or height, we can't interact with the transformer
+      console.log('pending rect calculation');
       this.parent.konva.layer.listening(false);
       this._setInteractionMode('off');
       return;
@@ -626,35 +630,49 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const tool = this.manager.tool.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
 
-    if (this.parent.$isEmpty.get()) {
-      // The layer is totally empty, we can just disable the layer
+    if (!isSelected) {
+      console.log('not selected');
+      // The layer is not selected
       this.parent.konva.layer.listening(false);
       this._setInteractionMode('off');
       return;
     }
 
-    if (isSelected && !this.$isTransforming.get() && tool === 'move') {
+    if (this.parent.$isEmpty.get()) {
+      // The layer is totally empty, we can just disable the layer
+      console.log('empty');
+      this.parent.konva.layer.listening(false);
+      this._setInteractionMode('off');
+      return;
+    }
+
+    if (!this.$isTransforming.get() && tool === 'move') {
       // We are moving this layer, it must be listening
+      console.log('moving');
       this.parent.konva.layer.listening(true);
       this._setInteractionMode('drag');
       return;
     }
 
-    if (isSelected && this.$isTransforming.get()) {
+    if (this.$isTransforming.get()) {
+      console.log('transforming...');
       // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer is
       // active, it will interrupt the stage drag events. So we should disable listening when the view tool is selected.
       if (tool === 'view') {
+        console.log('...with view tool');
         this.parent.konva.layer.listening(false);
         this._setInteractionMode('off');
       } else {
+        console.log('...not with view tool');
         this.parent.konva.layer.listening(true);
         this._setInteractionMode('all');
       }
-    } else {
-      // The layer is not selected, or we are using a tool that doesn't need the layer to be listening - disable interaction stuff
-      this.parent.konva.layer.listening(false);
-      this._setInteractionMode('off');
+      return;
     }
+
+    // The layer is not selected
+    this.parent.konva.layer.listening(false);
+    this._setInteractionMode('off');
   };
 
   /**

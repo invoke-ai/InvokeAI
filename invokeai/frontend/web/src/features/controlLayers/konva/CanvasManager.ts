@@ -113,8 +113,8 @@ export class CanvasManager extends CanvasModuleBase {
         this.stagingArea.$isStaging,
         this.compositor.$isBusy,
       ],
-      (isFiltering, isTransforming, isRasterizing, isStaging, isCompositing) => {
-        return isFiltering || isTransforming || isRasterizing || isStaging || isCompositing;
+      (isFiltering, isTransforming, isRasterizing, isSegmenting, isStaging, isCompositing) => {
+        return isFiltering || isTransforming || isRasterizing || isSegmenting || isStaging || isCompositing;
       }
     );
 
