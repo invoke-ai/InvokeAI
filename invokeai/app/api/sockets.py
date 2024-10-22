@@ -12,7 +12,11 @@ from invokeai.app.services.events.events_common import (
     BulkDownloadErrorEvent,
     BulkDownloadEventBase,
     BulkDownloadStartedEvent,
+    BulkUploadCompletedEvent,
+    BulkUploadErrorEvent,
     BulkUploadEventBase,
+    BulkUploadProgressEvent,
+    BulkUploadStartedEvent,
     DownloadCancelledEvent,
     DownloadCompleteEvent,
     DownloadErrorEvent,
@@ -53,6 +57,7 @@ class BulkDownloadSubscriptionEvent(BaseModel):
 
     bulk_download_id: str
 
+
 class BulkUploadSubscriptionEvent(BaseModel):
     """Event data for subscribing to the socket.io bulk uploads room.
     This is a pydantic model to ensure the data is in the correct format."""
@@ -87,6 +92,7 @@ MODEL_EVENTS = {
 }
 
 BULK_DOWNLOAD_EVENTS = {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, BulkDownloadErrorEvent}
+BULK_UPLOAD_EVENTS = {BulkUploadStartedEvent, BulkUploadCompletedEvent, BulkUploadProgressEvent, BulkUploadErrorEvent}
 
 
 class SocketIO:
@@ -114,6 +120,7 @@ class SocketIO:
         register_events(QUEUE_EVENTS, self._handle_queue_event)
         register_events(MODEL_EVENTS, self._handle_model_event)
         register_events(BULK_DOWNLOAD_EVENTS, self._handle_bulk_image_download_event)
+        register_events(BULK_UPLOAD_EVENTS, self._handle_bulk_image_upload_event)
 
     async def _handle_sub_queue(self, sid: str, data: Any) -> None:
         await self._sio.enter_room(sid, QueueSubscriptionEvent(**data).queue_id)

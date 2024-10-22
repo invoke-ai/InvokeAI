@@ -2,7 +2,6 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from typing import List, Optional
-from uuid import uuid4
 
 from PIL.Image import Image as PILImageType
 from tqdm import tqdm
@@ -101,12 +100,11 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
 
-    def create_many(self, upload_data_list: List[ImageBulkUploadData]) -> None:
+    def create_many(self, bulk_upload_id: str, upload_data_list: List[ImageBulkUploadData]) -> None:
         total_images = len(upload_data_list)
         processed_counter = 0  # Local counter
         images_DTOs: list[ImageDTO] = []  # Collect ImageDTOs for successful uploads
         progress_lock = Lock()
-        bulk_upload_id = uuid4().hex
 
         self.__invoker.services.events.emit_bulk_upload_started(
             bulk_upload_id=bulk_upload_id,
@@ -182,7 +180,6 @@ class ImageService(ImageServiceABC):
                         bulk_upload_id=bulk_upload_id,
                         completed=processed_counter,
                         total=total_images,
-                        image_DTO=image_DTO,
                     )
                 except Exception as e:
                     self.__invoker.services.logger.error(f"Error in processing image: {str(e)}")

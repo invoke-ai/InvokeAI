@@ -42,6 +42,7 @@ class BulkUploadImageResponse(BaseModel):
     response_model=BulkUploadImageResponse,
 )
 async def bulk_upload(
+    bulk_upload_id: str,
     files: list[UploadFile],
     background_tasks: BackgroundTasks,
     request: Request,
@@ -104,7 +105,7 @@ async def bulk_upload(
         upload_data_list.append(upload_data)
 
     # Schedule image processing as a background task
-    background_tasks.add_task(ApiDependencies.invoker.services.images.create_many, upload_data_list)
+    background_tasks.add_task(ApiDependencies.invoker.services.images.create_many, bulk_upload_id, upload_data_list)
 
     return BulkUploadImageResponse(sent=len(files), uploading=len(upload_data_list))
 

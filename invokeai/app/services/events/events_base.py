@@ -34,7 +34,6 @@ from invokeai.app.services.events.events_common import (
     QueueClearedEvent,
     QueueItemStatusChangedEvent,
 )
-from invokeai.app.services.images.images_common import ImageDTO
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
@@ -211,9 +210,9 @@ class EventServiceBase:
         """Emitted when a bulk image upload is started"""
         self.dispatch(BulkUploadStartedEvent.build(bulk_upload_id, total))
 
-    def emit_bulk_upload_progress(self, bulk_upload_id: str, completed: int, total: int, image_DTO: ImageDTO) -> None:
+    def emit_bulk_upload_progress(self, bulk_upload_id: str, completed: int, total: int) -> None:
         """Emitted when a bulk image upload is started"""
-        self.dispatch(BulkUploadProgressEvent.build(bulk_upload_id, completed, total, image_DTO))
+        self.dispatch(BulkUploadProgressEvent.build(bulk_upload_id, completed, total))
 
     def emit_bulk_upload_complete(self, bulk_upload_id: str, total: int) -> None:
         """Emitted when a bulk image upload is complete"""

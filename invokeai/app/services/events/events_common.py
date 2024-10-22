@@ -4,7 +4,6 @@ from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
 from pydantic import BaseModel, ConfigDict, Field
 
-from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import (
     QUEUE_ITEM_STATUS,
@@ -626,10 +625,12 @@ class BulkDownloadErrorEvent(BulkDownloadEventBase):
             error=error,
         )
 
+
 class BulkUploadEventBase(EventBase):
     """Base class for events associated with a bulk image upload"""
 
     bulk_upload_id: str = Field(description="The ID of the bulk image download")
+
 
 @payload_schema.register
 class BulkUploadStartedEvent(BulkUploadEventBase):
@@ -641,13 +642,13 @@ class BulkUploadStartedEvent(BulkUploadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_upload_id: str,total: int,
+        cls,
+        bulk_upload_id: str,
+        total: int,
     ) -> "BulkUploadStartedEvent":
-        return cls(
-            bulk_upload_id=bulk_upload_id,
-            total=total
-        )
-    
+        return cls(bulk_upload_id=bulk_upload_id, total=total)
+
+
 @payload_schema.register
 class BulkUploadCompletedEvent(BulkUploadEventBase):
     """Event model for bulk_upload_completed"""
@@ -658,13 +659,13 @@ class BulkUploadCompletedEvent(BulkUploadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_upload_id: str, total: int,
+        cls,
+        bulk_upload_id: str,
+        total: int,
     ) -> "BulkUploadCompletedEvent":
-        return cls(
-            bulk_upload_id=bulk_upload_id,
-            total=total
-        )
-    
+        return cls(bulk_upload_id=bulk_upload_id, total=total)
+
+
 @payload_schema.register
 class BulkUploadProgressEvent(BulkUploadEventBase):
     """Event model for bulk_upload_progress"""
@@ -673,18 +674,21 @@ class BulkUploadProgressEvent(BulkUploadEventBase):
 
     completed: int = Field(description="The completed number of images")
     total: int = Field(description="The total number of images")
-    image_DTO: ImageDTO = Field(description="The uploaded image")
 
     @classmethod
     def build(
-        cls, bulk_upload_id: str,completed: int, total: int, image_DTO: ImageDTO, 
+        cls,
+        bulk_upload_id: str,
+        completed: int,
+        total: int,
     ) -> "BulkUploadProgressEvent":
         return cls(
             bulk_upload_id=bulk_upload_id,
             completed=completed,
             total=total,
-            image_DTO=image_DTO
         )
+
+
 @payload_schema.register
 class BulkUploadErrorEvent(BulkUploadEventBase):
     """Event model for bulk_upload_error"""
@@ -695,9 +699,8 @@ class BulkUploadErrorEvent(BulkUploadEventBase):
 
     @classmethod
     def build(
-        cls,  bulk_upload_id: str,error: str,
+        cls,
+        bulk_upload_id: str,
+        error: str,
     ) -> "BulkUploadErrorEvent":
-        return cls(
-            bulk_upload_id=bulk_upload_id,
-            error=error
-        )
+        return cls(bulk_upload_id=bulk_upload_id, error=error)
