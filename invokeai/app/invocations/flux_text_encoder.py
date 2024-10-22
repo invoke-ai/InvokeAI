@@ -95,7 +95,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
 
             # Apply LoRA models to the CLIP encoder.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
-            if clip_text_encoder_config.format in [ModelFormat.Diffusers]:
+            if clip_text_encoder_config.format in [ModelFormat.Diffusers, ModelFormat.Checkpoint]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
                     LoRAPatcher.apply_lora_patches(

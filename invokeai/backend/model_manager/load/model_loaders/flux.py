@@ -7,7 +7,7 @@ from typing import Optional
 import accelerate
 import torch
 from safetensors.torch import load_file
-from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer, T5Config
+from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer, T5Config, CLIPTextConfig
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
@@ -189,8 +189,22 @@ class FluxCheckpointModel(ModelLoader):
     ) -> AnyModel:
         if not isinstance(config, MainCheckpointConfig):
             raise ValueError("Only MainCheckpointConfig models are currently supported here.")
-
         match submodel_type:
+            case SubModelType.Tokenizer:
+                return CLIPTokenizer.from_pretrained("InvokeAI/clip-vit-large-patch14-text-encoder", subfolder="bfloat16/tokenizer")
+            case SubModelType.TextEncoder:
+                if not (prefix := config.submodels.get(ModelType.CLIPEmbed)):
+                    raise ValueError(f"This model does not contain a {ModelType.T5Encoder} prefix")
+                model = CLIPTextModel(CLIPTextConfig(
+                    hidden_size=768,
+                    intermediate_size=3072,
+                    projection_dim=768,
+                ))
+                sd = load_file(Path(config.path))
+                encoder_keys = [k[len(prefix):] for k in sd.keys() if k.startswith(prefix) and not k.endswith("text_projection.weight")]
+                clip_sd = FilteredStringDict(sd, encoder_keys, prefix)
+                model.load_state_dict(state_dict=clip_sd)
+                return model
             case SubModelType.Tokenizer2:
                 prefix = config.submodels.get(ModelType.T5Encoder)
                 return T5Tokenizer.from_pretrained("InvokeAI/t5-v1_1-xxl", subfolder="bfloat16/tokenizer_2", max_length=512)
@@ -217,6 +231,18 @@ class FluxCheckpointModel(ModelLoader):
                 return model
             case SubModelType.Transformer:
                 return self._load_from_singlefile(config)
+            case SubModelType.VAE:
+                model_path = Path(config.path)
+                if not (prefix := config.submodels.get(ModelType.VAE)):
+                    raise ValueError(f"This model does not contain a {ModelType.VAE} prefix")
+                with SilenceWarnings():
+                    model = AutoEncoder(ae_params["flux"])
+                    sd = load_file(model_path)
+                    encoder_keys = [k[len(prefix):] for k in sd.keys() if k.startswith(prefix)]
+                    t5_sd = FilteredStringDict(sd, encoder_keys, prefix)
+                    model.load_state_dict(sd, assign=True)
+                    model.to(dtype=self._torch_dtype)
+                return model
 
         raise ValueError(
             f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"

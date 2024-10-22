@@ -448,7 +448,7 @@ class ModelProbe(object):
 PREFIX_MAP = {
     "text_encoders.t5xxl.transformer.": ModelType.T5Encoder,
     "model.diffusion_model.": ModelType.Main,
-    "text_encoders.clip_l.": ModelType.CLIPEmbed,
+    "text_encoders.clip_l.transformer.": ModelType.CLIPEmbed,
     "vae": ModelType.VAE,
 }
 
