@@ -52,6 +52,8 @@ class ImageBulkUploadData(BaseModel):
     graph: Optional[str] = None
     width: Optional[int] = None
     height: Optional[int] = None
+    user_id: Optional[str] = None
+    project_id: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True

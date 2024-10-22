@@ -34,6 +34,7 @@ class ImageFileStorageBase(ABC):
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
         thumbnail_size: int = 256,
+        project_id: Optional[str] = None,
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
         pass

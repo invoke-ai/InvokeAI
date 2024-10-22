@@ -129,6 +129,8 @@ class ImageService(ImageServiceABC):
                     has_workflow=image_data.workflow is not None or image_data.graph is not None,
                     is_intermediate=False,
                     metadata=image_data.metadata,
+                    user_id=image_data.user_id,
+                    project_id=image_data.project_id,
                 )
 
                 if image_data.board_id is not None:
@@ -142,6 +144,7 @@ class ImageService(ImageServiceABC):
                     metadata=image_data.metadata,
                     workflow=image_data.workflow,
                     graph=image_data.graph,
+                    project_id=image_data.project_id,
                 )
 
                 image_dto = self.get_dto(image_data.image_name)

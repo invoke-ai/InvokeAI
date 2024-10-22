@@ -54,6 +54,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
         thumbnail_size: int = 256,
+        project_id: Optional[str] = None,
     ) -> None:
         try:
             self.__validate_storage_folders()
