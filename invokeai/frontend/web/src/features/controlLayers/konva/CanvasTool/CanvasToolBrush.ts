@@ -185,16 +185,6 @@ export class CanvasToolBrush extends CanvasModuleBase {
    * @param e The Konva event object.
    */
   onStagePointerEnter = async (e: KonvaEventObject<PointerEvent>) => {
-    if (this.parent.$tool.get() !== 'brush') {
-      // This should never happen, but just in case
-      return;
-    }
-
-    if (!this.parent.getCanDraw()) {
-      // We can't draw, so don't do anything
-      return;
-    }
-
     const cursorPos = this.parent.$cursorPos.get();
     const isMouseDown = this.parent.$isMouseDown.get();
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
@@ -248,16 +238,6 @@ export class CanvasToolBrush extends CanvasModuleBase {
    * @param e The Konva event object.
    */
   onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
-    if (this.parent.$tool.get() !== 'brush') {
-      // This should never happen, but just in case
-      return;
-    }
-
-    if (!this.parent.getCanDraw()) {
-      // We can't draw, so don't do anything
-      return;
-    }
-
     const cursorPos = this.parent.$cursorPos.get();
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
@@ -345,12 +325,6 @@ export class CanvasToolBrush extends CanvasModuleBase {
    * @param e The Konva event object.
    */
   onStagePointerUp = (_e: KonvaEventObject<PointerEvent>) => {
-    if (this.parent.$tool.get() !== 'brush') {
-      return;
-    }
-    if (!this.parent.getCanDraw()) {
-      return;
-    }
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
     if (!selectedEntity) {
       return;
@@ -376,14 +350,6 @@ export class CanvasToolBrush extends CanvasModuleBase {
    * @param e The Konva event object.
    */
   onStagePointerMove = async (e: KonvaEventObject<PointerEvent>) => {
-    if (this.parent.$tool.get() !== 'brush') {
-      return;
-    }
-
-    if (!this.parent.getCanDraw()) {
-      return;
-    }
-
     const cursorPos = this.parent.$cursorPos.get();
 
     if (!cursorPos) {
