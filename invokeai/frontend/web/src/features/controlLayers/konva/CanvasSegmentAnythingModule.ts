@@ -6,7 +6,7 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
-import { getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
+import { floorCoord, getKonvaNodeDebugAttrs, getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
 import type {
   CanvasImageState,
   Coordinate,
@@ -14,14 +14,15 @@ import type {
   SAMPoint,
   SAMPointLabel,
 } from 'features/controlLayers/store/types';
+import { SAM_POINT_LABEL_NUMBER_TO_STRING } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
-import { atom } from 'nanostores';
+import type { Atom } from 'nanostores';
+import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
-import type { S } from 'services/api/types';
 
 type CanvasSegmentAnythingModuleConfig = {
   SAM_POINT_RADIUS: number;
@@ -34,12 +35,12 @@ type CanvasSegmentAnythingModuleConfig = {
 };
 
 const DEFAULT_CONFIG: CanvasSegmentAnythingModuleConfig = {
-  SAM_POINT_RADIUS: 5,
+  SAM_POINT_RADIUS: 8,
   SAM_POINT_BORDER_WIDTH: 2,
   SAM_POINT_BORDER_COLOR: { r: 0, g: 0, b: 0, a: 1 },
-  SAM_POINT_FOREGROUND_COLOR: { r: 0, g: 200, b: 0, a: 0.7 },
-  SAM_POINT_BACKGROUND_COLOR: { r: 200, g: 0, b: 0, a: 0.7 },
-  SAM_POINT_NEUTRAL_COLOR: { r: 0, g: 0, b: 200, a: 0.7 },
+  SAM_POINT_FOREGROUND_COLOR: { r: 50, g: 255, b: 0, a: 1 }, // green-ish
+  SAM_POINT_BACKGROUND_COLOR: { r: 255, g: 0, b: 50, a: 1 }, // red-ish
+  SAM_POINT_NEUTRAL_COLOR: { r: 0, g: 225, b: 255, a: 1 }, // cyan-ish
   PROCESS_DEBOUNCE_MS: 300,
 };
 
@@ -72,7 +73,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   $hasProcessed = atom<boolean>(false);
   $isProcessing = atom<boolean>(false);
 
-  $pointType = atom<SAMPointLabel>('foreground');
+  $pointType = atom<SAMPointLabel>(1);
+  $pointTypeEnglish = computed<(typeof SAM_POINT_LABEL_NUMBER_TO_STRING)[SAMPointLabel], Atom<SAMPointLabel>>(
+    this.$pointType,
+    (pointType) => SAM_POINT_LABEL_NUMBER_TO_STRING[pointType]
+  );
   $isDraggingPoint = atom<boolean>(false);
 
   imageState: CanvasImageState | null = null;
@@ -116,7 +121,18 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.konva.group.add(this.konva.maskGroup);
     this.konva.group.add(this.konva.pointGroup);
     this.konva.maskGroup.add(this.konva.compositingRect);
+    this.subscriptions.add(
+      this.manager.stage.$stageAttrs.listen((stageAttrs, oldStageAttrs) => {
+        if (stageAttrs.scale !== oldStageAttrs.scale) {
+          this.syncPointScales();
+        }
+      })
+    );
   }
+
+  syncCursorStyle = () => {
+    this.manager.stage.setCursor('crosshair');
+  };
 
   createPoint(coord: Coordinate, label: SAMPointLabel): SAMPointState {
     const id = getPrefixedId('sam_point');
@@ -124,12 +140,14 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       name: this.KONVA_CIRCLE_NAME,
       x: Math.round(coord.x),
       y: Math.round(coord.y),
-      radius: this.config.SAM_POINT_RADIUS,
+      radius: this.manager.stage.unscale(this.config.SAM_POINT_RADIUS),
       fill: rgbaColorToString(this.getSAMPointColor(label)),
       stroke: rgbaColorToString(this.config.SAM_POINT_BORDER_COLOR),
-      strokeWidth: this.config.SAM_POINT_BORDER_WIDTH,
+      strokeWidth: this.manager.stage.unscale(this.config.SAM_POINT_BORDER_WIDTH),
       draggable: true,
-      perfectDrawEnabled: false,
+      perfectDrawEnabled: true,
+      opacity: 0.6,
+      dragDistance: 3,
     });
 
     circle.on('pointerup', (e) => {
@@ -147,33 +165,58 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     circle.on('dragend', () => {
       this.$isDraggingPoint.set(false);
+      this.log.trace(
+        { x: Math.round(circle.x()), y: Math.round(circle.y()), label: SAM_POINT_LABEL_NUMBER_TO_STRING[label] },
+        'SAM point moved'
+      );
     });
 
-    circle.dragBoundFunc(({ x, y }) => ({
-      x: Math.round(x),
-      y: Math.round(y),
-    }));
+    circle.dragBoundFunc((pos) => floorCoord(pos));
 
     this.konva.pointGroup.add(circle);
-    const state: SAMPointState = {
+
+    this.log.trace(
+      { x: Math.round(circle.x()), y: Math.round(circle.y()), label: SAM_POINT_LABEL_NUMBER_TO_STRING[label] },
+      'Created SAM point'
+    );
+
+    return {
       id,
       label,
       konva: { circle },
     };
-
-    return state;
   }
 
+  syncPointScales = () => {
+    const radius = this.manager.stage.unscale(this.config.SAM_POINT_RADIUS);
+    const borderWidth = this.manager.stage.unscale(this.config.SAM_POINT_BORDER_WIDTH);
+    for (const {
+      konva: { circle },
+    } of this.points) {
+      circle.radius(radius);
+      circle.strokeWidth(borderWidth);
+    }
+  };
+
   getSAMPoints = (): SAMPoint[] => {
-    return this.points.map(({ konva: { circle }, label }) => ({
-      x: circle.x(),
-      y: circle.y(),
-      label,
-    }));
+    const points: SAMPoint[] = [];
+
+    for (const { konva, label } of this.points) {
+      points.push({
+        x: Math.round(konva.circle.x()),
+        y: Math.round(konva.circle.y()),
+        label,
+      });
+    }
+
+    return points;
   };
 
   onPointerUp = (e: KonvaEventObject<PointerEvent>) => {
     if (e.evt.button !== 0) {
+      return;
+    }
+    if (this.manager.stage.getIsDragging()) {
       return;
     }
     if (this.$isDraggingPoint.get()) {
@@ -184,7 +227,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
 
-    this.points.push(this.createPoint(cursorPos.relative, this.$pointType.get()));
+    const pixelRect = this.parent.transformer.$pixelRect.get();
+
+    const normalizedPoint = offsetCoord(cursorPos.relative, { x: pixelRect.x, y: pixelRect.y });
+    const samPoint = this.createPoint(normalizedPoint, this.$pointType.get());
+    this.points.push(samPoint);
   };
 
   setSegmentingEventListeners = () => {
@@ -202,6 +249,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
     this.log.trace('Starting segment anything');
+    this.$pointType.set(1);
     this.$isSegmenting.set(true);
     this.manager.stateApi.$segmentingAdapter.set(this.parent);
     for (const point of this.points) {
@@ -209,6 +257,14 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
     this.points = [];
     this.parent.konva.layer.add(this.konva.group);
+    console.log({
+      position: this.parent.state.position,
+      pixelRect: this.parent.transformer.$pixelRect.get(),
+      nodeRect: this.parent.transformer.$nodeRect.get(),
+      getRelativeRect: this.parent.transformer.getRelativeRect(),
+    });
+    const pixelRect = this.parent.transformer.$pixelRect.get();
+    this.konva.group.setAttrs({ x: pixelRect.x, y: pixelRect.y });
     this.parent.konva.layer.listening(true);
 
     this.setSegmentingEventListeners();
@@ -239,15 +295,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       type: 'segment_anything_object_identifier',
       model: 'segment-anything-huge',
       image: { image_name: rasterizeResult.value.image_name },
-      object_identifiers: [
-        {
-          points: this.getSAMPoints().map(({ x, y, label }): S['SAMPoint'] => ({
-            x,
-            y,
-            label: label === 'foreground' ? 1 : -1,
-          })),
-        },
-      ],
+      object_identifiers: [{ points: this.getSAMPoints() }],
     });
     const applyMask = g.addNode({
       id: getPrefixedId('apply_tensor_mask_to_image'),
@@ -321,7 +369,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
     this.konva.compositingRect.visible(false);
     this.konva.maskGroup.clearCache();
-    this.$pointType.set('foreground');
+    this.$pointType.set(1);
     this.$isSegmenting.set(false);
     this.$hasProcessed.set(false);
     this.manager.stateApi.$segmentingAdapter.set(null);
@@ -364,11 +412,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   };
 
   getSAMPointColor(label: SAMPointLabel): RgbaColor {
-    if (label === 'neutral') {
+    if (label === 0) {
       return this.config.SAM_POINT_NEUTRAL_COLOR;
-    } else if (label === 'foreground') {
+    } else if (label === 1) {
       return this.config.SAM_POINT_FOREGROUND_COLOR;
     } else {
+      // label === -1
       return this.config.SAM_POINT_BACKGROUND_COLOR;
     }
   }

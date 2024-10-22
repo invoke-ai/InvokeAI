@@ -203,12 +203,9 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
    * Renders the bbox. The bbox is only visible when the tool is set to 'bbox'.
    */
   render = () => {
-    this.log.trace('Rendering');
-
-    const { x, y, width, height } = this.manager.stateApi.runSelector(selectBbox).rect;
     const tool = this.manager.tool.$tool.get();
 
-    this.konva.group.visible(true);
+    const { x, y, width, height } = this.manager.stateApi.runSelector(selectBbox).rect;
 
     // We need to reach up to the preview layer to enable/disable listening so that the bbox can be interacted with.
     // If the mangaer is busy, we disable listening so the bbox cannot be interacted with.

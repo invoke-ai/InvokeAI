@@ -96,8 +96,29 @@ const zCoordinateWithPressure = z.object({
 });
 export type CoordinateWithPressure = z.infer<typeof zCoordinateWithPressure>;
 
-export const zSAMPointLabel = z.enum(['foreground', 'background', 'neutral']);
+const SAM_POINT_LABELS = {
+  background: -1,
+  neutral: 0,
+  foreground: 1,
+} as const;
+
+export const zSAMPointLabel = z.nativeEnum(SAM_POINT_LABELS);
 export type SAMPointLabel = z.infer<typeof zSAMPointLabel>;
+
+export const zSAMPointLabelString = z.enum(['background', 'neutral', 'foreground']);
+export type SAMPointLabelString = z.infer<typeof zSAMPointLabelString>;
+
+export const SAM_POINT_LABEL_NUMBER_TO_STRING: Record<SAMPointLabel, SAMPointLabelString> = {
+  '-1': 'background',
+  0: 'neutral',
+  1: 'foreground',
+};
+
+export const SAM_POINT_LABEL_STRING_TO_NUMBER: Record<SAMPointLabelString, SAMPointLabel> = {
+  background: -1,
+  neutral: 0,
+  foreground: 1,
+};
 
 export const zSAMPoint = z.object({
   x: z.number().int().gte(0),
