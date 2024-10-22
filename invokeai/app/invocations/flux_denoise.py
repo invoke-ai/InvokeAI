@@ -570,6 +570,11 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             else:
                 raise ValueError(f"Unsupported IP-Adapter image type: {type(ip_adapter_field.image)}")
 
+            if len(ipa_image_fields) != 1:
+                raise ValueError(
+                    f"FLUX IP-Adapter only supports a single image prompt (received {len(ipa_image_fields)})."
+                )
+
             ipa_images = [context.images.get_pil(image.image_name) for image in ipa_image_fields]
 
             pos_images: list[npt.NDArray[np.uint8]] = []

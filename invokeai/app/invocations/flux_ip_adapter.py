@@ -35,7 +35,7 @@ class FluxIPAdapterInvocation(BaseInvocation):
 
     # FLUXIPAdapterInvocation is based closely on IPAdapterInvocation, but with some unsupported features removed.
 
-    image: Union[ImageField, List[ImageField]] = InputField(description="The IP-Adapter image prompt(s).")
+    image: ImageField = InputField(description="The IP-Adapter image prompt(s).")
     ip_adapter_model: ModelIdentifierField = InputField(
         description="The IP-Adapter model.", title="IP-Adapter Model", ui_type=UIType.IPAdapterModel
     )
