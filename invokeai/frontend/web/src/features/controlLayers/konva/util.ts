@@ -1,6 +1,12 @@
 import type { Selector, Store } from '@reduxjs/toolkit';
 import { $authToken } from 'app/store/nanostores/authToken';
-import type { CanvasEntityIdentifier, CanvasObjectState, Coordinate, Rect } from 'features/controlLayers/store/types';
+import type {
+  CanvasEntityIdentifier,
+  CanvasObjectState,
+  Coordinate,
+  CoordinateWithPressure,
+  Rect,
+} from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -545,11 +551,6 @@ export const exhaustiveCheck = (value: never): never => {
   assert(false, `Unhandled value: ${value}`);
 };
 
-type CoordinateWithPressure = {
-  x: number;
-  y: number;
-  pressure: number;
-};
 export const getLastPointOfLastLineWithPressure = (
   objects: CanvasObjectState[],
   type: 'brush_line_with_pressure' | 'eraser_line_with_pressure'

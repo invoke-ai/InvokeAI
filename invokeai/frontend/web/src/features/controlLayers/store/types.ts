@@ -89,6 +89,12 @@ const zCoordinate = z.object({
   y: z.number(),
 });
 export type Coordinate = z.infer<typeof zCoordinate>;
+const zCoordinateWithPressure = z.object({
+  x: z.number(),
+  y: z.number(),
+  pressure: z.number(),
+});
+export type CoordinateWithPressure = z.infer<typeof zCoordinateWithPressure>;
 
 export const zSAMPointLabel = z.enum(['foreground', 'background', 'neutral']);
 export type SAMPointLabel = z.infer<typeof zSAMPointLabel>;
@@ -117,6 +123,9 @@ const zCanvasBrushLineState = z.object({
   id: zId,
   type: z.literal('brush_line'),
   strokeWidth: z.number().min(1),
+  /**
+   * Points without pressure are in the format [x1, y1, x2, y2, ...]
+   */
   points: zPoints,
   color: zRgbaColor,
   clip: zRect.nullable(),
@@ -127,6 +136,9 @@ const zCanvasBrushLineWithPressureState = z.object({
   id: zId,
   type: z.literal('brush_line_with_pressure'),
   strokeWidth: z.number().min(1),
+  /**
+   * Points with pressure are in the format [x1, y1, pressure1, x2, y2, pressure2, ...]
+   */
   points: zPointsWithPressure,
   color: zRgbaColor,
   clip: zRect.nullable(),
@@ -137,6 +149,9 @@ const zCanvasEraserLineState = z.object({
   id: zId,
   type: z.literal('eraser_line'),
   strokeWidth: z.number().min(1),
+  /**
+   * Points without pressure are in the format [x1, y1, x2, y2, ...]
+   */
   points: zPoints,
   clip: zRect.nullable(),
 });
@@ -146,6 +161,9 @@ const zCanvasEraserLineWithPressureState = z.object({
   id: zId,
   type: z.literal('eraser_line_with_pressure'),
   strokeWidth: z.number().min(1),
+  /**
+   * Points with pressure are in the format [x1, y1, pressure1, x2, y2, pressure2, ...]
+   */
   points: zPointsWithPressure,
   clip: zRect.nullable(),
 });
