@@ -90,6 +90,10 @@ export class CanvasToolEraser extends CanvasModuleBase {
     this.konva.group.add(this.konva.cutoutCircle, this.konva.innerBorder, this.konva.outerBorder);
   }
 
+  syncCursorStyle = () => {
+    this.manager.stage.setCursor('none');
+  };
+
   render = () => {
     if (this.parent.$tool.get() !== 'eraser') {
       this.setVisibility(false);

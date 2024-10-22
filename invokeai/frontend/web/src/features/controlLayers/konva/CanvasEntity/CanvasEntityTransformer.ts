@@ -234,8 +234,25 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     this.konva.transformer.on('transform', this.syncObjectGroupWithProxyRect);
     this.konva.transformer.on('transformend', this.snapProxyRectToPixelGrid);
+    this.konva.transformer.on('pointerenter', () => {
+      this.manager.stage.setCursor('move');
+    });
+    this.konva.transformer.on('pointerleave', () => {
+      this.manager.stage.setCursor('default');
+    });
     this.konva.proxyRect.on('dragmove', this.onDragMove);
     this.konva.proxyRect.on('dragend', this.onDragEnd);
+    this.konva.proxyRect.on('pointerenter', () => {
+      this.manager.stage.setCursor('move');
+    });
+    this.konva.proxyRect.on('pointerleave', () => {
+      this.manager.stage.setCursor('default');
+    });
+
+    this.subscriptions.add(() => {
+      this.konva.transformer.off('transform transformend pointerenter pointerleave');
+      this.konva.proxyRect.off('dragmove dragend pointerenter pointerleave');
+    });
 
     // When the stage scale changes, we may need to re-scale some of the transformer's components. For example,
     // the bbox outline should always be 1 screen pixel wide, so we need to update its stroke width.
