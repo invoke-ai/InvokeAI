@@ -6,7 +6,6 @@ import { CanvasToolEraser } from 'features/controlLayers/konva/CanvasTool/Canvas
 import {
   calculateNewBrushSizeFromWheelDelta,
   floorCoord,
-  getColorAtCoordinate,
   getIsPrimaryMouseDown,
   getPrefixedId,
   offsetCoord,
@@ -19,14 +18,11 @@ import type {
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   Coordinate,
-  RgbColor,
   Tool,
 } from 'features/controlLayers/store/types';
-import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
-import rafThrottle from 'raf-throttle';
 import type { Logger } from 'roarr';
 
 // Konva's docs say the default drag buttons are [0], but it's actually [0,1]. We only want left-click to drag, so we
@@ -89,10 +85,6 @@ export class CanvasToolModule extends CanvasModuleBase {
    * The last cursor position.
    */
   $cursorPos = atom<{ relative: Coordinate; absolute: Coordinate } | null>(null);
-  /**
-   * The color currently under the cursor. Only has a value when the color picker tool is active.
-   */
-  $colorUnderCursor = atom<RgbColor>(RGBA_BLACK);
   /**
    * The last pointer type that was used on the stage. This is used to determine if we should show a tool preview. For
    * example, when using a pen, we should not show a brush preview.
@@ -405,13 +397,9 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
 
       const tool = this.$tool.get();
-      const settings = this.manager.stateApi.getSettings();
 
       if (tool === 'colorPicker') {
-        const color = this.$colorUnderCursor.get();
-        if (color) {
-          this.manager.stateApi.setColor({ ...settings.color, ...color });
-        }
+        this.tools.colorPicker.onStagePointerUp(e);
         return;
       }
 
@@ -442,18 +430,6 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
   };
 
-  syncColorUnderCursor = rafThrottle(() => {
-    const cursorPos = this.$cursorPos.get();
-    if (!cursorPos) {
-      return;
-    }
-
-    const color = getColorAtCoordinate(this.konva.stage, cursorPos.absolute);
-    if (color) {
-      this.$colorUnderCursor.set(color);
-    }
-  });
-
   onStagePointerMove = async (e: KonvaEventObject<PointerEvent>) => {
     try {
       this.$lastPointerType.set(e.evt.pointerType);
@@ -472,7 +448,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       const tool = this.$tool.get();
 
       if (tool === 'colorPicker') {
-        this.syncColorUnderCursor();
+        this.tools.colorPicker.onStagePointerMove(e);
       }
 
       const isMouseDown = this.$isMouseDown.get();
@@ -679,7 +655,6 @@ export class CanvasToolModule extends CanvasModuleBase {
       $toolBuffer: this.$toolBuffer.get(),
       $isMouseDown: this.$isMouseDown.get(),
       $cursorPos: this.$cursorPos.get(),
-      $colorUnderCursor: this.$colorUnderCursor.get(),
       brushToolPreview: this.tools.brush.repr(),
       eraserToolPreview: this.tools.eraser.repr(),
       colorPickerToolPreview: this.tools.colorPicker.repr(),
