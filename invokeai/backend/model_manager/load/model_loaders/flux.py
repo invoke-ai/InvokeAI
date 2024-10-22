@@ -193,12 +193,11 @@ class FluxCheckpointModel(ModelLoader):
         match submodel_type:
             case SubModelType.Tokenizer2:
                 prefix = config.submodels.get(ModelType.T5Encoder)
-                return T5Tokenizer.from_pretrained(Path("C:\\Users\\brandon\\invokeai\\models\\any\\t5_encoder\\t5_8b_quantized_encoder\\tokenizer_2"), max_length=512)
+                return T5Tokenizer.from_pretrained("InvokeAI/t5-v1_1-xxl", subfolder="bfloat16/tokenizer_2", max_length=512)
             case SubModelType.TextEncoder2:
                 if not (prefix := config.submodels.get(ModelType.T5Encoder)):
                     raise ValueError(f"This model does not contain a {ModelType.T5Encoder} prefix")
                 sd = load_file(Path(config.path))
-                encoder_keys = [k[len(prefix):] for k in sd.keys() if k.startswith(prefix)]
                 model = T5EncoderModel(T5Config(
                     d_model=4096,
                     d_ff=10240,
@@ -208,6 +207,11 @@ class FluxCheckpointModel(ModelLoader):
                     feed_forward_proj="gated-gelu",
                     is_encoder_decoder=False,
                 ))
+                embeds = model.get_input_embeddings() # type: ignore
+                if not isinstance(embeds, torch.nn.Embedding):
+                    raise ValueError("Unable to load given T5 Encoder")
+                sd[f"{prefix}encoder.embed_tokens.weight"] = embeds.weight
+                encoder_keys = [k[len(prefix):] for k in sd.keys() if k.startswith(prefix)]
                 t5_sd = FilteredStringDict(sd, encoder_keys, prefix)
                 model.load_state_dict(state_dict=t5_sd)
                 return model
