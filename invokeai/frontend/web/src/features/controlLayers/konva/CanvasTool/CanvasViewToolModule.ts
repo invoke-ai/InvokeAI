@@ -4,7 +4,7 @@ import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/C
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Logger } from 'roarr';
 
-export class CanvasToolView extends CanvasModuleBase {
+export class CanvasViewToolModule extends CanvasModuleBase {
   readonly type = 'view_tool';
   readonly id: string;
   readonly path: string[];
