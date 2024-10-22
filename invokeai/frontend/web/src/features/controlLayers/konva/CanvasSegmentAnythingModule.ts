@@ -7,7 +7,13 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasImageState, RgbaColor, SAMPoint, SAMPointLabel } from 'features/controlLayers/store/types';
+import type {
+  CanvasImageState,
+  Coordinate,
+  RgbaColor,
+  SAMPoint,
+  SAMPointLabel,
+} from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import Konva from 'konva';
@@ -30,7 +36,7 @@ type CanvasSegmentAnythingModuleConfig = {
 const DEFAULT_CONFIG: CanvasSegmentAnythingModuleConfig = {
   SAM_POINT_RADIUS: 5,
   SAM_POINT_BORDER_WIDTH: 2,
-  SAM_POINT_BORDER_COLOR: { r: 0, g: 0, b: 0, a: 0.7 },
+  SAM_POINT_BORDER_COLOR: { r: 0, g: 0, b: 0, a: 1 },
   SAM_POINT_FOREGROUND_COLOR: { r: 0, g: 200, b: 0, a: 0.7 },
   SAM_POINT_BACKGROUND_COLOR: { r: 200, g: 0, b: 0, a: 0.7 },
   SAM_POINT_NEUTRAL_COLOR: { r: 0, g: 0, b: 200, a: 0.7 },
@@ -67,6 +73,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   $isProcessing = atom<boolean>(false);
 
   $pointType = atom<SAMPointLabel>('foreground');
+  $isDraggingPoint = atom<boolean>(false);
 
   imageState: CanvasImageState | null = null;
 
@@ -111,33 +118,41 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.konva.maskGroup.add(this.konva.compositingRect);
   }
 
-  createPoint(x: number, y: number, label: SAMPointLabel): SAMPointState {
+  createPoint(coord: Coordinate, label: SAMPointLabel): SAMPointState {
     const id = getPrefixedId('sam_point');
     const circle = new Konva.Circle({
       name: this.KONVA_CIRCLE_NAME,
-      x: Math.round(x),
-      y: Math.round(y),
+      x: Math.round(coord.x),
+      y: Math.round(coord.y),
       radius: this.config.SAM_POINT_RADIUS,
       fill: rgbaColorToString(this.getSAMPointColor(label)),
       stroke: rgbaColorToString(this.config.SAM_POINT_BORDER_COLOR),
       strokeWidth: this.config.SAM_POINT_BORDER_WIDTH,
+      draggable: true,
+      perfectDrawEnabled: false,
     });
 
     circle.on('pointerup', (e) => {
+      if (this.$isDraggingPoint.get()) {
+        return;
+      }
       e.cancelBubble = true;
       circle.destroy();
       this.points = this.points.filter((point) => point.id !== id);
     });
 
-    // circle.on('dragend', (e) => {
-    //   e.cancelBubble = true;
-    //   console.log('dragend', circle.x(), circle.y(), e);
-    // });
+    circle.on('dragstart', () => {
+      this.$isDraggingPoint.set(true);
+    });
 
-    // circle.dragBoundFunc(({ x, y }) => ({
-    //   x: Math.round(x),
-    //   y: Math.round(y),
-    // }));
+    circle.on('dragend', () => {
+      this.$isDraggingPoint.set(false);
+    });
+
+    circle.dragBoundFunc(({ x, y }) => ({
+      x: Math.round(x),
+      y: Math.round(y),
+    }));
 
     this.konva.pointGroup.add(circle);
     const state: SAMPointState = {
@@ -157,13 +172,19 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }));
   };
 
-  onPointerUp = (_: KonvaEventObject<PointerEvent>) => {
+  onPointerUp = (e: KonvaEventObject<PointerEvent>) => {
+    if (e.evt.button !== 0) {
+      return;
+    }
+    if (this.$isDraggingPoint.get()) {
+      return;
+    }
     const cursorPos = this.manager.tool.$cursorPos.get();
     if (!cursorPos) {
       return;
     }
 
-    this.points.push(this.createPoint(cursorPos.relative.x, cursorPos.relative.y, this.$pointType.get()));
+    this.points.push(this.createPoint(cursorPos.relative, this.$pointType.get()));
   };
 
   setSegmentingEventListeners = () => {
