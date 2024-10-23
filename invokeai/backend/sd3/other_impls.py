@@ -4,6 +4,7 @@
 ### This file contains impls for underlying related models (CLIP, T5, etc)
 
 import math
+from typing import Callable, Optional
 
 import torch
 from torch import nn
@@ -14,7 +15,9 @@ from transformers import CLIPTokenizer, T5TokenizerFast
 #################################################################################################
 
 
-def attention(q, k, v, heads, mask=None):
+def attention(
+    q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, heads: int, mask: Optional[torch.Tensor] = None
+) -> torch.Tensor:
     """Convenience wrapper around a basic attention operation"""
     b, _, dim_head = q.shape
     dim_head //= heads
@@ -28,23 +31,25 @@ class Mlp(nn.Module):
 
     def __init__(
         self,
-        in_features,
-        hidden_features=None,
-        out_features=None,
-        act_layer=nn.GELU,
-        bias=True,
-        dtype=None,
-        device=None,
+        in_features: int,
+        hidden_features: Optional[int] = None,
+        out_features: Optional[int] = None,
+        act_layer: Callable[[torch.Tensor], torch.Tensor] | None = None,
+        bias: bool = True,
+        dtype: Optional[torch.dtype] = None,
+        device: Optional[torch.device] = None,
     ):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
+        if act_layer is None:
+            act_layer = torch.nn.functional.gelu
 
-        self.fc1 = nn.Linear(in_features, hidden_features, bias=bias, dtype=dtype, device=device)
+        self.fc1 = torch.nn.Linear(in_features, hidden_features, bias=bias, dtype=dtype, device=device)
         self.act = act_layer
-        self.fc2 = nn.Linear(hidden_features, out_features, bias=bias, dtype=dtype, device=device)
+        self.fc2 = torch.nn.Linear(hidden_features, out_features, bias=bias, dtype=dtype, device=device)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.fc1(x)
         x = self.act(x)
         x = self.fc2(x)
