@@ -9,9 +9,7 @@ import { FilterTypeSelect } from 'features/controlLayers/components/Filters/Filt
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
-import {
-  selectAutoProcessFilter,
-} from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectAutoProcessFilter } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
