@@ -1,6 +1,7 @@
 import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
+import { CanvasOperationIsolatedLayerPreviewSwitch } from 'features/controlLayers/components/CanvasOperationIsolatedLayerPreviewSwitch';
 import { SegmentAnythingPointType } from 'features/controlLayers/components/SegmentAnything/SegmentAnythingPointType';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
@@ -52,6 +53,8 @@ const SegmentAnythingContent = memo(
           <Heading size="md" color="base.300" userSelect="none">
             {t('controlLayers.segment.segment')}
           </Heading>
+          <Spacer />
+          <CanvasOperationIsolatedLayerPreviewSwitch />
         </Flex>
 
         <SegmentAnythingPointType adapter={adapter} />

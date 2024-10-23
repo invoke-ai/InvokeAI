@@ -2,6 +2,7 @@ import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Swi
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
+import { CanvasOperationIsolatedLayerPreviewSwitch } from 'features/controlLayers/components/CanvasOperationIsolatedLayerPreviewSwitch';
 import { FilterSettings } from 'features/controlLayers/components/Filters/FilterSettings';
 import { FilterTypeSelect } from 'features/controlLayers/components/Filters/FilterTypeSelect';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -9,9 +10,7 @@ import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/kon
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import {
   selectAutoProcessFilter,
-  selectIsolatedFilteringPreview,
   settingsAutoProcessFilterToggled,
-  settingsIsolatedFilteringPreviewToggled,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
@@ -26,16 +25,11 @@ const FilterContent = memo(
     const dispatch = useAppDispatch();
     const ref = useRef<HTMLDivElement>(null);
     useFocusRegion('canvas', ref, { focusOnMount: true });
-
     const config = useStore(adapter.filterer.$filterConfig);
     const isCanvasFocused = useIsRegionFocused('canvas');
     const isProcessing = useStore(adapter.filterer.$isProcessing);
     const hasProcessed = useStore(adapter.filterer.$hasProcessed);
     const autoProcessFilter = useAppSelector(selectAutoProcessFilter);
-    const isolatedFilteringPreview = useAppSelector(selectIsolatedFilteringPreview);
-    const onChangeIsolatedPreview = useCallback(() => {
-      dispatch(settingsIsolatedFilteringPreviewToggled());
-    }, [dispatch]);
 
     const onChangeFilterConfig = useCallback(
       (filterConfig: FilterConfig) => {
@@ -98,10 +92,7 @@ const FilterContent = memo(
             <FormLabel m={0}>{t('controlLayers.filter.autoProcess')}</FormLabel>
             <Switch size="sm" isChecked={autoProcessFilter} onChange={onChangeAutoProcessFilter} />
           </FormControl>
-          <FormControl w="min-content">
-            <FormLabel m={0}>{t('controlLayers.settings.isolatedPreview')}</FormLabel>
-            <Switch size="sm" isChecked={isolatedFilteringPreview} onChange={onChangeIsolatedPreview} />
-          </FormControl>
+          <CanvasOperationIsolatedLayerPreviewSwitch />
         </Flex>
         <FilterTypeSelect filterType={config.type} onChange={onChangeFilterType} />
         <FilterSettings filterConfig={config} onChange={onChangeFilterConfig} />

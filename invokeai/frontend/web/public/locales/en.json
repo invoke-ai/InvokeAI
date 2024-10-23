@@ -1863,10 +1863,9 @@
                 "label": "Preserve Masked Region",
                 "alert": "Preserving Masked Region"
             },
-            "isolatedPreview": "Isolated Preview",
             "isolatedStagingPreview": "Isolated Staging Preview",
-            "isolatedFilteringPreview": "Isolated Filtering Preview",
-            "isolatedTransformingPreview": "Isolated Transforming Preview",
+            "isolatedLayerPreview": "Isolated Layer Preview",
+            "isolatedLayerPreviewDesc": "Whether to show only this layer when performing operations like filtering or transforming.",
             "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
             "pressureSensitivity": "Pressure Sensitivity"
         },

@@ -72,13 +72,9 @@ type CanvasSettingsState = {
    */
   isolatedStagingPreview: boolean;
   /**
-   * Whether to show only the selected layer while filtering.
+   * Whether to show only the selected layer while filtering, transforming, or doing other operations.
    */
-  isolatedFilteringPreview: boolean;
-  /**
-   * Whether to show only the selected layer while transforming.
-   */
-  isolatedTransformingPreview: boolean;
+  isolatedLayerPreview: boolean;
   /**
    * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
    */
@@ -101,8 +97,7 @@ const initialState: CanvasSettingsState = {
   bboxOverlay: false,
   preserveMask: false,
   isolatedStagingPreview: true,
-  isolatedFilteringPreview: true,
-  isolatedTransformingPreview: true,
+  isolatedLayerPreview: true,
   pressureSensitivity: true,
 };
 
@@ -155,11 +150,8 @@ export const canvasSettingsSlice = createSlice({
     settingsIsolatedStagingPreviewToggled: (state) => {
       state.isolatedStagingPreview = !state.isolatedStagingPreview;
     },
-    settingsIsolatedFilteringPreviewToggled: (state) => {
-      state.isolatedFilteringPreview = !state.isolatedFilteringPreview;
-    },
-    settingsIsolatedTransformingPreviewToggled: (state) => {
-      state.isolatedTransformingPreview = !state.isolatedTransformingPreview;
+    settingsIsolatedLayerPreviewToggled: (state) => {
+      state.isolatedLayerPreview = !state.isolatedLayerPreview;
     },
     settingsPressureSensitivityToggled: (state) => {
       state.pressureSensitivity = !state.pressureSensitivity;
@@ -191,8 +183,7 @@ export const {
   settingsBboxOverlayToggled,
   settingsPreserveMaskToggled,
   settingsIsolatedStagingPreviewToggled,
-  settingsIsolatedFilteringPreviewToggled,
-  settingsIsolatedTransformingPreviewToggled,
+  settingsIsolatedLayerPreviewToggled,
   settingsPressureSensitivityToggled,
 } = canvasSettingsSlice.actions;
 
@@ -226,10 +217,5 @@ export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
   (canvasSettings) => canvasSettings.showProgressOnCanvas
 );
 export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settings) => settings.isolatedStagingPreview);
-export const selectIsolatedFilteringPreview = createCanvasSettingsSelector(
-  (settings) => settings.isolatedFilteringPreview
-);
-export const selectIsolatedTransformingPreview = createCanvasSettingsSelector(
-  (settings) => settings.isolatedTransformingPreview
-);
+export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
 export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);
