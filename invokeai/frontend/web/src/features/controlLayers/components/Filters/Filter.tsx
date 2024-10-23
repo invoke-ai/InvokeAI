@@ -2,14 +2,14 @@ import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-librar
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
+import { CanvasAutoProcessSwitch } from 'features/controlLayers/components/CanvasAutoProcessSwitch';
 import { CanvasOperationIsolatedLayerPreviewSwitch } from 'features/controlLayers/components/CanvasOperationIsolatedLayerPreviewSwitch';
-import { FilterAutoProcessSwitch } from 'features/controlLayers/components/Filters/FilterAutoProcessSwitch';
 import { FilterSettings } from 'features/controlLayers/components/Filters/FilterSettings';
 import { FilterTypeSelect } from 'features/controlLayers/components/Filters/FilterTypeSelect';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
-import { selectAutoProcessFilter } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -26,7 +26,7 @@ const FilterContent = memo(
     const isCanvasFocused = useIsRegionFocused('canvas');
     const isProcessing = useStore(adapter.filterer.$isProcessing);
     const hasProcessed = useStore(adapter.filterer.$hasProcessed);
-    const autoProcessFilter = useAppSelector(selectAutoProcessFilter);
+    const autoProcess = useAppSelector(selectAutoProcess);
 
     const onChangeFilterConfig = useCallback(
       (filterConfig: FilterConfig) => {
@@ -81,7 +81,7 @@ const FilterContent = memo(
             {t('controlLayers.filter.filter')}
           </Heading>
           <Spacer />
-          <FilterAutoProcessSwitch />
+          <CanvasAutoProcessSwitch />
           <CanvasOperationIsolatedLayerPreviewSwitch />
         </Flex>
         <FilterTypeSelect filterType={config.type} onChange={onChangeFilterType} />
@@ -93,7 +93,7 @@ const FilterContent = memo(
             onClick={adapter.filterer.processImmediate}
             isLoading={isProcessing}
             loadingText={t('controlLayers.filter.process')}
-            isDisabled={!isValid || autoProcessFilter}
+            isDisabled={!isValid || autoProcess}
           >
             {t('controlLayers.filter.process')}
           </Button>
