@@ -161,7 +161,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     const tool = this.$tool.get();
     const segmentingAdapter = this.manager.stateApi.$segmentingAdapter.get();
 
-    if (this.manager.stage.getIsDragging() || tool === 'view') {
+    if ((this.manager.stage.getIsDragging() || tool === 'view') && !segmentingAdapter) {
       this.tools.view.syncCursorStyle();
     } else if (segmentingAdapter) {
       segmentingAdapter.segmentAnything.syncCursorStyle();
