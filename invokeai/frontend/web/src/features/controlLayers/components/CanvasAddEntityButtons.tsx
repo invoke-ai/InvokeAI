@@ -1,5 +1,6 @@
 import { Button, Flex, Heading } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   useAddControlLayer,
   useAddGlobalReferenceImage,
@@ -72,16 +73,17 @@ export const CanvasAddEntityButtons = memo(() => {
         </Flex>
         <Flex flexDir="column" justifyContent="flex-start" gap={2}>
           <Heading size="xs">{t('controlLayers.layer_other')}</Heading>
-
-          <Button
-            size="sm"
-            variant="ghost"
-            justifyContent="flex-start"
-            leftIcon={<PiPlusBold />}
-            onClick={addControlLayer}
-          >
-            {t('controlLayers.controlLayer')}
-          </Button>
+          <InformationalPopover feature="controlNet">
+            <Button
+              size="sm"
+              variant="ghost"
+              justifyContent="flex-start"
+              leftIcon={<PiPlusBold />}
+              onClick={addControlLayer}
+            >
+              {t('controlLayers.controlLayer')}
+            </Button>
+          </InformationalPopover>
           <Button
             size="sm"
             variant="ghost"
