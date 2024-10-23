@@ -108,12 +108,18 @@ export type SAMPointLabel = z.infer<typeof zSAMPointLabel>;
 export const zSAMPointLabelString = z.enum(['background', 'neutral', 'foreground']);
 export type SAMPointLabelString = z.infer<typeof zSAMPointLabelString>;
 
+/**
+ * A mapping of SAM point labels (as numbers) to their string representations.
+ */
 export const SAM_POINT_LABEL_NUMBER_TO_STRING: Record<SAMPointLabel, SAMPointLabelString> = {
   '-1': 'background',
   0: 'neutral',
   1: 'foreground',
 };
 
+/**
+ * A mapping of SAM point labels (as strings) to their numeric representations.
+ */
 export const SAM_POINT_LABEL_STRING_TO_NUMBER: Record<SAMPointLabelString, SAMPointLabel> = {
   background: -1,
   neutral: 0,
