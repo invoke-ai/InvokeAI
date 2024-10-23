@@ -779,6 +779,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
   destroy = () => {
     this.log.debug('Destroying module');
+    if (this.abortController && !this.abortController.signal.aborted) {
+      this.abortController.abort();
+    }
+    this.abortController = null;
     this.unsubscribe();
     this.konva.group.destroy();
   };
