@@ -44,6 +44,7 @@ export const ControlLayerControlAdapterModel = memo(({ modelKey, onChange: onCha
     getIsDisabled,
     isLoading,
     groupByType: true,
+    showDescriptions: true,
   });
 
   return (

@@ -1,4 +1,4 @@
-import { Button, Flex, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Button, Flex, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
 import { flattenStarterModel, useBuildModelInstallArg } from 'features/modelManagerV2/hooks/useBuildModelsToInstall';
 import { isMainModelBase } from 'features/nodes/types/common';
 import { MODEL_TYPE_SHORT_MAP } from 'features/parameters/types/constants';
@@ -44,8 +44,13 @@ export const StarterBundle = ({ bundleName, bundle }: { bundleName: string; bund
   return (
     <Tooltip
       label={
-        <Flex flexDir="column">
-          <Text>{t('modelManager.includesNModels', { n: bundle.length })}</Text>
+        <Flex flexDir="column" p={1}>
+          <Text>{t('modelManager.includesNModels', { n: bundle.length })}:</Text>
+          <UnorderedList>
+            {bundle.map((model, index) => (
+              <ListItem key={index}>{model.name}</ListItem>
+            ))}
+          </UnorderedList>
         </Flex>
       }
     >

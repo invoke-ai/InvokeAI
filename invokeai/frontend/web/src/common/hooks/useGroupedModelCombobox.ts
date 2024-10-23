@@ -16,6 +16,7 @@ type UseGroupedModelComboboxArg<T extends AnyModelConfig> = {
   getIsDisabled?: (model: T) => boolean;
   isLoading?: boolean;
   groupByType?: boolean;
+  showDescriptions?: boolean;
 };
 
 type UseGroupedModelComboboxReturn = {
@@ -37,7 +38,15 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
 ): UseGroupedModelComboboxReturn => {
   const { t } = useTranslation();
   const base = useAppSelector(selectBaseWithSDXLFallback);
-  const { modelConfigs, selectedModel, getIsDisabled, onChange, isLoading, groupByType = false } = arg;
+  const {
+    modelConfigs,
+    selectedModel,
+    getIsDisabled,
+    onChange,
+    isLoading,
+    groupByType = false,
+    showDescriptions = false,
+  } = arg;
   const options = useMemo<GroupBase<ComboboxOption>[]>(() => {
     if (!modelConfigs) {
       return [];
@@ -51,6 +60,7 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
           options: val.map((model) => ({
             label: model.name,
             value: model.key,
+            description: (showDescriptions && model.description) || undefined,
             isDisabled: getIsDisabled ? getIsDisabled(model) : false,
           })),
         });
@@ -60,7 +70,7 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
     );
     _options.sort((a) => (a.label?.split('/')[0]?.toLowerCase().includes(base) ? -1 : 1));
     return _options;
-  }, [modelConfigs, groupByType, getIsDisabled, base]);
+  }, [modelConfigs, groupByType, getIsDisabled, base, showDescriptions]);
 
   const value = useMemo(
     () =>
