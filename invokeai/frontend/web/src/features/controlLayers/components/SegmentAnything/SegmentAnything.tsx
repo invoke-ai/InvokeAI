@@ -51,7 +51,7 @@ const SegmentAnythingContent = memo(
       >
         <Flex w="full" gap={4}>
           <Heading size="md" color="base.300" userSelect="none">
-            {t('controlLayers.segment.segment')}
+            {t('controlLayers.segment.autoMask')}
           </Heading>
           <Spacer />
           <CanvasOperationIsolatedLayerPreviewSwitch />

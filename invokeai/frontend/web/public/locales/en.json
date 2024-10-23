@@ -1843,7 +1843,7 @@
             "cancel": "Cancel"
         },
         "segment": {
-            "segment": "Segment",
+            "autoMask": "Auto Mask",
             "pointType": "Point Type",
             "foreground": "Foreground",
             "background": "Background",
