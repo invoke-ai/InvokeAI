@@ -323,7 +323,7 @@ inpaint_cnet_sd1 = StarterModel(
     previous_names=["inpaint"],
 )
 mlsd_sd1 = StarterModel(
-    name="Line Drawing",
+    name="Line Drawing (mlsd)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_mlsd",
     description="Uses straight line detection for controlling the generation.",
@@ -387,7 +387,7 @@ scribble_sd1 = StarterModel(
     previous_names=["scribble"],
 )
 softedge_sd1 = StarterModel(
-    name="Soft Edge Detection",
+    name="Soft Edge Detection (softedge)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_softedge",
     description="Uses a soft edge detection map to control composition.",
@@ -395,7 +395,7 @@ softedge_sd1 = StarterModel(
     previous_names=["softedge"],
 )
 shuffle_sd1 = StarterModel(
-    name="Remix",
+    name="Remix (shuffle)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11e_sd15_shuffle",
     description="ControlNet weights trained on sd-1.5 with shuffle image conditioning",
@@ -427,7 +427,7 @@ depth_sdxl = StarterModel(
     previous_names=["depth-sdxl"],
 )
 softedge_sdxl = StarterModel(
-    name="Soft Edge Detection",
+    name="Soft Edge Detection (softedge)",
     base=BaseModelType.StableDiffusionXL,
     source="SargeZT/controlNet-sd-xl-1.0-softedge-dexined",
     description="Uses a soft edge detection map to control composition.",
