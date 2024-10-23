@@ -2,13 +2,13 @@ import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-librar
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
+import { CanvasAutoProcessSwitch } from 'features/controlLayers/components/CanvasAutoProcessSwitch';
 import { CanvasOperationIsolatedLayerPreviewSwitch } from 'features/controlLayers/components/CanvasOperationIsolatedLayerPreviewSwitch';
-import { FilterAutoProcessSwitch } from 'features/controlLayers/components/Filters/FilterAutoProcessSwitch';
 import { SegmentAnythingPointType } from 'features/controlLayers/components/SegmentAnything/SegmentAnythingPointType';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
-import { selectAutoProcessFilter } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +22,7 @@ const SegmentAnythingContent = memo(
     const isCanvasFocused = useIsRegionFocused('canvas');
     const isProcessing = useStore(adapter.segmentAnything.$isProcessing);
     const hasPoints = useStore(adapter.segmentAnything.$hasPoints);
-    const autoProcessFilter = useAppSelector(selectAutoProcessFilter);
+    const autoProcess = useAppSelector(selectAutoProcess);
 
     useRegisteredHotkeys({
       id: 'applySegmentAnything',
@@ -59,7 +59,7 @@ const SegmentAnythingContent = memo(
             {t('controlLayers.segment.autoMask')}
           </Heading>
           <Spacer />
-          <FilterAutoProcessSwitch />
+          <CanvasAutoProcessSwitch />
           <CanvasOperationIsolatedLayerPreviewSwitch />
         </Flex>
 
@@ -72,7 +72,7 @@ const SegmentAnythingContent = memo(
             isLoading={isProcessing}
             loadingText={t('controlLayers.segment.process')}
             variant="ghost"
-            isDisabled={!hasPoints || autoProcessFilter}
+            isDisabled={!hasPoints || autoProcess}
           >
             {t('controlLayers.segment.process')}
           </Button>

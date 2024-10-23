@@ -48,9 +48,9 @@ type CanvasSettingsState = {
    */
   outputOnlyMaskedRegions: boolean;
   /**
-   * Whether to automatically process the filter when the filter configuration changes.
+   * Whether to automatically process the operations like filtering and auto-masking.
    */
-  autoProcessFilter: boolean;
+  autoProcess: boolean;
   /**
    * The snap-to-grid setting for the canvas.
    */
@@ -91,7 +91,7 @@ const initialState: CanvasSettingsState = {
   color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
   sendToCanvas: false,
   outputOnlyMaskedRegions: false,
-  autoProcessFilter: true,
+  autoProcess: true,
   snapToGrid: true,
   showProgressOnCanvas: true,
   bboxOverlay: false,
@@ -132,8 +132,8 @@ export const canvasSettingsSlice = createSlice({
     settingsOutputOnlyMaskedRegionsToggled: (state) => {
       state.outputOnlyMaskedRegions = !state.outputOnlyMaskedRegions;
     },
-    settingsAutoProcessFilterToggled: (state) => {
-      state.autoProcessFilter = !state.autoProcessFilter;
+    settingsAutoProcessToggled: (state) => {
+      state.autoProcess = !state.autoProcess;
     },
     settingsSnapToGridToggled: (state) => {
       state.snapToGrid = !state.snapToGrid;
@@ -177,7 +177,7 @@ export const {
   settingsInvertScrollForToolWidthChanged,
   settingsSendToCanvasChanged,
   settingsOutputOnlyMaskedRegionsToggled,
-  settingsAutoProcessFilterToggled,
+  settingsAutoProcessToggled,
   settingsSnapToGridToggled,
   settingsShowProgressOnCanvasToggled,
   settingsBboxOverlayToggled,
@@ -210,7 +210,7 @@ export const selectOutputOnlyMaskedRegions = createCanvasSettingsSelector(
 export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
 export const selectBboxOverlay = createCanvasSettingsSelector((settings) => settings.bboxOverlay);
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
-export const selectAutoProcessFilter = createCanvasSettingsSelector((settings) => settings.autoProcessFilter);
+export const selectAutoProcess = createCanvasSettingsSelector((settings) => settings.autoProcess);
 export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
 export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.sendToCanvas);
 export const selectShowProgressOnCanvas = createCanvasSettingsSelector(

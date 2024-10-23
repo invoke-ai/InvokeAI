@@ -7,7 +7,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { addCoords, getKonvaNodeDebugAttrs, getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
-import { selectAutoProcessFilter } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type {
   CanvasImageState,
   Coordinate,
@@ -247,13 +247,13 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       })
     );
 
-    // When the points change, process them if autoProcessFilter is enabled
+    // When the points change, process them if autoProcess is enabled
     this.subscriptions.add(
       this.$points.listen((points) => {
         if (points.length === 0) {
           return;
         }
-        if (this.manager.stateApi.getSettings().autoProcessFilter && this.$isSegmenting.get()) {
+        if (this.manager.stateApi.getSettings().autoProcess && this.$isSegmenting.get()) {
           this.process();
         }
       })
@@ -261,11 +261,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // When auto-process is enabled, process the points if they have not been processed
     this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectAutoProcessFilter, (autoProcessFilter) => {
+      this.manager.stateApi.createStoreSubscription(selectAutoProcess, (autoProcess) => {
         if (this.$points.get().length === 0) {
           return;
         }
-        if (autoProcessFilter && this.$isSegmenting.get() && !this.$hasProcessed.get()) {
+        if (autoProcess && this.$isSegmenting.get() && !this.$hasProcessed.get()) {
           this.process();
         }
       })

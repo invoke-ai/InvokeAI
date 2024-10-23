@@ -4,7 +4,7 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectAutoProcessFilter } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { getFilterForModel, IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import type { CanvasImageState } from 'features/controlLayers/store/types';
@@ -58,14 +58,14 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
     this.subscriptions.add(
       this.$filterConfig.listen(() => {
-        if (this.manager.stateApi.getSettings().autoProcessFilter && this.$isFiltering.get()) {
+        if (this.manager.stateApi.getSettings().autoProcess && this.$isFiltering.get()) {
           this.process();
         }
       })
     );
     this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectAutoProcessFilter, (autoPreviewFilter) => {
-        if (autoPreviewFilter && this.$isFiltering.get()) {
+      this.manager.stateApi.createStoreSubscription(selectAutoProcess, (autoProcess) => {
+        if (autoProcess && this.$isFiltering.get()) {
           this.process();
         }
       })
@@ -97,7 +97,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     }
     this.$isFiltering.set(true);
     this.manager.stateApi.$filteringAdapter.set(this.parent);
-    if (this.manager.stateApi.getSettings().autoProcessFilter) {
+    if (this.manager.stateApi.getSettings().autoProcess) {
       this.processImmediate();
     }
   };
