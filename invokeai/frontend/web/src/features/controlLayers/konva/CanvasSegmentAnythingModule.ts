@@ -128,7 +128,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   /**
    * The type of point to create when segmenting, as a string. This is a computed value based on $pointType.
    */
-  $pointTypeEnglish = computed<SAMPointLabelString, Atom<SAMPointLabel>>(
+  $pointTypeString = computed<SAMPointLabelString, Atom<SAMPointLabel>>(
     this.$pointType,
     (pointType) => SAM_POINT_LABEL_NUMBER_TO_STRING[pointType]
   );
