@@ -316,6 +316,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       e.cancelBubble = true;
       circle.destroy();
       this.$points.set(this.$points.get().filter((point) => point.id !== id));
+      this.$hasProcessed.set(false);
     });
 
     circle.on('dragstart', () => {
