@@ -121,6 +121,7 @@ class ModelProbe(object):
         "T2IAdapter": ModelType.T2IAdapter,
         "CLIPModel": ModelType.CLIPEmbed,
         "CLIPTextModel": ModelType.CLIPEmbed,
+        "CLIPTextModelWithProjection": ModelType.CLIPEmbed,
         "T5EncoderModel": ModelType.T5Encoder,
         "FluxControlNetModel": ModelType.ControlNet,
     }
