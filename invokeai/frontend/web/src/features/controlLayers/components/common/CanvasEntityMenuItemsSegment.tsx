@@ -12,7 +12,7 @@ export const CanvasEntityMenuItemsSegment = memo(() => {
 
   return (
     <MenuItem onClick={segmentAnything.start} icon={<PiMaskHappyBold />} isDisabled={segmentAnything.isDisabled}>
-      {t('controlLayers.segment.segment')}
+      {t('controlLayers.segment.autoMask')}
     </MenuItem>
   );
 });
