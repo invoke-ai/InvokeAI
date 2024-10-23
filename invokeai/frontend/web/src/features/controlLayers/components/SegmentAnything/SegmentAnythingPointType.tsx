@@ -25,14 +25,14 @@ export const SegmentAnythingPointType = memo(
         <FormLabel>{t('controlLayers.segment.pointType')}</FormLabel>
         <RadioGroup value={pointType} onChange={onChange} w="full" size="md">
           <Flex alignItems="center" w="full" gap={4} fontWeight="semibold" color="base.300">
+            <Radio value="foreground">
+              <Text>{t('controlLayers.segment.foreground')}</Text>
+            </Radio>
             <Radio value="background">
               <Text>{t('controlLayers.segment.background')}</Text>
             </Radio>
             <Radio value="neutral">
               <Text>{t('controlLayers.segment.neutral')}</Text>
-            </Radio>
-            <Radio value="foreground">
-              <Text>{t('controlLayers.segment.foreground')}</Text>
             </Radio>
           </Flex>
         </RadioGroup>
