@@ -30,12 +30,14 @@ export class CanvasRectToolModule extends CanvasModuleBase {
 
   onStagePointerDown = async (_e: KonvaEventObject<PointerEvent>) => {
     const cursorPos = this.parent.$cursorPos.get();
+    const isPrimaryPointerDown = this.parent.$isPrimaryPointerDown.get();
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (!cursorPos || !selectedEntity) {
+    if (!cursorPos || !isPrimaryPointerDown || !selectedEntity) {
       /**
        * Can't do anything without:
        * - A cursor position: the cursor is not on the stage
+       * - The mouse is down: the user is not drawing
        * - A selected entity: there is no entity to draw on
        */
       return;
@@ -71,7 +73,7 @@ export class CanvasRectToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (!this.parent.$isMouseDown.get()) {
+    if (!this.parent.$isPrimaryPointerDown.get()) {
       return;
     }
 

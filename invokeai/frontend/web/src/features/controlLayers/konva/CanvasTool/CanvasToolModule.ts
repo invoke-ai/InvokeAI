@@ -76,17 +76,18 @@ export class CanvasToolModule extends CanvasModuleBase {
    */
   $toolBuffer = atom<Tool | null>(null);
   /**
-   * Whether the pointer is currently down on the stage.
+   * Whether the primary pointer (left mouse, pen, first touch) is currently down on the stage.
    *
-   * For example, the pointer down was fired on the stage and then moves the cursor outside of the stage, this will
-   * still be true. When the cursor moves back onto the stage, if there has not been an pointer up fired, this will
-   * still be true.
+   * This is set true when the pointer down is fired on the stage and false when the pointer up is fired anywhere,
+   * including outside of the stage. This flag is thus true when the user is actively drawing on the stage.
    *
-   * However, if the pointer down was fired _outside_ the stage, and the cursor moves onto the stage, this will be false.
+   * For example, if the pointer down was fired on the stage and the cursor then leaves the stage without a pointer up
+   * event, this will still be true. If the cursor then moves back onto the stage, this will still be true.
    *
-   * TODO(psyche): Give this a more accurate name.
+   * However, if the pointer down was initially fired _outside_ the stage, and the cursor moves onto the stage, this
+   * will be false.
    */
-  $isMouseDown = atom<boolean>(false);
+  $isPrimaryPointerDown = atom<boolean>(false);
   /**
    * The last cursor position.
    */
@@ -139,7 +140,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.subscriptions.add(
       this.$tool.listen(() => {
         // On tool switch, reset mouse state
-        this.manager.tool.$isMouseDown.set(false);
+        this.manager.tool.$isPrimaryPointerDown.set(false);
         this.render();
       })
     );
@@ -342,7 +343,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         return;
       }
 
-      this.$isMouseDown.set(getIsPrimaryMouseDown(e));
+      this.$isPrimaryPointerDown.set(getIsPrimaryMouseDown(e));
 
       this.syncCursorPositions();
 
@@ -489,7 +490,7 @@ export class CanvasToolModule extends CanvasModuleBase {
    */
   onWindowPointerUp = (_: PointerEvent) => {
     try {
-      this.$isMouseDown.set(false);
+      this.$isPrimaryPointerDown.set(false);
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
       if (selectedEntity && selectedEntity.bufferRenderer.hasBuffer() && !this.manager.$isBusy.get()) {
@@ -591,7 +592,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       config: this.config,
       $tool: this.$tool.get(),
       $toolBuffer: this.$toolBuffer.get(),
-      $isMouseDown: this.$isMouseDown.get(),
+      $isPrimaryPointerDown: this.$isPrimaryPointerDown.get(),
       $cursorPos: this.$cursorPos.get(),
       tools: {
         brush: this.tools.brush.repr(),

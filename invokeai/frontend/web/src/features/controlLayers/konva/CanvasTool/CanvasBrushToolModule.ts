@@ -126,10 +126,10 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
       return;
     }
 
-    const isMouseDown = this.parent.$isMouseDown.get();
+    const isPrimaryPointerDown = this.parent.$isPrimaryPointerDown.get();
     const lastPointerType = this.parent.$lastPointerType.get();
 
-    if (lastPointerType !== 'mouse' && isMouseDown) {
+    if (lastPointerType !== 'mouse' && isPrimaryPointerDown) {
       this.setVisibility(false);
       return;
     }
@@ -152,7 +152,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
       y: alignedCursorPos.y,
       radius,
       fill: rgbaColorToString(brushPreviewFill),
-      visible: !isMouseDown && lastPointerType === 'mouse',
+      visible: !isPrimaryPointerDown && lastPointerType === 'mouse',
     });
 
     // But the borders are in screen-pixels
@@ -193,10 +193,10 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
    */
   onStagePointerEnter = async (e: KonvaEventObject<PointerEvent>) => {
     const cursorPos = this.parent.$cursorPos.get();
-    const isMouseDown = this.parent.$isMouseDown.get();
+    const isPrimaryPointerDown = this.parent.$isPrimaryPointerDown.get();
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (!cursorPos || !isMouseDown || !selectedEntity) {
+    if (!cursorPos || !isPrimaryPointerDown || !selectedEntity) {
       /**
        * Can't do anything without:
        * - A cursor position: the cursor is not on the stage
@@ -246,12 +246,14 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
    */
   onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
     const cursorPos = this.parent.$cursorPos.get();
+    const isPrimaryPointerDown = this.parent.$isPrimaryPointerDown.get();
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (!cursorPos || !selectedEntity) {
+    if (!cursorPos || !selectedEntity || !isPrimaryPointerDown) {
       /**
        * Can't do anything without:
        * - A cursor position: the cursor is not on the stage
+       * - The mouse is down: the user is not drawing
        * - A selected entity: there is no entity to draw on
        */
       return;
@@ -363,7 +365,7 @@ export class CanvasBrushToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (!this.parent.$isMouseDown.get()) {
+    if (!this.parent.$isPrimaryPointerDown.get()) {
       return;
     }
 
