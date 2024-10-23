@@ -527,6 +527,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     if (segmentResult.isErr()) {
       this.log.error({ error: serializeError(segmentResult.error) }, 'Error segmenting');
       this.$isProcessing.set(false);
+      if (!this.abortController.signal.aborted) {
+        this.abortController.abort();
+      }
       this.abortController = null;
       return;
     }
@@ -549,6 +552,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     this.$isProcessing.set(false);
     this.$hasProcessed.set(true);
+    if (!this.abortController.signal.aborted) {
+      this.abortController.abort();
+    }
     this.abortController = null;
   };
 
