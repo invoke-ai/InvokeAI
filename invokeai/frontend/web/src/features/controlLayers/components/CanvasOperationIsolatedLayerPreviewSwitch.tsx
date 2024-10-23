@@ -18,7 +18,7 @@ export const CanvasOperationIsolatedLayerPreviewSwitch = memo(() => {
   return (
     <Tooltip label={t('controlLayers.settings.isolatedLayerPreviewDesc')}>
       <FormControl w="min-content">
-        <FormLabel m={0}>{t('controlLayers.settings.isolatedLayerPreview')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.settings.isolatedPreview')}</FormLabel>
         <Switch size="sm" isChecked={isolatedLayerPreview} onChange={onChangeIsolatedPreview} />
       </FormControl>
     </Tooltip>
