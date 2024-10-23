@@ -1,10 +1,9 @@
-import type { ComboboxOnChange } from '@invoke-ai/ui-library';
-import { Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormLabel, Radio, RadioGroup, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import { SAM_POINT_LABEL_STRING_TO_NUMBER, zSAMPointLabelString } from 'features/controlLayers/store/types';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const SegmentAnythingPointType = memo(
@@ -12,23 +11,9 @@ export const SegmentAnythingPointType = memo(
     const { t } = useTranslation();
     const pointType = useStore(adapter.segmentAnything.$pointTypeString);
 
-    const options = useMemo(() => {
-      return [
-        { value: 'foreground', label: t('controlLayers.segment.foreground') },
-        { value: 'background', label: t('controlLayers.segment.background') },
-        { value: 'neutral', label: t('controlLayers.segment.neutral') },
-      ];
-    }, [t]);
-
-    const value = useMemo(() => options.find((o) => o.value === pointType) ?? null, [options, pointType]);
-
-    const onChange = useCallback<ComboboxOnChange>(
-      (v) => {
-        if (!v) {
-          return;
-        }
-
-        const labelAsString = zSAMPointLabelString.parse(v.value);
+    const onChange = useCallback(
+      (v: string) => {
+        const labelAsString = zSAMPointLabelString.parse(v);
         const labelAsNumber = SAM_POINT_LABEL_STRING_TO_NUMBER[labelAsString];
         adapter.segmentAnything.$pointType.set(labelAsNumber);
       },
@@ -36,12 +21,22 @@ export const SegmentAnythingPointType = memo(
     );
 
     return (
-      <Flex gap={4} w="full">
-        <FormControl maxW={64}>
-          <FormLabel m={0}>{t('controlLayers.segment.pointType')}</FormLabel>
-          <Combobox options={options} value={value} onChange={onChange} isSearchable={false} isClearable={false} />
-        </FormControl>
-      </Flex>
+      <FormControl w="full">
+        <FormLabel>{t('controlLayers.segment.pointType')}</FormLabel>
+        <RadioGroup value={pointType} onChange={onChange} w="full" size="md">
+          <Flex alignItems="center" w="full" gap={4} fontWeight="semibold" color="base.300">
+            <Radio value="background">
+              <Text>{t('controlLayers.segment.background')}</Text>
+            </Radio>
+            <Radio value="neutral">
+              <Text>{t('controlLayers.segment.neutral')}</Text>
+            </Radio>
+            <Radio value="foreground">
+              <Text>{t('controlLayers.segment.foreground')}</Text>
+            </Radio>
+          </Flex>
+        </RadioGroup>
+      </FormControl>
     );
   }
 );
