@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 export const SegmentAnythingPointType = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
     const { t } = useTranslation();
-    const pointType = useStore(adapter.segmentAnything.$pointTypeEnglish);
+    const pointType = useStore(adapter.segmentAnything.$pointTypeString);
 
     const options = useMemo(() => {
       return [
