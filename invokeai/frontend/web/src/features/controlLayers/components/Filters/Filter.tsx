@@ -1,8 +1,9 @@
-import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Switch } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { CanvasOperationIsolatedLayerPreviewSwitch } from 'features/controlLayers/components/CanvasOperationIsolatedLayerPreviewSwitch';
+import { FilterAutoProcessSwitch } from 'features/controlLayers/components/Filters/FilterAutoProcessSwitch';
 import { FilterSettings } from 'features/controlLayers/components/Filters/FilterSettings';
 import { FilterTypeSelect } from 'features/controlLayers/components/Filters/FilterTypeSelect';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -10,7 +11,6 @@ import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/kon
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import {
   selectAutoProcessFilter,
-  settingsAutoProcessFilterToggled,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
@@ -22,7 +22,6 @@ import { PiArrowsCounterClockwiseBold, PiCheckBold, PiShootingStarBold, PiXBold 
 const FilterContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
     const { t } = useTranslation();
-    const dispatch = useAppDispatch();
     const ref = useRef<HTMLDivElement>(null);
     useFocusRegion('canvas', ref, { focusOnMount: true });
     const config = useStore(adapter.filterer.$filterConfig);
@@ -44,10 +43,6 @@ const FilterContent = memo(
       },
       [adapter.filterer.$filterConfig]
     );
-
-    const onChangeAutoProcessFilter = useCallback(() => {
-      dispatch(settingsAutoProcessFilterToggled());
-    }, [dispatch]);
 
     const isValid = useMemo(() => {
       return IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
@@ -88,10 +83,7 @@ const FilterContent = memo(
             {t('controlLayers.filter.filter')}
           </Heading>
           <Spacer />
-          <FormControl w="min-content">
-            <FormLabel m={0}>{t('controlLayers.filter.autoProcess')}</FormLabel>
-            <Switch size="sm" isChecked={autoProcessFilter} onChange={onChangeAutoProcessFilter} />
-          </FormControl>
+          <FilterAutoProcessSwitch />
           <CanvasOperationIsolatedLayerPreviewSwitch />
         </Flex>
         <FilterTypeSelect filterType={config.type} onChange={onChangeFilterType} />
