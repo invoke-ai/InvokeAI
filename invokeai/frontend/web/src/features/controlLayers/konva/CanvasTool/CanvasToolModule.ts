@@ -594,12 +594,15 @@ export class CanvasToolModule extends CanvasModuleBase {
       $toolBuffer: this.$toolBuffer.get(),
       $isPrimaryPointerDown: this.$isPrimaryPointerDown.get(),
       $cursorPos: this.$cursorPos.get(),
+      $lastPointerType: this.$lastPointerType.get(),
       tools: {
         brush: this.tools.brush.repr(),
         eraser: this.tools.eraser.repr(),
         colorPicker: this.tools.colorPicker.repr(),
         rect: this.tools.rect.repr(),
         bbox: this.tools.bbox.repr(),
+        view: this.tools.view.repr(),
+        move: this.tools.move.repr(),
       },
     };
   };
