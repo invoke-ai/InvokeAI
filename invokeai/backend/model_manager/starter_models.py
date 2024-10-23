@@ -13,6 +13,9 @@ class StarterModelWithoutDependencies(BaseModel):
     type: ModelType
     format: Optional[ModelFormat] = None
     is_installed: bool = False
+    # allows us to track what models a user has installed across name changes within starter models
+    # if you update a starter model name, please add the old one to this list for that starter model
+    previous_names: list[str] = []
 
 
 class StarterModel(StarterModelWithoutDependencies):
@@ -243,44 +246,49 @@ easy_neg_sd1 = StarterModel(
 # endregion
 # region IP Adapter
 ip_adapter_sd1 = StarterModel(
-    name="IP Adapter",
+    name="Standard Reference (IP Adapter)",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/InvokeAI/ip_adapter_sd15/resolve/main/ip-adapter_sd15.safetensors",
-    description="IP-Adapter for SD 1.5 models",
+    description="References images with a more generalized/looser degree of precision.",
     type=ModelType.IPAdapter,
     dependencies=[ip_adapter_sd_image_encoder],
+    previous_names=["IP Adapter"],
 )
 ip_adapter_plus_sd1 = StarterModel(
-    name="IP Adapter Plus",
+    name="Precise Reference (IP Adapter Plus)",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/InvokeAI/ip_adapter_plus_sd15/resolve/main/ip-adapter-plus_sd15.safetensors",
-    description="Refined IP-Adapter for SD 1.5 models",
+    description="References images with a higher degree of precision.",
     type=ModelType.IPAdapter,
     dependencies=[ip_adapter_sd_image_encoder],
+    previous_names=["IP Adapter Plus"],
 )
 ip_adapter_plus_face_sd1 = StarterModel(
-    name="IP Adapter Plus Face",
+    name="Face Reference (IP Adapter Plus Face)",
     base=BaseModelType.StableDiffusion1,
     source="https://huggingface.co/InvokeAI/ip_adapter_plus_face_sd15/resolve/main/ip-adapter-plus-face_sd15.safetensors",
-    description="Refined IP-Adapter for SD 1.5 models, adapted for faces",
+    description="References images with a higher degree of precision, adapted for faces",
     type=ModelType.IPAdapter,
     dependencies=[ip_adapter_sd_image_encoder],
+    previous_names=["IP Adapter Plus Face"],
 )
 ip_adapter_sdxl = StarterModel(
-    name="IP Adapter SDXL",
+    name="Standard Reference (IP Adapter ViT-H)",
     base=BaseModelType.StableDiffusionXL,
     source="https://huggingface.co/InvokeAI/ip_adapter_sdxl_vit_h/resolve/main/ip-adapter_sdxl_vit-h.safetensors",
-    description="IP-Adapter for SDXL models",
+    description="References images with a higher degree of precision.",
     type=ModelType.IPAdapter,
     dependencies=[ip_adapter_sdxl_image_encoder],
+    previous_names=["IP Adapter SDXL"],
 )
 ip_adapter_flux = StarterModel(
-    name="XLabs FLUX IP-Adapter",
+    name="Standard Reference (XLabs FLUX IP-Adapter)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/XLabs-AI/flux-ip-adapter/resolve/main/flux-ip-adapter.safetensors",
-    description="FLUX IP-Adapter",
+    description="References images with a more generalized/looser degree of precision.",
     type=ModelType.IPAdapter,
     dependencies=[clip_vit_l_image_encoder],
+    previous_names=["XLabs FLUX IP-Adapter"],
 )
 # endregion
 # region ControlNet
@@ -299,157 +307,162 @@ qr_code_cnet_sdxl = StarterModel(
     type=ModelType.ControlNet,
 )
 canny_sd1 = StarterModel(
-    name="canny",
+    name="Hard Edge Detection (canny)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_canny",
-    description="ControlNet weights trained on sd-1.5 with canny conditioning.",
+    description="Uses detected edges in the image to control composition.",
     type=ModelType.ControlNet,
+    previous_names=["canny"],
 )
 inpaint_cnet_sd1 = StarterModel(
-    name="inpaint",
+    name="Inpainting",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_inpaint",
     description="ControlNet weights trained on sd-1.5 with canny conditioning, inpaint version",
     type=ModelType.ControlNet,
+    previous_names=["inpaint"],
 )
 mlsd_sd1 = StarterModel(
-    name="mlsd",
+    name="Line Drawing",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_mlsd",
-    description="ControlNet weights trained on sd-1.5 with canny conditioning, MLSD version",
+    description="Uses straight line detection for controlling the generation.",
     type=ModelType.ControlNet,
+    previous_names=["mlsd"],
 )
 depth_sd1 = StarterModel(
-    name="depth",
+    name="Depth Map",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11f1p_sd15_depth",
-    description="ControlNet weights trained on sd-1.5 with depth conditioning",
+    description="Uses depth information in the image to control the depth in the generation.",
     type=ModelType.ControlNet,
+    previous_names=["depth"],
 )
 normal_bae_sd1 = StarterModel(
-    name="normal_bae",
+    name="Lighting Detection (Normals)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_normalbae",
-    description="ControlNet weights trained on sd-1.5 with normalbae image conditioning",
+    description="Uses detected lighting information to guide the lighting of the composition.",
     type=ModelType.ControlNet,
+    previous_names=["normal_bae"],
 )
 seg_sd1 = StarterModel(
-    name="seg",
+    name="Segmentation Map",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_seg",
-    description="ControlNet weights trained on sd-1.5 with seg image conditioning",
+    description="Uses segmentation maps to guide the structure of the composition.",
     type=ModelType.ControlNet,
+    previous_names=["seg"],
 )
 lineart_sd1 = StarterModel(
-    name="lineart",
+    name="Lineart",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_lineart",
-    description="ControlNet weights trained on sd-1.5 with lineart image conditioning",
+    description="Uses lineart detection to guide the lighting of the composition.",
     type=ModelType.ControlNet,
+    previous_names=["lineart"],
 )
 lineart_anime_sd1 = StarterModel(
-    name="lineart_anime",
+    name="Lineart Anime",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15s2_lineart_anime",
-    description="ControlNet weights trained on sd-1.5 with anime image conditioning",
+    description="Uses anime lineart detection to guide the lighting of the composition.",
     type=ModelType.ControlNet,
+    previous_names=["lineart_anime"],
 )
 openpose_sd1 = StarterModel(
-    name="openpose",
+    name="Pose Detection (openpose)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_openpose",
-    description="ControlNet weights trained on sd-1.5 with openpose image conditioning",
+    description="Uses pose information to control the pose of human characters in the generation.",
     type=ModelType.ControlNet,
+    previous_names=["openpose"],
 )
 scribble_sd1 = StarterModel(
-    name="scribble",
+    name="Contour Detection (scribble)",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_scribble",
-    description="ControlNet weights trained on sd-1.5 with scribble image conditioning",
+    description="Uses edges, contours, or line art in the image to control composition.",
     type=ModelType.ControlNet,
+    previous_names=["scribble"],
 )
 softedge_sd1 = StarterModel(
-    name="softedge",
+    name="Soft Edge Detection",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11p_sd15_softedge",
-    description="ControlNet weights trained on sd-1.5 with soft edge conditioning",
+    description="Uses a soft edge detection map to control composition.",
     type=ModelType.ControlNet,
+    previous_names=["softedge"],
 )
 shuffle_sd1 = StarterModel(
-    name="shuffle",
+    name="Remix",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11e_sd15_shuffle",
     description="ControlNet weights trained on sd-1.5 with shuffle image conditioning",
     type=ModelType.ControlNet,
+    previous_names=["shuffle"],
 )
 tile_sd1 = StarterModel(
-    name="tile",
+    name="Tile",
     base=BaseModelType.StableDiffusion1,
     source="lllyasviel/control_v11f1e_sd15_tile",
-    description="ControlNet weights trained on sd-1.5 with tiled image conditioning",
+    description="Uses image data to replicate exact colors/structure in the resulting generation.",
     type=ModelType.ControlNet,
-)
-ip2p_sd1 = StarterModel(
-    name="ip2p",
-    base=BaseModelType.StableDiffusion1,
-    source="lllyasviel/control_v11e_sd15_ip2p",
-    description="ControlNet weights trained on sd-1.5 with ip2p conditioning.",
-    type=ModelType.ControlNet,
+    previous_names=["tile"],
 )
 canny_sdxl = StarterModel(
-    name="canny-sdxl",
+    name="Hard Edge Detection (canny)",
     base=BaseModelType.StableDiffusionXL,
     source="xinsir/controlNet-canny-sdxl-1.0",
-    description="ControlNet weights trained on sdxl-1.0 with canny conditioning, by Xinsir.",
+    description="Uses detected edges in the image to control composition.",
     type=ModelType.ControlNet,
+    previous_names=["canny-sdxl"],
 )
 depth_sdxl = StarterModel(
-    name="depth-sdxl",
+    name="Depth Map",
     base=BaseModelType.StableDiffusionXL,
     source="diffusers/controlNet-depth-sdxl-1.0",
-    description="ControlNet weights trained on sdxl-1.0 with depth conditioning.",
+    description="Uses depth information in the image to control the depth in the generation.",
     type=ModelType.ControlNet,
+    previous_names=["depth-sdxl"],
 )
 softedge_sdxl = StarterModel(
-    name="softedge-dexined-sdxl",
+    name="Soft Edge Detection",
     base=BaseModelType.StableDiffusionXL,
     source="SargeZT/controlNet-sd-xl-1.0-softedge-dexined",
-    description="ControlNet weights trained on sdxl-1.0 with dexined soft edge preprocessing.",
+    description="Uses a soft edge detection map to control composition.",
     type=ModelType.ControlNet,
-)
-depth_zoe_16_sdxl = StarterModel(
-    name="depth-16bit-zoe-sdxl",
-    base=BaseModelType.StableDiffusionXL,
-    source="SargeZT/controlNet-sd-xl-1.0-depth-16bit-zoe",
-    description="ControlNet weights trained on sdxl-1.0 with Zoe's preprocessor (16 bits).",
-    type=ModelType.ControlNet,
-)
-depth_zoe_32_sdxl = StarterModel(
-    name="depth-zoe-sdxl",
-    base=BaseModelType.StableDiffusionXL,
-    source="diffusers/controlNet-zoe-depth-sdxl-1.0",
-    description="ControlNet weights trained on sdxl-1.0 with Zoe's preprocessor (32 bits).",
-    type=ModelType.ControlNet,
+    previous_names=["softedge-dexined-sdxl"],
 )
 openpose_sdxl = StarterModel(
-    name="openpose-sdxl",
+    name="Pose Detection (openpose)",
     base=BaseModelType.StableDiffusionXL,
     source="xinsir/controlNet-openpose-sdxl-1.0",
-    description="ControlNet weights trained on sdxl-1.0 compatible with the DWPose processor by Xinsir.",
+    description="Uses pose information to control the pose of human characters in the generation.",
     type=ModelType.ControlNet,
+    previous_names=["openpose-sdxl", "controlnet-openpose-sdxl"],
 )
 scribble_sdxl = StarterModel(
-    name="scribble-sdxl",
+    name="Contour Detection (scribble)",
     base=BaseModelType.StableDiffusionXL,
     source="xinsir/controlNet-scribble-sdxl-1.0",
-    description="ControlNet weights trained on sdxl-1.0 compatible with various lineart processors and black/white sketches by Xinsir.",
+    description="Uses edges, contours, or line art in the image to control composition.",
     type=ModelType.ControlNet,
+    previous_names=["scribble-sdxl", "controlnet-scribble-sdxl"],
 )
 tile_sdxl = StarterModel(
-    name="tile-sdxl",
+    name="Tile",
     base=BaseModelType.StableDiffusionXL,
     source="xinsir/controlNet-tile-sdxl-1.0",
-    description="ControlNet weights trained on sdxl-1.0 with tiled image conditioning",
+    description="Uses image data to replicate exact colors/structure in the resulting generation.",
+    type=ModelType.ControlNet,
+    previous_names=["tile-sdxl"],
+)
+union_cnet_sdxl = StarterModel(
+    name="Multi-Guidance Detection (Union Pro)",
+    base=BaseModelType.StableDiffusionXL,
+    source="InvokeAI/Xinsir-SDXL_Controlnet_Union",
+    description="A unified ControlNet for SDXL model that supports 10+ control types",
     type=ModelType.ControlNet,
 )
 union_cnet_flux = StarterModel(
@@ -462,60 +475,52 @@ union_cnet_flux = StarterModel(
 # endregion
 # region T2I Adapter
 t2i_canny_sd1 = StarterModel(
-    name="canny-sd15",
+    name="Hard Edge Detection (canny)",
     base=BaseModelType.StableDiffusion1,
     source="TencentARC/t2iadapter_canny_sd15v2",
-    description="T2I Adapter weights trained on sd-1.5 with canny conditioning.",
+    description="Uses detected edges in the image to control composition",
     type=ModelType.T2IAdapter,
+    previous_names=["canny-sd15"],
 )
 t2i_sketch_sd1 = StarterModel(
-    name="sketch-sd15",
+    name="Sketch",
     base=BaseModelType.StableDiffusion1,
     source="TencentARC/t2iadapter_sketch_sd15v2",
-    description="T2I Adapter weights trained on sd-1.5 with sketch conditioning.",
+    description="Uses a sketch to control composition",
     type=ModelType.T2IAdapter,
+    previous_names=["sketch-sd15"],
 )
 t2i_depth_sd1 = StarterModel(
-    name="depth-sd15",
+    name="Depth Map",
     base=BaseModelType.StableDiffusion1,
     source="TencentARC/t2iadapter_depth_sd15v2",
-    description="T2I Adapter weights trained on sd-1.5 with depth conditioning.",
+    description="Uses depth information in the image to control the depth in the generation.",
     type=ModelType.T2IAdapter,
-)
-t2i_zoe_depth_sd1 = StarterModel(
-    name="zoedepth-sd15",
-    base=BaseModelType.StableDiffusion1,
-    source="TencentARC/t2iadapter_zoedepth_sd15v1",
-    description="T2I Adapter weights trained on sd-1.5 with zoe depth conditioning.",
-    type=ModelType.T2IAdapter,
+    previous_names=["depth-sd15"],
 )
 t2i_canny_sdxl = StarterModel(
-    name="canny-sdxl",
+    name="Hard Edge Detection (canny)",
     base=BaseModelType.StableDiffusionXL,
     source="TencentARC/t2i-adapter-canny-sdxl-1.0",
-    description="T2I Adapter weights trained on sdxl-1.0 with canny conditioning.",
+    description="Uses detected edges in the image to control composition",
     type=ModelType.T2IAdapter,
-)
-t2i_zoe_depth_sdxl = StarterModel(
-    name="zoedepth-sdxl",
-    base=BaseModelType.StableDiffusionXL,
-    source="TencentARC/t2i-adapter-depth-zoe-sdxl-1.0",
-    description="T2I Adapter weights trained on sdxl-1.0 with zoe depth conditioning.",
-    type=ModelType.T2IAdapter,
+    previous_names=["canny-sdxl"],
 )
 t2i_lineart_sdxl = StarterModel(
-    name="lineart-sdxl",
+    name="Lineart",
     base=BaseModelType.StableDiffusionXL,
     source="TencentARC/t2i-adapter-lineart-sdxl-1.0",
-    description="T2I Adapter weights trained on sdxl-1.0 with lineart conditioning.",
+    description="Uses lineart detection to guide the lighting of the composition.",
     type=ModelType.T2IAdapter,
+    previous_names=["lineart-sdxl"],
 )
 t2i_sketch_sdxl = StarterModel(
-    name="sketch-sdxl",
+    name="Sketch",
     base=BaseModelType.StableDiffusionXL,
     source="TencentARC/t2i-adapter-sketch-sdxl-1.0",
-    description="T2I Adapter weights trained on sdxl-1.0 with sketch conditioning.",
+    description="Uses a sketch to control composition",
     type=ModelType.T2IAdapter,
+    previous_names=["sketch-sdxl"],
 )
 # endregion
 # region SpandrelImageToImage
@@ -600,22 +605,18 @@ STARTER_MODELS: list[StarterModel] = [
     softedge_sd1,
     shuffle_sd1,
     tile_sd1,
-    ip2p_sd1,
     canny_sdxl,
     depth_sdxl,
     softedge_sdxl,
-    depth_zoe_16_sdxl,
-    depth_zoe_32_sdxl,
     openpose_sdxl,
     scribble_sdxl,
     tile_sdxl,
+    union_cnet_sdxl,
     union_cnet_flux,
     t2i_canny_sd1,
     t2i_sketch_sd1,
     t2i_depth_sd1,
-    t2i_zoe_depth_sd1,
     t2i_canny_sdxl,
-    t2i_zoe_depth_sdxl,
     t2i_lineart_sdxl,
     t2i_sketch_sdxl,
     realesrgan_x4,
@@ -646,7 +647,6 @@ sd1_bundle: list[StarterModel] = [
     softedge_sd1,
     shuffle_sd1,
     tile_sd1,
-    ip2p_sd1,
     swinir,
 ]
 
@@ -657,8 +657,6 @@ sdxl_bundle: list[StarterModel] = [
     canny_sdxl,
     depth_sdxl,
     softedge_sdxl,
-    depth_zoe_16_sdxl,
-    depth_zoe_32_sdxl,
     openpose_sdxl,
     scribble_sdxl,
     tile_sdxl,

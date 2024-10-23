@@ -808,7 +808,11 @@ def get_is_installed(
     for model in installed_models:
         if model.source == starter_model.source:
             return True
-        if model.name == starter_model.name and model.base == starter_model.base and model.type == starter_model.type:
+        if (
+            (model.name == starter_model.name or model.name in starter_model.previous_names)
+            and model.base == starter_model.base
+            and model.type == starter_model.type
+        ):
             return True
     return False
 
