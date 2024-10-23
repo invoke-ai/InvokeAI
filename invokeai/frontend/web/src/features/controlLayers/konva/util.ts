@@ -152,7 +152,7 @@ export const snapToRect = (pos: Vector2d, rect: Rect, threshold = 10): Vector2d 
  * Checks if the left mouse button is currently pressed
  * @param e The konva event
  */
-export const getIsMouseDown = (e: KonvaEventObject<MouseEvent>): boolean => e.evt.buttons === 1;
+export const getIsPrimaryPointerDown = (e: KonvaEventObject<PointerEvent>): boolean => e.evt.buttons === 1;
 
 /**
  * Checks if the stage is currently focused

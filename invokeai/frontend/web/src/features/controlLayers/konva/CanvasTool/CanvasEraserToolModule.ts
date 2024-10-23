@@ -112,10 +112,10 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
       return;
     }
 
-    const isMouseDown = this.parent.$isMouseDown.get();
+    const isPrimaryPointerDown = this.parent.$isPrimaryPointerDown.get();
     const lastPointerType = this.parent.$lastPointerType.get();
 
-    if (lastPointerType !== 'mouse' && isMouseDown) {
+    if (lastPointerType !== 'mouse' && isPrimaryPointerDown) {
       this.setVisibility(false);
       return;
     }
@@ -166,12 +166,10 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
    */
   onStagePointerEnter = async (e: KonvaEventObject<PointerEvent>) => {
     const cursorPos = this.parent.$cursorPos.get();
-
-    const isMouseDown = this.parent.$isMouseDown.get();
-    const settings = this.manager.stateApi.getSettings();
+    const isPrimaryPointerDown = this.parent.$isPrimaryPointerDown.get();
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (!cursorPos || !isMouseDown || !selectedEntity) {
+    if (!cursorPos || !isPrimaryPointerDown || !selectedEntity) {
       /**
        * Can't do anything without:
        * - A cursor position: the cursor is not on the stage
@@ -181,6 +179,7 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
       return;
     }
 
+    const settings = this.manager.stateApi.getSettings();
     const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
@@ -334,7 +333,7 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (!this.parent.$isMouseDown.get()) {
+    if (!this.parent.$isPrimaryPointerDown.get()) {
       return;
     }
 
