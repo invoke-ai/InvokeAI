@@ -112,6 +112,7 @@ class ModelProbe(object):
         "StableDiffusionXLPipeline": ModelType.Main,
         "StableDiffusionXLImg2ImgPipeline": ModelType.Main,
         "StableDiffusionXLInpaintPipeline": ModelType.Main,
+        "StableDiffusion3Pipeline": ModelType.Main,
         "LatentConsistencyModelPipeline": ModelType.Main,
         "AutoencoderKL": ModelType.VAE,
         "AutoencoderTiny": ModelType.VAE,
@@ -747,18 +748,33 @@ class FolderProbeBase(ProbeBase):
 
 class PipelineFolderProbe(FolderProbeBase):
     def get_base_type(self) -> BaseModelType:
-        with open(self.model_path / "unet" / "config.json", "r") as file:
-            unet_conf = json.load(file)
-        if unet_conf["cross_attention_dim"] == 768:
-            return BaseModelType.StableDiffusion1
-        elif unet_conf["cross_attention_dim"] == 1024:
-            return BaseModelType.StableDiffusion2
-        elif unet_conf["cross_attention_dim"] == 1280:
-            return BaseModelType.StableDiffusionXLRefiner
-        elif unet_conf["cross_attention_dim"] == 2048:
-            return BaseModelType.StableDiffusionXL
-        else:
-            raise InvalidModelConfigException(f"Unknown base model for {self.model_path}")
+        # Handle pipelines with a UNet (i.e SD 1.x, SD2, SDXL).
+        config_path = self.model_path / "unet" / "config.json"
+        if config_path.exists():
+            with open(config_path) as file:
+                unet_conf = json.load(file)
+            if unet_conf["cross_attention_dim"] == 768:
+                return BaseModelType.StableDiffusion1
+            elif unet_conf["cross_attention_dim"] == 1024:
+                return BaseModelType.StableDiffusion2
+            elif unet_conf["cross_attention_dim"] == 1280:
+                return BaseModelType.StableDiffusionXLRefiner
+            elif unet_conf["cross_attention_dim"] == 2048:
+                return BaseModelType.StableDiffusionXL
+            else:
+                raise InvalidModelConfigException(f"Unknown base model for {self.model_path}")
+
+        # Handle pipelines with a transformer (i.e. SD3).
+        config_path = self.model_path / "transformer" / "config.json"
+        if config_path.exists():
+            with open(config_path) as file:
+                transformer_conf = json.load(file)
+            if transformer_conf["_class_name"] == "SD3Transformer2DModel":
+                return BaseModelType.StableDiffusion3
+            else:
+                raise InvalidModelConfigException(f"Unknown base model for {self.model_path}")
+
+        raise InvalidModelConfigException(f"Unknown base model for {self.model_path}")
 
     def get_scheduler_prediction_type(self) -> SchedulerPredictionType:
         with open(self.model_path / "scheduler" / "scheduler_config.json", "r") as file:
