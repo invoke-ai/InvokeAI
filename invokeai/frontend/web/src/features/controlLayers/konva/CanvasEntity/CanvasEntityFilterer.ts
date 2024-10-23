@@ -55,7 +55,9 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating filter module');
+  }
 
+  subscribe = () => {
     this.subscriptions.add(
       this.$filterConfig.listen(() => {
         if (this.manager.stateApi.getSettings().autoProcess && this.$isFiltering.get()) {
@@ -70,7 +72,12 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
         }
       })
     );
-  }
+  };
+
+  unsubscribe = () => {
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
+  };
 
   start = (config?: FilterConfig) => {
     const filteringAdapter = this.manager.stateApi.$filteringAdapter.get();
@@ -80,6 +87,9 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     }
 
     this.log.trace('Initializing filter');
+
+    this.subscribe();
+
     if (config) {
       this.$filterConfig.set(config);
     } else if (this.parent.type === 'control_layer_adapter' && this.parent.state.controlAdapter.model) {
@@ -204,6 +214,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       replaceObjects: true,
     });
     this.imageState = null;
+    this.unsubscribe();
     this.$isFiltering.set(false);
     this.$hasProcessed.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
@@ -225,6 +236,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.log.trace('Cancelling filter');
 
     this.reset();
+    this.unsubscribe();
     this.$isProcessing.set(false);
     this.$isFiltering.set(false);
     this.$hasProcessed.set(false);
@@ -242,5 +254,14 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       $isProcessing: this.$isProcessing.get(),
       $filterConfig: this.$filterConfig.get(),
     };
+  };
+
+  destroy = () => {
+    this.log.debug('Destroying module');
+    if (this.abortController && !this.abortController.signal.aborted) {
+      this.abortController.abort();
+    }
+    this.abortController = null;
+    this.unsubscribe();
   };
 }
