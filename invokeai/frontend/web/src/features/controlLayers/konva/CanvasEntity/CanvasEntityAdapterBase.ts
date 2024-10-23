@@ -12,10 +12,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
 import { getKonvaNodeDebugAttrs, getRectIntersection } from 'features/controlLayers/konva/util';
-import {
-  selectIsolatedFilteringPreview,
-  selectIsolatedTransformingPreview,
-} from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectIsolatedLayerPreview } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   buildSelectIsHidden,
   buildSelectIsSelected,
@@ -274,13 +271,11 @@ export abstract class CanvasEntityAdapterBase<
      */
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsHidden, this.syncVisibility));
     this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectIsolatedFilteringPreview, this.syncVisibility)
+      this.manager.stateApi.createStoreSubscription(selectIsolatedLayerPreview, this.syncVisibility)
     );
     this.subscriptions.add(this.manager.stateApi.$filteringAdapter.listen(this.syncVisibility));
-    this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectIsolatedTransformingPreview, this.syncVisibility)
-    );
     this.subscriptions.add(this.manager.stateApi.$transformingAdapter.listen(this.syncVisibility));
+    this.subscriptions.add(this.manager.stateApi.$segmentingAdapter.listen(this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsSelected, this.syncVisibility));
 
     /**
@@ -445,8 +440,10 @@ export abstract class CanvasEntityAdapterBase<
       return;
     }
 
+    const isolatedLayerPreview = this.manager.stateApi.runSelector(selectIsolatedLayerPreview);
+
     // Handle isolated preview modes - if another entity is filtering or transforming, we may need to hide this entity.
-    if (this.manager.stateApi.runSelector(selectIsolatedFilteringPreview)) {
+    if (isolatedLayerPreview) {
       const filteringEntityIdentifier = this.manager.stateApi.$filteringAdapter.get()?.entityIdentifier;
       if (filteringEntityIdentifier && filteringEntityIdentifier.id !== this.id) {
         this.setVisibility(false);
@@ -454,7 +451,7 @@ export abstract class CanvasEntityAdapterBase<
       }
     }
 
-    if (this.manager.stateApi.runSelector(selectIsolatedTransformingPreview)) {
+    if (isolatedLayerPreview) {
       const transformingEntity = this.manager.stateApi.$transformingAdapter.get();
       if (
         transformingEntity &&
@@ -462,6 +459,14 @@ export abstract class CanvasEntityAdapterBase<
         // Silent transforms should be transparent to the user, so we don't need to hide the entity.
         !transformingEntity.transformer.$silentTransform.get()
       ) {
+        this.setVisibility(false);
+        return;
+      }
+    }
+
+    if (isolatedLayerPreview) {
+      const segmentingEntity = this.manager.stateApi.$segmentingAdapter.get();
+      if (segmentingEntity && segmentingEntity.entityIdentifier.id !== this.id) {
         this.setVisibility(false);
         return;
       }

@@ -1,28 +1,28 @@
 import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  selectIsolatedFilteringPreview,
-  settingsIsolatedFilteringPreviewToggled,
+  selectIsolatedLayerPreview,
+  settingsIsolatedLayerPreviewToggled,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const CanvasSettingsIsolatedFilteringPreviewSwitch = memo(() => {
+export const CanvasSettingsIsolatedLayerPreviewSwitch = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const isolatedFilteringPreview = useAppSelector(selectIsolatedFilteringPreview);
+  const isolatedLayerPreview = useAppSelector(selectIsolatedLayerPreview);
   const onChange = useCallback(() => {
-    dispatch(settingsIsolatedFilteringPreviewToggled());
+    dispatch(settingsIsolatedLayerPreviewToggled());
   }, [dispatch]);
 
   return (
     <FormControl>
       <FormLabel m={0} flexGrow={1}>
-        {t('controlLayers.settings.isolatedFilteringPreview')}
+        {t('controlLayers.settings.isolatedLayerPreview')}
       </FormLabel>
-      <Switch size="sm" isChecked={isolatedFilteringPreview} onChange={onChange} />
+      <Switch size="sm" isChecked={isolatedLayerPreview} onChange={onChange} />
     </FormControl>
   );
 });
 
-CanvasSettingsIsolatedFilteringPreviewSwitch.displayName = 'CanvasSettingsIsolatedFilteringPreviewSwitch';
+CanvasSettingsIsolatedLayerPreviewSwitch.displayName = 'CanvasSettingsIsolatedLayerPreviewSwitch';
