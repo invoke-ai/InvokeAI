@@ -126,6 +126,13 @@ export const floorCoord = (coord: Coordinate): Coordinate => {
   };
 };
 
+export const roundCoord = (coord: Coordinate): Coordinate => {
+  return {
+    x: Math.round(coord.x),
+    y: Math.round(coord.y),
+  };
+};
+
 /**
  * Snaps a position to the edge of the given rect if within a threshold of the edge
  * @param pos The position to snap

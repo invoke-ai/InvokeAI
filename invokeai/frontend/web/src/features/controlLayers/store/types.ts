@@ -132,6 +132,7 @@ const zSAMPoint = z.object({
   label: zSAMPointLabel,
 });
 export type SAMPoint = z.infer<typeof zSAMPoint>;
+export type SAMPointWithId = SAMPoint & { id: string };
 
 const zRect = z.object({
   x: z.number(),
