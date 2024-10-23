@@ -53,6 +53,7 @@ class BaseModelType(str, Enum):
     Any = "any"
     StableDiffusion1 = "sd-1"
     StableDiffusion2 = "sd-2"
+    StableDiffusion35 = "sd-3.5"
     StableDiffusionXL = "sdxl"
     StableDiffusionXLRefiner = "sdxl-refiner"
     Flux = "flux"

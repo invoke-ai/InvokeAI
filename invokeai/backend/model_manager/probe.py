@@ -37,6 +37,7 @@ from invokeai.backend.model_manager.config import (
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.sd3.sd3_state_dict_utils import is_sd3_checkpoint
 from invokeai.backend.spandrel_image_to_image_model import SpandrelImageToImageModel
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
@@ -402,6 +403,9 @@ class ModelProbe(object):
                     #   is used rather than attempting to support flux with separate model types and format
                     #   If changed in the future, please fix me
                     config_file = "flux-schnell"
+            elif base_type == BaseModelType.StableDiffusion35:
+                # TODO(ryand): Think about what to do here.
+                config_file = "sd3.5-large"
             else:
                 config_file = LEGACY_CONFIGS[base_type][variant_type]
                 if isinstance(config_file, dict):  # need another tier for sd-2.x models
@@ -521,7 +525,7 @@ class CheckpointProbeBase(ProbeBase):
     def get_variant_type(self) -> ModelVariantType:
         model_type = ModelProbe.get_model_type_from_checkpoint(self.model_path, self.checkpoint)
         base_type = self.get_base_type()
-        if model_type != ModelType.Main or base_type == BaseModelType.Flux:
+        if model_type != ModelType.Main or base_type in (BaseModelType.Flux, BaseModelType.StableDiffusion35):
             return ModelVariantType.Normal
         state_dict = self.checkpoint.get("state_dict") or self.checkpoint
         in_channels = state_dict["model.diffusion_model.input_blocks.0.0.weight"].shape[1]
@@ -546,6 +550,10 @@ class PipelineCheckpointProbe(CheckpointProbeBase):
             or "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in state_dict
         ):
             return BaseModelType.Flux
+
+        if is_sd3_checkpoint(state_dict):
+            return BaseModelType.StableDiffusion35
+
         key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
         if key_name in state_dict and state_dict[key_name].shape[-1] == 768:
             return BaseModelType.StableDiffusion1
