@@ -693,7 +693,7 @@ class MMDiTX(torch.nn.Module):
 
     def __init__(
         self,
-        input_size: int = 32,
+        input_size: int | None = 32,
         patch_size: int = 2,
         in_channels: int = 4,
         depth: int = 28,

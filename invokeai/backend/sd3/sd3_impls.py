@@ -9,9 +9,10 @@ import re
 
 import einops
 import torch
-from mmditx import MMDiTX
 from PIL import Image
 from tqdm import tqdm
+
+from invokeai.backend.sd3.mmditx import MMDiTX
 
 #################################################################################################
 ### MMDiT Model Wrapping
@@ -21,7 +22,7 @@ from tqdm import tqdm
 class ModelSamplingDiscreteFlow(torch.nn.Module):
     """Helper for sampler scheduling (ie timestep/sigma calculations) for Discrete Flow models"""
 
-    def __init__(self, shift=1.0):
+    def __init__(self, shift: float = 1.0):
         super().__init__()
         self.shift = shift
         timesteps = 1000
@@ -36,7 +37,7 @@ class ModelSamplingDiscreteFlow(torch.nn.Module):
     def sigma_max(self):
         return self.sigmas[-1]
 
-    def timestep(self, sigma):
+    def timestep(self, sigma: torch.Tensor) -> torch.Tensor:
         return sigma * 1000
 
     def sigma(self, timestep: torch.Tensor):
@@ -45,7 +46,9 @@ class ModelSamplingDiscreteFlow(torch.nn.Module):
             return timestep
         return self.shift * timestep / (1 + (self.shift - 1) * timestep)
 
-    def calculate_denoised(self, sigma, model_output, model_input):
+    def calculate_denoised(
+        self, sigma: torch.Tensor, model_output: torch.Tensor, model_input: torch.Tensor
+    ) -> torch.Tensor:
         sigma = sigma.view(sigma.shape[:1] + (1,) * (model_output.ndim - 1))
         return model_input - model_output * sigma
 
@@ -108,7 +111,9 @@ class BaseModel(torch.nn.Module):
         )
         self.model_sampling = ModelSamplingDiscreteFlow(shift=shift)
 
-    def apply_model(self, x, sigma, c_crossattn=None, y=None):
+    def apply_model(
+        self, x: torch.Tensor, sigma: float, c_crossattn: torch.Tensor | None = None, y: torch.Tensor | None = None
+    ):
         dtype = self.get_dtype()
         timestep = self.model_sampling.timestep(sigma).float()
         model_output = self.diffusion_model(x.to(dtype), timestep, context=c_crossattn.to(dtype), y=y.to(dtype)).float()
