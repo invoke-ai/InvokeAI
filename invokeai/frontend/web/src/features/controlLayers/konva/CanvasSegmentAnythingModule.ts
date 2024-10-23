@@ -152,7 +152,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   $points = atom<SAMPointState[]>([]);
 
   /**
-   * Whether the module has points.
+   * Whether the module has points. This is a computed value based on $points.
    */
   $hasPoints = computed(this.$points, (points) => points.length > 0);
 
@@ -221,55 +221,13 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       }),
     };
 
-    // Mask group is below the point group
+    // Points should always be rendered above the mask group
     this.konva.group.add(this.konva.maskGroup);
     this.konva.group.add(this.konva.pointGroup);
 
     // Compositing rect is added to the mask group - will also be above the mask image, but that doesn't get created
     // until after processing
     this.konva.maskGroup.add(this.konva.compositingRect);
-
-    this.subscriptions.add(
-      this.$isProcessing.listen((isProcessing) => {
-        this.syncCursorStyle();
-        if (this.$isSegmenting.get()) {
-          this.parent.konva.layer.listening(!isProcessing);
-        }
-      })
-    );
-
-    // Scale the SAM points when the stage scale changes
-    this.subscriptions.add(
-      this.manager.stage.$stageAttrs.listen((stageAttrs, oldStageAttrs) => {
-        if (stageAttrs.scale !== oldStageAttrs.scale) {
-          this.syncPointScales();
-        }
-      })
-    );
-
-    // When the points change, process them if autoProcess is enabled
-    this.subscriptions.add(
-      this.$points.listen((points) => {
-        if (points.length === 0) {
-          return;
-        }
-        if (this.manager.stateApi.getSettings().autoProcess && this.$isSegmenting.get()) {
-          this.process();
-        }
-      })
-    );
-
-    // When auto-process is enabled, process the points if they have not been processed
-    this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectAutoProcess, (autoProcess) => {
-        if (this.$points.get().length === 0) {
-          return;
-        }
-        if (autoProcess && this.$isSegmenting.get() && !this.$hasProcessed.get()) {
-          this.process();
-        }
-      })
-    );
   }
 
   /**
@@ -430,17 +388,64 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   };
 
   /**
-   * Adds Konva stage event listeners for segmenting the entity.
+   * Adds event listeners needed while segmenting the entity.
    */
-  addStageEventListeners = () => {
+  subscribe = () => {
     this.manager.stage.konva.stage.on('pointerup', this.onStagePointerUp);
+    this.subscriptions.add(() => {
+      this.manager.stage.konva.stage.off('pointerup', this.onStagePointerUp);
+    });
+
+    // When we change the processing status, we should update the cursor style and the layer's listening status. For
+    // example, when processing, we should disable listening on the layer so the user can't add more points, else we
+    // should enable listening.
+    this.subscriptions.add(
+      this.$isProcessing.listen((isProcessing) => {
+        this.syncCursorStyle();
+        this.parent.konva.layer.listening(!isProcessing);
+      })
+    );
+
+    // Scale the SAM points when the stage scale changes
+    this.subscriptions.add(
+      this.manager.stage.$stageAttrs.listen((stageAttrs, oldStageAttrs) => {
+        if (stageAttrs.scale !== oldStageAttrs.scale) {
+          this.syncPointScales();
+        }
+      })
+    );
+
+    // When the points change, process them if autoProcess is enabled
+    this.subscriptions.add(
+      this.$points.listen((points) => {
+        if (points.length === 0) {
+          return;
+        }
+        if (this.manager.stateApi.getSettings().autoProcess) {
+          this.process();
+        }
+      })
+    );
+
+    // When auto-process is enabled, process the points if they have not been processed
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectAutoProcess, (autoProcess) => {
+        if (this.$points.get().length === 0) {
+          return;
+        }
+        if (autoProcess && !this.$hasProcessed.get()) {
+          this.process();
+        }
+      })
+    );
   };
 
   /**
-   * Removes Konva stage event listeners for segmenting the entity.
+   * Adds event listeners needed while segmenting the entity.
    */
-  removeStageEventListeners = () => {
-    this.manager.stage.konva.stage.off('pointerup', this.onStagePointerUp);
+  unsubscribe = () => {
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
   };
 
   /**
@@ -469,8 +474,8 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     // Enable listening on the parent adapter's layer so the module can receive pointer events
     this.parent.konva.layer.listening(true);
 
-    // Set up the segmenting event listeners (e.g. window pointerup)
-    this.addStageEventListeners();
+    // Subscribe all listeners needed for segmenting (e.g. window pointerup, state listeners)
+    this.subscribe();
 
     // Set the global segmenting adapter to this module
     this.manager.stateApi.$segmentingAdapter.set(this.parent);
@@ -654,7 +659,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    */
   teardown = () => {
     this.konva.group.remove();
-    this.removeStageEventListeners();
+    this.unsubscribe();
     this.$isSegmenting.set(false);
     this.manager.stateApi.$segmentingAdapter.set(null);
   };
@@ -774,8 +779,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
   destroy = () => {
     this.log.debug('Destroying module');
-    this.subscriptions.forEach((unsubscribe) => unsubscribe());
-    this.removeStageEventListeners();
+    this.unsubscribe();
     this.konva.group.destroy();
   };
 }
