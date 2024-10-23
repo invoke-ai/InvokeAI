@@ -102,7 +102,7 @@ const SAM_POINT_LABELS = {
   foreground: 1,
 } as const;
 
-export const zSAMPointLabel = z.nativeEnum(SAM_POINT_LABELS);
+const zSAMPointLabel = z.nativeEnum(SAM_POINT_LABELS);
 export type SAMPointLabel = z.infer<typeof zSAMPointLabel>;
 
 export const zSAMPointLabelString = z.enum(['background', 'neutral', 'foreground']);
@@ -126,7 +126,7 @@ export const SAM_POINT_LABEL_STRING_TO_NUMBER: Record<SAMPointLabelString, SAMPo
   foreground: 1,
 };
 
-export const zSAMPoint = z.object({
+const zSAMPoint = z.object({
   x: z.number().int().gte(0),
   y: z.number().int().gte(0),
   label: zSAMPointLabel,
