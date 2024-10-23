@@ -11,7 +11,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import CheckpointConfigBase, SubModelType
 
 
-@invocation_output("flux_model_loader_output")
+@invocation_output("sd3_model_loader_output")
 class Sd3ModelLoaderOutput(BaseInvocationOutput):
     """SD3 base model loader output."""
 
