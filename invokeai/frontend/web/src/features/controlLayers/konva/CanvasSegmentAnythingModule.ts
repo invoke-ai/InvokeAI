@@ -498,8 +498,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.$isProcessing.set(true);
 
     this.log.trace({ points }, 'Segmenting');
-    const rect = this.parent.transformer.getRelativeRect();
 
+    // Rasterize the entity in its current state
+    const rect = this.parent.transformer.getRelativeRect();
     const rasterizeResult = await withResultAsync(() =>
       this.parent.renderer.rasterize({ rect, attrs: { filters: [], opacity: 1 } })
     );
@@ -510,11 +511,14 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
 
+    // Create an AbortController for the segmenting process
     const controller = new AbortController();
     this.abortController = controller;
 
+    // Build the graph for segmenting the image, using the rasterized image DTO
     const { graph, outputNodeId } = this.buildGraph(rasterizeResult.value);
 
+    // Run the graph and get the segmented image output
     const segmentResult = await withResultAsync(() =>
       this.manager.stateApi.runGraphAndReturnImageOutput({
         graph,
@@ -524,9 +528,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       })
     );
 
+    // If there is an error, log it and bail out of this processing run
     if (segmentResult.isErr()) {
       this.log.error({ error: serializeError(segmentResult.error) }, 'Error segmenting');
       this.$isProcessing.set(false);
+      // Clean up the abort controller as needed
       if (!this.abortController.signal.aborted) {
         this.abortController.abort();
       }
@@ -535,29 +541,50 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
 
     this.log.trace({ imageDTO: segmentResult.value }, 'Segmented');
+
+    // Prepare the ephemeral image state
     this.imageState = imageDTOToImageObject(segmentResult.value);
+
+    // Destroy any existing masked image and create a new one
     if (this.maskedImage) {
       this.maskedImage.destroy();
     }
     this.maskedImage = new CanvasObjectImage(this.imageState, this);
+
+    // Force update the masked image - after awaiting, the image will be rendered (in memory)
     await this.maskedImage.update(this.imageState, true);
+
+    // Update the compositing rect to match the image size
     this.konva.compositingRect.setAttrs({
       width: this.imageState.image.width,
       height: this.imageState.image.height,
       visible: true,
     });
+
+    // Now we can add the masked image to the mask group. It will be rendered above the compositing rect, but should be
+    // under it, so we will move the compositing rect to the top
     this.konva.maskGroup.add(this.maskedImage.konva.group);
     this.konva.compositingRect.moveToTop();
+
+    // Cache the group to ensure the mask is rendered correctly w/ opacity
     this.konva.maskGroup.cache();
 
+    // We are done processing (still segmenting though!)
     this.$isProcessing.set(false);
+
+    // The current points have been processed
     this.$hasProcessed.set(true);
+
+    // Clean up the abort controller as needed
     if (!this.abortController.signal.aborted) {
       this.abortController.abort();
     }
     this.abortController = null;
   };
 
+  /**
+   * Debounced version of processImmediate.
+   */
   process = debounce(this.processImmediate, this.config.PROCESS_DEBOUNCE_MS);
 
   /**
@@ -574,7 +601,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
     this.log.trace('Applying');
+
+    // Commit the buffer, which will move the buffer to from the layers' buffer renderer to its main renderer
     this.parent.bufferRenderer.commitBuffer();
+
+    // Rasterize the entity, this time replacing the objects with the masked image
     const rect = this.parent.transformer.getRelativeRect();
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.entityIdentifier,
@@ -585,6 +616,8 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       },
       replaceObjects: true,
     });
+
+    // Final cleanup and teardown, returning user to main canvas UI
     this.resetEphemeralState();
     this.teardown();
   };
@@ -604,6 +637,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    */
   cancel = () => {
     this.log.trace('Canceling');
+    // Reset the module's state and tear down, returning user to main canvas UI
     this.resetEphemeralState();
     this.teardown();
   };
