@@ -48,7 +48,9 @@ export const StarterBundle = ({ bundleName, bundle }: { bundleName: string; bund
           <Text>{t('modelManager.includesNModels', { n: bundle.length })}:</Text>
           <UnorderedList>
             {bundle.map((model, index) => (
-              <ListItem key={index}>{model.name}</ListItem>
+              <ListItem key={index} wordBreak="break-all">
+                {model.name}
+              </ListItem>
             ))}
           </UnorderedList>
         </Flex>
