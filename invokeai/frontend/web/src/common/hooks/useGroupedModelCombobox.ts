@@ -4,6 +4,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
+import { selectSystemShouldEnableModelDescriptions } from 'features/system/store/systemSlice';
 import { groupBy, reduce } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +17,6 @@ type UseGroupedModelComboboxArg<T extends AnyModelConfig> = {
   getIsDisabled?: (model: T) => boolean;
   isLoading?: boolean;
   groupByType?: boolean;
-  showDescriptions?: boolean;
 };
 
 type UseGroupedModelComboboxReturn = {
@@ -38,15 +38,8 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
 ): UseGroupedModelComboboxReturn => {
   const { t } = useTranslation();
   const base = useAppSelector(selectBaseWithSDXLFallback);
-  const {
-    modelConfigs,
-    selectedModel,
-    getIsDisabled,
-    onChange,
-    isLoading,
-    groupByType = false,
-    showDescriptions = false,
-  } = arg;
+  const shouldShowModelDescriptions = useAppSelector(selectSystemShouldEnableModelDescriptions);
+  const { modelConfigs, selectedModel, getIsDisabled, onChange, isLoading, groupByType = false } = arg;
   const options = useMemo<GroupBase<ComboboxOption>[]>(() => {
     if (!modelConfigs) {
       return [];
@@ -60,7 +53,7 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
           options: val.map((model) => ({
             label: model.name,
             value: model.key,
-            description: (showDescriptions && model.description) || undefined,
+            description: (shouldShowModelDescriptions && model.description) || undefined,
             isDisabled: getIsDisabled ? getIsDisabled(model) : false,
           })),
         });
@@ -70,7 +63,7 @@ export const useGroupedModelCombobox = <T extends AnyModelConfig>(
     );
     _options.sort((a) => (a.label?.split('/')[0]?.toLowerCase().includes(base) ? -1 : 1));
     return _options;
-  }, [modelConfigs, groupByType, getIsDisabled, base, showDescriptions]);
+  }, [modelConfigs, groupByType, getIsDisabled, base, shouldShowModelDescriptions]);
 
   const value = useMemo(
     () =>
