@@ -29,7 +29,7 @@ import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/com
 import { ASPECT_RATIO_MAP } from 'features/parameters/components/Bbox/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
-import { merge, omit } from 'lodash-es';
+import { merge } from 'lodash-es';
 import type { UndoableOptions } from 'redux-undo';
 import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -57,13 +57,13 @@ import type {
 } from './types';
 import { getEntityIdentifier, isRenderableEntity } from './types';
 import {
+  converters,
   getControlLayerState,
   getInpaintMaskState,
   getRasterLayerState,
   getReferenceImageState,
   getRegionalGuidanceState,
   imageDTOToImageWithDims,
-  initialControlNet,
   initialIPAdapter,
 } from './util';
 
@@ -157,28 +157,25 @@ export const canvasSlice = createSlice({
       reducer: (
         state,
         action: PayloadAction<
-          EntityIdentifierPayload<{ newId: string; overrides?: Partial<CanvasControlLayerState> }, 'raster_layer'>
+          EntityIdentifierPayload<
+            { newId: string; overrides?: Partial<CanvasControlLayerState>; replace?: boolean },
+            'raster_layer'
+          >
         >
       ) => {
-        const { entityIdentifier, newId, overrides } = action.payload;
+        const { entityIdentifier, newId, overrides, replace } = action.payload;
         const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
         }
 
         // Convert the raster layer to control layer
-        const controlLayerState: CanvasControlLayerState = {
-          ...deepClone(layer),
-          id: newId,
-          type: 'control_layer',
-          controlAdapter: deepClone(initialControlNet),
-          withTransparencyEffect: true,
-        };
+        const controlLayerState = converters.rasterLayer.toControlLayer(newId, layer, overrides);
 
-        merge(controlLayerState, overrides);
-
-        // Remove the raster layer
-        state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
+        if (replace) {
+          // Remove the raster layer
+          state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
+        }
 
         // Add the converted control layer
         state.controlLayers.entities.push(controlLayerState);
@@ -186,9 +183,88 @@ export const canvasSlice = createSlice({
         state.selectedEntityIdentifier = { type: controlLayerState.type, id: controlLayerState.id };
       },
       prepare: (
-        payload: EntityIdentifierPayload<{ overrides?: Partial<CanvasControlLayerState> } | undefined, 'raster_layer'>
+        payload: EntityIdentifierPayload<
+          { overrides?: Partial<CanvasControlLayerState>; replace?: boolean } | undefined,
+          'raster_layer'
+        >
       ) => ({
         payload: { ...payload, newId: getPrefixedId('control_layer') },
+      }),
+    },
+    rasterLayerConvertedToInpaintMask: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          EntityIdentifierPayload<
+            { newId: string; overrides?: Partial<CanvasInpaintMaskState>; replace?: boolean },
+            'raster_layer'
+          >
+        >
+      ) => {
+        const { entityIdentifier, newId, overrides, replace } = action.payload;
+        const layer = selectEntity(state, entityIdentifier);
+        if (!layer) {
+          return;
+        }
+
+        // Convert the raster layer to inpaint mask
+        const inpaintMaskState = converters.rasterLayer.toInpaintMask(newId, layer, overrides);
+
+        if (replace) {
+          // Remove the raster layer
+          state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
+        }
+
+        // Add the converted inpaint mask
+        state.inpaintMasks.entities.push(inpaintMaskState);
+
+        state.selectedEntityIdentifier = { type: inpaintMaskState.type, id: inpaintMaskState.id };
+      },
+      prepare: (
+        payload: EntityIdentifierPayload<
+          { overrides?: Partial<CanvasInpaintMaskState>; replace?: boolean } | undefined,
+          'raster_layer'
+        >
+      ) => ({
+        payload: { ...payload, newId: getPrefixedId('inpaint_mask') },
+      }),
+    },
+    rasterLayerConvertedToRegionalGuidance: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          EntityIdentifierPayload<
+            { newId: string; overrides?: Partial<CanvasRegionalGuidanceState>; replace?: boolean },
+            'raster_layer'
+          >
+        >
+      ) => {
+        const { entityIdentifier, newId, overrides, replace } = action.payload;
+        const layer = selectEntity(state, entityIdentifier);
+        if (!layer) {
+          return;
+        }
+
+        // Convert the raster layer to inpaint mask
+        const regionalGuidanceState = converters.rasterLayer.toRegionalGuidance(newId, layer, overrides);
+
+        if (replace) {
+          // Remove the raster layer
+          state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
+        }
+
+        // Add the converted inpaint mask
+        state.regionalGuidance.entities.push(regionalGuidanceState);
+
+        state.selectedEntityIdentifier = { type: regionalGuidanceState.type, id: regionalGuidanceState.id };
+      },
+      prepare: (
+        payload: EntityIdentifierPayload<
+          { overrides?: Partial<CanvasRegionalGuidanceState>; replace?: boolean } | undefined,
+          'raster_layer'
+        >
+      ) => ({
+        payload: { ...payload, newId: getPrefixedId('regional_guidance') },
       }),
     },
     //#region Control layers
@@ -217,30 +293,123 @@ export const canvasSlice = createSlice({
       state.selectedEntityIdentifier = { type: 'control_layer', id: data.id };
     },
     controlLayerConvertedToRasterLayer: {
-      reducer: (state, action: PayloadAction<EntityIdentifierPayload<{ newId: string }, 'control_layer'>>) => {
-        const { entityIdentifier, newId } = action.payload;
+      reducer: (
+        state,
+        action: PayloadAction<
+          EntityIdentifierPayload<
+            { newId: string; overrides?: Partial<CanvasRasterLayerState>; replace?: boolean },
+            'control_layer'
+          >
+        >
+      ) => {
+        const { entityIdentifier, newId, overrides, replace } = action.payload;
         const layer = selectEntity(state, entityIdentifier);
         if (!layer) {
           return;
         }
 
         // Convert the raster layer to control layer
-        const rasterLayerState: CanvasRasterLayerState = {
-          ...omit(deepClone(layer), ['type', 'controlAdapter', 'withTransparencyEffect']),
-          id: newId,
-          type: 'raster_layer',
-        };
+        const rasterLayerState = converters.controlLayer.toRasterLayer(newId, layer, overrides);
 
-        // Remove the control layer
-        state.controlLayers.entities = state.controlLayers.entities.filter((layer) => layer.id !== entityIdentifier.id);
+        if (replace) {
+          // Remove the control layer
+          state.controlLayers.entities = state.controlLayers.entities.filter(
+            (layer) => layer.id !== entityIdentifier.id
+          );
+        }
 
         // Add the new raster layer
         state.rasterLayers.entities.push(rasterLayerState);
 
         state.selectedEntityIdentifier = { type: rasterLayerState.type, id: rasterLayerState.id };
       },
-      prepare: (payload: EntityIdentifierPayload<void, 'control_layer'>) => ({
+      prepare: (
+        payload: EntityIdentifierPayload<
+          { overrides?: Partial<CanvasRasterLayerState>; replace?: boolean } | undefined,
+          'control_layer'
+        >
+      ) => ({
         payload: { ...payload, newId: getPrefixedId('raster_layer') },
+      }),
+    },
+    controlLayerConvertedToInpaintMask: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          EntityIdentifierPayload<
+            { newId: string; overrides?: Partial<CanvasInpaintMaskState>; replace?: boolean },
+            'control_layer'
+          >
+        >
+      ) => {
+        const { entityIdentifier, newId, overrides, replace } = action.payload;
+        const layer = selectEntity(state, entityIdentifier);
+        if (!layer) {
+          return;
+        }
+
+        // Convert the control layer to inpaint mask
+        const inpaintMaskState = converters.controlLayer.toInpaintMask(newId, layer, overrides);
+
+        if (replace) {
+          // Remove the control layer
+          state.controlLayers.entities = state.controlLayers.entities.filter(
+            (layer) => layer.id !== entityIdentifier.id
+          );
+        }
+
+        // Add the new inpaint mask
+        state.inpaintMasks.entities.push(inpaintMaskState);
+
+        state.selectedEntityIdentifier = { type: inpaintMaskState.type, id: inpaintMaskState.id };
+      },
+      prepare: (
+        payload: EntityIdentifierPayload<
+          { overrides?: Partial<CanvasInpaintMaskState>; replace?: boolean } | undefined,
+          'control_layer'
+        >
+      ) => ({
+        payload: { ...payload, newId: getPrefixedId('inpaint_mask') },
+      }),
+    },
+    controlLayerConvertedToRegionalGuidance: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          EntityIdentifierPayload<
+            { newId: string; overrides?: Partial<CanvasRegionalGuidanceState>; replace?: boolean },
+            'control_layer'
+          >
+        >
+      ) => {
+        const { entityIdentifier, newId, overrides, replace } = action.payload;
+        const layer = selectEntity(state, entityIdentifier);
+        if (!layer) {
+          return;
+        }
+
+        // Convert the control layer to regional guidance
+        const regionalGuidanceState = converters.controlLayer.toRegionalGuidance(newId, layer, overrides);
+
+        if (replace) {
+          // Remove the control layer
+          state.controlLayers.entities = state.controlLayers.entities.filter(
+            (layer) => layer.id !== entityIdentifier.id
+          );
+        }
+
+        // Add the new regional guidance
+        state.regionalGuidance.entities.push(regionalGuidanceState);
+
+        state.selectedEntityIdentifier = { type: regionalGuidanceState.type, id: regionalGuidanceState.id };
+      },
+      prepare: (
+        payload: EntityIdentifierPayload<
+          { overrides?: Partial<CanvasRegionalGuidanceState>; replace?: boolean } | undefined,
+          'control_layer'
+        >
+      ) => ({
+        payload: { ...payload, newId: getPrefixedId('regional_guidance') },
       }),
     },
     controlLayerModelChanged: (
@@ -447,6 +616,46 @@ export const canvasSlice = createSlice({
       state.regionalGuidance.entities.push(data);
       state.selectedEntityIdentifier = { type: 'regional_guidance', id: data.id };
     },
+    rgConvertedToInpaintMask: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          EntityIdentifierPayload<
+            { newId: string; overrides?: Partial<CanvasInpaintMaskState>; replace?: boolean },
+            'regional_guidance'
+          >
+        >
+      ) => {
+        const { entityIdentifier, newId, overrides, replace } = action.payload;
+        const layer = selectEntity(state, entityIdentifier);
+        if (!layer) {
+          return;
+        }
+
+        // Convert the regional guidance to inpaint mask
+        const inpaintMaskState = converters.regionalGuidance.toInpaintMask(newId, layer, overrides);
+
+        if (replace) {
+          // Remove the regional guidance
+          state.regionalGuidance.entities = state.regionalGuidance.entities.filter(
+            (layer) => layer.id !== entityIdentifier.id
+          );
+        }
+
+        // Add the new inpaint mask
+        state.inpaintMasks.entities.push(inpaintMaskState);
+
+        state.selectedEntityIdentifier = { type: inpaintMaskState.type, id: inpaintMaskState.id };
+      },
+      prepare: (
+        payload: EntityIdentifierPayload<
+          { overrides?: Partial<CanvasInpaintMaskState>; replace?: boolean } | undefined,
+          'regional_guidance'
+        >
+      ) => ({
+        payload: { ...payload, newId: getPrefixedId('inpaint_mask') },
+      }),
+    },
     rgPositivePromptChanged: (
       state,
       action: PayloadAction<EntityIdentifierPayload<{ prompt: string | null }, 'regional_guidance'>>
@@ -643,6 +852,44 @@ export const canvasSlice = createSlice({
       const { data } = action.payload;
       state.inpaintMasks.entities = [data];
       state.selectedEntityIdentifier = { type: 'inpaint_mask', id: data.id };
+    },
+    inpaintMaskConvertedToRegionalGuidance: {
+      reducer: (
+        state,
+        action: PayloadAction<
+          EntityIdentifierPayload<
+            { newId: string; overrides?: Partial<CanvasRegionalGuidanceState>; replace?: boolean },
+            'inpaint_mask'
+          >
+        >
+      ) => {
+        const { entityIdentifier, newId, overrides, replace } = action.payload;
+        const layer = selectEntity(state, entityIdentifier);
+        if (!layer) {
+          return;
+        }
+
+        // Convert the inpaint mask to regional guidance
+        const regionalGuidanceState = converters.inpaintMask.toRegionalGuidance(newId, layer, overrides);
+
+        if (replace) {
+          // Remove the inpaint mask
+          state.inpaintMasks.entities = state.inpaintMasks.entities.filter((layer) => layer.id !== entityIdentifier.id);
+        }
+
+        // Add the new regional guidance
+        state.regionalGuidance.entities.push(regionalGuidanceState);
+
+        state.selectedEntityIdentifier = { type: regionalGuidanceState.type, id: regionalGuidanceState.id };
+      },
+      prepare: (
+        payload: EntityIdentifierPayload<
+          { overrides?: Partial<CanvasRegionalGuidanceState>; replace?: boolean } | undefined,
+          'inpaint_mask'
+        >
+      ) => ({
+        payload: { ...payload, newId: getPrefixedId('regional_guidance') },
+      }),
     },
     //#region BBox
     bboxScaledWidthChanged: (state, action: PayloadAction<number>) => {
@@ -1210,10 +1457,14 @@ export const {
   rasterLayerAdded,
   // rasterLayerRecalled,
   rasterLayerConvertedToControlLayer,
+  rasterLayerConvertedToInpaintMask,
+  rasterLayerConvertedToRegionalGuidance,
   // Control layers
   controlLayerAdded,
   // controlLayerRecalled,
   controlLayerConvertedToRasterLayer,
+  controlLayerConvertedToInpaintMask,
+  controlLayerConvertedToRegionalGuidance,
   controlLayerModelChanged,
   controlLayerControlModeChanged,
   controlLayerWeightChanged,
@@ -1231,6 +1482,7 @@ export const {
   // Regions
   rgAdded,
   // rgRecalled,
+  rgConvertedToInpaintMask,
   rgPositivePromptChanged,
   rgNegativePromptChanged,
   rgAutoNegativeToggled,
@@ -1244,6 +1496,7 @@ export const {
   rgIPAdapterCLIPVisionModelChanged,
   // Inpaint mask
   inpaintMaskAdded,
+  inpaintMaskConvertedToRegionalGuidance,
   // inpaintMaskRecalled,
 } = canvasSlice.actions;
 
