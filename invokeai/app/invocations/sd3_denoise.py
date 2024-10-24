@@ -44,7 +44,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     negative_text_conditioning: SD3ConditioningField = InputField(
         description=FieldDescriptions.negative_cond, input=Input.Connection
     )
-    cfg_scale: float | list[float] = InputField(default=1.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
+    cfg_scale: float | list[float] = InputField(default=7.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
     num_steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
@@ -75,7 +75,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         clip_prompt_embeds = torch.cat([sd3_conditioning.clip_l_embeds, sd3_conditioning.clip_g_embeds], dim=-1)
         clip_prompt_embeds = torch.nn.functional.pad(
-            clip_prompt_embeds, (0, t5_embeds.shape[-1] - sd3_conditioning.clip_l_embeds.shape[-1])
+            clip_prompt_embeds, (0, t5_embeds.shape[-1] - clip_prompt_embeds.shape[-1])
         )
 
         prompt_embeds = torch.cat([clip_prompt_embeds, t5_embeds], dim=-2)
