@@ -1,6 +1,6 @@
 import io
 import traceback
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -15,7 +15,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageRecordChanges,
     ResourceOrigin,
 )
-from invokeai.app.services.images.images_common import ImageDTO, ImageUrlsDTO
+from invokeai.app.services.images.images_common import ImageBulkUploadData, ImageDTO, ImageUrlsDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -24,6 +24,90 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
+
+
+class BulkUploadImageResponse(BaseModel):
+    sent: int
+    uploading: int
+
+
+@images_router.post(
+    "/bulk-upload",
+    operation_id="bulk_upload",
+    responses={
+        201: {"description": "The images are being prepared for upload"},
+        415: {"description": "Images upload failed"},
+    },
+    status_code=201,
+    response_model=BulkUploadImageResponse,
+)
+async def bulk_upload(
+    bulk_upload_id: str,
+    files: list[UploadFile],
+    background_tasks: BackgroundTasks,
+    request: Request,
+    response: Response,
+    board_id: Optional[str] = Query(default=None, description="The board to add this images to, if any"),
+) -> BulkUploadImageResponse:
+    """Uploads multiple images"""
+    upload_data_list: List[ImageBulkUploadData] = []
+
+    # loop to handle multiple files
+    for file in files:
+        if not file.content_type or not file.content_type.startswith("image"):
+            ApiDependencies.invoker.services.logger.error("Not an image")
+            continue
+
+        _metadata = None
+        _workflow = None
+        _graph = None
+
+        contents = await file.read()
+        try:
+            pil_image = Image.open(io.BytesIO(contents))
+        except Exception:
+            ApiDependencies.invoker.services.logger.error(traceback.format_exc())
+            continue
+
+        # TODO: retain non-invokeai metadata on upload?
+        # attempt to parse metadata from image
+        metadata_raw = pil_image.info.get("invokeai_metadata", None)
+        if isinstance(metadata_raw, str):
+            _metadata = metadata_raw
+        else:
+            ApiDependencies.invoker.services.logger.debug("Failed to parse metadata for uploaded image")
+            pass
+
+        # attempt to parse workflow from image
+        workflow_raw = pil_image.info.get("invokeai_workflow", None)
+        if isinstance(workflow_raw, str):
+            _workflow = workflow_raw
+        else:
+            ApiDependencies.invoker.services.logger.debug("Failed to parse workflow for uploaded image")
+            pass
+
+        # attempt to extract graph from image
+        graph_raw = pil_image.info.get("invokeai_graph", None)
+        if isinstance(graph_raw, str):
+            _graph = graph_raw
+        else:
+            ApiDependencies.invoker.services.logger.debug("Failed to parse graph for uploaded image")
+            pass
+
+        # construct an ImageUploadData object for each file
+        upload_data = ImageBulkUploadData(
+            image=pil_image,
+            board_id=board_id,
+            metadata=_metadata,
+            workflow=_workflow,
+            graph=_graph,
+        )
+        upload_data_list.append(upload_data)
+
+    # Schedule image processing as a background task
+    background_tasks.add_task(ApiDependencies.invoker.services.images.create_many, bulk_upload_id, upload_data_list)
+
+    return BulkUploadImageResponse(sent=len(files), uploading=len(upload_data_list))
 
 
 @images_router.post(

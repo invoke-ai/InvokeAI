@@ -5,6 +5,8 @@ type ClientEmitSubscribeQueue = { queue_id: string };
 type ClientEmitUnsubscribeQueue = ClientEmitSubscribeQueue;
 type ClientEmitSubscribeBulkDownload = { bulk_download_id: string };
 type ClientEmitUnsubscribeBulkDownload = ClientEmitSubscribeBulkDownload;
+type ClientEmitSubscribeBulkUpload = { bulk_upload_id: string };
+type ClientEmitUnsubscribeBulkUpload = ClientEmitSubscribeBulkUpload;
 
 export type ServerToClientEvents = {
   invocation_progress: (payload: S['InvocationProgressEvent']) => void;
@@ -31,6 +33,10 @@ export type ServerToClientEvents = {
   bulk_download_started: (payload: S['BulkDownloadStartedEvent']) => void;
   bulk_download_complete: (payload: S['BulkDownloadCompleteEvent']) => void;
   bulk_download_error: (payload: S['BulkDownloadErrorEvent']) => void;
+  bulk_upload_started: (payload: S['BulkUploadStartedEvent']) => void;
+  bulk_upload_completed: (payload: S['BulkUploadCompletedEvent']) => void;
+  bulk_upload_progress: (payload: S['BulkUploadProgressEvent']) => void;
+  bulk_upload_error: (payload: S['BulkUploadErrorEvent']) => void;
 };
 
 export type ClientToServerEvents = {
@@ -40,6 +46,8 @@ export type ClientToServerEvents = {
   unsubscribe_queue: (payload: ClientEmitUnsubscribeQueue) => void;
   subscribe_bulk_download: (payload: ClientEmitSubscribeBulkDownload) => void;
   unsubscribe_bulk_download: (payload: ClientEmitUnsubscribeBulkDownload) => void;
+  subscribe_bulk_upload: (payload: ClientEmitSubscribeBulkUpload) => void;
+  unsubscribe_bulk_upload: (payload: ClientEmitUnsubscribeBulkUpload) => void;
 };
 
 export type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;

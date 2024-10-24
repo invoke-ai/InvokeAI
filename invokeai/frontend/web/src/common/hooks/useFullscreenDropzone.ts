@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import { $queueId } from 'app/store/nanostores/queueId';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
@@ -9,7 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Accept, FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { useUploadImageMutation } from 'services/api/endpoints/images';
+import { useBulkUploadImagesMutation, useUploadImageMutation } from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
 
 const log = logger('gallery');
@@ -25,6 +26,7 @@ export const useFullscreenDropzone = () => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
   const [uploadImage] = useUploadImageMutation();
+  const [bulkUploadImages] = useBulkUploadImagesMutation();
   const activeTabName = useAppSelector(selectActiveTab);
   const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
 
@@ -37,7 +39,7 @@ export const useFullscreenDropzone = () => {
   }, [activeTabName]);
 
   const onDrop = useCallback(
-    (acceptedFiles: Array<File>, fileRejections: Array<FileRejection>) => {
+    async (acceptedFiles: Array<File>, fileRejections: Array<FileRejection>) => {
       if (fileRejections.length > 0) {
         const errors = fileRejections.map((rejection) => ({
           errors: rejection.errors.map(({ message }) => message),
@@ -60,22 +62,39 @@ export const useFullscreenDropzone = () => {
         return;
       }
 
-      for (const [i, file] of acceptedFiles.entries()) {
+      if (acceptedFiles.length > 1) {
+        try {
+          toast({
+            id: 'BULK_UPLOAD',
+            title: t('gallery.bulkUploadRequested'),
+            status: 'info',
+            duration: null,
+          });
+          await bulkUploadImages({
+            bulk_upload_id: $queueId.get(),
+            files: acceptedFiles,
+            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+          }).unwrap();
+        } catch (error) {
+          toast({
+            status: 'error',
+            title: t('gallery.bulkUploadRequestFailed'),
+          });
+          throw error;
+        }
+      } else if (acceptedFiles[0]) {
         uploadImage({
-          file,
+          file: acceptedFiles[0],
           image_category: 'user',
           is_intermediate: false,
           postUploadAction: getPostUploadAction(),
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          // The `imageUploaded` listener does some extra logic, like switching to the asset view on upload on the
-          // first upload of a "batch".
-          isFirstUploadOfBatch: i === 0,
         });
       }
 
       setIsHandlingUpload(false);
     },
-    [t, maxImageUploadCount, uploadImage, getPostUploadAction, autoAddBoardId]
+    [t, maxImageUploadCount, uploadImage, getPostUploadAction, autoAddBoardId, bulkUploadImages]
   );
 
   const onDragOver = useCallback(() => {

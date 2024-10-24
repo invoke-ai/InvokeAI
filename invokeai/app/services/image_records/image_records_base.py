@@ -89,6 +89,8 @@ class ImageRecordStorageBase(ABC):
         session_id: Optional[str] = None,
         node_id: Optional[str] = None,
         metadata: Optional[str] = None,
+        user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
     ) -> datetime:
         """Saves an image record."""
         pass

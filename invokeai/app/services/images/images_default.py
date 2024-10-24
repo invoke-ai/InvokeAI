@@ -1,6 +1,10 @@
-from typing import Optional
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
+from typing import List, Optional
 
 from PIL.Image import Image as PILImageType
+from tqdm import tqdm
 
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_files.image_files_common import (
@@ -20,7 +24,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_base import ImageServiceABC
-from invokeai.app.services.images.images_common import ImageDTO, image_record_to_dto
+from invokeai.app.services.images.images_common import ImageBulkUploadData, ImageDTO, image_record_to_dto
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -95,6 +99,99 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
+
+    def create_many(self, bulk_upload_id: str, upload_data_list: List[ImageBulkUploadData]) -> None:
+        total_images = len(upload_data_list)
+        processed_counter = 0  # Local counter
+        images_DTOs: list[ImageDTO] = []  # Collect ImageDTOs for successful uploads
+        progress_lock = Lock()
+
+        self.__invoker.services.events.emit_bulk_upload_started(
+            bulk_upload_id=bulk_upload_id,
+            total=total_images,
+        )
+
+        def process_and_save_image(image_data: ImageBulkUploadData):
+            nonlocal processed_counter  # refer to the counter in the enclosing scope
+            try:
+                # processing and saving each image
+                width, height = image_data.image.size
+                image_data.width = width
+                image_data.height = height
+                image_name = self.__invoker.services.names.create_image_name()
+                image_data.image_name = image_name
+                self.__invoker.services.image_records.save(
+                    image_name=image_data.image_name,
+                    image_origin=ResourceOrigin.EXTERNAL,
+                    image_category=ImageCategory.USER,
+                    width=image_data.width,
+                    height=image_data.height,
+                    has_workflow=image_data.workflow is not None or image_data.graph is not None,
+                    is_intermediate=False,
+                    metadata=image_data.metadata,
+                    user_id=image_data.user_id,
+                    project_id=image_data.project_id,
+                )
+
+                if image_data.board_id is not None:
+                    self.__invoker.services.board_image_records.add_image_to_board(
+                        board_id=image_data.board_id, image_name=image_data.image_name
+                    )
+
+                self.__invoker.services.image_files.save(
+                    image_name=image_data.image_name,
+                    image=image_data.image,
+                    metadata=image_data.metadata,
+                    workflow=image_data.workflow,
+                    graph=image_data.graph,
+                    project_id=image_data.project_id,
+                )
+
+                image_dto = self.get_dto(image_data.image_name)
+                self._on_changed(image_dto)
+
+                with progress_lock:
+                    processed_counter += 1
+
+                return image_dto
+            except ImageRecordSaveException:
+                self.__invoker.services.logger.error("Failed to save image record")
+                raise
+            except ImageFileSaveException:
+                self.__invoker.services.logger.error("Failed to save image file")
+                raise
+            except Exception as e:
+                self.__invoker.services.logger.error(f"Problem processing and saving image: {str(e)}")
+                raise e
+
+        # Determine the number of available CPU cores
+        num_cores = os.cpu_count() or 1
+        num_workers = max(1, num_cores - 1)
+
+        # Initialize tqdm progress bar
+        pbar = tqdm(total=total_images, desc="Processing Images", unit="images", colour="green")
+
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            futures = [executor.submit(process_and_save_image, image) for image in upload_data_list]
+            for future in as_completed(futures):
+                try:
+                    image_DTO = future.result()
+                    images_DTOs.append(image_DTO)
+                    pbar.update(1)  # Update progress bar
+
+                    self.__invoker.services.events.emit_bulk_upload_progress(
+                        bulk_upload_id=bulk_upload_id,
+                        completed=processed_counter,
+                        total=total_images,
+                    )
+                except Exception as e:
+                    self.__invoker.services.logger.error(f"Error in processing image: {str(e)}")
+                    self.__invoker.services.events.emit_bulk_upload_error(bulk_upload_id=bulk_upload_id, error=str(e))
+
+        pbar.close()
+        self.__invoker.services.events.emit_bulk_upload_complete(
+            bulk_upload_id=bulk_upload_id, total=len(images_DTOs), image_DTO=images_DTOs[0]
+        )
 
     def update(
         self,

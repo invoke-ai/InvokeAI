@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 from PIL.Image import Image as PILImageType
 
@@ -10,7 +10,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageRecordChanges,
     ResourceOrigin,
 )
-from invokeai.app.services.images.images_common import ImageDTO
+from invokeai.app.services.images.images_common import ImageBulkUploadData, ImageDTO
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -56,6 +56,11 @@ class ImageServiceABC(ABC):
         graph: Optional[str] = None,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
+        pass
+
+    @abstractmethod
+    def create_many(self, bulk_upload_id: str, upload_data_list: List[ImageBulkUploadData]):
+        """Creates an images array DTO out of an array of images, storing the images and their metadata"""
         pass
 
     @abstractmethod

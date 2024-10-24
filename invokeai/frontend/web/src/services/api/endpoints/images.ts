@@ -5,6 +5,7 @@ import type { BoardId } from 'features/gallery/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import type { components, paths } from 'services/api/schema';
 import type {
+  BulkUploadImageResponse,
   DeleteBoardResult,
   GraphAndWorkflowResponse,
   ImageCategory,
@@ -272,7 +273,6 @@ export const imagesApi = api.injectEndpoints({
         board_id?: string;
         crop_visible?: boolean;
         metadata?: SerializableObject;
-        isFirstUploadOfBatch?: boolean;
       }
     >({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {
@@ -319,6 +319,31 @@ export const imagesApi = api.injectEndpoints({
             id: boardId,
           },
         ];
+      },
+    }),
+    bulkUploadImages: build.mutation<
+      BulkUploadImageResponse,
+      {
+        bulk_upload_id: string;
+        files: File[];
+        board_id?: string;
+      }
+    >({
+      query: ({ bulk_upload_id, files, board_id }) => {
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append('files', file);
+        }
+
+        return {
+          url: buildImagesUrl('bulk-upload'),
+          method: 'POST',
+          body: formData,
+          params: {
+            bulk_upload_id,
+            board_id: board_id === 'none' ? undefined : board_id,
+          },
+        };
       },
     }),
 
@@ -556,6 +581,7 @@ export const {
   useGetImageWorkflowQuery,
   useLazyGetImageWorkflowQuery,
   useUploadImageMutation,
+  useBulkUploadImagesMutation,
   useClearIntermediatesMutation,
   useAddImagesToBoardMutation,
   useRemoveImagesFromBoardMutation,

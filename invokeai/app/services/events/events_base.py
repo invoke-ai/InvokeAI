@@ -1,13 +1,17 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Literal, Optional
 
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     BulkDownloadCompleteEvent,
     BulkDownloadErrorEvent,
     BulkDownloadStartedEvent,
+    BulkUploadCompletedEvent,
+    BulkUploadErrorEvent,
+    BulkUploadProgressEvent,
+    BulkUploadStartedEvent,
     DownloadCancelledEvent,
     DownloadCompleteEvent,
     DownloadErrorEvent,
@@ -30,6 +34,7 @@ from invokeai.app.services.events.events_common import (
     QueueClearedEvent,
     QueueItemStatusChangedEvent,
 )
+from invokeai.app.services.images.images_common import ImageDTO
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
@@ -43,6 +48,8 @@ if TYPE_CHECKING:
         SessionQueueStatus,
     )
     from invokeai.backend.model_manager.config import AnyModelConfig, SubModelType
+
+UploadStatusType = Literal["started", "processing", "done", "error"]
 
 
 class EventServiceBase:
@@ -195,5 +202,25 @@ class EventServiceBase:
         self.dispatch(
             BulkDownloadErrorEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name, error)
         )
+
+    # endregion
+
+    # region Bulk image upload
+
+    def emit_bulk_upload_started(self, bulk_upload_id: str, total: int) -> None:
+        """Emitted when a bulk image upload is started"""
+        self.dispatch(BulkUploadStartedEvent.build(bulk_upload_id, total))
+
+    def emit_bulk_upload_progress(self, bulk_upload_id: str, completed: int, total: int) -> None:
+        """Emitted when a bulk image upload is started"""
+        self.dispatch(BulkUploadProgressEvent.build(bulk_upload_id, completed, total))
+
+    def emit_bulk_upload_complete(self, bulk_upload_id: str, total: int, image_DTO: ImageDTO) -> None:
+        """Emitted when a bulk image upload is complete"""
+        self.dispatch(BulkUploadCompletedEvent.build(bulk_upload_id, total=total, image_DTO=image_DTO))
+
+    def emit_bulk_upload_error(self, bulk_upload_id: str, error: str) -> None:
+        """Emitted when a bulk image upload has an error"""
+        self.dispatch(BulkUploadErrorEvent.build(bulk_upload_id, error))
 
     # endregion

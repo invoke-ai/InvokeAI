@@ -1,4 +1,4 @@
-import { ExternalLink } from '@invoke-ai/ui-library';
+import { ExternalLink, Flex, Progress, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import { $baseUrl } from 'app/store/nanostores/baseUrl';
@@ -15,8 +15,11 @@ import { t } from 'i18next';
 import { forEach, isNil, round } from 'lodash-es';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_TAG } from 'services/api';
+import { boardsApi } from 'services/api/endpoints/boards';
+import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi, queueItemsAdapter } from 'services/api/endpoints/queue';
+import { getCategories, getListImagesUrl } from 'services/api/util';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
@@ -42,6 +45,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(socketConnected());
     const queue_id = $queueId.get();
     socket.emit('subscribe_queue', { queue_id });
+    socket.emit('subscribe_bulk_upload', { bulk_upload_id: $queueId.get() });
     if (!$baseUrl.get()) {
       const bulk_download_id = $bulkDownloadId.get();
       socket.emit('subscribe_bulk_download', { bulk_download_id });
@@ -481,6 +485,102 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       id: bulk_download_item_name,
       title: t('gallery.bulkDownloadFailed'),
       status: 'error',
+      description: error,
+      duration: null,
+    });
+  });
+
+  socket.on('bulk_upload_started', (data) => {
+    log.debug({ data }, 'Bulk gallery upload started');
+    const { total } = data;
+
+    toast({
+      id: 'BULK_UPLOAD',
+      title: t('gallery.bulkUploadStarted'),
+      status: 'info',
+      updateDescription: true,
+      withCount: false,
+      description: (
+        <Flex flexDir="column" gap={2}>
+          <Text>{t('gallery.bulkUploadStartedDesc', { x: total })}</Text>
+          <Progress value={0} />
+        </Flex>
+      ),
+      duration: null,
+    });
+  });
+
+  socket.on('bulk_upload_progress', (data) => {
+    log.debug({ data }, 'Bulk gallery upload ready');
+    const { completed, total } = data;
+
+    toast({
+      id: 'BULK_UPLOAD',
+      title: t('gallery.bulkUploadStarted'),
+      status: 'info',
+      updateDescription: true,
+      withCount: false,
+      description: (
+        <Flex flexDir="column" gap={2}>
+          <Text>{t('gallery.bulkUploadProgressDesc', { x: total, y: completed })}</Text>
+          <Progress value={(completed / total) * 100} />
+        </Flex>
+      ),
+      duration: null,
+    });
+  });
+
+  socket.on('bulk_upload_completed', (data) => {
+    log.debug({ data }, 'Bulk gallery upload ready');
+    const { total, image_DTO: imageDTO } = data;
+
+    toast({
+      id: 'BULK_UPLOAD',
+      title: t('gallery.bulkUploadComplete'),
+      status: 'success',
+      updateDescription: true,
+      withCount: false,
+      description: (
+        <Flex flexDir="column" gap={2}>
+          <Text>{t('gallery.bulkUploadCompleteDesc', { x: total })}</Text>
+          <Progress value={100} />
+        </Flex>
+      ),
+      duration: null,
+    });
+
+    // update the total images for the board
+    dispatch(
+      boardsApi.util.updateQueryData('getBoardImagesTotal', imageDTO.board_id ?? 'none', (draft) => {
+        draft.total += 1;
+      })
+    );
+
+    dispatch(
+      imagesApi.util.invalidateTags([
+        { type: 'Board', id: imageDTO.board_id ?? 'none' },
+        {
+          type: 'ImageList',
+          id: getListImagesUrl({
+            board_id: imageDTO.board_id ?? 'none',
+            categories: getCategories(imageDTO),
+          }),
+        },
+      ])
+    );
+  });
+
+  socket.on('bulk_upload_error', (data) => {
+    log.error({ data }, 'Bulk gallery download error');
+
+    const { error } = data;
+
+    toast({
+      id: 'BULK_UPLOAD',
+      title: t('gallery.bulkUploadFailed'),
+      status: 'error',
+      updateDescription: true,
+      withCount: false,
       description: error,
       duration: null,
     });

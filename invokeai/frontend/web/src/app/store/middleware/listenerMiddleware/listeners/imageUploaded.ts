@@ -78,22 +78,9 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
         lastUploadedToastTimeout = window.setTimeout(() => {
           toastApi.close();
         }, 3000);
-        /**
-         * We only want to change the board and view if this is the first upload of a batch, else we end up hijacking
-         * the user's gallery board and view selection:
-         * - User uploads multiple images
-         * - A couple uploads finish, but others are pending still
-         * - User changes the board selection
-         * - Pending uploads finish and change the board back to the original board
-         * - User is confused as to why the board changed
-         *
-         * Default to true to not require _all_ image upload handlers to set this value
-         */
-        const isFirstUploadOfBatch = action.meta.arg.originalArgs.isFirstUploadOfBatch ?? true;
-        if (isFirstUploadOfBatch) {
-          dispatch(boardIdSelected({ boardId }));
-          dispatch(galleryViewChanged('assets'));
-        }
+
+        dispatch(boardIdSelected({ boardId }));
+        dispatch(galleryViewChanged('assets'));
         return;
       }
 

@@ -432,6 +432,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/bulk-upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Upload
+         * @description Uploads multiple images
+         */
+        post: operations["bulk_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/upload": {
         parameters: {
             query?: never;
@@ -2117,6 +2137,11 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_bulk_upload */
+        Body_bulk_upload: {
+            /** Files */
+            files: Blob[];
+        };
         /** Body_cancel_by_batch_ids */
         Body_cancel_by_batch_ids: {
             /**
@@ -2606,6 +2631,104 @@ export type components = {
              * @description The name of the bulk image download item
              */
             bulk_download_item_name: string;
+        };
+        /**
+         * BulkUploadCompletedEvent
+         * @description Event model for bulk_upload_completed
+         */
+        BulkUploadCompletedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Bulk Upload Id
+             * @description The ID of the bulk image download
+             */
+            bulk_upload_id: string;
+            /**
+             * Total
+             * @description The total numberof images
+             */
+            total: number;
+            /** @description An image from the upload so client can refetch correctly */
+            image_DTO: components["schemas"]["ImageDTO"];
+        };
+        /**
+         * BulkUploadErrorEvent
+         * @description Event model for bulk_upload_error
+         */
+        BulkUploadErrorEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Bulk Upload Id
+             * @description The ID of the bulk image download
+             */
+            bulk_upload_id: string;
+            /**
+             * Error
+             * @description The error message
+             */
+            error: string;
+        };
+        /** BulkUploadImageResponse */
+        BulkUploadImageResponse: {
+            /** Sent */
+            sent: number;
+            /** Uploading */
+            uploading: number;
+        };
+        /**
+         * BulkUploadProgressEvent
+         * @description Event model for bulk_upload_progress
+         */
+        BulkUploadProgressEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Bulk Upload Id
+             * @description The ID of the bulk image download
+             */
+            bulk_upload_id: string;
+            /**
+             * Completed
+             * @description The completed number of images
+             */
+            completed: number;
+            /**
+             * Total
+             * @description The total number of images
+             */
+            total: number;
+        };
+        /**
+         * BulkUploadStartedEvent
+         * @description Event model for bulk_upload_started
+         */
+        BulkUploadStartedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Bulk Upload Id
+             * @description The ID of the bulk image download
+             */
+            bulk_upload_id: string;
+            /**
+             * Total
+             * @description The total numberof images
+             */
+            total: number;
         };
         /**
          * CLIPEmbedDiffusersConfig
@@ -18464,6 +18587,50 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    bulk_upload: {
+        parameters: {
+            query: {
+                bulk_upload_id: string;
+                /** @description The board to add this images to, if any */
+                board_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_bulk_upload"];
+            };
+        };
+        responses: {
+            /** @description The images are being prepared for upload */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkUploadImageResponse"];
+                };
+            };
+            /** @description Images upload failed */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

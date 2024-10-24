@@ -1,6 +1,7 @@
 from typing import Optional
 
-from pydantic import Field
+from PIL.Image import Image as PILImageType
+from pydantic import BaseModel, Field
 
 from invokeai.app.services.image_records.image_records_common import ImageRecord
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
@@ -39,3 +40,20 @@ def image_record_to_dto(
         thumbnail_url=thumbnail_url,
         board_id=board_id,
     )
+
+
+class ImageBulkUploadData(BaseModel):
+    image: PILImageType
+    image_name: Optional[str] = None
+    image_url: Optional[str] = None
+    board_id: Optional[str] = None
+    metadata: Optional[str] = None
+    workflow: Optional[str] = None
+    graph: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    user_id: Optional[str] = None
+    project_id: Optional[str] = None
+
+    class Config:
+        arbitrary_types_allowed = True
