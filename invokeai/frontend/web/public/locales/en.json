@@ -1876,7 +1876,7 @@
             "exclude": "Exclude",
             "neutral": "Neutral",
             "reset": "Reset",
-            "apply": "Apply",
+            "saveAs": "Save As",
             "cancel": "Cancel",
             "process": "Process"
         },
