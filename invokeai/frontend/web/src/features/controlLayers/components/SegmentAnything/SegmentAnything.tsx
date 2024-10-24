@@ -22,7 +22,7 @@ import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSl
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiCheckBold, PiStarBold, PiXBold } from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiFloppyDiskBold, PiStarBold, PiXBold } from 'react-icons/pi';
 
 const SegmentAnythingContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
@@ -116,7 +116,7 @@ const SegmentAnythingContent = memo(
           <Menu>
             <MenuButton
               as={Button}
-              leftIcon={<PiCheckBold />}
+              leftIcon={<PiFloppyDiskBold />}
               isLoading={isProcessing}
               loadingText={t('controlLayers.segment.saveAs')}
               variant="ghost"
