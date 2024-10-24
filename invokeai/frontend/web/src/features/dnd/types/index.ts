@@ -42,11 +42,11 @@ export type AddControlLayerFromImageDropData = BaseDropData & {
   actionType: 'ADD_CONTROL_LAYER_FROM_IMAGE';
 };
 
-export type AddInpaintMaskFromImageDropData = BaseDropData & {
+type AddInpaintMaskFromImageDropData = BaseDropData & {
   actionType: 'ADD_INPAINT_MASK_FROM_IMAGE';
 };
 
-export type AddRegionalGuidanceFromImageDropData = BaseDropData & {
+type AddRegionalGuidanceFromImageDropData = BaseDropData & {
   actionType: 'ADD_REGIONAL_GUIDANCE_FROM_IMAGE';
 };
 
