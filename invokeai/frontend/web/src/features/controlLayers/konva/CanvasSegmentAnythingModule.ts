@@ -15,6 +15,7 @@ import {
 } from 'features/controlLayers/konva/util';
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type {
+  CanvasEntityType,
   CanvasImageState,
   Coordinate,
   RgbaColor,
@@ -34,6 +35,8 @@ import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
 import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 
 type CanvasSegmentAnythingModuleConfig = {
   /**
@@ -152,7 +155,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   /**
    * The ephemeral image state of the processed image. Only used while segmenting.
    */
-  imageState: CanvasImageState | null = null;
+  $imageState = atom<CanvasImageState | null>(null);
+
+  /**
+   * Whether the module has an image state. This is a computed value based on $imageState.
+   */
+  $hasImageState = computed(this.$imageState, (imageState) => imageState !== null);
 
   /**
    * The current input points. A listener is added to this atom to process the points when they change.
@@ -567,21 +575,23 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.log.trace({ imageDTO: segmentResult.value }, 'Segmented');
 
     // Prepare the ephemeral image state
-    this.imageState = imageDTOToImageObject(segmentResult.value);
+    const imageState = imageDTOToImageObject(segmentResult.value);
+    this.$imageState.set(imageState);
 
     // Destroy any existing masked image and create a new one
     if (this.maskedImage) {
       this.maskedImage.destroy();
     }
-    this.maskedImage = new CanvasObjectImage(this.imageState, this);
+
+    this.maskedImage = new CanvasObjectImage(imageState, this);
 
     // Force update the masked image - after awaiting, the image will be rendered (in memory)
-    await this.maskedImage.update(this.imageState, true);
+    await this.maskedImage.update(imageState, true);
 
     // Update the compositing rect to match the image size
     this.konva.compositingRect.setAttrs({
-      width: this.imageState.image.width,
-      height: this.imageState.image.height,
+      width: imageState.image.width,
+      height: imageState.image.height,
       visible: true,
     });
 
@@ -614,7 +624,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * Applies the segmented image to the entity.
    */
   apply = () => {
-    const imageState = this.imageState;
+    const imageState = this.$imageState.get();
     if (!imageState) {
       this.log.error('No image state to apply');
       return;
@@ -635,6 +645,55 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       },
       replaceObjects: true,
     });
+
+    // Final cleanup and teardown, returning user to main canvas UI
+    this.resetEphemeralState();
+    this.teardown();
+  };
+
+  /**
+   * Applies the segmented image to the entity.
+   */
+  saveAs = (type: Exclude<CanvasEntityType, 'reference_image'>) => {
+    const imageState = this.$imageState.get();
+    if (!imageState) {
+      this.log.error('No image state to save as');
+      return;
+    }
+    this.log.trace(`Saving as ${type}`);
+
+    // Clear the buffer - we are creating a new entity, so we don't want to keep the old one
+    this.parent.bufferRenderer.clearBuffer();
+
+    // Create the new entity with the masked image as its only object
+    const rect = this.parent.transformer.getRelativeRect();
+    const arg = {
+      overrides: {
+        objects: [imageState],
+        position: {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+        },
+      },
+      isSelected: true,
+    };
+
+    switch (type) {
+      case 'raster_layer':
+        this.manager.stateApi.addRasterLayer(arg);
+        break;
+      case 'control_layer':
+        this.manager.stateApi.addControlLayer(arg);
+        break;
+      case 'inpaint_mask':
+        this.manager.stateApi.addInpaintMask(arg);
+        break;
+      case 'regional_guidance':
+        this.manager.stateApi.addRegionalGuidance(arg);
+        break;
+      default:
+        assert<Equals<typeof type, never>>(false);
+    }
 
     // Final cleanup and teardown, returning user to main canvas UI
     this.resetEphemeralState();
@@ -703,7 +762,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // Empty internal module state
     this.$points.set([]);
-    this.imageState = null;
+    this.$imageState.set(null);
     this.$pointType.set(1);
     this.$lastProcessedHash.set('');
     this.$isProcessing.set(false);
@@ -773,7 +832,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         label,
         circle: getKonvaNodeDebugAttrs(konva.circle),
       })),
-      imageState: deepClone(this.imageState),
+      imageState: deepClone(this.$imageState.get()),
       maskedImage: this.maskedImage?.repr(),
       config: deepClone(this.config),
       $isSegmenting: this.$isSegmenting.get(),
