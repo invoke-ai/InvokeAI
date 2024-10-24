@@ -80,7 +80,7 @@ const DEFAULT_CONFIG: CanvasSegmentAnythingModuleConfig = {
   SAM_POINT_FOREGROUND_COLOR: { r: 50, g: 255, b: 0, a: 1 }, // light green
   SAM_POINT_BACKGROUND_COLOR: { r: 255, g: 0, b: 50, a: 1 }, // red-ish
   SAM_POINT_NEUTRAL_COLOR: { r: 0, g: 225, b: 255, a: 1 }, // cyan
-  MASK_COLOR: { r: 0, g: 200, b: 200, a: 0.5 }, // cyan with 50% opacity
+  MASK_COLOR: { r: 0, g: 225, b: 255, a: 1 }, // cyan
   PROCESS_DEBOUNCE_MS: 1000,
 };
 
@@ -203,6 +203,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
      * It's rendered with a globalCompositeOperation of 'source-atop' to preview the mask as a semi-transparent overlay.
      */
     compositingRect: Konva.Rect;
+    /**
+     * A tween for pulsing the mask group's opacity.
+     */
+    maskTween: Konva.Tween | null;
   };
 
   KONVA_CIRCLE_NAME = `${this.type}:circle`;
@@ -225,7 +229,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.konva = {
       group: new Konva.Group({ name: this.KONVA_GROUP_NAME }),
       pointGroup: new Konva.Group({ name: this.KONVA_POINT_GROUP_NAME }),
-      maskGroup: new Konva.Group({ name: this.KONVA_MASK_GROUP_NAME }),
+      maskGroup: new Konva.Group({ name: this.KONVA_MASK_GROUP_NAME, opacity: 0.6 }),
       compositingRect: new Konva.Rect({
         name: this.KONVA_COMPOSITING_RECT_NAME,
         fill: rgbaColorToString(this.config.MASK_COLOR),
@@ -235,6 +239,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         perfectDrawEnabled: false,
         visible: false,
       }),
+      maskTween: null,
     };
 
     // Points should always be rendered above the mask group
@@ -582,6 +587,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     if (this.maskedImage) {
       this.maskedImage.destroy();
     }
+    if (this.konva.maskTween) {
+      this.konva.maskTween.destroy();
+      this.konva.maskTween = null;
+    }
 
     this.maskedImage = new CanvasObjectImage(imageState, this);
 
@@ -602,6 +611,19 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // Cache the group to ensure the mask is rendered correctly w/ opacity
     this.konva.maskGroup.cache();
+
+    // Create a pulsing tween
+    this.konva.maskTween = new Konva.Tween({
+      node: this.konva.maskGroup,
+      duration: 1,
+      opacity: 0.4, // oscillate between this value and pre-tween opacity
+      yoyo: true,
+      repeat: Infinity,
+      easing: Konva.Easings.EaseOut,
+    });
+
+    // Start the pulsing effect
+    this.konva.maskTween.play();
 
     this.$lastProcessedHash.set(hash);
 
@@ -758,6 +780,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
     if (this.maskedImage) {
       this.maskedImage.destroy();
+    }
+    if (this.konva.maskTween) {
+      this.konva.maskTween.destroy();
+      this.konva.maskTween = null;
     }
 
     // Empty internal module state
