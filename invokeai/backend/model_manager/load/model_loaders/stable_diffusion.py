@@ -134,7 +134,6 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                 torch_dtype=self._torch_dtype,
                 prediction_type=prediction_type,
                 upcast_attention=upcast_attention,
-                load_safety_checker=False,
             )
 
         if not submodel_type:
