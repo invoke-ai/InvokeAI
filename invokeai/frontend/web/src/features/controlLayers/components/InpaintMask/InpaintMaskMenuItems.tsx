@@ -5,6 +5,8 @@ import { CanvasEntityMenuItemsCropToBbox } from 'features/controlLayers/componen
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
+import { InpaintMaskMenuItemsConvertToSubMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsConvertToSubMenu';
+import { InpaintMaskMenuItemsCopyToSubMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsCopyToSubMenu';
 import { memo } from 'react';
 
 export const InpaintMaskMenuItems = memo(() => {
@@ -19,6 +21,9 @@ export const InpaintMaskMenuItems = memo(() => {
       <CanvasEntityMenuItemsTransform />
       <MenuDivider />
       <CanvasEntityMenuItemsCropToBbox />
+      <MenuDivider />
+      <InpaintMaskMenuItemsConvertToSubMenu />
+      <InpaintMaskMenuItemsCopyToSubMenu />
     </>
   );
 });
