@@ -20,7 +20,7 @@ export const CanvasEntityMenuItemsCopyToClipboard = memo(() => {
 
   return (
     <MenuItem onClick={onClick} icon={<PiCopyBold />} isDisabled={!isInteractable}>
-      {t('controlLayers.copyToClipboard')}
+      {t('common.clipboard')}
     </MenuItem>
   );
 });

@@ -25,8 +25,8 @@ const MenuContent = () => {
   return (
     <CanvasManagerProviderGate>
       <MenuList>
-        <CanvasContextMenuGlobalMenuItems />
         <CanvasContextMenuSelectedEntityMenuItems />
+        <CanvasContextMenuGlobalMenuItems />
       </MenuList>
     </CanvasManagerProviderGate>
   );
