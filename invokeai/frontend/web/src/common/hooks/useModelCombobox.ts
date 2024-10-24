@@ -1,5 +1,7 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
+import { selectSystemShouldEnableModelDescriptions } from 'features/system/store/systemSlice';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyModelConfig } from 'services/api/types';
@@ -24,13 +26,16 @@ type UseModelComboboxReturn = {
 export const useModelCombobox = <T extends AnyModelConfig>(arg: UseModelComboboxArg<T>): UseModelComboboxReturn => {
   const { t } = useTranslation();
   const { modelConfigs, selectedModel, getIsDisabled, onChange, isLoading, optionsFilter = () => true } = arg;
+  const shouldShowModelDescriptions = useAppSelector(selectSystemShouldEnableModelDescriptions);
+
   const options = useMemo<ComboboxOption[]>(() => {
     return modelConfigs.filter(optionsFilter).map((model) => ({
       label: model.name,
       value: model.key,
+      description: (shouldShowModelDescriptions && model.description) || undefined,
       isDisabled: getIsDisabled ? getIsDisabled(model) : false,
     }));
-  }, [optionsFilter, getIsDisabled, modelConfigs]);
+  }, [optionsFilter, getIsDisabled, modelConfigs, shouldShowModelDescriptions]);
 
   const value = useMemo(
     () => options.find((m) => (selectedModel ? m.value === selectedModel.key : false)),
