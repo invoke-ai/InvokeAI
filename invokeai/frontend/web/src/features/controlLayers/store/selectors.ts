@@ -349,6 +349,27 @@ export const buildSelectIsSelected = (entityIdentifier: CanvasEntityIdentifier) 
   );
 };
 
+/**
+ * Builds a selector that selects if the entity is empty.
+ *
+ * Reference images are considered empty if the IP adapter is empty.
+ *
+ * Other entities are considered empty if they have no objects.
+ */
+export const buildSelectHasObjects = (entityIdentifier: CanvasEntityIdentifier) => {
+  return createSelector(selectCanvasSlice, (canvas) => {
+    const entity = selectEntity(canvas, entityIdentifier);
+
+    if (!entity) {
+      return false;
+    }
+    if (entity.type === 'reference_image') {
+      return entity.ipAdapter.image !== null;
+    }
+    return entity.objects.length > 0;
+  });
+};
+
 export const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);
 export const selectHeight = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.height);
 export const selectAspectRatioID = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.aspectRatio.id);
