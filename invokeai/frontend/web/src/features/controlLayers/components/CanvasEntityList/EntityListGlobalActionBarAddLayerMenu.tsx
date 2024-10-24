@@ -1,6 +1,5 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   useAddControlLayer,
   useAddGlobalReferenceImage,
@@ -57,11 +56,9 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
           </MenuItem>
         </MenuGroup>
         <MenuGroup title={t('controlLayers.layer_other')}>
-          <InformationalPopover feature="controlNet" inPortal={false}>
-            <MenuItem icon={<PiPlusBold />} onClick={addControlLayer}>
-              {t('controlLayers.controlLayer')}
-            </MenuItem>
-          </InformationalPopover>
+          <MenuItem icon={<PiPlusBold />} onClick={addControlLayer}>
+            {t('controlLayers.controlLayer')}
+          </MenuItem>
           <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>
             {t('controlLayers.rasterLayer')}
           </MenuItem>
