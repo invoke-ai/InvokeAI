@@ -1253,21 +1253,15 @@
         },
         "inpainting": {
             "heading": "Inpainting",
-            "paragraphs": [
-                "Controls which area is modified, guided by Denoising Strength."
-            ]
+            "paragraphs": ["Controls which area is modified, guided by Denoising Strength."]
         },
         "rasterLayer": {
             "heading": "Raster Layer",
-            "paragraphs": [
-                "Pixel-based content of your canvas, used during image generation."
-            ]
+            "paragraphs": ["Pixel-based content of your canvas, used during image generation."]
         },
         "regionalGuidance": {
             "heading": "Regional Guidance",
-            "paragraphs": [
-                "Brush to guide where elements from global prompts should appear."
-            ]
+            "paragraphs": ["Brush to guide where elements from global prompts should appear."]
         },
         "regionalGuidanceAndReferenceImage": {
             "heading": "Regional Guidance and Regional Reference Image",
@@ -1282,9 +1276,7 @@
         },
         "regionalReferenceImage": {
             "heading": "Regional Reference Image",
-            "paragraphs": [
-                "Brush to apply a reference image to specific areas."
-            ]
+            "paragraphs": ["Brush to apply a reference image to specific areas."]
         },
         "controlNet": {
             "heading": "ControlNet",
