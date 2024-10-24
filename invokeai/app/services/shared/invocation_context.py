@@ -221,7 +221,7 @@ class ImagesInterface(InvocationContextInterface):
         )
 
     def get_pil(self, image_name: str, mode: IMAGE_MODES | None = None) -> Image:
-        """Gets an image as a PIL Image object.
+        """Gets an image as a PIL Image object. This method returns a copy of the image.
 
         Args:
             image_name: The name of the image to get.
@@ -233,11 +233,15 @@ class ImagesInterface(InvocationContextInterface):
         image = self._services.images.get_pil_image(image_name)
         if mode and mode != image.mode:
             try:
+                # convert makes a copy!
                 image = image.convert(mode)
             except ValueError:
                 self._services.logger.warning(
                     f"Could not convert image from {image.mode} to {mode}. Using original mode instead."
                 )
+        else:
+            # copy the image to prevent the user from modifying the original
+            image = image.copy()
         return image
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
