@@ -1780,8 +1780,6 @@
                 "on": "Activé",
                 "label": "Aligner sur la grille"
             },
-            "isolatedFilteringPreview": "Aperçu de filtrage isolé",
-            "isolatedTransformingPreview": "Aperçu de transformation isolée",
             "invertBrushSizeScrollDirection": "Inverser le défilement pour la taille du pinceau",
             "pressureSensitivity": "Sensibilité à la pression",
             "preserveMask": {
@@ -1791,7 +1789,6 @@
             "isolatedPreview": "Aperçu Isolé",
             "isolatedStagingPreview": "Aperçu de l'attente isolé"
         },
-        "convertToRasterLayer": "Convertir en Couche de Rastérisation",
         "transparency": "Transparence",
         "moveBackward": "Reculer",
         "rectangle": "Rectangle",
@@ -1914,7 +1911,6 @@
         "globalReferenceImage_withCount_one": "$t(controlLayers.globalReferenceImage)",
         "globalReferenceImage_withCount_many": "Images de référence globales",
         "globalReferenceImage_withCount_other": "Images de référence globales",
-        "convertToControlLayer": "Convertir en Couche de Contrôle",
         "layer_withCount_one": "Couche {{count}}",
         "layer_withCount_many": "Couches {{count}}",
         "layer_withCount_other": "Couches {{count}}",

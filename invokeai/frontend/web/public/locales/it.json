@@ -1734,7 +1734,7 @@
             "composition": "Solo Composizione",
             "ipAdapterMethod": "Metodo Adattatore IP"
         },
-        "showingType": "Mostrare {{type}}",
+        "showingType": "Mostra {{type}}",
         "dynamicGrid": "Griglia dinamica",
         "tool": {
             "view": "Muovi",
@@ -1862,8 +1862,6 @@
         "layer_withCount_one": "Livello ({{count}})",
         "layer_withCount_many": "Livelli ({{count}})",
         "layer_withCount_other": "Livelli ({{count}})",
-        "convertToControlLayer": "Converti in livello di controllo",
-        "convertToRasterLayer": "Converti in livello raster",
         "unlocked": "Sbloccato",
         "enableTransparencyEffect": "Abilita l'effetto trasparenza",
         "replaceLayer": "Sostituisci livello",
@@ -1876,9 +1874,7 @@
         "newCanvasSession": "Nuova sessione Tela",
         "deleteSelected": "Elimina selezione",
         "settings": {
-            "isolatedFilteringPreview": "Anteprima del filtraggio isolata",
             "isolatedStagingPreview": "Anteprima di generazione isolata",
-            "isolatedTransformingPreview": "Anteprima di trasformazione isolata",
             "isolatedPreview": "Anteprima isolata",
             "invertBrushSizeScrollDirection": "Inverti scorrimento per dimensione pennello",
             "snapToGrid": {
@@ -1890,7 +1886,9 @@
             "preserveMask": {
                 "alert": "Preservare la regione mascherata",
                 "label": "Preserva la regione mascherata"
-            }
+            },
+            "isolatedLayerPreview": "Anteprima livello isolato",
+            "isolatedLayerPreviewDesc": "Se visualizzare solo questo livello quando si eseguono operazioni come il filtraggio o la trasformazione."
         },
         "transform": {
             "reset": "Reimposta",
@@ -1937,7 +1935,12 @@
             "saveCanvasToGallery": "Salva la Tela nella Galleria",
             "saveToGalleryGroup": "Salva nella Galleria"
         },
-        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine"
+        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine",
+        "segment": {
+            "reset": "Reimposta",
+            "cancel": "Annulla",
+            "process": "Elabora"
+        }
     },
     "ui": {
         "tabs": {

@@ -82,7 +82,17 @@
         "dontShowMeThese": "请勿显示这些内容",
         "beta": "测试版",
         "toResolve": "解决",
-        "tab": "标签页"
+        "tab": "标签页",
+        "apply": "应用",
+        "edit": "编辑",
+        "off": "关",
+        "loadingImage": "正在加载图片",
+        "ok": "确定",
+        "placeholderSelectAModel": "选择一个模型",
+        "close": "关闭",
+        "reset": "重设",
+        "none": "无",
+        "new": "新建"
     },
     "gallery": {
         "galleryImageSize": "预览大小",
@@ -140,12 +150,72 @@
         "stretchToFit": "拉伸以适应",
         "exitCompare": "退出对比",
         "compareHelp1": "在点击图库中的图片或使用箭头键切换比较图片时，请按住<Kbd>Alt</Kbd> 键。",
-        "go": "运行"
+        "go": "运行",
+        "boardsSettings": "画板设置",
+        "imagesSettings": "画廊图片设置",
+        "gallery": "画廊",
+        "move": "移动",
+        "imagesTab": "您在Invoke中创建和保存的图片。"
     },
     "hotkeys": {
         "searchHotkeys": "检索快捷键",
         "noHotkeysFound": "未找到快捷键",
-        "clearSearch": "清除检索项"
+        "clearSearch": "清除检索项",
+        "app": {
+            "cancelQueueItem": {
+                "title": "取消"
+            },
+            "selectQueueTab": {
+                "title": "选择队列标签",
+                "desc": "选择队列标签。"
+            },
+            "toggleLeftPanel": {
+                "desc": "显示或隐藏左侧面板。",
+                "title": "开关左侧面板"
+            },
+            "resetPanelLayout": {
+                "title": "重设面板布局"
+            },
+            "togglePanels": {
+                "title": "开关面板",
+                "desc": "同时显示或隐藏左右两侧的面板。"
+            },
+            "selectWorkflowsTab": {
+                "title": "选择工作流标签",
+                "desc": "选择工作流标签。"
+            },
+            "selectModelsTab": {
+                "title": "选择模型标签",
+                "desc": "选择模型标签。"
+            },
+            "toggleRightPanel": {
+                "title": "开关右侧面板",
+                "desc": "显示或隐藏右侧面板。"
+            },
+            "clearQueue": {
+                "title": "清除队列",
+                "desc": "取消并清除所有队列条目。"
+            },
+            "selectCanvasTab": {
+                "title": "选择画布标签",
+                "desc": "选择画布标签。"
+            }
+        },
+        "canvas": {
+            "selectBrushTool": {
+                "title": "画笔工具",
+                "desc": "选择画笔工具。"
+            },
+            "selectEraserTool": {
+                "title": "橡皮擦工具"
+            },
+            "title": "画布",
+            "selectColorPickerTool": {
+                "title": "拾色器工具",
+                "desc": "选择拾色器工具。"
+            }
+        },
+        "hotkeys": "快捷键"
     },
     "modelManager": {
         "modelManager": "模型管理器",
@@ -416,7 +486,9 @@
         "createIssue": "创建问题",
         "about": "关于",
         "submitSupportTicket": "提交支持工单",
-        "toggleRightPanel": "切换右侧面板(G)"
+        "toggleRightPanel": "切换右侧面板(G)",
+        "uploadImages": "上传图片",
+        "toggleLeftPanel": "开关左侧面板(T)"
     },
     "nodes": {
         "zoomInNodes": "放大",
@@ -610,7 +682,12 @@
         "openQueue": "打开队列",
         "prompts_other": "提示词",
         "iterations_other": "迭代",
-        "generations_other": "生成"
+        "generations_other": "生成",
+        "canvas": "画布",
+        "workflows": "工作流",
+        "generation": "生成",
+        "other": "其他",
+        "gallery": "画廊"
     },
     "sdxl": {
         "refinerStart": "Refiner 开始作用时机",
@@ -709,7 +786,8 @@
         "shared": "共享面板",
         "archiveBoard": "归档面板",
         "archived": "已归档",
-        "assetsWithCount_other": "{{count}}项资源"
+        "assetsWithCount_other": "{{count}}项资源",
+        "updateBoardError": "更新画板出错"
     },
     "dynamicPrompts": {
         "seedBehaviour": {
