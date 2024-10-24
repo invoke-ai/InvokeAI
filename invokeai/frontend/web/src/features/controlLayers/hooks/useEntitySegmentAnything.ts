@@ -5,11 +5,13 @@ import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdap
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { isSegmentableEntityIdentifier } from 'features/controlLayers/store/types';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useCallback, useMemo } from 'react';
 
 export const useEntitySegmentAnything = (entityIdentifier: CanvasEntityIdentifier | null) => {
   const canvasManager = useCanvasManager();
   const adapter = useEntityAdapterSafe(entityIdentifier);
+  const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusy();
   const isInteractable = useStore(adapter?.$isInteractable ?? $false);
   const isEmpty = useStore(adapter?.$isEmpty ?? $false);
@@ -50,8 +52,9 @@ export const useEntitySegmentAnything = (entityIdentifier: CanvasEntityIdentifie
     if (!adapter) {
       return;
     }
+    imageViewer.close();
     adapter.segmentAnything.start();
-  }, [isDisabled, entityIdentifier, canvasManager]);
+  }, [isDisabled, entityIdentifier, canvasManager, imageViewer]);
 
   return { isDisabled, start } as const;
 };
