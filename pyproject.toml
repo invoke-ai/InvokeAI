@@ -89,7 +89,7 @@ dependencies = [
   "pypatchmatch",
   'pyperclip',
   "pyreadline3",
-  "python-multipart",
+  "python-multipart==0.0.12",
   "requests~=2.28.2",
   "rich~=13.3",
   "scikit-image~=0.21.0",
