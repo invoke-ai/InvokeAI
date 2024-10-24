@@ -41,7 +41,7 @@ export const CanvasDropArea = memo(() => {
   return (
     <>
       <Grid
-        gridTemplateRows="1fr 1fr 1fr"
+        gridTemplateRows="1fr 1fr"
         gridTemplateColumns="1fr 1fr"
         position="absolute"
         top={0}
