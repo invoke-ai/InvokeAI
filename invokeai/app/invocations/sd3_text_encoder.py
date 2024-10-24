@@ -2,7 +2,14 @@ from contextlib import ExitStack
 from typing import Iterator, Tuple
 
 import torch
-from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
+from transformers import (
+    CLIPTextModel,
+    CLIPTextModelWithProjection,
+    CLIPTokenizer,
+    T5EncoderModel,
+    T5Tokenizer,
+    T5TokenizerFast,
+)
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
@@ -86,7 +93,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
             t5_tokenizer_info as t5_tokenizer,
         ):
             assert isinstance(t5_text_encoder, T5EncoderModel)
-            assert isinstance(t5_tokenizer, T5Tokenizer)
+            assert isinstance(t5_tokenizer, (T5Tokenizer, T5TokenizerFast))
 
             text_inputs = t5_tokenizer(
                 prompt,
@@ -127,7 +134,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
             clip_tokenizer_info as clip_tokenizer,
             ExitStack() as exit_stack,
         ):
-            assert isinstance(clip_text_encoder, CLIPTextModel)
+            assert isinstance(clip_text_encoder, (CLIPTextModel, CLIPTextModelWithProjection))
             assert isinstance(clip_tokenizer, CLIPTokenizer)
 
             clip_text_encoder_config = clip_text_encoder_info.config
@@ -150,23 +157,6 @@ class Sd3TextEncoderInvocation(BaseInvocation):
                 raise ValueError(f"Unsupported model format: {clip_text_encoder_config.format}")
 
             clip_text_encoder = clip_text_encoder.eval().requires_grad_(False)
-
-            batch_encoding = clip_tokenizer(
-                prompt,
-                truncation=True,
-                max_length=77,
-                return_length=False,
-                return_overflowing_tokens=False,
-                padding="max_length",
-                return_tensors="pt",
-            )
-            outputs = clip_text_encoder(
-                input_ids=batch_encoding["input_ids"].to(clip_text_encoder.device),
-                attention_mask=None,
-                output_hidden_states=False,
-            )
-            # TODO(ryand): Confirm that this is the correct output. ('last_hidden_state' is the default)
-            pooled_prompt_embeds = outputs["pooler_output"]
 
             text_inputs = clip_tokenizer(
                 prompt,
