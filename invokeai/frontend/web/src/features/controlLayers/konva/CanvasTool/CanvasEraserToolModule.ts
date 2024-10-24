@@ -216,12 +216,14 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
    */
   onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
     const cursorPos = this.parent.$cursorPos.get();
+    const isPrimaryPointerDown = this.parent.$isPrimaryPointerDown.get();
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (!cursorPos || !selectedEntity) {
+    if (!cursorPos || !selectedEntity || !isPrimaryPointerDown) {
       /**
        * Can't do anything without:
        * - A cursor position: the cursor is not on the stage
+       * - The mouse is down: the user is not drawing
        * - A selected entity: there is no entity to draw on
        */
       return;
