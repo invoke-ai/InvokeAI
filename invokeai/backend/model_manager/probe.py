@@ -18,6 +18,7 @@ from invokeai.backend.flux.ip_adapter.state_dict_utils import is_state_dict_xlab
 from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
 )
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import ConfigLoader
 from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import is_state_dict_likely_in_flux_kohya_format
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.config import (
@@ -31,6 +32,8 @@ from invokeai.backend.model_manager.config import (
     ModelRepoVariant,
     ModelSourceType,
     ModelType,
+    SubModelType,
+    SubmodelDefinition,
     ModelVariantType,
     SchedulerPredictionType,
 )
@@ -123,6 +126,8 @@ class ModelProbe(object):
         "CLIPTextModel": ModelType.CLIPEmbed,
         "T5EncoderModel": ModelType.T5Encoder,
         "FluxControlNetModel": ModelType.ControlNet,
+        "SD3Transformer2DModel": ModelType.Main,
+        "CLIPTextModelWithProjection": ModelType.CLIPEmbed,
     }
 
     @classmethod
@@ -179,7 +184,7 @@ class ModelProbe(object):
             fields.get("description") or f"{fields['base'].value} {model_type.value} model {fields['name']}"
         )
         fields["format"] = ModelFormat(fields.get("format")) if "format" in fields else probe.get_format()
-        fields["hash"] = fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)
+        fields["hash"] = "placeholder" #fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)
 
         fields["default_settings"] = fields.get("default_settings")
 
@@ -217,6 +222,10 @@ class ModelProbe(object):
                 fields["base"] == BaseModelType.StableDiffusion2
                 and fields["prediction_type"] == SchedulerPredictionType.VPrediction
             )
+
+        get_submodels = getattr(probe, "get_submodels", None)
+        if fields['base'] == BaseModelType.StableDiffusion3 and callable(get_submodels):
+            fields["submodels"] = get_submodels()
 
         model_info = ModelConfigFactory.make_config(fields)  # , key=fields.get("key", None))
         return model_info
@@ -785,6 +794,21 @@ class PipelineFolderProbe(FolderProbeBase):
             return SchedulerPredictionType.Epsilon
         else:
             raise InvalidModelConfigException("Unknown scheduler prediction type: {scheduler_conf['prediction_type']}")
+
+    def get_submodels(self) -> Dict[SubModelType, SubmodelDefinition]:
+        config = ConfigLoader.load_config(self.model_path, config_name="model_index.json")
+        submodels: Dict[SubModelType, SubmodelDefinition] = {}
+        for key, value in config.items():
+            if key.startswith("_") or not (isinstance(value, list) and len(value) == 2):
+                continue
+            model_loader = str(value[1])
+            if model_type := ModelProbe.CLASS2TYPE.get(model_loader):
+                submodels[SubModelType(key)] = SubmodelDefinition(
+                    path_or_prefix=(self.model_path / key).resolve().as_posix(),
+                    model_type=model_type,
+                )
+
+        return submodels
 
     def get_variant_type(self) -> ModelVariantType:
         # This only works for pipelines! Any kind of
