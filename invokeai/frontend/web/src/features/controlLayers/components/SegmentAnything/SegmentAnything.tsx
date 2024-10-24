@@ -3,11 +3,16 @@ import {
   ButtonGroup,
   Flex,
   Heading,
+  Icon,
+  ListItem,
   Menu,
   MenuButton,
   MenuItem,
   MenuList,
   Spacer,
+  Text,
+  Tooltip,
+  UnorderedList,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -20,9 +25,10 @@ import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/kon
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiFloppyDiskBold, PiStarBold, PiXBold } from 'react-icons/pi';
+import { Trans, useTranslation } from 'react-i18next';
+import { PiArrowsCounterClockwiseBold, PiFloppyDiskBold, PiInfoBold, PiStarBold, PiXBold } from 'react-icons/pi';
 
 const SegmentAnythingContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
@@ -81,10 +87,17 @@ const SegmentAnythingContent = memo(
         transitionProperty="height"
         transitionDuration="normal"
       >
-        <Flex w="full" gap={4}>
-          <Heading size="md" color="base.300" userSelect="none">
-            {t('controlLayers.segment.autoMask')}
-          </Heading>
+        <Flex w="full" gap={4} alignItems="center">
+          <Flex gap={2}>
+            <Heading size="md" color="base.300" userSelect="none">
+              {t('controlLayers.segment.autoMask')}
+            </Heading>
+            <Tooltip label={<SegmentAnythingHelpTooltipContent />}>
+              <Flex alignItems="center">
+                <Icon as={PiInfoBold} color="base.500" />
+              </Flex>
+            </Tooltip>
+          </Flex>
           <Spacer />
           <CanvasAutoProcessSwitch />
           <CanvasOperationIsolatedLayerPreviewSwitch />
@@ -166,3 +179,31 @@ export const SegmentAnything = () => {
 
   return <SegmentAnythingContent adapter={adapter} />;
 };
+
+const Bold = (props: PropsWithChildren) => (
+  <Text as="span" fontWeight="semibold">
+    {props.children}
+  </Text>
+);
+
+const SegmentAnythingHelpTooltipContent = memo(() => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex gap={3} flexDir="column">
+      <Text>
+        <Trans i18nKey="controlLayers.segment.help1" components={{ Bold: <Bold /> }} />
+      </Text>
+      <Text>
+        <Trans i18nKey="controlLayers.segment.help2" components={{ Bold: <Bold /> }} />
+      </Text>
+      <UnorderedList>
+        <ListItem>{t('controlLayers.segment.clickToAdd')}</ListItem>
+        <ListItem>{t('controlLayers.segment.dragToMove')}</ListItem>
+        <ListItem>{t('controlLayers.segment.clickToRemove')}</ListItem>
+      </UnorderedList>
+    </Flex>
+  );
+});
+
+SegmentAnythingHelpTooltipContent.displayName = 'SegmentAnythingHelpTooltipContent';
