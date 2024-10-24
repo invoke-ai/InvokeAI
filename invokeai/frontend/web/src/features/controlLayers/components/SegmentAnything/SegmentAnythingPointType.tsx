@@ -31,9 +31,6 @@ export const SegmentAnythingPointType = memo(
             <Radio value="background">
               <Text>{t('controlLayers.segment.background')}</Text>
             </Radio>
-            <Radio value="neutral">
-              <Text>{t('controlLayers.segment.neutral')}</Text>
-            </Radio>
           </Flex>
         </RadioGroup>
       </FormControl>
