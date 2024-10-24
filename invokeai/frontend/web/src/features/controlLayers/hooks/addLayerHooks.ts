@@ -24,7 +24,9 @@ import {
   selectEntityOrThrow,
 } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasControlLayerState,
   CanvasEntityIdentifier,
+  CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   ControlNetConfig,
@@ -117,6 +119,60 @@ export const useNewRasterLayerFromImage = () => {
         objects: [imageObject],
       };
       dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+    },
+    [bboxRect.x, bboxRect.y, dispatch]
+  );
+
+  return func;
+};
+
+export const useNewControlLayerFromImage = () => {
+  const dispatch = useAppDispatch();
+  const bboxRect = useAppSelector(selectBboxRect);
+  const func = useCallback(
+    (imageDTO: ImageDTO) => {
+      const imageObject = imageDTOToImageObject(imageDTO);
+      const overrides: Partial<CanvasControlLayerState> = {
+        position: { x: bboxRect.x, y: bboxRect.y },
+        objects: [imageObject],
+      };
+      dispatch(controlLayerAdded({ overrides, isSelected: true }));
+    },
+    [bboxRect.x, bboxRect.y, dispatch]
+  );
+
+  return func;
+};
+
+export const useNewInpaintMaskFromImage = () => {
+  const dispatch = useAppDispatch();
+  const bboxRect = useAppSelector(selectBboxRect);
+  const func = useCallback(
+    (imageDTO: ImageDTO) => {
+      const imageObject = imageDTOToImageObject(imageDTO);
+      const overrides: Partial<CanvasInpaintMaskState> = {
+        position: { x: bboxRect.x, y: bboxRect.y },
+        objects: [imageObject],
+      };
+      dispatch(inpaintMaskAdded({ overrides, isSelected: true }));
+    },
+    [bboxRect.x, bboxRect.y, dispatch]
+  );
+
+  return func;
+};
+
+export const useNewRegionalGuidanceFromImage = () => {
+  const dispatch = useAppDispatch();
+  const bboxRect = useAppSelector(selectBboxRect);
+  const func = useCallback(
+    (imageDTO: ImageDTO) => {
+      const imageObject = imageDTOToImageObject(imageDTO);
+      const overrides: Partial<CanvasRegionalGuidanceState> = {
+        position: { x: bboxRect.x, y: bboxRect.y },
+        objects: [imageObject],
+      };
+      dispatch(rgAdded({ overrides, isSelected: true }));
     },
     [bboxRect.x, bboxRect.y, dispatch]
   );

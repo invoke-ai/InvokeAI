@@ -7,8 +7,7 @@ import { ImageMenuItemDelete } from 'features/gallery/components/ImageContextMen
 import { ImageMenuItemDownload } from 'features/gallery/components/ImageContextMenu/ImageMenuItemDownload';
 import { ImageMenuItemLoadWorkflow } from 'features/gallery/components/ImageContextMenu/ImageMenuItemLoadWorkflow';
 import { ImageMenuItemMetadataRecallActions } from 'features/gallery/components/ImageContextMenu/ImageMenuItemMetadataRecallActions';
-import { ImageMenuItemNewCanvasFromImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewCanvasFromImage';
-import { ImageMenuItemNewLayerFromImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewLayerFromImage';
+import { ImageMenuItemNewFromImageSubMenu } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewFromImageSubMenu';
 import { ImageMenuItemOpenInNewTab } from 'features/gallery/components/ImageContextMenu/ImageMenuItemOpenInNewTab';
 import { ImageMenuItemOpenInViewer } from 'features/gallery/components/ImageContextMenu/ImageMenuItemOpenInViewer';
 import { ImageMenuItemSelectForCompare } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSelectForCompare';
@@ -39,8 +38,7 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       <MenuDivider />
       <ImageMenuItemSendToUpscale />
       <CanvasManagerProviderGate>
-        <ImageMenuItemNewLayerFromImage />
-        <ImageMenuItemNewCanvasFromImage />
+        <ImageMenuItemNewFromImageSubMenu />
       </CanvasManagerProviderGate>
       <MenuDivider />
       <ImageMenuItemChangeBoard />
