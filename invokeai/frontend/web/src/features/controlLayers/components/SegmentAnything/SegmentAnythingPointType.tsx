@@ -26,10 +26,10 @@ export const SegmentAnythingPointType = memo(
         <RadioGroup value={pointType} onChange={onChange} w="full" size="md">
           <Flex alignItems="center" w="full" gap={4} fontWeight="semibold" color="base.300">
             <Radio value="foreground">
-              <Text>{t('controlLayers.segment.foreground')}</Text>
+              <Text>{t('controlLayers.segment.include')}</Text>
             </Radio>
             <Radio value="background">
-              <Text>{t('controlLayers.segment.background')}</Text>
+              <Text>{t('controlLayers.segment.exclude')}</Text>
             </Radio>
           </Flex>
         </RadioGroup>
