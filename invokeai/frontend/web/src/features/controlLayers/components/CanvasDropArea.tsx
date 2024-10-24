@@ -3,7 +3,9 @@ import IAIDroppable from 'common/components/IAIDroppable';
 import type {
   AddControlLayerFromImageDropData,
   AddGlobalReferenceImageFromImageDropData,
+  AddInpaintMaskFromImageDropData,
   AddRasterLayerFromImageDropData,
+  AddRegionalGuidanceFromImageDropData,
   AddRegionalReferenceImageFromImageDropData,
 } from 'features/dnd/types';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
@@ -18,6 +20,16 @@ const addRasterLayerFromImageDropData: AddRasterLayerFromImageDropData = {
 const addControlLayerFromImageDropData: AddControlLayerFromImageDropData = {
   id: 'add-control-layer-from-image-drop-data',
   actionType: 'ADD_CONTROL_LAYER_FROM_IMAGE',
+};
+
+const addInpaintMaskFromImageDropData: AddInpaintMaskFromImageDropData = {
+  id: 'add-inpaint-mask-from-image-drop-data',
+  actionType: 'ADD_INPAINT_MASK_FROM_IMAGE',
+};
+
+const addRegionalGuidanceFromImageDropData: AddRegionalGuidanceFromImageDropData = {
+  id: 'add-regional-guidance-from-image-drop-data',
+  actionType: 'ADD_REGIONAL_GUIDANCE_FROM_IMAGE',
 };
 
 const addRegionalReferenceImageFromImageDropData: AddRegionalReferenceImageFromImageDropData = {
@@ -41,7 +53,7 @@ export const CanvasDropArea = memo(() => {
   return (
     <>
       <Grid
-        gridTemplateRows="1fr 1fr"
+        gridTemplateRows="1fr 1fr 1fr"
         gridTemplateColumns="1fr 1fr"
         position="absolute"
         top={0}
@@ -62,6 +74,7 @@ export const CanvasDropArea = memo(() => {
             data={addControlLayerFromImageDropData}
           />
         </GridItem>
+
         <GridItem position="relative">
           <IAIDroppable
             dropLabel={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
@@ -72,6 +85,19 @@ export const CanvasDropArea = memo(() => {
           <IAIDroppable
             dropLabel={t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
             data={addGlobalReferenceImageFromImageDropData}
+          />
+        </GridItem>
+
+        <GridItem position="relative">
+          <IAIDroppable
+            dropLabel={t('controlLayers.canvasContextMenu.newInpaintMask')}
+            data={addInpaintMaskFromImageDropData}
+          />
+        </GridItem>
+        <GridItem position="relative">
+          <IAIDroppable
+            dropLabel={t('controlLayers.canvasContextMenu.newRegionalGuidance')}
+            data={addRegionalGuidanceFromImageDropData}
           />
         </GridItem>
       </Grid>
