@@ -1251,6 +1251,41 @@
             "heading": "Mask Adjustments",
             "paragraphs": ["Adjust the mask."]
         },
+        "inpainting": {
+            "heading": "Inpainting",
+            "paragraphs": [
+                "Select an area to modify or vary while preserving the rest of your image. The inpainted region blends the content seamlessly into its surroundings, while “Denoising Strength” controls how much to vary the region from its original state."
+            ]
+        },
+        "rasterLayer": {
+            "heading": "Raster Layer",
+            "paragraphs": [
+                "Raster Layers provide the foundation for your canvas and are incorporated into the generation process when you press “Invoke”. The model will preserve structure and color while allowing AI to enhance or reimagine the content based on your prompts, settings, and other layers."
+            ]
+        },
+        "regionalGuidance": {
+            "heading": "Regional Guidance",
+            "paragraphs": [
+                "Regional Guidance allows you to define a region of the image (eg. with the brush tool) and provide a text prompt. The model incorporates that prompt guidance only in the area of the image defined by the region you defined."
+            ]
+        },
+        "regionalGuidanceAndReferenceImage": {
+            "heading": "Regional Guidance and Regional Reference Image",
+            "paragraphs": [
+                "Regional Guidance allows you to define a region of the image (eg. with the brush tool) and provide a text prompt. The model incorporates that prompt guidance only in the area of the image defined by the region you defined.",
+                "Regional reference image allows you to define a region of the image (eg. with the brush tool) and provide a reference image. The model incorporates that prompt guidance only in the area of the image defined by the region you defined."
+            ]
+        },
+        "globalReferenceImage": {
+            "heading": "Global Reference Image",
+            "paragraphs": ["Apply a reference image that influences the entire canvas."]
+        },
+        "regionalReferenceImage": {
+            "heading": "Regional Reference Image",
+            "paragraphs": [
+                "Define a region of the image (eg. with the brush tool) and provide a reference image. The model incorporates that prompt guidance only in the area of the image defined by the region you defined."
+            ]
+        },
         "controlNet": {
             "heading": "ControlNet",
             "paragraphs": [
