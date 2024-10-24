@@ -1935,6 +1935,8 @@
             "newRegionalReferenceImage": "New Regional Reference Image",
             "newControlLayer": "New Control Layer",
             "newRasterLayer": "New Raster Layer",
+            "newInpaintMask": "New Inpaint Mask",
+            "newRegionalGuidance": "New Regional Guidance",
             "cropCanvasToBbox": "Crop Canvas to Bbox"
         },
         "stagingArea": {
