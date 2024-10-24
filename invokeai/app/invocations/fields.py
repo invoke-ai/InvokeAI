@@ -248,6 +248,12 @@ class FluxConditioningField(BaseModel):
     conditioning_name: str = Field(description="The name of conditioning tensor")
 
 
+class SD3ConditioningField(BaseModel):
+    """A conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
 class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
