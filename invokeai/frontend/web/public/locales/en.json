@@ -1889,7 +1889,12 @@
             "reset": "Reset",
             "saveAs": "Save As",
             "cancel": "Cancel",
-            "process": "Process"
+            "process": "Process",
+            "help1": "Auto-mask creates a mask for a single target object. Add <Bold>Include</Bold> and <Bold>Exclude</Bold> points to indicate which parts of the layer are part of the target object.",
+            "help2": "Start with one <Bold>Include</Bold> point within the target object. Add more points to refine the mask. Fewer points typically produce better results.",
+            "clickToAdd": "Click on the layer to add a point",
+            "dragToMove": "Drag a point to move it",
+            "clickToRemove": "Click on a point to remove it"
         },
         "settings": {
             "snapToGrid": {
