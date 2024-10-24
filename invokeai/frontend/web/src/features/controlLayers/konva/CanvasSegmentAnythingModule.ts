@@ -293,6 +293,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       if (this.$isDraggingPoint.get()) {
         return;
       }
+      if (e.evt.button !== 0) {
+        return;
+      }
       // This event should not bubble up to the parent, stage or any other nodes
       e.cancelBubble = true;
       circle.destroy();
