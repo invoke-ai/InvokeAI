@@ -7,7 +7,7 @@ from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokeniz
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
-from invokeai.app.invocations.primitives import FluxConditioningOutput
+from invokeai.app.invocations.primitives import SD3ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.lora.conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
 from invokeai.backend.lora.lora_model_raw import LoRAModelRaw
@@ -47,7 +47,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
     prompt: str = InputField(description="Text prompt to encode.")
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> FluxConditioningOutput:
+    def invoke(self, context: InvocationContext) -> SD3ConditioningOutput:
         # Note: The text encoding model are run in separate functions to ensure that all model references are locally
         # scoped. This ensures that earlier models can be freed and gc'd before loading later models (if necessary).
 
@@ -72,7 +72,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         )
 
         conditioning_name = context.conditioning.save(conditioning_data)
-        return FluxConditioningOutput.build(conditioning_name)
+        return SD3ConditioningOutput.build(conditioning_name)
 
     def _t5_encode(self, context: InvocationContext, max_seq_len: int) -> torch.Tensor:
         assert self.t5_encoder is not None
