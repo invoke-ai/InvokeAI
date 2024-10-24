@@ -17,6 +17,7 @@ const initialSystemState: SystemState = {
   shouldUseNSFWChecker: false,
   shouldUseWatermarker: false,
   shouldEnableInformationalPopovers: true,
+  shouldEnableModelDescriptions: true,
   logIsEnabled: true,
   logLevel: 'debug',
   logNamespaces: [...zLogNamespace.options],
@@ -57,6 +58,9 @@ export const systemSlice = createSlice({
     setShouldEnableInformationalPopovers(state, action: PayloadAction<boolean>) {
       state.shouldEnableInformationalPopovers = action.payload;
     },
+    setShouldEnableModelDescriptions(state, action: PayloadAction<boolean>) {
+      state.shouldEnableModelDescriptions = action.payload;
+    },
     shouldConfirmOnNewSessionToggled(state) {
       state.shouldConfirmOnNewSession = !state.shouldConfirmOnNewSession;
     },
@@ -73,6 +77,7 @@ export const {
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
   setShouldEnableInformationalPopovers,
+  setShouldEnableModelDescriptions,
   shouldConfirmOnNewSessionToggled,
 } = systemSlice.actions;
 
@@ -107,5 +112,8 @@ export const selectSystemShouldAntialiasProgressImage = createSystemSelector(
 );
 export const selectSystemShouldEnableInformationalPopovers = createSystemSelector(
   (system) => system.shouldEnableInformationalPopovers
+);
+export const selectSystemShouldEnableModelDescriptions = createSystemSelector(
+  (system) => system.shouldEnableModelDescriptions
 );
 export const selectSystemShouldConfirmOnNewSession = createSystemSelector((system) => system.shouldConfirmOnNewSession);
