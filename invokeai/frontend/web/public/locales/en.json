@@ -1872,8 +1872,8 @@
         "segment": {
             "autoMask": "Auto Mask",
             "pointType": "Point Type",
-            "foreground": "Foreground",
-            "background": "Background",
+            "include": "Include",
+            "exclude": "Exclude",
             "neutral": "Neutral",
             "reset": "Reset",
             "apply": "Apply",
