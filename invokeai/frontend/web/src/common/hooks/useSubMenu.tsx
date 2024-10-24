@@ -1,8 +1,8 @@
 import type { MenuButtonProps, MenuItemProps, MenuListProps, MenuProps } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Text } from '@invoke-ai/ui-library';
 import { useDisclosure } from 'common/hooks/useBoolean';
-import type { FocusEventHandler, PointerEvent } from 'react';
-import { useCallback } from 'react';
+import type { FocusEventHandler, PointerEvent, RefObject } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { PiCaretRightBold } from 'react-icons/pi';
 import { useDebouncedCallback } from 'use-debounce';
 
@@ -12,7 +12,7 @@ type UseSubMenuReturn = {
   parentMenuItemProps: Partial<MenuItemProps>;
   menuProps: Partial<MenuProps>;
   menuButtonProps: Partial<MenuButtonProps>;
-  menuListProps: Partial<MenuListProps>;
+  menuListProps: Partial<MenuListProps> & { ref: RefObject<HTMLDivElement> };
 };
 
 /**
@@ -55,6 +55,7 @@ type UseSubMenuReturn = {
  */
 export const useSubMenu = (): UseSubMenuReturn => {
   const subMenu = useDisclosure(false);
+  const menuListRef = useRef<HTMLDivElement>(null);
   const closeDebounced = useDebouncedCallback(subMenu.close, 300);
   const openAndCancelPendingClose = useCallback(() => {
     closeDebounced.cancel();
@@ -80,15 +81,47 @@ export const useSubMenu = (): UseSubMenuReturn => {
     },
     [closeDebounced, subMenu]
   );
+
   const onParentMenuItemPointerLeave = useCallback(
     (e: PointerEvent<HTMLButtonElement>) => {
+      /**
+       * The pointerleave event is triggered when the pen or touch device is lifted, which would close the sub-menu.
+       * However, we want to keep the sub-menu open until the pen or touch device pressed some other element. This
+       * will be handled in the useEffect below - just ignore the pointerleave event for pen and touch devices.
+       */
       if (e.pointerType === 'pen' || e.pointerType === 'touch') {
         return;
       }
-      closeDebounced();
+      subMenu.close();
     },
-    [closeDebounced]
+    [subMenu]
   );
+
+  /**
+   * When using a mouse, the pointerleave events close the menu. But when using a pen or touch device, we need to close
+   * the sub-menu when the user taps outside of the menu list. So we need to listen for clicks outside of the menu list
+   * and close the menu accordingly.
+   */
+  useEffect(() => {
+    const el = menuListRef.current;
+    if (!el) {
+      return;
+    }
+    const controller = new AbortController();
+    window.addEventListener(
+      'click',
+      (e) => {
+        if (menuListRef.current?.contains(e.target as Node)) {
+          return;
+        }
+        subMenu.close();
+      },
+      { signal: controller.signal }
+    );
+    return () => {
+      controller.abort();
+    };
+  }, [subMenu]);
 
   return {
     parentMenuItemProps: {
@@ -110,6 +143,7 @@ export const useSubMenu = (): UseSubMenuReturn => {
       height: 'full',
     },
     menuListProps: {
+      ref: menuListRef,
       onPointerEnter: openAndCancelPendingClose,
       onPointerLeave: closeDebounced,
       onBlur: onBlurMenuList,
