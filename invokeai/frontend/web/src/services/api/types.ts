@@ -242,5 +242,20 @@ export type PostUploadAction =
   | UpscaleInitialImageAction
   | ReplaceLayerWithImagePostUploadAction;
 
+// System Stats
+interface GPUStat {
+  id: number;
+  load: number;
+  memory: number;
+  memory_total: number;
+  temperature: number;
+}
+
+export interface SystemStats {
+  cpu_usage: number;
+  ram_usage: number;
+  gpu_usage: GPUStat[];
+}
+
 export type BoardRecordOrderBy = S['BoardRecordOrderBy'];
 export type StarterModel = S['StarterModel'];

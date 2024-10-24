@@ -1662,6 +1662,7 @@
         "deletePrompt": "Delete Prompt",
         "deleteReferenceImage": "Delete Reference Image",
         "showHUD": "Show HUD",
+        "showSystemStats": "Show System Stats",
         "rectangle": "Rectangle",
         "maskFill": "Mask Fill",
         "addPositivePrompt": "Add $t(controlLayers.prompt)",
@@ -1916,6 +1917,11 @@
         "HUD": {
             "bbox": "Bbox",
             "scaledBbox": "Scaled Bbox",
+            "cpuUsage": "CPU Usage",
+            "ramUsage": "RAM Usage",
+            "gpuUsage": "GPU Usage",
+            "gpuVram": "GPU VRAM",
+            "gpuTemp": "GPU Temp",
             "entityStatus": {
                 "isFiltering": "{{title}} is filtering",
                 "isTransforming": "{{title}} is transforming",

@@ -1,7 +1,7 @@
 import { $openAPISchemaUrl } from 'app/store/nanostores/openAPISchemaUrl';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import type { paths } from 'services/api/schema';
-import type { AppConfig, AppDependencyVersions, AppVersion } from 'services/api/types';
+import type { AppConfig, AppDependencyVersions, AppVersion, SystemStats } from 'services/api/types';
 
 import { api, buildV1Url } from '..';
 
@@ -75,6 +75,14 @@ export const appInfoApi = api.injectEndpoints({
       },
       providesTags: ['Schema'],
     }),
+
+    getSystemStats: build.query<SystemStats, void>({
+      query: () => ({
+        url: buildAppInfoUrl('system-stats'),
+        method: 'GET',
+      }),
+      providesTags: ['FetchOnReconnect'],
+    }),
   }),
 });
 
@@ -88,4 +96,5 @@ export const {
   useGetInvocationCacheStatusQuery,
   useGetOpenAPISchemaQuery,
   useLazyGetOpenAPISchemaQuery,
+  useGetSystemStatsQuery,
 } = appInfoApi;
