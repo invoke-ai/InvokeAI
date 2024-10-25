@@ -4,12 +4,6 @@ import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/C
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Logger } from 'roarr';
 
-// Typo insurance
-const KEY_LEFT = 'ArrowLeft';
-const KEY_RIGHT = 'ArrowRight';
-const KEY_UP = 'ArrowUp';
-const KEY_DOWN = 'ArrowDown';
-
 export class CanvasMoveToolModule extends CanvasModuleBase {
   readonly type = 'move_tool';
   readonly id: string;
@@ -41,31 +35,27 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
 
   onKeyDown = (e: KeyboardEvent) => {
     // Support moving via arrow keys
-    let offset_x;
-    let offset_y;
-    switch (e.key) {
-      case KEY_LEFT:
-        offset_x = -1;
-        break;
-      case KEY_RIGHT:
-        offset_x = 1;
-        break;
-      case KEY_UP:
-        offset_y = -1;
-        break;
-      case KEY_DOWN:
-        offset_y = 1;
-        break;
-    }
+    const OFFSET = 1; // Define a constant for the movement offset
+    const offsets: Record<string, { x: number; y: number }> = {
+      ArrowLeft: { x: -OFFSET, y: 0 },
+      ArrowRight: { x: OFFSET, y: 0 },
+      ArrowUp: { x: 0, y: -OFFSET },
+      ArrowDown: { x: 0, y: OFFSET },
+    };
+    const { key } = e;
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-    this.log.debug(`XX ${selectedEntity} YY ${selectedEntity?.$isDisabled.get()}`);
-    if (selectedEntity && !selectedEntity.$isDisabled.get()) {
-      if (offset_x !== undefined) {
-        selectedEntity.konva.layer.x(selectedEntity.konva.layer.x() + offset_x);
-      }
-      if (offset_y !== undefined) {
-        selectedEntity.konva.layer.y(selectedEntity.konva.layer.y() + offset_y);
-      }
+
+    if (!selectedEntity || selectedEntity.$isDisabled.get()) {
+      return; // Early return if no entity is selected or it is disabled
+    }
+
+    const { x: offsetX = 0, y: offsetY = 0 } = offsets[key] || {};
+
+    if (offsetX) {
+      selectedEntity.konva.layer.x(selectedEntity.konva.layer.x() + offsetX);
+    }
+    if (offsetY) {
+      selectedEntity.konva.layer.y(selectedEntity.konva.layer.y() + offsetY);
     }
   };
 }
