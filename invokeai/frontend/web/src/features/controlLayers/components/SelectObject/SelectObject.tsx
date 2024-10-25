@@ -42,6 +42,10 @@ const SelectObjectContent = memo(
     const hasImageState = useStore(adapter.segmentAnything.$hasImageState);
     const autoProcess = useAppSelector(selectAutoProcess);
 
+    const replaceCurrent = useCallback(() => {
+      adapter.segmentAnything.apply();
+    }, [adapter.segmentAnything]);
+
     const saveAsInpaintMask = useCallback(() => {
       adapter.segmentAnything.saveAs('inpaint_mask');
     }, [adapter.segmentAnything]);
@@ -142,17 +146,20 @@ const SelectObjectContent = memo(
               {t('controlLayers.selectObject.saveAs')}
             </MenuButton>
             <MenuList>
+              <MenuItem isDisabled={!hasImageState} onClick={replaceCurrent}>
+                {t('controlLayers.replaceCurrent')}
+              </MenuItem>
               <MenuItem isDisabled={!hasImageState} onClick={saveAsInpaintMask}>
-                {t('controlLayers.inpaintMask')}
+                {t('controlLayers.newInpaintMask')}
               </MenuItem>
               <MenuItem isDisabled={!hasImageState} onClick={saveAsRegionalGuidance}>
-                {t('controlLayers.regionalGuidance')}
+                {t('controlLayers.newRegionalGuidance')}
               </MenuItem>
               <MenuItem isDisabled={!hasImageState} onClick={saveAsControlLayer}>
-                {t('controlLayers.controlLayer')}
+                {t('controlLayers.newControlLayer')}
               </MenuItem>
               <MenuItem isDisabled={!hasImageState} onClick={saveAsRasterLayer}>
-                {t('controlLayers.rasterLayer')}
+                {t('controlLayers.newRasterLayer')}
               </MenuItem>
             </MenuList>
           </Menu>
