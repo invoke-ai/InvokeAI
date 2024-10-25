@@ -165,11 +165,11 @@ export const UseDefaultSettingsButton = () => {
       icon={<PiSparkleFill />}
       tooltip={tooltip}
       aria-label={t('modelManager.useDefaultSettings')}
-      isDisabled={!model || !hasDefaultSettings}
+      isDisabled={!model || !hasDefaultSettings || outOfSyncSettings.length === 0}
       onClick={handleClickDefaultSettings}
       size="sm"
       variant="ghost"
-      colorScheme={outOfSyncSettings.length ? 'warning' : 'invokeBlue'}
+      colorScheme="warning"
     />
   );
 };
