@@ -110,6 +110,11 @@ def stable_diffusion_step_callback(
         sdxl_latent_rgb_factors = torch.tensor(SDXL_LATENT_RGB_FACTORS, dtype=sample.dtype, device=sample.device)
         sdxl_smooth_matrix = torch.tensor(SDXL_SMOOTH_MATRIX, dtype=sample.dtype, device=sample.device)
         image = sample_to_lowres_estimated_image(sample, sdxl_latent_rgb_factors, sdxl_smooth_matrix)
+    elif base_model == BaseModelType.StableDiffusion3:
+        # Note: We reuse the FLUX_LATENT_RGB_FACTORS for SD3 because they are the same shape. It should be possible to
+        # estimate much better factors for SD3.
+        sd3_latent_rgb_factors = torch.tensor(FLUX_LATENT_RGB_FACTORS, dtype=sample.dtype, device=sample.device)
+        image = sample_to_lowres_estimated_image(sample, sd3_latent_rgb_factors)
     else:
         v1_5_latent_rgb_factors = torch.tensor(SD1_5_LATENT_RGB_FACTORS, dtype=sample.dtype, device=sample.device)
         image = sample_to_lowres_estimated_image(sample, v1_5_latent_rgb_factors)
