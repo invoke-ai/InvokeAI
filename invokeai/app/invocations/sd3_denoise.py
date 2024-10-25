@@ -46,7 +46,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     negative_text_conditioning: SD3ConditioningField = InputField(
         description=FieldDescriptions.negative_cond, input=Input.Connection
     )
-    cfg_scale: float | list[float] = InputField(default=7.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
+    cfg_scale: float | list[float] = InputField(default=3.5, description=FieldDescriptions.cfg_scale, title="CFG Scale")
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
     num_steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
