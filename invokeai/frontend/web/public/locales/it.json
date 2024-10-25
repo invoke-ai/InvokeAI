@@ -1734,7 +1734,7 @@
             "composition": "Solo Composizione",
             "ipAdapterMethod": "Metodo Adattatore IP"
         },
-        "showingType": "Mostrare {{type}}",
+        "showingType": "Mostra {{type}}",
         "dynamicGrid": "Griglia dinamica",
         "tool": {
             "view": "Muovi",
@@ -1888,7 +1888,9 @@
             "preserveMask": {
                 "alert": "Preservare la regione mascherata",
                 "label": "Preserva la regione mascherata"
-            }
+            },
+            "isolatedLayerPreview": "Anteprima livello isolato",
+            "isolatedLayerPreviewDesc": "Se visualizzare solo questo livello quando si eseguono operazioni come il filtraggio o la trasformazione."
         },
         "transform": {
             "reset": "Reimposta",
@@ -1935,7 +1937,13 @@
             "saveCanvasToGallery": "Salva la Tela nella Galleria",
             "saveToGalleryGroup": "Salva nella Galleria"
         },
-        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine"
+        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine",
+        "segment": {
+            "reset": "Reimposta",
+            "apply": "Applica",
+            "cancel": "Annulla",
+            "process": "Elabora"
+        }
     },
     "ui": {
         "tabs": {
