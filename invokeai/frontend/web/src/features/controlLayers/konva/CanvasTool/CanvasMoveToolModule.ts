@@ -45,7 +45,7 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
     const { key } = e;
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (!selectedEntity || selectedEntity.$isDisabled.get()) {
+    if (! (selectedEntity && selectedEntity.$isInteractable.get())) {
       return; // Early return if no entity is selected or it is disabled
     }
 
