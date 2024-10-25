@@ -5,16 +5,16 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMaskHappyBold } from 'react-icons/pi';
 
-export const CanvasEntityMenuItemsSegment = memo(() => {
+export const CanvasEntityMenuItemsSelectObject = memo(() => {
   const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
   const segmentAnything = useEntitySegmentAnything(entityIdentifier);
 
   return (
     <MenuItem onClick={segmentAnything.start} icon={<PiMaskHappyBold />} isDisabled={segmentAnything.isDisabled}>
-      {t('controlLayers.segment.autoMask')}
+      {t('controlLayers.selectObject.selectObject')}
     </MenuItem>
   );
 });
 
-CanvasEntityMenuItemsSegment.displayName = 'CanvasEntityMenuItemsSegment';
+CanvasEntityMenuItemsSelectObject.displayName = 'CanvasEntityMenuItemsSelectObject';

@@ -5,7 +5,7 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export const SegmentAnythingInvert = memo(
+export const SelectObjectInvert = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
     const { t } = useTranslation();
     const invert = useStore(adapter.segmentAnything.$invert);
@@ -16,11 +16,11 @@ export const SegmentAnythingInvert = memo(
 
     return (
       <FormControl w="min-content">
-        <FormLabel m={0}>{t('controlLayers.segment.invertSelection')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.selectObject.invertSelection')}</FormLabel>
         <Switch size="sm" isChecked={invert} onChange={onChange} />
       </FormControl>
     );
   }
 );
 
-SegmentAnythingInvert.displayName = 'SegmentAnythingInvert';
+SelectObjectInvert.displayName = 'SelectObjectInvert';

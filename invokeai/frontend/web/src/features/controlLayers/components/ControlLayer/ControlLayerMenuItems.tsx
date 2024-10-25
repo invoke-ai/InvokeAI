@@ -6,7 +6,7 @@ import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/c
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
 import { CanvasEntityMenuItemsFilter } from 'features/controlLayers/components/common/CanvasEntityMenuItemsFilter';
 import { CanvasEntityMenuItemsSave } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSave';
-import { CanvasEntityMenuItemsSegment } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSegment';
+import { CanvasEntityMenuItemsSelectObject } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSelectObject';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
 import { ControlLayerMenuItemsConvertToSubMenu } from 'features/controlLayers/components/ControlLayer/ControlLayerMenuItemsConvertToSubMenu';
 import { ControlLayerMenuItemsCopyToSubMenu } from 'features/controlLayers/components/ControlLayer/ControlLayerMenuItemsCopyToSubMenu';
@@ -24,7 +24,7 @@ export const ControlLayerMenuItems = memo(() => {
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />
       <CanvasEntityMenuItemsFilter />
-      <CanvasEntityMenuItemsSegment />
+      <CanvasEntityMenuItemsSelectObject />
       <ControlLayerMenuItemsTransparencyEffect />
       <MenuDivider />
       <CanvasEntityMenuItemsCropToBbox />

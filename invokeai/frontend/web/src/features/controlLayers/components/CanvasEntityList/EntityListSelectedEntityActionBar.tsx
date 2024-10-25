@@ -1,10 +1,10 @@
 import { Flex, Spacer } from '@invoke-ai/ui-library';
 import { EntityListGlobalActionBarAddLayerMenu } from 'features/controlLayers/components/CanvasEntityList/EntityListGlobalActionBarAddLayerMenu';
-import { EntityListSelectedEntityActionBarAutoMaskButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarAutoMaskButton';
 import { EntityListSelectedEntityActionBarDuplicateButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarDuplicateButton';
 import { EntityListSelectedEntityActionBarFill } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFill';
 import { EntityListSelectedEntityActionBarFilterButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFilterButton';
 import { EntityListSelectedEntityActionBarOpacity } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarOpacity';
+import { EntityListSelectedEntityActionBarSelectObjectButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarSelectObjectButton';
 import { EntityListSelectedEntityActionBarTransformButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarTransformButton';
 import { memo } from 'react';
 
@@ -17,7 +17,7 @@ export const EntityListSelectedEntityActionBar = memo(() => {
       <Spacer />
       <EntityListSelectedEntityActionBarFill />
       <Flex h="full">
-        <EntityListSelectedEntityActionBarAutoMaskButton />
+        <EntityListSelectedEntityActionBarSelectObjectButton />
         <EntityListSelectedEntityActionBarFilterButton />
         <EntityListSelectedEntityActionBarTransformButton />
         <EntityListSelectedEntityActionBarSaveToAssetsButton />

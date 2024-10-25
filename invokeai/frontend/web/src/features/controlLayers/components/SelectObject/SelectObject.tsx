@@ -19,8 +19,8 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { CanvasAutoProcessSwitch } from 'features/controlLayers/components/CanvasAutoProcessSwitch';
 import { CanvasOperationIsolatedLayerPreviewSwitch } from 'features/controlLayers/components/CanvasOperationIsolatedLayerPreviewSwitch';
-import { SegmentAnythingInvert } from 'features/controlLayers/components/SegmentAnything/SegmentAnythingInvert';
-import { SegmentAnythingPointType } from 'features/controlLayers/components/SegmentAnything/SegmentAnythingPointType';
+import { SelectObjectInvert } from 'features/controlLayers/components/SelectObject/SelectObjectInvert';
+import { SelectObjectPointType } from 'features/controlLayers/components/SelectObject/SelectObjectPointType';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
@@ -31,7 +31,7 @@ import { memo, useCallback, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiArrowsCounterClockwiseBold, PiFloppyDiskBold, PiInfoBold, PiStarBold, PiXBold } from 'react-icons/pi';
 
-const SegmentAnythingContent = memo(
+const SelectObjectContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
     const { t } = useTranslation();
     const ref = useRef<HTMLDivElement>(null);
@@ -91,9 +91,9 @@ const SegmentAnythingContent = memo(
         <Flex w="full" gap={4} alignItems="center">
           <Flex gap={2}>
             <Heading size="md" color="base.300" userSelect="none">
-              {t('controlLayers.segment.autoMask')}
+              {t('controlLayers.selectObject.selectObject')}
             </Heading>
-            <Tooltip label={<SegmentAnythingHelpTooltipContent />}>
+            <Tooltip label={<SelectObjectHelpTooltipContent />}>
               <Flex alignItems="center">
                 <Icon as={PiInfoBold} color="base.500" />
               </Flex>
@@ -105,8 +105,8 @@ const SegmentAnythingContent = memo(
         </Flex>
 
         <Flex w="full" justifyContent="space-between" py={2}>
-          <SegmentAnythingPointType adapter={adapter} />
-          <SegmentAnythingInvert adapter={adapter} />
+          <SelectObjectPointType adapter={adapter} />
+          <SelectObjectInvert adapter={adapter} />
         </Flex>
 
         <ButtonGroup isAttached={false} size="sm" w="full">
@@ -114,32 +114,32 @@ const SegmentAnythingContent = memo(
             leftIcon={<PiStarBold />}
             onClick={adapter.segmentAnything.processImmediate}
             isLoading={isProcessing}
-            loadingText={t('controlLayers.segment.process')}
+            loadingText={t('controlLayers.selectObject.process')}
             variant="ghost"
             isDisabled={!hasPoints || autoProcess}
           >
-            {t('controlLayers.segment.process')}
+            {t('controlLayers.selectObject.process')}
           </Button>
           <Spacer />
           <Button
             leftIcon={<PiArrowsCounterClockwiseBold />}
             onClick={adapter.segmentAnything.reset}
             isLoading={isProcessing}
-            loadingText={t('controlLayers.segment.reset')}
+            loadingText={t('controlLayers.selectObject.reset')}
             variant="ghost"
           >
-            {t('controlLayers.segment.reset')}
+            {t('controlLayers.selectObject.reset')}
           </Button>
           <Menu>
             <MenuButton
               as={Button}
               leftIcon={<PiFloppyDiskBold />}
               isLoading={isProcessing}
-              loadingText={t('controlLayers.segment.saveAs')}
+              loadingText={t('controlLayers.selectObject.saveAs')}
               variant="ghost"
               isDisabled={!hasImageState}
             >
-              {t('controlLayers.segment.saveAs')}
+              {t('controlLayers.selectObject.saveAs')}
             </MenuButton>
             <MenuList>
               <MenuItem isDisabled={!hasImageState} onClick={saveAsInpaintMask}>
@@ -163,7 +163,7 @@ const SegmentAnythingContent = memo(
             loadingText={t('common.cancel')}
             variant="ghost"
           >
-            {t('controlLayers.segment.cancel')}
+            {t('controlLayers.selectObject.cancel')}
           </Button>
         </ButtonGroup>
       </Flex>
@@ -171,9 +171,9 @@ const SegmentAnythingContent = memo(
   }
 );
 
-SegmentAnythingContent.displayName = 'SegmentAnythingContent';
+SelectObjectContent.displayName = 'SegmentAnythingContent';
 
-export const SegmentAnything = () => {
+export const SelectObject = memo(() => {
   const canvasManager = useCanvasManager();
   const adapter = useStore(canvasManager.stateApi.$segmentingAdapter);
 
@@ -181,8 +181,10 @@ export const SegmentAnything = () => {
     return null;
   }
 
-  return <SegmentAnythingContent adapter={adapter} />;
-};
+  return <SelectObjectContent adapter={adapter} />;
+});
+
+SelectObject.displayName = 'SelectObject';
 
 const Bold = (props: PropsWithChildren) => (
   <Text as="span" fontWeight="semibold">
@@ -190,27 +192,27 @@ const Bold = (props: PropsWithChildren) => (
   </Text>
 );
 
-const SegmentAnythingHelpTooltipContent = memo(() => {
+const SelectObjectHelpTooltipContent = memo(() => {
   const { t } = useTranslation();
 
   return (
     <Flex gap={3} flexDir="column">
       <Text>
-        <Trans i18nKey="controlLayers.segment.help1" components={{ Bold: <Bold /> }} />
+        <Trans i18nKey="controlLayers.selectObject.help1" components={{ Bold: <Bold /> }} />
       </Text>
       <Text>
-        <Trans i18nKey="controlLayers.segment.help2" components={{ Bold: <Bold /> }} />
+        <Trans i18nKey="controlLayers.selectObject.help2" components={{ Bold: <Bold /> }} />
       </Text>
       <Text>
-        <Trans i18nKey="controlLayers.segment.help3" />
+        <Trans i18nKey="controlLayers.selectObject.help3" />
       </Text>
       <UnorderedList>
-        <ListItem>{t('controlLayers.segment.clickToAdd')}</ListItem>
-        <ListItem>{t('controlLayers.segment.dragToMove')}</ListItem>
-        <ListItem>{t('controlLayers.segment.clickToRemove')}</ListItem>
+        <ListItem>{t('controlLayers.selectObject.clickToAdd')}</ListItem>
+        <ListItem>{t('controlLayers.selectObject.dragToMove')}</ListItem>
+        <ListItem>{t('controlLayers.selectObject.clickToRemove')}</ListItem>
       </UnorderedList>
     </Flex>
   );
 });
 
-SegmentAnythingHelpTooltipContent.displayName = 'SegmentAnythingHelpTooltipContent';
+SelectObjectHelpTooltipContent.displayName = 'SelectObjectHelpTooltipContent';
