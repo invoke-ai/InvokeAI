@@ -137,15 +137,13 @@ export const UseDefaultSettingsButton = () => {
     }
 
     return (
-      <Flex direction="column" gap={3}>
-        <Flex direction="column">
-          <Text>{t('modelManager.defaultSettingsOutOfSync')}</Text>
-          <UnorderedList>
-            {outOfSyncSettings.map((setting) => (
-              <ListItem key={setting}>{setting}</ListItem>
-            ))}
-          </UnorderedList>
-        </Flex>
+      <Flex direction="column" gap={2}>
+        <Text>{t('modelManager.defaultSettingsOutOfSync')}</Text>
+        <UnorderedList>
+          {outOfSyncSettings.map((setting) => (
+            <ListItem key={setting}>{setting}</ListItem>
+          ))}
+        </UnorderedList>
         <Text>{t('modelManager.restoreDefaultSettings')}</Text>
       </Flex>
     );
