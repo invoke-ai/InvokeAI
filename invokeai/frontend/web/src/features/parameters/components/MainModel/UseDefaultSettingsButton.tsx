@@ -12,6 +12,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { selectHeight, selectWidth } from 'features/controlLayers/store/selectors';
 import { setDefaultSettings } from 'features/parameters/store/actions';
+import { isNil } from 'lodash-es';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSparkleFill } from 'react-icons/pi';
@@ -71,43 +72,43 @@ export const UseDefaultSettingsButton = () => {
         guidance: defaultGuidance,
       } = defaultSettings;
 
-      if (defaultVAE && vae && defaultVAE !== vae.key) {
+      if (!isNil(defaultVAE) && vae && defaultVAE !== vae.key) {
         settings.push(t('modelManager.vae'));
       }
 
-      if (defaultVAE && !vae && defaultVAE !== 'default') {
+      if (!isNil(defaultVAE) && !vae && defaultVAE !== 'default') {
         settings.push(t('modelManager.vae'));
       }
 
-      if (defaultVAEPrecision && defaultVAEPrecision !== vaePrecision) {
+      if (!isNil(defaultVAEPrecision) && defaultVAEPrecision !== vaePrecision) {
         settings.push(t('modelManager.vaePrecision'));
       }
 
-      if (defaultCfg && defaultCfg !== cfg) {
+      if (!isNil(defaultCfg) && defaultCfg !== cfg) {
         settings.push(t('parameters.cfgScale'));
       }
 
-      if (defaultCfgRescale && defaultCfgRescale !== cfgRescale) {
+      if (!isNil(defaultCfgRescale) && defaultCfgRescale !== cfgRescale) {
         settings.push(t('parameters.cfgRescaleMultiplier'));
       }
 
-      if (defaultSteps && defaultSteps !== steps) {
+      if (!isNil(defaultSteps) && defaultSteps !== steps) {
         settings.push(t('parameters.steps'));
       }
 
-      if (defaultScheduler && defaultScheduler !== scheduler) {
+      if (!isNil(defaultScheduler) && defaultScheduler !== scheduler) {
         settings.push(t('parameters.scheduler'));
       }
 
-      if (defaultWidth && defaultWidth !== width) {
+      if (!isNil(defaultWidth) && defaultWidth !== width) {
         settings.push(t('parameters.width'));
       }
 
-      if (defaultHeight && defaultHeight !== height) {
+      if (!isNil(defaultHeight) && defaultHeight !== height) {
         settings.push(t('parameters.height'));
       }
 
-      if (defaultGuidance && defaultGuidance !== guidance) {
+      if (!isNil(defaultGuidance) && defaultGuidance !== guidance) {
         settings.push(t('parameters.guidance'));
       }
     }
