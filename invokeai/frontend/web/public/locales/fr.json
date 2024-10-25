@@ -1780,8 +1780,6 @@
                 "on": "Activé",
                 "label": "Aligner sur la grille"
             },
-            "isolatedFilteringPreview": "Aperçu de filtrage isolé",
-            "isolatedTransformingPreview": "Aperçu de transformation isolée",
             "invertBrushSizeScrollDirection": "Inverser le défilement pour la taille du pinceau",
             "pressureSensitivity": "Sensibilité à la pression",
             "preserveMask": {

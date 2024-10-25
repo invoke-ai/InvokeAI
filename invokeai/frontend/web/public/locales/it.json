@@ -1876,9 +1876,7 @@
         "newCanvasSession": "Nuova sessione Tela",
         "deleteSelected": "Elimina selezione",
         "settings": {
-            "isolatedFilteringPreview": "Anteprima del filtraggio isolata",
             "isolatedStagingPreview": "Anteprima di generazione isolata",
-            "isolatedTransformingPreview": "Anteprima di trasformazione isolata",
             "isolatedPreview": "Anteprima isolata",
             "invertBrushSizeScrollDirection": "Inverti scorrimento per dimensione pennello",
             "snapToGrid": {
