@@ -5,7 +5,7 @@ import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/sel
 import { isSegmentableEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiMaskHappyBold } from 'react-icons/pi';
+import { PiShapesFill } from 'react-icons/pi';
 
 export const EntityListSelectedEntityActionBarSelectObjectButton = memo(() => {
   const { t } = useTranslation();
@@ -29,7 +29,7 @@ export const EntityListSelectedEntityActionBarSelectObjectButton = memo(() => {
       alignSelf="stretch"
       aria-label={t('controlLayers.selectObject.selectObject')}
       tooltip={t('controlLayers.selectObject.selectObject')}
-      icon={<PiMaskHappyBold />}
+      icon={<PiShapesFill />}
     />
   );
 });
