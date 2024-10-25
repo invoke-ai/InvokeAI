@@ -95,6 +95,12 @@ const zSpandrelFilterConfig = z.object({
 });
 export type SpandrelFilterConfig = z.infer<typeof zSpandrelFilterConfig>;
 
+const zAlphaToOutlineFilterConfig = z.object({
+  type: z.literal('alpha_to_outline'),
+  line_width: z.number().gte(1),
+});
+export type AlphaToOutlineFilterConfig = z.infer<typeof zAlphaToOutlineFilterConfig>;
+
 const zFilterConfig = z.discriminatedUnion('type', [
   zCannyEdgeDetectionFilterConfig,
   zColorMapFilterConfig,
@@ -109,6 +115,7 @@ const zFilterConfig = z.discriminatedUnion('type', [
   zPiDiNetEdgeDetectionFilterConfig,
   zDWOpenposeDetectionFilterConfig,
   zSpandrelFilterConfig,
+  zAlphaToOutlineFilterConfig,
 ]);
 export type FilterConfig = z.infer<typeof zFilterConfig>;
 
@@ -126,6 +133,7 @@ const zFilterType = z.enum([
   'pidi_edge_detection',
   'dw_openpose_detection',
   'spandrel_filter',
+  'alpha_to_outline',
 ]);
 export type FilterType = z.infer<typeof zFilterType>;
 export const isFilterType = (v: unknown): v is FilterType => zFilterType.safeParse(v).success;
@@ -156,6 +164,26 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
         image: { image_name },
         low_threshold,
         high_threshold,
+      });
+      return {
+        graph,
+        outputNodeId: node.id,
+      };
+    },
+  },
+  alpha_to_outline: {
+    type: 'alpha_to_outline',
+    buildDefaults: () => ({
+      type: 'alpha_to_outline',
+      line_width: 32,
+    }),
+    buildGraph: ({ image_name }, { line_width }) => {
+      const graph = new Graph(getPrefixedId('alpha_to_outline_filter'));
+      const node = graph.addNode({
+        id: getPrefixedId('alpha_to_outline'),
+        type: 'img_alpha_to_outline',
+        image: { image_name },
+        line_width,
       });
       return {
         graph,

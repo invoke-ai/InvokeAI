@@ -1812,6 +1812,11 @@
                 "low_threshold": "Low Threshold",
                 "high_threshold": "High Threshold"
             },
+            "alpha_to_outline": {
+                "label": "Alpha to Outline",
+                "description": "Outlines the opaque regions of the image with a line of the given width.",
+                "line_width": "Line Width"
+            },
             "color_map": {
                 "label": "Color Map",
                 "description": "Create a color map from the selected layer.",

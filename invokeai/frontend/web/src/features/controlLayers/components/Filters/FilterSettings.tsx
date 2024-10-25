@@ -1,4 +1,5 @@
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { FilterAlphaToOutline } from 'features/controlLayers/components/Filters/FilterAlphaToOutline';
 import { FilterCannyEdgeDetection } from 'features/controlLayers/components/Filters/FilterCannyEdgeDetection';
 import { FilterColorMap } from 'features/controlLayers/components/Filters/FilterColorMap';
 import { FilterContentShuffle } from 'features/controlLayers/components/Filters/FilterContentShuffle';
@@ -61,6 +62,10 @@ export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
 
   if (filterConfig.type === 'spandrel_filter') {
     return <FilterSpandrel config={filterConfig} onChange={onChange} />;
+  }
+
+  if (filterConfig.type === 'alpha_to_outline_filter') {
+    return <FilterAlphaToOutline config={filterConfig} onChange={onChange} />;
   }
 
   return (
