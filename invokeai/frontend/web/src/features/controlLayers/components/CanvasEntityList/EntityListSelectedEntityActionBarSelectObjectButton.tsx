@@ -24,7 +24,7 @@ export const EntityListSelectedEntityActionBarSelectObjectButton = memo(() => {
     <IconButton
       onClick={segment.start}
       isDisabled={segment.isDisabled}
-      size="sm"
+      minW={8}
       variant="link"
       alignSelf="stretch"
       aria-label={t('controlLayers.selectObject.selectObject')}

@@ -24,7 +24,7 @@ export const EntityListSelectedEntityActionBarFilterButton = memo(() => {
     <IconButton
       onClick={filter.start}
       isDisabled={filter.isDisabled}
-      size="sm"
+      minW={8}
       variant="link"
       alignSelf="stretch"
       aria-label={t('controlLayers.filter.filter')}
