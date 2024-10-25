@@ -1,5 +1,7 @@
 import { Button, Flex, Heading } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useHFForbiddenToast } from 'features/modelManagerV2/hooks/useHFForbiddenToast';
+import { useHFLoginToast } from 'features/modelManagerV2/hooks/useHFLoginToast';
 import { selectSelectedModelKey, setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,8 +9,6 @@ import { PiPlusBold } from 'react-icons/pi';
 
 import ModelList from './ModelManagerPanel/ModelList';
 import { ModelListNavigation } from './ModelManagerPanel/ModelListNavigation';
-import { useHFLoginToast } from '../hooks/useHFLoginToast';
-import { useHFForbiddenToast } from '../hooks/useHFForbiddenToast';
 
 export const ModelManager = memo(() => {
   const { t } = useTranslation();
@@ -19,7 +19,7 @@ export const ModelManager = memo(() => {
   const selectedModelKey = useAppSelector(selectSelectedModelKey);
 
   useHFLoginToast();
-  useHFForbiddenToast()
+  useHFForbiddenToast();
 
   return (
     <Flex flexDir="column" layerStyle="first" p={4} gap={4} borderRadius="base" w="50%" h="full">

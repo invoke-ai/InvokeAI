@@ -1,14 +1,14 @@
-import { Button, Divider, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
+import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
+import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetHFTokenStatusQuery, useLazyGetHuggingFaceModelsQuery } from 'services/api/endpoints/models';
 
-import { HuggingFaceResults } from './HuggingFaceResults';
 import { HFToken } from './HFToken';
-import { skipToken } from '@reduxjs/toolkit/query';
-import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
+import { HuggingFaceResults } from './HuggingFaceResults';
 
 export const HuggingFaceForm = memo(() => {
   const [huggingFaceRepo, setHuggingFaceRepo] = useState('');
