@@ -1,4 +1,14 @@
-import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
+import {
+  Button,
+  ButtonGroup,
+  Flex,
+  Heading,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  Spacer,
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
@@ -15,7 +25,7 @@ import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiCheckBold, PiPlayFill, PiXBold } from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiFloppyDiskBold, PiPlayFill, PiXBold } from 'react-icons/pi';
 
 const FilterContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
@@ -45,6 +55,22 @@ const FilterContent = memo(
     const isValid = useMemo(() => {
       return IMAGE_FILTERS[config.type].validateConfig?.(config as never) ?? true;
     }, [config]);
+
+    const saveAsInpaintMask = useCallback(() => {
+      adapter.filterer.saveAs('inpaint_mask');
+    }, [adapter.filterer]);
+
+    const saveAsRegionalGuidance = useCallback(() => {
+      adapter.filterer.saveAs('regional_guidance');
+    }, [adapter.filterer]);
+
+    const saveAsRasterLayer = useCallback(() => {
+      adapter.filterer.saveAs('raster_layer');
+    }, [adapter.filterer]);
+
+    const saveAsControlLayer = useCallback(() => {
+      adapter.filterer.saveAs('control_layer');
+    }, [adapter.filterer]);
 
     useRegisteredHotkeys({
       id: 'applyFilter',
@@ -107,16 +133,35 @@ const FilterContent = memo(
           >
             {t('controlLayers.filter.reset')}
           </Button>
-          <Button
-            variant="ghost"
-            leftIcon={<PiCheckBold />}
-            onClick={adapter.filterer.apply}
-            isLoading={isProcessing}
-            loadingText={t('controlLayers.filter.apply')}
-            isDisabled={!isValid || !hasProcessed}
-          >
-            {t('controlLayers.filter.apply')}
-          </Button>
+          <Menu>
+            <MenuButton
+              as={Button}
+              leftIcon={<PiFloppyDiskBold />}
+              isLoading={isProcessing}
+              loadingText={t('controlLayers.selectObject.saveAs')}
+              variant="ghost"
+              isDisabled={!isValid || !hasProcessed}
+            >
+              {t('controlLayers.selectObject.saveAs')}
+            </MenuButton>
+            <MenuList>
+              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={adapter.filterer.apply}>
+                {t('controlLayers.replaceCurrent')}
+              </MenuItem>
+              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsInpaintMask}>
+                {t('controlLayers.newInpaintMask')}
+              </MenuItem>
+              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsRegionalGuidance}>
+                {t('controlLayers.newRegionalGuidance')}
+              </MenuItem>
+              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsControlLayer}>
+                {t('controlLayers.newControlLayer')}
+              </MenuItem>
+              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsRasterLayer}>
+                {t('controlLayers.newRasterLayer')}
+              </MenuItem>
+            </MenuList>
+          </Menu>
           <Button
             variant="ghost"
             leftIcon={<PiXBold />}
