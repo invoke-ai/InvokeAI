@@ -19,6 +19,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { CanvasAutoProcessSwitch } from 'features/controlLayers/components/CanvasAutoProcessSwitch';
 import { CanvasOperationIsolatedLayerPreviewSwitch } from 'features/controlLayers/components/CanvasOperationIsolatedLayerPreviewSwitch';
+import { SegmentAnythingInvert } from 'features/controlLayers/components/SegmentAnything/SegmentAnythingInvert';
 import { SegmentAnythingPointType } from 'features/controlLayers/components/SegmentAnything/SegmentAnythingPointType';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterControlLayer';
@@ -103,7 +104,10 @@ const SegmentAnythingContent = memo(
           <CanvasOperationIsolatedLayerPreviewSwitch />
         </Flex>
 
-        <SegmentAnythingPointType adapter={adapter} />
+        <Flex w="full" justifyContent="space-between" py={2}>
+          <SegmentAnythingPointType adapter={adapter} />
+          <SegmentAnythingInvert adapter={adapter} />
+        </Flex>
 
         <ButtonGroup isAttached={false} size="sm" w="full">
           <Button
@@ -196,6 +200,9 @@ const SegmentAnythingHelpTooltipContent = memo(() => {
       </Text>
       <Text>
         <Trans i18nKey="controlLayers.segment.help2" components={{ Bold: <Bold /> }} />
+      </Text>
+      <Text>
+        <Trans i18nKey="controlLayers.segment.help3" />
       </Text>
       <UnorderedList>
         <ListItem>{t('controlLayers.segment.clickToAdd')}</ListItem>
