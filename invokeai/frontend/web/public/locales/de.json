@@ -1170,7 +1170,19 @@
         "workflowVersion": "Version",
         "saveToGallery": "In Galerie speichern",
         "noWorkflows": "Keine Arbeitsabläufe",
-        "noMatchingWorkflows": "Keine passenden Arbeitsabläufe"
+        "noMatchingWorkflows": "Keine passenden Arbeitsabläufe",
+        "unknownErrorValidatingWorkflow": "Unbekannter Fehler beim Validieren des Arbeitsablaufes",
+        "inputFieldTypeParseError": "Typ des Eingabefelds {{node}}.{{field}} kann nicht analysiert werden ({{message}})",
+        "workflowSettings": "Arbeitsablauf Editor Einstellungen",
+        "unableToLoadWorkflow": "Arbeitsablauf kann nicht geladen werden",
+        "viewMode": "In linearen Ansicht verwenden",
+        "unableToValidateWorkflow": "Arbeitsablauf kann nicht validiert werden",
+        "outputFieldTypeParseError": "Typ des Ausgabefelds {{node}}.{{field}} kann nicht analysiert werden ({{message}})",
+        "unableToGetWorkflowVersion": "Version des Arbeitsablaufschemas kann nicht bestimmt werden",
+        "unknownFieldType": "$t(nodes.unknownField) Typ: {{type}}",
+        "unknownField": "Unbekanntes Feld",
+        "unableToUpdateNodes_one": "{{count}} Knoten kann nicht aktualisiert werden",
+        "unableToUpdateNodes_other": "{{count}} Knoten können nicht aktualisiert werden"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
