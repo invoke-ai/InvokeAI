@@ -344,6 +344,24 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/hf_login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Hf Login Status */
+        get: operations["get_hf_login_status"];
+        put?: never;
+        /** Do Hf Login */
+        post: operations["do_hf_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/download_queue/": {
         parameters: {
             query?: never;
@@ -2156,6 +2174,14 @@ export type components = {
              * @description The list of names of images to delete
              */
             image_names: string[];
+        };
+        /** Body_do_hf_login */
+        Body_do_hf_login: {
+            /**
+             * Token
+             * @description Hugging Face token to use for login
+             */
+            token: string;
         };
         /** Body_download */
         Body_download: {
@@ -7322,6 +7348,11 @@ export type components = {
              */
             type: "hf";
         };
+        /**
+         * HFTokenStatus
+         * @enum {string}
+         */
+        HFTokenStatus: "valid" | "invalid" | "unknown";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -18270,6 +18301,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CacheStats"] | null;
+                };
+            };
+        };
+    };
+    get_hf_login_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HFTokenStatus"];
+                };
+            };
+        };
+    };
+    do_hf_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_do_hf_login"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HFTokenStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

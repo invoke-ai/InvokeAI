@@ -1,17 +1,22 @@
-import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
+import { Button, Divider, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLazyGetHuggingFaceModelsQuery } from 'services/api/endpoints/models';
+import { useGetHFTokenStatusQuery, useLazyGetHuggingFaceModelsQuery } from 'services/api/endpoints/models';
 
 import { HuggingFaceResults } from './HuggingFaceResults';
+import { HFToken } from './HFToken';
+import { skipToken } from '@reduxjs/toolkit/query';
+import { useFeatureStatus } from '../../../../system/hooks/useFeatureStatus';
 
 export const HuggingFaceForm = memo(() => {
   const [huggingFaceRepo, setHuggingFaceRepo] = useState('');
   const [displayResults, setDisplayResults] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const { t } = useTranslation();
+  const isHFTokenEnabled = useFeatureStatus('hfToken');
+  const { currentData } = useGetHFTokenStatusQuery(isHFTokenEnabled ? undefined : skipToken);
 
   const [_getHuggingFaceModels, { isLoading, data }] = useLazyGetHuggingFaceModelsQuery();
   const [installModel] = useInstallModel();
@@ -41,7 +46,7 @@ export const HuggingFaceForm = memo(() => {
   }, []);
 
   return (
-    <Flex flexDir="column" height="100%" gap={3}>
+    <Flex flexDir="column" height="100%" gap={4}>
       <FormControl isInvalid={!!errorMessage.length} w="full" orientation="vertical" flexShrink={0}>
         <FormLabel>{t('modelManager.huggingFaceRepoID')}</FormLabel>
         <Flex gap={3} alignItems="center" w="full">
@@ -63,6 +68,7 @@ export const HuggingFaceForm = memo(() => {
         <FormHelperText>{t('modelManager.huggingFaceHelper')}</FormHelperText>
         {!!errorMessage.length && <FormErrorMessage>{errorMessage}</FormErrorMessage>}
       </FormControl>
+      {currentData !== 'valid' && <HFToken />}
       {data && data.urls && displayResults && <HuggingFaceResults results={data.urls} />}
     </Flex>
   );

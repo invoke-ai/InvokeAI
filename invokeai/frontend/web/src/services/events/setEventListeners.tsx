@@ -22,6 +22,8 @@ import type { ClientToServerEvents, ServerToClientEvents } from 'services/events
 import type { Socket } from 'socket.io-client';
 
 import { $lastProgressEvent } from './stores';
+import { $isHFLoginToastOpen } from '../../features/modelManagerV2/hooks/useHFLoginToast';
+import { $isHFForbiddenToastOpen } from '../../features/modelManagerV2/hooks/useHFForbiddenToast';
 
 const log = logger('events');
 
@@ -294,6 +296,15 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     const { id, error, error_type } = data;
     const installs = selectModelInstalls(getState()).data;
+    
+
+    if (error === "Unauthorized") {
+      $isHFLoginToastOpen.set(true)
+    }
+
+    if (error === "Forbidden") {
+      $isHFForbiddenToastOpen.set({isEnabled: true, source: data.source})
+    }
 
     if (!installs?.find((install) => install.id === id)) {
       dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));

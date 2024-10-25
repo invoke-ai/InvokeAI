@@ -7,6 +7,8 @@ import { PiPlusBold } from 'react-icons/pi';
 
 import ModelList from './ModelManagerPanel/ModelList';
 import { ModelListNavigation } from './ModelManagerPanel/ModelListNavigation';
+import { useHFLoginToast } from '../hooks/useHFLoginToast';
+import { useHFForbiddenToast } from '../hooks/useHFForbiddenToast';
 
 export const ModelManager = memo(() => {
   const { t } = useTranslation();
@@ -15,6 +17,9 @@ export const ModelManager = memo(() => {
     dispatch(setSelectedModelKey(null));
   }, [dispatch]);
   const selectedModelKey = useAppSelector(selectSelectedModelKey);
+
+  useHFLoginToast();
+  useHFForbiddenToast()
 
   return (
     <Flex flexDir="column" layerStyle="first" p={4} gap={4} borderRadius="base" w="50%" h="full">
