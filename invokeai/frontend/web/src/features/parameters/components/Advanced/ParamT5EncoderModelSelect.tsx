@@ -6,7 +6,11 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useT5EncoderModels } from 'services/api/hooks/modelsByType';
-import type { T5EncoderBnbQuantizedLlmInt8bModelConfig, T5EncoderModelConfig } from 'services/api/types';
+import type {
+  MainModelConfig,
+  T5EncoderBnbQuantizedLlmInt8bModelConfig,
+  T5EncoderModelConfig,
+} from 'services/api/types';
 
 const ParamT5EncoderModelSelect = () => {
   const dispatch = useAppDispatch();
@@ -15,7 +19,7 @@ const ParamT5EncoderModelSelect = () => {
   const [modelConfigs, { isLoading }] = useT5EncoderModels();
 
   const _onChange = useCallback(
-    (t5EncoderModel: T5EncoderBnbQuantizedLlmInt8bModelConfig | T5EncoderModelConfig | null) => {
+    (t5EncoderModel: T5EncoderBnbQuantizedLlmInt8bModelConfig | T5EncoderModelConfig | MainModelConfig | null) => {
       if (t5EncoderModel) {
         dispatch(t5EncoderModelSelected(zModelIdentifierField.parse(t5EncoderModel)));
       }
