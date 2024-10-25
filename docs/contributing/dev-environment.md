@@ -17,46 +17,49 @@ If you just want to use Invoke, you should use the [installer][installer link].
 ## Setup
 
 1. Run through the [requirements][requirements link].
-1. [Fork and clone][forking link] the [InvokeAI repo][repo link].
-1. Create an directory for user data (images, models, db, etc). This is typically at `~/invokeai`, but if you already have a non-dev install, you may want to create a separate directory for the dev install.
-1. Create a python virtual environment inside the directory you just created:
+2. [Fork and clone][forking link] the [InvokeAI repo][repo link].
+3. Create an directory for user data (images, models, db, etc). This is typically at `~/invokeai`, but if you already have a non-dev install, you may want to create a separate directory for the dev install.
+4. Create a python virtual environment inside the directory you just created:
 
-   ```sh
-   python3 -m venv .venv --prompt InvokeAI-Dev
-   ```
+      ```sh
+      python3 -m venv .venv --prompt InvokeAI-Dev
+      ```
 
-1. Activate the venv (you'll need to do this every time you want to run the app):
+5. Activate the venv (you'll need to do this every time you want to run the app):
 
-   ```sh
-   source .venv/bin/activate
-   ```
+        ```sh
+        source .venv/bin/activate
+        ```
 
-1. Install the repo as an [editable install][editable install link]:
+6. Install the repo as an [editable install][editable install link]:
 
-   ```sh
-   pip install -e ".[dev,test,xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
-   ```
+      ```sh
+      pip install -e ".[dev,test,xformers]" --use-pep517 --extra-index-url https://download.pytorch.org/whl/cu121
+      ```
 
-   Refer to the [manual installation][manual install link]] instructions for more determining the correct install options. `xformers` is optional, but `dev` and `test` are not.
+      Refer to the [manual installation][manual install link]] instructions for more determining the correct install options. `xformers` is optional, but `dev` and `test` are not.
 
-1. Install the frontend dev toolchain:
+7. Install the frontend dev toolchain:
 
    - [`nodejs`](https://nodejs.org/) (recommend v20 LTS)
-   - [`pnpm`](https://pnpm.io/installation#installing-a-specific-version) (must be v8 - not v9!)
+   - [`pnpm`](https://pnpm.io/8.x/installation) (must be v8 - not v9!)
 
-1. Do a production build of the frontend:
+8. Do a production build of the frontend:
 
-   ```sh
-   pnpm build
-   ```
+      ```sh
+      cd PATH_TO_INVOKEAI_REPO/invokeai/frontend/web
+      pnpm i
+      pnpm build
+      ```
 
-1. Start the application:
+9. Start the application:
 
-   ```sh
-   python scripts/invokeai-web.py
-   ```
+      ```sh
+      cd PATH_TO_INVOKEAI_REPO
+      python scripts/invokeai-web.py
+      ```
 
-1. Access the UI at `localhost:9090`.
+10. Access the UI at `localhost:9090`.
 
 ## Updating the UI
 
