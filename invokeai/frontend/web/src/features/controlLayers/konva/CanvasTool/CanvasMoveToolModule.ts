@@ -33,27 +33,35 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
   /**
    * This is a noop. Entity transformers handle cursor style when the move tool is active.
    */
-  syncCursorStyle = noop
+  syncCursorStyle = noop;
 
   onKeyDown = (e: KeyboardEvent) => {
     // Support moving via arrow keys
-    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-    let offset_x; let offset_y
+    let offset_x;
+    let offset_y;
     switch (e.key) {
       case KEY_LEFT:
-        offset_x = -1; break
+        offset_x = -1;
+        break;
       case KEY_RIGHT:
-        offset_x = 1; break
+        offset_x = 1;
+        break;
       case KEY_UP:
-        offset_y = -1; break
+        offset_y = -1;
+        break;
       case KEY_DOWN:
-        offset_y = 1; break
+        offset_y = 1;
+        break;
     }
-    if (offset_x !== undefined) {
-      selectedEntity?.konva.layer.x(selectedEntity?.konva.layer.x()+offset_x)
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+    this.log.debug(`XX ${selectedEntity} YY ${selectedEntity?.$isDisabled.get()}`);
+    if (selectedEntity && !selectedEntity.$isDisabled.get()) {
+      if (offset_x !== undefined) {
+        selectedEntity.konva.layer.x(selectedEntity.konva.layer.x() + offset_x);
+      }
+      if (offset_y !== undefined) {
+        selectedEntity.konva.layer.y(selectedEntity.konva.layer.y() + offset_y);
+      }
     }
-    if (offset_y !== undefined) {
-      selectedEntity?.konva.layer.y(selectedEntity?.konva.layer.y()+offset_y)
-    }
-  }
+  };
 }
