@@ -75,15 +75,7 @@ export type AnyModelConfig =
   | MainModelConfig
   | CLIPVisionDiffusersConfig;
 
-const check_submodel_model_type = (
-  submodels: {
-    [key: string]: {
-      path_or_prefix: string;
-      model_type: ModelType;
-    };
-  },
-  model_type: string
-): boolean => {
+const check_submodel_model_type = (submodels: AnyModelConfig['submodels'], model_type: string): boolean => {
   for (const submodel in submodels) {
     if (submodel && submodels[submodel] && submodels[submodel].model_type === model_type) {
       return true;
@@ -169,6 +161,10 @@ export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is
 
 export const isSDXLMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'sdxl';
+};
+
+export const isSD3MainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'sd-3';
 };
 
 export const isFluxMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

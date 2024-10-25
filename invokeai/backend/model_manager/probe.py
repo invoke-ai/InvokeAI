@@ -18,9 +18,8 @@ from invokeai.backend.flux.ip_adapter.state_dict_utils import is_state_dict_xlab
 from invokeai.backend.lora.conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
 )
-from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import ConfigLoader
 from invokeai.backend.lora.conversions.flux_kohya_lora_conversion_utils import is_state_dict_likely_in_flux_kohya_format
-from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
+from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.backend.model_manager.config import (
     AnyModelConfig,
     BaseModelType,
@@ -32,11 +31,12 @@ from invokeai.backend.model_manager.config import (
     ModelRepoVariant,
     ModelSourceType,
     ModelType,
-    SubModelType,
-    SubmodelDefinition,
     ModelVariantType,
     SchedulerPredictionType,
+    SubmodelDefinition,
+    SubModelType,
 )
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import ConfigLoader
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length, read_checkpoint_meta
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
@@ -184,7 +184,7 @@ class ModelProbe(object):
             fields.get("description") or f"{fields['base'].value} {model_type.value} model {fields['name']}"
         )
         fields["format"] = ModelFormat(fields.get("format")) if "format" in fields else probe.get_format()
-        fields["hash"] = "placeholder" #fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)
+        fields["hash"] = "placeholder"  # fields.get("hash") or ModelHash(algorithm=hash_algo).hash(model_path)
 
         fields["default_settings"] = fields.get("default_settings")
 
@@ -224,7 +224,7 @@ class ModelProbe(object):
             )
 
         get_submodels = getattr(probe, "get_submodels", None)
-        if fields['base'] == BaseModelType.StableDiffusion3 and callable(get_submodels):
+        if fields["base"] == BaseModelType.StableDiffusion3 and callable(get_submodels):
             fields["submodels"] = get_submodels()
 
         model_info = ModelConfigFactory.make_config(fields)  # , key=fields.get("key", None))

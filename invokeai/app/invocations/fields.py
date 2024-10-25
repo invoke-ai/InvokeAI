@@ -41,6 +41,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     # region Model Field Types
     MainModel = "MainModelField"
     FluxMainModel = "FluxMainModelField"
+    SD3MainModel = "SD3MainModelField"
     SDXLMainModel = "SDXLMainModelField"
     SDXLRefinerModel = "SDXLRefinerModelField"
     ONNXModel = "ONNXModelField"
