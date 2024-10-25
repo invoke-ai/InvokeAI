@@ -1,4 +1,5 @@
 import { Flex, IconButton, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
+import { EMPTY_OBJECT } from 'app/store/constants';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
   selectCFGRescaleMultiplier,
@@ -17,6 +18,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSparkleFill } from 'react-icons/pi';
 import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
+import type { S } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 
 export const UseDefaultSettingsButton = () => {
@@ -51,10 +53,10 @@ export const UseDefaultSettingsButton = () => {
     return settings && Object.values(settings).some((setting) => !!setting);
   }, [modelConfig]);
 
-  const defaultSettings = useMemo(() => {
+  const defaultSettings = useMemo<S['MainModelDefaultSettings']>(() => {
     return modelConfig && isNonRefinerMainModelConfig(modelConfig) && modelConfig.default_settings
       ? modelConfig.default_settings
-      : {};
+      : EMPTY_OBJECT;
   }, [modelConfig]);
 
   const outOfSyncSettings = useMemo(() => {
