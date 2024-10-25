@@ -15,7 +15,7 @@ import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiCheckBold, PiShootingStarBold, PiXBold } from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiCheckBold, PiPlayFill, PiXBold } from 'react-icons/pi';
 
 const FilterContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
@@ -89,7 +89,7 @@ const FilterContent = memo(
         <ButtonGroup isAttached={false} size="sm" w="full">
           <Button
             variant="ghost"
-            leftIcon={<PiShootingStarBold />}
+            leftIcon={<PiPlayFill />}
             onClick={adapter.filterer.processImmediate}
             isLoading={isProcessing}
             loadingText={t('controlLayers.filter.process')}
