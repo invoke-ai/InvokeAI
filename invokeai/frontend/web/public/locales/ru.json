@@ -1836,14 +1836,12 @@
         },
         "settings": {
             "isolatedPreview": "Изолированный предпросмотр",
-            "isolatedTransformingPreview": "Изолированный предпросмотр преобразования",
             "invertBrushSizeScrollDirection": "Инвертировать прокрутку для размера кисти",
             "snapToGrid": {
                 "label": "Привязка к сетке",
                 "on": "Вкл",
                 "off": "Выкл"
             },
-            "isolatedFilteringPreview": "Изолированный предпросмотр фильтрации",
             "pressureSensitivity": "Чувствительность к давлению",
             "isolatedStagingPreview": "Изолированный предпросмотр на промежуточной стадии",
             "preserveMask": {
