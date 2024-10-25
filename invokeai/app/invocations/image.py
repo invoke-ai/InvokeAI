@@ -1055,3 +1055,49 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_dto = context.images.save(image=generated_image)
 
         return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "img_alpha_to_outline",
+    title="Image Alpha to Outline",
+    tags=["image", "mask", "id"],
+    category="image",
+    version="1.0.0",
+)
+class ImageAlphaToOutlineInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Finds the outline of the alpha channel of an image, expands it and returns just the outline."""
+
+    image: ImageField = InputField(description="The input image. It should have some transparency.")
+    line_width: int = InputField(default=16, ge=1, description="The width of the outline")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        img_pil = context.images.get_pil(self.image.image_name, mode="RGBA")
+
+        # Create a binary mask from the alpha channel
+        alpha = numpy.array(img_pil.split()[-1], dtype=numpy.uint8)
+        _, binary_mask = cv2.threshold(alpha, 0, 255, cv2.THRESH_BINARY)
+
+        # Find contours in the binary mask - effectively the outline of the alpha channel
+        contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Create an empty mask to draw the contours - this will be the alpha channel of the output image
+        contour_mask = numpy.zeros_like(binary_mask)
+
+        # Draw the contours on the mask at the specified line width
+        cv2.drawContours(
+            image=contour_mask,
+            contours=contours,
+            contourIdx=-1,
+            color=255,
+            thickness=self.line_width,
+        )
+
+        # Create our result image, fully transparent
+        result_rgba = numpy.zeros((contour_mask.shape[0], contour_mask.shape[1], 4), dtype=numpy.uint8)
+
+        # Set alpha channel from expanded line mask
+        result_rgba[..., 3] = contour_mask
+
+        result_img = Image.fromarray(result_rgba, "RGBA")
+        image_dto = context.images.save(image=result_img)
+        return ImageOutput.build(image_dto)
