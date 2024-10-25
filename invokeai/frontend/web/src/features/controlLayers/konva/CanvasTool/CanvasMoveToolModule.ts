@@ -41,7 +41,6 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
 
   onKeyDown = (e: KeyboardEvent) => {
     // Support moving via arrow keys
-    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
     let offset_x;
     let offset_y;
     switch (e.key) {
@@ -58,11 +57,15 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
         offset_y = 1;
         break;
     }
-    if (offset_x !== undefined) {
-      selectedEntity?.konva.layer.x(selectedEntity?.konva.layer.x() + offset_x);
-    }
-    if (offset_y !== undefined) {
-      selectedEntity?.konva.layer.y(selectedEntity?.konva.layer.y() + offset_y);
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+    this.log.debug(`XX ${selectedEntity} YY ${selectedEntity?.$isDisabled.get()}`);
+    if (selectedEntity && !selectedEntity.$isDisabled.get()) {
+      if (offset_x !== undefined) {
+        selectedEntity.konva.layer.x(selectedEntity.konva.layer.x() + offset_x);
+      }
+      if (offset_y !== undefined) {
+        selectedEntity.konva.layer.y(selectedEntity.konva.layer.y() + offset_y);
+      }
     }
   };
 }
