@@ -1,12 +1,9 @@
-import { Button, ExternalLink, Text, useToast } from '@invoke-ai/ui-library';
+import { ExternalLink, Text, useToast } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { setActiveTab } from 'features/ui/store/uiSlice';
 import { atom } from 'nanostores';
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const FEATURE_ID = 'hfToken';
 const TOAST_ID = 'hfForbidden';
 
 /**
@@ -22,9 +19,8 @@ export const useHFForbiddenToast = () => {
   useEffect(() => {
     if (!isHFForbiddenToastOpen.isEnabled) {
       toast.close(TOAST_ID);
-      return
+      return;
     }
-
 
     if (isHFForbiddenToastOpen.isEnabled) {
       toast({
@@ -45,5 +41,5 @@ export const useHFForbiddenToast = () => {
         onCloseComplete: () => $isHFForbiddenToastOpen.set({ isEnabled: false }),
       });
     }
-  }, [isHFForbiddenToastOpen, t]);
+  }, [isHFForbiddenToastOpen, t, toast]);
 };

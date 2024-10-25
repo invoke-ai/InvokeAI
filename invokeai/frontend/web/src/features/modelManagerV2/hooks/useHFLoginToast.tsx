@@ -36,7 +36,7 @@ export const useHFLoginToast = () => {
   useEffect(() => {
     if (!isHFLoginToastOpen) {
       toast.close(TOAST_ID);
-      return
+      return;
     }
 
     if (isHFLoginToastOpen && data) {
@@ -51,7 +51,7 @@ export const useHFLoginToast = () => {
         onCloseComplete: () => $isHFLoginToastOpen.set(false),
       });
     }
-  }, [isHFLoginToastOpen, data]);
+  }, [isHFLoginToastOpen, data, toast]);
 };
 
 type Props = {

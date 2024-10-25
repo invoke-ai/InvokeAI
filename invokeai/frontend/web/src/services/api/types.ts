@@ -245,7 +245,6 @@ export type PostUploadAction =
 export type BoardRecordOrderBy = S['BoardRecordOrderBy'];
 export type StarterModel = S['StarterModel'];
 
-
 export type GetHFTokenStatusResponse =
   paths['/api/v2/models/hf_login']['get']['responses']['200']['content']['application/json'];
 export type SetHFTokenResponse = NonNullable<

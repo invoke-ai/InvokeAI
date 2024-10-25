@@ -294,7 +294,7 @@ export const {
   usePruneCompletedModelInstallsMutation,
   useGetStarterModelsQuery,
   useGetHFTokenStatusQuery,
-  useSetHFTokenMutation
+  useSetHFTokenMutation,
 } = modelsApi;
 
 export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();
