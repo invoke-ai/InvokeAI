@@ -528,11 +528,17 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onKeyDown = (e: KeyboardEvent) => {
-    if (e.repeat) {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return;
     }
 
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    switch (this.$tool.get()) { // before repeat, as we may want to catch repeating keys
+      case 'move':
+        this.tools.move.onKeyDown(e);
+        break
+    }
+
+    if (e.repeat) {
       return;
     }
 
