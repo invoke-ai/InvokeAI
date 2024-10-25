@@ -254,7 +254,6 @@
         "loraModels": "LoRAs",
         "main": "Principal",
         "urlOrLocalPathHelper": "Les URL doivent pointer vers un seul fichier. Les chemins locaux peuvent pointer vers un seul fichier ou un dossier pour un seul modèle de diffuseurs.",
-        "useDefaultSettings": "Utiliser les paramètres par défaut",
         "modelImageUpdateFailed": "Mise à jour de l'image du modèle échouée",
         "loraTriggerPhrases": "Phrases de déclenchement LoRA",
         "mainModelTriggerPhrases": "Phrases de déclenchement du modèle principal",
@@ -1789,7 +1788,6 @@
             "isolatedPreview": "Aperçu Isolé",
             "isolatedStagingPreview": "Aperçu de l'attente isolé"
         },
-        "convertToRasterLayer": "Convertir en Couche de Rastérisation",
         "transparency": "Transparence",
         "moveBackward": "Reculer",
         "rectangle": "Rectangle",
@@ -1912,7 +1910,6 @@
         "globalReferenceImage_withCount_one": "$t(controlLayers.globalReferenceImage)",
         "globalReferenceImage_withCount_many": "Images de référence globales",
         "globalReferenceImage_withCount_other": "Images de référence globales",
-        "convertToControlLayer": "Convertir en Couche de Contrôle",
         "layer_withCount_one": "Couche {{count}}",
         "layer_withCount_many": "Couches {{count}}",
         "layer_withCount_other": "Couches {{count}}",
