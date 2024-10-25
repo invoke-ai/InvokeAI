@@ -280,7 +280,6 @@
         "noModelsInstalled": "无已安装的模型",
         "urlOrLocalPathHelper": "链接应该指向单个文件.本地路径可以指向单个文件,或者对于单个扩散模型(diffusers model),可以指向一个文件夹.",
         "modelSettings": "模型设置",
-        "useDefaultSettings": "使用默认设置",
         "scanPlaceholder": "本地文件夹路径",
         "installRepo": "安装仓库",
         "modelImageDeleted": "模型图像已删除",

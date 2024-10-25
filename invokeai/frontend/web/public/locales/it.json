@@ -542,7 +542,6 @@
         "defaultSettingsSaved": "Impostazioni predefinite salvate",
         "defaultSettings": "Impostazioni predefinite",
         "metadata": "Metadati",
-        "useDefaultSettings": "Usa le impostazioni predefinite",
         "triggerPhrases": "Frasi Trigger",
         "deleteModelImage": "Elimina l'immagine del modello",
         "localOnly": "solo locale",
@@ -1862,8 +1861,6 @@
         "layer_withCount_one": "Livello ({{count}})",
         "layer_withCount_many": "Livelli ({{count}})",
         "layer_withCount_other": "Livelli ({{count}})",
-        "convertToControlLayer": "Converti in livello di controllo",
-        "convertToRasterLayer": "Converti in livello raster",
         "unlocked": "Sbloccato",
         "enableTransparencyEffect": "Abilita l'effetto trasparenza",
         "replaceLayer": "Sostituisci livello",
@@ -1937,13 +1934,7 @@
             "saveCanvasToGallery": "Salva la Tela nella Galleria",
             "saveToGalleryGroup": "Salva nella Galleria"
         },
-        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine",
-        "segment": {
-            "reset": "Reimposta",
-            "apply": "Applica",
-            "cancel": "Annulla",
-            "process": "Elabora"
-        }
+        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine"
     },
     "ui": {
         "tabs": {
