@@ -173,6 +173,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   $hasPoints = computed(this.$points, (points) => points.length > 0);
 
   /**
+   * Whether the module should invert the mask image.
+   */
+  $invert = atom<boolean>(false);
+
+  /**
    * The masked image object, if it exists.
    */
   maskedImage: CanvasObjectImage | null = null;
@@ -456,6 +461,19 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       })
     );
 
+    // When the invert flag changes, process if autoProcess is enabled
+    this.subscriptions.add(
+      this.$invert.listen(() => {
+        if (this.$points.get().length === 0) {
+          return;
+        }
+
+        if (this.manager.stateApi.getSettings().autoProcess) {
+          this.process();
+        }
+      })
+    );
+
     // When auto-process is enabled, process the points if they have not been processed
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectAutoProcess, (autoProcess) => {
@@ -529,7 +547,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
 
-    const hash = stableHash(points);
+    const invert = this.$invert.get();
+
+    const hash = stableHash({ points, invert });
     if (hash === this.$lastProcessedHash.get()) {
       this.log.trace('Already processed points');
       return;
@@ -556,7 +576,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.abortController = controller;
 
     // Build the graph for segmenting the image, using the rasterized image DTO
-    const { graph, outputNodeId } = this.buildGraph(rasterizeResult.value, points);
+    const { graph, outputNodeId } = CanvasSegmentAnythingModule.buildGraph(rasterizeResult.value, points, invert);
 
     // Run the graph and get the segmented image output
     const segmentResult = await withResultAsync(() =>
@@ -793,6 +813,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.$points.set([]);
     this.$imageState.set(null);
     this.$pointType.set(1);
+    this.$invert.set(false);
     this.$lastProcessedHash.set('');
     this.$isProcessing.set(false);
 
@@ -808,7 +829,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   /**
    * Builds a graph for segmenting an image with the given image DTO.
    */
-  buildGraph = ({ image_name }: ImageDTO, points: SAMPointWithId[]): { graph: Graph; outputNodeId: string } => {
+  static buildGraph = (
+    { image_name }: ImageDTO,
+    points: SAMPointWithId[],
+    invert: boolean
+  ): { graph: Graph; outputNodeId: string } => {
     const graph = new Graph(getPrefixedId('canvas_segment_anything'));
 
     // TODO(psyche): When SAM2 is available in transformers, use it here
@@ -827,6 +852,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       id: getPrefixedId('apply_tensor_mask_to_image'),
       type: 'apply_tensor_mask_to_image',
       image: { image_name },
+      invert,
     });
     graph.addEdge(segmentAnything, 'mask', applyMask, 'mask');
 
