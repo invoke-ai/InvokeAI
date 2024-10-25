@@ -165,6 +165,7 @@ class ApplyMaskTensorToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     mask: TensorField = InputField(description="The mask tensor to apply.")
     image: ImageField = InputField(description="The image to apply the mask to.")
+    invert: bool = InputField(default=False, description="Whether to invert the mask.")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name, mode="RGBA")
@@ -178,6 +179,9 @@ class ApplyMaskTensorToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         if mask.dtype != torch.bool:
             mask = mask > 0.5
         mask_np = (mask.float() * 255).byte().cpu().numpy().astype(np.uint8)
+
+        if self.invert:
+            mask_np = 255 - mask_np
 
         # Apply the mask only to the alpha channel where the original alpha is non-zero. This preserves the original
         # image's transparency - else the transparent regions would end up as opaque black.
