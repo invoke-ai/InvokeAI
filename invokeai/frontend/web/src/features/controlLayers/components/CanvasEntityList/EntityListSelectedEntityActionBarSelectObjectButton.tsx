@@ -5,9 +5,9 @@ import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/sel
 import { isSegmentableEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiMaskHappyBold } from 'react-icons/pi';
+import { PiShapesFill } from 'react-icons/pi';
 
-export const EntityListSelectedEntityActionBarAutoMaskButton = memo(() => {
+export const EntityListSelectedEntityActionBarSelectObjectButton = memo(() => {
   const { t } = useTranslation();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const segment = useEntitySegmentAnything(selectedEntityIdentifier);
@@ -24,14 +24,14 @@ export const EntityListSelectedEntityActionBarAutoMaskButton = memo(() => {
     <IconButton
       onClick={segment.start}
       isDisabled={segment.isDisabled}
-      size="sm"
+      minW={8}
       variant="link"
       alignSelf="stretch"
-      aria-label={t('controlLayers.segment.autoMask')}
-      tooltip={t('controlLayers.segment.autoMask')}
-      icon={<PiMaskHappyBold />}
+      aria-label={t('controlLayers.selectObject.selectObject')}
+      tooltip={t('controlLayers.selectObject.selectObject')}
+      icon={<PiShapesFill />}
     />
   );
 });
 
-EntityListSelectedEntityActionBarAutoMaskButton.displayName = 'EntityListSelectedEntityActionBarAutoMaskButton';
+EntityListSelectedEntityActionBarSelectObjectButton.displayName = 'EntityListSelectedEntityActionBarSelectObjectButton';

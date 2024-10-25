@@ -21,7 +21,7 @@ import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/s
 import type { CanvasEntityIdentifier, ControlModeV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBoundingBoxBold, PiShootingStarBold, PiUploadBold } from 'react-icons/pi';
+import { PiBoundingBoxBold, PiShootingStarFill, PiUploadBold } from 'react-icons/pi';
 import type { ControlNetModelConfig, PostUploadAction, T2IAdapterModelConfig } from 'services/api/types';
 
 const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) => {
@@ -93,7 +93,7 @@ export const ControlLayerControlAdapter = memo(() => {
           variant="link"
           aria-label={t('controlLayers.filter.filter')}
           tooltip={t('controlLayers.filter.filter')}
-          icon={<PiShootingStarBold />}
+          icon={<PiShootingStarFill />}
         />
         <IconButton
           onClick={pullBboxIntoLayer}
