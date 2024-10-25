@@ -128,9 +128,9 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
                 "The bnb modules are not available. Please install bitsandbytes if available on your platform."
             )
         match submodel_type:
-            case SubModelType.Tokenizer2:
+            case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
                 return T5Tokenizer.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
-            case SubModelType.TextEncoder2:
+            case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
                 te2_model_path = Path(config.path) / "text_encoder_2"
                 model_config = AutoConfig.from_pretrained(te2_model_path)
                 with accelerate.init_empty_weights():
@@ -172,9 +172,9 @@ class T5EncoderCheckpointModel(ModelLoader):
             raise ValueError("Only T5EncoderConfig models are currently supported here.")
 
         match submodel_type:
-            case SubModelType.Tokenizer2:
+            case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
                 return T5Tokenizer.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
-            case SubModelType.TextEncoder2:
+            case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
                 return T5EncoderModel.from_pretrained(Path(config.path) / "text_encoder_2", torch_dtype="auto")
 
         raise ValueError(

@@ -34,6 +34,8 @@ import {
   isModelIdentifierFieldInputTemplate,
   isSchedulerFieldInputInstance,
   isSchedulerFieldInputTemplate,
+  isSD3MainModelFieldInputInstance,
+  isSD3MainModelFieldInputTemplate,
   isSDXLMainModelFieldInputInstance,
   isSDXLMainModelFieldInputTemplate,
   isSDXLRefinerModelFieldInputInstance,
@@ -66,6 +68,7 @@ import MainModelFieldInputComponent from './inputs/MainModelFieldInputComponent'
 import NumberFieldInputComponent from './inputs/NumberFieldInputComponent';
 import RefinerModelFieldInputComponent from './inputs/RefinerModelFieldInputComponent';
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
+import SD3MainModelFieldInputComponent from './inputs/SD3MainModelFieldInputComponent';
 import SDXLMainModelFieldInputComponent from './inputs/SDXLMainModelFieldInputComponent';
 import SpandrelImageToImageModelFieldInputComponent from './inputs/SpandrelImageToImageModelFieldInputComponent';
 import StringFieldInputComponent from './inputs/StringFieldInputComponent';
@@ -168,8 +171,13 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   if (isColorFieldInputInstance(fieldInstance) && isColorFieldInputTemplate(fieldTemplate)) {
     return <ColorFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
+
   if (isFluxMainModelFieldInputInstance(fieldInstance) && isFluxMainModelFieldInputTemplate(fieldTemplate)) {
     return <FluxMainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isSD3MainModelFieldInputInstance(fieldInstance) && isSD3MainModelFieldInputTemplate(fieldTemplate)) {
+    return <SD3MainModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isSDXLMainModelFieldInputInstance(fieldInstance) && isSDXLMainModelFieldInputTemplate(fieldTemplate)) {

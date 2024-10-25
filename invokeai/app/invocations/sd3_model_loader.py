@@ -1,3 +1,5 @@
+from typing import Optional
+
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -5,10 +7,10 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
+from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField, UIType
 from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, T5EncoderField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.config import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.config import SubModelType
 
 
 @invocation_output("sd3_model_loader_output")
@@ -33,57 +35,58 @@ class Sd3ModelLoaderOutput(BaseInvocationOutput):
 class Sd3ModelLoaderInvocation(BaseInvocation):
     """Loads a SD3 base model, outputting its submodels."""
 
-    # TODO(ryand): Create a UIType.Sd3MainModelField to use here.
-    # model: ModelIdentifierField = InputField(
-    #     description=FieldDescriptions.sd3_model,
-    #     ui_type=UIType.SD3MainModel,
-    #     input=Input.Direct,
-    # )
-    model: str = InputField(
+    model: ModelIdentifierField = InputField(
         description=FieldDescriptions.sd3_model,
+        ui_type=UIType.SD3MainModel,
         input=Input.Direct,
     )
 
+    t5_encoder_model: Optional[ModelIdentifierField] = InputField(
+        description=FieldDescriptions.t5_encoder,
+        ui_type=UIType.T5EncoderModel,
+        input=Input.Direct,
+        title="T5 Encoder",
+        default=None,
+    )
+
+    # TODO(brandon): Setup UI updates to support selecting a clip l model.
+    # clip_l_model: ModelIdentifierField = InputField(
+    #     description=FieldDescriptions.clip_l_model,
+    #     ui_type=UIType.CLIPEmbedModel,
+    #     input=Input.Direct,
+    #     title="CLIP L Encoder",
+    # )
+
+    # TODO(brandon): Setup UI updates to support selecting a clip g model.
+    # clip_g_model: ModelIdentifierField = InputField(
+    #     description=FieldDescriptions.clip_g_model,
+    #     ui_type=UIType.CLIPGModel,
+    #     input=Input.Direct,
+    #     title="CLIP G Encoder",
+    # )
+
+    # TODO(brandon): Setup UI updates to support selecting an SD3 vae model.
+    # vae_model: ModelIdentifierField = InputField(
+    #     description=FieldDescriptions.vae_model, ui_type=UIType.FluxVAEModel, title="VAE", default=None
+    # )
+
     def invoke(self, context: InvocationContext) -> Sd3ModelLoaderOutput:
-        # model_key = self.model.key
-        # if not context.models.exists(model_key):
-        #     raise ValueError(f"Unknown model: {model_key}")
-
-        # mmditx = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
-        # vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
-        # tokenizer_l = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-        # clip_encoder_l = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
-        # tokenizer_g = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
-        # clip_encoder_g = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
-        # tokenizer_t5 = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer3})
-        # t5_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder3})
-
-        # return Sd3ModelLoaderOutput(
-        #     mmditx=TransformerField(transformer=mmditx, loras=[]),
-        #     clip_l=CLIPField(tokenizer=tokenizer_l, text_encoder=clip_encoder_l, loras=[], skipped_layers=0),
-        #     clip_g=CLIPField(tokenizer=tokenizer_g, text_encoder=clip_encoder_g, loras=[], skipped_layers=0),
-        #     t5_encoder=T5EncoderField(tokenizer=tokenizer_t5, text_encoder=t5_encoder),
-        #     vae=VAEField(vae=vae),
-        # )
-
-        model_configs = context.models.search_by_attrs(
-            name=self.model, base=BaseModelType.StableDiffusion3, type=ModelType.Main
+        mmditx = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+        vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
+        tokenizer_l = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+        clip_encoder_l = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        tokenizer_g = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
+        clip_encoder_g = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
+        tokenizer_t5 = (
+            self.t5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer3})
+            if self.t5_encoder_model
+            else self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer3})
         )
-
-        if len(model_configs) != 1:
-            raise ValueError(f"Expected 1 model config, got {len(model_configs)}")
-
-        model_config = model_configs[0]
-        model_identifier = ModelIdentifierField.from_config(model_config)
-
-        mmditx = model_identifier.model_copy(update={"submodel_type": SubModelType.Transformer})
-        vae = model_identifier.model_copy(update={"submodel_type": SubModelType.VAE})
-        tokenizer_l = model_identifier.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-        clip_encoder_l = model_identifier.model_copy(update={"submodel_type": SubModelType.TextEncoder})
-        tokenizer_g = model_identifier.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
-        clip_encoder_g = model_identifier.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
-        tokenizer_t5 = model_identifier.model_copy(update={"submodel_type": SubModelType.Tokenizer3})
-        t5_encoder = model_identifier.model_copy(update={"submodel_type": SubModelType.TextEncoder3})
+        t5_encoder = (
+            self.t5_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder3})
+            if self.t5_encoder_model
+            else self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder3})
+        )
 
         return Sd3ModelLoaderOutput(
             mmditx=TransformerField(transformer=mmditx, loras=[]),

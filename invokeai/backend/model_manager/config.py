@@ -26,7 +26,6 @@ from typing import Literal, Optional, Type, TypeAlias, Union
 
 import diffusers
 import onnxruntime as ort
-from pathlib import Path
 import torch
 from diffusers.models.modeling_utils import ModelMixin
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, TypeAdapter
@@ -150,9 +149,11 @@ class ModelSourceType(str, Enum):
 
 DEFAULTS_PRECISION = Literal["fp16", "fp32"]
 
+
 class SubmodelDefinition(BaseModel):
     path_or_prefix: str
     model_type: ModelType
+
 
 class MainModelDefaultSettings(BaseModel):
     vae: str | None = Field(default=None, description="Default VAE for this model (model key)")

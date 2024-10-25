@@ -115,6 +115,10 @@ const zSDXLMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('SDXLMainModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zSD3MainModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('SD3MainModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zFluxMainModelFieldType = zFieldTypeBase.extend({
   name: z.literal('FluxMainModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -174,6 +178,7 @@ const zStatefulFieldType = z.union([
   zModelIdentifierFieldType,
   zMainModelFieldType,
   zSDXLMainModelFieldType,
+  zSD3MainModelFieldType,
   zFluxMainModelFieldType,
   zSDXLRefinerModelFieldType,
   zVAEModelFieldType,
@@ -465,6 +470,29 @@ export const isSDXLMainModelFieldInputInstance = (val: unknown): val is SDXLMain
   zSDXLMainModelFieldInputInstance.safeParse(val).success;
 export const isSDXLMainModelFieldInputTemplate = (val: unknown): val is SDXLMainModelFieldInputTemplate =>
   zSDXLMainModelFieldInputTemplate.safeParse(val).success;
+// #endregion
+
+// #region SD3MainModelField
+
+const zSD3MainModelFieldValue = zMainModelFieldValue; // TODO: Narrow to SDXL models only.
+const zSD3MainModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zSD3MainModelFieldValue,
+});
+const zSD3MainModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zSD3MainModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zSD3MainModelFieldValue,
+});
+const zSD3MainModelFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zSD3MainModelFieldType,
+});
+export type SD3MainModelFieldInputInstance = z.infer<typeof zSD3MainModelFieldInputInstance>;
+export type SD3MainModelFieldInputTemplate = z.infer<typeof zSD3MainModelFieldInputTemplate>;
+export const isSD3MainModelFieldInputInstance = (val: unknown): val is SD3MainModelFieldInputInstance =>
+  zSD3MainModelFieldInputInstance.safeParse(val).success;
+export const isSD3MainModelFieldInputTemplate = (val: unknown): val is SD3MainModelFieldInputTemplate =>
+  zSD3MainModelFieldInputTemplate.safeParse(val).success;
+
 // #endregion
 
 // #region FluxMainModelField
@@ -806,6 +834,7 @@ export const zStatefulFieldValue = z.union([
   zMainModelFieldValue,
   zSDXLMainModelFieldValue,
   zFluxMainModelFieldValue,
+  zSD3MainModelFieldValue,
   zSDXLRefinerModelFieldValue,
   zVAEModelFieldValue,
   zLoRAModelFieldValue,
@@ -837,6 +866,7 @@ const zStatefulFieldInputInstance = z.union([
   zModelIdentifierFieldInputInstance,
   zMainModelFieldInputInstance,
   zFluxMainModelFieldInputInstance,
+  zSD3MainModelFieldInputInstance,
   zSDXLMainModelFieldInputInstance,
   zSDXLRefinerModelFieldInputInstance,
   zVAEModelFieldInputInstance,
@@ -870,6 +900,7 @@ const zStatefulFieldInputTemplate = z.union([
   zModelIdentifierFieldInputTemplate,
   zMainModelFieldInputTemplate,
   zFluxMainModelFieldInputTemplate,
+  zSD3MainModelFieldInputTemplate,
   zSDXLMainModelFieldInputTemplate,
   zSDXLRefinerModelFieldInputTemplate,
   zVAEModelFieldInputTemplate,
@@ -904,6 +935,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zModelIdentifierFieldOutputTemplate,
   zMainModelFieldOutputTemplate,
   zFluxMainModelFieldOutputTemplate,
+  zSD3MainModelFieldOutputTemplate,
   zSDXLMainModelFieldOutputTemplate,
   zSDXLRefinerModelFieldOutputTemplate,
   zVAEModelFieldOutputTemplate,

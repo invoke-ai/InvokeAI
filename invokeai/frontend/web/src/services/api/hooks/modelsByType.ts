@@ -20,6 +20,7 @@ import {
   isNonRefinerMainModelConfig,
   isNonSDXLMainModelConfig,
   isRefinerMainModelModelConfig,
+  isSD3MainModelModelConfig,
   isSDXLMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT2IAdapterModelConfig,
@@ -47,6 +48,7 @@ export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
 export const useNonSDXLMainModels = buildModelsHook(isNonSDXLMainModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useFluxModels = buildModelsHook(isFluxMainModelModelConfig);
+export const useSD3Models = buildModelsHook(isSD3MainModelModelConfig);
 export const useSDXLModels = buildModelsHook(isSDXLMainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlNetAndT2IAdapterModels = buildModelsHook(isControlNetOrT2IAdapterModelConfig);
