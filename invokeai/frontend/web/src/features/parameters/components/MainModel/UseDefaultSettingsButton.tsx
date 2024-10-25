@@ -131,6 +131,10 @@ export const UseDefaultSettingsButton = () => {
   ]);
 
   const tooltip = useMemo(() => {
+    if (!model) {
+      return t('modelManager.noModelSelected');
+    }
+
     if (!hasDefaultSettings) {
       return t('modelManager.noDefaultSettings');
     }
@@ -150,7 +154,7 @@ export const UseDefaultSettingsButton = () => {
         <Text>{t('modelManager.restoreDefaultSettings')}</Text>
       </Flex>
     );
-  }, [outOfSyncSettings, t, hasDefaultSettings]);
+  }, [model, hasDefaultSettings, outOfSyncSettings, t]);
 
   const handleClickDefaultSettings = useCallback(() => {
     dispatch(setDefaultSettings());
