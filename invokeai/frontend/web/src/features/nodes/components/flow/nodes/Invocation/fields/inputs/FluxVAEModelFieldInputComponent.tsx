@@ -6,7 +6,7 @@ import type { FluxVAEModelFieldInputInstance, FluxVAEModelFieldInputTemplate } f
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFluxVAEModels } from 'services/api/hooks/modelsByType';
-import type { VAEModelConfig } from 'services/api/types';
+import type { MainModelConfig, VAEModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -19,7 +19,7 @@ const FluxVAEModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useFluxVAEModels();
   const _onChange = useCallback(
-    (value: VAEModelConfig | null) => {
+    (value: VAEModelConfig | MainModelConfig | null) => {
       if (!value) {
         return;
       }
