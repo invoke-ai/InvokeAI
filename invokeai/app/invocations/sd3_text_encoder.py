@@ -22,6 +22,9 @@ from invokeai.backend.lora.lora_patcher import LoRAPatcher
 from invokeai.backend.model_manager.config import ModelFormat
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, SD3ConditioningInfo
 
+# The SD3 T5 Max Sequence Length set based on the default in diffusers.
+SD3_T5_MAX_SEQ_LEN = 256
+
 
 @invocation(
     "sd3_text_encoder",
@@ -48,6 +51,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
     # The SD3 models were trained with text encoder dropout, so the T5 encoder can be omitted to save time/memory.
     t5_encoder: T5EncoderField | None = InputField(
         title="T5Encoder",
+        default=None,
         description=FieldDescriptions.t5_encoder,
         input=Input.Connection,
     )
@@ -61,10 +65,9 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         clip_l_embeddings, clip_l_pooled_embeddings = self._clip_encode(context, self.clip_l)
         clip_g_embeddings, clip_g_pooled_embeddings = self._clip_encode(context, self.clip_g)
 
-        t5_max_seq_len = 256
         t5_embeddings: torch.Tensor | None = None
         if self.t5_encoder is not None:
-            t5_embeddings = self._t5_encode(context, t5_max_seq_len)
+            t5_embeddings = self._t5_encode(context, SD3_T5_MAX_SEQ_LEN)
 
         conditioning_data = ConditioningFieldData(
             conditionings=[
