@@ -3,7 +3,7 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { useEntityFilter } from 'features/controlLayers/hooks/useEntityFilter';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiShootingStarBold } from 'react-icons/pi';
+import { PiShootingStarFill } from 'react-icons/pi';
 
 export const CanvasEntityMenuItemsFilter = memo(() => {
   const { t } = useTranslation();
@@ -11,7 +11,7 @@ export const CanvasEntityMenuItemsFilter = memo(() => {
   const filter = useEntityFilter(entityIdentifier);
 
   return (
-    <MenuItem onClick={filter.start} icon={<PiShootingStarBold />} isDisabled={filter.isDisabled}>
+    <MenuItem onClick={filter.start} icon={<PiShootingStarFill />} isDisabled={filter.isDisabled}>
       {t('controlLayers.filter.filter')}
     </MenuItem>
   );
