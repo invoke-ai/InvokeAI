@@ -18,6 +18,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.config import BaseModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -236,6 +237,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return latents
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
-        def step_callback(state: PipelineIntermediateState) -> None: ...
+        def step_callback(state: PipelineIntermediateState) -> None:
+            context.util.sd_step_callback(state, BaseModelType.StableDiffusion3)
 
         return step_callback
