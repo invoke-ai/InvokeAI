@@ -29,7 +29,7 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiFloppyDiskBold, PiInfoBold, PiStarBold, PiXBold } from 'react-icons/pi';
+import { PiArrowsCounterClockwiseBold, PiFloppyDiskBold, PiInfoBold, PiPlayFill, PiXBold } from 'react-icons/pi';
 
 const SelectObjectContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
@@ -111,7 +111,7 @@ const SelectObjectContent = memo(
 
         <ButtonGroup isAttached={false} size="sm" w="full">
           <Button
-            leftIcon={<PiStarBold />}
+            leftIcon={<PiPlayFill />}
             onClick={adapter.segmentAnything.processImmediate}
             isLoading={isProcessing}
             loadingText={t('controlLayers.selectObject.process')}
