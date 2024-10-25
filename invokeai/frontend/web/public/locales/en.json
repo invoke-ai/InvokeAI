@@ -1886,8 +1886,8 @@
             "apply": "Apply",
             "cancel": "Cancel"
         },
-        "segment": {
-            "autoMask": "Auto Mask",
+        "selectObject": {
+            "selectObject": "Select Object",
             "pointType": "Point Type",
             "invertSelection": "Invert Selection",
             "include": "Include",

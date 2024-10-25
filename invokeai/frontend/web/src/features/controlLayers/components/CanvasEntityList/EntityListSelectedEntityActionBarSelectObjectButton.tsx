@@ -7,7 +7,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMaskHappyBold } from 'react-icons/pi';
 
-export const EntityListSelectedEntityActionBarAutoMaskButton = memo(() => {
+export const EntityListSelectedEntityActionBarSelectObjectButton = memo(() => {
   const { t } = useTranslation();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const segment = useEntitySegmentAnything(selectedEntityIdentifier);
@@ -27,11 +27,11 @@ export const EntityListSelectedEntityActionBarAutoMaskButton = memo(() => {
       size="sm"
       variant="link"
       alignSelf="stretch"
-      aria-label={t('controlLayers.segment.autoMask')}
-      tooltip={t('controlLayers.segment.autoMask')}
+      aria-label={t('controlLayers.selectObject.selectObject')}
+      tooltip={t('controlLayers.selectObject.selectObject')}
       icon={<PiMaskHappyBold />}
     />
   );
 });
 
-EntityListSelectedEntityActionBarAutoMaskButton.displayName = 'EntityListSelectedEntityActionBarAutoMaskButton';
+EntityListSelectedEntityActionBarSelectObjectButton.displayName = 'EntityListSelectedEntityActionBarSelectObjectButton';
