@@ -98,7 +98,7 @@ const CanvasAlertsSelectedEntityStatusContent = memo(({ entityIdentifier, adapte
   }
 
   return (
-    <Alert status={alert.status} borderRadius="base" fontSize="sm" shadow="md" w="fit-content" alignSelf="flex-end">
+    <Alert status={alert.status} borderRadius="base" fontSize="sm" shadow="md" w="fit-content">
       <AlertIcon />
       <AlertTitle>{alert.title}</AlertTitle>
     </Alert>
