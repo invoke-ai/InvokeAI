@@ -92,7 +92,8 @@
         "none": "Niente",
         "new": "Nuovo",
         "view": "Vista",
-        "close": "Chiudi"
+        "close": "Chiudi",
+        "clipboard": "Appunti"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -587,7 +588,11 @@
         "installingXModels_many": "Installazione di {{count}} modelli",
         "installingXModels_other": "Installazione di {{count}} modelli",
         "includesNModels": "Include {{n}} modelli e le loro dipendenze",
-        "starterBundleHelpText": "Installa facilmente tutti i modelli necessari per iniziare con un modello base, tra cui un modello principale, controlnet, adattatori IP e altro. Selezionando un pacchetto salterai tutti i modelli che hai già installato."
+        "starterBundleHelpText": "Installa facilmente tutti i modelli necessari per iniziare con un modello base, tra cui un modello principale, controlnet, adattatori IP e altro. Selezionando un pacchetto salterai tutti i modelli che hai già installato.",
+        "noDefaultSettings": "Nessuna impostazione predefinita configurata per questo modello. Visita Gestione Modelli per aggiungere impostazioni predefinite.",
+        "defaultSettingsOutOfSync": "Alcune impostazioni non corrispondono a quelle predefinite del modello:",
+        "restoreDefaultSettings": "Fare clic per utilizzare le impostazioni predefinite del modello.",
+        "usingDefaultSettings": "Utilizzo delle impostazioni predefinite del modello"
     },
     "parameters": {
         "images": "Immagini",
@@ -723,7 +728,10 @@
         "reloadingIn": "Ricaricando in",
         "informationalPopoversDisabled": "Testo informativo a comparsa disabilitato",
         "informationalPopoversDisabledDesc": "I testi informativi a comparsa sono disabilitati. Attivali nelle impostazioni.",
-        "confirmOnNewSession": "Conferma su nuova sessione"
+        "confirmOnNewSession": "Conferma su nuova sessione",
+        "enableModelDescriptions": "Abilita le descrizioni dei modelli nei menu a discesa",
+        "modelDescriptionsDisabled": "Descrizioni dei modelli nei menu a discesa disabilitate",
+        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disabilitate. Abilitale nelle Impostazioni."
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -1491,6 +1499,42 @@
                 "Controlla quanto il prompt influenza il processo di generazione.",
                 "Valori di guida elevati possono causare sovrasaturazione e una guida elevata o bassa può causare risultati di generazione distorti. La guida si applica solo ai modelli FLUX DEV."
             ]
+        },
+        "regionalReferenceImage": {
+            "paragraphs": [
+                "Pennello per applicare un'immagine di riferimento ad aree specifiche."
+            ],
+            "heading": "Immagine di riferimento Regionale"
+        },
+        "rasterLayer": {
+            "paragraphs": [
+                "Contenuto basato sui pixel della tua tela, utilizzato durante la generazione dell'immagine."
+            ],
+            "heading": "Livello Raster"
+        },
+        "regionalGuidance": {
+            "heading": "Guida Regionale",
+            "paragraphs": [
+                "Pennello per guidare la posizione in cui devono apparire gli elementi dei prompt globali."
+            ]
+        },
+        "regionalGuidanceAndReferenceImage": {
+            "heading": "Guida regionale e immagine di riferimento regionale",
+            "paragraphs": [
+                "Per la Guida Regionale, utilizzare il pennello per indicare dove devono apparire gli elementi dei prompt globali.",
+                "Per l'immagine di riferimento regionale, utilizzare il pennello per applicare un'immagine di riferimento ad aree specifiche."
+            ]
+        },
+        "globalReferenceImage": {
+            "heading": "Immagine di riferimento Globale",
+            "paragraphs": [
+                "Applica un'immagine di riferimento per influenzare l'intera generazione."
+            ]
+        },
+        "inpainting": {
+            "paragraphs": [
+                "Controlla quale area viene modificata, in base all'intensità di riduzione del rumore."
+            ]
         }
     },
     "sdxl": {
@@ -1932,9 +1976,45 @@
             "canvasGroup": "Tela",
             "newRasterLayer": "Nuovo Livello Raster",
             "saveCanvasToGallery": "Salva la Tela nella Galleria",
-            "saveToGalleryGroup": "Salva nella Galleria"
+            "saveToGalleryGroup": "Salva nella Galleria",
+            "newInpaintMask": "Nuova maschera Inpaint",
+            "newRegionalGuidance": "Nuova Guida Regionale"
         },
-        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine"
+        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine",
+        "copyRasterLayerTo": "Copia $t(controlLayers.rasterLayer) in",
+        "copyControlLayerTo": "Copia $t(controlLayers.controlLayer) in",
+        "copyInpaintMaskTo": "Copia $t(controlLayers.inpaintMask) in",
+        "selectObject": {
+            "dragToMove": "Trascina un punto per spostarlo",
+            "clickToAdd": "Fare clic sul livello per aggiungere un punto",
+            "clickToRemove": "Clicca su un punto per rimuoverlo",
+            "help3": "Inverte la selezione per selezionare tutto tranne l'oggetto di destinazione.",
+            "pointType": "Tipo punto",
+            "apply": "Applica",
+            "reset": "Reimposta",
+            "cancel": "Annulla",
+            "selectObject": "Seleziona oggetto",
+            "invertSelection": "Inverti selezione",
+            "exclude": "Escludi",
+            "include": "Includi",
+            "neutral": "Neutro",
+            "saveAs": "Salva come",
+            "process": "Elabora",
+            "help1": "Seleziona un singolo oggetto di destinazione. Aggiungi i punti <Bold>Includi</Bold> e <Bold>Escludi</Bold> per indicare quali parti del livello fanno parte dell'oggetto di destinazione.",
+            "help2": "Inizia con un punto <Bold>Include</Bold> all'interno dell'oggetto di destinazione. Aggiungi altri punti per perfezionare la selezione. Meno punti in genere producono risultati migliori."
+        },
+        "convertControlLayerTo": "Converti $t(controlLayers.controlLayer) in",
+        "newRasterLayer": "Nuovo $t(controlLayers.rasterLayer)",
+        "newRegionalGuidance": "Nuovo $t(controlLayers.regionalGuidance)",
+        "canvasAsRasterLayer": "$t(controlLayers.canvas) come $t(controlLayers.rasterLayer)",
+        "canvasAsControlLayer": "$t(controlLayers.canvas) come $t(controlLayers.controlLayer)",
+        "convertInpaintMaskTo": "Converti $t(controlLayers.inpaintMask) in",
+        "copyRegionalGuidanceTo": "Copia $t(controlLayers.regionalGuidance) in",
+        "convertRasterLayerTo": "Converti $t(controlLayers.rasterLayer) in",
+        "convertRegionalGuidanceTo": "Converti $t(controlLayers.regionalGuidance) in",
+        "newControlLayer": "Nuovo $t(controlLayers.controlLayer)",
+        "newInpaintMask": "Nuovo $t(controlLayers.inpaintMask)",
+        "replaceCurrent": "Sostituisci corrente"
     },
     "ui": {
         "tabs": {
