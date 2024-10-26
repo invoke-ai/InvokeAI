@@ -57,8 +57,9 @@ export const CanvasMainPanelContent = memo(() => {
       alignItems="center"
       justifyContent="center"
       borderWidth={1}
-      p={1}
+      p={2}
       borderColor={isRegionFocused ? 'blue.300' : 'transparent'}
+      transition="border-color 0.1s"
     >
       <CanvasManagerProviderGate>
         <CanvasToolbar />

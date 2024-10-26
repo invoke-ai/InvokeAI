@@ -52,6 +52,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
       rowGap={4}
       alignItems="center"
       justifyContent="center"
+      transition="border-color 0.1s"
     >
       {hasImageToCompare && <CompareToolbar />}
       {!hasImageToCompare && <ViewerToolbar closeButton={closeButton} />}

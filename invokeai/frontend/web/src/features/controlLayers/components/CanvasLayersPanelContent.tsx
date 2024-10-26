@@ -23,8 +23,9 @@ export const CanvasLayersPanelContent = memo(() => {
       borderWidth={1}
       borderColor={isRegionFocused ? 'blue.300' : 'transparent'}
       borderRadius="base"
-      p={1}
+      p={2}
       marginTop={-1}
+      transition="border-color 0.1s"
     >
       <EntityListSelectedEntityActionBar />
       <Divider py={0} borderColor="base.600" />

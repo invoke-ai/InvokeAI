@@ -58,11 +58,12 @@ const GalleryPanelContent = () => {
       h="full"
       w="full"
       tabIndex={-1}
-      p={1}
+      p={2}
       marginTop={-1}
       borderWidth={1}
       borderRadius="base"
       borderColor={isRegionFocused ? 'invokeBlue.300' : 'transparent'}
+      transition="border-color 0.1s"
     >
       <Flex alignItems="center" justifyContent="space-between" w="full">
         <Flex flexGrow={1} flexBasis={0}>
