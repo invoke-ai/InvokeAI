@@ -71,12 +71,16 @@ export const CanvasMainPanelContent = memo(() => {
           >
             <InvokeCanvasComponent />
             <CanvasManagerProviderGate>
-              {showHUD && (
-                <Flex position="absolute" top={1} insetInlineStart={1} pointerEvents="none">
-                  <CanvasHUD />
-                </Flex>
-              )}
-              <Flex flexDir="column" position="absolute" top={1} insetInlineEnd={1} pointerEvents="none" gap={2}>
+              <Flex
+                position="absolute"
+                flexDir="column"
+                top={1}
+                insetInlineStart={1}
+                pointerEvents="none"
+                gap={2}
+                alignItems="flex-start"
+              >
+                {showHUD && <CanvasHUD />}
                 <CanvasAlertsSelectedEntityStatus />
                 <CanvasAlertsPreserveMask />
                 <CanvasAlertsSendingToGallery />
