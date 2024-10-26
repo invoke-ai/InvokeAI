@@ -46,7 +46,7 @@ const REGION_TARGETS: Record<FocusRegionName, Set<HTMLElement>> = {
 /**
  * The currently-focused region or `null` if no region is focused.
  */
-const $focusedRegion = atom<FocusRegionName | null>(null);
+export const $focusedRegion = atom<FocusRegionName | null>(null);
 
 /**
  * A map of focus regions to atoms that indicate if that region is focused.
