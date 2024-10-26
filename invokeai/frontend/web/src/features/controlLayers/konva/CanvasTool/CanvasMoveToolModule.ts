@@ -20,7 +20,6 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
     this.manager = this.parent.manager;
     this.path = this.manager.buildPath(this);
     this.log = this.manager.buildLogger(this);
-
     this.log.debug('Creating module');
   }
 
@@ -45,18 +44,15 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
     };
     const { key } = e;
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+    const { x: offsetX = 0, y: offsetY = 0 } = offsets[key] || {};
 
-    if (!(selectedEntity && selectedEntity.$isInteractable.get() && $focusedRegion.get() === 'canvas')) {
+    if (
+      !(selectedEntity && selectedEntity.$isInteractable.get() && $focusedRegion.get() === 'canvas') ||
+      (offsetX === 0 && offsetY === 0)
+    ) {
       return; // Early return if no entity is selected or it is disabled or canvas is not focused
     }
 
-    const { x: offsetX = 0, y: offsetY = 0 } = offsets[key] || {};
-
-    if (offsetX) {
-      selectedEntity.konva.layer.x(selectedEntity.konva.layer.x() + offsetX);
-    }
-    if (offsetY) {
-      selectedEntity.konva.layer.y(selectedEntity.konva.layer.y() + offsetY);
-    }
+    selectedEntity.transformer.nudgePosition(offsetX, offsetY);
   };
 }
