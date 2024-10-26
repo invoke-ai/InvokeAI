@@ -2005,7 +2005,7 @@
         },
         "convertControlLayerTo": "Converti $t(controlLayers.controlLayer) in",
         "newRasterLayer": "Nuovo $t(controlLayers.rasterLayer)",
-        "newRegionalGuidance": "Nuovo $t(controlLayers.regionalGuidance)",
+        "newRegionalGuidance": "Nuova $t(controlLayers.regionalGuidance)",
         "canvasAsRasterLayer": "$t(controlLayers.canvas) come $t(controlLayers.rasterLayer)",
         "canvasAsControlLayer": "$t(controlLayers.canvas) come $t(controlLayers.controlLayer)",
         "convertInpaintMaskTo": "Converti $t(controlLayers.inpaintMask) in",
@@ -2013,7 +2013,7 @@
         "convertRasterLayerTo": "Converti $t(controlLayers.rasterLayer) in",
         "convertRegionalGuidanceTo": "Converti $t(controlLayers.regionalGuidance) in",
         "newControlLayer": "Nuovo $t(controlLayers.controlLayer)",
-        "newInpaintMask": "Nuovo $t(controlLayers.inpaintMask)",
+        "newInpaintMask": "Nuova $t(controlLayers.inpaintMask)",
         "replaceCurrent": "Sostituisci corrente"
     },
     "ui": {
