@@ -20,10 +20,9 @@ export const InpaintMaskMenuItems = memo(() => {
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />
       <MenuDivider />
-      <CanvasEntityMenuItemsCropToBbox />
-      <MenuDivider />
-      <InpaintMaskMenuItemsConvertToSubMenu />
       <InpaintMaskMenuItemsCopyToSubMenu />
+      <InpaintMaskMenuItemsConvertToSubMenu />
+      <CanvasEntityMenuItemsCropToBbox />
     </>
   );
 });
