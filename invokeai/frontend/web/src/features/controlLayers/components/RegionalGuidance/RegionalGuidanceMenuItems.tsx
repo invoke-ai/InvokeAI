@@ -25,10 +25,9 @@ export const RegionalGuidanceMenuItems = memo(() => {
       <CanvasEntityMenuItemsTransform />
       <RegionalGuidanceMenuItemsAutoNegative />
       <MenuDivider />
-      <CanvasEntityMenuItemsCropToBbox />
-      <MenuDivider />
-      <RegionalGuidanceMenuItemsConvertToSubMenu />
       <RegionalGuidanceMenuItemsCopyToSubMenu />
+      <RegionalGuidanceMenuItemsConvertToSubMenu />
+      <CanvasEntityMenuItemsCropToBbox />
     </>
   );
 });

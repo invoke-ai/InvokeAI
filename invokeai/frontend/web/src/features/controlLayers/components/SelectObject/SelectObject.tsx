@@ -10,6 +10,7 @@ import {
   MenuItem,
   MenuList,
   Spacer,
+  Spinner,
   Text,
   Tooltip,
   UnorderedList,
@@ -29,7 +30,7 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiFloppyDiskBold, PiInfoBold, PiPlayFill, PiXBold } from 'react-icons/pi';
+import { PiCaretDownBold, PiInfoBold } from 'react-icons/pi';
 
 const SelectObjectContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
@@ -41,10 +42,6 @@ const SelectObjectContent = memo(
     const hasPoints = useStore(adapter.segmentAnything.$hasPoints);
     const hasImageState = useStore(adapter.segmentAnything.$hasImageState);
     const autoProcess = useAppSelector(selectAutoProcess);
-
-    const replaceCurrent = useCallback(() => {
-      adapter.segmentAnything.apply();
-    }, [adapter.segmentAnything]);
 
     const saveAsInpaintMask = useCallback(() => {
       adapter.segmentAnything.saveAs('inpaint_mask');
@@ -115,58 +112,59 @@ const SelectObjectContent = memo(
 
         <ButtonGroup isAttached={false} size="sm" w="full">
           <Button
-            leftIcon={<PiPlayFill />}
             onClick={adapter.segmentAnything.processImmediate}
-            isLoading={isProcessing}
             loadingText={t('controlLayers.selectObject.process')}
             variant="ghost"
-            isDisabled={!hasPoints || autoProcess}
+            isDisabled={isProcessing || !hasPoints || autoProcess}
           >
             {t('controlLayers.selectObject.process')}
+            {isProcessing && <Spinner ms={3} boxSize={5} color="base.600" />}
           </Button>
           <Spacer />
           <Button
-            leftIcon={<PiArrowsCounterClockwiseBold />}
             onClick={adapter.segmentAnything.reset}
-            isLoading={isProcessing}
+            isDisabled={isProcessing || !hasPoints}
             loadingText={t('controlLayers.selectObject.reset')}
             variant="ghost"
           >
             {t('controlLayers.selectObject.reset')}
           </Button>
+          <Button
+            onClick={adapter.segmentAnything.apply}
+            loadingText={t('controlLayers.selectObject.apply')}
+            variant="ghost"
+            isDisabled={isProcessing || !hasImageState}
+          >
+            {t('controlLayers.selectObject.apply')}
+          </Button>
           <Menu>
             <MenuButton
               as={Button}
-              leftIcon={<PiFloppyDiskBold />}
-              isLoading={isProcessing}
               loadingText={t('controlLayers.selectObject.saveAs')}
               variant="ghost"
-              isDisabled={!hasImageState}
+              isDisabled={isProcessing || !hasImageState}
+              rightIcon={<PiCaretDownBold />}
             >
               {t('controlLayers.selectObject.saveAs')}
             </MenuButton>
             <MenuList>
-              <MenuItem isDisabled={!hasImageState} onClick={replaceCurrent}>
-                {t('controlLayers.replaceCurrent')}
-              </MenuItem>
-              <MenuItem isDisabled={!hasImageState} onClick={saveAsInpaintMask}>
+              <MenuItem isDisabled={isProcessing || !hasImageState} onClick={saveAsInpaintMask}>
                 {t('controlLayers.newInpaintMask')}
               </MenuItem>
-              <MenuItem isDisabled={!hasImageState} onClick={saveAsRegionalGuidance}>
+              <MenuItem isDisabled={isProcessing || !hasImageState} onClick={saveAsRegionalGuidance}>
                 {t('controlLayers.newRegionalGuidance')}
               </MenuItem>
-              <MenuItem isDisabled={!hasImageState} onClick={saveAsControlLayer}>
+              <MenuItem isDisabled={isProcessing || !hasImageState} onClick={saveAsControlLayer}>
                 {t('controlLayers.newControlLayer')}
               </MenuItem>
-              <MenuItem isDisabled={!hasImageState} onClick={saveAsRasterLayer}>
+              <MenuItem isDisabled={isProcessing || !hasImageState} onClick={saveAsRasterLayer}>
                 {t('controlLayers.newRasterLayer')}
               </MenuItem>
             </MenuList>
           </Menu>
           <Button
-            leftIcon={<PiXBold />}
             onClick={adapter.segmentAnything.cancel}
-            isLoading={isProcessing}
+            isDisabled={isProcessing}
             loadingText={t('common.cancel')}
             variant="ghost"
           >

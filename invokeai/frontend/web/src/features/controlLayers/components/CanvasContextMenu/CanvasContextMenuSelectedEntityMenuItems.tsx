@@ -1,3 +1,4 @@
+import { MenuGroup } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ControlLayerMenuItems } from 'features/controlLayers/components/ControlLayer/ControlLayerMenuItems';
 import { InpaintMaskMenuItems } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItems';
@@ -8,7 +9,9 @@ import {
   EntityIdentifierContext,
   useEntityIdentifierContext,
 } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useEntityTypeString } from 'features/controlLayers/hooks/useEntityTypeString';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
+import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -46,9 +49,20 @@ export const CanvasContextMenuSelectedEntityMenuItems = memo(() => {
 
   return (
     <EntityIdentifierContext.Provider value={selectedEntityIdentifier}>
-      <CanvasContextMenuSelectedEntityMenuItemsContent />
+      <CanvasContextMenuSelectedEntityMenuGroup>
+        <CanvasContextMenuSelectedEntityMenuItemsContent />
+      </CanvasContextMenuSelectedEntityMenuGroup>
     </EntityIdentifierContext.Provider>
   );
 });
 
 CanvasContextMenuSelectedEntityMenuItems.displayName = 'CanvasContextMenuSelectedEntityMenuItems';
+
+const CanvasContextMenuSelectedEntityMenuGroup = memo((props: PropsWithChildren) => {
+  const entityIdentifier = useEntityIdentifierContext();
+  const title = useEntityTypeString(entityIdentifier.type);
+
+  return <MenuGroup title={title}>{props.children}</MenuGroup>;
+});
+
+CanvasContextMenuSelectedEntityMenuGroup.displayName = 'CanvasContextMenuSelectedEntityMenuGroup';

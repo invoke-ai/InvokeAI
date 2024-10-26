@@ -25,11 +25,10 @@ export const RasterLayerMenuItems = memo(() => {
       <CanvasEntityMenuItemsFilter />
       <CanvasEntityMenuItemsSelectObject />
       <MenuDivider />
+      <RasterLayerMenuItemsCopyToSubMenu />
+      <RasterLayerMenuItemsConvertToSubMenu />
       <CanvasEntityMenuItemsCropToBbox />
       <CanvasEntityMenuItemsSave />
-      <MenuDivider />
-      <RasterLayerMenuItemsConvertToSubMenu />
-      <RasterLayerMenuItemsCopyToSubMenu />
     </>
   );
 });
