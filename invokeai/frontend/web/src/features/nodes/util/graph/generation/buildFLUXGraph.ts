@@ -19,6 +19,9 @@ import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
+import { addControlNets } from './addControlAdapters';
+import { addIPAdapters } from './addIPAdapters';
+
 const log = logger('system');
 
 export const buildFLUXGraph = async (
@@ -93,6 +96,7 @@ export const buildFLUXGraph = async (
   > = l2i;
 
   g.addEdge(modelLoader, 'transformer', noise, 'transformer');
+  g.addEdge(modelLoader, 'vae', noise, 'controlnet_vae');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
@@ -175,6 +179,58 @@ export const buildFLUXGraph = async (
       denoisingStart,
       false
     );
+  }
+
+  const controlNetCollector = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('control_net_collector'),
+  });
+  const controlNetResult = await addControlNets(
+    manager,
+    canvas.controlLayers.entities,
+    g,
+    canvas.bbox.rect,
+    controlNetCollector,
+    modelConfig.base
+  );
+  if (controlNetResult.addedControlNets > 0) {
+    g.addEdge(controlNetCollector, 'collection', noise, 'control');
+  } else {
+    g.deleteNode(controlNetCollector.id);
+  }
+
+  const ipAdapterCollector = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('ip_adapter_collector'),
+  });
+  const ipAdapterResult = addIPAdapters(canvas.referenceImages.entities, g, ipAdapterCollector, modelConfig.base);
+
+  const totalIPAdaptersAdded = ipAdapterResult.addedIPAdapters;
+  if (totalIPAdaptersAdded > 0) {
+    assert(steps > 2);
+    const cfg_scale_start_step = 1;
+    const cfg_scale_end_step = Math.ceil(steps / 2);
+    assert(cfg_scale_end_step > cfg_scale_start_step);
+
+    const negCond = g.addNode({
+      type: 'flux_text_encoder',
+      id: getPrefixedId('flux_text_encoder'),
+      prompt: '',
+    });
+
+    g.addEdge(modelLoader, 'clip', negCond, 'clip');
+    g.addEdge(modelLoader, 't5_encoder', negCond, 't5_encoder');
+    g.addEdge(modelLoader, 'max_seq_len', negCond, 't5_max_seq_len');
+    g.addEdge(negCond, 'conditioning', noise, 'negative_text_conditioning');
+
+    g.updateNode(noise, {
+      cfg_scale: 3,
+      cfg_scale_start_step,
+      cfg_scale_end_step,
+    });
+    g.addEdge(ipAdapterCollector, 'collection', noise, 'ip_adapter');
+  } else {
+    g.deleteNode(ipAdapterCollector.id);
   }
 
   if (state.system.shouldUseNSFWChecker) {

@@ -1,22 +1,12 @@
 import { Box, Flex, Heading } from '@invoke-ai/ui-library';
-import type { AnimationProps } from 'framer-motion';
-import { motion } from 'framer-motion';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
+import { selectMaxImageUploadCount } from 'features/system/store/configSlice';
 import { memo } from 'react';
 import type { DropzoneState } from 'react-dropzone';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
-
-const initial: AnimationProps['initial'] = {
-  opacity: 0,
-};
-const animate: AnimationProps['animate'] = {
-  opacity: 1,
-  transition: { duration: 0.1 },
-};
-const exit: AnimationProps['exit'] = {
-  opacity: 0,
-  transition: { duration: 0.1 },
-};
+import { useBoardName } from 'services/api/hooks/useBoardName';
 
 type ImageUploadOverlayProps = {
   dropzone: DropzoneState;
@@ -24,7 +14,6 @@ type ImageUploadOverlayProps = {
 };
 
 const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
-  const { t } = useTranslation();
   const { dropzone, setIsHandlingUpload } = props;
 
   useHotkeys(
@@ -36,67 +25,65 @@ const ImageUploadOverlay = (props: ImageUploadOverlayProps) => {
   );
 
   return (
-    <Box
-      key="image-upload-overlay"
-      initial={initial}
-      animate={animate}
-      exit={exit}
-      as={motion.div}
-      position="absolute"
-      top={0}
-      insetInlineStart={0}
-      width="100dvw"
-      height="100dvh"
-      zIndex={999}
-      backdropFilter="blur(20px)"
-    >
+    <Box position="absolute" top={0} right={0} bottom={0} left={0} zIndex={999} backdropFilter="blur(20px)">
+      <Flex position="absolute" top={0} right={0} bottom={0} left={0} bg="base.900" opacity={0.7} />
       <Flex
         position="absolute"
-        top={0}
-        insetInlineStart={0}
-        w="full"
-        h="full"
-        bg="base.900"
-        opacity={0.7}
-        alignItems="center"
-        justifyContent="center"
+        flexDir="column"
+        gap={4}
+        top={2}
+        right={2}
+        bottom={2}
+        left={2}
+        opacity={1}
+        borderWidth={2}
+        borderColor={dropzone.isDragAccept ? 'invokeYellow.300' : 'error.500'}
+        borderRadius="base"
+        borderStyle="dashed"
         transitionProperty="common"
         transitionDuration="0.1s"
-      />
-      <Flex
-        position="absolute"
-        top={0}
-        insetInlineStart={0}
-        width="full"
-        height="full"
         alignItems="center"
         justifyContent="center"
-        p={4}
+        color={dropzone.isDragReject ? 'error.300' : undefined}
       >
-        <Flex
-          width="full"
-          height="full"
-          alignItems="center"
-          justifyContent="center"
-          flexDir="column"
-          gap={4}
-          borderWidth={3}
-          borderRadius="xl"
-          borderStyle="dashed"
-          color="base.100"
-          borderColor="base.200"
-        >
-          {dropzone.isDragAccept ? (
-            <Heading size="lg">{t('gallery.dropToUpload')}</Heading>
-          ) : (
-            <>
-              <Heading size="lg">{t('toast.invalidUpload')}</Heading>
-              <Heading size="md">{t('toast.uploadFailedInvalidUploadDesc')}</Heading>
-            </>
-          )}
-        </Flex>
+        {dropzone.isDragAccept && <DragAcceptMessage />}
+        {!dropzone.isDragAccept && <DragRejectMessage />}
       </Flex>
     </Box>
   );
 };
 export default memo(ImageUploadOverlay);
+
+const DragAcceptMessage = () => {
+  const { t } = useTranslation();
+  const selectedBoardId = useAppSelector(selectSelectedBoardId);
+  const boardName = useBoardName(selectedBoardId);
+
+  return (
+    <>
+      <Heading size="lg">{t('gallery.dropToUpload')}</Heading>
+      <Heading size="md">{t('toast.imagesWillBeAddedTo', { boardName })}</Heading>
+    </>
+  );
+};
+
+const DragRejectMessage = () => {
+  const { t } = useTranslation();
+  const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
+
+  if (maxImageUploadCount === undefined) {
+    return (
+      <>
+        <Heading size="lg">{t('toast.invalidUpload')}</Heading>
+        <Heading size="md">{t('toast.uploadFailedInvalidUploadDesc')}</Heading>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Heading size="lg">{t('toast.invalidUpload')}</Heading>
+      <Heading size="md">{t('toast.uploadFailedInvalidUploadDesc_withCount', { count: maxImageUploadCount })}</Heading>
+    </>
+  );
+};

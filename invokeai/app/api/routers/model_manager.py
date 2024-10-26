@@ -38,7 +38,12 @@ from invokeai.backend.model_manager.load.model_cache.model_cache_base import Cac
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.search import ModelSearch
-from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel, StarterModelWithoutDependencies
+from invokeai.backend.model_manager.starter_models import (
+    STARTER_BUNDLES,
+    STARTER_MODELS,
+    StarterModel,
+    StarterModelWithoutDependencies,
+)
 
 model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
 
@@ -792,22 +797,52 @@ async def convert_model(
     return new_config
 
 
-@model_manager_router.get("/starter_models", operation_id="get_starter_models", response_model=list[StarterModel])
-async def get_starter_models() -> list[StarterModel]:
+class StarterModelResponse(BaseModel):
+    starter_models: list[StarterModel]
+    starter_bundles: dict[str, list[StarterModel]]
+
+
+def get_is_installed(
+    starter_model: StarterModel | StarterModelWithoutDependencies, installed_models: list[AnyModelConfig]
+) -> bool:
+    for model in installed_models:
+        if model.source == starter_model.source:
+            return True
+        if (
+            (model.name == starter_model.name or model.name in starter_model.previous_names)
+            and model.base == starter_model.base
+            and model.type == starter_model.type
+        ):
+            return True
+    return False
+
+
+@model_manager_router.get("/starter_models", operation_id="get_starter_models", response_model=StarterModelResponse)
+async def get_starter_models() -> StarterModelResponse:
     installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
-    installed_model_sources = {m.source for m in installed_models}
     starter_models = deepcopy(STARTER_MODELS)
+    starter_bundles = deepcopy(STARTER_BUNDLES)
     for model in starter_models:
-        if model.source in installed_model_sources:
-            model.is_installed = True
+        model.is_installed = get_is_installed(model, installed_models)
         # Remove already-installed dependencies
         missing_deps: list[StarterModelWithoutDependencies] = []
+
         for dep in model.dependencies or []:
-            if dep.source not in installed_model_sources:
+            if not get_is_installed(dep, installed_models):
                 missing_deps.append(dep)
         model.dependencies = missing_deps
 
-    return starter_models
+    for bundle in starter_bundles.values():
+        for model in bundle:
+            model.is_installed = get_is_installed(model, installed_models)
+            # Remove already-installed dependencies
+            missing_deps: list[StarterModelWithoutDependencies] = []
+            for dep in model.dependencies or []:
+                if not get_is_installed(dep, installed_models):
+                    missing_deps.append(dep)
+            model.dependencies = missing_deps
+
+    return StarterModelResponse(starter_models=starter_models, starter_bundles=starter_bundles)
 
 
 @model_manager_router.get(

@@ -528,7 +528,8 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldT5EncoderValueChanged,
   fieldCLIPEmbedValueChanged,
   fieldFluxVAEModelValueChanged,
-  nodesChanged,
+  // The `nodesChanged` has extra logic and is handled in its own extra reducer
+  // nodesChanged,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
   nodeLabelChanged,

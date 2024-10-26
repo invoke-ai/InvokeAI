@@ -18,9 +18,8 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectSendToCanvas, settingsSendToCanvasChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { selectCanvasRightPanelLayersTab } from 'features/controlLayers/store/ephemeral';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
 import type { ChangeEvent, PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -186,7 +185,7 @@ const ActivateCanvasButton = (props: PropsWithChildren) => {
   const imageViewer = useImageViewer();
   const onClick = useCallback(() => {
     dispatch(setActiveTab('canvas'));
-    selectCanvasRightPanelLayersTab();
+    dispatch(activeTabCanvasRightPanelChanged('layers'));
     imageViewer.close();
   }, [dispatch, imageViewer]);
   return (

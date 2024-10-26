@@ -10,6 +10,19 @@ from safetensors.torch import load_file
 from transformers import AutoConfig, AutoModelForTextEncoding, CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
+from invokeai.backend.flux.controlnet.state_dict_utils import (
+    convert_diffusers_instantx_state_dict_to_bfl_format,
+    infer_flux_params_from_state_dict,
+    infer_instantx_num_control_modes_from_state_dict,
+    is_state_dict_instantx_controlnet,
+    is_state_dict_xlabs_controlnet,
+)
+from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
+from invokeai.backend.flux.ip_adapter.state_dict_utils import infer_xlabs_ip_adapter_params_from_state_dict
+from invokeai.backend.flux.ip_adapter.xlabs_ip_adapter_flux import (
+    XlabsIpAdapterFlux,
+)
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.util import ae_params, params
@@ -24,6 +37,9 @@ from invokeai.backend.model_manager import (
 from invokeai.backend.model_manager.config import (
     CheckpointConfigBase,
     CLIPEmbedDiffusersConfig,
+    ControlNetCheckpointConfig,
+    ControlNetDiffusersConfig,
+    IPAdapterCheckpointConfig,
     MainBnbQuantized4bCheckpointConfig,
     MainCheckpointConfig,
     MainGGUFCheckpointConfig,
@@ -159,7 +175,7 @@ class T5EncoderCheckpointModel(ModelLoader):
             case SubModelType.Tokenizer2:
                 return T5Tokenizer.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
             case SubModelType.TextEncoder2:
-                return T5EncoderModel.from_pretrained(Path(config.path) / "text_encoder_2")
+                return T5EncoderModel.from_pretrained(Path(config.path) / "text_encoder_2", torch_dtype="auto")
 
         raise ValueError(
             f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
@@ -292,4 +308,75 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
             if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
                 sd = convert_bundle_to_flux_transformer_checkpoint(sd)
             model.load_state_dict(sd, assign=True)
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Diffusers)
+class FluxControlnetModel(ModelLoader):
+    """Class to load FLUX ControlNet models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if isinstance(config, ControlNetCheckpointConfig):
+            model_path = Path(config.path)
+        elif isinstance(config, ControlNetDiffusersConfig):
+            # If this is a diffusers directory, we simply ignore the config file and load from the weight file.
+            model_path = Path(config.path) / "diffusion_pytorch_model.safetensors"
+        else:
+            raise ValueError(f"Unexpected ControlNet model config type: {type(config)}")
+
+        sd = load_file(model_path)
+
+        # Detect the FLUX ControlNet model type from the state dict.
+        if is_state_dict_xlabs_controlnet(sd):
+            return self._load_xlabs_controlnet(sd)
+        elif is_state_dict_instantx_controlnet(sd):
+            return self._load_instantx_controlnet(sd)
+        else:
+            raise ValueError("Do not recognize the state dict as an XLabs or InstantX ControlNet model.")
+
+    def _load_xlabs_controlnet(self, sd: dict[str, torch.Tensor]) -> AnyModel:
+        with accelerate.init_empty_weights():
+            # HACK(ryand): Is it safe to assume dev here?
+            model = XLabsControlNetFlux(params["flux-dev"])
+
+        model.load_state_dict(sd, assign=True)
+        return model
+
+    def _load_instantx_controlnet(self, sd: dict[str, torch.Tensor]) -> AnyModel:
+        sd = convert_diffusers_instantx_state_dict_to_bfl_format(sd)
+        flux_params = infer_flux_params_from_state_dict(sd)
+        num_control_modes = infer_instantx_num_control_modes_from_state_dict(sd)
+
+        with accelerate.init_empty_weights():
+            model = InstantXControlNetFlux(flux_params, num_control_modes)
+
+        model.load_state_dict(sd, assign=True)
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.IPAdapter, format=ModelFormat.Checkpoint)
+class FluxIpAdapterModel(ModelLoader):
+    """Class to load FLUX IP-Adapter models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, IPAdapterCheckpointConfig):
+            raise ValueError(f"Unexpected model config type: {type(config)}.")
+
+        sd = load_file(Path(config.path))
+
+        params = infer_xlabs_ip_adapter_params_from_state_dict(sd)
+
+        with accelerate.init_empty_weights():
+            model = XlabsIpAdapterFlux(params=params)
+
+        model.load_xlabs_state_dict(sd, assign=True)
         return model

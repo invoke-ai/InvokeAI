@@ -1,3 +1,4 @@
+import { Mutex } from 'async-mutex';
 import { withResultAsync } from 'common/util/result';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
@@ -13,7 +14,7 @@ import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/sel
 import type { Coordinate, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
-import { debounce, get } from 'lodash-es';
+import { clamp, debounce, get } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
@@ -96,14 +97,21 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   config: CanvasEntityTransformerConfig = DEFAULT_CONFIG;
 
   /**
-   * The rect of the parent, _including_ transparent regions.
+   * The rect of the parent, _including_ transparent regions, **relative to the parent's position**. To get the rect
+   * relative to the _stage_, add the parent's position.
+   *
    * It is calculated via Konva's getClientRect method, which is fast but includes transparent regions.
+   *
+   * This rect is relative _to the parent's position_, not the stage.
    */
   $nodeRect = atom<Rect>(getEmptyRect());
 
   /**
-   * The rect of the parent, _excluding_ transparent regions.
+   * The rect of the parent, _excluding_ transparent regions, **relative to the parent's position**. To get the rect
+   * relative to the _stage_, add the parent's position.
+   *
    * If the parent's nodes have no possibility of transparent regions, this will be calculated the same way as nodeRect.
+   *
    * If the parent's nodes may have transparent regions, this will be calculated manually by rasterizing the parent and
    * checking the pixel data.
    */
@@ -147,6 +155,25 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   $isProcessing = atom(false);
 
+  /**
+   * Whether the transformer is currently in silent mode. In silent mode, the transform operation should not show any
+   * visual feedback.
+   *
+   * This is set every time a transform is started.
+   *
+   * This is used for transform operations like directly fitting the entity to the bbox, which should not show the
+   * transform controls, Transform react component or have any other visual feedback. The transform should just happen
+   * silently.
+   */
+  $silentTransform = atom(false);
+
+  /**
+   * A mutex to prevent concurrent operations.
+   *
+   * The mutex is locked during transformation and during rect calculations which are handled in a web worker.
+   */
+  transformMutex = new Mutex();
+
   konva: {
     transformer: Konva.Transformer;
     proxyRect: Konva.Rect;
@@ -170,7 +197,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
         name: `${this.type}:outline_rect`,
         stroke: this.config.OUTLINE_COLOR,
         perfectDrawEnabled: false,
-        strokeHitEnabled: false,
+        hitStrokeWidth: 0,
       }),
       transformer: new Konva.Transformer({
         name: `${this.type}:transformer`,
@@ -207,8 +234,25 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     this.konva.transformer.on('transform', this.syncObjectGroupWithProxyRect);
     this.konva.transformer.on('transformend', this.snapProxyRectToPixelGrid);
+    this.konva.transformer.on('pointerenter', () => {
+      this.manager.stage.setCursor('move');
+    });
+    this.konva.transformer.on('pointerleave', () => {
+      this.manager.stage.setCursor('default');
+    });
     this.konva.proxyRect.on('dragmove', this.onDragMove);
     this.konva.proxyRect.on('dragend', this.onDragEnd);
+    this.konva.proxyRect.on('pointerenter', () => {
+      this.manager.stage.setCursor('move');
+    });
+    this.konva.proxyRect.on('pointerleave', () => {
+      this.manager.stage.setCursor('default');
+    });
+
+    this.subscriptions.add(() => {
+      this.konva.transformer.off('transform transformend pointerenter pointerleave');
+      this.konva.proxyRect.off('dragmove dragend pointerenter pointerleave');
+    });
 
     // When the stage scale changes, we may need to re-scale some of the transformer's components. For example,
     // the bbox outline should always be 1 screen pixel wide, so we need to update its stroke width.
@@ -376,9 +420,15 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   };
 
   /**
-   * Fits the proxy rect to the bounding box of the parent entity, then syncs the object group with the proxy rect.
+   * Fits the entity to the bbox using the "fill" strategy.
    */
-  fitProxyRectToBbox = () => {
+  fitToBboxFill = () => {
+    if (!this.$isTransformEnabled.get()) {
+      this.log.warn(
+        'Cannot fit to bbox contain when transform is disabled. Did you forget to call `await adapter.transformer.startTransform()`?'
+      );
+      return;
+    }
     const { rect } = this.manager.stateApi.getBbox();
     const scaleX = rect.width / this.konva.proxyRect.width();
     const scaleY = rect.height / this.konva.proxyRect.height();
@@ -387,6 +437,74 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       y: rect.y,
       scaleX,
       scaleY,
+      rotation: 0,
+    });
+    this.syncObjectGroupWithProxyRect();
+  };
+
+  /**
+   * Fits the entity to the bbox using the "contain" strategy.
+   */
+  fitToBboxContain = () => {
+    if (!this.$isTransformEnabled.get()) {
+      this.log.warn(
+        'Cannot fit to bbox contain when transform is disabled. Did you forget to call `await adapter.transformer.startTransform()`?'
+      );
+      return;
+    }
+    const { rect } = this.manager.stateApi.getBbox();
+    const gridSize = this.manager.stateApi.getGridSize();
+    const width = this.konva.proxyRect.width();
+    const height = this.konva.proxyRect.height();
+    const scaleX = rect.width / width;
+    const scaleY = rect.height / height;
+
+    // "contain" means that the entity should be scaled to fit within the bbox, but it should not exceed the bbox.
+    const scale = Math.min(scaleX, scaleY);
+
+    // Center the shape within the bounding box
+    const offsetX = (rect.width - width * scale) / 2;
+    const offsetY = (rect.height - height * scale) / 2;
+
+    this.konva.proxyRect.setAttrs({
+      x: clamp(roundToMultiple(rect.x + offsetX, gridSize), rect.x, rect.x + rect.width),
+      y: clamp(roundToMultiple(rect.y + offsetY, gridSize), rect.y, rect.y + rect.height),
+      scaleX: scale,
+      scaleY: scale,
+      rotation: 0,
+    });
+    this.syncObjectGroupWithProxyRect();
+  };
+
+  /**
+   * Fits the entity to the bbox using the "cover" strategy.
+   */
+  fitToBboxCover = () => {
+    if (!this.$isTransformEnabled.get()) {
+      this.log.warn(
+        'Cannot fit to bbox contain when transform is disabled. Did you forget to call `await adapter.transformer.startTransform()`?'
+      );
+      return;
+    }
+    const { rect } = this.manager.stateApi.getBbox();
+    const gridSize = this.manager.stateApi.getGridSize();
+    const width = this.konva.proxyRect.width();
+    const height = this.konva.proxyRect.height();
+    const scaleX = rect.width / width;
+    const scaleY = rect.height / height;
+
+    // "cover" is the same as "contain", but we choose the larger scale to cover the shape
+    const scale = Math.max(scaleX, scaleY);
+
+    // Center the shape within the bounding box
+    const offsetX = (rect.width - width * scale) / 2;
+    const offsetY = (rect.height - height * scale) / 2;
+
+    this.konva.proxyRect.setAttrs({
+      x: roundToMultiple(rect.x + offsetX, gridSize),
+      y: roundToMultiple(rect.y + offsetY, gridSize),
+      scaleX: scale,
+      scaleY: scale,
       rotation: 0,
     });
     this.syncObjectGroupWithProxyRect();
@@ -473,9 +591,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
 
-    if (this.manager.$isBusy.get() && !this.$isTransforming.get()) {
-      // The canvas is busy, we can't interact with the transformer
-      this.parent.konva.layer.listening(false);
+    if (this.parent.segmentAnything?.$isSegmenting.get()) {
+      // When segmenting, the layer should listen but the transformer should not be interactable
+      this.parent.konva.layer.listening(true);
       this._setInteractionMode('off');
       return;
     }
@@ -508,6 +626,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const tool = this.manager.tool.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
 
+    if (!isSelected) {
+      // The layer is not selected
+      this.parent.konva.layer.listening(false);
+      this._setInteractionMode('off');
+      return;
+    }
+
     if (this.parent.$isEmpty.get()) {
       // The layer is totally empty, we can just disable the layer
       this.parent.konva.layer.listening(false);
@@ -515,14 +640,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
 
-    if (isSelected && !this.$isTransforming.get() && tool === 'move') {
+    if (!this.$isTransforming.get() && tool === 'move') {
       // We are moving this layer, it must be listening
       this.parent.konva.layer.listening(true);
       this._setInteractionMode('drag');
       return;
     }
 
-    if (isSelected && this.$isTransforming.get()) {
+    if (this.$isTransforming.get()) {
       // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer is
       // active, it will interrupt the stage drag events. So we should disable listening when the view tool is selected.
       if (tool === 'view') {
@@ -532,11 +657,12 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
         this.parent.konva.layer.listening(true);
         this._setInteractionMode('all');
       }
-    } else {
-      // The layer is not selected, or we are using a tool that doesn't need the layer to be listening - disable interaction stuff
-      this.parent.konva.layer.listening(false);
-      this._setInteractionMode('off');
+      return;
     }
+
+    // The layer is not selected
+    this.parent.konva.layer.listening(false);
+    this._setInteractionMode('off');
   };
 
   /**
@@ -558,13 +684,31 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   /**
    * Starts the transformation of the entity.
+   *
+   * This method will asynchronously acquire a mutex to prevent concurrent operations. If you need to perform an
+   * operation after the transformation is started, you should await this method.
+   *
+   * @param arg Options for starting the transformation
+   * @param arg.silent Whether the transformation should be silent. If silent, the transform controls will not be shown,
+   * so you _must_ call `applyTransform` or `stopTransform` to complete the transformation.
+   *
+   * @example
+   * ```ts
+   * await adapter.transformer.startTransform({ silent: true });
+   * adapter.transformer.fitToBboxContain();
+   * await adapter.transformer.applyTransform();
+   * ```
    */
-  startTransform = () => {
+  startTransform = async (arg?: { silent: boolean }) => {
     const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
     if (transformingAdapter) {
       assert(false, `Already transforming an entity: ${transformingAdapter.id}`);
     }
+    // This will be released when the transformation is stopped
+    await this.transformMutex.acquire();
     this.log.debug('Starting transform');
+    const { silent } = { silent: false, ...arg };
+    this.$silentTransform.set(silent);
     this.$isTransforming.set(true);
     this.manager.stateApi.$transformingAdapter.set(this.parent);
     this.syncInteractionState();
@@ -574,11 +718,23 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * Applies the transformation of the entity.
    */
   applyTransform = async () => {
+    if (!this.$isTransforming.get()) {
+      this.log.warn(
+        'Cannot apply transform when not transforming. Did you forget to call `await adapter.transformer.startTransform()`?'
+      );
+      return;
+    }
     this.log.debug('Applying transform');
     this.$isProcessing.set(true);
+    this._setInteractionMode('off');
     const rect = this.getRelativeRect();
     const rasterizeResult = await withResultAsync(() =>
-      this.parent.renderer.rasterize({ rect, replaceObjects: true, attrs: { opacity: 1, filters: [] } })
+      this.parent.renderer.rasterize({
+        rect,
+        replaceObjects: true,
+        ignoreCache: true,
+        attrs: { opacity: 1, filters: [] },
+      })
     );
     if (rasterizeResult.isErr()) {
       this.log.error({ error: serializeError(rasterizeResult.error) }, 'Failed to rasterize entity');
@@ -608,6 +764,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.syncInteractionState();
     this.manager.stateApi.$transformingAdapter.set(null);
     this.$isProcessing.set(false);
+    this.transformMutex.release();
   };
 
   /**
@@ -706,21 +863,21 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       this.parent.renderer.konva.objectGroup.setAttrs(groupAttrs);
       this.parent.bufferRenderer.konva.group.setAttrs(groupAttrs);
     }
-
-    this.parent.renderer.updatePreviewCanvas();
   };
 
   calculateRect = debounce(() => {
     this.log.debug('Calculating bbox');
 
-    this.$isPendingRectCalculation.set(true);
+    const canvas = this.parent.getCanvas();
 
     if (!this.parent.renderer.hasObjects()) {
       this.log.trace('No objects, resetting bbox');
       this.$nodeRect.set(getEmptyRect());
       this.$pixelRect.set(getEmptyRect());
+      this.parent.$canvasCache.set(canvas);
       this.$isPendingRectCalculation.set(false);
       this.updateBbox();
+      this.transformMutex.release();
       return;
     }
 
@@ -730,13 +887,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       this.$nodeRect.set({ ...rect });
       this.$pixelRect.set({ ...rect });
       this.log.trace({ nodeRect: this.$nodeRect.get(), pixelRect: this.$pixelRect.get() }, 'Got bbox from client rect');
+      this.parent.$canvasCache.set(canvas);
       this.$isPendingRectCalculation.set(false);
       this.updateBbox();
+      this.transformMutex.release();
       return;
     }
 
     // We have eraser strokes - we must calculate the bbox using pixel data
-    const canvas = this.parent.renderer.getCanvas({ attrs: { opacity: 1, filters: [] } });
     const imageData = canvasToImageData(canvas);
     this.manager.worker.requestBbox(
       { buffer: imageData.data.buffer, width: imageData.width, height: imageData.height },
@@ -758,13 +916,17 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
           { nodeRect: this.$nodeRect.get(), pixelRect: this.$pixelRect.get(), extents },
           `Got bbox from worker`
         );
+        this.parent.$canvasCache.set(canvas);
         this.$isPendingRectCalculation.set(false);
         this.updateBbox();
+        this.transformMutex.release();
       }
     );
   }, this.config.RECT_CALC_DEBOUNCE_MS);
 
-  requestRectCalculation = () => {
+  requestRectCalculation = async () => {
+    // This will be released when the rect calculation is complete
+    await this.transformMutex.acquire();
     this.$isPendingRectCalculation.set(true);
     this.syncInteractionState();
     this.calculateRect();

@@ -10,6 +10,7 @@ import { CanvasDropArea } from 'features/controlLayers/components/CanvasDropArea
 import { Filter } from 'features/controlLayers/components/Filters/Filter';
 import { CanvasHUD } from 'features/controlLayers/components/HUD/CanvasHUD';
 import { InvokeCanvasComponent } from 'features/controlLayers/components/InvokeCanvasComponent';
+import { SelectObject } from 'features/controlLayers/components/SelectObject/SelectObject';
 import { StagingAreaIsStagingGate } from 'features/controlLayers/components/StagingArea/StagingAreaIsStagingGate';
 import { StagingAreaToolbar } from 'features/controlLayers/components/StagingArea/StagingAreaToolbar';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
@@ -24,8 +25,8 @@ const MenuContent = () => {
   return (
     <CanvasManagerProviderGate>
       <MenuList>
-        <CanvasContextMenuGlobalMenuItems />
         <CanvasContextMenuSelectedEntityMenuItems />
+        <CanvasContextMenuGlobalMenuItems />
       </MenuList>
     </CanvasManagerProviderGate>
   );
@@ -70,12 +71,16 @@ export const CanvasMainPanelContent = memo(() => {
           >
             <InvokeCanvasComponent />
             <CanvasManagerProviderGate>
-              {showHUD && (
-                <Flex position="absolute" top={1} insetInlineStart={1} pointerEvents="none">
-                  <CanvasHUD />
-                </Flex>
-              )}
-              <Flex flexDir="column" position="absolute" top={1} insetInlineEnd={1} pointerEvents="none" gap={2}>
+              <Flex
+                position="absolute"
+                flexDir="column"
+                top={1}
+                insetInlineStart={1}
+                pointerEvents="none"
+                gap={2}
+                alignItems="flex-start"
+              >
+                {showHUD && <CanvasHUD />}
                 <CanvasAlertsSelectedEntityStatus />
                 <CanvasAlertsPreserveMask />
                 <CanvasAlertsSendingToGallery />
@@ -101,6 +106,7 @@ export const CanvasMainPanelContent = memo(() => {
         <CanvasManagerProviderGate>
           <Filter />
           <Transform />
+          <SelectObject />
         </CanvasManagerProviderGate>
       </Flex>
       <CanvasDropArea />

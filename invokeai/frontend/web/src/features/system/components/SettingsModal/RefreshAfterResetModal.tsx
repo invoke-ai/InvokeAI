@@ -8,6 +8,7 @@ import {
   ModalOverlay,
   Text,
 } from '@invoke-ai/ui-library';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 export const [useRefreshAfterResetModal] = buildUseBoolean(false);
 
 const RefreshAfterResetModal = () => {
+  useAssertSingleton('RefreshAfterResetModal');
   const { t } = useTranslation();
   const [countdown, setCountdown] = useState(3);
 

@@ -29,7 +29,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
     <Menu>
       <MenuButton
         as={IconButton}
-        size="sm"
+        minW={8}
         variant="link"
         alignSelf="stretch"
         tooltip={t('controlLayers.addLayer')}
@@ -40,7 +40,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
       />
       <MenuList>
         <MenuGroup title={t('controlLayers.global')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addGlobalReferenceImage} isDisabled={isFLUX}>
+          <MenuItem icon={<PiPlusBold />} onClick={addGlobalReferenceImage}>
             {t('controlLayers.globalReferenceImage')}
           </MenuItem>
         </MenuGroup>
@@ -56,7 +56,7 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
           </MenuItem>
         </MenuGroup>
         <MenuGroup title={t('controlLayers.layer_other')}>
-          <MenuItem icon={<PiPlusBold />} onClick={addControlLayer} isDisabled={isFLUX}>
+          <MenuItem icon={<PiPlusBold />} onClick={addControlLayer}>
             {t('controlLayers.controlLayer')}
           </MenuItem>
           <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>

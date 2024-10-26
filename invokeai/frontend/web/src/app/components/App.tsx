@@ -4,6 +4,7 @@ import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useStudioInitAction } from 'app/hooks/useStudioInitAction';
 import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
 import { useLogger } from 'app/logging/useLogger';
+import { useSyncLoggingConfig } from 'app/logging/useSyncLoggingConfig';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { PartialAppConfig } from 'app/types/invokeai';
@@ -20,14 +21,18 @@ import {
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
+import { ImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
+import { ShareWorkflowModal } from 'features/nodes/components/sidePanel/WorkflowListMenu/ShareWorkflowModal';
 import { ClearQueueConfirmationsAlertDialog } from 'features/queue/components/ClearQueueConfirmationAlertDialog';
+import { DeleteStylePresetDialog } from 'features/stylePresets/components/DeleteStylePresetDialog';
 import { StylePresetModal } from 'features/stylePresets/components/StylePresetForm/StylePresetModal';
 import RefreshAfterResetModal from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { AppContent } from 'features/ui/components/AppContent';
-import { AnimatePresence } from 'framer-motion';
+import { DeleteWorkflowDialog } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
+import { NewWorkflowConfirmationAlertDialog } from 'features/workflowLibrary/components/NewWorkflowConfirmationAlertDialog';
 import i18n from 'i18n';
 import { size } from 'lodash-es';
 import { memo, useCallback, useEffect } from 'react';
@@ -55,6 +60,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
   useGlobalModifiersInit();
   useGlobalHotkeys();
   useGetOpenAPISchemaQuery();
+  useSyncLoggingConfig();
 
   const { dropzone, isHandlingUpload, setIsHandlingUpload } = useFullscreenDropzone();
 
@@ -96,22 +102,25 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       >
         <input {...dropzone.getInputProps()} />
         <AppContent />
-        <AnimatePresence>
-          {dropzone.isDragActive && isHandlingUpload && (
-            <ImageUploadOverlay dropzone={dropzone} setIsHandlingUpload={setIsHandlingUpload} />
-          )}
-        </AnimatePresence>
+        {dropzone.isDragActive && isHandlingUpload && (
+          <ImageUploadOverlay dropzone={dropzone} setIsHandlingUpload={setIsHandlingUpload} />
+        )}
       </Box>
       <DeleteImageModal />
       <ChangeBoardModal />
       <DynamicPromptsModal />
       <StylePresetModal />
       <ClearQueueConfirmationsAlertDialog />
+      <NewWorkflowConfirmationAlertDialog />
+      <DeleteStylePresetDialog />
+      <DeleteWorkflowDialog />
+      <ShareWorkflowModal />
       <RefreshAfterResetModal />
       <DeleteBoardModal />
       <GlobalImageHotkeys />
       <NewGallerySessionDialog />
       <NewCanvasSessionDialog />
+      <ImageContextMenu />
     </ErrorBoundary>
   );
 };

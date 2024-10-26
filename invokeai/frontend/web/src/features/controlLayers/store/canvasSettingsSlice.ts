@@ -48,9 +48,9 @@ type CanvasSettingsState = {
    */
   outputOnlyMaskedRegions: boolean;
   /**
-   * Whether to automatically process the filter when the filter configuration changes.
+   * Whether to automatically process the operations like filtering and auto-masking.
    */
-  autoProcessFilter: boolean;
+  autoProcess: boolean;
   /**
    * The snap-to-grid setting for the canvas.
    */
@@ -72,13 +72,9 @@ type CanvasSettingsState = {
    */
   isolatedStagingPreview: boolean;
   /**
-   * Whether to show only the selected layer while filtering.
+   * Whether to show only the selected layer while filtering, transforming, or doing other operations.
    */
-  isolatedFilteringPreview: boolean;
-  /**
-   * Whether to show only the selected layer while transforming.
-   */
-  isolatedTransformingPreview: boolean;
+  isolatedLayerPreview: boolean;
   /**
    * Whether to use pressure sensitivity for the brush and eraser tool when a pen device is used.
    */
@@ -95,14 +91,13 @@ const initialState: CanvasSettingsState = {
   color: { r: 31, g: 160, b: 224, a: 1 }, // invokeBlue.500
   sendToCanvas: false,
   outputOnlyMaskedRegions: false,
-  autoProcessFilter: true,
+  autoProcess: true,
   snapToGrid: true,
   showProgressOnCanvas: true,
   bboxOverlay: false,
   preserveMask: false,
   isolatedStagingPreview: true,
-  isolatedFilteringPreview: true,
-  isolatedTransformingPreview: true,
+  isolatedLayerPreview: true,
   pressureSensitivity: true,
 };
 
@@ -137,8 +132,8 @@ export const canvasSettingsSlice = createSlice({
     settingsOutputOnlyMaskedRegionsToggled: (state) => {
       state.outputOnlyMaskedRegions = !state.outputOnlyMaskedRegions;
     },
-    settingsAutoProcessFilterToggled: (state) => {
-      state.autoProcessFilter = !state.autoProcessFilter;
+    settingsAutoProcessToggled: (state) => {
+      state.autoProcess = !state.autoProcess;
     },
     settingsSnapToGridToggled: (state) => {
       state.snapToGrid = !state.snapToGrid;
@@ -155,11 +150,8 @@ export const canvasSettingsSlice = createSlice({
     settingsIsolatedStagingPreviewToggled: (state) => {
       state.isolatedStagingPreview = !state.isolatedStagingPreview;
     },
-    settingsIsolatedFilteringPreviewToggled: (state) => {
-      state.isolatedFilteringPreview = !state.isolatedFilteringPreview;
-    },
-    settingsIsolatedTransformingPreviewToggled: (state) => {
-      state.isolatedTransformingPreview = !state.isolatedTransformingPreview;
+    settingsIsolatedLayerPreviewToggled: (state) => {
+      state.isolatedLayerPreview = !state.isolatedLayerPreview;
     },
     settingsPressureSensitivityToggled: (state) => {
       state.pressureSensitivity = !state.pressureSensitivity;
@@ -185,14 +177,13 @@ export const {
   settingsInvertScrollForToolWidthChanged,
   settingsSendToCanvasChanged,
   settingsOutputOnlyMaskedRegionsToggled,
-  settingsAutoProcessFilterToggled,
+  settingsAutoProcessToggled,
   settingsSnapToGridToggled,
   settingsShowProgressOnCanvasToggled,
   settingsBboxOverlayToggled,
   settingsPreserveMaskToggled,
   settingsIsolatedStagingPreviewToggled,
-  settingsIsolatedFilteringPreviewToggled,
-  settingsIsolatedTransformingPreviewToggled,
+  settingsIsolatedLayerPreviewToggled,
   settingsPressureSensitivityToggled,
 } = canvasSettingsSlice.actions;
 
@@ -219,17 +210,12 @@ export const selectOutputOnlyMaskedRegions = createCanvasSettingsSelector(
 export const selectDynamicGrid = createCanvasSettingsSelector((settings) => settings.dynamicGrid);
 export const selectBboxOverlay = createCanvasSettingsSelector((settings) => settings.bboxOverlay);
 export const selectShowHUD = createCanvasSettingsSelector((settings) => settings.showHUD);
-export const selectAutoProcessFilter = createCanvasSettingsSelector((settings) => settings.autoProcessFilter);
+export const selectAutoProcess = createCanvasSettingsSelector((settings) => settings.autoProcess);
 export const selectSnapToGrid = createCanvasSettingsSelector((settings) => settings.snapToGrid);
 export const selectSendToCanvas = createCanvasSettingsSelector((canvasSettings) => canvasSettings.sendToCanvas);
 export const selectShowProgressOnCanvas = createCanvasSettingsSelector(
   (canvasSettings) => canvasSettings.showProgressOnCanvas
 );
 export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settings) => settings.isolatedStagingPreview);
-export const selectIsolatedFilteringPreview = createCanvasSettingsSelector(
-  (settings) => settings.isolatedFilteringPreview
-);
-export const selectIsolatedTransformingPreview = createCanvasSettingsSelector(
-  (settings) => settings.isolatedTransformingPreview
-);
+export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
 export const selectPressureSensitivity = createCanvasSettingsSelector((settings) => settings.pressureSensitivity);

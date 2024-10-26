@@ -42,6 +42,14 @@ export type AddControlLayerFromImageDropData = BaseDropData & {
   actionType: 'ADD_CONTROL_LAYER_FROM_IMAGE';
 };
 
+type AddInpaintMaskFromImageDropData = BaseDropData & {
+  actionType: 'ADD_INPAINT_MASK_FROM_IMAGE';
+};
+
+type AddRegionalGuidanceFromImageDropData = BaseDropData & {
+  actionType: 'ADD_REGIONAL_GUIDANCE_FROM_IMAGE';
+};
+
 export type AddRegionalReferenceImageFromImageDropData = BaseDropData & {
   actionType: 'ADD_REGIONAL_REFERENCE_IMAGE_FROM_IMAGE';
 };
@@ -53,7 +61,7 @@ export type AddGlobalReferenceImageFromImageDropData = BaseDropData & {
 export type ReplaceLayerImageDropData = BaseDropData & {
   actionType: 'REPLACE_LAYER_WITH_IMAGE';
   context: {
-    entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer'>;
+    entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer' | 'inpaint_mask' | 'regional_guidance'>;
   };
 };
 
@@ -98,7 +106,9 @@ export type TypesafeDroppableData =
   | AddControlLayerFromImageDropData
   | ReplaceLayerImageDropData
   | AddRegionalReferenceImageFromImageDropData
-  | AddGlobalReferenceImageFromImageDropData;
+  | AddGlobalReferenceImageFromImageDropData
+  | AddInpaintMaskFromImageDropData
+  | AddRegionalGuidanceFromImageDropData;
 
 type BaseDragData = {
   id: string;

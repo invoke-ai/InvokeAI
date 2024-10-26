@@ -1,6 +1,12 @@
 import type { Selector, Store } from '@reduxjs/toolkit';
 import { $authToken } from 'app/store/nanostores/authToken';
-import type { CanvasEntityIdentifier, CanvasObjectState, Coordinate, Rect } from 'features/controlLayers/store/types';
+import type {
+  CanvasEntityIdentifier,
+  CanvasObjectState,
+  Coordinate,
+  CoordinateWithPressure,
+  Rect,
+} from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -75,6 +81,18 @@ export const offsetCoord = (coord: Coordinate, offset: Coordinate): Coordinate =
 };
 
 /**
+ * Adds two coordinates together.
+ * @param a The first coordinate
+ * @param b The second coordinate
+ */
+export const addCoords = (a: Coordinate, b: Coordinate): Coordinate => {
+  return {
+    x: a.x + b.x,
+    y: a.y + b.y,
+  };
+};
+
+/**
  * Snaps a position to the edge of the stage if within a threshold of the edge
  * @param pos The position to snap
  * @param stage The konva stage
@@ -108,6 +126,13 @@ export const floorCoord = (coord: Coordinate): Coordinate => {
   };
 };
 
+export const roundCoord = (coord: Coordinate): Coordinate => {
+  return {
+    x: Math.round(coord.x),
+    y: Math.round(coord.y),
+  };
+};
+
 /**
  * Snaps a position to the edge of the given rect if within a threshold of the edge
  * @param pos The position to snap
@@ -134,7 +159,7 @@ export const snapToRect = (pos: Vector2d, rect: Rect, threshold = 10): Vector2d 
  * Checks if the left mouse button is currently pressed
  * @param e The konva event
  */
-export const getIsMouseDown = (e: KonvaEventObject<MouseEvent>): boolean => e.evt.buttons === 1;
+export const getIsPrimaryPointerDown = (e: KonvaEventObject<PointerEvent>): boolean => e.evt.buttons === 1;
 
 /**
  * Checks if the stage is currently focused
@@ -333,7 +358,7 @@ export const dataURLToImageData = (dataURL: string, width: number, height: numbe
 
 export const konvaNodeToCanvas = (arg: { node: Konva.Node; rect?: Rect; bg?: string }): HTMLCanvasElement => {
   const { node, rect, bg } = arg;
-  const canvas = node.toCanvas({ ...(rect ?? {}), imageSmoothingEnabled: false });
+  const canvas = node.toCanvas({ ...(rect ?? {}), imageSmoothingEnabled: false, pixelRatio: 1 });
 
   if (!bg) {
     return canvas;
@@ -506,6 +531,36 @@ export const getRectUnion = (...rects: Rect[]): Rect => {
 };
 
 /**
+ * Gets the intersection of any number of rects.
+ * @params rects The rects to intersect
+ * @returns The intersection of the rects, or an empty rect if no intersection exists
+ */
+export const getRectIntersection = (...rects: Rect[]): Rect => {
+  const firstRect = rects.shift();
+
+  if (!firstRect) {
+    return getEmptyRect();
+  }
+
+  const rect = rects.reduce<Rect>((acc, r) => {
+    const x = Math.max(acc.x, r.x);
+    const y = Math.max(acc.y, r.y);
+    const width = Math.min(acc.x + acc.width, r.x + r.width) - x;
+    const height = Math.min(acc.y + acc.height, r.y + r.height) - y;
+
+    // We continue even if width or height is negative, and check at the end
+    return { x, y, width, height };
+  }, firstRect);
+
+  // Final check to ensure positive width and height, else return empty rect
+  if (rect.width < 0 || rect.height < 0) {
+    return getEmptyRect();
+  }
+
+  return rect || getEmptyRect();
+};
+
+/**
  * Asserts that the value is never reached. Used for exhaustive checks in switch statements or conditional logic to ensure
  * that all possible values are handled.
  * @param value The value that should never be reached
@@ -515,11 +570,6 @@ export const exhaustiveCheck = (value: never): never => {
   assert(false, `Unhandled value: ${value}`);
 };
 
-type CoordinateWithPressure = {
-  x: number;
-  y: number;
-  pressure: number;
-};
 export const getLastPointOfLastLineWithPressure = (
   objects: CanvasObjectState[],
   type: 'brush_line_with_pressure' | 'eraser_line_with_pressure'
@@ -582,6 +632,10 @@ export const getKonvaNodeDebugAttrs = (node: Konva.Node) => {
     offsetX: node.offsetX(),
     offsetY: node.offsetY(),
     rotation: node.rotation(),
+    isCached: node.isCached(),
+    visible: node.visible(),
+    listening: node.listening(),
+    zIndex: node.zIndex(),
   };
 };
 

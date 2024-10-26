@@ -15,8 +15,8 @@ import { Panel, PanelGroup } from 'react-resizable-panels';
 
 import BoardsListWrapper from './Boards/BoardsList/BoardsListWrapper';
 import BoardsSearch from './Boards/BoardsList/BoardsSearch';
+import BoardsSettingsPopover from './Boards/BoardsSettingsPopover';
 import { Gallery } from './Gallery';
-import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
 
 const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0 };
 
@@ -51,8 +51,8 @@ const GalleryPanelContent = () => {
 
   return (
     <Flex ref={galleryPanelFocusRef} position="relative" flexDirection="column" h="full" w="full" tabIndex={-1}>
-      <Flex alignItems="center" w="full">
-        <Flex w="25%">
+      <Flex alignItems="center" justifyContent="space-between" w="full">
+        <Flex flexGrow={1} flexBasis={0}>
           <Button
             size="sm"
             variant="ghost"
@@ -62,9 +62,11 @@ const GalleryPanelContent = () => {
             {boardsListPanel.isCollapsed ? t('boards.viewBoards') : t('boards.hideBoards')}
           </Button>
         </Flex>
-        <GalleryHeader />
-        <Flex h="full" w="25%" justifyContent="flex-end">
-          <GallerySettingsPopover />
+        <Flex>
+          <GalleryHeader />
+        </Flex>
+        <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
+          <BoardsSettingsPopover />
           <IconButton
             size="sm"
             variant="link"

@@ -1,7 +1,7 @@
 import type { FilterType } from 'features/controlLayers/store/filters';
 import type { ParameterPrecision, ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import type { TabName } from 'features/ui/store/uiTypes';
-import type { O } from 'ts-toolbelt';
+import type { PartialDeep } from 'type-fest';
 
 /**
  * A disable-able application feature
@@ -79,6 +79,7 @@ export type AppConfig = {
   metadataFetchDebounce?: number;
   workflowFetchDebounce?: number;
   isLocal?: boolean;
+  maxImageUploadCount?: number;
   sd: {
     defaultModel?: string;
     disabledControlNetModels: string[];
@@ -118,4 +119,4 @@ export type AppConfig = {
   };
 };
 
-export type PartialAppConfig = O.Partial<AppConfig, 'deep'>;
+export type PartialAppConfig = PartialDeep<AppConfig>;

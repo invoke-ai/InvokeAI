@@ -16,11 +16,12 @@ import {
   controlLayerModelChanged,
   controlLayerWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
+import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, ControlModeV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiBoundingBoxBold, PiShootingStarBold, PiUploadBold } from 'react-icons/pi';
+import { PiBoundingBoxBold, PiShootingStarFill, PiUploadBold } from 'react-icons/pi';
 import type { ControlNetModelConfig, PostUploadAction, T2IAdapterModelConfig } from 'services/api/types';
 
 const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) => {
@@ -42,6 +43,7 @@ export const ControlLayerControlAdapter = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('control_layer');
   const controlAdapter = useControlLayerControlAdapter(entityIdentifier);
   const filter = useEntityFilter(entityIdentifier);
+  const isFLUX = useAppSelector(selectIsFLUX);
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
@@ -91,7 +93,7 @@ export const ControlLayerControlAdapter = memo(() => {
           variant="link"
           aria-label={t('controlLayers.filter.filter')}
           tooltip={t('controlLayers.filter.filter')}
-          icon={<PiShootingStarBold />}
+          icon={<PiShootingStarFill />}
         />
         <IconButton
           onClick={pullBboxIntoLayer}
@@ -117,7 +119,7 @@ export const ControlLayerControlAdapter = memo(() => {
       </Flex>
       <Weight weight={controlAdapter.weight} onChange={onChangeWeight} />
       <BeginEndStepPct beginEndStepPct={controlAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
-      {controlAdapter.type === 'controlnet' && (
+      {controlAdapter.type === 'controlnet' && !isFLUX && (
         <ControlLayerControlAdapterControlMode
           controlMode={controlAdapter.controlMode}
           onChange={onChangeControlMode}

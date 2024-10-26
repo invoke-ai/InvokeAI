@@ -1,15 +1,14 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
 
 type Props = {
   isOver: boolean;
   label?: string;
+  withBackdrop?: boolean;
 };
 
 const IAIDropOverlay = (props: Props) => {
-  const { t } = useTranslation();
-  const { isOver, label = t('gallery.drop') } = props;
+  const { isOver, label, withBackdrop = true } = props;
   return (
     <Flex position="absolute" top={0} right={0} bottom={0} left={0}>
       <Flex
@@ -20,7 +19,7 @@ const IAIDropOverlay = (props: Props) => {
         left={0}
         w="full"
         h="full"
-        bg="base.900"
+        bg={withBackdrop ? 'base.900' : 'transparent'}
         opacity={0.7}
         borderRadius="base"
         alignItems="center"
@@ -45,16 +44,18 @@ const IAIDropOverlay = (props: Props) => {
         alignItems="center"
         justifyContent="center"
       >
-        <Text
-          fontSize="lg"
-          fontWeight="semibold"
-          color={isOver ? 'invokeYellow.300' : 'base.500'}
-          transitionProperty="common"
-          transitionDuration="0.1s"
-          textAlign="center"
-        >
-          {label}
-        </Text>
+        {label && (
+          <Text
+            fontSize="lg"
+            fontWeight="semibold"
+            color={isOver ? 'invokeYellow.300' : 'base.500'}
+            transitionProperty="common"
+            transitionDuration="0.1s"
+            textAlign="center"
+          >
+            {label}
+          </Text>
+        )}
       </Flex>
     </Flex>
   );

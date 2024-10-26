@@ -62,6 +62,7 @@ export const CanvasDropArea = memo(() => {
             data={addControlLayerFromImageDropData}
           />
         </GridItem>
+
         <GridItem position="relative">
           <IAIDroppable
             dropLabel={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}

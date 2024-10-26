@@ -8,9 +8,9 @@ import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { selectCanvasQueueCounts } from 'services/api/endpoints/queue';
 import type { S } from 'services/api/types';
-import type { O } from 'ts-toolbelt';
+import type { SetNonNullable } from 'type-fest';
 
-type ProgressEventWithImage = O.NonNullable<S['InvocationProgressEvent'], 'image'>;
+type ProgressEventWithImage = SetNonNullable<S['InvocationProgressEvent'], 'image'>;
 const isProgressEventWithImage = (val: S['InvocationProgressEvent']): val is ProgressEventWithImage =>
   Boolean(val.image);
 
@@ -140,6 +140,7 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
           y,
           width,
           height,
+          perfectDrawEnabled: false,
         });
         this.konva.group.add(this.konva.image);
       }

@@ -4,10 +4,10 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectAutoProcessFilter } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { getFilterForModel, IMAGE_FILTERS } from 'features/controlLayers/store/filters';
-import type { CanvasImageState } from 'features/controlLayers/store/types';
+import type { CanvasEntityType, CanvasImageState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { debounce } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -15,6 +15,7 @@ import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
 import { buildSelectModelConfig } from 'services/api/hooks/modelsByType';
 import { isControlNetOrT2IAdapterModelConfig } from 'services/api/types';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 type CanvasEntityFiltererConfig = {
@@ -56,30 +57,41 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating filter module');
+  }
 
+  subscribe = () => {
     this.subscriptions.add(
       this.$filterConfig.listen(() => {
-        if (this.manager.stateApi.getSettings().autoProcessFilter && this.$isFiltering.get()) {
+        if (this.manager.stateApi.getSettings().autoProcess && this.$isFiltering.get()) {
           this.process();
         }
       })
     );
     this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectAutoProcessFilter, (autoPreviewFilter) => {
-        if (autoPreviewFilter && this.$isFiltering.get()) {
+      this.manager.stateApi.createStoreSubscription(selectAutoProcess, (autoProcess) => {
+        if (autoProcess && this.$isFiltering.get()) {
           this.process();
         }
       })
     );
-  }
+  };
+
+  unsubscribe = () => {
+    this.subscriptions.forEach((unsubscribe) => unsubscribe());
+    this.subscriptions.clear();
+  };
 
   start = (config?: FilterConfig) => {
     const filteringAdapter = this.manager.stateApi.$filteringAdapter.get();
     if (filteringAdapter) {
-      assert(false, `Already filtering an entity: ${filteringAdapter.id}`);
+      this.log.error(`Already filtering an entity: ${filteringAdapter.id}`);
+      return;
     }
 
     this.log.trace('Initializing filter');
+
+    this.subscribe();
+
     if (config) {
       this.$filterConfig.set(config);
     } else if (this.parent.type === 'control_layer_adapter' && this.parent.state.controlAdapter.model) {
@@ -97,7 +109,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     }
     this.$isFiltering.set(true);
     this.manager.stateApi.$filteringAdapter.set(this.parent);
-    if (this.manager.stateApi.getSettings().autoProcessFilter) {
+    if (this.manager.stateApi.getSettings().autoProcess) {
       this.processImmediate();
     }
   };
@@ -204,6 +216,51 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       replaceObjects: true,
     });
     this.imageState = null;
+    this.unsubscribe();
+    this.$isFiltering.set(false);
+    this.$hasProcessed.set(false);
+    this.manager.stateApi.$filteringAdapter.set(null);
+  };
+
+  saveAs = (type: Exclude<CanvasEntityType, 'reference_image'>) => {
+    const imageState = this.imageState;
+    if (!imageState) {
+      this.log.warn('No image state to apply filter to');
+      return;
+    }
+    this.log.trace('Applying filter');
+    this.parent.bufferRenderer.commitBuffer();
+    const rect = this.parent.transformer.getRelativeRect();
+    const arg = {
+      overrides: {
+        objects: [imageState],
+        position: {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+        },
+      },
+      isSelected: true,
+    };
+
+    switch (type) {
+      case 'raster_layer':
+        this.manager.stateApi.addRasterLayer(arg);
+        break;
+      case 'control_layer':
+        this.manager.stateApi.addControlLayer(arg);
+        break;
+      case 'inpaint_mask':
+        this.manager.stateApi.addInpaintMask(arg);
+        break;
+      case 'regional_guidance':
+        this.manager.stateApi.addRegionalGuidance(arg);
+        break;
+      default:
+        assert<Equals<typeof type, never>>(false);
+    }
+
+    this.imageState = null;
+    this.unsubscribe();
     this.$isFiltering.set(false);
     this.$hasProcessed.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
@@ -216,7 +273,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.abortController = null;
     this.parent.bufferRenderer.clearBuffer();
     this.parent.transformer.updatePosition();
-    this.parent.renderer.syncCache(true);
+    this.parent.renderer.syncKonvaCache(true);
     this.imageState = null;
     this.$hasProcessed.set(false);
   };
@@ -225,6 +282,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.log.trace('Cancelling filter');
 
     this.reset();
+    this.unsubscribe();
     this.$isProcessing.set(false);
     this.$isFiltering.set(false);
     this.$hasProcessed.set(false);
@@ -242,5 +300,14 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       $isProcessing: this.$isProcessing.get(),
       $filterConfig: this.$filterConfig.get(),
     };
+  };
+
+  destroy = () => {
+    this.log.debug('Destroying module');
+    if (this.abortController && !this.abortController.signal.aborted) {
+      this.abortController.abort();
+    }
+    this.abortController = null;
+    this.unsubscribe();
   };
 }

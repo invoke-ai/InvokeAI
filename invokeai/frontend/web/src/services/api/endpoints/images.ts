@@ -272,6 +272,7 @@ export const imagesApi = api.injectEndpoints({
         board_id?: string;
         crop_visible?: boolean;
         metadata?: SerializableObject;
+        isFirstUploadOfBatch?: boolean;
       }
     >({
       query: ({ file, image_category, is_intermediate, session_id, board_id, crop_visible, metadata }) => {

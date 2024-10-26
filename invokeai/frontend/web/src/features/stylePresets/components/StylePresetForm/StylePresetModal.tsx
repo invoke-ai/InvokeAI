@@ -9,6 +9,7 @@ import {
   Spinner,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
 import type { PrefilledFormData } from 'features/stylePresets/store/stylePresetModal';
 import { $stylePresetModalState } from 'features/stylePresets/store/stylePresetModal';
@@ -19,6 +20,7 @@ import type { StylePresetFormData } from './StylePresetForm';
 import { StylePresetForm } from './StylePresetForm';
 
 export const StylePresetModal = () => {
+  useAssertSingleton('StylePresetModal');
   const [formData, setFormData] = useState<StylePresetFormData | null>(null);
   const { t } = useTranslation();
   const stylePresetModalState = useStore($stylePresetModalState);

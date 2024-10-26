@@ -308,7 +308,7 @@ const getSelectIsTypeHidden = (type: CanvasEntityType) => {
 /**
  * Builds a selector taht selects if the entity is hidden.
  */
-export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdentifier) => {
+export const buildSelectIsHidden = (entityIdentifier: CanvasEntityIdentifier) => {
   const selectIsTypeHidden = getSelectIsTypeHidden(entityIdentifier.type);
   return createSelector(
     [selectCanvasSlice, selectIsTypeHidden, selectIsStaging, selectIsolatedStagingPreview],
@@ -337,6 +337,37 @@ export const buildEntityIsHiddenSelector = (entityIdentifier: CanvasEntityIdenti
       return false;
     }
   );
+};
+
+/**
+ * Builds a selector taht selects if the entity is selected.
+ */
+export const buildSelectIsSelected = (entityIdentifier: CanvasEntityIdentifier) => {
+  return createSelector(
+    selectSelectedEntityIdentifier,
+    (selectedEntityIdentifier) => selectedEntityIdentifier?.id === entityIdentifier.id
+  );
+};
+
+/**
+ * Builds a selector that selects if the entity is empty.
+ *
+ * Reference images are considered empty if the IP adapter is empty.
+ *
+ * Other entities are considered empty if they have no objects.
+ */
+export const buildSelectHasObjects = (entityIdentifier: CanvasEntityIdentifier) => {
+  return createSelector(selectCanvasSlice, (canvas) => {
+    const entity = selectEntity(canvas, entityIdentifier);
+
+    if (!entity) {
+      return false;
+    }
+    if (entity.type === 'reference_image') {
+      return entity.ipAdapter.image !== null;
+    }
+    return entity.objects.length > 0;
+  });
 };
 
 export const selectWidth = createSelector(selectCanvasSlice, (canvas) => canvas.bbox.rect.width);

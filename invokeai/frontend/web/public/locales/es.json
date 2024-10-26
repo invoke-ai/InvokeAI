@@ -224,7 +224,9 @@
         "createIssue": "Crear un problema",
         "resetUI": "Interfaz de usuario $t(accessibility.reset)",
         "mode": "Modo",
-        "submitSupportTicket": "Enviar Ticket de Soporte"
+        "submitSupportTicket": "Enviar Ticket de Soporte",
+        "toggleRightPanel": "Activar o desactivar el panel derecho (G)",
+        "toggleLeftPanel": "Activar o desactivar el panel izquierdo (T)"
     },
     "nodes": {
         "zoomInNodes": "Acercar",
@@ -273,7 +275,12 @@
         "addSharedBoard": "Agregar Panel Compartido",
         "boards": "Paneles",
         "archiveBoard": "Archivar Panel",
-        "archived": "Archivado"
+        "archived": "Archivado",
+        "selectedForAutoAdd": "Seleccionado para agregar automáticamente",
+        "unarchiveBoard": "Desarchivar el tablero",
+        "noBoards": "No hay tableros {{boardType}}",
+        "shared": "Carpetas compartidas",
+        "deletedPrivateBoardsCannotbeRestored": "Los tableros eliminados no se pueden restaurar. Al elegir \"Eliminar solo tablero\", las imágenes se colocan en un estado privado y sin categoría para el creador de la imagen."
     },
     "accordions": {
         "compositing": {
@@ -316,5 +323,13 @@
         "inviteTeammates": "Invitar compañeros de equipo",
         "shareAccess": "Compartir acceso",
         "professionalUpsell": "Disponible en la edición profesional de Invoke. Haz clic aquí o visita invoke.com/pricing para obtener más detalles."
+    },
+    "controlLayers": {
+        "layer_one": "Capa",
+        "layer_many": "Capas",
+        "layer_other": "Capas",
+        "layer_withCount_one": "({{count}}) capa",
+        "layer_withCount_many": "({{count}}) capas",
+        "layer_withCount_other": "({{count}}) capas"
     }
 }

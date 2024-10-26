@@ -4,6 +4,7 @@ import { EntityListSelectedEntityActionBarDuplicateButton } from 'features/contr
 import { EntityListSelectedEntityActionBarFill } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFill';
 import { EntityListSelectedEntityActionBarFilterButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarFilterButton';
 import { EntityListSelectedEntityActionBarOpacity } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarOpacity';
+import { EntityListSelectedEntityActionBarSelectObjectButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarSelectObjectButton';
 import { EntityListSelectedEntityActionBarTransformButton } from 'features/controlLayers/components/CanvasEntityList/EntityListSelectedEntityActionBarTransformButton';
 import { memo } from 'react';
 
@@ -16,6 +17,7 @@ export const EntityListSelectedEntityActionBar = memo(() => {
       <Spacer />
       <EntityListSelectedEntityActionBarFill />
       <Flex h="full">
+        <EntityListSelectedEntityActionBarSelectObjectButton />
         <EntityListSelectedEntityActionBarFilterButton />
         <EntityListSelectedEntityActionBarTransformButton />
         <EntityListSelectedEntityActionBarSaveToAssetsButton />

@@ -51,10 +51,16 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
     /**
      * Sync the $isStaging flag with the redux state. $isStaging is used by the manager to determine the global busy
      * state of the canvas.
+     *
+     * We also set the $shouldShowStagedImage flag when we enter staging mode, so that the staged images are shown,
+     * even if the user disabled this in the last staging session.
      */
     this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectIsStaging, (isStaging) => {
+      this.manager.stateApi.createStoreSubscription(selectIsStaging, (isStaging, oldIsStaging) => {
         this.$isStaging.set(isStaging);
+        if (isStaging && !oldIsStaging) {
+          this.$shouldShowStagedImage.set(true);
+        }
       })
     );
   }

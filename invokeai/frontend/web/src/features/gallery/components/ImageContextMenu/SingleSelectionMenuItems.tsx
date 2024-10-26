@@ -1,12 +1,13 @@
-import { Flex, MenuDivider } from '@invoke-ai/ui-library';
+import { MenuDivider } from '@invoke-ai/ui-library';
+import { IconMenuItemGroup } from 'common/components/IconMenuItem';
+import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { ImageMenuItemChangeBoard } from 'features/gallery/components/ImageContextMenu/ImageMenuItemChangeBoard';
 import { ImageMenuItemCopy } from 'features/gallery/components/ImageContextMenu/ImageMenuItemCopy';
 import { ImageMenuItemDelete } from 'features/gallery/components/ImageContextMenu/ImageMenuItemDelete';
 import { ImageMenuItemDownload } from 'features/gallery/components/ImageContextMenu/ImageMenuItemDownload';
 import { ImageMenuItemLoadWorkflow } from 'features/gallery/components/ImageContextMenu/ImageMenuItemLoadWorkflow';
 import { ImageMenuItemMetadataRecallActions } from 'features/gallery/components/ImageContextMenu/ImageMenuItemMetadataRecallActions';
-import { ImageMenuItemNewCanvasFromImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewCanvasFromImage';
-import { ImageMenuItemNewLayerFromImage } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewLayerFromImage';
+import { ImageMenuItemNewFromImageSubMenu } from 'features/gallery/components/ImageContextMenu/ImageMenuItemNewFromImageSubMenu';
 import { ImageMenuItemOpenInNewTab } from 'features/gallery/components/ImageContextMenu/ImageMenuItemOpenInNewTab';
 import { ImageMenuItemOpenInViewer } from 'features/gallery/components/ImageContextMenu/ImageMenuItemOpenInViewer';
 import { ImageMenuItemSelectForCompare } from 'features/gallery/components/ImageContextMenu/ImageMenuItemSelectForCompare';
@@ -23,21 +24,22 @@ type SingleSelectionMenuItemsProps = {
 const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) => {
   return (
     <ImageDTOContextProvider value={imageDTO}>
-      <Flex gap={2}>
+      <IconMenuItemGroup>
         <ImageMenuItemOpenInNewTab />
         <ImageMenuItemCopy />
         <ImageMenuItemDownload />
         <ImageMenuItemOpenInViewer />
         <ImageMenuItemSelectForCompare />
         <ImageMenuItemDelete />
-      </Flex>
+      </IconMenuItemGroup>
       <MenuDivider />
       <ImageMenuItemLoadWorkflow />
       <ImageMenuItemMetadataRecallActions />
       <MenuDivider />
       <ImageMenuItemSendToUpscale />
-      <ImageMenuItemNewLayerFromImage />
-      <ImageMenuItemNewCanvasFromImage />
+      <CanvasManagerProviderGate>
+        <ImageMenuItemNewFromImageSubMenu />
+      </CanvasManagerProviderGate>
       <MenuDivider />
       <ImageMenuItemChangeBoard />
       <ImageMenuItemStarUnstar />

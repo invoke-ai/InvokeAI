@@ -8,7 +8,7 @@ import { workflowUpdated } from 'features/workflowLibrary/store/actions';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateWorkflowMutation, useUpdateWorkflowMutation, workflowsApi } from 'services/api/endpoints/workflows';
-import type { O } from 'ts-toolbelt';
+import type { SetRequired } from 'type-fest';
 
 type UseSaveLibraryWorkflowReturn = {
   saveWorkflow: () => Promise<void>;
@@ -18,7 +18,7 @@ type UseSaveLibraryWorkflowReturn = {
 
 type UseSaveLibraryWorkflow = () => UseSaveLibraryWorkflowReturn;
 
-export const isWorkflowWithID = (workflow: WorkflowV3): workflow is O.Required<WorkflowV3, 'id'> =>
+export const isWorkflowWithID = (workflow: WorkflowV3): workflow is SetRequired<WorkflowV3, 'id'> =>
   Boolean(workflow.id);
 
 export const useSaveLibraryWorkflow: UseSaveLibraryWorkflow = () => {

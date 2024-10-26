@@ -47,6 +47,7 @@ export class CanvasObjectBrushLine extends CanvasModuleBase {
         lineCap: 'round',
         lineJoin: 'round',
         globalCompositeOperation: 'source-over',
+        perfectDrawEnabled: false,
       }),
     };
     this.konva.group.add(this.konva.line);

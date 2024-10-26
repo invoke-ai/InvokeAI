@@ -27,15 +27,16 @@ import { SettingsDeveloperLogNamespaces } from 'features/system/components/Setti
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
-  logIsEnabledChanged,
   selectSystemShouldAntialiasProgressImage,
   selectSystemShouldConfirmOnDelete,
   selectSystemShouldConfirmOnNewSession,
   selectSystemShouldEnableInformationalPopovers,
+  selectSystemShouldEnableModelDescriptions,
   selectSystemShouldUseNSFWChecker,
   selectSystemShouldUseWatermarker,
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
+  setShouldEnableModelDescriptions,
   shouldAntialiasProgressImageChanged,
   shouldConfirmOnNewSessionToggled,
   shouldUseNSFWCheckerChanged,
@@ -76,12 +77,6 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  useEffect(() => {
-    if (!config?.shouldShowDeveloperSettings) {
-      dispatch(logIsEnabledChanged(false));
-    }
-  }, [dispatch, config?.shouldShowDeveloperSettings]);
-
   const { isNSFWCheckerAvailable, isWatermarkerAvailable } = useGetAppConfigQuery(undefined, {
     selectFromResult: ({ data }) => ({
       isNSFWCheckerAvailable: data?.nsfw_methods.includes('nsfw_checker') ?? false,
@@ -106,6 +101,7 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   const shouldUseNSFWChecker = useAppSelector(selectSystemShouldUseNSFWChecker);
   const shouldUseWatermarker = useAppSelector(selectSystemShouldUseWatermarker);
   const shouldEnableInformationalPopovers = useAppSelector(selectSystemShouldEnableInformationalPopovers);
+  const shouldEnableModelDescriptions = useAppSelector(selectSystemShouldEnableModelDescriptions);
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
   const onToggleConfirmOnNewSession = useCallback(() => {
     dispatch(shouldConfirmOnNewSessionToggled());
@@ -158,6 +154,12 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   const handleChangeShouldEnableInformationalPopovers = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(setShouldEnableInformationalPopovers(e.target.checked));
+    },
+    [dispatch]
+  );
+  const handleChangeShouldEnableModelDescriptions = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldEnableModelDescriptions(e.target.checked));
     },
     [dispatch]
   );
@@ -231,6 +233,13 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                       <Switch
                         isChecked={shouldEnableInformationalPopovers}
                         onChange={handleChangeShouldEnableInformationalPopovers}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.enableModelDescriptions')}</FormLabel>
+                      <Switch
+                        isChecked={shouldEnableModelDescriptions}
+                        onChange={handleChangeShouldEnableModelDescriptions}
                       />
                     </FormControl>
                   </StickyScrollable>

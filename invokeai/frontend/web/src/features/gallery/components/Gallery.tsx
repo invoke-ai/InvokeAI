@@ -23,6 +23,8 @@ import { useTranslation } from 'react-i18next';
 import { PiMagnifyingGlassBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
+import GallerySettingsPopover from './GallerySettingsPopover/GallerySettingsPopover';
+import { GalleryUploadButton } from './GalleryUploadButton';
 import GalleryImageGrid from './ImageGrid/GalleryImageGrid';
 import { GalleryPagination } from './ImageGrid/GalleryPagination';
 import { GallerySearch } from './ImageGrid/GallerySearch';
@@ -85,15 +87,19 @@ export const Gallery = () => {
               {t('gallery.assets')}
             </Tab>
           </Tooltip>
-          <IconButton
-            size="sm"
-            variant="link"
-            alignSelf="stretch"
-            onClick={handleClickSearch}
-            tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
-            aria-label={t('gallery.displaySearch')}
-            icon={<PiMagnifyingGlassBold />}
-          />
+          <Flex h="full" justifyContent="flex-end">
+            <GalleryUploadButton />
+            <GallerySettingsPopover />
+            <IconButton
+              size="sm"
+              variant="link"
+              alignSelf="stretch"
+              onClick={handleClickSearch}
+              tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
+              aria-label={t('gallery.displaySearch')}
+              icon={<PiMagnifyingGlassBold />}
+            />
+          </Flex>
         </TabList>
       </Tabs>
 

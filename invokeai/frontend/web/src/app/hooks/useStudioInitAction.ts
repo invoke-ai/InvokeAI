@@ -12,7 +12,7 @@ import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { toast } from 'features/toast/toast';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -140,6 +140,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
         case 'generation':
           // Go to the canvas tab, open the image viewer, and enable send-to-gallery mode
           store.dispatch(setActiveTab('canvas'));
+          store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
           store.dispatch(settingsSendToCanvasChanged(false));
           $imageViewer.set(true);
           break;

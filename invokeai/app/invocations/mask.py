@@ -5,6 +5,7 @@ from PIL import Image
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, InvocationContext, invocation
 from invokeai.app.invocations.fields import ImageField, InputField, TensorField, WithBoard, WithMetadata
 from invokeai.app.invocations.primitives import ImageOutput, MaskOutput
+from invokeai.backend.image_util.util import pil_to_np
 
 
 @invocation(
@@ -147,4 +148,56 @@ class MaskTensorToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         mask_pil = Image.fromarray(mask_np, mode="L")
         image_dto = context.images.save(image=mask_pil)
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "apply_tensor_mask_to_image",
+    title="Apply Tensor Mask to Image",
+    tags=["mask"],
+    category="mask",
+    version="1.0.0",
+)
+class ApplyMaskTensorToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Applies a tensor mask to an image.
+
+    The image is converted to RGBA and the mask is applied to the alpha channel."""
+
+    mask: TensorField = InputField(description="The mask tensor to apply.")
+    image: ImageField = InputField(description="The image to apply the mask to.")
+    invert: bool = InputField(default=False, description="Whether to invert the mask.")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name, mode="RGBA")
+        mask = context.tensors.load(self.mask.tensor_name)
+
+        # Squeeze the channel dimension if it exists.
+        if mask.dim() == 3:
+            mask = mask.squeeze(0)
+
+        # Ensure that the mask is binary.
+        if mask.dtype != torch.bool:
+            mask = mask > 0.5
+        mask_np = (mask.float() * 255).byte().cpu().numpy().astype(np.uint8)
+
+        if self.invert:
+            mask_np = 255 - mask_np
+
+        # Apply the mask only to the alpha channel where the original alpha is non-zero. This preserves the original
+        # image's transparency - else the transparent regions would end up as opaque black.
+
+        # Separate the image into R, G, B, and A channels
+        image_np = pil_to_np(image)
+        r, g, b, a = np.split(image_np, 4, axis=-1)
+
+        # Apply the mask to the alpha channel
+        new_alpha = np.where(a.squeeze() > 0, mask_np, a.squeeze())
+
+        # Stack the RGB channels with the modified alpha
+        masked_image_np = np.dstack([r.squeeze(), g.squeeze(), b.squeeze(), new_alpha])
+
+        # Convert back to an image (RGBA)
+        masked_image = Image.fromarray(masked_image_np.astype(np.uint8), "RGBA")
+        image_dto = context.images.save(image=masked_image)
+
         return ImageOutput.build(image_dto)

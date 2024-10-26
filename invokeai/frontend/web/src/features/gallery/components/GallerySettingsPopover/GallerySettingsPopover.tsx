@@ -1,10 +1,7 @@
 import { Divider, Flex, IconButton, Popover, PopoverBody, PopoverContent, PopoverTrigger } from '@invoke-ai/ui-library';
-import BoardAutoAddSelect from 'features/gallery/components/Boards/BoardAutoAddSelect';
 import AlwaysShowImageSizeCheckbox from 'features/gallery/components/GallerySettingsPopover/AlwaysShowImageSizeCheckbox';
-import AutoAssignBoardCheckbox from 'features/gallery/components/GallerySettingsPopover/AutoAssignBoardCheckbox';
 import AutoSwitchCheckbox from 'features/gallery/components/GallerySettingsPopover/AutoSwitchCheckbox';
 import ImageMinimumWidthSlider from 'features/gallery/components/GallerySettingsPopover/ImageMinimumWidthSlider';
-import ShowArchivedBoardsCheckbox from 'features/gallery/components/GallerySettingsPopover/ShowArchivedBoardsCheckbox';
 import ShowStarredFirstCheckbox from 'features/gallery/components/GallerySettingsPopover/ShowStarredFirstCheckbox';
 import SortDirectionCombobox from 'features/gallery/components/GallerySettingsPopover/SortDirectionCombobox';
 import { memo } from 'react';
@@ -21,8 +18,9 @@ const GallerySettingsPopover = () => {
           size="sm"
           variant="link"
           alignSelf="stretch"
-          aria-label={t('gallery.gallerySettings')}
+          aria-label={t('gallery.imagesSettings')}
           icon={<PiGearSixFill />}
+          tooltip={t('gallery.imagesSettings')}
         />
       </PopoverTrigger>
       <PopoverContent>
@@ -30,10 +28,7 @@ const GallerySettingsPopover = () => {
           <Flex direction="column" gap={2}>
             <ImageMinimumWidthSlider />
             <AutoSwitchCheckbox />
-            <AutoAssignBoardCheckbox />
             <AlwaysShowImageSizeCheckbox />
-            <ShowArchivedBoardsCheckbox />
-            <BoardAutoAddSelect />
             <Divider pt={2} />
             <ShowStarredFirstCheckbox />
             <SortDirectionCombobox />

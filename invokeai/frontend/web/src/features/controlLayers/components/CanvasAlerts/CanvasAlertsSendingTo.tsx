@@ -2,14 +2,10 @@ import { Alert, AlertDescription, AlertIcon, AlertTitle, Button, Flex } from '@i
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import {
-  selectCanvasRightPanelGalleryTab,
-  selectCanvasRightPanelLayersTab,
-} from 'features/controlLayers/store/ephemeral';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useCurrentDestination } from 'features/queue/hooks/useCurrentDestination';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { setActiveTab } from 'features/ui/store/uiSlice';
+import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { useCallback, useMemo } from 'react';
@@ -17,10 +13,11 @@ import { Trans, useTranslation } from 'react-i18next';
 
 const ActivateImageViewerButton = (props: PropsWithChildren) => {
   const imageViewer = useImageViewer();
+  const dispatch = useAppDispatch();
   const onClick = useCallback(() => {
     imageViewer.open();
-    selectCanvasRightPanelGalleryTab();
-  }, [imageViewer]);
+    dispatch(activeTabCanvasRightPanelChanged('gallery'));
+  }, [imageViewer, dispatch]);
   return (
     <Button onClick={onClick} size="sm" variant="link" color="base.50">
       {props.children}
@@ -60,7 +57,7 @@ const ActivateCanvasButton = (props: PropsWithChildren) => {
   const imageViewer = useImageViewer();
   const onClick = useCallback(() => {
     dispatch(setActiveTab('canvas'));
-    selectCanvasRightPanelLayersTab();
+    dispatch(activeTabCanvasRightPanelChanged('layers'));
     imageViewer.close();
   }, [dispatch, imageViewer]);
   return (
@@ -135,7 +132,6 @@ const AlertWrapper = ({
             fontSize="sm"
             shadow="md"
             w="fit-content"
-            alignSelf="flex-end"
           >
             <Flex w="full" alignItems="center">
               <AlertIcon />

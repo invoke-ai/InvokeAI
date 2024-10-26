@@ -14,6 +14,7 @@ import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/selectors';
@@ -31,6 +32,7 @@ import type { BoardDTO } from 'services/api/types';
 export const $boardToDelete = atom<BoardDTO | null>(null);
 
 const DeleteBoardModal = () => {
+  useAssertSingleton('DeleteBoardModal');
   const boardToDelete = useStore($boardToDelete);
   const { t } = useTranslation();
   const { currentData: boardImageNames, isFetching: isFetchingBoardNames } = useListAllImageNamesForBoardQuery(

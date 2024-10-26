@@ -6,11 +6,13 @@ import {
 } from 'common/util/roundDownToMultiple';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { getKonvaNodeDebugAttrs, getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import { noop } from 'lodash-es';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { assert } from 'tsafe';
@@ -31,11 +33,11 @@ const NO_ANCHORS: string[] = [];
 /**
  * Renders the bounding box. The bounding box can be transformed by the user.
  */
-export class CanvasBboxModule extends CanvasModuleBase {
+export class CanvasBboxToolModule extends CanvasModuleBase {
   readonly type = 'bbox';
   readonly id: string;
   readonly path: string[];
-  readonly parent: CanvasManager;
+  readonly parent: CanvasToolModule;
   readonly manager: CanvasManager;
   readonly log: Logger;
 
@@ -61,18 +63,18 @@ export class CanvasBboxModule extends CanvasModuleBase {
    */
   $aspectRatioBuffer = atom(1);
 
-  constructor(manager: CanvasManager) {
+  constructor(parent: CanvasToolModule) {
     super();
     this.id = getPrefixedId(this.type);
-    this.parent = manager;
-    this.manager = manager;
+    this.parent = parent;
+    this.manager = parent.manager;
     this.path = this.manager.buildPath(this);
     this.log = this.manager.buildLogger(this);
 
     this.log.debug('Creating bbox module');
 
     this.konva = {
-      group: new Konva.Group({ name: `${this.type}:group`, listening: true }),
+      group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
       // We will use a Konva.Transformer for the generation bbox. Transformers need some shape to transform, so we will
       // create a transparent rect for this purpose.
       proxyRect: new Konva.Rect({
@@ -83,6 +85,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
         stroke: 'rgb(42,42,42)',
         strokeWidth: 1,
         strokeScaleEnabled: false,
+        perfectDrawEnabled: false,
       }),
       overlayGroup: new Konva.Group({
         name: `${this.type}:overlayGroup`,
@@ -123,8 +126,10 @@ export class CanvasBboxModule extends CanvasModuleBase {
         strokeEnabled: false,
         draggable: false,
         fill: 'hsl(220 12% 10% / 0.8)',
+        perfectDrawEnabled: false,
       }),
       transformer: new Konva.Transformer({
+        listening: false,
         name: `${this.type}:transformer`,
         borderDash: [5, 5],
         borderStroke: 'rgba(212,216,234,1)',
@@ -133,7 +138,6 @@ export class CanvasBboxModule extends CanvasModuleBase {
         rotateEnabled: false,
         keepRatio: false,
         ignoreStroke: true,
-        listening: false,
         flipEnabled: false,
         anchorFill: 'rgba(212,216,234,1)',
         anchorStroke: 'rgb(42,42,42)',
@@ -147,9 +151,18 @@ export class CanvasBboxModule extends CanvasModuleBase {
     };
 
     this.konva.proxyRect.on('dragmove', this.onDragMove);
+    this.konva.proxyRect.on('pointerenter', () => {
+      this.manager.stage.setCursor('move');
+    });
+    this.konva.proxyRect.on('pointerleave', () => {
+      this.manager.stage.setCursor('default');
+    });
     this.konva.transformer.on('transform', this.onTransform);
     this.konva.transformer.on('transformend', this.onTransformEnd);
-
+    this.subscriptions.add(() => {
+      this.konva.proxyRect.off('dragmove pointerenter pointerleave');
+      this.konva.transformer.off('transform transformend');
+    });
     // The transformer will always be transforming the proxy rect
     this.konva.transformer.nodes([this.konva.proxyRect]);
 
@@ -159,7 +172,7 @@ export class CanvasBboxModule extends CanvasModuleBase {
     this.konva.group.add(this.konva.transformer);
 
     // We will listen to the tool state to determine if the bbox should be visible or not.
-    this.subscriptions.add(this.manager.tool.$tool.listen(this.render));
+    this.subscriptions.add(this.parent.$tool.listen(this.render));
 
     // Also listen to redux state to update the bbox's position and dimensions.
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectBbox, this.render));
@@ -174,6 +187,9 @@ export class CanvasBboxModule extends CanvasModuleBase {
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
   }
 
+  // This is a noop. The cursor is changed when the cursor enters or leaves the bbox.
+  syncCursorStyle = noop;
+
   initialize = () => {
     this.log.debug('Initializing module');
     // We need to retain a copy of the bbox state because
@@ -187,16 +203,13 @@ export class CanvasBboxModule extends CanvasModuleBase {
    * Renders the bbox. The bbox is only visible when the tool is set to 'bbox'.
    */
   render = () => {
-    this.log.trace('Rendering');
-
-    const { x, y, width, height } = this.manager.stateApi.runSelector(selectBbox).rect;
     const tool = this.manager.tool.$tool.get();
 
-    this.konva.group.visible(true);
+    const { x, y, width, height } = this.manager.stateApi.runSelector(selectBbox).rect;
 
     // We need to reach up to the preview layer to enable/disable listening so that the bbox can be interacted with.
     // If the mangaer is busy, we disable listening so the bbox cannot be interacted with.
-    this.manager.konva.previewLayer.listening(tool === 'bbox' && !this.manager.$isBusy.get());
+    this.konva.group.listening(tool === 'bbox' && !this.manager.$isBusy.get());
 
     this.konva.proxyRect.setAttrs({
       x,

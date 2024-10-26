@@ -1,16 +1,14 @@
 import { Checkbox, ConfirmationAlertDialog, Flex, FormControl, FormLabel, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { newCanvasSessionRequested, newGallerySessionRequested } from 'features/controlLayers/store/actions';
-import {
-  selectCanvasRightPanelGalleryTab,
-  selectCanvasRightPanelLayersTab,
-} from 'features/controlLayers/store/ephemeral';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import {
   selectSystemShouldConfirmOnNewSession,
   shouldConfirmOnNewSessionToggled,
 } from 'features/system/store/systemSlice';
+import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -26,7 +24,7 @@ export const useNewGallerySession = () => {
   const newGallerySessionImmediate = useCallback(() => {
     dispatch(newGallerySessionRequested());
     imageViewer.open();
-    selectCanvasRightPanelGalleryTab();
+    dispatch(activeTabCanvasRightPanelChanged('gallery'));
   }, [dispatch, imageViewer]);
 
   const newGallerySessionWithDialog = useCallback(() => {
@@ -49,7 +47,7 @@ export const useNewCanvasSession = () => {
   const newCanvasSessionImmediate = useCallback(() => {
     dispatch(newCanvasSessionRequested());
     imageViewer.close();
-    selectCanvasRightPanelLayersTab();
+    dispatch(activeTabCanvasRightPanelChanged('layers'));
   }, [dispatch, imageViewer]);
 
   const newCanvasSessionWithDialog = useCallback(() => {
@@ -65,6 +63,7 @@ export const useNewCanvasSession = () => {
 };
 
 export const NewGallerySessionDialog = memo(() => {
+  useAssertSingleton('NewGallerySessionDialog');
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
 
@@ -100,6 +99,7 @@ export const NewGallerySessionDialog = memo(() => {
 NewGallerySessionDialog.displayName = 'NewGallerySessionDialog';
 
 export const NewCanvasSessionDialog = memo(() => {
+  useAssertSingleton('NewCanvasSessionDialog');
   const { t } = useTranslation();
 
   const dispatch = useAppDispatch();

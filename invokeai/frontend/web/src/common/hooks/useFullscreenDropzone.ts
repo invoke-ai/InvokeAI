@@ -1,6 +1,8 @@
-import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
+import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { selectMaxImageUploadCount } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { useCallback, useEffect, useState } from 'react';
@@ -10,80 +12,78 @@ import { useTranslation } from 'react-i18next';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
 import type { PostUploadAction } from 'services/api/types';
 
+const log = logger('gallery');
+
 const accept: Accept = {
   'image/png': ['.png'],
   'image/jpeg': ['.jpg', '.jpeg', '.png'],
 };
 
-const selectPostUploadAction = createMemoizedSelector(selectActiveTab, (activeTabName) => {
-  let postUploadAction: PostUploadAction = { type: 'TOAST' };
-
-  if (activeTabName === 'upscaling') {
-    postUploadAction = { type: 'SET_UPSCALE_INITIAL_IMAGE' };
-  }
-
-  return postUploadAction;
-});
-
 export const useFullscreenDropzone = () => {
+  useAssertSingleton('useFullscreenDropzone');
   const { t } = useTranslation();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [isHandlingUpload, setIsHandlingUpload] = useState<boolean>(false);
-  const postUploadAction = useAppSelector(selectPostUploadAction);
   const [uploadImage] = useUploadImageMutation();
+  const activeTabName = useAppSelector(selectActiveTab);
+  const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
 
-  const fileRejectionCallback = useCallback(
-    (rejection: FileRejection) => {
-      setIsHandlingUpload(true);
-
-      toast({
-        id: 'UPLOAD_FAILED',
-        title: t('toast.uploadFailed'),
-        description: rejection.errors.map((error) => error.message).join('\n'),
-        status: 'error',
-      });
-    },
-    [t]
-  );
-
-  const fileAcceptedCallback = useCallback(
-    (file: File) => {
-      uploadImage({
-        file,
-        image_category: 'user',
-        is_intermediate: false,
-        postUploadAction,
-        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-      });
-    },
-    [autoAddBoardId, postUploadAction, uploadImage]
-  );
+  const getPostUploadAction = useCallback((): PostUploadAction => {
+    if (activeTabName === 'upscaling') {
+      return { type: 'SET_UPSCALE_INITIAL_IMAGE' };
+    } else {
+      return { type: 'TOAST' };
+    }
+  }, [activeTabName]);
 
   const onDrop = useCallback(
     (acceptedFiles: Array<File>, fileRejections: Array<FileRejection>) => {
-      if (fileRejections.length > 1) {
+      if (fileRejections.length > 0) {
+        const errors = fileRejections.map((rejection) => ({
+          errors: rejection.errors.map(({ message }) => message),
+          file: rejection.file.path,
+        }));
+        log.error({ errors }, 'Invalid upload');
+        const description =
+          maxImageUploadCount === undefined
+            ? t('toast.uploadFailedInvalidUploadDesc')
+            : t('toast.uploadFailedInvalidUploadDesc_withCount', { count: maxImageUploadCount });
+
         toast({
           id: 'UPLOAD_FAILED',
           title: t('toast.uploadFailed'),
-          description: t('toast.uploadFailedInvalidUploadDesc'),
+          description,
           status: 'error',
         });
+
+        setIsHandlingUpload(false);
         return;
       }
 
-      fileRejections.forEach((rejection: FileRejection) => {
-        fileRejectionCallback(rejection);
-      });
+      for (const [i, file] of acceptedFiles.entries()) {
+        uploadImage({
+          file,
+          image_category: 'user',
+          is_intermediate: false,
+          postUploadAction: getPostUploadAction(),
+          board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+          // The `imageUploaded` listener does some extra logic, like switching to the asset view on upload on the
+          // first upload of a "batch".
+          isFirstUploadOfBatch: i === 0,
+        });
+      }
 
-      acceptedFiles.forEach((file: File) => {
-        fileAcceptedCallback(file);
-      });
+      setIsHandlingUpload(false);
     },
-    [t, fileAcceptedCallback, fileRejectionCallback]
+    [t, maxImageUploadCount, uploadImage, getPostUploadAction, autoAddBoardId]
   );
 
   const onDragOver = useCallback(() => {
     setIsHandlingUpload(true);
+  }, []);
+
+  const onDragLeave = useCallback(() => {
+    setIsHandlingUpload(false);
   }, []);
 
   const dropzone = useDropzone({
@@ -91,8 +91,10 @@ export const useFullscreenDropzone = () => {
     noClick: true,
     onDrop,
     onDragOver,
-    multiple: false,
+    onDragLeave,
     noKeyboard: true,
+    multiple: maxImageUploadCount === undefined || maxImageUploadCount > 1,
+    maxFiles: maxImageUploadCount,
   });
 
   useEffect(() => {

@@ -1,7 +1,7 @@
 {
   "_class_name": "ControlNetModel",
   "_diffusers_version": "0.16.0.dev0",
-  "_name_or_path": "/home/patrick/controlnet_v1_1/control_v11p_sd15_canny",
+  "_name_or_path": "controlnet_v1_1/control_v11p_sd15_canny",
   "act_fn": "silu",
   "attention_head_dim": 8,
   "block_out_channels": [

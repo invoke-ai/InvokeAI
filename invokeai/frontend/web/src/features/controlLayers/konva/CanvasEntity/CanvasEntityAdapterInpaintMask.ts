@@ -16,6 +16,7 @@ export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<
   bufferRenderer: CanvasEntityBufferObjectRenderer;
   transformer: CanvasEntityTransformer;
   filterer = undefined;
+  segmentAnything = undefined;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'inpaint_mask'>, manager: CanvasManager) {
     super(entityIdentifier, manager, 'inpaint_mask_adapter');
@@ -39,6 +40,9 @@ export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<
       return;
     }
 
+    // If prevState is undefined, this is the first render. Some logic is only needed on the first render, or required
+    // on first render.
+
     if (!prevState || this.state.isEnabled !== prevState.isEnabled) {
       this.syncIsEnabled();
     }
@@ -55,19 +59,14 @@ export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<
       this.syncOpacity();
     }
     if (!prevState || this.state.fill !== prevState.fill) {
-      this.syncCompositingRectFill();
+      // On first render, we must force the update
+      this.renderer.updateCompositingRectFill(!prevState);
     }
     if (!prevState) {
-      this.syncCompositingRectSize();
+      // On first render, we must force the updates
+      this.renderer.updateCompositingRectSize(true);
+      this.renderer.updateCompositingRectPosition(true);
     }
-  };
-
-  syncCompositingRectSize = () => {
-    this.renderer.updateCompositingRectSize();
-  };
-
-  syncCompositingRectFill = () => {
-    this.renderer.updateCompositingRectFill();
   };
 
   getHashableState = (): SerializableObject => {
@@ -78,7 +77,7 @@ export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<
   getCanvas = (rect?: Rect): HTMLCanvasElement => {
     // The opacity may have been changed in response to user selecting a different entity category, and the mask regions
     // should be fully opaque - set opacity to 1 before rendering the canvas
-    const attrs: GroupConfig = { opacity: 1 };
+    const attrs: GroupConfig = { opacity: 1, filters: [] };
     const canvas = this.renderer.getCanvas({ rect, attrs });
     return canvas;
   };

@@ -8,6 +8,7 @@ import {
   controlLayerAdded,
   entityRasterized,
   entitySelected,
+  inpaintMaskAdded,
   rasterLayerAdded,
   referenceImageAdded,
   referenceImageIPAdapterImageChanged,
@@ -17,6 +18,7 @@ import {
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type {
   CanvasControlLayerState,
+  CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
@@ -107,6 +109,46 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
           position: { x, y },
         };
         dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+        return;
+      }
+
+      /**
+
+      /**
+       * Image dropped on Inpaint Mask
+       */
+      if (
+        overData.actionType === 'ADD_INPAINT_MASK_FROM_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
+        const { x, y } = selectCanvasSlice(getState()).bbox.rect;
+        const overrides: Partial<CanvasInpaintMaskState> = {
+          objects: [imageObject],
+          position: { x, y },
+        };
+        dispatch(inpaintMaskAdded({ overrides, isSelected: true }));
+        return;
+      }
+
+      /**
+
+      /**
+       * Image dropped on Regional Guidance
+       */
+      if (
+        overData.actionType === 'ADD_REGIONAL_GUIDANCE_FROM_IMAGE' &&
+        activeData.payloadType === 'IMAGE_DTO' &&
+        activeData.payload.imageDTO
+      ) {
+        const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
+        const { x, y } = selectCanvasSlice(getState()).bbox.rect;
+        const overrides: Partial<CanvasRegionalGuidanceState> = {
+          objects: [imageObject],
+          position: { x, y },
+        };
+        dispatch(rgAdded({ overrides, isSelected: true }));
         return;
       }
 
