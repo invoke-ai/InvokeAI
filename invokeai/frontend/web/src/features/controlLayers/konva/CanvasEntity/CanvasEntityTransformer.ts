@@ -548,14 +548,18 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     }
 
     const pixelRect = this.$pixelRect.get();
+    this.nudgePosition(-pixelRect.x, -pixelRect.y);
+  };
 
+  nudgePosition = (x: number, y: number) => {
+    // Nudge the position by (x, y) pixels
     const position = {
-      x: this.konva.proxyRect.x() - pixelRect.x,
-      y: this.konva.proxyRect.y() - pixelRect.y,
+      x: this.konva.proxyRect.x() + x,
+      y: this.konva.proxyRect.y() + y,
     };
-
-    this.log.trace({ position }, 'Position changed');
+    // Push state to redux
     this.manager.stateApi.setEntityPosition({ entityIdentifier: this.parent.entityIdentifier, position });
+    this.log.trace({ position }, 'Position changed');
   };
 
   syncObjectGroupWithProxyRect = () => {
