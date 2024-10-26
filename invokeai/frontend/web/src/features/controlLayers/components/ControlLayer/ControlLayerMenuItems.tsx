@@ -27,11 +27,10 @@ export const ControlLayerMenuItems = memo(() => {
       <CanvasEntityMenuItemsSelectObject />
       <ControlLayerMenuItemsTransparencyEffect />
       <MenuDivider />
+      <ControlLayerMenuItemsCopyToSubMenu />
+      <ControlLayerMenuItemsConvertToSubMenu />
       <CanvasEntityMenuItemsCropToBbox />
       <CanvasEntityMenuItemsSave />
-      <MenuDivider />
-      <ControlLayerMenuItemsConvertToSubMenu />
-      <ControlLayerMenuItemsCopyToSubMenu />
     </>
   );
 });
