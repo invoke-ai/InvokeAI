@@ -32,8 +32,19 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
   const newRegionalGuidanceFromImage = useNewRegionalGuidanceFromImage();
   const newCanvasFromImage = useNewCanvasFromImage();
 
-  const onClickNewCanvasFromImage = useCallback(() => {
-    newCanvasFromImage(imageDTO);
+  const onClickNewCanvasWithRasterLayerFromImage = useCallback(() => {
+    newCanvasFromImage(imageDTO, 'raster_layer');
+    dispatch(setActiveTab('canvas'));
+    imageViewer.close();
+    toast({
+      id: 'SENT_TO_CANVAS',
+      title: t('toast.sentToCanvas'),
+      status: 'success',
+    });
+  }, [dispatch, imageDTO, imageViewer, newCanvasFromImage, t]);
+
+  const onClickNewCanvasWithControlLayerFromImage = useCallback(() => {
+    newCanvasFromImage(imageDTO, 'control_layer');
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -98,8 +109,15 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
           <SubMenuButtonContent label="New from Image" />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
-          <MenuItem icon={<PiFileBold />} onClickCapture={onClickNewCanvasFromImage} isDisabled={isBusy}>
-            {t('controlLayers.canvas')}
+          <MenuItem icon={<PiFileBold />} onClickCapture={onClickNewCanvasWithRasterLayerFromImage} isDisabled={isBusy}>
+            {t('controlLayers.canvasAsRasterLayer')}
+          </MenuItem>
+          <MenuItem
+            icon={<PiFileBold />}
+            onClickCapture={onClickNewCanvasWithControlLayerFromImage}
+            isDisabled={isBusy}
+          >
+            {t('controlLayers.canvasAsControlLayer')}
           </MenuItem>
           <MenuItem icon={<NewLayerIcon />} onClickCapture={onClickNewInpaintMaskFromImage} isDisabled={isBusy}>
             {t('controlLayers.inpaintMask')}

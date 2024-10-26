@@ -57,7 +57,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
         {hasImageToCompare && <ImageComparison containerDims={containerDims} />}
       </Box>
       <ImageComparisonDroppable />
-      <Box position="absolute" top={14} insetInlineEnd={2}>
+      <Box position="absolute" top={14} insetInlineStart={2}>
         <CanvasAlertsSendingToCanvas />
       </Box>
     </Flex>

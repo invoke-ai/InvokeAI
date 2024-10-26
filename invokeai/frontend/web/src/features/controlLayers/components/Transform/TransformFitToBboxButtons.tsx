@@ -4,7 +4,6 @@ import { useStore } from '@nanostores/react';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsOutBold } from 'react-icons/pi';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 import { z } from 'zod';
@@ -60,10 +59,9 @@ export const TransformFitToBboxButtons = memo(({ adapter }: { adapter: CanvasEnt
         <Combobox options={options} value={value} onChange={onChange} isSearchable={false} isClearable={false} />
       </FormControl>
       <Button
-        leftIcon={<PiArrowsOutBold />}
         size="sm"
         onClick={onClick}
-        isLoading={isProcessing}
+        isDisabled={isProcessing}
         loadingText={t('controlLayers.transform.fitToBbox')}
         variant="ghost"
       >

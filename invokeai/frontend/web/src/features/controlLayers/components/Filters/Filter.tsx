@@ -8,6 +8,7 @@ import {
   MenuItem,
   MenuList,
   Spacer,
+  Spinner,
 } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -25,7 +26,7 @@ import { IMAGE_FILTERS } from 'features/controlLayers/store/filters';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiFloppyDiskBold, PiPlayFill, PiXBold } from 'react-icons/pi';
+import { PiCaretDownBold } from 'react-icons/pi';
 
 const FilterContent = memo(
   ({ adapter }: { adapter: CanvasEntityAdapterRasterLayer | CanvasEntityAdapterControlLayer }) => {
@@ -115,39 +116,41 @@ const FilterContent = memo(
         <ButtonGroup isAttached={false} size="sm" w="full">
           <Button
             variant="ghost"
-            leftIcon={<PiPlayFill />}
             onClick={adapter.filterer.processImmediate}
-            isLoading={isProcessing}
             loadingText={t('controlLayers.filter.process')}
-            isDisabled={!isValid || autoProcess}
+            isDisabled={isProcessing || !isValid || autoProcess}
           >
             {t('controlLayers.filter.process')}
+            {isProcessing && <Spinner ms={3} boxSize={5} color="base.600" />}
           </Button>
           <Spacer />
           <Button
-            leftIcon={<PiArrowsCounterClockwiseBold />}
             onClick={adapter.filterer.reset}
-            isLoading={isProcessing}
+            isDisabled={isProcessing}
             loadingText={t('controlLayers.filter.reset')}
             variant="ghost"
           >
             {t('controlLayers.filter.reset')}
           </Button>
+          <Button
+            onClick={adapter.filterer.apply}
+            loadingText={t('controlLayers.filter.apply')}
+            variant="ghost"
+            isDisabled={isProcessing || !isValid || !hasProcessed}
+          >
+            {t('controlLayers.filter.apply')}
+          </Button>
           <Menu>
             <MenuButton
               as={Button}
-              leftIcon={<PiFloppyDiskBold />}
-              isLoading={isProcessing}
               loadingText={t('controlLayers.selectObject.saveAs')}
               variant="ghost"
-              isDisabled={!isValid || !hasProcessed}
+              isDisabled={isProcessing || !isValid || !hasProcessed}
+              rightIcon={<PiCaretDownBold />}
             >
               {t('controlLayers.selectObject.saveAs')}
             </MenuButton>
             <MenuList>
-              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={adapter.filterer.apply}>
-                {t('controlLayers.replaceCurrent')}
-              </MenuItem>
               <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsInpaintMask}>
                 {t('controlLayers.newInpaintMask')}
               </MenuItem>
@@ -162,12 +165,7 @@ const FilterContent = memo(
               </MenuItem>
             </MenuList>
           </Menu>
-          <Button
-            variant="ghost"
-            leftIcon={<PiXBold />}
-            onClick={adapter.filterer.cancel}
-            loadingText={t('controlLayers.filter.cancel')}
-          >
+          <Button variant="ghost" onClick={adapter.filterer.cancel} loadingText={t('controlLayers.filter.cancel')}>
             {t('controlLayers.filter.cancel')}
           </Button>
         </ButtonGroup>
