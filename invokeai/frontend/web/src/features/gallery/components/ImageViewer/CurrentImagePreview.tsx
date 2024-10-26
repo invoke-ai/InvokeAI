@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
 import IAIDndImage from 'common/components/IAIDndImage';
+import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import type { TypesafeDraggableData } from 'features/dnd/types';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
@@ -73,6 +74,9 @@ const CurrentImagePreview = () => {
           dataTestId="image-preview"
         />
       )}
+      <Box position="absolute" top={0} insetInlineStart={0}>
+        <CanvasAlertsSendingToCanvas />
+      </Box>
       {shouldShowImageDetails && imageDTO && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
           <ImageMetadataViewer image={imageDTO} />
