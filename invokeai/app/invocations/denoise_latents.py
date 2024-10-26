@@ -522,7 +522,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         for t2i_adapter_field in t2i_adapters:
             image = context.images.get_pil(t2i_adapter_field.image.image_name)
-            if bgr_mode:#SDXL t2i trained on cv2's BGR outputs, but PIL won't convert straight to BGR
+            if bgr_mode:  # SDXL t2i trained on cv2's BGR outputs, but PIL won't convert straight to BGR
                 r, g, b = image.split()
                 image = Image.merge("RGB", (b, g, r))
             ext_manager.add_extension(
@@ -623,7 +623,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             t2i_adapter_model_config = context.models.get_config(t2i_adapter_field.t2i_adapter_model.key)
             t2i_adapter_loaded_model = context.models.load(t2i_adapter_field.t2i_adapter_model)
             image = context.images.get_pil(t2i_adapter_field.image.image_name)
-                
+
             # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
             if t2i_adapter_model_config.base == BaseModelType.StableDiffusion1:
                 max_unet_downscale = 8
