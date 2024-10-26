@@ -1682,6 +1682,8 @@
         "controlLayer": "Control Layer",
         "inpaintMask": "Inpaint Mask",
         "regionalGuidance": "Regional Guidance",
+        "canvasAsRasterLayer": "$t(controlLayers.canvas) as $t(controlLayers.rasterLayer)",
+        "canvasAsControlLayer": "$t(controlLayers.canvas) as $t(controlLayers.controlLayer)",
         "referenceImage": "Reference Image",
         "regionalReferenceImage": "Regional Reference Image",
         "globalReferenceImage": "Global Reference Image",
