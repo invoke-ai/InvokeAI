@@ -52,8 +52,9 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
     if (!adapter) {
       return;
     }
+    imageViewer.close();
     await adapter.transformer.startTransform();
-  }, [isDisabled, entityIdentifier, canvasManager]);
+  }, [isDisabled, entityIdentifier, canvasManager, imageViewer]);
 
   const fitToBbox = useCallback(async () => {
     if (isDisabled) {
