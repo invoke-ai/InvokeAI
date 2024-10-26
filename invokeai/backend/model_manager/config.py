@@ -394,6 +394,8 @@ class IPAdapterBaseConfig(ModelConfigBase):
 class IPAdapterInvokeAIConfig(IPAdapterBaseConfig):
     """Model config for IP Adapter diffusers format models."""
 
+    # TODO(ryand): Should we deprecate this field? From what I can tell, it hasn't been probed correctly for a long
+    # time. Need to go through the history to make sure I'm understanding this fully.
     image_encoder_model_id: str
     format: Literal[ModelFormat.InvokeAI]
 

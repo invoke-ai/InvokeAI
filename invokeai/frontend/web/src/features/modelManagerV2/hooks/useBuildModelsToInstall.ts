@@ -21,9 +21,12 @@ export const useBuildModelInstallArg = () => {
   });
 
   const getIsInstalled = useCallback(
-    ({ source, name, base, type, is_installed }: StarterModel): boolean =>
+    ({ source, name, base, type, is_installed, previous_names }: StarterModel): boolean =>
       modelList.some(
-        (mc) => is_installed || source === mc.source || (base === mc.base && name === mc.name && type === mc.type)
+        (mc) =>
+          is_installed ||
+          source === mc.source ||
+          (base === mc.base && (name === mc.name || previous_names?.includes(name)) && type === mc.type)
       ),
     [modelList]
   );

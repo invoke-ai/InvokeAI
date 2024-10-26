@@ -2,11 +2,16 @@ import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { getColorAtCoordinate, getPrefixedId } from 'features/controlLayers/konva/util';
+import type { RgbColor } from 'features/controlLayers/store/types';
+import { RGBA_BLACK } from 'features/controlLayers/store/types';
 import Konva from 'konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
+import { atom } from 'nanostores';
+import rafThrottle from 'raf-throttle';
 import type { Logger } from 'roarr';
 
-type CanvasToolColorPickerConfig = {
+type CanvasColorPickerToolModuleConfig = {
   /**
    * The inner radius of the ring.
    */
@@ -49,7 +54,7 @@ type CanvasToolColorPickerConfig = {
   CROSSHAIR_BORDER_COLOR: string;
 };
 
-const DEFAULT_CONFIG: CanvasToolColorPickerConfig = {
+const DEFAULT_CONFIG: CanvasColorPickerToolModuleConfig = {
   RING_INNER_RADIUS: 25,
   RING_OUTER_RADIUS: 35,
   RING_BORDER_INNER_COLOR: 'rgba(0,0,0,1)',
@@ -65,7 +70,7 @@ const DEFAULT_CONFIG: CanvasToolColorPickerConfig = {
 /**
  * Renders a preview of the color picker tool on the canvas.
  */
-export class CanvasToolColorPicker extends CanvasModuleBase {
+export class CanvasColorPickerToolModule extends CanvasModuleBase {
   readonly type = 'color_picker_tool';
   readonly id: string;
   readonly path: string[];
@@ -73,7 +78,12 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
   readonly manager: CanvasManager;
   readonly log: Logger;
 
-  config: CanvasToolColorPickerConfig = DEFAULT_CONFIG;
+  config: CanvasColorPickerToolModuleConfig = DEFAULT_CONFIG;
+
+  /**
+   * The color currently under the cursor. Only has a value when the color picker tool is active.
+   */
+  $colorUnderCursor = atom<RgbColor>(RGBA_BLACK);
 
   /**
    * The Konva objects that make up the color picker tool preview:
@@ -110,6 +120,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:color_picker_group`, listening: false }),
       ringCandidateColor: new Konva.Ring({
+        listening: false,
         name: `${this.type}:color_picker_candidate_color_ring`,
         innerRadius: 0,
         outerRadius: 0,
@@ -117,6 +128,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
         perfectDrawEnabled: false,
       }),
       ringCurrentColor: new Konva.Arc({
+        listening: false,
         name: `${this.type}:color_picker_current_color_arc`,
         innerRadius: 0,
         outerRadius: 0,
@@ -125,6 +137,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
         perfectDrawEnabled: false,
       }),
       ringInnerBorder: new Konva.Ring({
+        listening: false,
         name: `${this.type}:color_picker_inner_border_ring`,
         innerRadius: 0,
         outerRadius: 0,
@@ -133,6 +146,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
         perfectDrawEnabled: false,
       }),
       ringOuterBorder: new Konva.Ring({
+        listening: false,
         name: `${this.type}:color_picker_outer_border_ring`,
         innerRadius: 0,
         outerRadius: 0,
@@ -141,41 +155,49 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
         perfectDrawEnabled: false,
       }),
       crosshairNorthInner: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_north1_line`,
         stroke: this.config.CROSSHAIR_LINE_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairNorthOuter: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_north2_line`,
         stroke: this.config.CROSSHAIR_BORDER_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairEastInner: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_east1_line`,
         stroke: this.config.CROSSHAIR_LINE_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairEastOuter: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_east2_line`,
         stroke: this.config.CROSSHAIR_BORDER_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairSouthInner: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_south1_line`,
         stroke: this.config.CROSSHAIR_LINE_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairSouthOuter: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_south2_line`,
         stroke: this.config.CROSSHAIR_BORDER_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairWestInner: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_west1_line`,
         stroke: this.config.CROSSHAIR_LINE_COLOR,
         perfectDrawEnabled: false,
       }),
       crosshairWestOuter: new Konva.Line({
+        listening: false,
         name: `${this.type}:color_picker_crosshair_west2_line`,
         stroke: this.config.CROSSHAIR_BORDER_COLOR,
         perfectDrawEnabled: false,
@@ -198,21 +220,27 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
     );
   }
 
+  syncCursorStyle = () => {
+    this.manager.stage.setCursor('none');
+  };
+
   /**
    * Renders the color picker tool preview on the canvas.
    */
   render = () => {
-    const tool = this.parent.$tool.get();
+    if (this.parent.$tool.get() !== 'colorPicker') {
+      this.setVisibility(false);
+      return;
+    }
 
-    if (tool !== 'colorPicker') {
+    if (!this.parent.getCanDraw()) {
       this.setVisibility(false);
       return;
     }
 
     const cursorPos = this.parent.$cursorPos.get();
-    const canDraw = this.parent.getCanDraw();
 
-    if (!cursorPos || tool !== 'colorPicker' || !canDraw) {
+    if (!cursorPos) {
       this.setVisibility(false);
       return;
     }
@@ -222,7 +250,7 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
     const { x, y } = cursorPos.relative;
 
     const settings = this.manager.stateApi.getSettings();
-    const colorUnderCursor = this.parent.$colorUnderCursor.get();
+    const colorUnderCursor = this.$colorUnderCursor.get();
     const colorPickerInnerRadius = this.manager.stage.unscale(this.config.RING_INNER_RADIUS);
     const colorPickerOuterRadius = this.manager.stage.unscale(this.config.RING_OUTER_RADIUS);
     const onePixel = this.manager.stage.unscale(1);
@@ -299,12 +327,38 @@ export class CanvasToolColorPicker extends CanvasModuleBase {
     this.konva.group.visible(visible);
   };
 
+  onStagePointerUp = (_e: KonvaEventObject<PointerEvent>) => {
+    const color = this.$colorUnderCursor.get();
+    if (color) {
+      const settings = this.manager.stateApi.getSettings();
+      // This will update the color but not the alpha value
+      this.manager.stateApi.setColor({ ...settings.color, ...color });
+    }
+  };
+
+  onStagePointerMove = (_e: KonvaEventObject<PointerEvent>) => {
+    this.syncColorUnderCursor();
+  };
+
+  syncColorUnderCursor = rafThrottle(() => {
+    const cursorPos = this.parent.$cursorPos.get();
+    if (!cursorPos) {
+      return;
+    }
+
+    const color = getColorAtCoordinate(this.manager.stage.konva.stage, cursorPos.absolute);
+    if (color) {
+      this.$colorUnderCursor.set(color);
+    }
+  });
+
   repr = () => {
     return {
       id: this.id,
       type: this.type,
       path: this.path,
       config: this.config,
+      $colorUnderCursor: this.$colorUnderCursor.get(),
     };
   };
 

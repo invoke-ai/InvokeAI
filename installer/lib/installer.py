@@ -245,6 +245,9 @@ class InvokeAiInstance:
 
         pip = local[self.pip]
 
+        # Uninstall xformers if it is present; the correct version of it will be reinstalled if needed
+        _ = pip["uninstall", "-yqq", "xformers"] & FG
+
         pipeline = pip[
             "install",
             "--require-virtualenv",
@@ -407,7 +410,7 @@ def get_torch_source() -> Tuple[str | None, str | None]:
     optional_modules: str | None = None
     if OS == "Linux":
         if device == GpuType.ROCM:
-            url = "https://download.pytorch.org/whl/rocm5.6"
+            url = "https://download.pytorch.org/whl/rocm6.1"
         elif device == GpuType.CPU:
             url = "https://download.pytorch.org/whl/cpu"
         elif device == GpuType.CUDA:

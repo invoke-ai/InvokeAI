@@ -37,6 +37,7 @@ export interface SystemState {
   shouldUseNSFWChecker: boolean;
   shouldUseWatermarker: boolean;
   shouldEnableInformationalPopovers: boolean;
+  shouldEnableModelDescriptions: boolean;
   logIsEnabled: boolean;
   logLevel: LogLevel;
   logNamespaces: LogNamespace[];

@@ -1,14 +1,4 @@
-import {
-  Box,
-  Flex,
-  Icon,
-  IconButton,
-  Input,
-  InputGroup,
-  InputRightElement,
-  Text,
-  Tooltip,
-} from '@invoke-ai/ui-library';
+import { Flex, Icon, IconButton, Input, InputGroup, InputRightElement, Text, Tooltip } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { map, size } from 'lodash-es';
 import type { ChangeEventHandler } from 'react';
@@ -59,14 +49,14 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
       <Flex justifyContent="space-between" alignItems="center">
         {size(results.starter_bundles) > 0 && (
           <Flex gap={4} alignItems="center">
-            <Flex gap={1} alignItems="center">
+            <Flex gap={2} alignItems="center">
               <Text color="base.200" fontWeight="semibold">
                 {t('modelManager.starterBundles')}
               </Text>
               <Tooltip label={t('modelManager.starterBundleHelpText')}>
-                <Box>
+                <Flex alignItems="center">
                   <Icon as={PiInfoBold} color="base.200" />
-                </Box>
+                </Flex>
               </Tooltip>
             </Flex>
             <Flex gap={2}>

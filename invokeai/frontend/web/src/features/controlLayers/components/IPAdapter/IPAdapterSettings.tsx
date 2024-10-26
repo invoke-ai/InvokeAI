@@ -16,6 +16,7 @@ import {
   referenceImageIPAdapterModelChanged,
   referenceImageIPAdapterWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
+import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { IPAImageDropData } from 'features/dnd/types';
@@ -90,6 +91,8 @@ export const IPAdapterSettings = memo(() => {
   const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);
   const isBusy = useCanvasIsBusy();
 
+  const isFLUX = useAppSelector(selectIsFLUX);
+
   return (
     <CanvasEntitySettingsWrapper>
       <Flex flexDir="column" gap={2} position="relative" w="full">
@@ -113,7 +116,7 @@ export const IPAdapterSettings = memo(() => {
         </Flex>
         <Flex gap={2} w="full" alignItems="center">
           <Flex flexDir="column" gap={2} w="full">
-            <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />
+            {!isFLUX && <IPAdapterMethod method={ipAdapter.method} onChange={onChangeIPMethod} />}
             <Weight weight={ipAdapter.weight} onChange={onChangeWeight} />
             <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>

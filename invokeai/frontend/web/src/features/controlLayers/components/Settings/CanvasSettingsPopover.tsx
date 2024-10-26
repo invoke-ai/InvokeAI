@@ -16,9 +16,8 @@ import { CanvasSettingsClipToBboxCheckbox } from 'features/controlLayers/compone
 import { CanvasSettingsDynamicGridSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsDynamicGridSwitch';
 import { CanvasSettingsSnapToGridCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsGridSize';
 import { CanvasSettingsInvertScrollCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsInvertScrollCheckbox';
-import { CanvasSettingsIsolatedFilteringPreviewSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsIsolatedFilteringPreviewSwitch';
+import { CanvasSettingsIsolatedLayerPreviewSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsIsolatedLayerPreviewSwitch';
 import { CanvasSettingsIsolatedStagingPreviewSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsIsolatedStagingPreviewSwitch';
-import { CanvasSettingsIsolatedTransformingPreviewSwitch } from 'features/controlLayers/components/Settings/CanvasSettingsIsolatedTransformingPreviewSwitch';
 import { CanvasSettingsLogDebugInfoButton } from 'features/controlLayers/components/Settings/CanvasSettingsLogDebugInfo';
 import { CanvasSettingsOutputOnlyMaskedRegionsCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsOutputOnlyMaskedRegionsCheckbox';
 import { CanvasSettingsPreserveMaskCheckbox } from 'features/controlLayers/components/Settings/CanvasSettingsPreserveMaskCheckbox';
@@ -54,8 +53,7 @@ export const CanvasSettingsPopover = memo(() => {
             <CanvasSettingsPressureSensitivityCheckbox />
             <CanvasSettingsShowProgressOnCanvas />
             <CanvasSettingsIsolatedStagingPreviewSwitch />
-            <CanvasSettingsIsolatedFilteringPreviewSwitch />
-            <CanvasSettingsIsolatedTransformingPreviewSwitch />
+            <CanvasSettingsIsolatedLayerPreviewSwitch />
             <CanvasSettingsDynamicGridSwitch />
             <CanvasSettingsBboxOverlaySwitch />
             <CanvasSettingsShowHUDSwitch />

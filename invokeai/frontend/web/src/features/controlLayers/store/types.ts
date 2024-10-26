@@ -46,7 +46,7 @@ const zControlModeV2 = z.enum(['balanced', 'more_prompt', 'more_control', 'unbal
 export type ControlModeV2 = z.infer<typeof zControlModeV2>;
 export const isControlModeV2 = (v: unknown): v is ControlModeV2 => zControlModeV2.safeParse(v).success;
 
-const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G']);
+const zCLIPVisionModelV2 = z.enum(['ViT-H', 'ViT-G', 'ViT-L']);
 export type CLIPVisionModelV2 = z.infer<typeof zCLIPVisionModelV2>;
 export const isCLIPVisionModelV2 = (v: unknown): v is CLIPVisionModelV2 => zCLIPVisionModelV2.safeParse(v).success;
 
@@ -89,6 +89,50 @@ const zCoordinate = z.object({
   y: z.number(),
 });
 export type Coordinate = z.infer<typeof zCoordinate>;
+const zCoordinateWithPressure = z.object({
+  x: z.number(),
+  y: z.number(),
+  pressure: z.number(),
+});
+export type CoordinateWithPressure = z.infer<typeof zCoordinateWithPressure>;
+
+const SAM_POINT_LABELS = {
+  background: -1,
+  neutral: 0,
+  foreground: 1,
+} as const;
+
+const zSAMPointLabel = z.nativeEnum(SAM_POINT_LABELS);
+export type SAMPointLabel = z.infer<typeof zSAMPointLabel>;
+
+export const zSAMPointLabelString = z.enum(['background', 'neutral', 'foreground']);
+export type SAMPointLabelString = z.infer<typeof zSAMPointLabelString>;
+
+/**
+ * A mapping of SAM point labels (as numbers) to their string representations.
+ */
+export const SAM_POINT_LABEL_NUMBER_TO_STRING: Record<SAMPointLabel, SAMPointLabelString> = {
+  '-1': 'background',
+  0: 'neutral',
+  1: 'foreground',
+};
+
+/**
+ * A mapping of SAM point labels (as strings) to their numeric representations.
+ */
+export const SAM_POINT_LABEL_STRING_TO_NUMBER: Record<SAMPointLabelString, SAMPointLabel> = {
+  background: -1,
+  neutral: 0,
+  foreground: 1,
+};
+
+const zSAMPoint = z.object({
+  x: z.number().int().gte(0),
+  y: z.number().int().gte(0),
+  label: zSAMPointLabel,
+});
+type SAMPoint = z.infer<typeof zSAMPoint>;
+export type SAMPointWithId = SAMPoint & { id: string };
 
 const zRect = z.object({
   x: z.number(),
@@ -107,6 +151,9 @@ const zCanvasBrushLineState = z.object({
   id: zId,
   type: z.literal('brush_line'),
   strokeWidth: z.number().min(1),
+  /**
+   * Points without pressure are in the format [x1, y1, x2, y2, ...]
+   */
   points: zPoints,
   color: zRgbaColor,
   clip: zRect.nullable(),
@@ -117,6 +164,9 @@ const zCanvasBrushLineWithPressureState = z.object({
   id: zId,
   type: z.literal('brush_line_with_pressure'),
   strokeWidth: z.number().min(1),
+  /**
+   * Points with pressure are in the format [x1, y1, pressure1, x2, y2, pressure2, ...]
+   */
   points: zPointsWithPressure,
   color: zRgbaColor,
   clip: zRect.nullable(),
@@ -127,6 +177,9 @@ const zCanvasEraserLineState = z.object({
   id: zId,
   type: z.literal('eraser_line'),
   strokeWidth: z.number().min(1),
+  /**
+   * Points without pressure are in the format [x1, y1, x2, y2, ...]
+   */
   points: zPoints,
   clip: zRect.nullable(),
 });
@@ -136,6 +189,9 @@ const zCanvasEraserLineWithPressureState = z.object({
   id: zId,
   type: z.literal('eraser_line_with_pressure'),
   strokeWidth: z.number().min(1),
+  /**
+   * Points with pressure are in the format [x1, y1, pressure1, x2, y2, pressure2, ...]
+   */
   points: zPointsWithPressure,
   clip: zRect.nullable(),
 });
@@ -445,6 +501,12 @@ export function isRegionalGuidanceEntityIdentifier(
 }
 
 export function isFilterableEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> | CanvasEntityIdentifier<'control_layer'> {
+  return isRasterLayerEntityIdentifier(entityIdentifier) || isControlLayerEntityIdentifier(entityIdentifier);
+}
+
+export function isSegmentableEntityIdentifier(
   entityIdentifier: CanvasEntityIdentifier
 ): entityIdentifier is CanvasEntityIdentifier<'raster_layer'> | CanvasEntityIdentifier<'control_layer'> {
   return isRasterLayerEntityIdentifier(entityIdentifier) || isControlLayerEntityIdentifier(entityIdentifier);

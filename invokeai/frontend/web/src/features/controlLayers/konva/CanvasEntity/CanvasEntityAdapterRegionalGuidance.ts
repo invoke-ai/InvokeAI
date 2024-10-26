@@ -16,6 +16,7 @@ export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase
   bufferRenderer: CanvasEntityBufferObjectRenderer;
   transformer: CanvasEntityTransformer;
   filterer = undefined;
+  segmentAnything = undefined;
 
   constructor(entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>, manager: CanvasManager) {
     super(entityIdentifier, manager, 'regional_guidance_adapter');

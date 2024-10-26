@@ -5,9 +5,9 @@ import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import type { AnyNode } from 'features/nodes/types/invocation';
 import type { Connection as NullableConnection, Edge } from 'reactflow';
-import type { O } from 'ts-toolbelt';
+import type { SetNonNullable } from 'type-fest';
 
-type Connection = O.NonNullable<NullableConnection>;
+type Connection = SetNonNullable<NullableConnection>;
 
 export type ValidationResult =
   | {

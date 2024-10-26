@@ -184,3 +184,153 @@ export const getInpaintMaskState = (
   merge(entityState, overrides);
   return entityState;
 };
+
+const convertRasterLayerToControlLayer = (
+  newId: string,
+  rasterLayerState: CanvasRasterLayerState,
+  overrides?: Partial<CanvasControlLayerState>
+): CanvasControlLayerState => {
+  const { name, objects, position } = rasterLayerState;
+  const controlLayerState = getControlLayerState(newId, {
+    name,
+    objects,
+    position,
+  });
+  merge(controlLayerState, overrides);
+  return controlLayerState;
+};
+
+const convertRasterLayerToInpaintMask = (
+  newId: string,
+  rasterLayerState: CanvasRasterLayerState,
+  overrides?: Partial<CanvasInpaintMaskState>
+): CanvasInpaintMaskState => {
+  const { name, objects, position } = rasterLayerState;
+  const inpaintMaskState = getInpaintMaskState(newId, {
+    name,
+    objects,
+    position,
+  });
+  merge(inpaintMaskState, overrides);
+  return inpaintMaskState;
+};
+
+const convertRasterLayerToRegionalGuidance = (
+  newId: string,
+  rasterLayerState: CanvasRasterLayerState,
+  overrides?: Partial<CanvasRegionalGuidanceState>
+): CanvasRegionalGuidanceState => {
+  const { name, objects, position } = rasterLayerState;
+  const regionalGuidanceState = getRegionalGuidanceState(newId, {
+    name,
+    objects,
+    position,
+  });
+  merge(regionalGuidanceState, overrides);
+  return regionalGuidanceState;
+};
+
+const convertControlLayerToRasterLayer = (
+  newId: string,
+  controlLayerState: CanvasControlLayerState,
+  overrides?: Partial<CanvasRasterLayerState>
+): CanvasRasterLayerState => {
+  const { name, objects, position } = controlLayerState;
+  const rasterLayerState = getRasterLayerState(newId, {
+    name,
+    objects,
+    position,
+  });
+  merge(rasterLayerState, overrides);
+  return rasterLayerState;
+};
+
+const convertControlLayerToInpaintMask = (
+  newId: string,
+  rasterLayerState: CanvasControlLayerState,
+  overrides?: Partial<CanvasInpaintMaskState>
+): CanvasInpaintMaskState => {
+  const { name, objects, position } = rasterLayerState;
+  const inpaintMaskState = getInpaintMaskState(newId, {
+    name,
+    objects,
+    position,
+  });
+  merge(inpaintMaskState, overrides);
+  return inpaintMaskState;
+};
+
+const convertControlLayerToRegionalGuidance = (
+  newId: string,
+  rasterLayerState: CanvasControlLayerState,
+  overrides?: Partial<CanvasRegionalGuidanceState>
+): CanvasRegionalGuidanceState => {
+  const { name, objects, position } = rasterLayerState;
+  const regionalGuidanceState = getRegionalGuidanceState(newId, {
+    name,
+    objects,
+    position,
+  });
+  merge(regionalGuidanceState, overrides);
+  return regionalGuidanceState;
+};
+
+const convertInpaintMaskToRegionalGuidance = (
+  newId: string,
+  inpaintMaskState: CanvasInpaintMaskState,
+  overrides?: Partial<CanvasRegionalGuidanceState>
+): CanvasRegionalGuidanceState => {
+  const { name, objects, position } = inpaintMaskState;
+  const regionalGuidanceState = getRegionalGuidanceState(newId, {
+    name,
+    objects,
+    position,
+  });
+  merge(regionalGuidanceState, overrides);
+  return regionalGuidanceState;
+};
+
+const convertRegionalGuidanceToInpaintMask = (
+  newId: string,
+  regionalGuidanceState: CanvasRegionalGuidanceState,
+  overrides?: Partial<CanvasInpaintMaskState>
+): CanvasInpaintMaskState => {
+  const { name, objects, position } = regionalGuidanceState;
+  const inpaintMaskState = getInpaintMaskState(newId, {
+    name,
+    objects,
+    position,
+  });
+  merge(inpaintMaskState, overrides);
+  return inpaintMaskState;
+};
+
+/**
+ * Supported conversions:
+ * - Raster Layer -> Control Layer
+ * - Raster Layer -> Inpaint Mask
+ * - Raster Layer -> Regional Guidance
+ * - Control Layer -> Control Layer
+ * - Control Layer -> Inpaint Mask
+ * - Control Layer -> Regional Guidance
+ * - Inpaint Mask -> Regional Guidance
+ * - Regional Guidance -> Inpaint Mask
+ */
+export const converters = {
+  rasterLayer: {
+    toControlLayer: convertRasterLayerToControlLayer,
+    toInpaintMask: convertRasterLayerToInpaintMask,
+    toRegionalGuidance: convertRasterLayerToRegionalGuidance,
+  },
+  controlLayer: {
+    toRasterLayer: convertControlLayerToRasterLayer,
+    toInpaintMask: convertControlLayerToInpaintMask,
+    toRegionalGuidance: convertControlLayerToRegionalGuidance,
+  },
+  inpaintMask: {
+    toRegionalGuidance: convertInpaintMaskToRegionalGuidance,
+  },
+  regionalGuidance: {
+    toInpaintMask: convertRegionalGuidanceToInpaintMask,
+  },
+};

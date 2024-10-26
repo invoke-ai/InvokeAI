@@ -1,5 +1,6 @@
 import { Button, Flex, Heading } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
   useAddControlLayer,
   useAddGlobalReferenceImage,
@@ -28,70 +29,80 @@ export const CanvasAddEntityButtons = memo(() => {
       <Flex position="relative" flexDir="column" gap={4} top="20%">
         <Flex flexDir="column" justifyContent="flex-start" gap={2}>
           <Heading size="xs">{t('controlLayers.global')}</Heading>
-          <Button
-            size="sm"
-            variant="ghost"
-            justifyContent="flex-start"
-            leftIcon={<PiPlusBold />}
-            onClick={addGlobalReferenceImage}
-            isDisabled={isFLUX}
-          >
-            {t('controlLayers.globalReferenceImage')}
-          </Button>
+          <InformationalPopover feature="globalReferenceImage">
+            <Button
+              size="sm"
+              variant="ghost"
+              justifyContent="flex-start"
+              leftIcon={<PiPlusBold />}
+              onClick={addGlobalReferenceImage}
+            >
+              {t('controlLayers.globalReferenceImage')}
+            </Button>
+          </InformationalPopover>
         </Flex>
         <Flex flexDir="column" gap={2}>
           <Heading size="xs">{t('controlLayers.regional')}</Heading>
-          <Button
-            size="sm"
-            variant="ghost"
-            justifyContent="flex-start"
-            leftIcon={<PiPlusBold />}
-            onClick={addInpaintMask}
-          >
-            {t('controlLayers.inpaintMask')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            justifyContent="flex-start"
-            leftIcon={<PiPlusBold />}
-            onClick={addRegionalGuidance}
-            isDisabled={isFLUX}
-          >
-            {t('controlLayers.regionalGuidance')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            justifyContent="flex-start"
-            leftIcon={<PiPlusBold />}
-            onClick={addRegionalReferenceImage}
-            isDisabled={isFLUX}
-          >
-            {t('controlLayers.regionalReferenceImage')}
-          </Button>
+          <InformationalPopover feature="inpainting">
+            <Button
+              size="sm"
+              variant="ghost"
+              justifyContent="flex-start"
+              leftIcon={<PiPlusBold />}
+              onClick={addInpaintMask}
+            >
+              {t('controlLayers.inpaintMask')}
+            </Button>
+          </InformationalPopover>
+          <InformationalPopover feature="regionalGuidance">
+            <Button
+              size="sm"
+              variant="ghost"
+              justifyContent="flex-start"
+              leftIcon={<PiPlusBold />}
+              onClick={addRegionalGuidance}
+              isDisabled={isFLUX}
+            >
+              {t('controlLayers.regionalGuidance')}
+            </Button>
+          </InformationalPopover>
+          <InformationalPopover feature="regionalReferenceImage">
+            <Button
+              size="sm"
+              variant="ghost"
+              justifyContent="flex-start"
+              leftIcon={<PiPlusBold />}
+              onClick={addRegionalReferenceImage}
+              isDisabled={isFLUX}
+            >
+              {t('controlLayers.regionalReferenceImage')}
+            </Button>
+          </InformationalPopover>
         </Flex>
         <Flex flexDir="column" justifyContent="flex-start" gap={2}>
           <Heading size="xs">{t('controlLayers.layer_other')}</Heading>
-
-          <Button
-            size="sm"
-            variant="ghost"
-            justifyContent="flex-start"
-            leftIcon={<PiPlusBold />}
-            onClick={addControlLayer}
-          >
-            {t('controlLayers.controlLayer')}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            justifyContent="flex-start"
-            leftIcon={<PiPlusBold />}
-            onClick={addRasterLayer}
-          >
-            {t('controlLayers.rasterLayer')}
-          </Button>
+          <InformationalPopover feature="controlNet">
+            <Button
+              size="sm"
+              variant="ghost"
+              justifyContent="flex-start"
+              leftIcon={<PiPlusBold />}
+              onClick={addControlLayer}
+            >
+              {t('controlLayers.controlLayer')}
+            </Button>
+          </InformationalPopover>
+          <InformationalPopover feature="rasterLayer">
+            <Button
+              size="sm"
+              variant="ghost"
+              justifyContent="flex-start"
+              leftIcon={<PiPlusBold />}
+              onClick={addRasterLayer}
+            >
+              {t('controlLayers.rasterLayer')}
+            </Button>
+          </InformationalPopover>
         </Flex>
       </Flex>
     </Flex>

@@ -10,11 +10,9 @@ import type { CanvasEntityTransformer } from 'features/controlLayers/konva/Canva
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import type { CanvasSegmentAnythingModule } from 'features/controlLayers/konva/CanvasSegmentAnythingModule';
 import { getKonvaNodeDebugAttrs, getRectIntersection } from 'features/controlLayers/konva/util';
-import {
-  selectIsolatedFilteringPreview,
-  selectIsolatedTransformingPreview,
-} from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectIsolatedLayerPreview } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   buildSelectIsHidden,
   buildSelectIsSelected,
@@ -71,6 +69,15 @@ export abstract class CanvasEntityAdapterBase<
   // method. If it wasn't in this ABC, we'd get a TS error in `destroy`. Maybe there's a better way to handle this
   // without requiring all adapters to implement this property and their own `destroy`?
   abstract filterer?: CanvasEntityFilterer;
+
+  /**
+   * The segment anything module for this entity adapter. Entities that support segment anything should implement
+   * this property.
+   */
+  // TODO(psyche): This is in the ABC and not in the concrete classes to allow all adapters to share the `destroy`
+  // method. If it wasn't in this ABC, we'd get a TS error in `destroy`. Maybe there's a better way to handle this
+  // without requiring all adapters to implement this property and their own `destroy`?
+  abstract segmentAnything?: CanvasSegmentAnythingModule;
 
   /**
    * Synchronizes the entity state with the canvas. This includes rendering the entity's objects, handling visibility,
@@ -264,13 +271,11 @@ export abstract class CanvasEntityAdapterBase<
      */
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsHidden, this.syncVisibility));
     this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectIsolatedFilteringPreview, this.syncVisibility)
+      this.manager.stateApi.createStoreSubscription(selectIsolatedLayerPreview, this.syncVisibility)
     );
     this.subscriptions.add(this.manager.stateApi.$filteringAdapter.listen(this.syncVisibility));
-    this.subscriptions.add(
-      this.manager.stateApi.createStoreSubscription(selectIsolatedTransformingPreview, this.syncVisibility)
-    );
     this.subscriptions.add(this.manager.stateApi.$transformingAdapter.listen(this.syncVisibility));
+    this.subscriptions.add(this.manager.stateApi.$segmentingAdapter.listen(this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(this.selectIsSelected, this.syncVisibility));
 
     /**
@@ -435,8 +440,10 @@ export abstract class CanvasEntityAdapterBase<
       return;
     }
 
+    const isolatedLayerPreview = this.manager.stateApi.runSelector(selectIsolatedLayerPreview);
+
     // Handle isolated preview modes - if another entity is filtering or transforming, we may need to hide this entity.
-    if (this.manager.stateApi.runSelector(selectIsolatedFilteringPreview)) {
+    if (isolatedLayerPreview) {
       const filteringEntityIdentifier = this.manager.stateApi.$filteringAdapter.get()?.entityIdentifier;
       if (filteringEntityIdentifier && filteringEntityIdentifier.id !== this.id) {
         this.setVisibility(false);
@@ -444,7 +451,7 @@ export abstract class CanvasEntityAdapterBase<
       }
     }
 
-    if (this.manager.stateApi.runSelector(selectIsolatedTransformingPreview)) {
+    if (isolatedLayerPreview) {
       const transformingEntity = this.manager.stateApi.$transformingAdapter.get();
       if (
         transformingEntity &&
@@ -452,6 +459,14 @@ export abstract class CanvasEntityAdapterBase<
         // Silent transforms should be transparent to the user, so we don't need to hide the entity.
         !transformingEntity.transformer.$silentTransform.get()
       ) {
+        this.setVisibility(false);
+        return;
+      }
+    }
+
+    if (isolatedLayerPreview) {
+      const segmentingEntity = this.manager.stateApi.$segmentingAdapter.get();
+      if (segmentingEntity && segmentingEntity.entityIdentifier.id !== this.id) {
         this.setVisibility(false);
         return;
       }
@@ -517,8 +532,17 @@ export abstract class CanvasEntityAdapterBase<
       this.transformer.stopTransform();
     }
     this.transformer.destroy();
-    if (this.filterer?.$isFiltering.get()) {
-      this.filterer.cancel();
+    if (this.filterer) {
+      if (this.filterer.$isFiltering.get()) {
+        this.filterer.cancel();
+      }
+      this.filterer?.destroy();
+    }
+    if (this.segmentAnything) {
+      if (this.segmentAnything.$isSegmenting.get()) {
+        this.segmentAnything.cancel();
+      }
+      this.segmentAnything.destroy();
     }
     this.konva.layer.destroy();
     this.manager.deleteAdapter(this.entityIdentifier);
@@ -534,6 +558,7 @@ export abstract class CanvasEntityAdapterBase<
       transformer: this.transformer.repr(),
       renderer: this.renderer.repr(),
       bufferRenderer: this.bufferRenderer.repr(),
+      segmentAnything: this.segmentAnything?.repr(),
       filterer: this.filterer?.repr(),
       hasCache: this.$canvasCache.get() !== null,
       isLocked: this.$isLocked.get(),

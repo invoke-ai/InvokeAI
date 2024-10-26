@@ -1,30 +1,20 @@
-import { Button, ButtonGroup, Flex, FormControl, FormLabel, Heading, Spacer, Switch } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Heading, Spacer, Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
+import { CanvasOperationIsolatedLayerPreviewSwitch } from 'features/controlLayers/components/CanvasOperationIsolatedLayerPreviewSwitch';
 import { TransformFitToBboxButtons } from 'features/controlLayers/components/Transform/TransformFitToBboxButtons';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
-import {
-  selectIsolatedTransformingPreview,
-  settingsIsolatedTransformingPreviewToggled,
-} from 'features/controlLayers/store/canvasSettingsSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo, useCallback, useRef } from 'react';
+import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiCheckBold, PiXBold } from 'react-icons/pi';
 
 const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
   const ref = useRef<HTMLDivElement>(null);
   useFocusRegion('canvas', ref, { focusOnMount: true });
   const isCanvasFocused = useIsRegionFocused('canvas');
   const isProcessing = useStore(adapter.transformer.$isProcessing);
-  const isolatedTransformingPreview = useAppSelector(selectIsolatedTransformingPreview);
-  const onChangeIsolatedPreview = useCallback(() => {
-    dispatch(settingsIsolatedTransformingPreviewToggled());
-  }, [dispatch]);
   const silentTransform = useStore(adapter.transformer.$silentTransform);
 
   useRegisteredHotkeys({
@@ -66,38 +56,33 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
           {t('controlLayers.transform.transform')}
         </Heading>
         <Spacer />
-        <FormControl w="min-content">
-          <FormLabel m={0}>{t('controlLayers.settings.isolatedPreview')}</FormLabel>
-          <Switch size="sm" isChecked={isolatedTransformingPreview} onChange={onChangeIsolatedPreview} />
-        </FormControl>
+        <CanvasOperationIsolatedLayerPreviewSwitch />
       </Flex>
 
       <TransformFitToBboxButtons adapter={adapter} />
 
-      <ButtonGroup isAttached={false} size="sm" w="full">
+      <ButtonGroup isAttached={false} size="sm" w="full" alignItems="center">
+        {isProcessing && <Spinner ms={3} boxSize={5} color="base.600" />}
         <Spacer />
         <Button
-          leftIcon={<PiArrowsCounterClockwiseBold />}
           onClick={adapter.transformer.resetTransform}
-          isLoading={isProcessing}
+          isDisabled={isProcessing}
           loadingText={t('controlLayers.transform.reset')}
           variant="ghost"
         >
           {t('controlLayers.transform.reset')}
         </Button>
         <Button
-          leftIcon={<PiCheckBold />}
           onClick={adapter.transformer.applyTransform}
-          isLoading={isProcessing}
+          isDisabled={isProcessing}
           loadingText={t('controlLayers.transform.apply')}
           variant="ghost"
         >
           {t('controlLayers.transform.apply')}
         </Button>
         <Button
-          leftIcon={<PiXBold />}
           onClick={adapter.transformer.stopTransform}
-          isLoading={isProcessing}
+          isDisabled={isProcessing}
           loadingText={t('common.cancel')}
           variant="ghost"
         >

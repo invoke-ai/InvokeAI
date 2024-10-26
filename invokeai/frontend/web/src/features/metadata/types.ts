@@ -1,5 +1,5 @@
 import type { ControlNetConfig, IPAdapterConfig, T2IAdapterConfig } from 'features/controlLayers/store/types';
-import type { O } from 'ts-toolbelt';
+import type { SetNonNullable } from 'type-fest';
 
 /**
  * Renders a value of type T as a React node.
@@ -145,6 +145,6 @@ export type BuildMetadataHandlers = <TValue, TItem>(
   arg: BuildMetadataHandlersArg<TValue, TItem>
 ) => MetadataHandlers<TValue, TItem>;
 
-export type ControlNetConfigMetadata = O.NonNullable<ControlNetConfig, 'model'>;
-export type T2IAdapterConfigMetadata = O.NonNullable<T2IAdapterConfig, 'model'>;
-export type IPAdapterConfigMetadata = O.NonNullable<IPAdapterConfig, 'model'>;
+export type ControlNetConfigMetadata = SetNonNullable<ControlNetConfig, 'model'>;
+export type T2IAdapterConfigMetadata = SetNonNullable<T2IAdapterConfig, 'model'>;
+export type IPAdapterConfigMetadata = SetNonNullable<IPAdapterConfig, 'model'>;

@@ -1,6 +1,12 @@
 import type { Selector, Store } from '@reduxjs/toolkit';
 import { $authToken } from 'app/store/nanostores/authToken';
-import type { CanvasEntityIdentifier, CanvasObjectState, Coordinate, Rect } from 'features/controlLayers/store/types';
+import type {
+  CanvasEntityIdentifier,
+  CanvasObjectState,
+  Coordinate,
+  CoordinateWithPressure,
+  Rect,
+} from 'features/controlLayers/store/types';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Vector2d } from 'konva/lib/types';
@@ -75,6 +81,18 @@ export const offsetCoord = (coord: Coordinate, offset: Coordinate): Coordinate =
 };
 
 /**
+ * Adds two coordinates together.
+ * @param a The first coordinate
+ * @param b The second coordinate
+ */
+export const addCoords = (a: Coordinate, b: Coordinate): Coordinate => {
+  return {
+    x: a.x + b.x,
+    y: a.y + b.y,
+  };
+};
+
+/**
  * Snaps a position to the edge of the stage if within a threshold of the edge
  * @param pos The position to snap
  * @param stage The konva stage
@@ -108,6 +126,13 @@ export const floorCoord = (coord: Coordinate): Coordinate => {
   };
 };
 
+export const roundCoord = (coord: Coordinate): Coordinate => {
+  return {
+    x: Math.round(coord.x),
+    y: Math.round(coord.y),
+  };
+};
+
 /**
  * Snaps a position to the edge of the given rect if within a threshold of the edge
  * @param pos The position to snap
@@ -134,7 +159,7 @@ export const snapToRect = (pos: Vector2d, rect: Rect, threshold = 10): Vector2d 
  * Checks if the left mouse button is currently pressed
  * @param e The konva event
  */
-export const getIsMouseDown = (e: KonvaEventObject<MouseEvent>): boolean => e.evt.buttons === 1;
+export const getIsPrimaryPointerDown = (e: KonvaEventObject<PointerEvent>): boolean => e.evt.buttons === 1;
 
 /**
  * Checks if the stage is currently focused
@@ -545,11 +570,6 @@ export const exhaustiveCheck = (value: never): never => {
   assert(false, `Unhandled value: ${value}`);
 };
 
-type CoordinateWithPressure = {
-  x: number;
-  y: number;
-  pressure: number;
-};
 export const getLastPointOfLastLineWithPressure = (
   objects: CanvasObjectState[],
   type: 'brush_line_with_pressure' | 'eraser_line_with_pressure'
@@ -615,6 +635,7 @@ export const getKonvaNodeDebugAttrs = (node: Konva.Node) => {
     isCached: node.isCached(),
     visible: node.visible(),
     listening: node.listening(),
+    zIndex: node.zIndex(),
   };
 };
 

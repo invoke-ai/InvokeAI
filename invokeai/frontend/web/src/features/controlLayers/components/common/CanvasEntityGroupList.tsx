@@ -1,9 +1,11 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Collapse, Flex, Icon, Spacer, Text } from '@invoke-ai/ui-library';
+import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { CanvasEntityAddOfTypeButton } from 'features/controlLayers/components/common/CanvasEntityAddOfTypeButton';
 import { CanvasEntityMergeVisibleButton } from 'features/controlLayers/components/common/CanvasEntityMergeVisibleButton';
 import { CanvasEntityTypeIsHiddenToggle } from 'features/controlLayers/components/common/CanvasEntityTypeIsHiddenToggle';
+import { useEntityTypeInformationalPopover } from 'features/controlLayers/hooks/useEntityTypeInformationalPopover';
 import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTitle';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { PropsWithChildren } from 'react';
@@ -21,6 +23,7 @@ const _hover: SystemStyleObject = {
 
 export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props) => {
   const title = useEntityTypeTitle(type);
+  const informationalPopoverFeature = useEntityTypeInformationalPopover(type);
   const collapse = useBoolean(true);
   const canMergeVisible = useMemo(() => type === 'raster_layer' || type === 'inpaint_mask', [type]);
   const canHideAll = useMemo(() => type !== 'reference_image', [type]);
@@ -47,15 +50,30 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
             transitionProperty="common"
             transitionDuration="fast"
           />
-          <Text
-            fontWeight="semibold"
-            color={isSelected ? 'base.200' : 'base.500'}
-            userSelect="none"
-            transitionProperty="common"
-            transitionDuration="fast"
-          >
-            {title}
-          </Text>
+          {informationalPopoverFeature ? (
+            <InformationalPopover feature={informationalPopoverFeature}>
+              <Text
+                fontWeight="semibold"
+                color={isSelected ? 'base.200' : 'base.500'}
+                userSelect="none"
+                transitionProperty="common"
+                transitionDuration="fast"
+              >
+                {title}
+              </Text>
+            </InformationalPopover>
+          ) : (
+            <Text
+              fontWeight="semibold"
+              color={isSelected ? 'base.200' : 'base.500'}
+              userSelect="none"
+              transitionProperty="common"
+              transitionDuration="fast"
+            >
+              {title}
+            </Text>
+          )}
+
           <Spacer />
         </Flex>
         {canMergeVisible && <CanvasEntityMergeVisibleButton type={type} />}

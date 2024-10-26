@@ -2,7 +2,7 @@ import type { ComboboxOnChange } from '@invoke-ai/ui-library';
 import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { selectBase, selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import type { CLIPVisionModelV2 } from 'features/controlLayers/store/types';
 import { isCLIPVisionModelV2 } from 'features/controlLayers/store/types';
 import { memo, useCallback, useMemo } from 'react';
@@ -11,9 +11,13 @@ import { useIPAdapterModels } from 'services/api/hooks/modelsByType';
 import type { AnyModelConfig, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
+// at this time, ViT-L is the only supported clip model for FLUX IP adapter
+const FLUX_CLIP_VISION = 'ViT-L';
+
 const CLIP_VISION_OPTIONS = [
   { label: 'ViT-H', value: 'ViT-H' },
   { label: 'ViT-G', value: 'ViT-G' },
+  { label: FLUX_CLIP_VISION, value: FLUX_CLIP_VISION },
 ];
 
 type Props = {
@@ -47,6 +51,8 @@ export const IPAdapterModel = memo(({ modelKey, onChangeModel, clipVisionModel, 
     [onChangeCLIPVisionModel]
   );
 
+  const isFLUX = useAppSelector(selectIsFLUX);
+
   const getIsDisabled = useCallback(
     (model: AnyModelConfig): boolean => {
       const isCompatible = currentBaseModel === model.base;
@@ -64,10 +70,16 @@ export const IPAdapterModel = memo(({ modelKey, onChangeModel, clipVisionModel, 
     isLoading,
   });
 
-  const clipVisionModelValue = useMemo(
-    () => CLIP_VISION_OPTIONS.find((o) => o.value === clipVisionModel),
-    [clipVisionModel]
-  );
+  const clipVisionOptions = useMemo(() => {
+    return CLIP_VISION_OPTIONS.map((option) => ({
+      ...option,
+      isDisabled: isFLUX && option.value !== FLUX_CLIP_VISION,
+    }));
+  }, [isFLUX]);
+
+  const clipVisionModelValue = useMemo(() => {
+    return CLIP_VISION_OPTIONS.find((o) => o.value === clipVisionModel);
+  }, [clipVisionModel]);
 
   return (
     <Flex gap={2}>
@@ -85,7 +97,7 @@ export const IPAdapterModel = memo(({ modelKey, onChangeModel, clipVisionModel, 
       {selectedModel?.format === 'checkpoint' && (
         <FormControl isInvalid={!value || currentBaseModel !== selectedModel?.base} width="max-content" minWidth={28}>
           <Combobox
-            options={CLIP_VISION_OPTIONS}
+            options={clipVisionOptions}
             placeholder={t('common.placeholderSelectAModel')}
             value={clipVisionModelValue}
             onChange={_onChangeCLIPVisionModel}

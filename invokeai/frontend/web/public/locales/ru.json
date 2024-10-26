@@ -94,7 +94,8 @@
         "reset": "Сброс",
         "none": "Ничего",
         "new": "Новый",
-        "ok": "Ok"
+        "ok": "Ok",
+        "close": "Закрыть"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
@@ -160,7 +161,9 @@
         "openViewer": "Открыть просмотрщик",
         "closeViewer": "Закрыть просмотрщик",
         "imagesTab": "Изображения, созданные и сохраненные в Invoke.",
-        "assetsTab": "Файлы, которые вы загрузили для использования в своих проектах."
+        "assetsTab": "Файлы, которые вы загрузили для использования в своих проектах.",
+        "boardsSettings": "Настройки доски",
+        "imagesSettings": "Настройки галереи изображений"
     },
     "hotkeys": {
         "searchHotkeys": "Поиск горячих клавиш",
@@ -583,7 +586,18 @@
         "learnMoreAboutSupportedModels": "Подробнее о поддерживаемых моделях",
         "t5Encoder": "T5 энкодер",
         "spandrelImageToImage": "Image to Image (Spandrel)",
-        "clipEmbed": "CLIP Embed"
+        "clipEmbed": "CLIP Embed",
+        "installingXModels_one": "Установка {{count}} модели",
+        "installingXModels_few": "Установка {{count}} моделей",
+        "installingXModels_many": "Установка {{count}} моделей",
+        "installingBundle": "Установка пакета",
+        "installingModel": "Установка модели",
+        "starterBundles": "Стартовые пакеты",
+        "skippingXDuplicates_one": ", пропуская {{count}} дубликат",
+        "skippingXDuplicates_few": ", пропуская {{count}} дубликата",
+        "skippingXDuplicates_many": ", пропуская {{count}} дубликатов",
+        "includesNModels": "Включает в себя {{n}} моделей и их зависимостей",
+        "starterBundleHelpText": "Легко установите все модели, необходимые для начала работы с базовой моделью, включая основную модель, сети управления, IP-адаптеры и многое другое. При выборе комплекта все уже установленные модели будут пропущены."
     },
     "parameters": {
         "images": "Изображения",
@@ -730,7 +744,7 @@
         "serverError": "Ошибка сервера",
         "connected": "Подключено к серверу",
         "canceled": "Обработка отменена",
-        "uploadFailedInvalidUploadDesc": "Должно быть одно изображение в формате PNG или JPEG",
+        "uploadFailedInvalidUploadDesc": "Это должны быть изображения PNG или JPEG.",
         "parameterNotSet": "Параметр не задан",
         "parameterSet": "Параметр задан",
         "problemCopyingImage": "Не удается скопировать изображение",
@@ -742,7 +756,7 @@
         "setNodeField": "Установить как поле узла",
         "invalidUpload": "Неверная загрузка",
         "imageUploaded": "Изображение загружено",
-        "addedToBoard": "Добавлено на доску",
+        "addedToBoard": "Добавлено в активы доски {{name}}",
         "workflowLoaded": "Рабочий процесс загружен",
         "problemDeletingWorkflow": "Проблема с удалением рабочего процесса",
         "modelAddedSimple": "Модель добавлена в очередь",
@@ -777,7 +791,13 @@
         "unableToLoadStylePreset": "Невозможно загрузить предустановку стиля",
         "layerCopiedToClipboard": "Слой скопирован в буфер обмена",
         "sentToUpscale": "Отправить на увеличение",
-        "layerSavedToAssets": "Слой сохранен в активах"
+        "layerSavedToAssets": "Слой сохранен в активах",
+        "linkCopied": "Ссылка скопирована",
+        "addedToUncategorized": "Добавлено в активы доски $t(boards.uncategorized)",
+        "imagesWillBeAddedTo": "Загруженные изображения будут добавлены в активы доски {{boardName}}.",
+        "uploadFailedInvalidUploadDesc_withCount_one": "Должно быть не более {{count}} изображения в формате PNG или JPEG.",
+        "uploadFailedInvalidUploadDesc_withCount_few": "Должно быть не более {{count}} изображений в формате PNG или JPEG.",
+        "uploadFailedInvalidUploadDesc_withCount_many": "Должно быть не более {{count}} изображений в формате PNG или JPEG."
     },
     "accessibility": {
         "uploadImage": "Загрузить изображение",
@@ -792,7 +812,8 @@
         "about": "Об этом",
         "submitSupportTicket": "Отправить тикет в службу поддержки",
         "toggleRightPanel": "Переключить правую панель (G)",
-        "toggleLeftPanel": "Переключить левую панель (T)"
+        "toggleLeftPanel": "Переключить левую панель (T)",
+        "uploadImages": "Загрузить изображения"
     },
     "nodes": {
         "zoomInNodes": "Увеличьте масштаб",
@@ -933,7 +954,7 @@
         "saveToGallery": "Сохранить в галерею",
         "noWorkflows": "Нет рабочих процессов",
         "noMatchingWorkflows": "Нет совпадающих рабочих процессов",
-        "workflowHelpText": "Нужна помощь? Ознакомьтесь с нашим руководством <LinkComponent>Getting Started with Workflows</LinkComponent>"
+        "workflowHelpText": "Нужна помощь? Ознакомьтесь с нашим руководством <LinkComponent>Getting Started with Workflows</LinkComponent>."
     },
     "boards": {
         "autoAddBoard": "Авто добавление Доски",
@@ -1409,7 +1430,8 @@
         "recallParameter": "Отозвать {{label}}",
         "allPrompts": "Все запросы",
         "imageDimensions": "Размеры изображения",
-        "canvasV2Metadata": "Холст"
+        "canvasV2Metadata": "Холст",
+        "guidance": "Точность"
     },
     "queue": {
         "status": "Статус",
@@ -1561,7 +1583,12 @@
         "defaultWorkflows": "Стандартные рабочие процессы",
         "deleteWorkflow2": "Вы уверены, что хотите удалить этот рабочий процесс? Это нельзя отменить.",
         "chooseWorkflowFromLibrary": "Выбрать рабочий процесс из библиотеки",
-        "uploadAndSaveWorkflow": "Загрузить в библиотеку"
+        "uploadAndSaveWorkflow": "Загрузить в библиотеку",
+        "edit": "Редактировать",
+        "download": "Скачать",
+        "copyShareLink": "Скопировать ссылку на общий доступ",
+        "copyShareLinkForWorkflow": "Скопировать ссылку на общий доступ для рабочего процесса",
+        "delete": "Удалить"
     },
     "hrf": {
         "enableHrf": "Включить исправление высокого разрешения",
@@ -1890,7 +1917,10 @@
             "fitToBbox": "Вместить в рамку",
             "reset": "Сбросить",
             "apply": "Применить",
-            "cancel": "Отменить"
+            "cancel": "Отменить",
+            "fitModeContain": "Уместить",
+            "fitMode": "Режим подгонки",
+            "fitModeFill": "Заполнить"
         },
         "disableAutoNegative": "Отключить авто негатив",
         "deleteReferenceImage": "Удалить эталонное изображение",
@@ -1920,7 +1950,8 @@
         "globalReferenceImage": "Глобальное эталонное изображение",
         "sendToGallery": "Отправить в галерею",
         "referenceImage": "Эталонное изображение",
-        "addGlobalReferenceImage": "Добавить $t(controlLayers.globalReferenceImage)"
+        "addGlobalReferenceImage": "Добавить $t(controlLayers.globalReferenceImage)",
+        "newImg2ImgCanvasFromImage": "Новое img2img из изображения"
     },
     "ui": {
         "tabs": {

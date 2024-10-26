@@ -234,8 +234,25 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     this.konva.transformer.on('transform', this.syncObjectGroupWithProxyRect);
     this.konva.transformer.on('transformend', this.snapProxyRectToPixelGrid);
+    this.konva.transformer.on('pointerenter', () => {
+      this.manager.stage.setCursor('move');
+    });
+    this.konva.transformer.on('pointerleave', () => {
+      this.manager.stage.setCursor('default');
+    });
     this.konva.proxyRect.on('dragmove', this.onDragMove);
     this.konva.proxyRect.on('dragend', this.onDragEnd);
+    this.konva.proxyRect.on('pointerenter', () => {
+      this.manager.stage.setCursor('move');
+    });
+    this.konva.proxyRect.on('pointerleave', () => {
+      this.manager.stage.setCursor('default');
+    });
+
+    this.subscriptions.add(() => {
+      this.konva.transformer.off('transform transformend pointerenter pointerleave');
+      this.konva.proxyRect.off('dragmove dragend pointerenter pointerleave');
+    });
 
     // When the stage scale changes, we may need to re-scale some of the transformer's components. For example,
     // the bbox outline should always be 1 screen pixel wide, so we need to update its stroke width.
@@ -574,9 +591,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
 
-    if (this.manager.$isBusy.get() && !this.$isTransforming.get()) {
-      // The canvas is busy, we can't interact with the transformer
-      this.parent.konva.layer.listening(false);
+    if (this.parent.segmentAnything?.$isSegmenting.get()) {
+      // When segmenting, the layer should listen but the transformer should not be interactable
+      this.parent.konva.layer.listening(true);
       this._setInteractionMode('off');
       return;
     }
@@ -609,6 +626,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     const tool = this.manager.tool.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
 
+    if (!isSelected) {
+      // The layer is not selected
+      this.parent.konva.layer.listening(false);
+      this._setInteractionMode('off');
+      return;
+    }
+
     if (this.parent.$isEmpty.get()) {
       // The layer is totally empty, we can just disable the layer
       this.parent.konva.layer.listening(false);
@@ -616,14 +640,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
 
-    if (isSelected && !this.$isTransforming.get() && tool === 'move') {
+    if (!this.$isTransforming.get() && tool === 'move') {
       // We are moving this layer, it must be listening
       this.parent.konva.layer.listening(true);
       this._setInteractionMode('drag');
       return;
     }
 
-    if (isSelected && this.$isTransforming.get()) {
+    if (this.$isTransforming.get()) {
       // When transforming, we want the stage to still be movable if the view tool is selected. If the transformer is
       // active, it will interrupt the stage drag events. So we should disable listening when the view tool is selected.
       if (tool === 'view') {
@@ -633,11 +657,12 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
         this.parent.konva.layer.listening(true);
         this._setInteractionMode('all');
       }
-    } else {
-      // The layer is not selected, or we are using a tool that doesn't need the layer to be listening - disable interaction stuff
-      this.parent.konva.layer.listening(false);
-      this._setInteractionMode('off');
+      return;
     }
+
+    // The layer is not selected
+    this.parent.konva.layer.listening(false);
+    this._setInteractionMode('off');
   };
 
   /**
