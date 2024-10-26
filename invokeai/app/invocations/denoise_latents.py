@@ -13,6 +13,7 @@ from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.schedulers.scheduling_dpmsolver_sde import DPMSolverSDEScheduler
 from diffusers.schedulers.scheduling_tcd import TCDScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin as Scheduler
+from PIL import Image
 from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
@@ -510,6 +511,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         t2i_adapters: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
         ext_manager: ExtensionsManager,
+        bgr_mode: bool = False,
     ) -> None:
         if t2i_adapters is None:
             return
@@ -519,6 +521,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             t2i_adapters = [t2i_adapters]
 
         for t2i_adapter_field in t2i_adapters:
+            image = context.images.get_pil(t2i_adapter_field.image.image_name)
+            if bgr_mode:#SDXL t2i trained on cv2's BGR outputs, but PIL won't convert straight to BGR
+                r, g, b = image.split()
+                image = Image.merge("RGB", (b, g, r))
             ext_manager.add_extension(
                 T2IAdapterExt(
                     node_context=context,
@@ -617,12 +623,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
             t2i_adapter_model_config = context.models.get_config(t2i_adapter_field.t2i_adapter_model.key)
             t2i_adapter_loaded_model = context.models.load(t2i_adapter_field.t2i_adapter_model)
             image = context.images.get_pil(t2i_adapter_field.image.image_name)
-
+                
             # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
             if t2i_adapter_model_config.base == BaseModelType.StableDiffusion1:
                 max_unet_downscale = 8
             elif t2i_adapter_model_config.base == BaseModelType.StableDiffusionXL:
                 max_unet_downscale = 4
+
+                # SDXL adapters are trained on cv2's BGR outputs
+                r, g, b = image.split()
+                image = Image.merge("RGB", (b, g, r))
             else:
                 raise ValueError(f"Unexpected T2I-Adapter base model type: '{t2i_adapter_model_config.base}'.")
 
@@ -900,7 +910,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
             #    ext = extension_field.to_extension(exit_stack, context, ext_manager)
             #    ext_manager.add_extension(ext)
             self.parse_controlnet_field(exit_stack, context, self.control, ext_manager)
-            self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager)
+            bgr_mode = self.unet.unet.base == BaseModelType.StableDiffusionXL
+            self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager, bgr_mode)
 
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
