@@ -1894,6 +1894,7 @@
             "include": "Include",
             "exclude": "Exclude",
             "neutral": "Neutral",
+            "apply": "Apply",
             "reset": "Reset",
             "saveAs": "Save As",
             "cancel": "Cancel",

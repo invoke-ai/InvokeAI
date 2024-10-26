@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Flex, Heading, Spacer } from '@invoke-ai/ui-library';
+import { Button, ButtonGroup, Flex, Heading, Spacer, Spinner } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { CanvasOperationIsolatedLayerPreviewSwitch } from 'features/controlLayers/components/CanvasOperationIsolatedLayerPreviewSwitch';
@@ -8,7 +8,6 @@ import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEnt
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowsCounterClockwiseBold, PiCheckBold, PiXBold } from 'react-icons/pi';
 
 const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
   const { t } = useTranslation();
@@ -62,30 +61,28 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
 
       <TransformFitToBboxButtons adapter={adapter} />
 
-      <ButtonGroup isAttached={false} size="sm" w="full">
+      <ButtonGroup isAttached={false} size="sm" w="full" alignItems="center">
+        {isProcessing && <Spinner ms={3} boxSize={5} color="base.600" />}
         <Spacer />
         <Button
-          leftIcon={<PiArrowsCounterClockwiseBold />}
           onClick={adapter.transformer.resetTransform}
-          isLoading={isProcessing}
+          isDisabled={isProcessing}
           loadingText={t('controlLayers.transform.reset')}
           variant="ghost"
         >
           {t('controlLayers.transform.reset')}
         </Button>
         <Button
-          leftIcon={<PiCheckBold />}
           onClick={adapter.transformer.applyTransform}
-          isLoading={isProcessing}
+          isDisabled={isProcessing}
           loadingText={t('controlLayers.transform.apply')}
           variant="ghost"
         >
           {t('controlLayers.transform.apply')}
         </Button>
         <Button
-          leftIcon={<PiXBold />}
           onClick={adapter.transformer.stopTransform}
-          isLoading={isProcessing}
+          isDisabled={isProcessing}
           loadingText={t('common.cancel')}
           variant="ghost"
         >
