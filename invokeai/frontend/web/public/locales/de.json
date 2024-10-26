@@ -95,7 +95,8 @@
         "none": "Keine",
         "new": "Neu",
         "ok": "OK",
-        "close": "Schließen"
+        "close": "Schließen",
+        "clipboard": "Zwischenablage"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
