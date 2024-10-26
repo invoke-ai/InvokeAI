@@ -1,6 +1,6 @@
 import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useFocusRegion } from 'common/hooks/focus';
+import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
@@ -32,6 +32,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
   const [containerRef, containerDims] = useMeasure<HTMLDivElement>();
   const ref = useRef<HTMLDivElement>(null);
   useFocusRegion('viewer', ref, useFocusRegionOptions);
+  const isRegionFocused = useIsRegionFocused('viewer');
 
   return (
     <Flex
@@ -40,6 +41,8 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
       layerStyle="first"
       p={2}
       borderRadius="base"
+      borderWidth={1}
+      borderColor={isRegionFocused ? 'blue.300' : 'transparent'}
       position="absolute"
       flexDirection="column"
       top={0}

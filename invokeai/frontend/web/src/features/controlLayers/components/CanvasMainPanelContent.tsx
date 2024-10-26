@@ -1,6 +1,6 @@
 import { ContextMenu, Flex, IconButton, Menu, MenuButton, MenuList } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { useFocusRegion } from 'common/hooks/focus';
+import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
 import { CanvasAlertsSendingToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
@@ -42,6 +42,7 @@ export const CanvasMainPanelContent = memo(() => {
   }, []);
 
   useFocusRegion('canvas', ref);
+  const isRegionFocused = useIsRegionFocused('canvas');
 
   return (
     <Flex
@@ -55,6 +56,9 @@ export const CanvasMainPanelContent = memo(() => {
       gap={2}
       alignItems="center"
       justifyContent="center"
+      borderWidth={1}
+      p={1}
+      borderColor={isRegionFocused ? 'blue.300' : 'transparent'}
     >
       <CanvasManagerProviderGate>
         <CanvasToolbar />

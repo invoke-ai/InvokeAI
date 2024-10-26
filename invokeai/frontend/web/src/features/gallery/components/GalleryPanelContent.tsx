@@ -1,6 +1,6 @@
 import { Box, Button, Collapse, Divider, Flex, IconButton, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { useFocusRegion } from 'common/hooks/focus';
+import { useFocusRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { GalleryHeader } from 'features/gallery/components/GalleryHeader';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
@@ -28,6 +28,7 @@ const GalleryPanelContent = () => {
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
   const galleryPanelFocusRef = useRef<HTMLDivElement>(null);
   useFocusRegion('gallery', galleryPanelFocusRef);
+  const isRegionFocused = useIsRegionFocused('gallery');
 
   const boardsListPanelOptions = useMemo<UsePanelOptions>(
     () => ({
@@ -50,7 +51,19 @@ const GalleryPanelContent = () => {
   }, [boardSearchText.length, boardSearchDisclosure, boardsListPanel, dispatch]);
 
   return (
-    <Flex ref={galleryPanelFocusRef} position="relative" flexDirection="column" h="full" w="full" tabIndex={-1}>
+    <Flex
+      ref={galleryPanelFocusRef}
+      position="relative"
+      flexDirection="column"
+      h="full"
+      w="full"
+      tabIndex={-1}
+      p={1}
+      marginTop={-1}
+      borderWidth={1}
+      borderRadius="base"
+      borderColor={isRegionFocused ? 'invokeBlue.300' : 'transparent'}
+    >
       <Flex alignItems="center" justifyContent="space-between" w="full">
         <Flex flexGrow={1} flexBasis={0}>
           <Button
