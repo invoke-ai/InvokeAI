@@ -46,6 +46,8 @@ import { useCallback } from 'react';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { ControlNetModelConfig, ImageDTO, IPAdapterModelConfig, T2IAdapterModelConfig } from 'services/api/types';
 import { isControlNetOrT2IAdapterModelConfig, isIPAdapterModelConfig } from 'services/api/types';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 
 export const selectDefaultControlAdapter = createSelector(
   selectModelConfigsQuery,
@@ -194,18 +196,31 @@ export const useNewCanvasFromImage = () => {
   const bboxRect = useAppSelector(selectBboxRect);
   const base = useAppSelector(selectBboxModelBase);
   const func = useCallback(
-    (imageDTO: ImageDTO) => {
+    (imageDTO: ImageDTO, type: CanvasRasterLayerState['type'] | CanvasControlLayerState['type']) => {
       // Calculate the new bbox dimensions to fit the image's aspect ratio at the optimal size
       const ratio = imageDTO.width / imageDTO.height;
       const optimalDimension = getOptimalDimension(base);
       const { width, height } = calculateNewSize(ratio, optimalDimension ** 2, base);
 
       // The overrides need to include the layer's ID so we can transform the layer it is initialized
-      const overrides = {
-        id: getPrefixedId('raster_layer'),
-        position: { x: bboxRect.x, y: bboxRect.y },
-        objects: [imageDTOToImageObject(imageDTO)],
-      } satisfies Partial<CanvasRasterLayerState>;
+      let overrides: Partial<CanvasRasterLayerState> | Partial<CanvasControlLayerState>;
+
+      if (type === 'raster_layer') {
+        overrides = {
+          id: getPrefixedId('raster_layer'),
+          position: { x: bboxRect.x, y: bboxRect.y },
+          objects: [imageDTOToImageObject(imageDTO)],
+        } satisfies Partial<CanvasRasterLayerState>;
+      } else if (type === 'control_layer') {
+        overrides = {
+          id: getPrefixedId('control_layer'),
+          position: { x: bboxRect.x, y: bboxRect.y },
+          objects: [imageDTOToImageObject(imageDTO)],
+        } satisfies Partial<CanvasControlLayerState>;
+      } else {
+        // Catch unhandled types
+        assert<Equals<typeof type, never>>(false);
+      }
 
       CanvasEntityAdapterBase.registerInitCallback(async (adapter) => {
         // Skip the callback if the adapter is not the one we are creating
@@ -222,7 +237,16 @@ export const useNewCanvasFromImage = () => {
       dispatch(canvasReset());
       // The `bboxChangedFromCanvas` reducer does no validation! Careful!
       dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
-      dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+
+      // The type casts are safe because the type is checked above
+      if (type === 'raster_layer') {
+        dispatch(rasterLayerAdded({ overrides: overrides as Partial<CanvasRasterLayerState>, isSelected: true }));
+      } else if (type === 'control_layer') {
+        dispatch(controlLayerAdded({ overrides: overrides as Partial<CanvasControlLayerState>, isSelected: true }));
+      } else {
+        // Catch unhandled types
+        assert<Equals<typeof type, never>>(false);
+      }
     },
     [base, bboxRect.x, bboxRect.y, dispatch]
   );
