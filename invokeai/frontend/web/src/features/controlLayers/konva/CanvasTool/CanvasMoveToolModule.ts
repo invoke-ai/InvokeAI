@@ -1,3 +1,4 @@
+import { $focusedRegion } from 'common/hooks/focus';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
@@ -35,7 +36,7 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
 
   onKeyDown = (e: KeyboardEvent) => {
     // Support moving via arrow keys
-    const OFFSET = 1; // Define a constant for the movement offset
+    const OFFSET = 1; // How much to move, in px
     const offsets: Record<string, { x: number; y: number }> = {
       ArrowLeft: { x: -OFFSET, y: 0 },
       ArrowRight: { x: OFFSET, y: 0 },
@@ -45,8 +46,8 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
     const { key } = e;
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (!(selectedEntity && selectedEntity.$isInteractable.get())) {
-      return; // Early return if no entity is selected or it is disabled
+    if (!(selectedEntity && selectedEntity.$isInteractable.get() && $focusedRegion.get() === 'canvas')) {
+      return; // Early return if no entity is selected or it is disabled or canvas is not focused
     }
 
     const { x: offsetX = 0, y: offsetY = 0 } = offsets[key] || {};
