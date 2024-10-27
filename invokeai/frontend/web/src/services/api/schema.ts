@@ -7912,6 +7912,13 @@ export type components = {
              */
             line_width_percent?: number;
             /**
+             * Line Mode
+             * @description Where to apply the mask
+             * @default both
+             * @enum {string}
+             */
+            line_mode?: "inner" | "outer" | "both";
+            /**
              * type
              * @default img_alpha_to_outline
              * @constant

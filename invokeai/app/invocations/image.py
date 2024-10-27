@@ -1070,6 +1070,7 @@ class ImageAlphaToOutlineInvocation(BaseInvocation, WithMetadata, WithBoard):
         le=100,
         description="The width of the outline as a percentage of image dimension",
     )
+    line_mode: Literal["inner", "outer", "both"] = InputField(default="both", description="Where to apply the mask")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         img_pil = context.images.get_pil(self.image.image_name, mode="RGBA")
@@ -1096,6 +1097,15 @@ class ImageAlphaToOutlineInvocation(BaseInvocation, WithMetadata, WithBoard):
             color=(255,),
             thickness=line_width,
         )
+
+        # Limit drawing the outline
+        if self.line_mode == "inner":
+            contour_mask = numpy.minimum(contour_mask, binary_mask)
+        if self.line_mode == "outer":
+            inverted_binary_mask = cv2.bitwise_not(binary_mask)
+            contour_mask = cv2.bitwise_and(contour_mask, inverted_binary_mask)
+        if self.line_mode == "both":
+            pass
 
         # Create our result image, fully transparent
         result_rgba = numpy.zeros((contour_mask.shape[0], contour_mask.shape[1], 4), dtype=numpy.uint8)
