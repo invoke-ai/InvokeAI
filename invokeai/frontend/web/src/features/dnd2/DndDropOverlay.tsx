@@ -40,7 +40,7 @@ export const DndDropOverlay = memo((props: Props) => {
         left={0.5}
         opacity={1}
         borderWidth={1.5}
-        borderColor={dndState === 'active' ? 'invokeYellow.300' : 'base.500'}
+        borderColor={dndState === 'over' ? 'invokeYellow.300' : 'base.500'}
         borderRadius="base"
         borderStyle="dashed"
         transitionProperty="common"
@@ -52,7 +52,7 @@ export const DndDropOverlay = memo((props: Props) => {
           <Text
             fontSize="lg"
             fontWeight="semibold"
-            color={dndState === 'active' ? 'invokeYellow.300' : 'base.500'}
+            color={dndState === 'over' ? 'invokeYellow.300' : 'base.500'}
             transitionProperty="common"
             transitionDuration="0.1s"
             textAlign="center"

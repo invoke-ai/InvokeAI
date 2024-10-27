@@ -53,6 +53,7 @@
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.4.0",
+    "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^1.4.0",
     "@dagrejs/dagre": "^1.1.4",
     "@dagrejs/graphlib": "^2.2.4",
     "@dnd-kit/core": "^6.1.0",

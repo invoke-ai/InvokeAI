@@ -225,24 +225,30 @@ export const removeFromBoardDndTarget = buildDndTargetApi<RemoveFromBoardDndTarg
 );
 
 const targetApis = [
+  // Set a reference image on existing layer
   setGlobalReferenceImageDndTarget,
   setRegionalGuidanceReferenceImageDndTarget,
   // Add layer from image
   addRasterLayerFromImageDndTarget,
   addControlLayerFromImageDndTarget,
+  // Add a layer w/ ref image preset
   addGlobalReferenceImageFromImageDndTarget,
   addRegionalGuidanceReferenceImageFromImageDndTarget,
-  //
+  // Replace layer content w/ image
+  replaceLayerWithImageDndTarget,
+  // Set the upscale image
+  setUpscaleInitialImageFromImageDndTarget,
+  // Set a field on a node
+  setNodeImageFieldDndTarget,
+  // Select images for comparison
+  selectForCompareDndTarget,
+  // Add an image to a board
+  addToBoardDndTarget,
+  // Remove an image from a board - essentially add to Uncategorized
+  removeFromBoardDndTarget,
+  // These are currently unused
   addRegionalGuidanceFromImageDndTarget,
   addInpaintMaskFromImageDndTarget,
-  //
-  replaceLayerWithImageDndTarget,
-  setUpscaleInitialImageFromImageDndTarget,
-  setNodeImageFieldDndTarget,
-  selectForCompareDndTarget,
-  // Board ops
-  addToBoardDndTarget,
-  removeFromBoardDndTarget,
 ] as const;
 
 /**
@@ -294,4 +300,4 @@ export const isValidDrop = (sourceData: DndSourceData, targetData: DndTargetData
   return false;
 };
 
-export type DndState = 'idle' | 'pending' | 'active';
+export type DndState = 'idle' | 'potential' | 'over';

@@ -1,21 +1,57 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { dropTargetForExternal, monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
+import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
+import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import { Box } from '@invoke-ai/ui-library';
 import { dndDropped } from 'app/store/middleware/listenerMiddleware/listeners/dnd';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { DndDropOverlay } from 'features/dnd2/DndDropOverlay';
 import type { DndState, DndTargetData } from 'features/dnd2/types';
-import { isDndSourceData, isValidDrop } from 'features/dnd2/types';
+import { isDndSourceData, isValidDrop, singleImageDndSource } from 'features/dnd2/types';
 import { memo, useEffect, useRef, useState } from 'react';
+import { uploadImage } from 'services/api/endpoints/images';
+import { z } from 'zod';
+
+const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpg', 'image/jpeg'];
+const ACCEPTED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
+const MAX_IMAGE_SIZE = 4; //In MegaBytes
+
+const sizeInMB = (sizeInBytes: number, decimalsNum = 2) => {
+  const result = sizeInBytes / (1024 * 1024);
+  return +result.toFixed(decimalsNum);
+};
+
+const zUploadFile = z
+  .custom<File>()
+  .refine(
+    (file) => {
+      return sizeInMB(file.size) <= MAX_IMAGE_SIZE;
+    },
+    () => ({ message: `The maximum image size is ${MAX_IMAGE_SIZE}MB` })
+  )
+  .refine(
+    (file) => {
+      return ACCEPTED_IMAGE_TYPES.includes(file.type);
+    },
+    (file) => ({ message: `File type ${file.type} is not supported` })
+  )
+  .refine(
+    (file) => {
+      return ACCEPTED_FILE_EXTENSIONS.some((ext) => file.name.endsWith(ext));
+    },
+    (file) => ({ message: `File extension .${file.name.split('.').at(-1)} is not supported` })
+  );
 
 type Props = {
-  label?: string;
-  disabled?: boolean;
+  label: string;
   targetData: DndTargetData;
+  elementDropEnabled?: boolean;
+  externalDropEnabled?: boolean;
 };
 
 export const DndDropTarget = memo((props: Props) => {
-  const { label, targetData, disabled } = props;
+  const { label, targetData, elementDropEnabled = true, externalDropEnabled = true } = props;
   const [dndState, setDndState] = useState<DndState>('idle');
   const ref = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
@@ -25,11 +61,15 @@ export const DndDropTarget = memo((props: Props) => {
       return;
     }
 
+    if (!elementDropEnabled) {
+      return;
+    }
+
     return combine(
       dropTargetForElements({
         element: ref.current,
         canDrop: (args) => {
-          if (disabled) {
+          if (!elementDropEnabled) {
             return false;
           }
           const sourceData = args.source.data;
@@ -39,10 +79,10 @@ export const DndDropTarget = memo((props: Props) => {
           return isValidDrop(sourceData, targetData);
         },
         onDragEnter: () => {
-          setDndState('active');
+          setDndState('over');
         },
         onDragLeave: () => {
-          setDndState('pending');
+          setDndState('potential');
         },
         getData: () => targetData,
         onDrop: (args) => {
@@ -55,9 +95,6 @@ export const DndDropTarget = memo((props: Props) => {
       }),
       monitorForElements({
         canMonitor: (args) => {
-          if (disabled) {
-            return false;
-          }
           const sourceData = args.source.data;
           if (!isDndSourceData(sourceData)) {
             return false;
@@ -65,14 +102,79 @@ export const DndDropTarget = memo((props: Props) => {
           return isValidDrop(sourceData, targetData);
         },
         onDragStart: () => {
-          setDndState('pending');
+          setDndState('potential');
         },
         onDrop: () => {
           setDndState('idle');
         },
       })
     );
-  }, [targetData, disabled, dispatch]);
+  }, [targetData, dispatch, elementDropEnabled]);
+
+  useEffect(() => {
+    if (!ref.current) {
+      return;
+    }
+
+    if (!externalDropEnabled) {
+      return;
+    }
+
+    return combine(
+      dropTargetForExternal({
+        element: ref.current,
+        canDrop: (args) => {
+          if (!externalDropEnabled) {
+            return false;
+          }
+          if (!containsFiles(args)) {
+            return false;
+          }
+          return true;
+        },
+        onDragEnter: () => {
+          setDndState('over');
+        },
+        onDragLeave: () => {
+          setDndState('potential');
+        },
+        onDrop: async ({ source }) => {
+          const files = await getFiles({ source });
+          for (const file of files) {
+            if (file === null) {
+              continue;
+            }
+            if (!zUploadFile.safeParse(file).success) {
+              continue;
+            }
+            const imageDTO = await uploadImage({
+              blob: file,
+              fileName: file.name,
+              image_category: 'user',
+              is_intermediate: false,
+            });
+            dispatch(dndDropped({ sourceData: singleImageDndSource.getData({ imageDTO }), targetData }));
+          }
+        },
+      }),
+      monitorForExternal({
+        canMonitor: (args) => {
+          if (!containsFiles(args)) {
+            return false;
+          }
+          return true;
+        },
+        onDragStart: () => {
+          setDndState('potential');
+          preventUnhandled.start();
+        },
+        onDrop: () => {
+          setDndState('idle');
+          preventUnhandled.stop();
+        },
+      })
+    );
+  }, [targetData, dispatch, externalDropEnabled]);
 
   return (
     <Box
@@ -84,6 +186,7 @@ export const DndDropTarget = memo((props: Props) => {
       left={0}
       w="full"
       h="full"
+      // We must disable pointer events when idle to prevent the overlay from blocking clicks
       pointerEvents={dndState === 'idle' ? 'none' : 'auto'}
     >
       <DndDropOverlay dndState={dndState} label={label} />

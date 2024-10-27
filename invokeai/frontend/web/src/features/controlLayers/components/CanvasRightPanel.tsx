@@ -1,5 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { dropTargetForExternal, monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
 import { Box, Button, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
@@ -87,6 +88,7 @@ const PanelTabs = memo(() => {
   const [galleryTabDndState, setGalleryTabDndState] = useState<DndState>('idle');
   const layersTabRef = useRef<HTMLDivElement>(null);
   const galleryTabRef = useRef<HTMLDivElement>(null);
+  const timeoutRef = useRef<number | null>(null);
 
   const layersTabLabel = useMemo(() => {
     if (activeEntityCount === 0) {
@@ -95,117 +97,151 @@ const PanelTabs = memo(() => {
     return `${t('controlLayers.layer_other')} (${activeEntityCount})`;
   }, [activeEntityCount, t]);
 
-  /**
-   * Handle dnd events for the tabs. When a tab is hovered for a certain amount of time, switch to that tab.
-   */
   useEffect(() => {
-    if (!layersTabRef.current || !galleryTabRef.current) {
+    if (!layersTabRef.current) {
       return;
     }
 
-    let tabTimeout: number | null = null;
+    const onDragEnter = () => {
+      // If we are already on the layers tab, do nothing
+      if (selectActiveTabCanvasRightPanel(store.getState()) === 'layers') {
+        return;
+      }
 
-    const layersTabCleanup = combine(
-      dropTargetForElements({
-        element: layersTabRef.current,
-        onDragEnter: () => {
-          // If we are already on the layers tab, do nothing
-          if (selectActiveTabCanvasRightPanel(store.getState()) === 'layers') {
-            return;
-          }
-
-          // Else set the state to active and switch to the layers tab after a timeout
-          setLayersTabDndState('active');
-          tabTimeout = window.setTimeout(() => {
-            tabTimeout = null;
-            store.dispatch(activeTabCanvasRightPanelChanged('layers'));
-            // When we switch tabs, the other tab should be pending
-            setLayersTabDndState('idle');
-            setGalleryTabDndState('pending');
-          }, 300);
-        },
-        onDragLeave: () => {
-          // Set the state to idle or pending depending on the current tab
-          if (selectActiveTabCanvasRightPanel(store.getState()) === 'layers') {
-            setLayersTabDndState('idle');
-          } else {
-            setLayersTabDndState('pending');
-          }
-          // Abort the tab switch if it hasn't happened yet
-          if (tabTimeout !== null) {
-            clearTimeout(tabTimeout);
-          }
-        },
-      }),
-      monitorForElements({
-        // Only monitor if we are not already on the layers tab
-        canMonitor: () => selectActiveTabCanvasRightPanel(store.getState()) !== 'layers',
-        onDragStart: () => {
-          // Set the state to pending when a drag starts
-          setLayersTabDndState('pending');
-        },
-      })
-    );
-
-    const galleryTabCleanup = combine(
-      dropTargetForElements({
-        element: galleryTabRef.current,
-        onDragEnter: () => {
-          // If we are already on the gallery tab, do nothing
-          if (selectActiveTabCanvasRightPanel(store.getState()) === 'gallery') {
-            return;
-          }
-
-          // Else set the state to active and switch to the gallery tab after a timeout
-          setGalleryTabDndState('active');
-          tabTimeout = window.setTimeout(() => {
-            tabTimeout = null;
-            store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
-            // When we switch tabs, the other tab should be pending
-            setGalleryTabDndState('idle');
-            setLayersTabDndState('pending');
-          }, 300);
-        },
-        onDragLeave: () => {
-          // Set the state to idle or pending depending on the current tab
-          if (selectActiveTabCanvasRightPanel(store.getState()) === 'gallery') {
-            setGalleryTabDndState('idle');
-          } else {
-            setGalleryTabDndState('pending');
-          }
-          // Abort the tab switch if it hasn't happened yet
-          if (tabTimeout !== null) {
-            clearTimeout(tabTimeout);
-          }
-        },
-      }),
-      monitorForElements({
-        // Only monitor if we are not already on the gallery tab
-        canMonitor: () => selectActiveTabCanvasRightPanel(store.getState()) !== 'gallery',
-        onDragStart: () => {
-          // Set the state to pending when a drag starts
-          setGalleryTabDndState('pending');
-        },
-      })
-    );
-
-    const sharedCleanup = monitorForElements({
-      onDrop: () => {
-        // Reset the dnd state when a drop happens
-        setGalleryTabDndState('idle');
+      // Else set the state to active and switch to the layers tab after a timeout
+      setLayersTabDndState('over');
+      timeoutRef.current = window.setTimeout(() => {
+        timeoutRef.current = null;
+        store.dispatch(activeTabCanvasRightPanelChanged('layers'));
+        // When we switch tabs, the other tab should be pending
         setLayersTabDndState('idle');
-      },
-    });
-
-    return () => {
-      layersTabCleanup();
-      galleryTabCleanup();
-      sharedCleanup();
-      if (tabTimeout !== null) {
-        clearTimeout(tabTimeout);
+        setGalleryTabDndState('potential');
+      }, 300);
+    };
+    const onDragLeave = () => {
+      // Set the state to idle or pending depending on the current tab
+      if (selectActiveTabCanvasRightPanel(store.getState()) === 'layers') {
+        setLayersTabDndState('idle');
+      } else {
+        setLayersTabDndState('potential');
+      }
+      // Abort the tab switch if it hasn't happened yet
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
       }
     };
+    const canMonitor = () => {
+      // Only monitor if we are not already on the layers tab
+      return selectActiveTabCanvasRightPanel(store.getState()) !== 'layers';
+    };
+    const onDragStart = () => {
+      // Set the state to pending when a drag starts
+      setLayersTabDndState('potential');
+    };
+    return combine(
+      dropTargetForElements({
+        element: layersTabRef.current,
+        onDragEnter,
+        onDragLeave,
+      }),
+      monitorForElements({
+        canMonitor,
+        onDragStart,
+      }),
+      dropTargetForExternal({
+        element: layersTabRef.current,
+        onDragEnter,
+        onDragLeave,
+      }),
+      monitorForExternal({
+        canMonitor,
+        onDragStart,
+      })
+    );
   }, [store]);
+
+  useEffect(() => {
+    if (!galleryTabRef.current) {
+      return;
+    }
+
+    const onDragEnter = () => {
+      // If we are already on the gallery tab, do nothing
+      if (selectActiveTabCanvasRightPanel(store.getState()) === 'gallery') {
+        return;
+      }
+
+      // Else set the state to active and switch to the gallery tab after a timeout
+      setGalleryTabDndState('over');
+      timeoutRef.current = window.setTimeout(() => {
+        timeoutRef.current = null;
+        store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
+        // When we switch tabs, the other tab should be pending
+        setGalleryTabDndState('idle');
+        setLayersTabDndState('potential');
+      }, 300);
+    };
+
+    const onDragLeave = () => {
+      // Set the state to idle or pending depending on the current tab
+      if (selectActiveTabCanvasRightPanel(store.getState()) === 'gallery') {
+        setGalleryTabDndState('idle');
+      } else {
+        setGalleryTabDndState('potential');
+      }
+      // Abort the tab switch if it hasn't happened yet
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+
+    const canMonitor = () => {
+      // Only monitor if we are not already on the gallery tab
+      return selectActiveTabCanvasRightPanel(store.getState()) !== 'gallery';
+    };
+
+    const onDragStart = () => {
+      // Set the state to pending when a drag starts
+      setGalleryTabDndState('potential');
+    };
+
+    return combine(
+      dropTargetForElements({
+        element: galleryTabRef.current,
+        onDragEnter,
+        onDragLeave,
+      }),
+      monitorForElements({
+        canMonitor,
+        onDragStart,
+      }),
+      dropTargetForExternal({
+        element: galleryTabRef.current,
+        onDragEnter,
+        onDragLeave,
+      }),
+      monitorForExternal({
+        canMonitor,
+        onDragStart,
+      })
+    );
+  }, [store]);
+
+  useEffect(() => {
+    const onDrop = () => {
+      // Reset the dnd state when a drop happens
+      setGalleryTabDndState('idle');
+      setLayersTabDndState('idle');
+    };
+    const cleanup = combine(monitorForElements({ onDrop }), monitorForExternal({ onDrop }));
+
+    return () => {
+      cleanup();
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <>
