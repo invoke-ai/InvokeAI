@@ -20,9 +20,9 @@ const GalleryImageGrid = () => {
   useGalleryHotkeys();
   const { t } = useTranslation();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
-  const { imageDTOs, isLoading, isError } = useListImagesQuery(queryArgs, {
+  const { hasImages, isLoading, isError } = useListImagesQuery(queryArgs, {
     selectFromResult: ({ data, isLoading, isSuccess, isError }) => ({
-      imageDTOs: data?.items ?? EMPTY_ARRAY,
+      hasImages: data && data.items.length > 0,
       isLoading,
       isSuccess,
       isError,
@@ -45,7 +45,7 @@ const GalleryImageGrid = () => {
     );
   }
 
-  if (imageDTOs.length === 0) {
+  if (!hasImages) {
     return (
       <Flex w="full" h="full" alignItems="center" justifyContent="center">
         <IAINoContentFallback label={t('gallery.noImagesInGallery')} icon={PiImageBold} />
@@ -53,12 +53,12 @@ const GalleryImageGrid = () => {
     );
   }
 
-  return <Content />;
+  return <GalleryImageGridContent />;
 };
 
 export default memo(GalleryImageGrid);
 
-const Content = () => {
+const GalleryImageGridContent = memo(() => {
   const dispatch = useAppDispatch();
   const galleryImageMinimumWidth = useAppSelector(selectGalleryImageMinimumWidth);
 
@@ -178,12 +178,14 @@ const Content = () => {
           gridTemplateColumns={`repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`}
           gap={1}
         >
-          {imageDTOs.map((imageDTO, index) => (
-            <GalleryImage key={imageDTO.image_name} imageDTO={imageDTO} index={index} />
+          {imageDTOs.map((imageDTO) => (
+            <GalleryImage key={imageDTO.image_name} imageDTO={imageDTO} />
           ))}
         </Grid>
       </Box>
       <GallerySelectionCountTag />
     </Box>
   );
-};
+});
+
+GalleryImageGridContent.displayName = 'GalleryImageGridContent';
