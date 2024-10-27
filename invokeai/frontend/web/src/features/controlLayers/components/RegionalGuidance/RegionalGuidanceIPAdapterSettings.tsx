@@ -20,8 +20,9 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import type { RGIPAdapterImageDropData } from 'features/dnd/types';
-import { memo, useCallback, useMemo } from 'react';
+import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd2/types';
+import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd2/types';
+import { memo, useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiTrashSimpleFill } from 'react-icons/pi';
 import type { ImageDTO, IPAdapterModelConfig, RGIPAdapterImagePostUploadAction } from 'services/api/types';
@@ -34,6 +35,7 @@ type Props = {
 export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Props) => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
+  const dndId = useId();
   const dispatch = useAppDispatch();
   const onDeleteIPAdapter = useCallback(() => {
     dispatch(rgIPAdapterDeleted({ entityIdentifier, referenceImageId }));
@@ -91,14 +93,16 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
     [dispatch, entityIdentifier, referenceImageId]
   );
 
-  const droppableData = useMemo<RGIPAdapterImageDropData>(
-    () => ({
-      actionType: 'SET_RG_IP_ADAPTER_IMAGE',
-      context: { id: entityIdentifier.id, referenceImageId: referenceImageId },
-      id: entityIdentifier.id,
-    }),
-    [entityIdentifier.id, referenceImageId]
+  const targetData = useMemo<SetRegionalGuidanceReferenceImageDndTargetData>(
+    () =>
+      setRegionalGuidanceReferenceImageDndTarget.getData({
+        dndId,
+        regionalGuidanceId: entityIdentifier.id,
+        referenceImageId,
+      }),
+    [dndId, entityIdentifier.id, referenceImageId]
   );
+
   const postUploadAction = useMemo<RGIPAdapterImagePostUploadAction>(
     () => ({ type: 'SET_RG_IP_ADAPTER_IMAGE', id: entityIdentifier.id, referenceImageId: referenceImageId }),
     [entityIdentifier.id, referenceImageId]
@@ -151,9 +155,9 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
             <IPAdapterImagePreview
-              image={ipAdapter.image ?? null}
+              image={ipAdapter.image}
               onChangeImage={onChangeImage}
-              droppableData={droppableData}
+              targetData={targetData}
               postUploadAction={postUploadAction}
             />
           </Flex>

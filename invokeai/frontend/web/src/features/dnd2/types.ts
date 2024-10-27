@@ -2,37 +2,47 @@ import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types'
 import type { BoardId } from 'features/gallery/store/types';
 import type { ImageDTO } from 'services/api/types';
 
-export type DndData = Record<string | symbol, unknown>;
+type AnyRecord = Record<string | symbol, unknown>;
+export type BaseDndData = { dndId: string } & Record<string | symbol, unknown>;
 const _buildDataTypeGuard =
-  <T extends DndData>(key: symbol) =>
-  (data: DndData): data is T => {
+  <T extends AnyRecord>(key: symbol) =>
+  (data: AnyRecord): data is T => {
     return Boolean(data[key]);
   };
 const _buildDataGetter =
-  <T extends DndData>(key: symbol) =>
+  <T extends AnyRecord>(key: symbol) =>
   (data: Omit<T, typeof key>): T => {
     return {
       [key]: true,
       ...data,
     } as T;
   };
-const buildDndSourceApi = <T extends DndData>(key: symbol) =>
+const buildDndSourceApi = <T extends AnyRecord>(key: symbol) =>
   ({ key, typeGuard: _buildDataTypeGuard<T>(key), getData: _buildDataGetter<T>(key) }) as const;
+
+type WithDndId<T> = T & { dndId: string };
+
+type DndData<PrivateKey extends symbol, Data extends Record<string | symbol, unknown> = Record<string, never>> = {
+  [k in PrivateKey]: true;
+} & WithDndId<Data>;
 
 //#region DndSourceData
 const _SingleImageDndSourceDataKey = Symbol('SingleImageDndSourceData');
-export type SingleImageDndSourceData = {
+export type SingleImageDndSourceDataPrev = {
   [_SingleImageDndSourceDataKey]: true;
   imageDTO: ImageDTO;
 };
+export type SingleImageDndSourceData = DndData<typeof _SingleImageDndSourceDataKey, { imageDTO: ImageDTO }>;
 export const singleImageDndSource = buildDndSourceApi<SingleImageDndSourceData>(_SingleImageDndSourceDataKey);
 
 const _MultipleImageDndSourceDataKey = Symbol('MultipleImageDndSourceData');
-export type MultipleImageDndSourceData = {
-  [_MultipleImageDndSourceDataKey]: true;
-  imageDTOs: ImageDTO[];
-  boardId: BoardId;
-};
+export type MultipleImageDndSourceData = DndData<
+  typeof _MultipleImageDndSourceDataKey,
+  {
+    imageDTOs: ImageDTO[];
+    boardId: BoardId;
+  }
+>;
 export const multipleImageDndSource = buildDndSourceApi<MultipleImageDndSourceData>(_MultipleImageDndSourceDataKey);
 
 /**
@@ -40,7 +50,7 @@ export const multipleImageDndSource = buildDndSourceApi<MultipleImageDndSourceDa
  */
 const sourceApis = [singleImageDndSource, multipleImageDndSource] as const;
 export type DndSourceData = SingleImageDndSourceData | MultipleImageDndSourceData;
-export const isDndSourceData = (data: DndData): data is DndSourceData => {
+export const isDndSourceData = (data: AnyRecord): data is DndSourceData => {
   for (const sourceApi of sourceApis) {
     if (sourceApi.typeGuard(data)) {
       return true;
@@ -52,27 +62,31 @@ export const isDndSourceData = (data: DndData): data is DndSourceData => {
 //#endregion
 
 //#region DndTargetData
-const buildDndTargetApi = <T extends DndData>(
+const buildDndTargetApi = <T extends BaseDndData>(
   key: symbol,
   validateDrop: (sourceData: DndSourceData, targetData: T) => boolean
 ) => ({ key, typeGuard: _buildDataTypeGuard<T>(key), getData: _buildDataGetter<T>(key), validateDrop }) as const;
 
 const _SetGlobalReferenceImageDndTargetDataKey = Symbol('SetGlobalReferenceImageDndTargetData');
-export type SetGlobalReferenceImageDndTargetData = {
-  [_SetGlobalReferenceImageDndTargetDataKey]: true;
-  globalReferenceImageId: string;
-};
+export type SetGlobalReferenceImageDndTargetData = DndData<
+  typeof _SetGlobalReferenceImageDndTargetDataKey,
+  {
+    globalReferenceImageId: string;
+  }
+>;
 export const setGlobalReferenceImageDndTarget = buildDndTargetApi<SetGlobalReferenceImageDndTargetData>(
   _SetGlobalReferenceImageDndTargetDataKey,
   singleImageDndSource.typeGuard
 );
 
 const _SetRegionalGuidanceReferenceImageDndTargetDataKey = Symbol('SetRegionalGuidanceReferenceImageDndTargetData');
-export type SetRegionalGuidanceReferenceImageDndTargetData = {
-  [_SetRegionalGuidanceReferenceImageDndTargetDataKey]: true;
-  regionalGuidanceId: string;
-  referenceImageId: string;
-};
+export type SetRegionalGuidanceReferenceImageDndTargetData = DndData<
+  typeof _SetRegionalGuidanceReferenceImageDndTargetDataKey,
+  {
+    regionalGuidanceId: string;
+    referenceImageId: string;
+  }
+>;
 export const setRegionalGuidanceReferenceImageDndTarget =
   buildDndTargetApi<SetRegionalGuidanceReferenceImageDndTargetData>(
     _SetRegionalGuidanceReferenceImageDndTargetDataKey,
@@ -80,36 +94,28 @@ export const setRegionalGuidanceReferenceImageDndTarget =
   );
 
 const _AddRasterLayerFromImageDndTargetDataKey = Symbol('AddRasterLayerFromImageDndTargetData');
-export type AddRasterLayerFromImageDndTargetData = {
-  [_AddRasterLayerFromImageDndTargetDataKey]: true;
-};
+export type AddRasterLayerFromImageDndTargetData = DndData<typeof _AddRasterLayerFromImageDndTargetDataKey>;
 export const addRasterLayerFromImageDndTarget = buildDndTargetApi<AddRasterLayerFromImageDndTargetData>(
   _AddRasterLayerFromImageDndTargetDataKey,
   singleImageDndSource.typeGuard
 );
 
 const _AddControlLayerFromImageDndTargetDataKey = Symbol('AddControlLayerFromImageDndTargetData');
-export type AddControlLayerFromImageDndTargetData = {
-  [_AddControlLayerFromImageDndTargetDataKey]: true;
-};
+export type AddControlLayerFromImageDndTargetData = DndData<typeof _AddControlLayerFromImageDndTargetDataKey>;
 export const addControlLayerFromImageDndTarget = buildDndTargetApi<AddControlLayerFromImageDndTargetData>(
   _AddControlLayerFromImageDndTargetDataKey,
   singleImageDndSource.typeGuard
 );
 
 const _AddInpaintMaskFromImageDndTargetDataKey = Symbol('AddInpaintMaskFromImageDndTargetData');
-export type AddInpaintMaskFromImageDndTargetData = {
-  [_AddInpaintMaskFromImageDndTargetDataKey]: true;
-};
+export type AddInpaintMaskFromImageDndTargetData = DndData<typeof _AddInpaintMaskFromImageDndTargetDataKey>;
 export const addInpaintMaskFromImageDndTarget = buildDndTargetApi<AddInpaintMaskFromImageDndTargetData>(
   _AddInpaintMaskFromImageDndTargetDataKey,
   singleImageDndSource.typeGuard
 );
 
 const _AddRegionalGuidanceFromImageDndTargetDataKey = Symbol('AddRegionalGuidanceFromImageDndTargetData');
-export type AddRegionalGuidanceFromImageDndTargetData = {
-  [_AddRegionalGuidanceFromImageDndTargetDataKey]: true;
-};
+export type AddRegionalGuidanceFromImageDndTargetData = DndData<typeof _AddRegionalGuidanceFromImageDndTargetDataKey>;
 export const addRegionalGuidanceFromImageDndTarget = buildDndTargetApi<AddRegionalGuidanceFromImageDndTargetData>(
   _AddRegionalGuidanceFromImageDndTargetDataKey,
   singleImageDndSource.typeGuard
@@ -118,9 +124,9 @@ export const addRegionalGuidanceFromImageDndTarget = buildDndTargetApi<AddRegion
 const _AddRegionalGuidanceReferenceImageFromImageDndTargetDataKey = Symbol(
   'AddRegionalGuidanceReferenceImageFromImageDndTargetData'
 );
-export type AddRegionalGuidanceReferenceImageFromImageDndTargetData = {
-  [_AddRegionalGuidanceReferenceImageFromImageDndTargetDataKey]: true;
-};
+export type AddRegionalGuidanceReferenceImageFromImageDndTargetData = DndData<
+  typeof _AddRegionalGuidanceReferenceImageFromImageDndTargetDataKey
+>;
 export const addRegionalGuidanceReferenceImageFromImageDndTarget =
   buildDndTargetApi<AddRegionalGuidanceReferenceImageFromImageDndTargetData>(
     _AddRegionalGuidanceReferenceImageFromImageDndTargetDataKey,
@@ -128,9 +134,9 @@ export const addRegionalGuidanceReferenceImageFromImageDndTarget =
   );
 
 const _AddGlobalReferenceImageFromImageDndTargetDataKey = Symbol('AddGlobalReferenceImageFromImageDndTargetData');
-export type AddGlobalReferenceImageFromImageDndTargetData = {
-  [_AddGlobalReferenceImageFromImageDndTargetDataKey]: true;
-};
+export type AddGlobalReferenceImageFromImageDndTargetData = DndData<
+  typeof _AddGlobalReferenceImageFromImageDndTargetDataKey
+>;
 export const addGlobalReferenceImageFromImageDndTarget =
   buildDndTargetApi<AddGlobalReferenceImageFromImageDndTargetData>(
     _AddGlobalReferenceImageFromImageDndTargetDataKey,
@@ -138,51 +144,66 @@ export const addGlobalReferenceImageFromImageDndTarget =
   );
 
 const _ReplaceLayerWithImageDndTargetDataKey = Symbol('ReplaceLayerWithImageDndTargetData');
-export type ReplaceLayerWithImageDndTargetData = {
-  [_ReplaceLayerWithImageDndTargetDataKey]: true;
-  entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer' | 'inpaint_mask' | 'regional_guidance'>;
-};
+export type ReplaceLayerWithImageDndTargetData = DndData<
+  typeof _ReplaceLayerWithImageDndTargetDataKey,
+  {
+    entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer' | 'inpaint_mask' | 'regional_guidance'>;
+  }
+>;
 export const replaceLayerWithImageDndTarget = buildDndTargetApi<ReplaceLayerWithImageDndTargetData>(
   _ReplaceLayerWithImageDndTargetDataKey,
   singleImageDndSource.typeGuard
 );
 
 const _SetUpscaleInitialImageFromImageDndTargetDataKey = Symbol('SetUpscaleInitialImageFromImageDndTargetData');
-export type SetUpscaleInitialImageFromImageDndTargetData = {
-  [_SetUpscaleInitialImageFromImageDndTargetDataKey]: true;
-};
+export type SetUpscaleInitialImageFromImageDndTargetData = DndData<
+  typeof _SetUpscaleInitialImageFromImageDndTargetDataKey
+>;
 export const setUpscaleInitialImageFromImageDndTarget = buildDndTargetApi<SetUpscaleInitialImageFromImageDndTargetData>(
   _SetUpscaleInitialImageFromImageDndTargetDataKey,
   singleImageDndSource.typeGuard
 );
 
 const _SetNodeImageFieldDndTargetDataKey = Symbol('SetNodeImageFieldDndTargetData');
-export type SetNodeImageFieldDndTargetData = {
-  [_SetNodeImageFieldDndTargetDataKey]: true;
-  nodeId: string;
-  fieldName: string;
-};
+export type SetNodeImageFieldDndTargetData = DndData<
+  typeof _SetNodeImageFieldDndTargetDataKey,
+  {
+    nodeId: string;
+    fieldName: string;
+  }
+>;
 export const setNodeImageFieldDndTarget = buildDndTargetApi<SetNodeImageFieldDndTargetData>(
   _SetNodeImageFieldDndTargetDataKey,
   singleImageDndSource.typeGuard
 );
 
 const _SelectForCompareDndTargetDataKey = Symbol('SelectForCompareDndTargetData');
-export type SelectForCompareDndTargetData = {
-  [_SelectForCompareDndTargetDataKey]: true;
-  firstImageName?: string | null;
-  secondImageName?: string | null;
-};
+export type SelectForCompareDndTargetData = DndData<
+  typeof _SelectForCompareDndTargetDataKey,
+  {
+    firstImageName?: string | null;
+    secondImageName?: string | null;
+  }
+>;
 export const selectForCompareDndTarget = buildDndTargetApi<SelectForCompareDndTargetData>(
   _SelectForCompareDndTargetDataKey,
   singleImageDndSource.typeGuard
 );
 
+const _ToastDndTargetDataKey = Symbol('ToastDndTargetData');
+export type ToastDndTargetData = DndData<typeof _ToastDndTargetDataKey>;
+export const ToastDndTarget = buildDndTargetApi<ToastDndTargetData>(
+  _ToastDndTargetDataKey,
+  singleImageDndSource.typeGuard
+);
+
 const _AddToBoardDndTargetDataKey = Symbol('AddToBoardDndTargetData');
-export type AddToBoardDndTargetData = {
-  [_AddToBoardDndTargetDataKey]: true;
-  boardId: string;
-};
+export type AddToBoardDndTargetData = DndData<
+  typeof _AddToBoardDndTargetDataKey,
+  {
+    boardId: string;
+  }
+>;
 export const addToBoardDndTarget = buildDndTargetApi<AddToBoardDndTargetData>(
   _AddToBoardDndTargetDataKey,
   (sourceData, targetData) => {
@@ -204,9 +225,7 @@ export const addToBoardDndTarget = buildDndTargetApi<AddToBoardDndTargetData>(
 );
 
 const _RemoveFromBoardDndTargetDataKey = Symbol('RemoveFromBoardDndTargetData');
-export type RemoveFromBoardDndTargetData = {
-  [_RemoveFromBoardDndTargetDataKey]: true;
-};
+export type RemoveFromBoardDndTargetData = DndData<typeof _RemoveFromBoardDndTargetDataKey>;
 export const removeFromBoardDndTarget = buildDndTargetApi<RemoveFromBoardDndTargetData>(
   _RemoveFromBoardDndTargetDataKey,
   (sourceData) => {
@@ -270,7 +289,7 @@ export type DndTargetData =
   | RemoveFromBoardDndTargetData
   | SelectForCompareDndTargetData;
 
-export const isDndTargetData = (data: DndData): data is DndTargetData => {
+export const isDndTargetData = (data: BaseDndData): data is DndTargetData => {
   for (const targetApi of targetApis) {
     if (targetApi.typeGuard(data)) {
       return true;

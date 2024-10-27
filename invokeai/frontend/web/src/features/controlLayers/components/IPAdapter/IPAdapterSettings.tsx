@@ -19,8 +19,8 @@ import {
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import type { IPAImageDropData } from 'features/dnd/types';
-import { memo, useCallback, useMemo } from 'react';
+import { setGlobalReferenceImageDndTarget, type SetGlobalReferenceImageDndTargetData } from 'features/dnd2/types';
+import { memo, useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold } from 'react-icons/pi';
 import type { ImageDTO, IPAdapterModelConfig, IPALayerImagePostUploadAction } from 'services/api/types';
@@ -80,13 +80,15 @@ export const IPAdapterSettings = memo(() => {
     [dispatch, entityIdentifier]
   );
 
-  const droppableData = useMemo<IPAImageDropData>(
-    () => ({ actionType: 'SET_IPA_IMAGE', context: { id: entityIdentifier.id }, id: entityIdentifier.id }),
-    [entityIdentifier.id]
-  );
+  const dndId = useId();
+
   const postUploadAction = useMemo<IPALayerImagePostUploadAction>(
     () => ({ type: 'SET_IPA_IMAGE', id: entityIdentifier.id }),
     [entityIdentifier.id]
+  );
+  const targetData = useMemo<SetGlobalReferenceImageDndTargetData>(
+    () => setGlobalReferenceImageDndTarget.getData({ dndId, globalReferenceImageId: entityIdentifier.id }),
+    [dndId, entityIdentifier.id]
   );
   const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);
   const isBusy = useCanvasIsBusy();
@@ -122,9 +124,9 @@ export const IPAdapterSettings = memo(() => {
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
             <IPAdapterImagePreview
-              image={ipAdapter.image ?? null}
+              image={ipAdapter.image}
               onChangeImage={onChangeImage}
-              droppableData={droppableData}
+              targetData={targetData}
               postUploadAction={postUploadAction}
             />
           </Flex>

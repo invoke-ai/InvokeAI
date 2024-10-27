@@ -8,7 +8,7 @@ import { selectAllowPrivateBoards } from 'features/system/store/configSelectors'
 import type { OverlayScrollbarsComponentRef } from 'overlayscrollbars-react';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties } from 'react';
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useState } from 'react';
 
 import { BoardsList } from './BoardsList';
 
@@ -19,24 +19,20 @@ const overlayScrollbarsStyles: CSSProperties = {
 
 const BoardsListWrapper = () => {
   const allowPrivateBoards = useAppSelector(selectAllowPrivateBoards);
-  const osRef = useRef<OverlayScrollbarsComponentRef>(null);
+  const [os, osRef] = useState<OverlayScrollbarsComponentRef | null>(null);
   useEffect(() => {
-    const elements = osRef.current?.osInstance()?.elements();
-    if (!elements) {
+    const element = os?.osInstance()?.elements().viewport;
+    if (!element) {
       return;
     }
-    return combine(
-      autoScrollForElements({ element: elements.viewport }),
-      autoScrollForExternal({ element: elements.viewport })
-    );
-  }, []);
+    return combine(autoScrollForElements({ element }), autoScrollForExternal({ element }));
+  }, [os]);
 
   return (
     <Box position="relative" w="full" h="full">
       <Box position="absolute" top={0} right={0} bottom={0} left={0}>
         <OverlayScrollbarsComponent
           ref={osRef}
-          defer
           style={overlayScrollbarsStyles}
           options={overlayScrollbarsParams.options}
         >

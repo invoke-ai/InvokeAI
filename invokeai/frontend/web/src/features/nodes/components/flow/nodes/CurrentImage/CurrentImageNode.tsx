@@ -1,8 +1,8 @@
 import { Flex, Image, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIDndImage from 'common/components/IAIDndImage';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
+import { DndImage } from 'features/dnd2/DndImage';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectLastSelectedImage } from 'features/gallery/store/gallerySelectors';
 import NodeWrapper from 'features/nodes/components/flow/nodes/common/NodeWrapper';
@@ -10,7 +10,7 @@ import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import type { AnimationProps } from 'framer-motion';
 import { motion } from 'framer-motion';
 import type { CSSProperties, PropsWithChildren } from 'react';
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { NodeProps } from 'reactflow';
 import { $lastProgressEvent } from 'services/events/stores';
@@ -18,6 +18,7 @@ import { $lastProgressEvent } from 'services/events/stores';
 const CurrentImageNode = (props: NodeProps) => {
   const imageDTO = useAppSelector(selectLastSelectedImage);
   const lastProgressEvent = useStore($lastProgressEvent);
+  const dndId = useId();
 
   if (lastProgressEvent?.image) {
     return (
@@ -30,7 +31,7 @@ const CurrentImageNode = (props: NodeProps) => {
   if (imageDTO) {
     return (
       <Wrapper nodeProps={props}>
-        <IAIDndImage imageDTO={imageDTO} isDragDisabled useThumbailFallback />
+        <DndImage dndId={dndId} imageDTO={imageDTO} />
       </Wrapper>
     );
   }

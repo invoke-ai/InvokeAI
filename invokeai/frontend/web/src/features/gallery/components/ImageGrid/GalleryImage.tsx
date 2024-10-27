@@ -7,6 +7,7 @@ import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/lis
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd2/types';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
@@ -15,7 +16,7 @@ import { SizedSkeletonLoader } from 'features/gallery/components/ImageGrid/Sized
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { MouseEventHandler } from 'react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
 // This class name is used to calculate the number of images that fit in the gallery
@@ -83,6 +84,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [element, ref] = useState<HTMLImageElement | null>(null);
+  const dndId = useId();
   const selectIsSelectedForCompare = useMemo(
     () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name === imageDTO.image_name),
     [imageDTO.image_name]
@@ -114,11 +116,15 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
           if (gallery.selection.length > 1 && gallery.selection.includes(imageDTO)) {
-            return multipleImageDndSource.getData({ imageDTOs: gallery.selection, boardId: gallery.selectedBoardId });
+            return multipleImageDndSource.getData({
+              dndId: getPrefixedId('dnd-gallery-selection'),
+              imageDTOs: gallery.selection,
+              boardId: gallery.selectedBoardId,
+            });
           }
 
           // Otherwise, initiate a single-image drag
-          return singleImageDndSource.getData({ imageDTO });
+          return singleImageDndSource.getData({ dndId, imageDTO });
         },
         // This is a "local" drag start event, meaning that it is only called when this specific image is dragged.
         onDragStart: (args) => {
@@ -145,7 +151,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         },
       })
     );
-  }, [imageDTO, element, store]);
+  }, [imageDTO, element, store, dndId]);
 
   const isHovered = useBoolean(false);
 

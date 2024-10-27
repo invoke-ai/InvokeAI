@@ -3,9 +3,11 @@ import { dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-d
 import { dropTargetForExternal, monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/adapter';
 import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
 import { dndDropped } from 'app/store/middleware/listenerMiddleware/listeners/dnd';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { DndDropOverlay } from 'features/dnd2/DndDropOverlay';
 import type { DndState, DndTargetData } from 'features/dnd2/types';
 import { isDndSourceData, isValidDrop, singleImageDndSource } from 'features/dnd2/types';
@@ -21,6 +23,20 @@ const sizeInMB = (sizeInBytes: number, decimalsNum = 2) => {
   const result = sizeInBytes / (1024 * 1024);
   return +result.toFixed(decimalsNum);
 };
+
+const sx = {
+  position: 'absolute',
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  w: 'full',
+  h: 'full',
+  // We must disable pointer events when idle to prevent the overlay from blocking clicks
+  '&[data-dnd-state="idle"]': {
+    pointerEvents: 'none',
+  },
+} satisfies SystemStyleObject;
 
 const zUploadFile = z
   .custom<File>()
@@ -76,6 +92,9 @@ export const DndDropTarget = memo((props: Props) => {
           if (!isDndSourceData(sourceData)) {
             return false;
           }
+          if (targetData.dndId === sourceData.dndId) {
+            return false;
+          }
           return isValidDrop(sourceData, targetData);
         },
         onDragEnter: () => {
@@ -97,6 +116,9 @@ export const DndDropTarget = memo((props: Props) => {
         canMonitor: (args) => {
           const sourceData = args.source.data;
           if (!isDndSourceData(sourceData)) {
+            return false;
+          }
+          if (targetData.dndId === sourceData.dndId) {
             return false;
           }
           return isValidDrop(sourceData, targetData);
@@ -153,7 +175,12 @@ export const DndDropTarget = memo((props: Props) => {
               image_category: 'user',
               is_intermediate: false,
             });
-            dispatch(dndDropped({ sourceData: singleImageDndSource.getData({ imageDTO }), targetData }));
+            dispatch(
+              dndDropped({
+                sourceData: singleImageDndSource.getData({ dndId: getPrefixedId('random-dnd-id'), imageDTO }),
+                targetData,
+              })
+            );
           }
         },
       }),
@@ -177,18 +204,7 @@ export const DndDropTarget = memo((props: Props) => {
   }, [targetData, dispatch, externalDropEnabled]);
 
   return (
-    <Box
-      ref={ref}
-      position="absolute"
-      top={0}
-      right={0}
-      bottom={0}
-      left={0}
-      w="full"
-      h="full"
-      // We must disable pointer events when idle to prevent the overlay from blocking clicks
-      pointerEvents={dndState === 'idle' ? 'none' : 'auto'}
-    >
+    <Box ref={ref} sx={sx} data-dnd-state={dndState}>
       <DndDropOverlay dndState={dndState} label={label} />
     </Box>
   );

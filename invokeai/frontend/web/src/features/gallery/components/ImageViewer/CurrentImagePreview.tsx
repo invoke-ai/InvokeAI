@@ -2,17 +2,17 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from 'app/store/storeHooks';
-import IAIDndImage from 'common/components/IAIDndImage';
 import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
-import type { TypesafeDraggableData } from 'features/dnd/types';
+import { DndImage } from 'features/dnd2/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevImageButtons from 'features/gallery/components/NextPrevImageButtons';
 import { selectLastSelectedImageName } from 'features/gallery/store/gallerySelectors';
 import { selectShouldShowImageDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import { $hasProgressImage, $isProgressFromCanvas } from 'services/events/stores';
 
 import { NoContentForViewer } from './NoContentForViewer';
@@ -21,21 +21,8 @@ import ProgressImage from './ProgressImage';
 const CurrentImagePreview = () => {
   const shouldShowImageDetails = useAppSelector(selectShouldShowImageDetails);
   const imageName = useAppSelector(selectLastSelectedImageName);
-  const hasProgressImage = useStore($hasProgressImage);
-  const isProgressFromCanvas = useStore($isProgressFromCanvas);
-  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
 
   const { currentData: imageDTO } = useGetImageDTOQuery(imageName ?? skipToken);
-
-  const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (imageDTO) {
-      return {
-        id: 'current-image',
-        payloadType: 'IMAGE_DTO',
-        payload: { imageDTO },
-      };
-    }
-  }, [imageDTO]);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -60,20 +47,7 @@ const CurrentImagePreview = () => {
       justifyContent="center"
       position="relative"
     >
-      {hasProgressImage && !isProgressFromCanvas && shouldShowProgressInViewer ? (
-        <ProgressImage />
-      ) : (
-        <IAIDndImage
-          imageDTO={imageDTO}
-          draggableData={draggableData}
-          isDropDisabled={true}
-          isUploadDisabled={true}
-          fitContainer
-          useThumbailFallback
-          noContentFallback={<NoContentForViewer />}
-          dataTestId="image-preview"
-        />
-      )}
+      <ImageContent imageDTO={imageDTO} />
       <Box position="absolute" top={0} insetInlineStart={0}>
         <CanvasAlertsSendingToCanvas />
       </Box>
@@ -106,6 +80,27 @@ const CurrentImagePreview = () => {
 };
 
 export default memo(CurrentImagePreview);
+
+const ImageContent = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
+  const hasProgressImage = useStore($hasProgressImage);
+  const isProgressFromCanvas = useStore($isProgressFromCanvas);
+  const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+
+  if (hasProgressImage && !isProgressFromCanvas && shouldShowProgressInViewer) {
+    return <ProgressImage />;
+  }
+
+  if (!imageDTO) {
+    return <NoContentForViewer />;
+  }
+
+  return (
+    <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
+      <DndImage dndId="current-image" imageDTO={imageDTO} />
+    </Flex>
+  );
+});
+ImageContent.displayName = 'ImageContent';
 
 const initial: AnimationProps['initial'] = {
   opacity: 0,

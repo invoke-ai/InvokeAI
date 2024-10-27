@@ -7,12 +7,12 @@ import { $installModelsTab } from 'features/modelManagerV2/subpanels/InstallMode
 import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { selectIsLocal } from 'features/system/store/configSlice';
 import { setActiveTab } from 'features/ui/store/uiSlice';
-import { useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 
-export const NoContentForViewer = () => {
+export const NoContentForViewer = memo(() => {
   const hasImages = useHasImages();
   const [mainModels, { data }] = useMainModels();
   const isLocal = useAppSelector(selectIsLocal);
@@ -113,4 +113,6 @@ export const NoContentForViewer = () => {
       </Flex>
     </Flex>
   );
-};
+});
+
+NoContentForViewer.displayName = 'NoContentForViewer';
