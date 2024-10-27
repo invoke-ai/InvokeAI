@@ -1,34 +1,20 @@
 import { Grid, GridItem } from '@invoke-ai/ui-library';
-import IAIDroppable from 'common/components/IAIDroppable';
-import type {
-  AddControlLayerFromImageDropData,
-  AddGlobalReferenceImageFromImageDropData,
-  AddRasterLayerFromImageDropData,
-  AddRegionalReferenceImageFromImageDropData,
-} from 'features/dnd/types';
+import { DndDropTarget } from 'features/dnd2/DndDropTarget';
+import {
+  addControlLayerFromImageDndTarget,
+  addGlobalReferenceImageFromImageDndTarget,
+  addRasterLayerFromImageDndTarget,
+  addRegionalGuidanceReferenceImageFromImageDndTarget,
+} from 'features/dnd2/types';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const addRasterLayerFromImageDropData: AddRasterLayerFromImageDropData = {
-  id: 'add-raster-layer-from-image-drop-data',
-  actionType: 'ADD_RASTER_LAYER_FROM_IMAGE',
-};
-
-const addControlLayerFromImageDropData: AddControlLayerFromImageDropData = {
-  id: 'add-control-layer-from-image-drop-data',
-  actionType: 'ADD_CONTROL_LAYER_FROM_IMAGE',
-};
-
-const addRegionalReferenceImageFromImageDropData: AddRegionalReferenceImageFromImageDropData = {
-  id: 'add-control-layer-from-image-drop-data',
-  actionType: 'ADD_REGIONAL_REFERENCE_IMAGE_FROM_IMAGE',
-};
-
-const addGlobalReferenceImageFromImageDropData: AddGlobalReferenceImageFromImageDropData = {
-  id: 'add-control-layer-from-image-drop-data',
-  actionType: 'ADD_GLOBAL_REFERENCE_IMAGE_FROM_IMAGE',
-};
+const addRasterLayerFromImageDndTargetData = addRasterLayerFromImageDndTarget.getData({});
+const addControlLayerFromImageDndTargetData = addControlLayerFromImageDndTarget.getData({});
+const addRegionalGuidanceReferenceImageFromImageDndTargetData =
+  addRegionalGuidanceReferenceImageFromImageDndTarget.getData({});
+const addGlobalReferenceImageFromImageDndTargetData = addGlobalReferenceImageFromImageDndTarget.getData({});
 
 export const CanvasDropArea = memo(() => {
   const { t } = useTranslation();
@@ -51,28 +37,28 @@ export const CanvasDropArea = memo(() => {
         pointerEvents="none"
       >
         <GridItem position="relative">
-          <IAIDroppable
-            dropLabel={t('controlLayers.canvasContextMenu.newRasterLayer')}
-            data={addRasterLayerFromImageDropData}
+          <DndDropTarget
+            label={t('controlLayers.canvasContextMenu.newRasterLayer')}
+            targetData={addRasterLayerFromImageDndTargetData}
           />
         </GridItem>
         <GridItem position="relative">
-          <IAIDroppable
-            dropLabel={t('controlLayers.canvasContextMenu.newControlLayer')}
-            data={addControlLayerFromImageDropData}
+          <DndDropTarget
+            label={t('controlLayers.canvasContextMenu.newControlLayer')}
+            targetData={addControlLayerFromImageDndTargetData}
           />
         </GridItem>
 
         <GridItem position="relative">
-          <IAIDroppable
-            dropLabel={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
-            data={addRegionalReferenceImageFromImageDropData}
+          <DndDropTarget
+            label={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
+            targetData={addRegionalGuidanceReferenceImageFromImageDndTargetData}
           />
         </GridItem>
         <GridItem position="relative">
-          <IAIDroppable
-            dropLabel={t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
-            data={addGlobalReferenceImageFromImageDropData}
+          <DndDropTarget
+            label={t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
+            targetData={addGlobalReferenceImageFromImageDndTargetData}
           />
         </GridItem>
       </Grid>

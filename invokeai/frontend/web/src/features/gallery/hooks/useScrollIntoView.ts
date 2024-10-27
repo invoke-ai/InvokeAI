@@ -1,7 +1,9 @@
+import { useAppSelector } from 'app/store/storeHooks';
 import { virtuosoGridRefs } from 'features/gallery/components/ImageGrid/types';
+import { selectHasMultipleImagesSelected } from 'features/gallery/store/gallerySelectors';
 import { getIsVisible } from 'features/gallery/util/getIsVisible';
 import { getScrollToIndexAlign } from 'features/gallery/util/getScrollToIndexAlign';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 /**
  * Scrolls an image into view when it is selected. This is necessary because
@@ -11,13 +13,13 @@ import { useEffect, useRef } from 'react';
  * Also handles when an image is selected programmatically - for example, when
  * auto-switching the new gallery images.
  *
+ * @param imageContainerRef The ref to the image container.
  * @param isSelected Whether the image is selected.
  * @param index The index of the image in the gallery.
- * @param selectionCount The number of images selected.
  * @returns
  */
-export const useScrollIntoView = (isSelected: boolean, index: number, areMultiplesSelected: boolean) => {
-  const imageContainerRef = useRef<HTMLDivElement>(null);
+export const useScrollIntoView = (imageContainerRef: HTMLElement | null, isSelected: boolean, index: number) => {
+  const areMultiplesSelected = useAppSelector(selectHasMultipleImagesSelected);
 
   useEffect(() => {
     if (!isSelected || areMultiplesSelected) {
@@ -33,7 +35,7 @@ export const useScrollIntoView = (isSelected: boolean, index: number, areMultipl
       return;
     }
 
-    const itemRect = imageContainerRef.current?.getBoundingClientRect();
+    const itemRect = imageContainerRef?.getBoundingClientRect();
     const rootRect = root.getBoundingClientRect();
 
     if (!itemRect || !getIsVisible(itemRect, rootRect)) {
@@ -42,7 +44,5 @@ export const useScrollIntoView = (isSelected: boolean, index: number, areMultipl
         align: getScrollToIndexAlign(index, range),
       });
     }
-  }, [isSelected, index, areMultiplesSelected]);
-
-  return imageContainerRef;
+  }, [isSelected, index, areMultiplesSelected, imageContainerRef]);
 };

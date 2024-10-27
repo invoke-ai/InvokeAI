@@ -1,40 +1,83 @@
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Text, useShiftModifier } from '@invoke-ai/ui-library';
+import { Box, Flex, Image, Skeleton, Text, useShiftModifier } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
+import { useAppStore } from 'app/store/nanostores/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
+import { useBoolean } from 'common/hooks/useBoolean';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import type { GallerySelectionDraggableData, ImageDraggableData, TypesafeDraggableData } from 'features/dnd/types';
+import { multipleImageDndSource, singleImageDndSource } from 'features/dnd2/types';
+import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { useMultiselect } from 'features/gallery/hooks/useMultiselect';
 import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
-import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
-import type { MouseEvent } from 'react';
-import { memo, useCallback, useMemo, useState } from 'react';
+import type { MouseEvent, MouseEventHandler } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsOutBold, PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 // This class name is used to calculate the number of images that fit in the gallery
-export const GALLERY_IMAGE_CLASS_NAME = 'gallery-image';
+export const GALLERY_IMAGE_CONTAINER_CLASS_NAME = 'gallery-image-container';
 
-const imageSx: SystemStyleObject = { w: 'full', h: 'full' };
-const boxSx: SystemStyleObject = {
+const galleryImageContainerSX = {
   containerType: 'inline-size',
-};
-
-const badgeSx: SystemStyleObject = {
-  '@container (max-width: 80px)': {
-    '&': { display: 'none' },
+  w: 'full',
+  h: 'full',
+  '.gallery-image-size-badge': {
+    '@container (max-width: 80px)': {
+      '&': { display: 'none' },
+    },
   },
-};
+  '.gallery-image': {
+    touchAction: 'none',
+    userSelect: 'none',
+    webkitUserSelect: 'none',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    aspectRatio: '1/1',
+    '::before': {
+      content: '""',
+      display: 'inline-block',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      pointerEvents: 'none',
+      borderRadius: 'base',
+    },
+    '&[data-selected=true]::before': {
+      boxShadow:
+        'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-500), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
+    },
+    '&[data-selected-for-compare=true]::before': {
+      boxShadow:
+        'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-300), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
+    },
+    '&:hover::before': {
+      boxShadow:
+        'inset 0px 0px 0px 2px var(--invoke-colors-invokeBlue-300), inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-800)',
+    },
+    '&:hover[data-selected=true]::before': {
+      boxShadow:
+        'inset 0px 0px 0px 3px var(--invoke-colors-invokeBlue-400), inset 0px 0px 0px 4px var(--invoke-colors-invokeBlue-800)',
+    },
+    '&:hover[data-selected-for-compare=true]::before': {
+      boxShadow:
+        'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-200), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
+    },
+  },
+} satisfies SystemStyleObject;
 
 interface HoverableImageProps {
   imageDTO: ImageDTO;
@@ -57,87 +100,125 @@ export const GalleryImage = memo(({ index, imageDTO }: HoverableImageProps) => {
 GalleryImage.displayName = 'GalleryImage';
 
 const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
-  const dispatch = useAppDispatch();
-  const selectedBoardId = useAppSelector(selectSelectedBoardId);
+  const store = useAppStore();
+  const [isDragging, setIsDragging] = useState(false);
+  const [element, ref] = useState<HTMLImageElement | null>(null);
+  const imageViewer = useImageViewer();
   const selectIsSelectedForCompare = useMemo(
     () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name === imageDTO.image_name),
     [imageDTO.image_name]
   );
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
-  const { handleClick, isSelected, areMultiplesSelected } = useMultiselect(imageDTO);
+  const selectIsSelected = useMemo(
+    () =>
+      createSelector(selectGallerySlice, (gallery) =>
+        gallery.selection.some((i) => i.image_name === imageDTO.image_name)
+      ),
+    [imageDTO.image_name]
+  );
+  const isSelected = useAppSelector(selectIsSelected);
 
-  const imageContainerRef = useScrollIntoView(isSelected, index, areMultiplesSelected);
+  useScrollIntoView(element, isSelected, index);
 
-  const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (areMultiplesSelected) {
-      const data: GallerySelectionDraggableData = {
-        id: 'gallery-image',
-        payloadType: 'GALLERY_SELECTION',
-        payload: { boardId: selectedBoardId },
-      };
-      return data;
+  useEffect(() => {
+    if (!element) {
+      return;
     }
+    return combine(
+      draggable({
+        element,
+        getInitialData: () => {
+          const { gallery } = store.getState();
+          // When we have multiple images selected, and the dragged image is part of the selection, initiate a
+          // multi-image drag.
+          if (gallery.selection.length > 1 && gallery.selection.includes(imageDTO)) {
+            return multipleImageDndSource.getData({ imageDTOs: gallery.selection, boardId: gallery.selectedBoardId });
+          }
 
-    if (imageDTO) {
-      const data: ImageDraggableData = {
-        id: 'gallery-image',
-        payloadType: 'IMAGE_DTO',
-        payload: { imageDTO },
-      };
-      return data;
-    }
-  }, [imageDTO, selectedBoardId, areMultiplesSelected]);
+          // Otherwise, initiate a single-image drag
+          return singleImageDndSource.getData({ imageDTO });
+        },
+        // This is a "local" drag start event, meaning that it is only called when this specific image is dragged.
+        onDragStart: (args) => {
+          // When we start dragging a single image, set the dragging state to true. This is only called when this
+          // specific image is dragged.
+          if (singleImageDndSource.typeGuard(args.source.data)) {
+            setIsDragging(true);
+            return;
+          }
+        },
+      }),
+      monitorForElements({
+        // This is a "global" drag start event, meaning that it is called for all drag events.
+        onDragStart: (args) => {
+          // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
+          // selection. This is called for all drag events.
+          if (multipleImageDndSource.typeGuard(args.source.data) && args.source.data.imageDTOs.includes(imageDTO)) {
+            setIsDragging(true);
+          }
+        },
+        onDrop: () => {
+          // Always set the dragging state to false when a drop event occurs.
+          setIsDragging(false);
+        },
+      })
+    );
+  }, [imageDTO, element, store]);
 
-  const [isHovered, setIsHovered] = useState(false);
+  const isHovered = useBoolean(false);
 
-  const handleMouseOver = useCallback(() => {
-    setIsHovered(true);
-  }, []);
+  const onClick = useCallback<MouseEventHandler<HTMLDivElement>>(
+    (e) => {
+      store.dispatch(
+        galleryImageClicked({
+          imageDTO,
+          shiftKey: e.shiftKey,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          altKey: e.altKey,
+        })
+      );
+    },
+    [imageDTO, store]
+  );
 
-  const imageViewer = useImageViewer();
-  const onDoubleClick = useCallback(() => {
+  const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     imageViewer.open();
-    dispatch(imageToCompareChanged(null));
-  }, [dispatch, imageViewer]);
-
-  const handleMouseOut = useCallback(() => {
-    setIsHovered(false);
-  }, []);
+    store.dispatch(imageToCompareChanged(null));
+  }, [imageViewer, store]);
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
 
-  if (!imageDTO) {
-    return <IAIFillSkeleton />;
-  }
+  useImageContextMenu(imageDTO, element);
 
   return (
-    <Box w="full" h="full" className={GALLERY_IMAGE_CLASS_NAME} data-testid={dataTestId} sx={boxSx}>
+    <Box
+      className={GALLERY_IMAGE_CONTAINER_CLASS_NAME}
+      data-testid={dataTestId}
+      sx={galleryImageContainerSX}
+      opacity={isDragging ? 0.3 : 1}
+    >
       <Flex
-        ref={imageContainerRef}
-        userSelect="none"
-        position="relative"
-        justifyContent="center"
-        alignItems="center"
-        aspectRatio="1/1"
-        onMouseOver={handleMouseOver}
-        onMouseOut={handleMouseOut}
+        role="button"
+        className="gallery-image"
+        onMouseOver={isHovered.setTrue}
+        onMouseOut={isHovered.setFalse}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        data-selected={isSelected}
+        data-selected-for-compare={isSelectedForCompare}
       >
-        <IAIDndImage
-          onClick={handleClick}
-          onDoubleClick={onDoubleClick}
-          imageDTO={imageDTO}
-          draggableData={draggableData}
-          isSelected={isSelected}
-          isSelectedForCompare={isSelectedForCompare}
-          minSize={0}
-          imageSx={imageSx}
-          isDropDisabled={true}
-          isUploadDisabled={true}
-          thumbnail={true}
-          withHoverOverlay
-        >
-          <HoverIcons imageDTO={imageDTO} isHovered={isHovered} />
-        </IAIDndImage>
+        <Image
+          ref={ref}
+          src={imageDTO.thumbnail_url}
+          fallback={<SizedSkeleton width={imageDTO.width} height={imageDTO.height} />}
+          w={imageDTO.width}
+          objectFit="contain"
+          maxW="full"
+          maxH="full"
+          borderRadius="base"
+        />
+        <HoverIcons imageDTO={imageDTO} isHovered={isHovered.isTrue} />
       </Flex>
     </Box>
   );
@@ -220,21 +301,17 @@ const StarIcon = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const [unstarImages] = useUnstarImagesMutation();
 
   const toggleStarredState = useCallback(() => {
-    if (imageDTO) {
-      if (imageDTO.starred) {
-        unstarImages({ imageDTOs: [imageDTO] });
-      }
-      if (!imageDTO.starred) {
-        starImages({ imageDTOs: [imageDTO] });
-      }
+    if (imageDTO.starred) {
+      unstarImages({ imageDTOs: [imageDTO] });
+    } else {
+      starImages({ imageDTOs: [imageDTO] });
     }
   }, [starImages, unstarImages, imageDTO]);
 
   const starIcon = useMemo(() => {
     if (imageDTO.starred) {
       return customStarUi ? customStarUi.on.icon : <PiStarFill />;
-    }
-    if (!imageDTO.starred) {
+    } else {
       return customStarUi ? customStarUi.off.icon : <PiStarBold />;
     }
   }, [imageDTO.starred, customStarUi]);
@@ -242,11 +319,9 @@ const StarIcon = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   const starTooltip = useMemo(() => {
     if (imageDTO.starred) {
       return customStarUi ? customStarUi.off.text : 'Unstar';
-    }
-    if (!imageDTO.starred) {
+    } else {
       return customStarUi ? customStarUi.on.text : 'Star';
     }
-    return '';
   }, [imageDTO.starred, customStarUi]);
 
   return (
@@ -266,6 +341,7 @@ StarIcon.displayName = 'StarIcon';
 const SizeBadge = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
   return (
     <Text
+      className="gallery-image-size-badge"
       position="absolute"
       background="base.900"
       color="base.50"
@@ -277,10 +353,15 @@ const SizeBadge = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
       px={2}
       lineHeight={1.25}
       borderTopEndRadius="base"
-      sx={badgeSx}
       pointerEvents="none"
     >{`${imageDTO.width}x${imageDTO.height}`}</Text>
   );
 });
 
 SizeBadge.displayName = 'SizeBadge';
+
+const SizedSkeleton = memo(({ width, height }: { width: number; height: number }) => {
+  return <Skeleton w={`${width}px`} h="auto" objectFit="contain" aspectRatio={`${width}/${height}`} />;
+});
+
+SizedSkeleton.displayName = 'SizedSkeleton';
