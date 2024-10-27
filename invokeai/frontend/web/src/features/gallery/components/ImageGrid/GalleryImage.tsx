@@ -9,14 +9,12 @@ import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import IAIFillSkeleton from 'common/components/IAIFillSkeleton';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd2/types';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { useScrollIntoView } from 'features/gallery/hooks/useScrollIntoView';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
@@ -81,7 +79,6 @@ const galleryImageContainerSX = {
 
 interface HoverableImageProps {
   imageDTO: ImageDTO;
-  index: number;
 }
 
 const selectAlwaysShouldImageSizeBadge = createSelector(
@@ -89,17 +86,7 @@ const selectAlwaysShouldImageSizeBadge = createSelector(
   (gallery) => gallery.alwaysShowImageSizeBadge
 );
 
-export const GalleryImage = memo(({ index, imageDTO }: HoverableImageProps) => {
-  if (!imageDTO) {
-    return <IAIFillSkeleton />;
-  }
-
-  return <GalleryImageContent index={index} imageDTO={imageDTO} />;
-});
-
-GalleryImage.displayName = 'GalleryImage';
-
-const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
+export const GalleryImage = memo(({ imageDTO }: HoverableImageProps) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [element, ref] = useState<HTMLImageElement | null>(null);
@@ -117,8 +104,6 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
     [imageDTO.image_name]
   );
   const isSelected = useAppSelector(selectIsSelected);
-
-  useScrollIntoView(element, isSelected, index);
 
   useEffect(() => {
     if (!element) {
@@ -224,7 +209,7 @@ const GalleryImageContent = memo(({ index, imageDTO }: HoverableImageProps) => {
   );
 });
 
-GalleryImageContent.displayName = 'GalleryImageContent';
+GalleryImage.displayName = 'GalleryImage';
 
 const HoverIcons = memo(({ imageDTO, isHovered }: { imageDTO: ImageDTO; isHovered: boolean }) => {
   const alwaysShowImageSizeBadge = useAppSelector(selectAlwaysShouldImageSizeBadge);

@@ -17,6 +17,8 @@ import { useEffect } from 'react';
  * @param isSelected Whether the image is selected.
  * @param index The index of the image in the gallery.
  * @returns
+ *
+ * @knip-ignore
  */
 export const useScrollIntoView = (imageContainerRef: HTMLElement | null, isSelected: boolean, index: number) => {
   const areMultiplesSelected = useAppSelector(selectHasMultipleImagesSelected);
