@@ -11,9 +11,9 @@ const DEFAULTS = IMAGE_FILTERS.alpha_to_outline.buildDefaults();
 
 export const FilterAlphaToOutline = ({ onChange, config }: Props) => {
   const { t } = useTranslation();
-  const handleLineWidthChange = useCallback(
+  const handleLineWidthPercentChange = useCallback(
     (v: number) => {
-      onChange({ ...config, line_width: v });
+      onChange({ ...config, line_width_percent: v });
     },
     [onChange, config]
   );
@@ -21,20 +21,20 @@ export const FilterAlphaToOutline = ({ onChange, config }: Props) => {
   return (
     <>
       <FormControl>
-        <FormLabel m={0}>{t('controlLayers.filter.alpha_to_outline.line_width')}</FormLabel>
+        <FormLabel m={0}>{t('controlLayers.filter.alpha_to_outline.line_width_percent')}</FormLabel>
         <CompositeSlider
-          value={config.line_width}
-          onChange={handleLineWidthChange}
-          defaultValue={DEFAULTS.line_width}
+          value={config.line_width_percent}
+          onChange={handleLineWidthPercentChange}
+          defaultValue={DEFAULTS.line_width_percent}
           min={1}
-          max={256}
+          max={100}
         />
         <CompositeNumberInput
-          value={config.line_width}
-          onChange={handleLineWidthChange}
-          defaultValue={DEFAULTS.line_width}
+          value={config.line_width_percent}
+          onChange={handleLineWidthPercentChange}
+          defaultValue={DEFAULTS.line_width_percent}
           min={1}
-          max={256}
+          max={100}
         />
       </FormControl>
     </>

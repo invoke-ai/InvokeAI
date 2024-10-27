@@ -7906,11 +7906,11 @@ export type components = {
              */
             image?: components["schemas"]["ImageField"];
             /**
-             * Line Width
-             * @description The width of the outline
-             * @default 16
+             * Line Width Percent
+             * @description The width of the outline as a percentage of image dimension
+             * @default 5
              */
-            line_width?: number;
+            line_width_percent?: number;
             /**
              * type
              * @default img_alpha_to_outline

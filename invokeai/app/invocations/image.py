@@ -6,11 +6,7 @@ import cv2
 import numpy
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
-from invokeai.app.invocations.baseinvocation import (
-    BaseInvocation,
-    Classification,
-    invocation,
-)
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.constants import IMAGE_MODES
 from invokeai.app.invocations.fields import (
     ColorField,
@@ -1068,7 +1064,12 @@ class ImageAlphaToOutlineInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Finds the outline of the alpha channel of an image, expands it and returns just the outline."""
 
     image: ImageField = InputField(description="The input image. It should have some transparency.")
-    line_width: int = InputField(default=16, ge=1, description="The width of the outline")
+    line_width_percent: float = InputField(
+        default=5,
+        ge=1,
+        le=100,
+        description="The width of the outline as a percentage of image dimension",
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         img_pil = context.images.get_pil(self.image.image_name, mode="RGBA")
@@ -1080,16 +1081,20 @@ class ImageAlphaToOutlineInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Find contours in the binary mask - effectively the outline of the alpha channel
         contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+        # Calculate line width based on smaller image dimension
+        smaller_dim = min(img_pil.size)
+        line_width = int(smaller_dim * (self.line_width_percent / 100))
+
         # Create an empty mask to draw the contours - this will be the alpha channel of the output image
         contour_mask = numpy.zeros_like(binary_mask)
 
-        # Draw the contours on the mask at the specified line width
+        # Draw the contours on the mask at the calculated line width
         cv2.drawContours(
             image=contour_mask,
             contours=contours,
             contourIdx=-1,
-            color=255,
-            thickness=self.line_width,
+            color=(255,),
+            thickness=line_width,
         )
 
         # Create our result image, fully transparent

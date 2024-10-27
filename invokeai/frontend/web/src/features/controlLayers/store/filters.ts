@@ -97,7 +97,7 @@ export type SpandrelFilterConfig = z.infer<typeof zSpandrelFilterConfig>;
 
 const zAlphaToOutlineFilterConfig = z.object({
   type: z.literal('alpha_to_outline'),
-  line_width: z.number().gte(1),
+  line_width_percent: z.number().gte(1).lte(100),
 });
 export type AlphaToOutlineFilterConfig = z.infer<typeof zAlphaToOutlineFilterConfig>;
 
@@ -175,15 +175,15 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
     type: 'alpha_to_outline',
     buildDefaults: () => ({
       type: 'alpha_to_outline',
-      line_width: 32,
+      line_width_percent: 5,
     }),
-    buildGraph: ({ image_name }, { line_width }) => {
+    buildGraph: ({ image_name }, { line_width_percent }) => {
       const graph = new Graph(getPrefixedId('alpha_to_outline_filter'));
       const node = graph.addNode({
         id: getPrefixedId('alpha_to_outline'),
         type: 'img_alpha_to_outline',
         image: { image_name },
-        line_width,
+        line_width_percent,
       });
       return {
         graph,

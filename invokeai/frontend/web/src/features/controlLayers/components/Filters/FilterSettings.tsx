@@ -64,7 +64,7 @@ export const FilterSettings = memo(({ filterConfig, onChange }: Props) => {
     return <FilterSpandrel config={filterConfig} onChange={onChange} />;
   }
 
-  if (filterConfig.type === 'alpha_to_outline_filter') {
+  if (filterConfig.type === 'alpha_to_outline') {
     return <FilterAlphaToOutline config={filterConfig} onChange={onChange} />;
   }
 
