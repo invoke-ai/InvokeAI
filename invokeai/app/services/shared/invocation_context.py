@@ -1,3 +1,4 @@
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional, Union
@@ -294,15 +295,15 @@ class TensorsInterface(InvocationContextInterface):
         return name
 
     def load(self, name: str) -> Tensor:
-        """Loads a tensor by name.
+        """Loads a tensor by name. This method returns a copy of the tensor.
 
         Args:
             name: The name of the tensor to load.
 
         Returns:
-            The loaded tensor.
+            The tensor.
         """
-        return self._services.tensors.load(name)
+        return self._services.tensors.load(name).clone()
 
 
 class ConditioningInterface(InvocationContextInterface):
@@ -320,16 +321,16 @@ class ConditioningInterface(InvocationContextInterface):
         return name
 
     def load(self, name: str) -> ConditioningFieldData:
-        """Loads conditioning data by name.
+        """Loads conditioning data by name. This method returns a copy of the conditioning data.
 
         Args:
             name: The name of the conditioning data to load.
 
         Returns:
-            The loaded conditioning data.
+            The conditioning data.
         """
 
-        return self._services.conditioning.load(name)
+        return deepcopy(self._services.conditioning.load(name))
 
 
 class ModelsInterface(InvocationContextInterface):

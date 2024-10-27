@@ -1715,6 +1715,12 @@ export type components = {
              */
             image?: components["schemas"]["ImageField"];
             /**
+             * Invert
+             * @description Whether to invert the mask.
+             * @default false
+             */
+            invert?: boolean;
+            /**
              * type
              * @default apply_tensor_mask_to_image
              * @constant

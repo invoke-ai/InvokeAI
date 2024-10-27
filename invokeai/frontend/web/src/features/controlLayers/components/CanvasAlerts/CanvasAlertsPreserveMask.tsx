@@ -13,7 +13,7 @@ export const CanvasAlertsPreserveMask = memo(() => {
   }
 
   return (
-    <Alert status="warning" borderRadius="base" fontSize="sm" shadow="md" w="fit-content" alignSelf="flex-end">
+    <Alert status="warning" borderRadius="base" fontSize="sm" shadow="md" w="fit-content">
       <AlertIcon />
       <AlertTitle>{t('controlLayers.settings.preserveMask.alert')}</AlertTitle>
     </Alert>

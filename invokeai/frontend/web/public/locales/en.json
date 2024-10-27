@@ -1682,6 +1682,8 @@
         "controlLayer": "Control Layer",
         "inpaintMask": "Inpaint Mask",
         "regionalGuidance": "Regional Guidance",
+        "canvasAsRasterLayer": "$t(controlLayers.canvas) as $t(controlLayers.rasterLayer)",
+        "canvasAsControlLayer": "$t(controlLayers.canvas) as $t(controlLayers.controlLayer)",
         "referenceImage": "Reference Image",
         "regionalReferenceImage": "Regional Reference Image",
         "globalReferenceImage": "Global Reference Image",
@@ -1757,6 +1759,7 @@
         "newGallerySessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be sent to the gallery.",
         "newCanvasSession": "New Canvas Session",
         "newCanvasSessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be staged on the canvas.",
+        "replaceCurrent": "Replace Current",
         "controlMode": {
             "controlMode": "Control Mode",
             "balanced": "Balanced",
@@ -1886,18 +1889,21 @@
             "apply": "Apply",
             "cancel": "Cancel"
         },
-        "segment": {
-            "autoMask": "Auto Mask",
+        "selectObject": {
+            "selectObject": "Select Object",
             "pointType": "Point Type",
+            "invertSelection": "Invert Selection",
             "include": "Include",
             "exclude": "Exclude",
             "neutral": "Neutral",
+            "apply": "Apply",
             "reset": "Reset",
             "saveAs": "Save As",
             "cancel": "Cancel",
             "process": "Process",
-            "help1": "Auto-mask creates a mask for a single target object. Add <Bold>Include</Bold> and <Bold>Exclude</Bold> points to indicate which parts of the layer are part of the target object.",
-            "help2": "Start with one <Bold>Include</Bold> point within the target object. Add more points to refine the mask. Fewer points typically produce better results.",
+            "help1": "Select a single target object. Add <Bold>Include</Bold> and <Bold>Exclude</Bold> points to indicate which parts of the layer are part of the target object.",
+            "help2": "Start with one <Bold>Include</Bold> point within the target object. Add more points to refine the selection. Fewer points typically produce better results.",
+            "help3": "Invert the selection to select everything except the target object.",
             "clickToAdd": "Click on the layer to add a point",
             "dragToMove": "Drag a point to move it",
             "clickToRemove": "Click on a point to remove it"

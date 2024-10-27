@@ -132,7 +132,6 @@ const AlertWrapper = ({
             fontSize="sm"
             shadow="md"
             w="fit-content"
-            alignSelf="flex-end"
           >
             <Flex w="full" alignItems="center">
               <AlertIcon />

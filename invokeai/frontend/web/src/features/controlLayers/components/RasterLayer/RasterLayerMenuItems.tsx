@@ -6,7 +6,7 @@ import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/c
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
 import { CanvasEntityMenuItemsFilter } from 'features/controlLayers/components/common/CanvasEntityMenuItemsFilter';
 import { CanvasEntityMenuItemsSave } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSave';
-import { CanvasEntityMenuItemsSegment } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSegment';
+import { CanvasEntityMenuItemsSelectObject } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSelectObject';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
 import { RasterLayerMenuItemsConvertToSubMenu } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItemsConvertToSubMenu';
 import { RasterLayerMenuItemsCopyToSubMenu } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItemsCopyToSubMenu';
@@ -23,13 +23,12 @@ export const RasterLayerMenuItems = memo(() => {
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />
       <CanvasEntityMenuItemsFilter />
-      <CanvasEntityMenuItemsSegment />
+      <CanvasEntityMenuItemsSelectObject />
       <MenuDivider />
+      <RasterLayerMenuItemsCopyToSubMenu />
+      <RasterLayerMenuItemsConvertToSubMenu />
       <CanvasEntityMenuItemsCropToBbox />
       <CanvasEntityMenuItemsSave />
-      <MenuDivider />
-      <RasterLayerMenuItemsConvertToSubMenu />
-      <RasterLayerMenuItemsCopyToSubMenu />
     </>
   );
 });

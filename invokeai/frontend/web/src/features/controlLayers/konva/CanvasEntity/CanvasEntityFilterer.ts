@@ -7,7 +7,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { getFilterForModel, IMAGE_FILTERS } from 'features/controlLayers/store/filters';
-import type { CanvasImageState } from 'features/controlLayers/store/types';
+import type { CanvasEntityType, CanvasImageState } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { debounce } from 'lodash-es';
 import { atom } from 'nanostores';
@@ -15,6 +15,8 @@ import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
 import { buildSelectModelConfig } from 'services/api/hooks/modelsByType';
 import { isControlNetOrT2IAdapterModelConfig } from 'services/api/types';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 
 type CanvasEntityFiltererConfig = {
   processDebounceMs: number;
@@ -213,6 +215,50 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       },
       replaceObjects: true,
     });
+    this.imageState = null;
+    this.unsubscribe();
+    this.$isFiltering.set(false);
+    this.$hasProcessed.set(false);
+    this.manager.stateApi.$filteringAdapter.set(null);
+  };
+
+  saveAs = (type: Exclude<CanvasEntityType, 'reference_image'>) => {
+    const imageState = this.imageState;
+    if (!imageState) {
+      this.log.warn('No image state to apply filter to');
+      return;
+    }
+    this.log.trace('Applying filter');
+    this.parent.bufferRenderer.commitBuffer();
+    const rect = this.parent.transformer.getRelativeRect();
+    const arg = {
+      overrides: {
+        objects: [imageState],
+        position: {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+        },
+      },
+      isSelected: true,
+    };
+
+    switch (type) {
+      case 'raster_layer':
+        this.manager.stateApi.addRasterLayer(arg);
+        break;
+      case 'control_layer':
+        this.manager.stateApi.addControlLayer(arg);
+        break;
+      case 'inpaint_mask':
+        this.manager.stateApi.addInpaintMask(arg);
+        break;
+      case 'regional_guidance':
+        this.manager.stateApi.addRegionalGuidance(arg);
+        break;
+      default:
+        assert<Equals<typeof type, never>>(false);
+    }
+
     this.imageState = null;
     this.unsubscribe();
     this.$isFiltering.set(false);
