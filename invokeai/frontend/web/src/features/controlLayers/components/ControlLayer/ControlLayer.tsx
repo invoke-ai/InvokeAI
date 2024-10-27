@@ -12,7 +12,7 @@ import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityI
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
 import { replaceLayerWithImageDndTarget, type ReplaceLayerWithImageDndTargetData } from 'features/dnd2/types';
-import { memo, useMemo } from 'react';
+import { memo, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -25,9 +25,10 @@ export const ControlLayer = memo(({ id }: Props) => {
     () => ({ id, type: 'control_layer' }),
     [id]
   );
+  const dndId = useId();
   const targetData = useMemo<ReplaceLayerWithImageDndTargetData>(
-    () => replaceLayerWithImageDndTarget.getData({ entityIdentifier }),
-    [entityIdentifier]
+    () => replaceLayerWithImageDndTarget.getData({ dndId, entityIdentifier }),
+    [dndId, entityIdentifier]
   );
 
   return (

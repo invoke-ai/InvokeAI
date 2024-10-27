@@ -2,12 +2,14 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIDndImage from 'common/components/IAIDndImage';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
-import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
+import { DndDropTarget } from 'features/dnd2/DndDropTarget';
+import { DndImage } from 'features/dnd2/DndImage';
+import type { SetNodeImageFieldDndTargetData } from 'features/dnd2/types';
+import { setNodeImageFieldDndTarget } from 'features/dnd2/types';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageFieldInputInstance, ImageFieldInputTemplate } from 'features/nodes/types/field';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -17,11 +19,12 @@ import { $isConnected } from 'services/events/stores';
 import type { FieldComponentProps } from './types';
 
 const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInstance, ImageFieldInputTemplate>) => {
+  const { t } = useTranslation();
   const { nodeId, field, fieldTemplate } = props;
   const dispatch = useAppDispatch();
   const isConnected = useStore($isConnected);
   const { currentData: imageDTO, isError } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
-
+  const dndId = useId();
   const handleReset = useCallback(() => {
     dispatch(
       fieldImageValueChanged({
@@ -32,23 +35,9 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
     );
   }, [dispatch, field.name, nodeId]);
 
-  const draggableData = useMemo<TypesafeDraggableData | undefined>(() => {
-    if (imageDTO) {
-      return {
-        id: `node-${nodeId}-${field.name}`,
-        payloadType: 'IMAGE_DTO',
-        payload: { imageDTO },
-      };
-    }
-  }, [field.name, imageDTO, nodeId]);
-
-  const droppableData = useMemo<TypesafeDroppableData | undefined>(
-    () => ({
-      id: `node-${nodeId}-${field.name}`,
-      actionType: 'SET_NODES_IMAGE',
-      context: { nodeId, fieldName: field.name },
-    }),
-    [field.name, nodeId]
+  const targetData = useMemo<SetNodeImageFieldDndTargetData>(
+    () => setNodeImageFieldDndTarget.getData({ dndId, nodeId, fieldName: field.name }),
+    [dndId, field.name, nodeId]
   );
 
   const postUploadAction = useMemo<PostUploadAction>(
@@ -68,6 +57,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
 
   return (
     <Flex
+      position="relative"
       className="nodrag"
       w="full"
       h="full"
@@ -78,21 +68,19 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
       borderWidth={fieldTemplate.required && !field.value ? 1 : 0}
       borderRadius="base"
     >
-      <IAIDndImage
-        imageDTO={imageDTO}
-        droppableData={droppableData}
-        draggableData={draggableData}
-        postUploadAction={postUploadAction}
-        useThumbailFallback
-        uploadElement={<UploadElement />}
-        minSize={8}
-      >
-        <IAIDndImageIcon
-          onClick={handleReset}
-          icon={imageDTO ? <PiArrowCounterClockwiseBold /> : undefined}
-          tooltip="Reset Image"
-        />
-      </IAIDndImage>
+      {imageDTO && (
+        <>
+          <DndImage dndId={dndId} imageDTO={imageDTO} minW={8} minH={8} />
+          <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
+            <IAIDndImageIcon
+              onClick={handleReset}
+              icon={imageDTO ? <PiArrowCounterClockwiseBold /> : undefined}
+              tooltip="Reset Image"
+            />
+          </Flex>
+        </>
+      )}
+      <DndDropTarget targetData={targetData} label={t('gallery.drop')} />
     </Flex>
   );
 };
