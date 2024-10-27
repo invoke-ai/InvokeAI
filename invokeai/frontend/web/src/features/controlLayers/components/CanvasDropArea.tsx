@@ -1,17 +1,17 @@
 import { Grid, GridItem } from '@invoke-ai/ui-library';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
 import {
-  addControlLayerFromImageDndTarget,
+  newControlLayerFromImageDndTarget,
   addGlobalReferenceImageFromImageDndTarget,
-  addRasterLayerFromImageDndTarget,
+  newRasterLayerFromImageDndTarget,
   addRegionalGuidanceReferenceImageFromImageDndTarget,
 } from 'features/dnd2/types';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const addRasterLayerFromImageDndTargetData = addRasterLayerFromImageDndTarget.getData({});
-const addControlLayerFromImageDndTargetData = addControlLayerFromImageDndTarget.getData({});
+const addRasterLayerFromImageDndTargetData = newRasterLayerFromImageDndTarget.getData({});
+const addControlLayerFromImageDndTargetData = newControlLayerFromImageDndTarget.getData({});
 const addRegionalGuidanceReferenceImageFromImageDndTargetData =
   addRegionalGuidanceReferenceImageFromImageDndTarget.getData({});
 const addGlobalReferenceImageFromImageDndTargetData = addGlobalReferenceImageFromImageDndTarget.getData({});

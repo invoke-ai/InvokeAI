@@ -15,7 +15,7 @@ import {
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
-import { memo, useCallback, useId, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiImageSquare } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -36,7 +36,6 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
-  const dndId = useId();
   const onClick = useCallback(() => {
     if (selectedBoardId !== board.board_id) {
       dispatch(boardIdSelected({ boardId: board.board_id }));
@@ -47,8 +46,8 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   }, [selectedBoardId, board.board_id, autoAssignBoardOnClick, autoAddBoardId, dispatch]);
 
   const targetData: AddToBoardDndTargetData = useMemo(
-    () => addToBoardDndTarget.getData({ dndId, boardId: board.board_id }),
-    [board.board_id, dndId]
+    () => addToBoardDndTarget.getData({ boardId: board.board_id }),
+    [board.board_id]
   );
 
   return (

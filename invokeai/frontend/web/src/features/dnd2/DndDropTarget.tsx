@@ -10,7 +10,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { DndDropOverlay } from 'features/dnd2/DndDropOverlay';
 import type { DndState, DndTargetData } from 'features/dnd2/types';
-import { isDndSourceData, isValidDrop, singleImageDndSource } from 'features/dnd2/types';
+import { getDndId, isDndSourceData, isValidDrop, singleImageDndSource } from 'features/dnd2/types';
 import { memo, useEffect, useRef, useState } from 'react';
 import { uploadImage } from 'services/api/endpoints/images';
 import { z } from 'zod';
@@ -92,7 +92,7 @@ export const DndDropTarget = memo((props: Props) => {
           if (!isDndSourceData(sourceData)) {
             return false;
           }
-          if (targetData.dndId === sourceData.dndId) {
+          if (getDndId(targetData) === getDndId(sourceData)) {
             return false;
           }
           return isValidDrop(sourceData, targetData);
@@ -118,7 +118,7 @@ export const DndDropTarget = memo((props: Props) => {
           if (!isDndSourceData(sourceData)) {
             return false;
           }
-          if (targetData.dndId === sourceData.dndId) {
+          if (getDndId(targetData) === getDndId(sourceData)) {
             return false;
           }
           return isValidDrop(sourceData, targetData);
@@ -177,7 +177,7 @@ export const DndDropTarget = memo((props: Props) => {
             });
             dispatch(
               dndDropped({
-                sourceData: singleImageDndSource.getData({ dndId: getPrefixedId('random-dnd-id'), imageDTO }),
+                sourceData: singleImageDndSource.getData({ imageDTO }, getPrefixedId('dnd-upload-image')),
                 targetData,
               })
             );

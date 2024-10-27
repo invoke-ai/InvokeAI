@@ -25,10 +25,10 @@ import type {
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
 import {
-  addControlLayerFromImageDndTarget,
+  newControlLayerFromImageDndTarget,
   addGlobalReferenceImageFromImageDndTarget,
   addInpaintMaskFromImageDndTarget,
-  addRasterLayerFromImageDndTarget,
+  newRasterLayerFromImageDndTarget,
   addRegionalGuidanceFromImageDndTarget,
   addRegionalGuidanceReferenceImageFromImageDndTarget,
   addToBoardDndTarget,
@@ -100,8 +100,8 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Add raster layer from image
         if (
-          addRasterLayerFromImageDndTarget.typeGuard(targetData) &&
-          addRasterLayerFromImageDndTarget.validateDrop(sourceData, targetData)
+          newRasterLayerFromImageDndTarget.typeGuard(targetData) &&
+          newRasterLayerFromImageDndTarget.validateDrop(sourceData, targetData)
         ) {
           const imageObject = imageDTOToImageObject(imageDTO);
           const { x, y } = selectCanvasSlice(getState()).bbox.rect;
@@ -145,8 +145,8 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Add control layer from image
         if (
-          addControlLayerFromImageDndTarget.typeGuard(targetData) &&
-          addControlLayerFromImageDndTarget.validateDrop(sourceData, targetData)
+          newControlLayerFromImageDndTarget.typeGuard(targetData) &&
+          newControlLayerFromImageDndTarget.validateDrop(sourceData, targetData)
         ) {
           const state = getState();
           const imageObject = imageDTOToImageObject(imageDTO);
