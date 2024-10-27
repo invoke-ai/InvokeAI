@@ -1,16 +1,18 @@
-import { useDndContext } from '@dnd-kit/core';
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Box, Button, Spacer, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDropOverlay from 'common/components/IAIDropOverlay';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
+import { DndDropOverlay } from 'features/dnd2/DndDropOverlay';
+import type { DndState } from 'features/dnd2/types';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
 import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const CanvasRightPanel = memo(() => {
@@ -79,37 +81,12 @@ CanvasRightPanel.displayName = 'CanvasRightPanel';
 
 const PanelTabs = memo(() => {
   const { t } = useTranslation();
-  const activeTab = useAppSelector(selectActiveTabCanvasRightPanel);
+  const store = useAppStore();
   const activeEntityCount = useAppSelector(selectEntityCountActive);
-  const tabTimeout = useRef<number | null>(null);
-  const dndCtx = useDndContext();
-  const dispatch = useAppDispatch();
-  const [mouseOverTab, setMouseOverTab] = useState<'layers' | 'gallery' | null>(null);
-
-  const onOnMouseOverLayersTab = useCallback(() => {
-    setMouseOverTab('layers');
-    tabTimeout.current = window.setTimeout(() => {
-      if (dndCtx.active) {
-        dispatch(activeTabCanvasRightPanelChanged('layers'));
-      }
-    }, 300);
-  }, [dndCtx.active, dispatch]);
-
-  const onOnMouseOverGalleryTab = useCallback(() => {
-    setMouseOverTab('gallery');
-    tabTimeout.current = window.setTimeout(() => {
-      if (dndCtx.active) {
-        dispatch(activeTabCanvasRightPanelChanged('gallery'));
-      }
-    }, 300);
-  }, [dndCtx.active, dispatch]);
-
-  const onMouseOut = useCallback(() => {
-    setMouseOverTab(null);
-    if (tabTimeout.current) {
-      clearTimeout(tabTimeout.current);
-    }
-  }, []);
+  const [layersTabDndState, setLayersTabDndState] = useState<DndState>('idle');
+  const [galleryTabDndState, setGalleryTabDndState] = useState<DndState>('idle');
+  const layersTabRef = useRef<HTMLDivElement>(null);
+  const galleryTabRef = useRef<HTMLDivElement>(null);
 
   const layersTabLabel = useMemo(() => {
     if (activeEntityCount === 0) {
@@ -118,23 +95,131 @@ const PanelTabs = memo(() => {
     return `${t('controlLayers.layer_other')} (${activeEntityCount})`;
   }, [activeEntityCount, t]);
 
+  /**
+   * Handle dnd events for the tabs. When a tab is hovered for a certain amount of time, switch to that tab.
+   */
+  useEffect(() => {
+    if (!layersTabRef.current || !galleryTabRef.current) {
+      return;
+    }
+
+    let tabTimeout: number | null = null;
+
+    const layersTabCleanup = combine(
+      dropTargetForElements({
+        element: layersTabRef.current,
+        onDragEnter: () => {
+          // If we are already on the layers tab, do nothing
+          if (selectActiveTabCanvasRightPanel(store.getState()) === 'layers') {
+            return;
+          }
+
+          // Else set the state to active and switch to the layers tab after a timeout
+          setLayersTabDndState('active');
+          tabTimeout = window.setTimeout(() => {
+            tabTimeout = null;
+            store.dispatch(activeTabCanvasRightPanelChanged('layers'));
+            // When we switch tabs, the other tab should be pending
+            setLayersTabDndState('idle');
+            setGalleryTabDndState('pending');
+          }, 300);
+        },
+        onDragLeave: () => {
+          // Set the state to idle or pending depending on the current tab
+          if (selectActiveTabCanvasRightPanel(store.getState()) === 'layers') {
+            setLayersTabDndState('idle');
+          } else {
+            setLayersTabDndState('pending');
+          }
+          // Abort the tab switch if it hasn't happened yet
+          if (tabTimeout !== null) {
+            clearTimeout(tabTimeout);
+          }
+        },
+      }),
+      monitorForElements({
+        // Only monitor if we are not already on the layers tab
+        canMonitor: () => selectActiveTabCanvasRightPanel(store.getState()) !== 'layers',
+        onDragStart: () => {
+          // Set the state to pending when a drag starts
+          setLayersTabDndState('pending');
+        },
+      })
+    );
+
+    const galleryTabCleanup = combine(
+      dropTargetForElements({
+        element: galleryTabRef.current,
+        onDragEnter: () => {
+          // If we are already on the gallery tab, do nothing
+          if (selectActiveTabCanvasRightPanel(store.getState()) === 'gallery') {
+            return;
+          }
+
+          // Else set the state to active and switch to the gallery tab after a timeout
+          setGalleryTabDndState('active');
+          tabTimeout = window.setTimeout(() => {
+            tabTimeout = null;
+            store.dispatch(activeTabCanvasRightPanelChanged('gallery'));
+            // When we switch tabs, the other tab should be pending
+            setGalleryTabDndState('idle');
+            setLayersTabDndState('pending');
+          }, 300);
+        },
+        onDragLeave: () => {
+          // Set the state to idle or pending depending on the current tab
+          if (selectActiveTabCanvasRightPanel(store.getState()) === 'gallery') {
+            setGalleryTabDndState('idle');
+          } else {
+            setGalleryTabDndState('pending');
+          }
+          // Abort the tab switch if it hasn't happened yet
+          if (tabTimeout !== null) {
+            clearTimeout(tabTimeout);
+          }
+        },
+      }),
+      monitorForElements({
+        // Only monitor if we are not already on the gallery tab
+        canMonitor: () => selectActiveTabCanvasRightPanel(store.getState()) !== 'gallery',
+        onDragStart: () => {
+          // Set the state to pending when a drag starts
+          setGalleryTabDndState('pending');
+        },
+      })
+    );
+
+    const sharedCleanup = monitorForElements({
+      onDrop: () => {
+        // Reset the dnd state when a drop happens
+        setGalleryTabDndState('idle');
+        setLayersTabDndState('idle');
+      },
+    });
+
+    return () => {
+      layersTabCleanup();
+      galleryTabCleanup();
+      sharedCleanup();
+      if (tabTimeout !== null) {
+        clearTimeout(tabTimeout);
+      }
+    };
+  }, [store]);
+
   return (
     <>
-      <Tab position="relative" onMouseOver={onOnMouseOverLayersTab} onMouseOut={onMouseOut} w={32}>
+      <Tab ref={layersTabRef} position="relative" w={32}>
         <Box as="span" w="full">
           {layersTabLabel}
         </Box>
-        {dndCtx.active && activeTab !== 'layers' && (
-          <IAIDropOverlay isOver={mouseOverTab === 'layers'} withBackdrop={false} />
-        )}
+        <DndDropOverlay dndState={layersTabDndState} withBackdrop={false} />
       </Tab>
-      <Tab position="relative" onMouseOver={onOnMouseOverGalleryTab} onMouseOut={onMouseOut} w={32}>
+      <Tab ref={galleryTabRef} position="relative" w={32}>
         <Box as="span" w="full">
           {t('gallery.gallery')}
         </Box>
-        {dndCtx.active && activeTab !== 'gallery' && (
-          <IAIDropOverlay isOver={mouseOverTab === 'gallery'} withBackdrop={false} />
-        )}
+        <DndDropOverlay dndState={galleryTabDndState} withBackdrop={false} />
       </Tab>
     </>
   );

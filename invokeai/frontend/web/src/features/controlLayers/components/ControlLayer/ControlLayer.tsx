@@ -1,5 +1,4 @@
 import { Spacer } from '@invoke-ai/ui-library';
-import IAIDroppable from 'common/components/IAIDroppable';
 import { CanvasEntityContainer } from 'features/controlLayers/components/common/CanvasEntityContainer';
 import { CanvasEntityHeader } from 'features/controlLayers/components/common/CanvasEntityHeader';
 import { CanvasEntityHeaderCommonActions } from 'features/controlLayers/components/common/CanvasEntityHeaderCommonActions';
@@ -11,7 +10,8 @@ import { ControlLayerSettings } from 'features/controlLayers/components/ControlL
 import { ControlLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
-import type { ReplaceLayerImageDropData } from 'features/dnd/types';
+import { DndDropTarget } from 'features/dnd2/DndDropTarget';
+import { replaceLayerWithImageDndTarget, type ReplaceLayerWithImageDndTargetData } from 'features/dnd2/types';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,10 +25,11 @@ export const ControlLayer = memo(({ id }: Props) => {
     () => ({ id, type: 'control_layer' }),
     [id]
   );
-  const dropData = useMemo<ReplaceLayerImageDropData>(
-    () => ({ id, actionType: 'REPLACE_LAYER_WITH_IMAGE', context: { entityIdentifier } }),
-    [id, entityIdentifier]
+  const targetData = useMemo<ReplaceLayerWithImageDndTargetData>(
+    () => replaceLayerWithImageDndTarget.getData({ entityIdentifier }),
+    [entityIdentifier]
   );
+
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
       <ControlLayerAdapterGate>
@@ -43,7 +44,7 @@ export const ControlLayer = memo(({ id }: Props) => {
           <CanvasEntitySettingsWrapper>
             <ControlLayerSettings />
           </CanvasEntitySettingsWrapper>
-          <IAIDroppable data={dropData} dropLabel={t('controlLayers.replaceLayer')} />
+          <DndDropTarget targetData={targetData} label={t('controlLayers.replaceLayer')} />
         </CanvasEntityContainer>
       </ControlLayerAdapterGate>
     </EntityIdentifierContext.Provider>

@@ -5,6 +5,9 @@ settings:
   excludeLinksFromLockfile: false
 
 dependencies:
+  '@atlaskit/pragmatic-drag-and-drop':
+    specifier: ^1.4.0
+    version: 1.4.0
   '@dagrejs/dagre':
     specifier: ^1.1.4
     version: 1.1.4
@@ -318,6 +321,14 @@ packages:
       '@jridgewell/gen-mapping': 0.3.5
       '@jridgewell/trace-mapping': 0.3.25
     dev: true
+
+  /@atlaskit/pragmatic-drag-and-drop@1.4.0:
+    resolution: {integrity: sha512-qRY3PTJIcxfl/QB8Gwswz+BRvlmgAC5pB+J2hL6dkIxgqAgVwOhAamMUKsrOcFU/axG2Q7RbNs1xfoLKDuhoPg==}
+    dependencies:
+      '@babel/runtime': 7.25.7
+      bind-event-listener: 3.0.0
+      raf-schd: 4.0.3
+    dev: false
 
   /@babel/code-frame@7.25.7:
     resolution: {integrity: sha512-0xZJFNE5XMpENsgfHYTw8FbX4kv53mFLn2i3XPoq69LyhYSCBJtitaHx9QnsVTrsogI4Z3+HtEfZ2/GFPOtf5g==}
@@ -4313,6 +4324,10 @@ packages:
       open: 8.4.2
     dev: true
 
+  /bind-event-listener@3.0.0:
+    resolution: {integrity: sha512-PJvH288AWQhKs2v9zyfYdPzlPqf5bXbGMmhmUIY9x4dAUGIWgomO771oBQNwJnMQSnUIXhKu6sgzpBRXTlvb8Q==}
+    dev: false
+
   /bl@4.1.0:
     resolution: {integrity: sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==}
     dependencies:
@@ -7556,6 +7571,10 @@ packages:
   /queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
     dev: true
+
+  /raf-schd@4.0.3:
+    resolution: {integrity: sha512-tQkJl2GRWh83ui2DiPTJz9wEiMN20syf+5oKfB03yYP7ioZcJwsIK8FjrtLwH1m7C7e+Tt2yYBlrOpdT+dyeIQ==}
+    dev: false
 
   /raf-throttle@2.0.6:
     resolution: {integrity: sha512-C7W6hy78A+vMmk5a/B6C5szjBHrUzWJkVyakjKCK59Uy2CcA7KhO1JUvvH32IXYFIcyJ3FMKP3ZzCc2/71I6Vg==}

@@ -8,24 +8,21 @@ import type { MouseEvent } from 'react';
 import { useCallback, useMemo } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
-export const useMultiselect = (imageDTO?: ImageDTO) => {
+export const useMultiselect = (imageDTO: ImageDTO) => {
   const dispatch = useAppDispatch();
   const areMultiplesSelected = useAppSelector(selectHasMultipleImagesSelected);
   const selectIsSelected = useMemo(
     () =>
       createSelector(selectGallerySlice, (gallery) =>
-        gallery.selection.some((i) => i.image_name === imageDTO?.image_name)
+        gallery.selection.some((i) => i.image_name === imageDTO.image_name)
       ),
-    [imageDTO?.image_name]
+    [imageDTO.image_name]
   );
   const isSelected = useAppSelector(selectIsSelected);
   const isMultiSelectEnabled = useFeatureStatus('multiselect');
 
-  const handleClick = useCallback(
+  const onClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
-      if (!imageDTO) {
-        return;
-      }
       if (!isMultiSelectEnabled) {
         dispatch(selectionChanged([imageDTO]));
         return;
@@ -47,6 +44,6 @@ export const useMultiselect = (imageDTO?: ImageDTO) => {
   return {
     areMultiplesSelected,
     isSelected,
-    handleClick,
+    onClick,
   };
 };

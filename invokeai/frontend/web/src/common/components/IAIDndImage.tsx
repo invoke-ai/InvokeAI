@@ -141,13 +141,13 @@ const IAIDndImage = (props: IAIDndImageProps) => {
       minH={minSize ? minSize : undefined}
       userSelect="none"
       cursor={isDragDisabled || !imageDTO ? 'default' : 'pointer'}
-      sx={withHoverOverlay ? sx : baseStyles}
+      // sx={withHoverOverlay ? sx : baseStyles}
       data-selected={isSelectedForCompare ? 'selectedForCompare' : isSelected ? 'selected' : undefined}
       {...rest}
     >
       {imageDTO && (
         <Flex
-          className="gallery-image-container"
+          // className="gallery-image-container"
           w="full"
           h="full"
           position={fitContainer ? 'absolute' : 'relative'}

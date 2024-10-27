@@ -9,6 +9,7 @@ import { addBatchEnqueuedListener } from 'app/store/middleware/listenerMiddlewar
 import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/boardAndImagesDeleted';
 import { addBoardIdSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/boardIdSelected';
 import { addBulkDownloadListeners } from 'app/store/middleware/listenerMiddleware/listeners/bulkDownload';
+import { addDndDroppedListener } from 'app/store/middleware/listenerMiddleware/listeners/dnd';
 import { addEnqueueRequestedLinear } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedLinear';
 import { addEnqueueRequestedNodes } from 'app/store/middleware/listenerMiddleware/listeners/enqueueRequestedNodes';
 import { addGalleryImageClickedListener } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
@@ -95,6 +96,7 @@ addUpdateAllNodesRequestedListener(startAppListening);
 
 // DND
 addImageDroppedListener(startAppListening);
+addDndDroppedListener(startAppListening);
 
 // Models
 addModelSelectedListener(startAppListening);

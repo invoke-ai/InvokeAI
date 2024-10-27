@@ -14,7 +14,7 @@ import { PiImageBold, PiWarningCircleBold } from 'react-icons/pi';
 import { useListImagesQuery } from 'services/api/endpoints/images';
 
 import { GALLERY_GRID_CLASS_NAME } from './constants';
-import { GALLERY_IMAGE_CLASS_NAME, GalleryImage } from './GalleryImage';
+import { GALLERY_IMAGE_CONTAINER_CLASS_NAME, GalleryImage } from './GalleryImage';
 
 const GalleryImageGrid = () => {
   useGalleryHotkeys();
@@ -79,7 +79,7 @@ const Content = () => {
       // Managing refs for dynamically rendered components is a bit tedious:
       // - https://react.dev/learn/manipulating-the-dom-with-refs#how-to-manage-a-list-of-refs-using-a-ref-callback
       // As a easy workaround, we can just grab the first gallery image element directly.
-      const imageEl = document.querySelector(`.${GALLERY_IMAGE_CLASS_NAME}`);
+      const imageEl = document.querySelector(`.${GALLERY_IMAGE_CONTAINER_CLASS_NAME}`);
       if (!imageEl) {
         // No images in gallery?
         return;
