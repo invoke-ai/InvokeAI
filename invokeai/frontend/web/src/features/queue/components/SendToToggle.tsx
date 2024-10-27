@@ -18,7 +18,7 @@ import {
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectSendToCanvas, settingsSendToCanvasChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
 import type { ChangeEvent, PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
@@ -142,7 +142,7 @@ export const SendToToggle = memo(() => {
             transitionDuration="0.2s"
           />
           <PopoverBody>
-            <TooltipContent sendToCanvas={sendToCanvas} isStaging={isStaging} />
+            <TooltipContent />
           </PopoverBody>
         </PopoverContent>
       </Portal>
@@ -150,10 +150,12 @@ export const SendToToggle = memo(() => {
   );
 });
 
-SendToToggle.displayName = 'CanvasSendToToggle';
+SendToToggle.displayName = 'SendToToggle';
 
-const TooltipContent = memo(({ sendToCanvas, isStaging }: { sendToCanvas: boolean; isStaging: boolean }) => {
+const TooltipContent = memo(() => {
   const { t } = useTranslation();
+  const sendToCanvas = useAppSelector(selectSendToCanvas);
+  const isStaging = useAppSelector(selectIsStaging);
 
   if (isStaging) {
     return (
@@ -180,14 +182,13 @@ const TooltipContent = memo(({ sendToCanvas, isStaging }: { sendToCanvas: boolea
 
 TooltipContent.displayName = 'TooltipContent';
 
-const ActivateCanvasButton = (props: PropsWithChildren) => {
+const ActivateCanvasButton = memo((props: PropsWithChildren) => {
   const dispatch = useAppDispatch();
-  const imageViewer = useImageViewer();
   const onClick = useCallback(() => {
     dispatch(setActiveTab('canvas'));
     dispatch(activeTabCanvasRightPanelChanged('layers'));
-    imageViewer.close();
-  }, [dispatch, imageViewer]);
+    $imageViewer.set(false);
+  }, [dispatch]);
   return (
     <Button
       onClick={onClick}
@@ -199,4 +200,6 @@ const ActivateCanvasButton = (props: PropsWithChildren) => {
       {props.children}
     </Button>
   );
-};
+});
+
+ActivateCanvasButton.displayName = 'ActivateCanvasButton';
