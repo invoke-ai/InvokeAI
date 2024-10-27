@@ -318,6 +318,13 @@ class AutoEncoder(nn.Module):
 
     def decode(self, z: Tensor) -> Tensor:
         z = z / self.scale_factor + self.shift_factor
+
+        # VAE is broken in float16, use same logic in model loading to pick bfloat16 or float32
+        if z.dtype == torch.float16:
+            try:
+                z = z.to(torch.bfloat16)
+            except TypeError:
+                z = z.to(torch.float32)
         return self.decoder(z)
 
     def forward(self, x: Tensor) -> Tensor:
