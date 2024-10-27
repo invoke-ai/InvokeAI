@@ -2,7 +2,7 @@ import { IconButton, Input, InputGroup, InputRightElement, Spinner } from '@invo
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectListImagesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import type { ChangeEvent, KeyboardEvent } from 'react';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 import { useListImagesQuery } from 'services/api/endpoints/images';
@@ -13,7 +13,7 @@ type Props = {
   onResetSearchTerm: () => void;
 };
 
-export const GallerySearch = ({ searchTerm, onChangeSearchTerm, onResetSearchTerm }: Props) => {
+export const GallerySearch = memo(({ searchTerm, onChangeSearchTerm, onResetSearchTerm }: Props) => {
   const { t } = useTranslation();
   const queryArgs = useAppSelector(selectListImagesQueryArgs);
   const { isPending } = useListImagesQuery(queryArgs, {
@@ -64,4 +64,6 @@ export const GallerySearch = ({ searchTerm, onChangeSearchTerm, onResetSearchTer
       )}
     </InputGroup>
   );
-};
+});
+
+GallerySearch.displayName = 'GallerySearch';

@@ -1,26 +1,21 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Image, Skeleton, Text, useShiftModifier } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
+import { Box, Flex, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
-import { $customStarUI } from 'app/store/nanostores/customStarUI';
 import { useAppStore } from 'app/store/nanostores/store';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
-import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd2/types';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
+import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
-import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { SizedSkeletonLoader } from 'features/gallery/components/ImageGrid/SizedSkeletonLoader';
+import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
-import type { MouseEvent, MouseEventHandler } from 'react';
+import type { MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiArrowsOutBold, PiStarBold, PiStarFill, PiTrashSimpleFill } from 'react-icons/pi';
-import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 // This class name is used to calculate the number of images that fit in the gallery
@@ -34,6 +29,9 @@ const galleryImageContainerSX = {
     '@container (max-width: 80px)': {
       '&': { display: 'none' },
     },
+  },
+  '&[data-is-dragging=true]': {
+    opacity: 0.3,
   },
   '.gallery-image': {
     touchAction: 'none',
@@ -77,20 +75,14 @@ const galleryImageContainerSX = {
   },
 } satisfies SystemStyleObject;
 
-interface HoverableImageProps {
+interface Props {
   imageDTO: ImageDTO;
 }
 
-const selectAlwaysShouldImageSizeBadge = createSelector(
-  selectGallerySlice,
-  (gallery) => gallery.alwaysShowImageSizeBadge
-);
-
-export const GalleryImage = memo(({ imageDTO }: HoverableImageProps) => {
+export const GalleryImage = memo(({ imageDTO }: Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [element, ref] = useState<HTMLImageElement | null>(null);
-  const imageViewer = useImageViewer();
   const selectIsSelectedForCompare = useMemo(
     () => createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare?.image_name === imageDTO.image_name),
     [imageDTO.image_name]
@@ -98,9 +90,14 @@ export const GalleryImage = memo(({ imageDTO }: HoverableImageProps) => {
   const isSelectedForCompare = useAppSelector(selectIsSelectedForCompare);
   const selectIsSelected = useMemo(
     () =>
-      createSelector(selectGallerySlice, (gallery) =>
-        gallery.selection.some((i) => i.image_name === imageDTO.image_name)
-      ),
+      createSelector(selectGallerySlice, (gallery) => {
+        for (const selectedImage of gallery.selection) {
+          if (selectedImage.image_name === imageDTO.image_name) {
+            return true;
+          }
+        }
+        return false;
+      }),
     [imageDTO.image_name]
   );
   const isSelected = useAppSelector(selectIsSelected);
@@ -168,9 +165,11 @@ export const GalleryImage = memo(({ imageDTO }: HoverableImageProps) => {
   );
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
-    imageViewer.open();
+    // Use the atom here directly instead of the `useImageViewer` to avoid re-rendering the gallery when the viewer
+    // opened state changes.
+    $imageViewer.set(true);
     store.dispatch(imageToCompareChanged(null));
-  }, [imageViewer, store]);
+  }, [store]);
 
   const dataTestId = useMemo(() => getGalleryImageDataTestId(imageDTO.image_name), [imageDTO.image_name]);
 
@@ -179,9 +178,9 @@ export const GalleryImage = memo(({ imageDTO }: HoverableImageProps) => {
   return (
     <Box
       className={GALLERY_IMAGE_CONTAINER_CLASS_NAME}
-      data-testid={dataTestId}
       sx={galleryImageContainerSX}
-      opacity={isDragging ? 0.3 : 1}
+      data-testid={dataTestId}
+      data-is-dragging={isDragging}
     >
       <Flex
         role="button"
@@ -196,157 +195,17 @@ export const GalleryImage = memo(({ imageDTO }: HoverableImageProps) => {
         <Image
           ref={ref}
           src={imageDTO.thumbnail_url}
-          fallback={<SizedSkeleton width={imageDTO.width} height={imageDTO.height} />}
+          fallback={<SizedSkeletonLoader width={imageDTO.width} height={imageDTO.height} />}
           w={imageDTO.width}
           objectFit="contain"
           maxW="full"
           maxH="full"
           borderRadius="base"
         />
-        <HoverIcons imageDTO={imageDTO} isHovered={isHovered.isTrue} />
+        <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered.isTrue} />
       </Flex>
     </Box>
   );
 });
 
 GalleryImage.displayName = 'GalleryImage';
-
-const HoverIcons = memo(({ imageDTO, isHovered }: { imageDTO: ImageDTO; isHovered: boolean }) => {
-  const alwaysShowImageSizeBadge = useAppSelector(selectAlwaysShouldImageSizeBadge);
-
-  return (
-    <>
-      {(isHovered || alwaysShowImageSizeBadge) && <SizeBadge imageDTO={imageDTO} />}
-      {(isHovered || imageDTO.starred) && <StarIcon imageDTO={imageDTO} />}
-      {isHovered && <DeleteIcon imageDTO={imageDTO} />}
-      {isHovered && <OpenInViewerIconButton imageDTO={imageDTO} />}
-    </>
-  );
-});
-HoverIcons.displayName = 'HoverIcons';
-
-const DeleteIcon = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
-  const shift = useShiftModifier();
-  const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const onClick = useCallback(
-    (e: MouseEvent<HTMLButtonElement>) => {
-      e.stopPropagation();
-      if (!imageDTO) {
-        return;
-      }
-      dispatch(imagesToDeleteSelected([imageDTO]));
-    },
-    [dispatch, imageDTO]
-  );
-
-  if (!shift) {
-    return null;
-  }
-
-  return (
-    <IAIDndImageIcon
-      onClick={onClick}
-      icon={<PiTrashSimpleFill />}
-      tooltip={t('gallery.deleteImage_one')}
-      position="absolute"
-      bottom={2}
-      insetInlineEnd={2}
-    />
-  );
-});
-
-DeleteIcon.displayName = 'DeleteIcon';
-
-const OpenInViewerIconButton = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
-  const imageViewer = useImageViewer();
-  const { t } = useTranslation();
-
-  const onClick = useCallback(() => {
-    imageViewer.openImageInViewer(imageDTO);
-  }, [imageDTO, imageViewer]);
-
-  return (
-    <IAIDndImageIcon
-      onClick={onClick}
-      icon={<PiArrowsOutBold />}
-      tooltip={t('gallery.openInViewer')}
-      position="absolute"
-      insetBlockStart={2}
-      insetInlineStart={2}
-    />
-  );
-});
-
-OpenInViewerIconButton.displayName = 'OpenInViewerIconButton';
-
-const StarIcon = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
-  const customStarUi = useStore($customStarUI);
-  const [starImages] = useStarImagesMutation();
-  const [unstarImages] = useUnstarImagesMutation();
-
-  const toggleStarredState = useCallback(() => {
-    if (imageDTO.starred) {
-      unstarImages({ imageDTOs: [imageDTO] });
-    } else {
-      starImages({ imageDTOs: [imageDTO] });
-    }
-  }, [starImages, unstarImages, imageDTO]);
-
-  const starIcon = useMemo(() => {
-    if (imageDTO.starred) {
-      return customStarUi ? customStarUi.on.icon : <PiStarFill />;
-    } else {
-      return customStarUi ? customStarUi.off.icon : <PiStarBold />;
-    }
-  }, [imageDTO.starred, customStarUi]);
-
-  const starTooltip = useMemo(() => {
-    if (imageDTO.starred) {
-      return customStarUi ? customStarUi.off.text : 'Unstar';
-    } else {
-      return customStarUi ? customStarUi.on.text : 'Star';
-    }
-  }, [imageDTO.starred, customStarUi]);
-
-  return (
-    <IAIDndImageIcon
-      onClick={toggleStarredState}
-      icon={starIcon}
-      tooltip={starTooltip}
-      position="absolute"
-      top={2}
-      insetInlineEnd={2}
-    />
-  );
-});
-
-StarIcon.displayName = 'StarIcon';
-
-const SizeBadge = memo(({ imageDTO }: { imageDTO: ImageDTO }) => {
-  return (
-    <Text
-      className="gallery-image-size-badge"
-      position="absolute"
-      background="base.900"
-      color="base.50"
-      fontSize="sm"
-      fontWeight="semibold"
-      bottom={1}
-      left={1}
-      opacity={0.7}
-      px={2}
-      lineHeight={1.25}
-      borderTopEndRadius="base"
-      pointerEvents="none"
-    >{`${imageDTO.width}x${imageDTO.height}`}</Text>
-  );
-});
-
-SizeBadge.displayName = 'SizeBadge';
-
-const SizedSkeleton = memo(({ width, height }: { width: number; height: number }) => {
-  return <Skeleton w={`${width}px`} h="auto" objectFit="contain" aspectRatio={`${width}/${height}`} />;
-});
-
-SizedSkeleton.displayName = 'SizedSkeleton';
