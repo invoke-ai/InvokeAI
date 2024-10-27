@@ -20,10 +20,9 @@ const sx = {
 
 type Props = ImageProps & {
   imageDTO: ImageDTO;
-  dndId: string;
 };
 
-export const DndImage = memo(({ imageDTO, dndId, ...rest }: Props) => {
+export const DndImage = memo(({ imageDTO, ...rest }: Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [element, ref] = useState<HTMLImageElement | null>(null);
@@ -34,9 +33,7 @@ export const DndImage = memo(({ imageDTO, dndId, ...rest }: Props) => {
     }
     return draggable({
       element,
-      getInitialData: () => {
-        return singleImageDndSource.getData({ dndId, imageDTO });
-      },
+      getInitialData: () => singleImageDndSource.getData({ imageDTO }, imageDTO.image_name),
       onDragStart: () => {
         setIsDragging(true);
       },
@@ -44,7 +41,7 @@ export const DndImage = memo(({ imageDTO, dndId, ...rest }: Props) => {
         setIsDragging(false);
       },
     });
-  }, [imageDTO, element, store, dndId]);
+  }, [imageDTO, element, store]);
 
   useImageContextMenu(imageDTO, element);
 

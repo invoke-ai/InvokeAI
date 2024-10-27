@@ -20,7 +20,7 @@ import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import { setGlobalReferenceImageDndTarget, type SetGlobalReferenceImageDndTargetData } from 'features/dnd2/types';
-import { memo, useCallback, useId, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold } from 'react-icons/pi';
 import type { ImageDTO, IPAdapterModelConfig, IPALayerImagePostUploadAction } from 'services/api/types';
@@ -80,15 +80,17 @@ export const IPAdapterSettings = memo(() => {
     [dispatch, entityIdentifier]
   );
 
-  const dndId = useId();
-
   const postUploadAction = useMemo<IPALayerImagePostUploadAction>(
     () => ({ type: 'SET_IPA_IMAGE', id: entityIdentifier.id }),
     [entityIdentifier.id]
   );
   const targetData = useMemo<SetGlobalReferenceImageDndTargetData>(
-    () => setGlobalReferenceImageDndTarget.getData({ dndId, globalReferenceImageId: entityIdentifier.id }),
-    [dndId, entityIdentifier.id]
+    () =>
+      setGlobalReferenceImageDndTarget.getData(
+        { globalReferenceImageId: entityIdentifier.id },
+        ipAdapter.image?.image_name
+      ),
+    [entityIdentifier.id, ipAdapter.image?.image_name]
   );
   const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);
   const isBusy = useCanvasIsBusy();

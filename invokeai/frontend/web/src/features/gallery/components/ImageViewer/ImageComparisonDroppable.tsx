@@ -1,4 +1,4 @@
-import { useAppStore } from 'app/store/storeHooks';
+import { useAppSelector } from 'app/store/storeHooks';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
 import type { SelectForCompareDndTargetData } from 'features/dnd2/types';
 import { selectForCompareDndTarget } from 'features/dnd2/types';
@@ -9,15 +9,14 @@ import { selectComparisonImages } from './common';
 
 export const ImageComparisonDroppable = memo(() => {
   const { t } = useTranslation();
-  const store = useAppStore();
+  const comparisonImages = useAppSelector(selectComparisonImages);
   const targetData = useMemo<SelectForCompareDndTargetData>(() => {
-    const { firstImage, secondImage } = selectComparisonImages(store.getState());
+    const { firstImage, secondImage } = comparisonImages;
     return selectForCompareDndTarget.getData({
-      dndId: 'current-image',
       firstImageName: firstImage?.image_name,
       secondImageName: secondImage?.image_name,
     });
-  }, [store]);
+  }, [comparisonImages]);
 
   return <DndDropTarget targetData={targetData} label={t('gallery.selectForCompare')} />;
 });

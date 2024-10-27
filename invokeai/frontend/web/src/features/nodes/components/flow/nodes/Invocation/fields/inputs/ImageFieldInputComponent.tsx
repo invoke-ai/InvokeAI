@@ -9,7 +9,7 @@ import type { SetNodeImageFieldDndTargetData } from 'features/dnd2/types';
 import { setNodeImageFieldDndTarget } from 'features/dnd2/types';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageFieldInputInstance, ImageFieldInputTemplate } from 'features/nodes/types/field';
-import { memo, useCallback, useEffect, useId, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
@@ -24,7 +24,6 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   const dispatch = useAppDispatch();
   const isConnected = useStore($isConnected);
   const { currentData: imageDTO, isError } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
-  const dndId = useId();
   const handleReset = useCallback(() => {
     dispatch(
       fieldImageValueChanged({
@@ -36,8 +35,8 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   }, [dispatch, field.name, nodeId]);
 
   const targetData = useMemo<SetNodeImageFieldDndTargetData>(
-    () => setNodeImageFieldDndTarget.getData({ dndId, nodeId, fieldName: field.name }),
-    [dndId, field.name, nodeId]
+    () => setNodeImageFieldDndTarget.getData({ nodeId, fieldName: field.name }, field.value?.image_name),
+    [field.name, field.value?.image_name, nodeId]
   );
 
   const postUploadAction = useMemo<PostUploadAction>(
@@ -70,7 +69,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
     >
       {imageDTO && (
         <>
-          <DndImage dndId={dndId} imageDTO={imageDTO} minW={8} minH={8} />
+          <DndImage imageDTO={imageDTO} minW={8} minH={8} />
           <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
             <IAIDndImageIcon
               onClick={handleReset}

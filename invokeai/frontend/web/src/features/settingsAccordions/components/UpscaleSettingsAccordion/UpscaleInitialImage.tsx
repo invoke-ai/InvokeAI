@@ -6,7 +6,7 @@ import { DndImage } from 'features/dnd2/DndImage';
 import { setUpscaleInitialImageFromImageDndTarget } from 'features/dnd2/types';
 import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { t } from 'i18next';
-import { useCallback, useId, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import type { PostUploadAction } from 'services/api/types';
 
@@ -15,7 +15,6 @@ const targetData = setUpscaleInitialImageFromImageDndTarget.getData({});
 export const UpscaleInitialImage = () => {
   const dispatch = useAppDispatch();
   const imageDTO = useAppSelector(selectUpscaleInitialImage);
-  const dndId = useId();
   const postUploadAction = useMemo<PostUploadAction>(
     () => ({
       type: 'SET_UPSCALE_INITIAL_IMAGE',
@@ -32,7 +31,7 @@ export const UpscaleInitialImage = () => {
       <Flex position="relative" w={36} h={36} alignItems="center" justifyContent="center">
         {imageDTO && (
           <>
-            <DndImage dndId={dndId} imageDTO={imageDTO} />
+            <DndImage imageDTO={imageDTO} />
             <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
               <IAIDndImageIcon
                 onClick={onReset}

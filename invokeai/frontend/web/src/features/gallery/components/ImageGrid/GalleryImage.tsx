@@ -7,7 +7,6 @@ import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/lis
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd2/types';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
@@ -116,15 +115,17 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
           if (gallery.selection.length > 1 && gallery.selection.includes(imageDTO)) {
-            return multipleImageDndSource.getData({
-              dndId: getPrefixedId('dnd-gallery-selection'),
-              imageDTOs: gallery.selection,
-              boardId: gallery.selectedBoardId,
-            });
+            return multipleImageDndSource.getData(
+              {
+                imageDTOs: gallery.selection,
+                boardId: gallery.selectedBoardId,
+              },
+              'gallery-selection'
+            );
           }
 
           // Otherwise, initiate a single-image drag
-          return singleImageDndSource.getData({ dndId, imageDTO });
+          return singleImageDndSource.getData({ imageDTO }, imageDTO.image_name);
         },
         // This is a "local" drag start event, meaning that it is only called when this specific image is dragged.
         onDragStart: (args) => {

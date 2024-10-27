@@ -10,7 +10,7 @@ import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types'
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
 import type { ReplaceLayerWithImageDndTargetData } from 'features/dnd2/types';
 import { replaceLayerWithImageDndTarget } from 'features/dnd2/types';
-import { memo, useId, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -19,11 +19,10 @@ type Props = {
 
 export const RasterLayer = memo(({ id }: Props) => {
   const { t } = useTranslation();
-  const dndId = useId();
   const entityIdentifier = useMemo<CanvasEntityIdentifier<'raster_layer'>>(() => ({ id, type: 'raster_layer' }), [id]);
   const targetData = useMemo<ReplaceLayerWithImageDndTargetData>(
-    () => replaceLayerWithImageDndTarget.getData({ dndId, entityIdentifier }),
-    [dndId, entityIdentifier]
+    () => replaceLayerWithImageDndTarget.getData({ entityIdentifier }, entityIdentifier.id),
+    [entityIdentifier]
   );
 
   return (

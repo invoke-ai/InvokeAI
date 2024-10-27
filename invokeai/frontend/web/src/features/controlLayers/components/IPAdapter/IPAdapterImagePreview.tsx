@@ -38,22 +38,22 @@ type Props = {
 export const IPAdapterImagePreview = memo(({ image, onChangeImage, targetData, postUploadAction }: Props) => {
   const { t } = useTranslation();
   const isConnected = useStore($isConnected);
-  const imageDTOQueryResult = useGetImageDTOQuery(image?.image_name ?? skipToken);
+  const { currentData: imageDTO, isError } = useGetImageDTOQuery(image?.image_name ?? skipToken);
   const handleResetControlImage = useCallback(() => {
     onChangeImage(null);
   }, [onChangeImage]);
 
   useEffect(() => {
-    if (isConnected && imageDTOQueryResult.isError) {
+    if (isConnected && isError) {
       handleResetControlImage();
     }
-  }, [handleResetControlImage, imageDTOQueryResult.isError, isConnected]);
+  }, [handleResetControlImage, isError, isConnected]);
 
   return (
-    <Flex sx={sx} data-error={!imageDTOQueryResult.currentData && !image?.image_name}>
-      {imageDTOQueryResult.currentData && (
+    <Flex sx={sx} data-error={!imageDTO && !image?.image_name}>
+      {imageDTO && (
         <>
-          <DndImage dndId={targetData.dndId} imageDTO={imageDTOQueryResult.currentData} />
+          <DndImage imageDTO={imageDTO} />
           <Flex position="absolute" flexDir="column" top={2} insetInlineEnd={2} gap={1}>
             <IAIDndImageIcon
               onClick={handleResetControlImage}

@@ -22,7 +22,7 @@ import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'feature
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
 import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd2/types';
 import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd2/types';
-import { memo, useCallback, useId, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiTrashSimpleFill } from 'react-icons/pi';
 import type { ImageDTO, IPAdapterModelConfig, RGIPAdapterImagePostUploadAction } from 'services/api/types';
@@ -35,7 +35,6 @@ type Props = {
 export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Props) => {
   const entityIdentifier = useEntityIdentifierContext('regional_guidance');
   const { t } = useTranslation();
-  const dndId = useId();
   const dispatch = useAppDispatch();
   const onDeleteIPAdapter = useCallback(() => {
     dispatch(rgIPAdapterDeleted({ entityIdentifier, referenceImageId }));
@@ -95,12 +94,14 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
 
   const targetData = useMemo<SetRegionalGuidanceReferenceImageDndTargetData>(
     () =>
-      setRegionalGuidanceReferenceImageDndTarget.getData({
-        dndId,
-        regionalGuidanceId: entityIdentifier.id,
-        referenceImageId,
-      }),
-    [dndId, entityIdentifier.id, referenceImageId]
+      setRegionalGuidanceReferenceImageDndTarget.getData(
+        {
+          regionalGuidanceId: entityIdentifier.id,
+          referenceImageId,
+        },
+        ipAdapter.image?.image_name
+      ),
+    [entityIdentifier.id, ipAdapter.image?.image_name, referenceImageId]
   );
 
   const postUploadAction = useMemo<RGIPAdapterImagePostUploadAction>(

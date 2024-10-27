@@ -96,7 +96,7 @@ const ImageContent = memo(({ imageDTO }: { imageDTO?: ImageDTO }) => {
 
   return (
     <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
-      <DndImage dndId="current-image" imageDTO={imageDTO} />
+      <DndImage imageDTO={imageDTO} />
     </Flex>
   );
 });
