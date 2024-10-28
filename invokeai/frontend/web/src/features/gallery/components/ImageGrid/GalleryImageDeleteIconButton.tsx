@@ -1,7 +1,7 @@
 import { useShiftModifier } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
-import { DndImageIcon } from 'features/dnd2/DndImageIcon';
+import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import type { MouseEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

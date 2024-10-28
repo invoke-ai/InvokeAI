@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import { DndImageIcon } from 'features/dnd2/DndImageIcon';
+import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { memo, useCallback } from 'react';
 import { PiStarBold, PiStarFill } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
