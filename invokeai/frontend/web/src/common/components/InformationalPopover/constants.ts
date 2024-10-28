@@ -23,8 +23,10 @@ export type Feature =
   | 'dynamicPrompts'
   | 'dynamicPromptsMaxPrompts'
   | 'dynamicPromptsSeedBehaviour'
+  | 'globalReferenceImage'
   | 'imageFit'
   | 'infillMethod'
+  | 'inpainting'
   | 'ipAdapterMethod'
   | 'lora'
   | 'loraWeight'
@@ -46,6 +48,7 @@ export type Feature =
   | 'paramVAEPrecision'
   | 'paramWidth'
   | 'patchmatchDownScaleSize'
+  | 'rasterLayer'
   | 'refinerModel'
   | 'refinerNegativeAestheticScore'
   | 'refinerPositiveAestheticScore'
@@ -53,6 +56,9 @@ export type Feature =
   | 'refinerStart'
   | 'refinerSteps'
   | 'refinerCfgScale'
+  | 'regionalGuidance'
+  | 'regionalGuidanceAndReferenceImage'
+  | 'regionalReferenceImage'
   | 'scaleBeforeProcessing'
   | 'seamlessTilingXAxis'
   | 'seamlessTilingYAxis'
@@ -75,6 +81,24 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   clipSkip: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings',
+  },
+  inpainting: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000096702-inpainting-outpainting-and-bounding-box',
+  },
+  rasterLayer: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000094998-raster-layers-and-initial-images',
+  },
+  regionalGuidance: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000165024-regional-guidance-layers',
+  },
+  regionalGuidanceAndReferenceImage: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000165024-regional-guidance-layers',
+  },
+  globalReferenceImage: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
+  },
+  regionalReferenceImage: {
+    href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
   },
   controlNet: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000105880',

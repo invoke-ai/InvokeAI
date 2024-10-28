@@ -127,8 +127,6 @@ export const buildUseDisclosure = (defaultIsOpen: boolean): [() => UseDisclosure
  *
  * Hook to manage a boolean state. Use this for a local boolean state.
  * @param defaultIsOpen Initial state of the disclosure
- *
- * @knipignore
  */
 export const useDisclosure = (defaultIsOpen: boolean): UseDisclosure => {
   const [isOpen, set] = useState(defaultIsOpen);

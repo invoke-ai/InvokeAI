@@ -17,6 +17,8 @@ export const isValidDrop = (overData?: TypesafeDroppableData | null, activeData?
     case 'SET_RG_IP_ADAPTER_IMAGE':
     case 'ADD_RASTER_LAYER_FROM_IMAGE':
     case 'ADD_CONTROL_LAYER_FROM_IMAGE':
+    case 'ADD_INPAINT_MASK_FROM_IMAGE':
+    case 'ADD_REGIONAL_GUIDANCE_FROM_IMAGE':
     case 'SET_UPSCALE_INITIAL_IMAGE':
     case 'SET_NODES_IMAGE':
     case 'SELECT_FOR_COMPARE':

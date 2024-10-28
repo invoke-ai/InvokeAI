@@ -5,11 +5,13 @@ import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdap
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { isTransformableEntityIdentifier } from 'features/controlLayers/store/types';
+import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useCallback, useMemo } from 'react';
 
 export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | null) => {
   const canvasManager = useCanvasManager();
   const adapter = useEntityAdapterSafe(entityIdentifier);
+  const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusy();
   const isInteractable = useStore(adapter?.$isInteractable ?? $false);
   const isEmpty = useStore(adapter?.$isEmpty ?? $false);
@@ -50,8 +52,9 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
     if (!adapter) {
       return;
     }
+    imageViewer.close();
     await adapter.transformer.startTransform();
-  }, [isDisabled, entityIdentifier, canvasManager]);
+  }, [isDisabled, entityIdentifier, canvasManager, imageViewer]);
 
   const fitToBbox = useCallback(async () => {
     if (isDisabled) {
@@ -67,10 +70,11 @@ export const useEntityTransform = (entityIdentifier: CanvasEntityIdentifier | nu
     if (!adapter) {
       return;
     }
+    imageViewer.close();
     await adapter.transformer.startTransform({ silent: true });
     adapter.transformer.fitToBboxContain();
     await adapter.transformer.applyTransform();
-  }, [canvasManager, entityIdentifier, isDisabled]);
+  }, [canvasManager, entityIdentifier, imageViewer, isDisabled]);
 
   return { isDisabled, start, fitToBbox } as const;
 };

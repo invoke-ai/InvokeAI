@@ -1715,6 +1715,12 @@ export type components = {
              */
             image?: components["schemas"]["ImageField"];
             /**
+             * Invert
+             * @description Whether to invert the mask.
+             * @default false
+             */
+            invert?: boolean;
+            /**
              * type
              * @default apply_tensor_mask_to_image
              * @constant
@@ -14731,7 +14737,7 @@ export type components = {
             bounding_boxes?: components["schemas"]["BoundingBoxField"][] | null;
             /**
              * Point Lists
-             * @description The points to prompt the SAM model with.
+             * @description The list of point lists to prompt the SAM model with. Each list of points represents a single object.
              * @default null
              */
             point_lists?: components["schemas"]["SAMPointsField"][] | null;
@@ -15347,6 +15353,11 @@ export type components = {
              * @default false
              */
             is_installed?: boolean;
+            /**
+             * Previous Names
+             * @default []
+             */
+            previous_names?: string[];
             /** Dependencies */
             dependencies?: components["schemas"]["StarterModelWithoutDependencies"][] | null;
         };
@@ -15375,6 +15386,11 @@ export type components = {
              * @default false
              */
             is_installed?: boolean;
+            /**
+             * Previous Names
+             * @default []
+             */
+            previous_names?: string[];
         };
         /**
          * Step Param Easing

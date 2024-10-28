@@ -2,7 +2,6 @@ import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegion } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { CanvasAlertsSendingToCanvas } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSendingTo';
 import { CompareToolbar } from 'features/gallery/components/ImageViewer/CompareToolbar';
 import CurrentImagePreview from 'features/gallery/components/ImageViewer/CurrentImagePreview';
 import { ImageComparison } from 'features/gallery/components/ImageViewer/ImageComparison';
@@ -46,7 +45,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
       right={0}
       bottom={0}
       left={0}
-      rowGap={4}
+      rowGap={2}
       alignItems="center"
       justifyContent="center"
     >
@@ -57,9 +56,6 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
         {hasImageToCompare && <ImageComparison containerDims={containerDims} />}
       </Box>
       <ImageComparisonDroppable />
-      <Box position="absolute" top={14} insetInlineEnd={2}>
-        <CanvasAlertsSendingToCanvas />
-      </Box>
     </Flex>
   );
 });

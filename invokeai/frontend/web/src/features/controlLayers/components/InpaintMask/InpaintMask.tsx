@@ -14,7 +14,7 @@ type Props = {
 };
 
 export const InpaintMask = memo(({ id }: Props) => {
-  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'inpaint_mask' }), [id]);
+  const entityIdentifier = useMemo<CanvasEntityIdentifier<'inpaint_mask'>>(() => ({ id, type: 'inpaint_mask' }), [id]);
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>

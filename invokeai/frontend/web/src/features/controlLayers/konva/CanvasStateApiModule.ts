@@ -17,12 +17,16 @@ import {
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import {
   bboxChangedFromCanvas,
+  controlLayerAdded,
   entityBrushLineAdded,
   entityEraserLineAdded,
   entityMoved,
   entityRasterized,
   entityRectAdded,
   entityReset,
+  inpaintMaskAdded,
+  rasterLayerAdded,
+  rgAdded,
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasStagingAreaSlice } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
@@ -51,6 +55,7 @@ import { getImageDTO } from 'services/api/endpoints/images';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO, S } from 'services/api/types';
 import { QueueError } from 'services/events/errors';
+import type { Param0 } from 'tsafe';
 import { assert } from 'tsafe';
 
 import type { CanvasEntityAdapter } from './CanvasEntity/types';
@@ -158,6 +163,34 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   addRect = (arg: EntityRectAddedPayload) => {
     this.store.dispatch(entityRectAdded(arg));
+  };
+
+  /**
+   * Adds a raster layer to the canvas, pushing state to redux.
+   */
+  addRasterLayer = (arg: Param0<typeof rasterLayerAdded>) => {
+    this.store.dispatch(rasterLayerAdded(arg));
+  };
+
+  /**
+   * Adds a control layer to the canvas, pushing state to redux.
+   */
+  addControlLayer = (arg: Param0<typeof controlLayerAdded>) => {
+    this.store.dispatch(controlLayerAdded(arg));
+  };
+
+  /**
+   * Adds an inpaint mask to the canvas, pushing state to redux.
+   */
+  addInpaintMask = (arg: Param0<typeof inpaintMaskAdded>) => {
+    this.store.dispatch(inpaintMaskAdded(arg));
+  };
+
+  /**
+   * Adds regional guidance to the canvas, pushing state to redux.
+   */
+  addRegionalGuidance = (arg: Param0<typeof rgAdded>) => {
+    this.store.dispatch(rgAdded(arg));
   };
 
   /**

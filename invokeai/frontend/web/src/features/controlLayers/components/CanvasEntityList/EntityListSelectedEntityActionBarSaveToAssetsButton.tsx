@@ -31,7 +31,7 @@ export const EntityListSelectedEntityActionBarSaveToAssetsButton = memo(() => {
     <IconButton
       onClick={onClick}
       isDisabled={!selectedEntityIdentifier || isBusy}
-      size="sm"
+      minW={8}
       variant="link"
       alignSelf="stretch"
       aria-label={t('controlLayers.saveLayerToAssets')}

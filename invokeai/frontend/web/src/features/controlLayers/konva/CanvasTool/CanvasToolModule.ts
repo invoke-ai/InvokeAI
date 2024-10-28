@@ -160,11 +160,16 @@ export class CanvasToolModule extends CanvasModuleBase {
     const stage = this.manager.stage;
     const tool = this.$tool.get();
     const segmentingAdapter = this.manager.stateApi.$segmentingAdapter.get();
+    const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
 
-    if ((this.manager.stage.getIsDragging() || tool === 'view') && !segmentingAdapter) {
+    if (this.manager.stage.getIsDragging()) {
+      this.tools.view.syncCursorStyle();
+    } else if (tool === 'view') {
       this.tools.view.syncCursorStyle();
     } else if (segmentingAdapter) {
       segmentingAdapter.segmentAnything.syncCursorStyle();
+    } else if (transformingAdapter) {
+      // The transformer handles cursor style via events
     } else if (this.manager.stateApi.$isFiltering.get()) {
       stage.setCursor('not-allowed');
     } else if (this.manager.stagingArea.$isStaging.get()) {

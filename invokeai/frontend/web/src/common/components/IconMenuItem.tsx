@@ -26,5 +26,9 @@ export const IconMenuItem = ({ tooltip, icon, ...props }: Props) => {
 };
 
 export const IconMenuItemGroup = ({ children }: { children: ReactNode }) => {
-  return <Flex gap={2}>{children}</Flex>;
+  return (
+    <Flex gap={2} justifyContent="space-between">
+      {children}
+    </Flex>
+  );
 };

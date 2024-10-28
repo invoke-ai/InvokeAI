@@ -6,15 +6,22 @@ import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konv
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
-import { addCoords, getKonvaNodeDebugAttrs, getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
+import {
+  addCoords,
+  getKonvaNodeDebugAttrs,
+  getPrefixedId,
+  offsetCoord,
+  roundCoord,
+} from 'features/controlLayers/konva/util';
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type {
+  CanvasEntityType,
   CanvasImageState,
   Coordinate,
   RgbaColor,
-  SAMPoint,
   SAMPointLabel,
   SAMPointLabelString,
+  SAMPointWithId,
 } from 'features/controlLayers/store/types';
 import { SAM_POINT_LABEL_NUMBER_TO_STRING } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
@@ -27,6 +34,9 @@ import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
 import type { ImageDTO } from 'services/api/types';
+import stableHash from 'stable-hash';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 
 type CanvasSegmentAnythingModuleConfig = {
   /**
@@ -70,7 +80,7 @@ const DEFAULT_CONFIG: CanvasSegmentAnythingModuleConfig = {
   SAM_POINT_FOREGROUND_COLOR: { r: 50, g: 255, b: 0, a: 1 }, // light green
   SAM_POINT_BACKGROUND_COLOR: { r: 255, g: 0, b: 50, a: 1 }, // red-ish
   SAM_POINT_NEUTRAL_COLOR: { r: 0, g: 225, b: 255, a: 1 }, // cyan
-  MASK_COLOR: { r: 0, g: 200, b: 200, a: 0.5 }, // cyan with 50% opacity
+  MASK_COLOR: { r: 0, g: 225, b: 255, a: 1 }, // cyan
   PROCESS_DEBOUNCE_MS: 1000,
 };
 
@@ -85,6 +95,7 @@ const DEFAULT_CONFIG: CanvasSegmentAnythingModuleConfig = {
 type SAMPointState = {
   id: string;
   label: SAMPointLabel;
+  coord: Coordinate;
   konva: {
     circle: Konva.Circle;
   };
@@ -113,9 +124,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   $isSegmenting = atom<boolean>(false);
 
   /**
-   * Whether the current set of points has been processed.
+   * The hash of the last processed points. This is used to prevent re-processing the same points.
    */
-  $hasProcessed = atom<boolean>(false);
+  $lastProcessedHash = atom<string>('');
 
   /**
    * Whether the module is currently processing the points.
@@ -144,10 +155,15 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   /**
    * The ephemeral image state of the processed image. Only used while segmenting.
    */
-  imageState: CanvasImageState | null = null;
+  $imageState = atom<CanvasImageState | null>(null);
 
   /**
-   * The current input points.
+   * Whether the module has an image state. This is a computed value based on $imageState.
+   */
+  $hasImageState = computed(this.$imageState, (imageState) => imageState !== null);
+
+  /**
+   * The current input points. A listener is added to this atom to process the points when they change.
    */
   $points = atom<SAMPointState[]>([]);
 
@@ -155,6 +171,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * Whether the module has points. This is a computed value based on $points.
    */
   $hasPoints = computed(this.$points, (points) => points.length > 0);
+
+  /**
+   * Whether the module should invert the mask image.
+   */
+  $invert = atom<boolean>(false);
 
   /**
    * The masked image object, if it exists.
@@ -187,6 +208,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
      * It's rendered with a globalCompositeOperation of 'source-atop' to preview the mask as a semi-transparent overlay.
      */
     compositingRect: Konva.Rect;
+    /**
+     * A tween for pulsing the mask group's opacity.
+     */
+    maskTween: Konva.Tween | null;
   };
 
   KONVA_CIRCLE_NAME = `${this.type}:circle`;
@@ -209,7 +234,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.konva = {
       group: new Konva.Group({ name: this.KONVA_GROUP_NAME }),
       pointGroup: new Konva.Group({ name: this.KONVA_POINT_GROUP_NAME }),
-      maskGroup: new Konva.Group({ name: this.KONVA_MASK_GROUP_NAME }),
+      maskGroup: new Konva.Group({ name: this.KONVA_MASK_GROUP_NAME, opacity: 0.6 }),
       compositingRect: new Konva.Rect({
         name: this.KONVA_COMPOSITING_RECT_NAME,
         fill: rgbaColorToString(this.config.MASK_COLOR),
@@ -219,6 +244,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         perfectDrawEnabled: false,
         visible: false,
       }),
+      maskTween: null,
     };
 
     // Points should always be rendered above the mask group
@@ -250,10 +276,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   createPoint(coord: Coordinate, label: SAMPointLabel): SAMPointState {
     const id = getPrefixedId('sam_point');
 
+    const roundedCoord = roundCoord(coord);
+
     const circle = new Konva.Circle({
       name: this.KONVA_CIRCLE_NAME,
-      x: Math.round(coord.x),
-      y: Math.round(coord.y),
+      x: roundedCoord.x,
+      y: roundedCoord.y,
       radius: this.manager.stage.unscale(this.config.SAM_POINT_RADIUS), // We will scale this as the stage scale changes
       fill: rgbaColorToString(this.getSAMPointColor(label)),
       stroke: rgbaColorToString(this.config.SAM_POINT_BORDER_COLOR),
@@ -270,14 +298,18 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       if (this.$isDraggingPoint.get()) {
         return;
       }
+      if (e.evt.button !== 0) {
+        return;
+      }
       // This event should not bubble up to the parent, stage or any other nodes
       e.cancelBubble = true;
       circle.destroy();
-      this.$points.set(this.$points.get().filter((point) => point.id !== id));
-      if (this.$points.get().length === 0) {
+
+      const newPoints = this.$points.get().filter((point) => point.id !== id);
+      if (newPoints.length === 0) {
         this.resetEphemeralState();
       } else {
-        this.$hasProcessed.set(false);
+        this.$points.set(newPoints);
       }
     });
 
@@ -286,25 +318,28 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     });
 
     circle.on('dragend', () => {
+      const roundedCoord = roundCoord(circle.position());
+
+      this.log.trace({ ...roundedCoord, label: SAM_POINT_LABEL_NUMBER_TO_STRING[label] }, 'Moved SAM point');
       this.$isDraggingPoint.set(false);
-      // Point has changed!
-      this.$hasProcessed.set(false);
-      this.$points.notify();
-      this.log.trace(
-        { x: Math.round(circle.x()), y: Math.round(circle.y()), label: SAM_POINT_LABEL_NUMBER_TO_STRING[label] },
-        'Moved SAM point'
-      );
+
+      const newPoints = this.$points.get().map((point) => {
+        if (point.id === id) {
+          return { ...point, coord: roundedCoord };
+        }
+        return point;
+      });
+
+      this.$points.set(newPoints);
     });
 
     this.konva.pointGroup.add(circle);
 
-    this.log.trace(
-      { x: Math.round(circle.x()), y: Math.round(circle.y()), label: SAM_POINT_LABEL_NUMBER_TO_STRING[label] },
-      'Created SAM point'
-    );
+    this.log.trace({ ...roundedCoord, label: SAM_POINT_LABEL_NUMBER_TO_STRING[label] }, 'Created SAM point');
 
     return {
       id,
+      coord: roundedCoord,
       label,
       konva: { circle },
     };
@@ -327,14 +362,14 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   /**
    * Gets the SAM points in the format expected by the segment-anything API. The x and y values are rounded to integers.
    */
-  getSAMPoints = (): SAMPoint[] => {
-    const points: SAMPoint[] = [];
+  getSAMPoints = (): SAMPointWithId[] => {
+    const points: SAMPointWithId[] = [];
 
-    for (const { konva, label } of this.$points.get()) {
+    for (const { id, coord, label } of this.$points.get()) {
       points.push({
-        // Pull out and round the x and y values from Konva
-        x: Math.round(konva.circle.x()),
-        y: Math.round(konva.circle.y()),
+        id,
+        x: coord.x,
+        y: coord.y,
         label,
       });
     }
@@ -381,10 +416,8 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // Create a SAM point at the normalized position
     const point = this.createPoint(normalizedPoint, this.$pointType.get());
-    this.$points.set([...this.$points.get(), point]);
-
-    // Mark the module as having _not_ processed the points now that they have changed
-    this.$hasProcessed.set(false);
+    const newPoints = [...this.$points.get(), point];
+    this.$points.set(newPoints);
   };
 
   /**
@@ -421,6 +454,20 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         if (points.length === 0) {
           return;
         }
+
+        if (this.manager.stateApi.getSettings().autoProcess) {
+          this.process();
+        }
+      })
+    );
+
+    // When the invert flag changes, process if autoProcess is enabled
+    this.subscriptions.add(
+      this.$invert.listen(() => {
+        if (this.$points.get().length === 0) {
+          return;
+        }
+
         if (this.manager.stateApi.getSettings().autoProcess) {
           this.process();
         }
@@ -433,7 +480,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         if (this.$points.get().length === 0) {
           return;
         }
-        if (autoProcess && !this.$hasProcessed.get()) {
+        if (autoProcess) {
           this.process();
         }
       })
@@ -500,6 +547,14 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
 
+    const invert = this.$invert.get();
+
+    const hash = stableHash({ points, invert });
+    if (hash === this.$lastProcessedHash.get()) {
+      this.log.trace('Already processed points');
+      return;
+    }
+
     this.$isProcessing.set(true);
 
     this.log.trace({ points }, 'Segmenting');
@@ -521,7 +576,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.abortController = controller;
 
     // Build the graph for segmenting the image, using the rasterized image DTO
-    const { graph, outputNodeId } = this.buildGraph(rasterizeResult.value);
+    const { graph, outputNodeId } = CanvasSegmentAnythingModule.buildGraph(rasterizeResult.value, points, invert);
 
     // Run the graph and get the segmented image output
     const segmentResult = await withResultAsync(() =>
@@ -548,21 +603,27 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.log.trace({ imageDTO: segmentResult.value }, 'Segmented');
 
     // Prepare the ephemeral image state
-    this.imageState = imageDTOToImageObject(segmentResult.value);
+    const imageState = imageDTOToImageObject(segmentResult.value);
+    this.$imageState.set(imageState);
 
     // Destroy any existing masked image and create a new one
     if (this.maskedImage) {
       this.maskedImage.destroy();
     }
-    this.maskedImage = new CanvasObjectImage(this.imageState, this);
+    if (this.konva.maskTween) {
+      this.konva.maskTween.destroy();
+      this.konva.maskTween = null;
+    }
+
+    this.maskedImage = new CanvasObjectImage(imageState, this);
 
     // Force update the masked image - after awaiting, the image will be rendered (in memory)
-    await this.maskedImage.update(this.imageState, true);
+    await this.maskedImage.update(imageState, true);
 
     // Update the compositing rect to match the image size
     this.konva.compositingRect.setAttrs({
-      width: this.imageState.image.width,
-      height: this.imageState.image.height,
+      width: imageState.image.width,
+      height: imageState.image.height,
       visible: true,
     });
 
@@ -574,11 +635,23 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     // Cache the group to ensure the mask is rendered correctly w/ opacity
     this.konva.maskGroup.cache();
 
+    // Create a pulsing tween
+    this.konva.maskTween = new Konva.Tween({
+      node: this.konva.maskGroup,
+      duration: 1,
+      opacity: 0.4, // oscillate between this value and pre-tween opacity
+      yoyo: true,
+      repeat: Infinity,
+      easing: Konva.Easings.EaseOut,
+    });
+
+    // Start the pulsing effect
+    this.konva.maskTween.play();
+
+    this.$lastProcessedHash.set(hash);
+
     // We are done processing (still segmenting though!)
     this.$isProcessing.set(false);
-
-    // The current points have been processed
-    this.$hasProcessed.set(true);
 
     // Clean up the abort controller as needed
     if (!this.abortController.signal.aborted) {
@@ -596,11 +669,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * Applies the segmented image to the entity.
    */
   apply = () => {
-    if (!this.$hasProcessed.get()) {
-      this.log.error('Cannot apply unprocessed points');
-      return;
-    }
-    const imageState = this.imageState;
+    const imageState = this.$imageState.get();
     if (!imageState) {
       this.log.error('No image state to apply');
       return;
@@ -621,6 +690,55 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       },
       replaceObjects: true,
     });
+
+    // Final cleanup and teardown, returning user to main canvas UI
+    this.resetEphemeralState();
+    this.teardown();
+  };
+
+  /**
+   * Applies the segmented image to the entity.
+   */
+  saveAs = (type: Exclude<CanvasEntityType, 'reference_image'>) => {
+    const imageState = this.$imageState.get();
+    if (!imageState) {
+      this.log.error('No image state to save as');
+      return;
+    }
+    this.log.trace(`Saving as ${type}`);
+
+    // Clear the buffer - we are creating a new entity, so we don't want to keep the old one
+    this.parent.bufferRenderer.clearBuffer();
+
+    // Create the new entity with the masked image as its only object
+    const rect = this.parent.transformer.getRelativeRect();
+    const arg = {
+      overrides: {
+        objects: [imageState],
+        position: {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+        },
+      },
+      isSelected: true,
+    };
+
+    switch (type) {
+      case 'raster_layer':
+        this.manager.stateApi.addRasterLayer(arg);
+        break;
+      case 'control_layer':
+        this.manager.stateApi.addControlLayer(arg);
+        break;
+      case 'inpaint_mask':
+        this.manager.stateApi.addInpaintMask(arg);
+        break;
+      case 'regional_guidance':
+        this.manager.stateApi.addRegionalGuidance(arg);
+        break;
+      default:
+        assert<Equals<typeof type, never>>(false);
+    }
 
     // Final cleanup and teardown, returning user to main canvas UI
     this.resetEphemeralState();
@@ -686,12 +804,17 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     if (this.maskedImage) {
       this.maskedImage.destroy();
     }
+    if (this.konva.maskTween) {
+      this.konva.maskTween.destroy();
+      this.konva.maskTween = null;
+    }
 
     // Empty internal module state
     this.$points.set([]);
-    this.imageState = null;
+    this.$imageState.set(null);
     this.$pointType.set(1);
-    this.$hasProcessed.set(false);
+    this.$invert.set(false);
+    this.$lastProcessedHash.set('');
     this.$isProcessing.set(false);
 
     // Reset non-ephemeral konva nodes
@@ -706,7 +829,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   /**
    * Builds a graph for segmenting an image with the given image DTO.
    */
-  buildGraph = ({ image_name }: ImageDTO): { graph: Graph; outputNodeId: string } => {
+  static buildGraph = (
+    { image_name }: ImageDTO,
+    points: SAMPointWithId[],
+    invert: boolean
+  ): { graph: Graph; outputNodeId: string } => {
     const graph = new Graph(getPrefixedId('canvas_segment_anything'));
 
     // TODO(psyche): When SAM2 is available in transformers, use it here
@@ -716,7 +843,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       type: 'segment_anything',
       model: 'segment-anything-huge',
       image: { image_name },
-      point_lists: [{ points: this.getSAMPoints() }],
+      point_lists: [{ points: points.map(({ x, y, label }) => ({ x, y, label })) }],
       mask_filter: 'largest',
     });
 
@@ -725,6 +852,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       id: getPrefixedId('apply_tensor_mask_to_image'),
       type: 'apply_tensor_mask_to_image',
       image: { image_name },
+      invert,
     });
     graph.addEdge(segmentAnything, 'mask', applyMask, 'mask');
 
@@ -759,11 +887,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         label,
         circle: getKonvaNodeDebugAttrs(konva.circle),
       })),
-      imageState: deepClone(this.imageState),
+      imageState: deepClone(this.$imageState.get()),
       maskedImage: this.maskedImage?.repr(),
       config: deepClone(this.config),
       $isSegmenting: this.$isSegmenting.get(),
-      $hasProcessed: this.$hasProcessed.get(),
+      $lastProcessedHash: this.$lastProcessedHash.get(),
       $isProcessing: this.$isProcessing.get(),
       $pointType: this.$pointType.get(),
       $pointTypeString: this.$pointTypeString.get(),

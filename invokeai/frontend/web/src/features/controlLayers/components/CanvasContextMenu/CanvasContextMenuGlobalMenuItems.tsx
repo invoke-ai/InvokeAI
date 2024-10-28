@@ -1,4 +1,5 @@
-import { MenuGroup, MenuItem } from '@invoke-ai/ui-library';
+import { Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { CanvasContextMenuItemsCropCanvasToBbox } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuItemsCropCanvasToBbox';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import {
@@ -16,6 +17,8 @@ import { PiFloppyDiskBold } from 'react-icons/pi';
 
 export const CanvasContextMenuGlobalMenuItems = memo(() => {
   const { t } = useTranslation();
+  const saveSubMenu = useSubMenu();
+  const newSubMenu = useSubMenu();
   const isBusy = useCanvasIsBusy();
   const saveCanvasToGallery = useSaveCanvasToGallery();
   const saveBboxToGallery = useSaveBboxToGallery();
@@ -28,27 +31,41 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
     <>
       <MenuGroup title={t('controlLayers.canvasContextMenu.canvasGroup')}>
         <CanvasContextMenuItemsCropCanvasToBbox />
-      </MenuGroup>
-      <MenuGroup title={t('controlLayers.canvasContextMenu.saveToGalleryGroup')}>
-        <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveCanvasToGallery}>
-          {t('controlLayers.canvasContextMenu.saveCanvasToGallery')}
+        <MenuItem {...saveSubMenu.parentMenuItemProps} icon={<PiFloppyDiskBold />}>
+          <Menu {...saveSubMenu.menuProps}>
+            <MenuButton {...saveSubMenu.menuButtonProps}>
+              <SubMenuButtonContent label={t('controlLayers.canvasContextMenu.saveToGalleryGroup')} />
+            </MenuButton>
+            <MenuList {...saveSubMenu.menuListProps}>
+              <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveCanvasToGallery}>
+                {t('controlLayers.canvasContextMenu.saveCanvasToGallery')}
+              </MenuItem>
+              <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveBboxToGallery}>
+                {t('controlLayers.canvasContextMenu.saveBboxToGallery')}
+              </MenuItem>
+            </MenuList>
+          </Menu>
         </MenuItem>
-        <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveBboxToGallery}>
-          {t('controlLayers.canvasContextMenu.saveBboxToGallery')}
-        </MenuItem>
-      </MenuGroup>
-      <MenuGroup title={t('controlLayers.canvasContextMenu.bboxGroup')}>
-        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newGlobalReferenceImageFromBbox}>
-          {t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
-        </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newRegionalReferenceImageFromBbox}>
-          {t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
-        </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newControlLayerFromBbox}>
-          {t('controlLayers.canvasContextMenu.newControlLayer')}
-        </MenuItem>
-        <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newRasterLayerFromBbox}>
-          {t('controlLayers.canvasContextMenu.newRasterLayer')}
+        <MenuItem {...newSubMenu.parentMenuItemProps} icon={<NewLayerIcon />}>
+          <Menu {...newSubMenu.menuProps}>
+            <MenuButton {...newSubMenu.menuButtonProps}>
+              <SubMenuButtonContent label={t('controlLayers.canvasContextMenu.bboxGroup')} />
+            </MenuButton>
+            <MenuList {...newSubMenu.menuListProps}>
+              <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newGlobalReferenceImageFromBbox}>
+                {t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
+              </MenuItem>
+              <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newRegionalReferenceImageFromBbox}>
+                {t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
+              </MenuItem>
+              <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newControlLayerFromBbox}>
+                {t('controlLayers.canvasContextMenu.newControlLayer')}
+              </MenuItem>
+              <MenuItem icon={<NewLayerIcon />} isDisabled={isBusy} onClick={newRasterLayerFromBbox}>
+                {t('controlLayers.canvasContextMenu.newRasterLayer')}
+              </MenuItem>
+            </MenuList>
+          </Menu>
         </MenuItem>
       </MenuGroup>
     </>

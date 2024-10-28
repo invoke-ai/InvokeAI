@@ -51,8 +51,8 @@ const GalleryPanelContent = () => {
 
   return (
     <Flex ref={galleryPanelFocusRef} position="relative" flexDirection="column" h="full" w="full" tabIndex={-1}>
-      <Flex alignItems="center" w="full">
-        <Flex w="25%">
+      <Flex alignItems="center" justifyContent="space-between" w="full">
+        <Flex flexGrow={1} flexBasis={0}>
           <Button
             size="sm"
             variant="ghost"
@@ -62,8 +62,10 @@ const GalleryPanelContent = () => {
             {boardsListPanel.isCollapsed ? t('boards.viewBoards') : t('boards.hideBoards')}
           </Button>
         </Flex>
-        <GalleryHeader />
-        <Flex h="full" w="25%" justifyContent="flex-end">
+        <Flex>
+          <GalleryHeader />
+        </Flex>
+        <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
           <BoardsSettingsPopover />
           <IconButton
             size="sm"

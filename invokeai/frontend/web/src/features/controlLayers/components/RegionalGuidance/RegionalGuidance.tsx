@@ -16,7 +16,10 @@ type Props = {
 };
 
 export const RegionalGuidance = memo(({ id }: Props) => {
-  const entityIdentifier = useMemo<CanvasEntityIdentifier>(() => ({ id, type: 'regional_guidance' }), [id]);
+  const entityIdentifier = useMemo<CanvasEntityIdentifier<'regional_guidance'>>(
+    () => ({ id, type: 'regional_guidance' }),
+    [id]
+  );
 
   return (
     <EntityIdentifierContext.Provider value={entityIdentifier}>
