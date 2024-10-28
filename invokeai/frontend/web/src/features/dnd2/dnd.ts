@@ -8,7 +8,7 @@ import type { ValueOf } from 'type-fest';
 import type { Jsonifiable } from 'type-fest/source/jsonifiable';
 
 type EmptyObject = Record<string, never>;
-type RecordUnknown = Record<string | symbol, unknown>;
+type UnknownDndData = Record<string | symbol, unknown>;
 
 /**
  * This file contains types, APIs, and utilities for Dnd functionality, as provided by pragmatic-drag-and-drop:
@@ -40,7 +40,7 @@ type Data<T extends string = string, K extends DndKind = DndKind, P extends Json
  */
 const _buildDataTypeGuard = <T extends Data>(type: string, kind: DndKind) => {
   // pragmatic-drag-and-drop types all data as unknown, so we need to cast it to the expected type
-  return (data: RecordUnknown): data is T => {
+  return (data: UnknownDndData): data is T => {
     try {
       return (data as Data).meta.type === type && (data as Data).meta.kind === kind;
     } catch {
@@ -371,7 +371,7 @@ export const Dnd = {
      * Checks if the data is a Dnd source data object.
      * @param data The data to check.
      */
-    isDndSourceData: (data: RecordUnknown): data is SourceDataUnion => {
+    isDndSourceData: (data: UnknownDndData): data is SourceDataUnion => {
       try {
         /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
         return (data as Data).meta.kind === 'source';
@@ -383,7 +383,7 @@ export const Dnd = {
      * Checks if the data is a Dnd target data object.
      * @param data The data to check.
      */
-    isDndTargetData: (data: RecordUnknown): data is TargetDataUnion => {
+    isDndTargetData: (data: UnknownDndData): data is TargetDataUnion => {
       try {
         /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
         return (data as Data).meta.kind === 'target';
