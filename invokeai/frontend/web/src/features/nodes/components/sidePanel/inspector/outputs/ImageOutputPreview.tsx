@@ -1,4 +1,4 @@
-import { DndImage } from 'features/dnd2/DndImage';
+import { DndImage } from 'features/dnd/DndImage';
 import { memo } from 'react';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageOutput } from 'services/api/types';

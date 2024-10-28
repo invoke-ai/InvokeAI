@@ -6,8 +6,8 @@ import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHook
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
-import type { Dnd } from 'features/dnd2/dnd';
-import { DndDropOverlay } from 'features/dnd2/DndDropOverlay';
+import type { Dnd } from 'features/dnd/dnd';
+import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';

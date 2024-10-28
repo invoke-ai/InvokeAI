@@ -20,7 +20,7 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import { Dnd } from 'features/dnd2/dnd';
+import { Dnd } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiTrashSimpleFill } from 'react-icons/pi';

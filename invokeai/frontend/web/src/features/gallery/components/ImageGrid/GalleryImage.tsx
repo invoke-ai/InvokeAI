@@ -7,7 +7,7 @@ import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/lis
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
-import { Dnd } from 'features/dnd2/dnd';
+import { Dnd } from 'features/dnd/dnd';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';

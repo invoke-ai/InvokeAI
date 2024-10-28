@@ -1,6 +1,6 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { Dnd } from 'features/dnd2/dnd';
-import { DndDropTarget } from 'features/dnd2/DndDropTarget';
+import { Dnd } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

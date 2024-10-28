@@ -1,8 +1,8 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { Dnd } from 'features/dnd2/dnd';
-import { DndDropTarget } from 'features/dnd2/DndDropTarget';
+import { Dnd } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
 import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';

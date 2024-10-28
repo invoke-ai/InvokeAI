@@ -10,8 +10,8 @@ import { ControlLayerSettings } from 'features/controlLayers/components/ControlL
 import { ControlLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
-import { Dnd } from 'features/dnd2/dnd';
-import { DndDropTarget } from 'features/dnd2/DndDropTarget';
+import { Dnd } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

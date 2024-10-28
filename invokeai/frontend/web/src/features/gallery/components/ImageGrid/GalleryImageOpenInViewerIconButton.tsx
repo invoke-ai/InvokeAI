@@ -1,4 +1,4 @@
-import { DndImageIcon } from 'features/dnd2/DndImageIcon';
+import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

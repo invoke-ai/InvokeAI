@@ -1,9 +1,9 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { Dnd } from 'features/dnd2/dnd';
-import { DndDropTarget } from 'features/dnd2/DndDropTarget';
-import { DndImage } from 'features/dnd2/DndImage';
-import { DndImageIcon } from 'features/dnd2/DndImageIcon';
+import { Dnd } from 'features/dnd/dnd';
+import { DndDropTarget } from 'features/dnd/DndDropTarget';
+import { DndImage } from 'features/dnd/DndImage';
+import { DndImageIcon } from 'features/dnd/DndImageIcon';
 import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';

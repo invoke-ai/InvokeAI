@@ -2,7 +2,7 @@ import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { ImageProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
-import { Dnd } from 'features/dnd2/dnd';
+import { Dnd } from 'features/dnd/dnd';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { memo, useEffect, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';

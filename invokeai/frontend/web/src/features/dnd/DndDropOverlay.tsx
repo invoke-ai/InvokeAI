@@ -1,5 +1,5 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
-import type { Dnd } from 'features/dnd2/dnd';
+import type { Dnd } from 'features/dnd/dnd';
 import { memo } from 'react';
 
 type Props = {

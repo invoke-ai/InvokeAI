@@ -24,7 +24,7 @@ import type {
   CanvasRegionalGuidanceState,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
-import { Dnd } from 'features/dnd2/dnd';
+import { Dnd } from 'features/dnd/dnd';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
