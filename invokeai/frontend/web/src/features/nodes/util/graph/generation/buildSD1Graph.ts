@@ -170,10 +170,12 @@ export const buildSD1Graph = async (
   > = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
+  const denoising_start = 1 - params.img2imgStrength;
+
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
+    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
   } else if (generationMode === 'img2img') {
-    canvasOutput = await addImageToImage(
+    canvasOutput = await addImageToImage({
       g,
       manager,
       l2i,
@@ -182,11 +184,11 @@ export const buildSD1Graph = async (
       originalSize,
       scaledSize,
       bbox,
-      1 - params.img2imgStrength,
-      vaePrecision === 'fp32'
-    );
+      denoising_start,
+      fp32: vaePrecision === 'fp32',
+    });
   } else if (generationMode === 'inpaint') {
-    canvasOutput = await addInpaint(
+    canvasOutput = await addInpaint({
       state,
       g,
       manager,
@@ -196,11 +198,11 @@ export const buildSD1Graph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      1 - params.img2imgStrength,
-      vaePrecision === 'fp32'
-    );
+      denoising_start,
+      fp32: vaePrecision === 'fp32',
+    });
   } else if (generationMode === 'outpaint') {
-    canvasOutput = await addOutpaint(
+    canvasOutput = await addOutpaint({
       state,
       g,
       manager,
@@ -210,9 +212,9 @@ export const buildSD1Graph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      1 - params.img2imgStrength,
-      fp32
-    );
+      denoising_start,
+      fp32,
+    });
   }
 
   const controlNetCollector = g.addNode({

@@ -79,7 +79,7 @@ export const buildFLUXGraph = async (
     prompt: positivePrompt,
   });
 
-  const noise = g.addNode({
+  const denoise = g.addNode({
     type: 'flux_denoise',
     id: getPrefixedId('flux_denoise'),
     guidance,
@@ -100,19 +100,19 @@ export const buildFLUXGraph = async (
     'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
   > = l2i;
 
-  g.addEdge(modelLoader, 'transformer', noise, 'transformer');
-  g.addEdge(modelLoader, 'vae', noise, 'controlnet_vae');
+  g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
+  g.addEdge(modelLoader, 'vae', denoise, 'controlnet_vae');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
   g.addEdge(modelLoader, 't5_encoder', posCond, 't5_encoder');
   g.addEdge(modelLoader, 'max_seq_len', posCond, 't5_max_seq_len');
 
-  addFLUXLoRAs(state, g, noise, modelLoader, posCond);
+  addFLUXLoRAs(state, g, denoise, modelLoader, posCond);
 
-  g.addEdge(posCond, 'conditioning', noise, 'positive_text_conditioning');
+  g.addEdge(posCond, 'conditioning', denoise, 'positive_text_conditioning');
 
-  g.addEdge(noise, 'latents', l2i, 'latents');
+  g.addEdge(denoise, 'latents', l2i, 'latents');
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
   assert(modelConfig.base === 'flux');
@@ -131,59 +131,59 @@ export const buildFLUXGraph = async (
     clip_embed_model: clipEmbedModel,
   });
 
-  let denoisingStart: number;
+  let denoising_start: number;
   if (optimizedDenoisingEnabled) {
     // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
     // more user-friendly for FLUX. Without this, most of the 'change' is concentrated in the high denoise strength
     // range (>0.9).
-    denoisingStart = 1 - img2imgStrength ** 0.2;
+    denoising_start = 1 - img2imgStrength ** 0.2;
   } else {
-    denoisingStart = 1 - img2imgStrength;
+    denoising_start = 1 - img2imgStrength;
   }
 
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
+    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
   } else if (generationMode === 'img2img') {
-    canvasOutput = await addImageToImage(
+    canvasOutput = await addImageToImage({
       g,
       manager,
       l2i,
-      noise,
-      modelLoader,
+      denoise,
+      vaeSource: modelLoader,
       originalSize,
       scaledSize,
       bbox,
-      denoisingStart,
-      false
-    );
+      denoising_start,
+      fp32: false,
+    });
   } else if (generationMode === 'inpaint') {
-    canvasOutput = await addInpaint(
+    canvasOutput = await addInpaint({
       state,
       g,
       manager,
       l2i,
-      noise,
-      modelLoader,
+      denoise,
+      vaeSource: modelLoader,
       modelLoader,
       originalSize,
       scaledSize,
-      denoisingStart,
-      false
-    );
+      denoising_start,
+      fp32: false,
+    });
   } else if (generationMode === 'outpaint') {
-    canvasOutput = await addOutpaint(
+    canvasOutput = await addOutpaint({
       state,
       g,
       manager,
       l2i,
-      noise,
-      modelLoader,
+      denoise,
+      vaeSource: modelLoader,
       modelLoader,
       originalSize,
       scaledSize,
-      denoisingStart,
-      false
-    );
+      denoising_start,
+      fp32: false,
+    });
   }
 
   const controlNetCollector = g.addNode({
@@ -199,7 +199,7 @@ export const buildFLUXGraph = async (
     modelConfig.base
   );
   if (controlNetResult.addedControlNets > 0) {
-    g.addEdge(controlNetCollector, 'collection', noise, 'control');
+    g.addEdge(controlNetCollector, 'collection', denoise, 'control');
   } else {
     g.deleteNode(controlNetCollector.id);
   }
@@ -226,14 +226,14 @@ export const buildFLUXGraph = async (
     g.addEdge(modelLoader, 'clip', negCond, 'clip');
     g.addEdge(modelLoader, 't5_encoder', negCond, 't5_encoder');
     g.addEdge(modelLoader, 'max_seq_len', negCond, 't5_max_seq_len');
-    g.addEdge(negCond, 'conditioning', noise, 'negative_text_conditioning');
+    g.addEdge(negCond, 'conditioning', denoise, 'negative_text_conditioning');
 
-    g.updateNode(noise, {
+    g.updateNode(denoise, {
       cfg_scale: 3,
       cfg_scale_start_step,
       cfg_scale_end_step,
     });
-    g.addEdge(ipAdapterCollector, 'collection', noise, 'ip_adapter');
+    g.addEdge(ipAdapterCollector, 'collection', denoise, 'ip_adapter');
   } else {
     g.deleteNode(ipAdapterCollector.id);
   }
@@ -262,5 +262,5 @@ export const buildFLUXGraph = async (
   });
 
   g.setMetadataReceivingNode(canvasOutput);
-  return { g, noise, posCond };
+  return { g, noise: denoise, posCond };
 };

@@ -10,19 +10,33 @@ import { addImageToLatents, getInfill } from 'features/nodes/util/graph/graphBui
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
-export const addOutpaint = async (
-  state: RootState,
-  g: Graph,
-  manager: CanvasManager,
-  l2i: Invocation<'l2i' | 'flux_vae_decode'>,
-  denoise: Invocation<'denoise_latents' | 'flux_denoise'>,
-  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader' | 'seamless' | 'vae_loader'>,
-  modelLoader: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader'>,
-  originalSize: Dimensions,
-  scaledSize: Dimensions,
-  denoising_start: number,
-  fp32: boolean
-): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
+type AddOutpaintArg = {
+  state: RootState;
+  g: Graph;
+  manager: CanvasManager;
+  l2i: Invocation<'l2i' | 'flux_vae_decode'>;
+  denoise: Invocation<'denoise_latents' | 'flux_denoise'>;
+  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader' | 'seamless' | 'vae_loader'>;
+  modelLoader: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader'>;
+  originalSize: Dimensions;
+  scaledSize: Dimensions;
+  denoising_start: number;
+  fp32: boolean;
+};
+
+export const addOutpaint = async ({
+  state,
+  g,
+  manager,
+  l2i,
+  denoise,
+  vaeSource,
+  modelLoader,
+  originalSize,
+  scaledSize,
+  denoising_start,
+  fp32,
+}: AddOutpaintArg): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
   denoise.denoising_start = denoising_start;
 
   const params = selectParamsSlice(state);
