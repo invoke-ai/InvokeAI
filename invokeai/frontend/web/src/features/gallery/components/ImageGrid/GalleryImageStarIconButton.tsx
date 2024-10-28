@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react';
 import { $customStarUI } from 'app/store/nanostores/customStarUI';
-import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
+import { DndImageIcon } from 'features/dnd2/DndImageIcon';
 import { memo, useCallback } from 'react';
 import { PiStarBold, PiStarFill } from 'react-icons/pi';
 import { useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
@@ -25,7 +25,7 @@ export const GalleryImageStarIconButton = memo(({ imageDTO }: Props) => {
 
   if (customStarUi) {
     return (
-      <IAIDndImageIcon
+      <DndImageIcon
         onClick={toggleStarredState}
         icon={imageDTO.starred ? customStarUi.on.icon : customStarUi.off.icon}
         tooltip={imageDTO.starred ? customStarUi.on.text : customStarUi.off.text}
@@ -37,7 +37,7 @@ export const GalleryImageStarIconButton = memo(({ imageDTO }: Props) => {
   }
 
   return (
-    <IAIDndImageIcon
+    <DndImageIcon
       onClick={toggleStarredState}
       icon={imageDTO.starred ? <PiStarFill /> : <PiStarBold />}
       tooltip={imageDTO.starred ? 'Unstar' : 'Star'}

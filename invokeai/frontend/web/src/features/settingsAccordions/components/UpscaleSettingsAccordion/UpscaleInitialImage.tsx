@@ -1,9 +1,9 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
 import { DndImage } from 'features/dnd2/DndImage';
+import { DndImageIcon } from 'features/dnd2/DndImageIcon';
 import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
@@ -35,7 +35,7 @@ export const UpscaleInitialImage = () => {
           <>
             <DndImage imageDTO={imageDTO} />
             <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
-              <IAIDndImageIcon
+              <DndImageIcon
                 onClick={onReset}
                 icon={<PiArrowCounterClockwiseBold size={16} />}
                 tooltip={t('common.reset')}

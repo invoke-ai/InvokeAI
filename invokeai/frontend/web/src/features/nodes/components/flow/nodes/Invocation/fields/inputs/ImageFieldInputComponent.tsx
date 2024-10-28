@@ -2,10 +2,10 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
 import { DndImage } from 'features/dnd2/DndImage';
+import { DndImageIcon } from 'features/dnd2/DndImageIcon';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageFieldInputInstance, ImageFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useEffect, useMemo } from 'react';
@@ -70,7 +70,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
         <>
           <DndImage imageDTO={imageDTO} minW={8} minH={8} />
           <Flex position="absolute" flexDir="column" top={1} insetInlineEnd={1} gap={1}>
-            <IAIDndImageIcon
+            <DndImageIcon
               onClick={handleReset}
               icon={imageDTO ? <PiArrowCounterClockwiseBold /> : undefined}
               tooltip="Reset Image"
