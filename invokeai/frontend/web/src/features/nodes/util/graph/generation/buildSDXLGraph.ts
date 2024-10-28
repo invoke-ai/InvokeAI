@@ -26,6 +26,7 @@ import {
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
@@ -123,10 +124,6 @@ export const buildSDXLGraph = async (
         })
       : null;
 
-  let canvasOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
-  > = l2i;
-
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
   g.addEdge(modelLoader, 'clip', negCond, 'clip');
@@ -173,10 +170,18 @@ export const buildSDXLGraph = async (
     await addSDXLRefiner(state, g, denoise, seamless, posCond, negCond, l2i);
   }
 
+  const denoising_start = refinerModel
+    ? Math.min(refinerStart, 1 - params.img2imgStrength)
+    : 1 - params.img2imgStrength;
+
+  let canvasOutput: Invocation<
+    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
+  > = l2i;
+
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
+    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
   } else if (generationMode === 'img2img') {
-    canvasOutput = await addImageToImage(
+    canvasOutput = await addImageToImage({
       g,
       manager,
       l2i,
@@ -185,11 +190,11 @@ export const buildSDXLGraph = async (
       originalSize,
       scaledSize,
       bbox,
-      refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength,
-      fp32
-    );
+      denoising_start,
+      fp32,
+    });
   } else if (generationMode === 'inpaint') {
-    canvasOutput = await addInpaint(
+    canvasOutput = await addInpaint({
       state,
       g,
       manager,
@@ -199,11 +204,11 @@ export const buildSDXLGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength,
-      fp32
-    );
+      denoising_start,
+      fp32,
+    });
   } else if (generationMode === 'outpaint') {
-    canvasOutput = await addOutpaint(
+    canvasOutput = await addOutpaint({
       state,
       g,
       manager,
@@ -213,9 +218,11 @@ export const buildSDXLGraph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      refinerModel ? Math.min(refinerStart, 1 - params.img2imgStrength) : 1 - params.img2imgStrength,
-      fp32
-    );
+      denoising_start,
+      fp32,
+    });
+  } else {
+    assert<Equals<typeof generationMode, never>>(false);
   }
 
   const controlNetCollector = g.addNode({
