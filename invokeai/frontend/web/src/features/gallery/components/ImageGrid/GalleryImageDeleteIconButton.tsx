@@ -1,7 +1,7 @@
 import { useShiftModifier } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import { imagesToDeleteSelected } from 'features/deleteImageModal/store/slice';
+import { DndImageIcon } from 'features/dnd2/DndImageIcon';
 import type { MouseEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +32,7 @@ export const GalleryImageDeleteIconButton = memo(({ imageDTO }: Props) => {
   }
 
   return (
-    <IAIDndImageIcon
+    <DndImageIcon
       onClick={onClick}
       icon={<PiTrashSimpleFill />}
       tooltip={t('gallery.deleteImage_one')}

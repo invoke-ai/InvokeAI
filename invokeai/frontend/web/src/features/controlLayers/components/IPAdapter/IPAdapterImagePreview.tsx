@@ -2,11 +2,11 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
-import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
 import type { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
 import { DndImage } from 'features/dnd2/DndImage';
+import { DndImageIcon } from 'features/dnd2/DndImageIcon';
 import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
@@ -55,7 +55,7 @@ export const IPAdapterImagePreview = memo(({ image, onChangeImage, targetData, p
         <>
           <DndImage imageDTO={imageDTO} />
           <Flex position="absolute" flexDir="column" top={2} insetInlineEnd={2} gap={1}>
-            <IAIDndImageIcon
+            <DndImageIcon
               onClick={handleResetControlImage}
               icon={<PiArrowCounterClockwiseBold size={16} />}
               tooltip={t('common.reset')}

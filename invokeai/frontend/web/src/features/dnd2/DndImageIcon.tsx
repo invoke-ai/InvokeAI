@@ -21,7 +21,7 @@ type Props = Omit<IconButtonProps, 'aria-label' | 'onClick' | 'tooltip'> & {
   tooltip: string;
 };
 
-const IAIDndImageIcon = (props: Props) => {
+export const DndImageIcon = memo((props: Props) => {
   const { onClick, tooltip, icon, ...rest } = props;
 
   return (
@@ -35,6 +35,6 @@ const IAIDndImageIcon = (props: Props) => {
       {...rest}
     />
   );
-};
+});
 
-export default memo(IAIDndImageIcon);
+DndImageIcon.displayName = 'DndImageIcon';

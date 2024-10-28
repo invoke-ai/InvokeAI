@@ -1,4 +1,4 @@
-import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
+import { DndImageIcon } from 'features/dnd2/DndImageIcon';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +18,7 @@ export const GalleryImageOpenInViewerIconButton = memo(({ imageDTO }: Props) => 
   }, [imageDTO, imageViewer]);
 
   return (
-    <IAIDndImageIcon
+    <DndImageIcon
       onClick={onClick}
       icon={<PiArrowsOutBold />}
       tooltip={t('gallery.openInViewer')}

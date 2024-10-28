@@ -19,7 +19,6 @@ import { $workflowCategories } from 'app/store/nanostores/workflowCategories';
 import { createStore } from 'app/store/store';
 import type { PartialAppConfig } from 'app/types/invokeai';
 import Loading from 'common/components/Loading/Loading';
-import AppDndContext from 'features/dnd/components/AppDndContext';
 import type { WorkflowCategory } from 'features/nodes/types/workflow';
 import type { PropsWithChildren, ReactNode } from 'react';
 import React, { lazy, memo, useEffect, useLayoutEffect, useMemo } from 'react';
@@ -237,9 +236,7 @@ const InvokeAIUI = ({
       <Provider store={store}>
         <React.Suspense fallback={<Loading />}>
           <ThemeLocaleProvider>
-            <AppDndContext>
-              <App config={config} studioInitAction={studioInitAction} />
-            </AppDndContext>
+            <App config={config} studioInitAction={studioInitAction} />
           </ThemeLocaleProvider>
         </React.Suspense>
       </Provider>
