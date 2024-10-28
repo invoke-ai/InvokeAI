@@ -1,16 +1,14 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
+import { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
 import { DndImage } from 'features/dnd2/DndImage';
-import { setUpscaleInitialImageFromImageDndTarget } from 'features/dnd2/types';
 import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import type { PostUploadAction } from 'services/api/types';
-
-const targetData = setUpscaleInitialImageFromImageDndTarget.getData({});
 
 export const UpscaleInitialImage = () => {
   const dispatch = useAppDispatch();
@@ -19,6 +17,10 @@ export const UpscaleInitialImage = () => {
     () => ({
       type: 'SET_UPSCALE_INITIAL_IMAGE',
     }),
+    []
+  );
+  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['setUpscaleInitialImageFromImage']>(
+    () => Dnd.Target.setUpscaleInitialImageFromImage.getData(),
     []
   );
 

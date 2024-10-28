@@ -1,20 +1,15 @@
 import { Grid, GridItem } from '@invoke-ai/ui-library';
+import { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
-import {
-  newControlLayerFromImageDndTarget,
-  addGlobalReferenceImageFromImageDndTarget,
-  newRasterLayerFromImageDndTarget,
-  addRegionalGuidanceReferenceImageFromImageDndTarget,
-} from 'features/dnd2/types';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const addRasterLayerFromImageDndTargetData = newRasterLayerFromImageDndTarget.getData({});
-const addControlLayerFromImageDndTargetData = newControlLayerFromImageDndTarget.getData({});
+const addRasterLayerFromImageDndTargetData = Dnd.Target.newRasterLayerFromImage.getData();
+const addControlLayerFromImageDndTargetData = Dnd.Target.newControlLayerFromImage.getData();
 const addRegionalGuidanceReferenceImageFromImageDndTargetData =
-  addRegionalGuidanceReferenceImageFromImageDndTarget.getData({});
-const addGlobalReferenceImageFromImageDndTargetData = addGlobalReferenceImageFromImageDndTarget.getData({});
+  Dnd.Target.newRegionalGuidanceReferenceImageFromImage.getData();
+const addGlobalReferenceImageFromImageDndTargetData = Dnd.Target.newGlobalReferenceImageFromImage.getData();
 
 export const CanvasDropArea = memo(() => {
   const { t } = useTranslation();

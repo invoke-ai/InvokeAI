@@ -1,9 +1,8 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
-import type { RemoveFromBoardDndTargetData } from 'features/dnd2/types';
-import { removeFromBoardDndTarget } from 'features/dnd2/types';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
 import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
@@ -44,7 +43,10 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     }
   }, [dispatch, autoAssignBoardOnClick]);
 
-  const targetData: RemoveFromBoardDndTargetData = useMemo(() => removeFromBoardDndTarget.getData({}), []);
+  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['removeFromBoard']>(
+    () => Dnd.Target.removeFromBoard.getData(),
+    []
+  );
 
   const { t } = useTranslation();
 

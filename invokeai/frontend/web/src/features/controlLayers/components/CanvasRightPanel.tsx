@@ -6,8 +6,8 @@ import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHook
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
+import type { Dnd } from 'features/dnd2/dnd';
 import { DndDropOverlay } from 'features/dnd2/DndDropOverlay';
-import type { DndState } from 'features/dnd2/types';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -84,8 +84,8 @@ const PanelTabs = memo(() => {
   const { t } = useTranslation();
   const store = useAppStore();
   const activeEntityCount = useAppSelector(selectEntityCountActive);
-  const [layersTabDndState, setLayersTabDndState] = useState<DndState>('idle');
-  const [galleryTabDndState, setGalleryTabDndState] = useState<DndState>('idle');
+  const [layersTabDndState, setLayersTabDndState] = useState<Dnd.types['DndState']>('idle');
+  const [galleryTabDndState, setGalleryTabDndState] = useState<Dnd.types['DndState']>('idle');
   const layersTabRef = useRef<HTMLDivElement>(null);
   const galleryTabRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<number | null>(null);

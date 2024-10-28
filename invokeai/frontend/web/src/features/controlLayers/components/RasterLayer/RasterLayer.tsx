@@ -7,9 +7,8 @@ import { CanvasEntityEditableTitle } from 'features/controlLayers/components/com
 import { RasterLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
-import type { ReplaceLayerWithImageDndTargetData } from 'features/dnd2/types';
-import { replaceLayerWithImageDndTarget } from 'features/dnd2/types';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -20,8 +19,8 @@ type Props = {
 export const RasterLayer = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const entityIdentifier = useMemo<CanvasEntityIdentifier<'raster_layer'>>(() => ({ id, type: 'raster_layer' }), [id]);
-  const targetData = useMemo<ReplaceLayerWithImageDndTargetData>(
-    () => replaceLayerWithImageDndTarget.getData({ entityIdentifier }, entityIdentifier.id),
+  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['replaceLayerWithImage']>(
+    () => Dnd.Target.replaceLayerWithImage.getData({ entityIdentifier }, entityIdentifier.id),
     [entityIdentifier]
   );
 

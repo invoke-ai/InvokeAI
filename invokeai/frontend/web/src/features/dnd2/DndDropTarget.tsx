@@ -7,10 +7,8 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
 import { dndDropped } from 'app/store/middleware/listenerMiddleware/listeners/dnd';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { Dnd } from 'features/dnd2/dnd';
 import { DndDropOverlay } from 'features/dnd2/DndDropOverlay';
-import type { DndState, DndTargetData } from 'features/dnd2/types';
-import { getDndId, isDndSourceData, isValidDrop, singleImageDndSource } from 'features/dnd2/types';
 import { memo, useEffect, useRef, useState } from 'react';
 import { uploadImage } from 'services/api/endpoints/images';
 import { z } from 'zod';
@@ -32,6 +30,7 @@ const sx = {
   left: 0,
   w: 'full',
   h: 'full',
+  pointerEvents: 'auto',
   // We must disable pointer events when idle to prevent the overlay from blocking clicks
   '&[data-dnd-state="idle"]': {
     pointerEvents: 'none',
@@ -61,14 +60,14 @@ const zUploadFile = z
 
 type Props = {
   label: string;
-  targetData: DndTargetData;
+  targetData: Dnd.types['TargetDataUnion'];
   elementDropEnabled?: boolean;
   externalDropEnabled?: boolean;
 };
 
 export const DndDropTarget = memo((props: Props) => {
   const { label, targetData, elementDropEnabled = true, externalDropEnabled = true } = props;
-  const [dndState, setDndState] = useState<DndState>('idle');
+  const [dndState, setDndState] = useState<Dnd.types['DndState']>('idle');
   const ref = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
 
@@ -89,13 +88,13 @@ export const DndDropTarget = memo((props: Props) => {
             return false;
           }
           const sourceData = args.source.data;
-          if (!isDndSourceData(sourceData)) {
+          if (!Dnd.Util.isDndSourceData(sourceData)) {
             return false;
           }
-          if (getDndId(targetData) === getDndId(sourceData)) {
+          if (Dnd.Util.getDndId(targetData) === Dnd.Util.getDndId(sourceData)) {
             return false;
           }
-          return isValidDrop(sourceData, targetData);
+          return Dnd.Util.isValidDrop(sourceData, targetData);
         },
         onDragEnter: () => {
           setDndState('over');
@@ -106,7 +105,7 @@ export const DndDropTarget = memo((props: Props) => {
         getData: () => targetData,
         onDrop: (args) => {
           const sourceData = args.source.data;
-          if (!isDndSourceData(sourceData)) {
+          if (!Dnd.Util.isDndSourceData(sourceData)) {
             return;
           }
           dispatch(dndDropped({ sourceData, targetData }));
@@ -115,13 +114,13 @@ export const DndDropTarget = memo((props: Props) => {
       monitorForElements({
         canMonitor: (args) => {
           const sourceData = args.source.data;
-          if (!isDndSourceData(sourceData)) {
+          if (!Dnd.Util.isDndSourceData(sourceData)) {
             return false;
           }
-          if (getDndId(targetData) === getDndId(sourceData)) {
+          if (Dnd.Util.getDndId(targetData) === Dnd.Util.getDndId(sourceData)) {
             return false;
           }
-          return isValidDrop(sourceData, targetData);
+          return Dnd.Util.isValidDrop(sourceData, targetData);
         },
         onDragStart: () => {
           setDndState('potential');
@@ -177,7 +176,7 @@ export const DndDropTarget = memo((props: Props) => {
             });
             dispatch(
               dndDropped({
-                sourceData: singleImageDndSource.getData({ imageDTO }, getPrefixedId('dnd-upload-image')),
+                sourceData: Dnd.Source.singleImage.getData({ imageDTO }),
                 targetData,
               })
             );

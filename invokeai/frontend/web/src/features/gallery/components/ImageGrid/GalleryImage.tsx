@@ -7,7 +7,7 @@ import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/lis
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
-import { multipleImageDndSource, singleImageDndSource } from 'features/dnd2/types';
+import { Dnd } from 'features/dnd2/dnd';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
@@ -115,7 +115,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
           if (gallery.selection.length > 1 && gallery.selection.includes(imageDTO)) {
-            return multipleImageDndSource.getData(
+            return Dnd.Source.multipleImage.getData(
               {
                 imageDTOs: gallery.selection,
                 boardId: gallery.selectedBoardId,
@@ -125,13 +125,13 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           }
 
           // Otherwise, initiate a single-image drag
-          return singleImageDndSource.getData({ imageDTO }, imageDTO.image_name);
+          return Dnd.Source.singleImage.getData({ imageDTO }, imageDTO.image_name);
         },
         // This is a "local" drag start event, meaning that it is only called when this specific image is dragged.
-        onDragStart: (args) => {
+        onDragStart: ({ source }) => {
           // When we start dragging a single image, set the dragging state to true. This is only called when this
           // specific image is dragged.
-          if (singleImageDndSource.typeGuard(args.source.data)) {
+          if (Dnd.Source.singleImage.typeGuard(source.data)) {
             setIsDragging(true);
             return;
           }
@@ -139,10 +139,11 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
       }),
       monitorForElements({
         // This is a "global" drag start event, meaning that it is called for all drag events.
-        onDragStart: (args) => {
+        onDragStart: ({ source }) => {
+          console.log(source);
           // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
           // selection. This is called for all drag events.
-          if (multipleImageDndSource.typeGuard(args.source.data) && args.source.data.imageDTOs.includes(imageDTO)) {
+          if (Dnd.Source.multipleImage.typeGuard(source.data) && source.data.payload.imageDTOs.includes(imageDTO)) {
             setIsDragging(true);
           }
         },
