@@ -14,14 +14,16 @@ import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { CanvasOutputs } from 'features/nodes/util/graph/graphBuilderUtils';
 import {
-  CANVAS_OUTPUT_PREFIX,
+  CANVAS_SCALED_OUTPUT_PREFIX,
   getBoardField,
   getPresetModifiedPrompts,
   getSizes,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 import { addControlNets } from './addControlAdapters';
@@ -96,10 +98,6 @@ export const buildFLUXGraph = async (
     id: getPrefixedId('flux_vae_decode'),
   });
 
-  let canvasOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
-  > = l2i;
-
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'vae', denoise, 'controlnet_vae');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
@@ -141,10 +139,12 @@ export const buildFLUXGraph = async (
     denoising_start = 1 - img2imgStrength;
   }
 
+  let canvasOutputs: CanvasOutputs;
+
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    canvasOutputs = addTextToImage({ g, l2i, originalSize, scaledSize });
   } else if (generationMode === 'img2img') {
-    canvasOutput = await addImageToImage({
+    canvasOutputs = await addImageToImage({
       g,
       manager,
       l2i,
@@ -157,7 +157,7 @@ export const buildFLUXGraph = async (
       fp32: false,
     });
   } else if (generationMode === 'inpaint') {
-    canvasOutput = await addInpaint({
+    canvasOutputs = await addInpaint({
       state,
       g,
       manager,
@@ -171,7 +171,7 @@ export const buildFLUXGraph = async (
       fp32: false,
     });
   } else if (generationMode === 'outpaint') {
-    canvasOutput = await addOutpaint({
+    canvasOutputs = await addOutpaint({
       state,
       g,
       manager,
@@ -184,6 +184,8 @@ export const buildFLUXGraph = async (
       denoising_start,
       fp32: false,
     });
+  } else {
+    assert<Equals<typeof generationMode, never>>(false);
   }
 
   const controlNetCollector = g.addNode({
@@ -239,11 +241,11 @@ export const buildFLUXGraph = async (
   }
 
   if (state.system.shouldUseNSFWChecker) {
-    canvasOutput = addNSFWChecker(g, canvasOutput);
+    canvasOutputs.scaled = addNSFWChecker(g, canvasOutputs.scaled);
   }
 
   if (state.system.shouldUseWatermarker) {
-    canvasOutput = addWatermarker(g, canvasOutput);
+    canvasOutputs.scaled = addWatermarker(g, canvasOutputs.scaled);
   }
 
   // This image will be staged, should not be saved to the gallery or added to a board.
@@ -254,13 +256,13 @@ export const buildFLUXGraph = async (
     g.upsertMetadata(selectCanvasMetadata(state));
   }
 
-  g.updateNode(canvasOutput, {
-    id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
+  g.updateNode(canvasOutputs.scaled, {
+    id: getPrefixedId(CANVAS_SCALED_OUTPUT_PREFIX),
     is_intermediate,
     use_cache: false,
     board,
   });
 
-  g.setMetadataReceivingNode(canvasOutput);
+  g.setMetadataReceivingNode(canvasOutputs.scaled);
   return { g, noise: denoise, posCond };
 };

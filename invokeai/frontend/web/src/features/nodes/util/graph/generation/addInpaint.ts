@@ -6,6 +6,7 @@ import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { CanvasOutputs } from 'features/nodes/util/graph/graphBuilderUtils';
 import { addImageToLatents } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
@@ -36,7 +37,7 @@ export const addInpaint = async ({
   scaledSize,
   denoising_start,
   fp32,
-}: AddInpaintArg): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
+}: AddInpaintArg): Promise<CanvasOutputs> => {
   denoise.denoising_start = denoising_start;
 
   const params = selectParamsSlice(state);
@@ -113,10 +114,10 @@ export const addInpaint = async ({
     // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
     // to canvas but not outputting only masked regions
     if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
-      canvasPasteBack.source_image = { image_name: initialImage.image_name };
+      g.addEdge(resizeImageToScaledSize, 'image', canvasPasteBack, 'source_image');
     }
 
-    return canvasPasteBack;
+    return { unscaled: canvasPasteBack, scaled: resizeOutput };
   } else {
     // No scale before processing, much simpler
     const i2l = addImageToLatents(g, modelLoader.type === 'flux_model_loader', fp32, initialImage.image_name);
@@ -160,6 +161,6 @@ export const addInpaint = async ({
       canvasPasteBack.source_image = { image_name: initialImage.image_name };
     }
 
-    return canvasPasteBack;
+    return { unscaled: canvasPasteBack, scaled: canvasPasteBack };
   }
 };

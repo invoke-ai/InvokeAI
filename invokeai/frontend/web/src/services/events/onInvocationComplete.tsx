@@ -6,7 +6,10 @@ import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagi
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
-import { CANVAS_OUTPUT_PREFIX } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  CANVAS_SCALED_OUTPUT_PREFIX,
+  CANVAS_UNSCALED_OUTPUT_PREFIX,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
@@ -16,7 +19,11 @@ import { $lastProgressEvent } from 'services/events/stores';
 const log = logger('events');
 
 const isCanvasOutputNode = (data: S['InvocationCompleteEvent']) => {
-  return data.invocation_source_id.split(':')[0] === CANVAS_OUTPUT_PREFIX;
+  return data.invocation_source_id.split(':')[0] === CANVAS_SCALED_OUTPUT_PREFIX;
+};
+
+const isCanvasUnscaledOutputNode = (data: S['InvocationCompleteEvent']) => {
+  return data.invocation_source_id.split(':')[0] === CANVAS_UNSCALED_OUTPUT_PREFIX;
 };
 
 const nodeTypeDenylist = ['load_image', 'image'];
@@ -125,9 +132,15 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
       // TODO(psyche): Can/should we let canvas handle this itself?
       if (isCanvasOutputNode(data)) {
         if (data.result.type === 'image_output') {
-          dispatch(stagingAreaImageStaged({ stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0 } }));
+          dispatch(
+            stagingAreaImageStaged({
+              stagingAreaImage: { imageDTO, offsetX: 0, offsetY: 0, preDownscaleImageDTO: null },
+            })
+          );
         }
         addImageToGallery(data, imageDTO);
+      } else if (isCanvasUnscaledOutputNode(data)) {
+        console.log(data.result);
       }
     } else if (!imageDTO.is_intermediate) {
       // Desintaion is gallery

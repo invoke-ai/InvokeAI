@@ -6,6 +6,7 @@ import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { CanvasOutputs } from 'features/nodes/util/graph/graphBuilderUtils';
 import { addImageToLatents, getInfill } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
@@ -36,7 +37,7 @@ export const addOutpaint = async ({
   scaledSize,
   denoising_start,
   fp32,
-}: AddOutpaintArg): Promise<Invocation<'canvas_v2_mask_and_crop'>> => {
+}: AddOutpaintArg): Promise<CanvasOutputs> => {
   denoise.denoising_start = denoising_start;
 
   const params = selectParamsSlice(state);
@@ -112,40 +113,33 @@ export const addOutpaint = async ({
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
 
-    // Resize the output image back to the original size
-    const resizeOutputImageToOriginalSize = g.addNode({
-      id: getPrefixedId('resize_image_to_original_size'),
-      type: 'img_resize',
-      ...originalSize,
-    });
-    const resizeOutputMaskToOriginalSize = g.addNode({
-      id: getPrefixedId('resize_mask_to_original_size'),
-      type: 'img_resize',
-      ...originalSize,
-    });
     const canvasPasteBack = g.addNode({
       id: getPrefixedId('canvas_v2_mask_and_crop'),
       type: 'canvas_v2_mask_and_crop',
       mask_blur: params.maskBlur,
     });
+    const resizeOutput = g.addNode({
+      id: getPrefixedId('resize_output'),
+      type: 'img_resize',
+      ...originalSize,
+    });
 
     // Resize initial image and mask to scaled size, feed into to gradient mask
 
-    // After denoising, resize the image and mask back to original size
-    g.addEdge(l2i, 'image', resizeOutputImageToOriginalSize, 'image');
-    g.addEdge(createGradientMask, 'expanded_mask_area', resizeOutputMaskToOriginalSize, 'image');
+    // Paste the generated masked image back onto the original image
+    g.addEdge(l2i, 'image', canvasPasteBack, 'generated_image');
+    g.addEdge(createGradientMask, 'expanded_mask_area', canvasPasteBack, 'mask');
 
-    // Finally, paste the generated masked image back onto the original image
-    g.addEdge(resizeOutputImageToOriginalSize, 'image', canvasPasteBack, 'generated_image');
-    g.addEdge(resizeOutputMaskToOriginalSize, 'image', canvasPasteBack, 'mask');
+    // Finally, resize the output back to the original size
+    g.addEdge(canvasPasteBack, 'image', resizeOutput, 'image');
 
     // Do the paste back if we are sending to gallery (in which case we want to see the full image), or if we are sending
     // to canvas but not outputting only masked regions
     if (!canvasSettings.sendToCanvas || !canvasSettings.outputOnlyMaskedRegions) {
-      canvasPasteBack.source_image = { image_name: initialImage.image_name };
+      g.addEdge(resizeInputImageToScaledSize, 'image', canvasPasteBack, 'source_image');
     }
 
-    return canvasPasteBack;
+    return { unscaled: canvasPasteBack, scaled: resizeOutput };
   } else {
     infill.image = { image_name: initialImage.image_name };
     // No scale before processing, much simpler
@@ -200,6 +194,6 @@ export const addOutpaint = async ({
       canvasPasteBack.source_image = { image_name: initialImage.image_name };
     }
 
-    return canvasPasteBack;
+    return { unscaled: canvasPasteBack, scaled: canvasPasteBack };
   }
 };

@@ -2,6 +2,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasState, Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { CanvasOutputs } from 'features/nodes/util/graph/graphBuilderUtils';
 import { addImageToLatents } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
@@ -30,7 +31,7 @@ export const addImageToImage = async ({
   bbox,
   denoising_start,
   fp32,
-}: AddImageToImageArg): Promise<Invocation<'img_resize' | 'l2i' | 'flux_vae_decode'>> => {
+}: AddImageToImageArg): Promise<CanvasOutputs> => {
   denoise.denoising_start = denoising_start;
 
   const { image_name } = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
@@ -57,13 +58,12 @@ export const addImageToImage = async ({
     g.addEdge(i2l, 'latents', denoise, 'latents');
     g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
 
-    // This is the new output node
-    return resizeImageToOriginalSize;
+    return { scaled: resizeImageToOriginalSize, unscaled: l2i };
   } else {
     // No need to resize, just decode
     const i2l = addImageToLatents(g, l2i.type === 'flux_vae_decode', fp32, image_name);
     g.addEdge(vaeSource, 'vae', i2l, 'vae');
     g.addEdge(i2l, 'latents', denoise, 'latents');
-    return l2i;
+    return { scaled: l2i, unscaled: l2i };
   }
 };

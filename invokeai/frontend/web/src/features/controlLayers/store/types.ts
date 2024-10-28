@@ -359,6 +359,7 @@ export type StagingAreaImage = {
   imageDTO: ImageDTO;
   offsetX: number;
   offsetY: number;
+  preDownscaleImageDTO: ImageDTO | null;
 };
 
 const zAspectRatioID = z.enum(['Free', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16']);

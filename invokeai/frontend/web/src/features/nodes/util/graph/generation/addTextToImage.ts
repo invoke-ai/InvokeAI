@@ -1,6 +1,7 @@
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { CanvasOutputs } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
@@ -11,12 +12,7 @@ type AddTextToImageArg = {
   scaledSize: Dimensions;
 };
 
-export const addTextToImage = ({
-  g,
-  l2i,
-  originalSize,
-  scaledSize,
-}: AddTextToImageArg): Invocation<'img_resize' | 'l2i' | 'flux_vae_decode'> => {
+export const addTextToImage = ({ g, l2i, originalSize, scaledSize }: AddTextToImageArg): CanvasOutputs => {
   if (!isEqual(scaledSize, originalSize)) {
     // We need to resize the output image back to the original size
     const resizeImageToOriginalSize = g.addNode({
@@ -26,8 +22,8 @@ export const addTextToImage = ({
     });
     g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
 
-    return resizeImageToOriginalSize;
+    return { scaled: resizeImageToOriginalSize, unscaled: l2i };
   } else {
-    return l2i;
+    return { scaled: l2i, unscaled: l2i };
   }
 };

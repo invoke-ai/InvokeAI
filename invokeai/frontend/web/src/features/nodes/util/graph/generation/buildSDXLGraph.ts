@@ -18,14 +18,17 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import type { CanvasOutputs } from 'features/nodes/util/graph/graphBuilderUtils';
 import {
-  CANVAS_OUTPUT_PREFIX,
+  CANVAS_SCALED_OUTPUT_PREFIX,
+  CANVAS_UNSCALED_OUTPUT_PREFIX,
   getBoardField,
   getPresetModifiedPrompts,
   getSizes,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
@@ -123,10 +126,6 @@ export const buildSDXLGraph = async (
         })
       : null;
 
-  let canvasOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
-  > = l2i;
-
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', posCond, 'clip');
   g.addEdge(modelLoader, 'clip', negCond, 'clip');
@@ -177,10 +176,12 @@ export const buildSDXLGraph = async (
     ? Math.min(refinerStart, 1 - params.img2imgStrength)
     : 1 - params.img2imgStrength;
 
+  let canvasOutputs: CanvasOutputs;
+
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
+    canvasOutputs = addTextToImage({ g, l2i, originalSize, scaledSize });
   } else if (generationMode === 'img2img') {
-    canvasOutput = await addImageToImage({
+    canvasOutputs = await addImageToImage({
       g,
       manager,
       l2i,
@@ -193,7 +194,7 @@ export const buildSDXLGraph = async (
       fp32,
     });
   } else if (generationMode === 'inpaint') {
-    canvasOutput = await addInpaint({
+    canvasOutputs = await addInpaint({
       state,
       g,
       manager,
@@ -207,7 +208,7 @@ export const buildSDXLGraph = async (
       fp32,
     });
   } else if (generationMode === 'outpaint') {
-    canvasOutput = await addOutpaint({
+    canvasOutputs = await addOutpaint({
       state,
       g,
       manager,
@@ -220,6 +221,8 @@ export const buildSDXLGraph = async (
       denoising_start,
       fp32,
     });
+  } else {
+    assert<Equals<typeof generationMode, never>>(false);
   }
 
   const controlNetCollector = g.addNode({
@@ -287,11 +290,11 @@ export const buildSDXLGraph = async (
   }
 
   if (state.system.shouldUseNSFWChecker) {
-    canvasOutput = addNSFWChecker(g, canvasOutput);
+    canvasOutputs.scaled = addNSFWChecker(g, canvasOutputs.scaled);
   }
 
   if (state.system.shouldUseWatermarker) {
-    canvasOutput = addWatermarker(g, canvasOutput);
+    canvasOutputs.scaled = addWatermarker(g, canvasOutputs.scaled);
   }
 
   // This image will be staged, should not be saved to the gallery or added to a board.
@@ -302,13 +305,18 @@ export const buildSDXLGraph = async (
     g.upsertMetadata(selectCanvasMetadata(state));
   }
 
-  g.updateNode(canvasOutput, {
-    id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
+  g.updateNode(canvasOutputs.scaled, {
+    id: getPrefixedId(CANVAS_SCALED_OUTPUT_PREFIX),
     is_intermediate,
     use_cache: false,
     board,
   });
 
-  g.setMetadataReceivingNode(canvasOutput);
+  g.updateNode(canvasOutputs.unscaled, {
+    id: getPrefixedId(CANVAS_UNSCALED_OUTPUT_PREFIX),
+    board,
+  });
+
+  g.setMetadataReceivingNode(canvasOutputs.scaled);
   return { g, noise, posCond };
 };

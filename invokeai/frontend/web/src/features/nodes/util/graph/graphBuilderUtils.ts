@@ -130,4 +130,12 @@ export const addImageToLatents = (g: Graph, isFlux: boolean, fp32: boolean, imag
   }
 };
 
-export const CANVAS_OUTPUT_PREFIX = 'canvas_output';
+export const CANVAS_SCALED_OUTPUT_PREFIX = 'canvas_scaled_output';
+export const CANVAS_UNSCALED_OUTPUT_PREFIX = 'canvas_unscaled_output';
+
+export type CanvasOutputs = {
+  scaled: Invocation<
+    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
+  >;
+  unscaled: Invocation<'l2i' | 'flux_vae_decode' | 'canvas_v2_mask_and_crop'>;
+};
