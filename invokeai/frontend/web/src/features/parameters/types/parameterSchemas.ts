@@ -141,6 +141,20 @@ export const isParameterStrength = (val: unknown): val is ParameterStrength =>
   zParameterStrength.safeParse(val).success;
 // #endregion
 
+// #region SeamlessX
+const zParameterSeamlessX = z.boolean();
+export type ParameterSeamlessX = z.infer<typeof zParameterSeamlessX>;
+export const isParameterSeamlessX = (val: unknown): val is boolean =>
+  zParameterSeamlessX.safeParse(val).success && val !== null && val !== undefined;
+// #endregion
+
+// #region SeamlessY
+const zParameterSeamlessY = z.boolean();
+export type ParameterSeamlessY = z.infer<typeof zParameterSeamlessY>;
+export const isParameterSeamlessY = (val: unknown): val is boolean =>
+  zParameterSeamlessY.safeParse(val).success && val !== null && val !== undefined;
+// #endregion
+
 // #region Precision
 const zParameterPrecision = z.enum(['fp16', 'fp32']);
 export type ParameterPrecision = z.infer<typeof zParameterPrecision>;
