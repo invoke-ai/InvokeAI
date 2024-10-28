@@ -10,8 +10,8 @@ import { ControlLayerSettings } from 'features/controlLayers/components/ControlL
 import { ControlLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
-import { replaceLayerWithImageDndTarget, type ReplaceLayerWithImageDndTargetData } from 'features/dnd2/types';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,8 +25,8 @@ export const ControlLayer = memo(({ id }: Props) => {
     () => ({ id, type: 'control_layer' }),
     [id]
   );
-  const targetData = useMemo<ReplaceLayerWithImageDndTargetData>(
-    () => replaceLayerWithImageDndTarget.getData({ entityIdentifier }, entityIdentifier.id),
+  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['replaceLayerWithImage']>(
+    () => Dnd.Target.replaceLayerWithImage.getData({ entityIdentifier }, entityIdentifier.id),
     [entityIdentifier]
   );
 

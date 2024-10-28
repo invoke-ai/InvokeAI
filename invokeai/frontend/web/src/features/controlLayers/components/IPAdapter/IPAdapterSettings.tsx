@@ -19,7 +19,7 @@ import {
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import { setGlobalReferenceImageDndTarget, type SetGlobalReferenceImageDndTargetData } from 'features/dnd2/types';
+import { Dnd } from 'features/dnd2/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold } from 'react-icons/pi';
@@ -84,9 +84,9 @@ export const IPAdapterSettings = memo(() => {
     () => ({ type: 'SET_IPA_IMAGE', id: entityIdentifier.id }),
     [entityIdentifier.id]
   );
-  const targetData = useMemo<SetGlobalReferenceImageDndTargetData>(
+  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['setGlobalReferenceImage']>(
     () =>
-      setGlobalReferenceImageDndTarget.getData(
+      Dnd.Target.setGlobalReferenceImage.getData(
         { globalReferenceImageId: entityIdentifier.id },
         ipAdapter.image?.image_name
       ),

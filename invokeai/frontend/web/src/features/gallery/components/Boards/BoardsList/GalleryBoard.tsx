@@ -2,9 +2,8 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
-import type { AddToBoardDndTargetData } from 'features/dnd2/types';
-import { addToBoardDndTarget } from 'features/dnd2/types';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { BoardEditableTitle } from 'features/gallery/components/Boards/BoardsList/BoardEditableTitle';
@@ -45,8 +44,8 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     }
   }, [selectedBoardId, board.board_id, autoAssignBoardOnClick, autoAddBoardId, dispatch]);
 
-  const targetData: AddToBoardDndTargetData = useMemo(
-    () => addToBoardDndTarget.getData({ boardId: board.board_id }),
+  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['addToBoard']>(
+    () => Dnd.Target.addToBoard.getData({ boardId: board.board_id }),
     [board.board_id]
   );
 

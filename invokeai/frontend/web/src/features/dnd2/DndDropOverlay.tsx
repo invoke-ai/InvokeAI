@@ -1,9 +1,9 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
-import type { DndState } from 'features/dnd2/types';
+import type { Dnd } from 'features/dnd2/dnd';
 import { memo } from 'react';
 
 type Props = {
-  dndState: DndState;
+  dndState: Dnd.types['DndState'];
   label?: string;
   withBackdrop?: boolean;
 };

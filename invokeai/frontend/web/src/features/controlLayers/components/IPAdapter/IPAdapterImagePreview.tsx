@@ -4,9 +4,9 @@ import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
+import type { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
 import { DndImage } from 'features/dnd2/DndImage';
-import type { DndTargetData } from 'features/dnd2/types';
 import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
@@ -31,7 +31,7 @@ const sx = {
 type Props = {
   image: ImageWithDims | null;
   onChangeImage: (imageDTO: ImageDTO | null) => void;
-  targetData: DndTargetData;
+  targetData: Dnd.types['TargetDataUnion'];
   postUploadAction: PostUploadAction;
 };
 

@@ -24,26 +24,7 @@ import type {
   CanvasRegionalGuidanceState,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
-import {
-  newControlLayerFromImageDndTarget,
-  addGlobalReferenceImageFromImageDndTarget,
-  addInpaintMaskFromImageDndTarget,
-  newRasterLayerFromImageDndTarget,
-  addRegionalGuidanceFromImageDndTarget,
-  addRegionalGuidanceReferenceImageFromImageDndTarget,
-  addToBoardDndTarget,
-  type DndSourceData,
-  type DndTargetData,
-  multipleImageDndSource,
-  removeFromBoardDndTarget,
-  replaceLayerWithImageDndTarget,
-  selectForCompareDndTarget,
-  setGlobalReferenceImageDndTarget,
-  setNodeImageFieldDndTarget,
-  setRegionalGuidanceReferenceImageDndTarget,
-  setUpscaleInitialImageFromImageDndTarget,
-  singleImageDndSource,
-} from 'features/dnd2/types';
+import { Dnd } from 'features/dnd2/dnd';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
@@ -52,8 +33,8 @@ import { imagesApi } from 'services/api/endpoints/images';
 const log = logger('system');
 
 export const dndDropped = createAction<{
-  sourceData: DndSourceData;
-  targetData: DndTargetData;
+  sourceData: Dnd.types['SourceDataUnion'];
+  targetData: Dnd.types['TargetDataUnion'];
 }>('dnd/dndDropped2');
 
 export const addDndDroppedListener = (startAppListening: AppStartListening) => {
@@ -63,16 +44,16 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
       const { sourceData, targetData } = action.payload;
 
       // Single image dropped
-      if (singleImageDndSource.typeGuard(sourceData)) {
+      if (Dnd.Source.singleImage.typeGuard(sourceData)) {
         log.debug({ sourceData, targetData }, 'Image dropped');
-        const { imageDTO } = sourceData;
+        const { imageDTO } = sourceData.payload;
 
         // Image dropped on IP Adapter
         if (
-          setGlobalReferenceImageDndTarget.typeGuard(targetData) &&
-          setGlobalReferenceImageDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.setGlobalReferenceImage.typeGuard(targetData) &&
+          Dnd.Target.setGlobalReferenceImage.validateDrop(sourceData, targetData)
         ) {
-          const { globalReferenceImageId } = targetData;
+          const { globalReferenceImageId } = targetData.payload;
           dispatch(
             referenceImageIPAdapterImageChanged({
               entityIdentifier: { id: globalReferenceImageId, type: 'reference_image' },
@@ -84,10 +65,10 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         //Image dropped on Regional Guidance IP Adapter
         if (
-          setRegionalGuidanceReferenceImageDndTarget.typeGuard(targetData) &&
-          setRegionalGuidanceReferenceImageDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.setRegionalGuidanceReferenceImage.typeGuard(targetData) &&
+          Dnd.Target.setRegionalGuidanceReferenceImage.validateDrop(sourceData, targetData)
         ) {
-          const { regionalGuidanceId, referenceImageId } = targetData;
+          const { regionalGuidanceId, referenceImageId } = targetData.payload;
           dispatch(
             rgIPAdapterImageChanged({
               entityIdentifier: { id: regionalGuidanceId, type: 'regional_guidance' },
@@ -100,8 +81,8 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Add raster layer from image
         if (
-          newRasterLayerFromImageDndTarget.typeGuard(targetData) &&
-          newRasterLayerFromImageDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.newRasterLayerFromImage.typeGuard(targetData) &&
+          Dnd.Target.newRasterLayerFromImage.validateDrop(sourceData, targetData)
         ) {
           const imageObject = imageDTOToImageObject(imageDTO);
           const { x, y } = selectCanvasSlice(getState()).bbox.rect;
@@ -115,8 +96,8 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Add inpaint mask from image
         if (
-          addInpaintMaskFromImageDndTarget.typeGuard(targetData) &&
-          addInpaintMaskFromImageDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.newInpaintMaskFromImage.typeGuard(targetData) &&
+          Dnd.Target.newInpaintMaskFromImage.validateDrop(sourceData, targetData)
         ) {
           const imageObject = imageDTOToImageObject(imageDTO);
           const { x, y } = selectCanvasSlice(getState()).bbox.rect;
@@ -130,8 +111,8 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Add regional guidance from image
         if (
-          addRegionalGuidanceFromImageDndTarget.typeGuard(targetData) &&
-          addRegionalGuidanceFromImageDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.newRegionalGuidanceFromImage.typeGuard(targetData) &&
+          Dnd.Target.newRegionalGuidanceFromImage.validateDrop(sourceData, targetData)
         ) {
           const imageObject = imageDTOToImageObject(imageDTO);
           const { x, y } = selectCanvasSlice(getState()).bbox.rect;
@@ -145,8 +126,8 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Add control layer from image
         if (
-          newControlLayerFromImageDndTarget.typeGuard(targetData) &&
-          newControlLayerFromImageDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.newControlLayerFromImage.typeGuard(targetData) &&
+          Dnd.Target.newControlLayerFromImage.validateDrop(sourceData, targetData)
         ) {
           const state = getState();
           const imageObject = imageDTOToImageObject(imageDTO);
@@ -163,8 +144,8 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Add regional guidance layer w/ reference image from image
         if (
-          addRegionalGuidanceReferenceImageFromImageDndTarget.typeGuard(targetData) &&
-          addRegionalGuidanceReferenceImageFromImageDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.newRegionalGuidanceReferenceImageFromImage.typeGuard(targetData) &&
+          Dnd.Target.newRegionalGuidanceReferenceImageFromImage.validateDrop(sourceData, targetData)
         ) {
           const state = getState();
           const ipAdapter = deepClone(selectDefaultIPAdapter(state));
@@ -178,8 +159,8 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Add global reference image from image
         if (
-          addGlobalReferenceImageFromImageDndTarget.typeGuard(targetData) &&
-          addGlobalReferenceImageFromImageDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.newGlobalReferenceImageFromImage.typeGuard(targetData) &&
+          Dnd.Target.newGlobalReferenceImageFromImage.validateDrop(sourceData, targetData)
         ) {
           const state = getState();
           const ipAdapter = deepClone(selectDefaultIPAdapter(state));
@@ -191,11 +172,11 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Replace layer with image
         if (
-          replaceLayerWithImageDndTarget.typeGuard(targetData) &&
-          replaceLayerWithImageDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.replaceLayerWithImage.typeGuard(targetData) &&
+          Dnd.Target.replaceLayerWithImage.validateDrop(sourceData, targetData)
         ) {
           const state = getState();
-          const { entityIdentifier } = targetData;
+          const { entityIdentifier } = targetData.payload;
           const imageObject = imageDTOToImageObject(imageDTO);
           const { x, y } = selectCanvasSlice(state).bbox.rect;
           dispatch(entityRasterized({ entityIdentifier, imageObject, position: { x, y }, replaceObjects: true }));
@@ -205,10 +186,10 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Image dropped on node image field
         if (
-          setNodeImageFieldDndTarget.typeGuard(targetData) &&
-          setNodeImageFieldDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.setNodeImageField.typeGuard(targetData) &&
+          Dnd.Target.setNodeImageField.validateDrop(sourceData, targetData)
         ) {
-          const { fieldName, nodeId } = targetData;
+          const { fieldName, nodeId } = targetData.payload;
           dispatch(
             fieldImageValueChanged({
               nodeId,
@@ -221,16 +202,16 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Image selected for compare
         if (
-          selectForCompareDndTarget.typeGuard(targetData) &&
-          selectForCompareDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.selectForCompare.typeGuard(targetData) &&
+          Dnd.Target.selectForCompare.validateDrop(sourceData, targetData)
         ) {
           dispatch(imageToCompareChanged(imageDTO));
           return;
         }
 
         // Image added to board
-        if (addToBoardDndTarget.typeGuard(targetData) && addToBoardDndTarget.validateDrop(sourceData, targetData)) {
-          const { boardId } = targetData;
+        if (Dnd.Target.addToBoard.typeGuard(targetData) && Dnd.Target.addToBoard.validateDrop(sourceData, targetData)) {
+          const { boardId } = targetData.payload;
           dispatch(
             imagesApi.endpoints.addImageToBoard.initiate({
               imageDTO,
@@ -243,8 +224,8 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Image removed from board
         if (
-          removeFromBoardDndTarget.typeGuard(targetData) &&
-          removeFromBoardDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.removeFromBoard.typeGuard(targetData) &&
+          Dnd.Target.removeFromBoard.validateDrop(sourceData, targetData)
         ) {
           dispatch(
             imagesApi.endpoints.removeImageFromBoard.initiate({
@@ -257,21 +238,21 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Image dropped on upscale initial image
         if (
-          setUpscaleInitialImageFromImageDndTarget.typeGuard(targetData) &&
-          setUpscaleInitialImageFromImageDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.setUpscaleInitialImageFromImage.typeGuard(targetData) &&
+          Dnd.Target.setUpscaleInitialImageFromImage.validateDrop(sourceData, targetData)
         ) {
           dispatch(upscaleInitialImageChanged(imageDTO));
           return;
         }
       }
 
-      if (multipleImageDndSource.typeGuard(sourceData)) {
+      if (Dnd.Source.multipleImage.typeGuard(sourceData)) {
         log.debug({ sourceData, targetData }, 'Multiple images dropped');
-        const { imageDTOs } = sourceData;
+        const { imageDTOs } = sourceData.payload;
 
         // Multiple images dropped on user board
-        if (addToBoardDndTarget.typeGuard(targetData) && addToBoardDndTarget.validateDrop(sourceData, targetData)) {
-          const { boardId } = targetData;
+        if (Dnd.Target.addToBoard.typeGuard(targetData) && Dnd.Target.addToBoard.validateDrop(sourceData, targetData)) {
+          const { boardId } = targetData.payload;
           dispatch(
             imagesApi.endpoints.addImagesToBoard.initiate({
               imageDTOs,
@@ -284,8 +265,8 @@ export const addDndDroppedListener = (startAppListening: AppStartListening) => {
 
         // Multiple images dropped on Uncategorized board (e.g. removed from board)
         if (
-          removeFromBoardDndTarget.typeGuard(targetData) &&
-          removeFromBoardDndTarget.validateDrop(sourceData, targetData)
+          Dnd.Target.removeFromBoard.typeGuard(targetData) &&
+          Dnd.Target.removeFromBoard.validateDrop(sourceData, targetData)
         ) {
           dispatch(
             imagesApi.endpoints.removeImagesFromBoard.initiate({

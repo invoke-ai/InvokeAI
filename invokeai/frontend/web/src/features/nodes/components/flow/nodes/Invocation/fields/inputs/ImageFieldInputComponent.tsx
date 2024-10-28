@@ -3,10 +3,9 @@ import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch } from 'app/store/storeHooks';
 import IAIDndImageIcon from 'common/components/IAIDndImageIcon';
+import { Dnd } from 'features/dnd2/dnd';
 import { DndDropTarget } from 'features/dnd2/DndDropTarget';
 import { DndImage } from 'features/dnd2/DndImage';
-import type { SetNodeImageFieldDndTargetData } from 'features/dnd2/types';
-import { setNodeImageFieldDndTarget } from 'features/dnd2/types';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageFieldInputInstance, ImageFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useEffect, useMemo } from 'react';
@@ -34,8 +33,8 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
     );
   }, [dispatch, field.name, nodeId]);
 
-  const targetData = useMemo<SetNodeImageFieldDndTargetData>(
-    () => setNodeImageFieldDndTarget.getData({ nodeId, fieldName: field.name }, field.value?.image_name),
+  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['setNodeImageField']>(
+    () => Dnd.Target.setNodeImageField.getData({ nodeId, fieldName: field.name }, field.value?.image_name),
     [field.name, field.value?.image_name, nodeId]
   );
 
