@@ -1,7 +1,9 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { preserveOffsetOnSource } from '@atlaskit/pragmatic-drag-and-drop/element/preserve-offset-on-source';
+import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Image } from '@invoke-ai/ui-library';
+import { Box, Flex, Heading, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import { useAppStore } from 'app/store/nanostores/store';
@@ -16,6 +18,8 @@ import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageVi
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useId, useMemo, useState } from 'react';
+import ReactDOM from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import type { ImageDTO } from 'services/api/types';
 
 // This class name is used to calculate the number of images that fit in the gallery
@@ -79,9 +83,16 @@ interface Props {
   imageDTO: ImageDTO;
 }
 
+type MultiImageDragPreviewState = {
+  container: HTMLElement;
+  imageDTOs: ImageDTO[];
+  domRect: DOMRect;
+};
+
 export const GalleryImage = memo(({ imageDTO }: Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
+  const [dragPreviewState, setDragPreviewState] = useState<MultiImageDragPreviewState | null>(null);
   const [element, ref] = useState<HTMLImageElement | null>(null);
   const dndId = useId();
   const selectIsSelectedForCompare = useMemo(
@@ -115,13 +126,10 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
           if (gallery.selection.length > 1 && gallery.selection.includes(imageDTO)) {
-            return Dnd.Source.multipleImage.getData(
-              {
-                imageDTOs: gallery.selection,
-                boardId: gallery.selectedBoardId,
-              },
-              'gallery-selection'
-            );
+            return Dnd.Source.multipleImage.getData({
+              imageDTOs: gallery.selection,
+              boardId: gallery.selectedBoardId,
+            });
           }
 
           // Otherwise, initiate a single-image drag
@@ -136,11 +144,32 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
             return;
           }
         },
+        // See: https://atlassian.design/components/pragmatic-drag-and-drop/core-package/adapters/element/drag-previews
+        onGenerateDragPreview: ({ nativeSetDragImage, source, location }) => {
+          if (Dnd.Source.multipleImage.typeGuard(source.data)) {
+            const { imageDTOs } = source.data.payload;
+            const domRect = source.element.getBoundingClientRect();
+            setCustomNativeDragPreview({
+              render({ container }) {
+                // Cause a `react` re-render to create your portal synchronously
+                setDragPreviewState({ container, imageDTOs, domRect });
+                // In our cleanup function: cause a `react` re-render to create remove your portal
+                // Note: you can also remove the portal in `onDragStart`,
+                // which is when the cleanup function is called
+                return () => setDragPreviewState(null);
+              },
+              nativeSetDragImage,
+              getOffset: preserveOffsetOnSource({
+                element: source.element,
+                input: location.current.input,
+              }),
+            });
+          }
+        },
       }),
       monitorForElements({
         // This is a "global" drag start event, meaning that it is called for all drag events.
         onDragStart: ({ source }) => {
-          console.log(source);
           // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
           // selection. This is called for all drag events.
           if (Dnd.Source.multipleImage.typeGuard(source.data) && source.data.payload.imageDTOs.includes(imageDTO)) {
@@ -184,36 +213,62 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   useImageContextMenu(imageDTO, element);
 
   return (
-    <Box
-      className={GALLERY_IMAGE_CONTAINER_CLASS_NAME}
-      sx={galleryImageContainerSX}
-      data-testid={dataTestId}
-      data-is-dragging={isDragging}
-    >
-      <Flex
-        role="button"
-        className="gallery-image"
-        onMouseOver={isHovered.setTrue}
-        onMouseOut={isHovered.setFalse}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-        data-selected={isSelected}
-        data-selected-for-compare={isSelectedForCompare}
+    <>
+      <Box
+        className={GALLERY_IMAGE_CONTAINER_CLASS_NAME}
+        sx={galleryImageContainerSX}
+        data-testid={dataTestId}
+        data-is-dragging={isDragging}
       >
-        <Image
-          ref={ref}
-          src={imageDTO.thumbnail_url}
-          fallback={<SizedSkeletonLoader width={imageDTO.width} height={imageDTO.height} />}
-          w={imageDTO.width}
-          objectFit="contain"
-          maxW="full"
-          maxH="full"
-          borderRadius="base"
-        />
-        <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered.isTrue} />
-      </Flex>
-    </Box>
+        <Flex
+          role="button"
+          className="gallery-image"
+          onMouseOver={isHovered.setTrue}
+          onMouseOut={isHovered.setFalse}
+          onClick={onClick}
+          onDoubleClick={onDoubleClick}
+          data-selected={isSelected}
+          data-selected-for-compare={isSelectedForCompare}
+        >
+          <Image
+            ref={ref}
+            src={imageDTO.thumbnail_url}
+            fallback={<SizedSkeletonLoader width={imageDTO.width} height={imageDTO.height} />}
+            w={imageDTO.width}
+            objectFit="contain"
+            maxW="full"
+            maxH="full"
+            borderRadius="base"
+          />
+          <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered.isTrue} />
+        </Flex>
+      </Box>
+      {dragPreviewState !== null &&
+        ReactDOM.createPortal(
+          <MultiImagePreview imageDTOs={dragPreviewState.imageDTOs} domRect={dragPreviewState.domRect} />,
+          dragPreviewState.container
+        )}
+    </>
   );
 });
 
 GalleryImage.displayName = 'GalleryImage';
+
+const MultiImagePreview = memo(({ imageDTOs, domRect }: { imageDTOs: ImageDTO[]; domRect: DOMRect }) => {
+  const { t } = useTranslation();
+  return (
+    <Flex
+      w={domRect.width}
+      h={domRect.height}
+      alignItems="center"
+      justifyContent="center"
+      flexDir="column"
+      bg="base.900"
+    >
+      <Heading>{imageDTOs.length}</Heading>
+      <Heading size="sm">{t('parameters.images')}</Heading>
+    </Flex>
+  );
+});
+
+MultiImagePreview.displayName = 'MultiImagePreview';
