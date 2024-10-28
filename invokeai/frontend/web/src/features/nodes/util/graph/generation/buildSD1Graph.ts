@@ -26,6 +26,7 @@ import {
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 import { addRegions } from './addRegions';
@@ -125,10 +126,6 @@ export const buildSD1Graph = async (
         })
       : null;
 
-  let canvasOutput: Invocation<
-    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
-  > = l2i;
-
   g.addEdge(modelLoader, 'unet', denoise, 'unet');
   g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
   g.addEdge(clipSkip, 'clip', posCond, 'clip');
@@ -170,10 +167,16 @@ export const buildSD1Graph = async (
   > = seamless ?? vaeLoader ?? modelLoader;
   g.addEdge(vaeSource, 'vae', l2i, 'vae');
 
+  const denoising_start = 1 - params.img2imgStrength;
+
+  let canvasOutput: Invocation<
+    'l2i' | 'img_nsfw' | 'img_watermark' | 'img_resize' | 'canvas_v2_mask_and_crop' | 'flux_vae_decode'
+  > = l2i;
+
   if (generationMode === 'txt2img') {
-    canvasOutput = addTextToImage(g, l2i, originalSize, scaledSize);
+    canvasOutput = addTextToImage({ g, l2i, originalSize, scaledSize });
   } else if (generationMode === 'img2img') {
-    canvasOutput = await addImageToImage(
+    canvasOutput = await addImageToImage({
       g,
       manager,
       l2i,
@@ -182,11 +185,11 @@ export const buildSD1Graph = async (
       originalSize,
       scaledSize,
       bbox,
-      1 - params.img2imgStrength,
-      vaePrecision === 'fp32'
-    );
+      denoising_start,
+      fp32: vaePrecision === 'fp32',
+    });
   } else if (generationMode === 'inpaint') {
-    canvasOutput = await addInpaint(
+    canvasOutput = await addInpaint({
       state,
       g,
       manager,
@@ -196,11 +199,11 @@ export const buildSD1Graph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      1 - params.img2imgStrength,
-      vaePrecision === 'fp32'
-    );
+      denoising_start,
+      fp32: vaePrecision === 'fp32',
+    });
   } else if (generationMode === 'outpaint') {
-    canvasOutput = await addOutpaint(
+    canvasOutput = await addOutpaint({
       state,
       g,
       manager,
@@ -210,9 +213,11 @@ export const buildSD1Graph = async (
       modelLoader,
       originalSize,
       scaledSize,
-      1 - params.img2imgStrength,
-      fp32
-    );
+      denoising_start,
+      fp32,
+    });
+  } else {
+    assert<Equals<typeof generationMode, never>>(false);
   }
 
   const controlNetCollector = g.addNode({
