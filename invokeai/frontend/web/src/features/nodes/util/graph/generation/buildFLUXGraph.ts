@@ -14,7 +14,12 @@ import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { getBoardField, getPresetModifiedPrompts, getSizes } from 'features/nodes/util/graph/graphBuilderUtils';
+import {
+  CANVAS_OUTPUT_PREFIX,
+  getBoardField,
+  getPresetModifiedPrompts,
+  getSizes,
+} from 'features/nodes/util/graph/graphBuilderUtils';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -250,7 +255,7 @@ export const buildFLUXGraph = async (
   }
 
   g.updateNode(canvasOutput, {
-    id: getPrefixedId('canvas_output'),
+    id: getPrefixedId(CANVAS_OUTPUT_PREFIX),
     is_intermediate,
     use_cache: false,
     board,
