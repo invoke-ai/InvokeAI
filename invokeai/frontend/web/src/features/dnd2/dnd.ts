@@ -7,7 +7,6 @@ import type { ImageDTO } from 'services/api/types';
 import type { ValueOf } from 'type-fest';
 import type { Jsonifiable } from 'type-fest/source/jsonifiable';
 
-type EmptyObject = Record<string, never>;
 type UnknownDndData = Record<string | symbol, unknown>;
 
 /**
@@ -24,7 +23,11 @@ type UnknownDndData = Record<string | symbol, unknown>;
 
 type DndKind = 'source' | 'target';
 
-type Data<T extends string = string, K extends DndKind = DndKind, P extends Jsonifiable = Jsonifiable> = {
+type Data<
+  T extends string = string,
+  K extends DndKind = DndKind,
+  P extends Jsonifiable | undefined = Jsonifiable | undefined,
+> = {
   meta: {
     id: string;
     type: T;
@@ -59,7 +62,7 @@ const _buildDataTypeGuard = <T extends Data>(type: string, kind: DndKind) => {
  */
 const _buildDataGetter =
   <T extends Data>(type: T['meta']['type'], kind: T['meta']['kind']) =>
-  (payload: T['payload'] extends EmptyObject ? void : T['payload'], dndId?: string | null): T => {
+  (payload: T['payload'] extends undefined ? void : T['payload'], dndId?: string | null): T => {
     return {
       meta: {
         id: dndId ?? getPrefixedId(`dnd-${kind}-${type}`),
@@ -95,7 +98,7 @@ type DndSourceAPI<T extends Data> = {
  * Builds a DndSourceAPI object.
  * @param key The unique symbol key for the DndData type.
  */
-const buildDndSourceApi = <P extends Jsonifiable = EmptyObject>(type: string) => {
+const buildDndSourceApi = <P extends Jsonifiable | undefined = undefined>(type: string) => {
   return {
     type,
     kind: 'source',
@@ -148,7 +151,7 @@ type DndTargetApi<T extends Data> = DndSourceAPI<T> & {
  * @param key The unique symbol key for the DndData type.
  * @param validateDrop A function that validates whether a drop is valid.
  */
-const buildDndTargetApi = <P extends Jsonifiable = EmptyObject>(
+const buildDndTargetApi = <P extends Jsonifiable | undefined = undefined>(
   type: string,
   validateDrop: (sourceData: Data<string, 'source', Jsonifiable>, targetData: Data<typeof type, 'target', P>) => boolean
 ) => {
