@@ -7,8 +7,6 @@ import type { ImageDTO } from 'services/api/types';
 import type { ValueOf } from 'type-fest';
 import type { Jsonifiable } from 'type-fest/source/jsonifiable';
 
-type UnknownDndData = Record<string | symbol, unknown>;
-
 /**
  * This file contains types, APIs, and utilities for Dnd functionality, as provided by pragmatic-drag-and-drop:
  * - Source and target data types
@@ -21,31 +19,71 @@ type UnknownDndData = Record<string | symbol, unknown>;
  * - https://atlassian.design/components/pragmatic-drag-and-drop/about
  */
 
+/**
+ * A type for unknown Dnd data. `pragmatic-drag-and-drop` types all data as this type.
+ */
+type UnknownDndData = Record<string | symbol, unknown>;
+
+/**
+ * A Dnd kind, which can be either a source or a target.
+ */
 type DndKind = 'source' | 'target';
 
-type Data<
+/**
+ * Data for a given Dnd source or target, which contains metadata and payload.
+ * @template T The type string of the Dnd data. This should be unique for each type of Dnd data.
+ * @template K The kind of the Dnd data ('source' or 'target').
+ * @template P The optional payload of the Dnd data. This can be any "Jsonifiable" data - that is, data that can be
+ * serialized to JSON. This ensures the data can be safely stored in Redux, logged, etc.
+ */
+type DndData<
   T extends string = string,
   K extends DndKind = DndKind,
   P extends Jsonifiable | undefined = Jsonifiable | undefined,
 > = {
+  /**
+   * Metadata about the DndData.
+   */
   meta: {
+    /**
+     * An identifier for this data. This may or may not be unique. This is primarily used to prevent a source from
+     * dropping on itself.
+     *
+     * A consumer may be both a Dnd source and target of the same type. For example, the upscaling initial image is
+     * a Dnd target and may contain an image, which is itself a Dnd source. In this case, the Dnd ID is used to prevent
+     * the upscaling initial image (and other instances of that same image) from being dropped onto itself.
+     *
+     * This is accomplished by checking the Dnd ID of the source against the Dnd ID of the target. If they match, the
+     * drop is rejected.
+     */
     id: string;
+    /**
+     * The type of the DndData.
+     */
     type: T;
+    /**
+     * The kind of the DndData (source or target).
+     */
     kind: K;
   };
+  /**
+   * The arbitrarily-shaped payload of the DndData.
+   */
   payload: P;
 };
 
 /**
  * Builds a type guard for a specific DndData type.
- * @param key The unique symbol key for the DndData type.
- * @returns A type guard for the DndData type.
+ * @template T The Dnd data type.
+ * @param type The type of the Dnd source or target data.
+ * @param kind The kind of the Dnd source or target data.
+ * @returns A type guard for the Dnd data.
  */
-const _buildDataTypeGuard = <T extends Data>(type: string, kind: DndKind) => {
+const _buildDataTypeGuard = <T extends DndData>(type: T['meta']['type'], kind: T['meta']['kind']) => {
   // pragmatic-drag-and-drop types all data as unknown, so we need to cast it to the expected type
   return (data: UnknownDndData): data is T => {
     try {
-      return (data as Data).meta.type === type && (data as Data).meta.kind === kind;
+      return (data as DndData).meta.type === type && (data as DndData).meta.kind === kind;
     } catch {
       return false;
     }
@@ -57,11 +95,13 @@ const _buildDataTypeGuard = <T extends Data>(type: string, kind: DndKind) => {
  *
  * The getter accepts arbitrary data and an optional Dnd ID. If no Dnd ID is provided, a unique one is generated.
  *
- * @param key The unique symbol key for the DndData type.
+ * @template T The Dnd data type.
+ * @param type The type of the Dnd source or target data.
+ * @param kind The kind of the Dnd source or target data.
  * @returns A getter for the DndData type.
  */
 const _buildDataGetter =
-  <T extends Data>(type: T['meta']['type'], kind: T['meta']['kind']) =>
+  <T extends DndData>(type: T['meta']['type'], kind: T['meta']['kind']) =>
   (payload: T['payload'] extends undefined ? void : T['payload'], dndId?: string | null): T => {
     return {
       meta: {
@@ -74,10 +114,16 @@ const _buildDataGetter =
   };
 
 /**
- * An API for a Dnd source. It provides a type guard, a getter, and a unique symbol key for the DndData type.
+ * The API for a Dnd source.
  */
-type DndSourceAPI<T extends Data> = {
+type DndSourceAPI<T extends DndData> = {
+  /**
+   * The type of the Dnd source.
+   */
   type: string;
+  /**
+   * The kind of the Dnd source. It is always 'source'.
+   */
   kind: 'source';
   /**
    * A type guard for the DndData type.
@@ -86,8 +132,8 @@ type DndSourceAPI<T extends Data> = {
    */
   typeGuard: ReturnType<typeof _buildDataTypeGuard<T>>;
   /**
-   * A getter for the DndData type.
-   * @param data The data to get.
+   * Gets a typed DndData object for the parent type.
+   * @param payload The payload for this DndData.
    * @param dndId The Dnd ID to use. If not provided, a unique one is generated.
    * @returns The DndData.
    */
@@ -95,16 +141,17 @@ type DndSourceAPI<T extends Data> = {
 };
 
 /**
- * Builds a DndSourceAPI object.
- * @param key The unique symbol key for the DndData type.
+ * Builds a Dnd source API.
+ * @template P The optional payload of the Dnd source.
+ * @param type The type of the Dnd source.
  */
 const buildDndSourceApi = <P extends Jsonifiable | undefined = undefined>(type: string) => {
   return {
     type,
     kind: 'source',
-    typeGuard: _buildDataTypeGuard<Data<typeof type, 'source', P>>(type, 'source'),
-    getData: _buildDataGetter<Data<typeof type, 'source', P>>(type, 'source'),
-  } satisfies DndSourceAPI<Data<typeof type, 'source', P>>;
+    typeGuard: _buildDataTypeGuard<DndData<typeof type, 'source', P>>(type, 'source'),
+    getData: _buildDataGetter<DndData<typeof type, 'source', P>>(type, 'source'),
+  } satisfies DndSourceAPI<DndData<typeof type, 'source', P>>;
 };
 
 //#region DndSourceData
@@ -134,34 +181,38 @@ type SourceDataUnion = ValueOf<SourceDataTypeMap>;
 
 //#region DndTargetData
 /**
- * An API for a Dnd target. It extends the DndSourceAPI with a validateDrop function.
+ * The API for a Dnd target.
  */
-type DndTargetApi<T extends Data> = DndSourceAPI<T> & {
+type DndTargetApi<T extends DndData> = DndSourceAPI<T> & {
   /**
    * Validates whether a drop is valid, give the source and target data.
    * @param sourceData The source data (i.e. the data being dragged)
    * @param targetData The target data (i.e. the data being dragged onto)
    * @returns Whether the drop is valid.
    */
-  validateDrop: (sourceData: Data<string, 'source', Jsonifiable>, targetData: T) => boolean;
+  validateDrop: (sourceData: DndData<string, 'source', Jsonifiable>, targetData: T) => boolean;
 };
 
 /**
- * Builds a DndTargetApi object.
- * @param key The unique symbol key for the DndData type.
+ * Builds a Dnd target API.
+ * @template P The optional payload of the Dnd target.
+ * @param type The type of the Dnd target.
  * @param validateDrop A function that validates whether a drop is valid.
  */
 const buildDndTargetApi = <P extends Jsonifiable | undefined = undefined>(
   type: string,
-  validateDrop: (sourceData: Data<string, 'source', Jsonifiable>, targetData: Data<typeof type, 'target', P>) => boolean
+  validateDrop: (
+    sourceData: DndData<string, 'source', Jsonifiable>,
+    targetData: DndData<typeof type, 'target', P>
+  ) => boolean
 ) => {
   return {
     type,
     kind: 'source',
-    typeGuard: _buildDataTypeGuard<Data<typeof type, 'target', P>>(type, 'target'),
-    getData: _buildDataGetter<Data<typeof type, 'target', P>>(type, 'target'),
+    typeGuard: _buildDataTypeGuard<DndData<typeof type, 'target', P>>(type, 'target'),
+    getData: _buildDataGetter<DndData<typeof type, 'target', P>>(type, 'target'),
     validateDrop,
-  } satisfies DndTargetApi<Data<typeof type, 'target', P>>;
+  } satisfies DndTargetApi<DndData<typeof type, 'target', P>>;
 };
 
 /**
@@ -329,6 +380,9 @@ const targetApisArray = Object.values(DndTarget);
 
 //#endregion
 
+/**
+ * The Dnd namespace, providing types and APIs for Dnd functionality.
+ */
 export declare namespace Dnd {
   export type types = {
     /**
@@ -339,6 +393,14 @@ export declare namespace Dnd {
      * - `over`: A drag is occurring, and the drag is valid for the current drop target, and the drag is over the drop target.
      */
     DndState: 'idle' | 'potential' | 'over';
+    /**
+     * A Dnd kind, which can be either a source or a target.
+     */
+    DndKind: DndKind;
+    /**
+     * A type for unknown Dnd data. `pragmatic-drag-and-drop` types all data as this type.
+     */
+    UnknownDndData: UnknownDndData;
     /**
      * A map of target APIs to their data types.
      */
@@ -367,7 +429,7 @@ export const Dnd = {
      * @param data The DndData object.
      * @returns The Dnd ID.
      */
-    getDndId: (data: Data): string => {
+    getDndId: (data: DndData): string => {
       return data.meta.id;
     },
     /**
@@ -377,7 +439,7 @@ export const Dnd = {
     isDndSourceData: (data: UnknownDndData): data is SourceDataUnion => {
       try {
         /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-        return (data as Data).meta.kind === 'source';
+        return (data as DndData).meta.kind === 'source';
       } catch {
         return false;
       }
@@ -389,7 +451,7 @@ export const Dnd = {
     isDndTargetData: (data: UnknownDndData): data is TargetDataUnion => {
       try {
         /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-        return (data as Data).meta.kind === 'target';
+        return (data as DndData).meta.kind === 'target';
       } catch {
         return false;
       }
