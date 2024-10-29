@@ -43,7 +43,6 @@ const mergeRasterLayers = async (canvasManager: CanvasManager, dispatch: AppDisp
         objects: [imageDTOToImageObject(result.value)],
         position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
       },
-      isMergingVisible: true,
     })
   );
 
@@ -70,7 +69,6 @@ const mergeInpaintMasks = async (canvasManager: CanvasManager, dispatch: AppDisp
         objects: [imageDTOToImageObject(result.value)],
         position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
       },
-      isMergingVisible: true,
     })
   );
 
