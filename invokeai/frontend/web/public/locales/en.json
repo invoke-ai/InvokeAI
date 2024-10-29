@@ -2081,13 +2081,11 @@
     },
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
-        "canvasV2Announcement": {
-            "newCanvas": "A powerful new control canvas",
-            "newLayerTypes": "New layer types for even more control",
-            "fluxSupport": "Support for the Flux family of models",
-            "readReleaseNotes": "Read Release Notes",
-            "watchReleaseVideo": "Watch Release Video",
-            "watchUiUpdatesOverview": "Watch UI Updates Overview"
-        }
+        "line1": "<ItalicComponent>Select Object</ItalicComponent> tool for precise object selection and editing",
+        "line2": "Expanded Flux support, now with Global Reference Images",
+        "line3": "Improved tooltips and context menus",
+        "readReleaseNotes": "Read Release Notes",
+        "watchRecentReleaseVideos": "Watch Recent Release Videos",
+        "watchUiUpdatesOverview": "Watch UI Updates Overview"
     }
 }
