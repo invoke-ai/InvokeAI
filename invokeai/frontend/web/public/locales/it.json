@@ -94,9 +94,7 @@
         "view": "Vista",
         "close": "Chiudi",
         "clipboard": "Appunti",
-        "inpaint": "",
-        "ok": "Ok",
-        "outpaint": ""
+        "ok": "Ok"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -177,8 +175,7 @@
             },
             "title": "Applicazione",
             "invoke": {
-                "desc": "Metti in coda una generazione, aggiungendola alla fine della coda.",
-                "title": ""
+                "desc": "Metti in coda una generazione, aggiungendola alla fine della coda."
             },
             "invokeFront": {
                 "title": "Invoke (Fronte)",
@@ -598,7 +595,6 @@
         "restoreDefaultSettings": "Fare clic per utilizzare le impostazioni predefinite del modello.",
         "usingDefaultSettings": "Utilizzo delle impostazioni predefinite del modello",
         "huggingFace": "HuggingFace",
-        "hfToken": "",
         "huggingFaceRepoID": "HuggingFace Repository ID",
         "clipEmbed": "CLIP Embed",
         "t5Encoder": "T5 Encoder"
@@ -678,8 +674,7 @@
             "canvasIsTransforming": "La tela sta trasformando",
             "canvasIsRasterizing": "La tela sta rasterizzando",
             "canvasIsCompositing": "La tela è in fase di composizione",
-            "canvasIsFiltering": "La tela sta filtrando",
-            "invoke": ""
+            "canvasIsFiltering": "La tela sta filtrando"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -1547,8 +1542,7 @@
         "inpainting": {
             "paragraphs": [
                 "Controlla quale area viene modificata, in base all'intensità di riduzione del rumore."
-            ],
-            "heading": ""
+            ]
         }
     },
     "sdxl": {
@@ -1852,8 +1846,7 @@
                 "model_size": "Dimensioni modello",
                 "model_size_large": "Grande",
                 "model_size_base": "Base",
-                "description": "Genera una mappa di profondità dal livello selezionato utilizzando un modello Depth Anything.",
-                "label": ""
+                "description": "Genera una mappa di profondità dal livello selezionato utilizzando un modello Depth Anything."
             },
             "color_map": {
                 "label": "Mappa colore",
@@ -2113,9 +2106,7 @@
         "positivePromptColumn": "'prompt' o 'positive_prompt'",
         "noTemplates": "Nessun modello",
         "acceptedColumnsKeys": "Colonne/chiavi accettate:",
-        "promptTemplateCleared": "Modello di prompt cancellato",
-        "nameColumn": "",
-        "negativePromptColumn": ""
+        "promptTemplateCleared": "Modello di prompt cancellato"
     },
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
