@@ -32,8 +32,8 @@ export const addImageToImage = async ({
   fp32,
 }: AddImageToImageArg): Promise<Invocation<'img_resize' | 'l2i' | 'flux_vae_decode'>> => {
   denoise.denoising_start = denoising_start;
-
-  const { image_name } = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
+  const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
+  const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, { is_intermediate: true });
 
   if (!isEqual(scaledSize, originalSize)) {
     // Resize the initial image to the scaled size, denoise, then resize back to the original size

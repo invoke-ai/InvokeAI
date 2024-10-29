@@ -68,12 +68,13 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
       metadata = selectCanvasMetadata(store.getState());
     }
 
-    const result = await withResultAsync(() =>
-      canvasManager.compositor.rasterizeAndUploadCompositeRasterLayer(rect, {
+    const result = await withResultAsync(() => {
+      const rasterAdapters = canvasManager.compositor.getVisibleAdaptersOfType('raster_layer');
+      return canvasManager.compositor.getCompositeImageDTO(rasterAdapters, rect, {
         is_intermediate: !saveToGallery,
         metadata,
-      })
-    );
+      });
+    });
 
     if (result.isOk()) {
       if (onSave) {

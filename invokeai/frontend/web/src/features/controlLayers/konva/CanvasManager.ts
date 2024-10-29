@@ -187,6 +187,18 @@ export class CanvasManager extends CanvasModuleBase {
     }
   };
 
+  getAdapters = (entityIdentifiers: CanvasEntityIdentifier[]): CanvasEntityAdapter[] => {
+    const adapters: CanvasEntityAdapter[] = [];
+    for (const entityIdentifier of entityIdentifiers) {
+      const adapter = this.getAdapter(entityIdentifier);
+      if (!adapter) {
+        continue;
+      }
+      adapters.push(adapter);
+    }
+    return adapters;
+  };
+
   getAllAdapters = (): CanvasEntityAdapter[] => {
     return [
       ...this.adapters.rasterLayers.values(),

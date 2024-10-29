@@ -45,8 +45,16 @@ export const addOutpaint = async ({
 
   const { bbox } = canvas;
 
-  const initialImage = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
-  const maskImage = await manager.compositor.getCompositeInpaintMaskImageDTO(bbox.rect);
+  const rasterAdapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
+  const initialImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, bbox.rect, {
+    is_intermediate: true,
+  });
+
+  const inpaintMaskAdapters = manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
+  const maskImage = await manager.compositor.getCompositeImageDTO(inpaintMaskAdapters, bbox.rect, {
+    is_intermediate: true,
+  });
+
   const infill = getInfill(g, params);
 
   if (!isEqual(scaledSize, originalSize)) {
