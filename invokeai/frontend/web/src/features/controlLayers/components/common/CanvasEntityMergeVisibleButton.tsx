@@ -7,7 +7,12 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityTypeCount } from 'features/controlLayers/hooks/useEntityTypeCount';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
-import { inpaintMaskAdded, rasterLayerAdded, rgAdded } from 'features/controlLayers/store/canvasSlice';
+import {
+  controlLayerAdded,
+  inpaintMaskAdded,
+  rasterLayerAdded,
+  rgAdded,
+} from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityType } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
@@ -101,6 +106,37 @@ const mergeRegionalGuidance = async (canvasManager: CanvasManager, dispatch: App
   toast({ title: t('controlLayers.mergeVisibleOk') });
 };
 
+const mergeControlLayers = async (canvasManager: CanvasManager, dispatch: AppDispatch) => {
+  const rect = canvasManager.stage.getVisibleRect('control_layer');
+  const adapters = canvasManager.compositor.getVisibleAdaptersOfType('control_layer');
+  const result = await withResultAsync(() =>
+    canvasManager.compositor.getCompositeImageDTO(
+      adapters,
+      rect,
+      { is_intermediate: true },
+      { globalCompositeOperation: 'lighter' }
+    )
+  );
+
+  if (result.isErr()) {
+    log.error({ error: serializeError(result.error) }, 'Failed to merge visible');
+    toast({ title: t('controlLayers.mergeVisibleError'), status: 'error' });
+    return;
+  }
+
+  dispatch(
+    controlLayerAdded({
+      isSelected: true,
+      overrides: {
+        objects: [imageDTOToImageObject(result.value)],
+        position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
+      },
+    })
+  );
+
+  toast({ title: t('controlLayers.mergeVisibleOk') });
+};
+
 export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -117,6 +153,9 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
         break;
       case 'regional_guidance':
         mergeRegionalGuidance(canvasManager, dispatch);
+        break;
+      case 'control_layer':
+        mergeControlLayers(canvasManager, dispatch);
         break;
       default:
         log.error({ type }, 'Unsupported type for merge visible');
