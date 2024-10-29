@@ -1,6 +1,6 @@
 import type { SerializableObject } from 'common/types';
 import { withResultAsync } from 'common/util/result';
-import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
+import type { CanvasEntityAdapter, CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import {
@@ -8,25 +8,38 @@ import {
   canvasToImageData,
   getImageDataTransparency,
   getPrefixedId,
+  getRectUnion,
   previewBlob,
 } from 'features/controlLayers/konva/util';
+import {
+  selectActiveControlLayerEntities,
+  selectActiveInpaintMaskEntities,
+  selectActiveRasterLayerEntities,
+  selectActiveRegionalGuidanceEntities,
+} from 'features/controlLayers/store/selectors';
 import type {
-  CanvasEntityState,
+  CanvasRenderableEntityIdentifier,
+  CanvasRenderableEntityState,
   CanvasRenderableEntityType,
   GenerationMode,
   Rect,
 } from 'features/controlLayers/store/types';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
+import { toast } from 'features/toast/toast';
+import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
+import { serializeError } from 'serialize-error';
 import type { UploadOptions } from 'services/api/endpoints/images';
 import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
-export type CompositingOptions = {
+type CompositingOptions = {
   /**
    * The global composite operation to use when compositing each entity.
    * See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
@@ -69,6 +82,53 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   }
 
   /**
+   * Gets the rect union of all visible entities of the given entity type. This is used for "merge visible".
+   *
+   * If no entity type is provided, all visible entities are included in the rect.
+   *
+   * @param type The optional entity type
+   * @returns The rect
+   */
+  getVisibleRectOfType = (type?: CanvasRenderableEntityType): Rect => {
+    const rects = [];
+
+    for (const adapter of this.manager.getAllAdapters()) {
+      if (!adapter.state.isEnabled) {
+        continue;
+      }
+      if (type && adapter.state.type !== type) {
+        continue;
+      }
+      if (adapter.renderer.hasObjects()) {
+        rects.push(adapter.transformer.getRelativeRect());
+      }
+    }
+
+    return getRectUnion(...rects);
+  };
+
+  /**
+   * Gets the rect union of the given entity adapters. This is used for "merge down" and "merge selected".
+   *
+   * Unlike `getVisibleRectOfType`, **disabled entities are included in the rect**, per the conventional behaviour of
+   * these merge methods.
+   *
+   * @param adapters The entity adapters to include in the rect
+   * @returns The rect
+   */
+  getRectOfAdapters = (adapters: CanvasEntityAdapter[]): Rect => {
+    const rects = [];
+
+    for (const adapter of adapters) {
+      if (adapter.renderer.hasObjects()) {
+        rects.push(adapter.transformer.getRelativeRect());
+      }
+    }
+
+    return getRectUnion(...rects);
+  };
+
+  /**
    * Gets all visible adapters for the given entity type. Visible adapters are those that are not disabled and have
    * objects to render. This is used for "merge visible" functionality and for calculating the generation mode.
    *
@@ -77,10 +137,8 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * @param type The entity type
    * @returns The adapters for the given entity type that are eligible to be included in a composite
    */
-  getVisibleAdaptersOfType = <T extends CanvasRenderableEntityType>(
-    type: T
-  ): Extract<CanvasEntityAdapter, { state: { type: T } }>[] => {
-    let entities: CanvasEntityState[];
+  getVisibleAdaptersOfType = <T extends CanvasRenderableEntityType>(type: T): CanvasEntityAdapterFromType<T>[] => {
+    let entities: CanvasRenderableEntityState[];
 
     switch (type) {
       case 'raster_layer':
@@ -109,7 +167,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       // Filter out adapters that are disabled or have no objects (and are thus not to be included in the composite)
       .filter((adapter) => !adapter.$isDisabled.get() && adapter.renderer.hasObjects());
 
-    return adapters as Extract<CanvasEntityAdapter, { state: { type: T } }>[];
+    return adapters as CanvasEntityAdapterFromType<T>[];
   };
 
   getCompositeHash = (adapters: CanvasEntityAdapter[], extra: SerializableObject): string => {
@@ -249,6 +307,105 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     imageDTO = uploadResult.value;
     this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
     return imageDTO;
+  };
+
+  /**
+   * Creates a merged composite image from the given entities. The entities are drawn in the order they are provided.
+   *
+   * The merged image is uploaded to the server and a new entity is created with the uploaded image as the only object.
+   *
+   * All entities must have the same type.
+   *
+   * @param entityIdentifiers The entity identifiers to merge
+   * @returns A promise that resolves to the image DTO, or null if the merge failed
+   */
+  mergeByEntityIdentifiers = async <T extends CanvasRenderableEntityIdentifier>(
+    entityIdentifiers: T[]
+  ): Promise<ImageDTO | null> => {
+    if (entityIdentifiers.length <= 1) {
+      this.log.warn({ entityIdentifiers }, 'Cannot merge less than 2 entities');
+      return null;
+    }
+    const type = entityIdentifiers[0]?.type;
+    assert(type, 'Cannot merge entities with no type (this should never happen)');
+    const adapters = this.manager.getAdapters(entityIdentifiers);
+    const rect = this.getRectOfAdapters(adapters);
+
+    const compositingOptions: CompositingOptions = {
+      globalCompositeOperation: type === 'control_layer' ? 'lighter' : undefined,
+    };
+
+    const result = await withResultAsync(() =>
+      this.getCompositeImageDTO(adapters, rect, { is_intermediate: true }, compositingOptions)
+    );
+
+    if (result.isErr()) {
+      this.log.error({ error: serializeError(result.error) }, 'Failed to merge selected entities');
+      toast({ title: t('controlLayers.mergeVisibleError'), status: 'error' });
+      return null;
+    }
+
+    // All layer types have the same arg - create a new entity with the image as the only object, positioned at the
+    // top left corner of the visible rect for the given entity type.
+    const addEntityArg = {
+      isSelected: true,
+      overrides: {
+        objects: [imageDTOToImageObject(result.value)],
+        position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
+      },
+    };
+
+    switch (type) {
+      case 'raster_layer':
+        this.manager.stateApi.addRasterLayer(addEntityArg);
+        break;
+      case 'inpaint_mask':
+        this.manager.stateApi.addInpaintMask(addEntityArg);
+        break;
+      case 'regional_guidance':
+        this.manager.stateApi.addRegionalGuidance(addEntityArg);
+        break;
+      case 'control_layer':
+        this.manager.stateApi.addControlLayer(addEntityArg);
+        break;
+      default:
+        assert<Equals<typeof type, never>>(false, 'Unsupported type for merge');
+    }
+
+    toast({ title: t('controlLayers.mergeVisibleOk') });
+
+    return result.value;
+  };
+
+  /**
+   * Merges all visible entities of the given type. This is used for "merge visible" functionality.
+   *
+   * @param type The type of entity to merge
+   * @returns A promise that resolves to the image DTO, or null if the merge failed
+   */
+  mergeVisibleOfType = (type: CanvasRenderableEntityType): Promise<ImageDTO | null> => {
+    let entities: CanvasRenderableEntityState[];
+
+    switch (type) {
+      case 'raster_layer':
+        entities = this.manager.stateApi.runSelector(selectActiveRasterLayerEntities);
+        break;
+      case 'inpaint_mask':
+        entities = this.manager.stateApi.runSelector(selectActiveInpaintMaskEntities);
+        break;
+      case 'regional_guidance':
+        entities = this.manager.stateApi.runSelector(selectActiveRegionalGuidanceEntities);
+        break;
+      case 'control_layer':
+        entities = this.manager.stateApi.runSelector(selectActiveControlLayerEntities);
+        break;
+      default:
+        assert<Equals<typeof type, never>>(false, 'Unsupported type for merge');
+    }
+
+    const entityIdentifiers = entities.map(getEntityIdentifier);
+
+    return this.mergeByEntityIdentifiers(entityIdentifiers);
   };
 
   /**

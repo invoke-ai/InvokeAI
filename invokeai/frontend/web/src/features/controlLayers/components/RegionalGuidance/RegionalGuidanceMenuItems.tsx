@@ -4,6 +4,7 @@ import { CanvasEntityMenuItemsArrange } from 'features/controlLayers/components/
 import { CanvasEntityMenuItemsCropToBbox } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCropToBbox';
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
+import { CanvasEntityMenuItemsMergeDown } from 'features/controlLayers/components/common/CanvasEntityMenuItemsMergeDown';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
 import { RegionalGuidanceMenuItemsAddPromptsAndIPAdapter } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItemsAddPromptsAndIPAdapter';
 import { RegionalGuidanceMenuItemsAutoNegative } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItemsAutoNegative';
@@ -25,6 +26,7 @@ export const RegionalGuidanceMenuItems = memo(() => {
       <CanvasEntityMenuItemsTransform />
       <RegionalGuidanceMenuItemsAutoNegative />
       <MenuDivider />
+      <CanvasEntityMenuItemsMergeDown />
       <RegionalGuidanceMenuItemsCopyToSubMenu />
       <RegionalGuidanceMenuItemsConvertToSubMenu />
       <CanvasEntityMenuItemsCropToBbox />

@@ -47,7 +47,7 @@ import type {
   Rect,
   RgbaColor,
 } from 'features/controlLayers/store/types';
-import { RGBA_BLACK } from 'features/controlLayers/store/types';
+import { isRenderableEntityIdentifier, RGBA_BLACK } from 'features/controlLayers/store/types';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -583,10 +583,13 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   getSelectedEntityAdapter = (): CanvasEntityAdapter | null => {
     const state = this.getCanvasState();
-    if (state.selectedEntityIdentifier) {
-      return this.manager.getAdapter(state.selectedEntityIdentifier);
+    if (!state.selectedEntityIdentifier) {
+      return null;
     }
-    return null;
+    if (!isRenderableEntityIdentifier(state.selectedEntityIdentifier)) {
+      return null;
+    }
+    return this.manager.getAdapter(state.selectedEntityIdentifier);
   };
 
   /**
