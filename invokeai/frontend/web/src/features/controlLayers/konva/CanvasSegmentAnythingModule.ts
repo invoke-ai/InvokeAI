@@ -676,9 +676,6 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
     this.log.trace('Applying');
 
-    // Commit the buffer, which will move the buffer to from the layers' buffer renderer to its main renderer
-    this.parent.bufferRenderer.commitBuffer();
-
     // Rasterize the entity, this time replacing the objects with the masked image
     const rect = this.parent.transformer.getRelativeRect();
     this.manager.stateApi.rasterizeEntity({
@@ -706,9 +703,6 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       return;
     }
     this.log.trace(`Saving as ${type}`);
-
-    // Clear the buffer - we are creating a new entity, so we don't want to keep the old one
-    this.parent.bufferRenderer.clearBuffer();
 
     // Create the new entity with the masked image as its only object
     const rect = this.parent.transformer.getRelativeRect();
@@ -820,10 +814,6 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     // Reset non-ephemeral konva nodes
     this.konva.compositingRect.visible(false);
     this.konva.maskGroup.clearCache();
-
-    // The parent module's buffer should be reset & forcibly sync the cache
-    this.parent.bufferRenderer.clearBuffer();
-    this.parent.renderer.syncKonvaCache(true);
   };
 
   /**
