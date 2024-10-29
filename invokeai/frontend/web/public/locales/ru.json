@@ -2057,14 +2057,6 @@
         }
     },
     "whatsNew": {
-        "canvasV2Announcement": {
-            "newLayerTypes": "Новые типы слоев для еще большего контроля",
-            "readReleaseNotes": "Прочитать информацию о выпуске",
-            "watchReleaseVideo": "Смотреть видео о выпуске",
-            "fluxSupport": "Поддержка семейства моделей Flux",
-            "newCanvas": "Новый мощный холст управления",
-            "watchUiUpdatesOverview": "Обзор обновлений пользовательского интерфейса"
-        },
         "whatsNewInInvoke": "Что нового в Invoke"
     },
     "newUserExperience": {

@@ -1342,15 +1342,7 @@
         "enableLogging": "Protokollierung aktivieren"
     },
     "whatsNew": {
-        "whatsNewInInvoke": "Was gibt's Neues",
-        "canvasV2Announcement": {
-            "fluxSupport": "Unterstützung für Flux-Modelle",
-            "newCanvas": "Eine leistungsstarke neue Kontrollfläche",
-            "newLayerTypes": "Neue Ebenentypen für noch mehr Kontrolle",
-            "readReleaseNotes": "Anmerkungen zu dieser Version lesen",
-            "watchReleaseVideo": "Video über diese Version anzeigen",
-            "watchUiUpdatesOverview": "Interface-Updates Übersicht"
-        }
+        "whatsNewInInvoke": "Was gibt's Neues"
     },
     "stylePresets": {
         "name": "Name",
