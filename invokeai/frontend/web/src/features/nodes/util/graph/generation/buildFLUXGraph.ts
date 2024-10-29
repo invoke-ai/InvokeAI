@@ -34,7 +34,7 @@ export const buildFLUXGraph = async (
   state: RootState,
   manager: CanvasManager
 ): Promise<{ g: Graph; noise: Invocation<'noise' | 'flux_denoise'>; posCond: Invocation<'flux_text_encoder'> }> => {
-  const generationMode = manager.compositor.getGenerationMode();
+  const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building FLUX graph');
 
   const params = selectParamsSlice(state);

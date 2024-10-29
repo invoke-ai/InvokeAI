@@ -37,7 +37,7 @@ export const buildSD1Graph = async (
   state: RootState,
   manager: CanvasManager
 ): Promise<{ g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'compel'> }> => {
-  const generationMode = manager.compositor.getGenerationMode();
+  const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SD1/SD2 graph');
 
   const params = selectParamsSlice(state);
