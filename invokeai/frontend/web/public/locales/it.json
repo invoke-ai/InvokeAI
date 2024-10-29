@@ -94,9 +94,9 @@
         "view": "Vista",
         "close": "Chiudi",
         "clipboard": "Appunti",
-        "inpaint": "ridipingi",
+        "inpaint": "",
         "ok": "Ok",
-        "outpaint": "ridipingi di più"
+        "outpaint": ""
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -178,7 +178,7 @@
             "title": "Applicazione",
             "invoke": {
                 "desc": "Metti in coda una generazione, aggiungendola alla fine della coda.",
-                "title": "Invoke"
+                "title": ""
             },
             "invokeFront": {
                 "title": "Invoke (Fronte)",
@@ -598,10 +598,10 @@
         "restoreDefaultSettings": "Fare clic per utilizzare le impostazioni predefinite del modello.",
         "usingDefaultSettings": "Utilizzo delle impostazioni predefinite del modello",
         "huggingFace": "HuggingFace",
-        "hfToken": "Gettone HuggingFace",
-        "huggingFaceRepoID": "ID repository HuggingFace",
-        "clipEmbed": "Incorpora CLIP",
-        "t5Encoder": "Codifica T5"
+        "hfToken": "",
+        "huggingFaceRepoID": "HuggingFace Repository ID",
+        "clipEmbed": "CLIP Embed",
+        "t5Encoder": "T5 Encoder"
     },
     "parameters": {
         "images": "Immagini",
@@ -679,7 +679,7 @@
             "canvasIsRasterizing": "La tela sta rasterizzando",
             "canvasIsCompositing": "La tela è in fase di composizione",
             "canvasIsFiltering": "La tela sta filtrando",
-            "invoke": "Invoke"
+            "invoke": ""
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -1153,7 +1153,7 @@
                 "Scegli quanti livelli del modello CLIP saltare.",
                 "Alcuni modelli funzionano meglio con determinate impostazioni di CLIP Skip."
             ],
-            "heading": "Salta CLIP"
+            "heading": "CLIP Skip"
         },
         "compositingCoherencePass": {
             "heading": "Passaggio di Coerenza",
@@ -1548,7 +1548,7 @@
             "paragraphs": [
                 "Controlla quale area viene modificata, in base all'intensità di riduzione del rumore."
             ],
-            "heading": "Ripittura"
+            "heading": ""
         }
     },
     "sdxl": {
@@ -1598,8 +1598,8 @@
         "recallParameter": "Richiama {{label}}",
         "canvasV2Metadata": "Tela",
         "guidance": "Guida",
-        "seamlessXAxis": "Asse X senza soluzione di continuità",
-        "seamlessYAxis": "Asse Y senza soluzione di continuità",
+        "seamlessXAxis": "Asse X senza giunte",
+        "seamlessYAxis": "Asse Y senza giunte",
         "vae": "VAE"
     },
     "hrf": {
@@ -1853,7 +1853,7 @@
                 "model_size_large": "Grande",
                 "model_size_base": "Base",
                 "description": "Genera una mappa di profondità dal livello selezionato utilizzando un modello Depth Anything.",
-                "label": "Qualsiasi profondità"
+                "label": ""
             },
             "color_map": {
                 "label": "Mappa colore",
@@ -2114,8 +2114,8 @@
         "noTemplates": "Nessun modello",
         "acceptedColumnsKeys": "Colonne/chiavi accettate:",
         "promptTemplateCleared": "Modello di prompt cancellato",
-        "nameColumn": "'nome'",
-        "negativePromptColumn": "'prompot_negativo'"
+        "nameColumn": "",
+        "negativePromptColumn": ""
     },
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
@@ -2126,7 +2126,13 @@
         "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
     },
     "whatsNew": {
-        "whatsNewInInvoke": "Novità in Invoke"
+        "whatsNewInInvoke": "Novità in Invoke",
+        "line2": "Supporto Flux esteso, ora con immagini di riferimento globali",
+        "line3": "Tooltip e menu contestuali migliorati",
+        "readReleaseNotes": "Leggi le note di rilascio",
+        "watchRecentReleaseVideos": "Guarda i video su questa versione",
+        "line1": "Strumento <ItalicComponent>Seleziona oggetto</ItalicComponent> per la selezione e la modifica precise degli oggetti",
+        "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia"
     },
     "system": {
         "logLevel": {
