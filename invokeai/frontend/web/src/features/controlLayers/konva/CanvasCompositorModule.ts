@@ -26,7 +26,7 @@ import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
-type CompositingOptions = {
+export type CompositingOptions = {
   /**
    * The global composite operation to use when compositing each entity.
    * See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
