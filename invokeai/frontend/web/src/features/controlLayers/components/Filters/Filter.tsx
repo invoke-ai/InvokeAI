@@ -36,7 +36,7 @@ const FilterContent = memo(
     const config = useStore(adapter.filterer.$filterConfig);
     const isCanvasFocused = useIsRegionFocused('canvas');
     const isProcessing = useStore(adapter.filterer.$isProcessing);
-    const hasProcessed = useStore(adapter.filterer.$hasProcessed);
+    const hasImageState = useStore(adapter.filterer.$hasImageState);
     const autoProcess = useAppSelector(selectAutoProcess);
 
     const onChangeFilterConfig = useCallback(
@@ -118,7 +118,7 @@ const FilterContent = memo(
             variant="ghost"
             onClick={adapter.filterer.processImmediate}
             loadingText={t('controlLayers.filter.process')}
-            isDisabled={isProcessing || !isValid || autoProcess}
+            isDisabled={isProcessing || !isValid || (autoProcess && hasImageState)}
           >
             {t('controlLayers.filter.process')}
             {isProcessing && <Spinner ms={3} boxSize={5} color="base.600" />}
@@ -136,7 +136,7 @@ const FilterContent = memo(
             onClick={adapter.filterer.apply}
             loadingText={t('controlLayers.filter.apply')}
             variant="ghost"
-            isDisabled={isProcessing || !isValid || !hasProcessed}
+            isDisabled={isProcessing || !isValid || !hasImageState}
           >
             {t('controlLayers.filter.apply')}
           </Button>
@@ -145,22 +145,22 @@ const FilterContent = memo(
               as={Button}
               loadingText={t('controlLayers.selectObject.saveAs')}
               variant="ghost"
-              isDisabled={isProcessing || !isValid || !hasProcessed}
+              isDisabled={isProcessing || !isValid || !hasImageState}
               rightIcon={<PiCaretDownBold />}
             >
               {t('controlLayers.selectObject.saveAs')}
             </MenuButton>
             <MenuList>
-              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsInpaintMask}>
+              <MenuItem isDisabled={isProcessing || !isValid || !hasImageState} onClick={saveAsInpaintMask}>
                 {t('controlLayers.newInpaintMask')}
               </MenuItem>
-              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsRegionalGuidance}>
+              <MenuItem isDisabled={isProcessing || !isValid || !hasImageState} onClick={saveAsRegionalGuidance}>
                 {t('controlLayers.newRegionalGuidance')}
               </MenuItem>
-              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsControlLayer}>
+              <MenuItem isDisabled={isProcessing || !isValid || !hasImageState} onClick={saveAsControlLayer}>
                 {t('controlLayers.newControlLayer')}
               </MenuItem>
-              <MenuItem isDisabled={!isValid || !hasProcessed} onClick={saveAsRasterLayer}>
+              <MenuItem isDisabled={isProcessing || !isValid || !hasImageState} onClick={saveAsRasterLayer}>
                 {t('controlLayers.newRasterLayer')}
               </MenuItem>
             </MenuList>
