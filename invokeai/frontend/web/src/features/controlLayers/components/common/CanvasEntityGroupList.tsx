@@ -25,7 +25,10 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
   const title = useEntityTypeTitle(type);
   const informationalPopoverFeature = useEntityTypeInformationalPopover(type);
   const collapse = useBoolean(true);
-  const canMergeVisible = useMemo(() => type === 'raster_layer' || type === 'inpaint_mask', [type]);
+  const canMergeVisible = useMemo(
+    () => type === 'raster_layer' || type === 'inpaint_mask' || type === 'regional_guidance',
+    [type]
+  );
   const canHideAll = useMemo(() => type !== 'reference_image', [type]);
 
   return (
