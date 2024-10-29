@@ -2126,14 +2126,6 @@
         "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
     },
     "whatsNew": {
-        "canvasV2Announcement": {
-            "readReleaseNotes": "Leggi le Note di Rilascio",
-            "fluxSupport": "Supporto per la famiglia di modelli Flux",
-            "newCanvas": "Una nuova potente tela di controllo",
-            "watchReleaseVideo": "Guarda il video di rilascio",
-            "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
-            "newLayerTypes": "Nuovi tipi di livello per un miglior controllo"
-        },
         "whatsNewInInvoke": "Novità in Invoke"
     },
     "system": {

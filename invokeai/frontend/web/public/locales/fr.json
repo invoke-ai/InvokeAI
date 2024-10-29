@@ -1682,14 +1682,6 @@
         "delete": "Supprimer"
     },
     "whatsNew": {
-        "canvasV2Announcement": {
-            "watchReleaseVideo": "Regarder la vidéo de lancement",
-            "newLayerTypes": "Nouveaux types de couches pour un contrôle encore plus précis",
-            "fluxSupport": "Support pour la famille de modèles Flux",
-            "readReleaseNotes": "Lire les notes de version",
-            "newCanvas": "Une nouvelle Toile de contrôle puissant",
-            "watchUiUpdatesOverview": "Regarder l'aperçu des mises à jour de l'UI"
-        },
         "whatsNewInInvoke": "Quoi de neuf dans Invoke"
     },
     "ui": {
