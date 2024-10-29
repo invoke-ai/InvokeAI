@@ -97,7 +97,10 @@ export abstract class CanvasEntityAdapterBase<
   abstract getCanvas: (rect?: Rect) => HTMLCanvasElement;
 
   /**
-   * Gets a hashable representation of the entity's state.
+   * Gets a hashable representation of the entity's _renderable_ state. This should exclude any properties that are not
+   * relevant to rendering the entity.
+   *
+   * This is used for caching.
    */
   abstract getHashableState: () => SerializableObject;
 
