@@ -51,7 +51,9 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
 
   const saveCanvas = useCallback(async () => {
     const rect =
-      region === 'bbox' ? canvasManager.stateApi.getBbox().rect : canvasManager.stage.getVisibleRect('raster_layer');
+      region === 'bbox'
+        ? canvasManager.stateApi.getBbox().rect
+        : canvasManager.compositor.getVisibleRectOfType('raster_layer');
 
     if (rect.width === 0 || rect.height === 0) {
       toast({
@@ -87,7 +89,6 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
     }
   }, [
     canvasManager.compositor,
-    canvasManager.stage,
     canvasManager.stateApi,
     onSave,
     region,

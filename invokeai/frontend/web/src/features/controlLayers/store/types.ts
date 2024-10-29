@@ -348,7 +348,7 @@ export const zCanvasEntityIdentifer = z.object({
   type: zCanvasEntityType,
 });
 export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
-
+export type CanvasRenderableEntityIdentifier = CanvasEntityIdentifier<CanvasRenderableEntityType>;
 export type LoRA = {
   id: string;
   isEnabled: boolean;
@@ -536,6 +536,12 @@ export function isSaveableEntityIdentifier(
 
 export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {
   return isRenderableEntityType(entity.type);
+}
+
+export function isRenderableEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasRenderableEntityIdentifier {
+  return isRenderableEntityType(entityIdentifier.type);
 }
 
 export const getEntityIdentifier = <T extends CanvasEntityType>(

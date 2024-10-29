@@ -4,6 +4,7 @@ import { CanvasEntityMenuItemsArrange } from 'features/controlLayers/components/
 import { CanvasEntityMenuItemsCropToBbox } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCropToBbox';
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
+import { CanvasEntityMenuItemsMergeDown } from 'features/controlLayers/components/common/CanvasEntityMenuItemsMergeDown';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
 import { InpaintMaskMenuItemsConvertToSubMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsConvertToSubMenu';
 import { InpaintMaskMenuItemsCopyToSubMenu } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItemsCopyToSubMenu';
@@ -20,6 +21,7 @@ export const InpaintMaskMenuItems = memo(() => {
       <MenuDivider />
       <CanvasEntityMenuItemsTransform />
       <MenuDivider />
+      <CanvasEntityMenuItemsMergeDown />
       <InpaintMaskMenuItemsCopyToSubMenu />
       <InpaintMaskMenuItemsConvertToSubMenu />
       <CanvasEntityMenuItemsCropToBbox />
