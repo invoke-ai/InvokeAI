@@ -5,6 +5,7 @@ import { CanvasEntityMenuItemsCropToBbox } from 'features/controlLayers/componen
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
 import { CanvasEntityMenuItemsMergeDown } from 'features/controlLayers/components/common/CanvasEntityMenuItemsMergeDown';
+import { CanvasEntityMenuItemsSave } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSave';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
 import { RegionalGuidanceMenuItemsAddPromptsAndIPAdapter } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItemsAddPromptsAndIPAdapter';
 import { RegionalGuidanceMenuItemsAutoNegative } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItemsAutoNegative';
@@ -30,6 +31,7 @@ export const RegionalGuidanceMenuItems = memo(() => {
       <RegionalGuidanceMenuItemsCopyToSubMenu />
       <RegionalGuidanceMenuItemsConvertToSubMenu />
       <CanvasEntityMenuItemsCropToBbox />
+      <CanvasEntityMenuItemsSave />
     </>
   );
 });
