@@ -856,7 +856,6 @@
         "width": "Breite",
         "createdBy": "Erstellt von",
         "steps": "Schritte",
-        "seamless": "Nahtlos",
         "positivePrompt": "Positiver Prompt",
         "generationMode": "Generierungsmodus",
         "Threshold": "Rauschen-Schwelle",

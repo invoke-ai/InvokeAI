@@ -1556,7 +1556,6 @@
         "refinerSteps": "Passi Affinamento"
     },
     "metadata": {
-        "seamless": "Senza giunture",
         "positivePrompt": "Prompt positivo",
         "negativePrompt": "Prompt negativo",
         "generationMode": "Modalità generazione",

@@ -665,7 +665,6 @@
         }
     },
     "metadata": {
-        "seamless": "Naadloos",
         "positivePrompt": "Positieve prompt",
         "negativePrompt": "Negatieve prompt",
         "generationMode": "Genereermodus",
