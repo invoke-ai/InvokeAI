@@ -725,7 +725,6 @@
         "workflow": "工作流",
         "steps": "步数",
         "scheduler": "调度器",
-        "seamless": "无缝",
         "recallParameters": "召回参数",
         "noRecallParameters": "未找到要召回的参数",
         "vae": "VAE",

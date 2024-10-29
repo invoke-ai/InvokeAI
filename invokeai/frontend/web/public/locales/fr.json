@@ -1436,7 +1436,6 @@
         "positivePrompt": "Prompt Positif",
         "allPrompts": "Tous les Prompts",
         "negativePrompt": "Prompt Négatif",
-        "seamless": "Sans jointure",
         "metadata": "Métadonné",
         "scheduler": "Planificateur",
         "imageDetails": "Détails de l'Image",
