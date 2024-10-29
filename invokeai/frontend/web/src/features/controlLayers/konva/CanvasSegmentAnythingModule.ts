@@ -705,6 +705,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
     this.log.trace(`Saving as ${type}`);
 
+    // Have the parent adopt the image module - this prevents a flash of the original layer content before the
+    // segmented image is rendered
+    if (this.imageModule) {
+      this.parent.renderer.adoptObjectRenderer(this.imageModule);
+    }
+
     // Create the new entity with the masked image as its only object
     const rect = this.parent.transformer.getRelativeRect();
     const arg = {
@@ -796,7 +802,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     for (const point of this.$points.get()) {
       point.konva.circle.destroy();
     }
-    if (this.imageModule) {
+
+    // If the image module exists, and is a child of the group, destroy it. It might not be a child of the group if
+    // the user has applied the segmented image and the image has been adopted by the parent entity.
+    if (this.imageModule && this.imageModule.konva.group.parent === this.konva.group) {
       this.imageModule.destroy();
       this.imageModule = null;
     }
