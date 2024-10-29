@@ -123,16 +123,10 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasRasterLayerState>;
           isSelected?: boolean;
-          isMergingVisible?: boolean;
         }>
       ) => {
-        const { id, overrides, isSelected, isMergingVisible } = action.payload;
+        const { id, overrides, isSelected } = action.payload;
         const entityState = getRasterLayerState(id, overrides);
-
-        if (isMergingVisible) {
-          // When merging visible, we delete all disabled layers
-          state.rasterLayers.entities = state.rasterLayers.entities.filter((layer) => !layer.isEnabled);
-        }
 
         state.rasterLayers.entities.push(entityState);
 
@@ -140,11 +134,7 @@ export const canvasSlice = createSlice({
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
-      prepare: (payload: {
-        overrides?: Partial<CanvasRasterLayerState>;
-        isSelected?: boolean;
-        isMergingVisible?: boolean;
-      }) => ({
+      prepare: (payload: { overrides?: Partial<CanvasRasterLayerState>; isSelected?: boolean }) => ({
         payload: { ...payload, id: getPrefixedId('raster_layer') },
       }),
     },
@@ -822,17 +812,11 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasInpaintMaskState>;
           isSelected?: boolean;
-          isMergingVisible?: boolean;
         }>
       ) => {
-        const { id, overrides, isSelected, isMergingVisible } = action.payload;
+        const { id, overrides, isSelected } = action.payload;
 
         const entityState = getInpaintMaskState(id, overrides);
-
-        if (isMergingVisible) {
-          // When merging visible, we delete all disabled layers
-          state.inpaintMasks.entities = state.inpaintMasks.entities.filter((layer) => !layer.isEnabled);
-        }
 
         state.inpaintMasks.entities.push(entityState);
 
@@ -840,11 +824,7 @@ export const canvasSlice = createSlice({
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
-      prepare: (payload?: {
-        overrides?: Partial<CanvasInpaintMaskState>;
-        isSelected?: boolean;
-        isMergingVisible?: boolean;
-      }) => ({
+      prepare: (payload?: { overrides?: Partial<CanvasInpaintMaskState>; isSelected?: boolean }) => ({
         payload: { ...payload, id: getPrefixedId('inpaint_mask') },
       }),
     },
