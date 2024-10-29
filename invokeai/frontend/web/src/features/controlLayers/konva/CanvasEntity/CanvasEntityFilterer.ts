@@ -228,8 +228,11 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       this.log.warn('No image state to apply filter to');
       return;
     }
-    this.log.trace('Applying filter');
-    this.parent.bufferRenderer.commitBuffer();
+    this.log.trace(`Saving as ${type}`);
+
+    // Clear the buffer - we are creating a new entity, so we don't want to keep the old one
+    this.parent.bufferRenderer.clearBuffer();
+
     const rect = this.parent.transformer.getRelativeRect();
     const arg = {
       overrides: {
