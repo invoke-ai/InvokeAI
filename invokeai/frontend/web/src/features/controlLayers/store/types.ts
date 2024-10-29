@@ -466,7 +466,7 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
-function isRenderableEntityType(
+export function isRenderableEntityType(
   entityType: CanvasEntityState['type']
 ): entityType is CanvasRenderableEntityState['type'] {
   return (

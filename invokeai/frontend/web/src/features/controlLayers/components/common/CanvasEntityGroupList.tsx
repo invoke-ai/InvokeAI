@@ -7,7 +7,7 @@ import { CanvasEntityMergeVisibleButton } from 'features/controlLayers/component
 import { CanvasEntityTypeIsHiddenToggle } from 'features/controlLayers/components/common/CanvasEntityTypeIsHiddenToggle';
 import { useEntityTypeInformationalPopover } from 'features/controlLayers/hooks/useEntityTypeInformationalPopover';
 import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTitle';
-import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import { type CanvasEntityIdentifier, isRenderableEntityType } from 'features/controlLayers/store/types';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 import { PiCaretDownBold } from 'react-icons/pi';
@@ -74,8 +74,8 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
 
           <Spacer />
         </Flex>
-        {type !== 'reference_image' && <CanvasEntityMergeVisibleButton type={type} />}
-        {type !== 'reference_image' && <CanvasEntityTypeIsHiddenToggle type={type} />}
+        {isRenderableEntityType(type) && <CanvasEntityMergeVisibleButton type={type} />}
+        {isRenderableEntityType(type) && <CanvasEntityTypeIsHiddenToggle type={type} />}
         <CanvasEntityAddOfTypeButton type={type} />
       </Flex>
       <Collapse in={collapse.isTrue}>
