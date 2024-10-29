@@ -416,6 +416,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.$initialFilterConfig.set(null);
     this.konva.group.remove();
     this.unsubscribe();
+    this.$isFiltering.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
   };
 
