@@ -332,6 +332,7 @@ const zCanvasRenderableEntityState = z.discriminatedUnion('type', [
   zCanvasInpaintMaskState,
 ]);
 export type CanvasRenderableEntityState = z.infer<typeof zCanvasRenderableEntityState>;
+export type CanvasRenderableEntityType = CanvasRenderableEntityState['type'];
 
 const zCanvasEntityType = z.union([
   zCanvasRasterLayerState.shape.type,
