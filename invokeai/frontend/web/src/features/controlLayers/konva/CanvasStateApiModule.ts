@@ -293,6 +293,8 @@ export class CanvasStateApiModule extends CanvasModuleBase {
       },
     };
 
+    let didSuceed = false;
+
     /**
      * If a timeout is provided, we will cancel the graph if it takes too long - but we need a way to clear the timeout
      * if the graph completes or errors before the timeout.
@@ -343,6 +345,8 @@ export class CanvasStateApiModule extends CanvasModuleBase {
           reject(getImageDTOResult.error);
           return;
         }
+
+        didSuceed = true;
 
         // Ok!
         resolve(getImageDTOResult.value);
@@ -434,6 +438,10 @@ export class CanvasStateApiModule extends CanvasModuleBase {
 
       if (timeout) {
         timeoutId = window.setTimeout(() => {
+          if (didSuceed) {
+            // If we already succeeded, we don't need to do anything
+            return;
+          }
           this.log.trace('Graph canceled by timeout');
           clearListeners();
           cancelGraph();
@@ -443,6 +451,10 @@ export class CanvasStateApiModule extends CanvasModuleBase {
 
       if (signal) {
         signal.addEventListener('abort', () => {
+          if (didSuceed) {
+            // If we already succeeded, we don't need to do anything
+            return;
+          }
           this.log.trace('Graph canceled by signal');
           _clearTimeout();
           clearListeners();
