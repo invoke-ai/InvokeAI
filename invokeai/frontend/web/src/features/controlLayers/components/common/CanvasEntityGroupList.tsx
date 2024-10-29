@@ -9,7 +9,7 @@ import { useEntityTypeInformationalPopover } from 'features/controlLayers/hooks/
 import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTitle';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { PropsWithChildren } from 'react';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import { PiCaretDownBold } from 'react-icons/pi';
 
 type Props = PropsWithChildren<{
@@ -25,11 +25,6 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
   const title = useEntityTypeTitle(type);
   const informationalPopoverFeature = useEntityTypeInformationalPopover(type);
   const collapse = useBoolean(true);
-  const canMergeVisible = useMemo(
-    () => type === 'raster_layer' || type === 'inpaint_mask' || type === 'regional_guidance',
-    [type]
-  );
-  const canHideAll = useMemo(() => type !== 'reference_image', [type]);
 
   return (
     <Flex flexDir="column" w="full">
@@ -79,8 +74,8 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
 
           <Spacer />
         </Flex>
-        {canMergeVisible && <CanvasEntityMergeVisibleButton type={type} />}
-        {canHideAll && <CanvasEntityTypeIsHiddenToggle type={type} />}
+        {type !== 'reference_image' && <CanvasEntityMergeVisibleButton type={type} />}
+        {type !== 'reference_image' && <CanvasEntityTypeIsHiddenToggle type={type} />}
         <CanvasEntityAddOfTypeButton type={type} />
       </Flex>
       <Collapse in={collapse.isTrue}>
