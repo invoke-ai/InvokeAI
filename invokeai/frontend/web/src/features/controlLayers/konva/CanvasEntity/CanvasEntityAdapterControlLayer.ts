@@ -78,7 +78,7 @@ export class CanvasEntityAdapterControlLayer extends CanvasEntityAdapterBase<
   };
 
   getHashableState = (): SerializableObject => {
-    const keysToOmit: (keyof CanvasControlLayerState)[] = ['name', 'controlAdapter', 'withTransparencyEffect'];
+    const keysToOmit: (keyof CanvasControlLayerState)[] = ['name', 'controlAdapter', 'withTransparencyEffect', 'isLocked'];
     return omit(this.state, keysToOmit);
   };
 }
