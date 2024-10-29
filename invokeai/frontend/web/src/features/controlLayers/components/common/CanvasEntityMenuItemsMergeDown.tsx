@@ -18,7 +18,7 @@ export const CanvasEntityMenuItemsMergeDown = memo(() => {
     if (entityIdentifierBelowThisOne === null) {
       return;
     }
-    canvasManager.compositor.mergeByEntityIdentifiers([entityIdentifierBelowThisOne, entityIdentifier]);
+    canvasManager.compositor.mergeByEntityIdentifiers([entityIdentifierBelowThisOne, entityIdentifier], true);
   }, [canvasManager.compositor, entityIdentifier, entityIdentifierBelowThisOne]);
 
   return (
