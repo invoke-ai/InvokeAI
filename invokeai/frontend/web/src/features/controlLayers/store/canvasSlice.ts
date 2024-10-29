@@ -123,18 +123,29 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasRasterLayerState>;
           isSelected?: boolean;
+          mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected } = action.payload;
+        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
         const entityState = getRasterLayerState(id, overrides);
 
         state.rasterLayers.entities.push(entityState);
 
-        if (isSelected) {
+        if (mergedEntitiesToDelete.length > 0) {
+          state.rasterLayers.entities = state.rasterLayers.entities.filter(
+            (entity) => !mergedEntitiesToDelete.includes(entity.id)
+          );
+        }
+
+        if (isSelected || mergedEntitiesToDelete.length > 0) {
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
-      prepare: (payload: { overrides?: Partial<CanvasRasterLayerState>; isSelected?: boolean }) => ({
+      prepare: (payload: {
+        overrides?: Partial<CanvasRasterLayerState>;
+        isSelected?: boolean;
+        mergedEntitiesToDelete?: string[];
+      }) => ({
         payload: { ...payload, id: getPrefixedId('raster_layer') },
       }),
     },
@@ -261,19 +272,34 @@ export const canvasSlice = createSlice({
     controlLayerAdded: {
       reducer: (
         state,
-        action: PayloadAction<{ id: string; overrides?: Partial<CanvasControlLayerState>; isSelected?: boolean }>
+        action: PayloadAction<{
+          id: string;
+          overrides?: Partial<CanvasControlLayerState>;
+          isSelected?: boolean;
+          mergedEntitiesToDelete?: string[];
+        }>
       ) => {
-        const { id, overrides, isSelected } = action.payload;
+        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getControlLayerState(id, overrides);
 
         state.controlLayers.entities.push(entityState);
 
-        if (isSelected) {
+        if (mergedEntitiesToDelete.length > 0) {
+          state.controlLayers.entities = state.controlLayers.entities.filter(
+            (entity) => !mergedEntitiesToDelete.includes(entity.id)
+          );
+        }
+
+        if (isSelected || mergedEntitiesToDelete.length > 0) {
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
-      prepare: (payload: { overrides?: Partial<CanvasControlLayerState>; isSelected?: boolean }) => ({
+      prepare: (payload: {
+        overrides?: Partial<CanvasControlLayerState>;
+        isSelected?: boolean;
+        mergedEntitiesToDelete?: string[];
+      }) => ({
         payload: { ...payload, id: getPrefixedId('control_layer') },
       }),
     },
@@ -585,19 +611,34 @@ export const canvasSlice = createSlice({
     rgAdded: {
       reducer: (
         state,
-        action: PayloadAction<{ id: string; overrides?: Partial<CanvasRegionalGuidanceState>; isSelected?: boolean }>
+        action: PayloadAction<{
+          id: string;
+          overrides?: Partial<CanvasRegionalGuidanceState>;
+          isSelected?: boolean;
+          mergedEntitiesToDelete?: string[];
+        }>
       ) => {
-        const { id, overrides, isSelected } = action.payload;
+        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getRegionalGuidanceState(id, overrides);
 
         state.regionalGuidance.entities.push(entityState);
 
-        if (isSelected) {
+        if (mergedEntitiesToDelete.length > 0) {
+          state.regionalGuidance.entities = state.regionalGuidance.entities.filter(
+            (entity) => !mergedEntitiesToDelete.includes(entity.id)
+          );
+        }
+
+        if (isSelected || mergedEntitiesToDelete.length > 0) {
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
-      prepare: (payload?: { overrides?: Partial<CanvasRegionalGuidanceState>; isSelected?: boolean }) => ({
+      prepare: (payload?: {
+        overrides?: Partial<CanvasRegionalGuidanceState>;
+        isSelected?: boolean;
+        mergedEntitiesToDelete?: string[];
+      }) => ({
         payload: { ...payload, id: getPrefixedId('regional_guidance') },
       }),
     },
@@ -812,19 +853,30 @@ export const canvasSlice = createSlice({
           id: string;
           overrides?: Partial<CanvasInpaintMaskState>;
           isSelected?: boolean;
+          mergedEntitiesToDelete?: string[];
         }>
       ) => {
-        const { id, overrides, isSelected } = action.payload;
+        const { id, overrides, isSelected, mergedEntitiesToDelete = [] } = action.payload;
 
         const entityState = getInpaintMaskState(id, overrides);
 
         state.inpaintMasks.entities.push(entityState);
 
-        if (isSelected) {
+        if (mergedEntitiesToDelete.length > 0) {
+          state.inpaintMasks.entities = state.inpaintMasks.entities.filter(
+            (entity) => !mergedEntitiesToDelete.includes(entity.id)
+          );
+        }
+
+        if (isSelected || mergedEntitiesToDelete.length > 0) {
           state.selectedEntityIdentifier = getEntityIdentifier(entityState);
         }
       },
-      prepare: (payload?: { overrides?: Partial<CanvasInpaintMaskState>; isSelected?: boolean }) => ({
+      prepare: (payload?: {
+        overrides?: Partial<CanvasInpaintMaskState>;
+        isSelected?: boolean;
+        mergedEntitiesToDelete?: string[];
+      }) => ({
         payload: { ...payload, id: getPrefixedId('inpaint_mask') },
       }),
     },

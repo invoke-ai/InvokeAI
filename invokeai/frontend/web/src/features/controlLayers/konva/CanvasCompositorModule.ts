@@ -9,6 +9,7 @@ import {
   getImageDataTransparency,
   getPrefixedId,
   getRectUnion,
+  mapId,
   previewBlob,
 } from 'features/controlLayers/konva/util';
 import {
@@ -317,10 +318,12 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * All entities must have the same type.
    *
    * @param entityIdentifiers The entity identifiers to merge
+   * @param deleteMergedEntities Whether to delete the merged entities after creating the new merged entity
    * @returns A promise that resolves to the image DTO, or null if the merge failed
    */
   mergeByEntityIdentifiers = async <T extends CanvasRenderableEntityIdentifier>(
-    entityIdentifiers: T[]
+    entityIdentifiers: T[],
+    deleteMergedEntities: boolean
   ): Promise<ImageDTO | null> => {
     if (entityIdentifiers.length <= 1) {
       this.log.warn({ entityIdentifiers }, 'Cannot merge less than 2 entities');
@@ -328,7 +331,10 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     }
     const type = entityIdentifiers[0]?.type;
     assert(type, 'Cannot merge entities with no type (this should never happen)');
+
     const adapters = this.manager.getAdapters(entityIdentifiers);
+    assert(adapters.length === entityIdentifiers.length, 'Failed to get all adapters for entity identifiers');
+
     const rect = this.getRectOfAdapters(adapters);
 
     const compositingOptions: CompositingOptions = {
@@ -353,6 +359,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         objects: [imageDTOToImageObject(result.value)],
         position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
       },
+      mergedEntitiesToDelete: deleteMergedEntities ? entityIdentifiers.map(mapId) : [],
     };
 
     switch (type) {
@@ -405,7 +412,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     const entityIdentifiers = entities.map(getEntityIdentifier);
 
-    return this.mergeByEntityIdentifiers(entityIdentifiers);
+    return this.mergeByEntityIdentifiers(entityIdentifiers, false);
   };
 
   /**
