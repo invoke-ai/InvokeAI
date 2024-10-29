@@ -1,8 +1,10 @@
 import type { SerializableObject } from 'common/types';
 import { withResultAsync } from 'common/util/result';
+import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import type { CanvasEntityAdapter, CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
+import type { Transparency } from 'features/controlLayers/konva/util';
 import {
   canvasToBlob,
   canvasToImageData,
@@ -416,6 +418,38 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   };
 
   /**
+   * Calculates the transparency of the composite of the give adapters.
+   * @param adapters The adapters to composite
+   * @param rect The region to include in the composite
+   * @param hash The hash to use for caching the result
+   * @returns A promise that resolves to the transparency of the composite
+   */
+  getTransparency = (adapters: CanvasEntityAdapter[], rect: Rect, hash: string): Promise<Transparency> => {
+    const entityIdentifiers = adapters.map((adapter) => adapter.entityIdentifier);
+    const logCtx = { entityIdentifiers, rect };
+    return CanvasCacheModule.getWithFallback({
+      cache: this.manager.cache.transparencyCalculationCache,
+      key: hash,
+      getValue: async () => {
+        this.$isProcessing.set(true);
+        const compositeInpaintMaskCanvas = this.getCompositeCanvas(adapters, rect);
+
+        const compositeInpaintMaskImageData = await CanvasCacheModule.getWithFallback({
+          cache: this.manager.cache.imageDataCache,
+          key: hash,
+          getValue: () => Promise.resolve(canvasToImageData(compositeInpaintMaskCanvas)),
+          onHit: () => this.log.trace(logCtx, 'Using cached image data'),
+          onMiss: () => this.log.trace(logCtx, 'Calculating image data'),
+        });
+
+        return getImageDataTransparency(compositeInpaintMaskImageData);
+      },
+      onHit: () => this.log.trace(logCtx, 'Using cached transparency'),
+      onMiss: () => this.log.trace(logCtx, 'Calculating transparency'),
+    });
+  };
+
+  /**
    * Calculates the generation mode for the current canvas state. This is determined by the transparency of the
    * composite raster layer and composite inpaint mask:
    * - Composite raster layer is fully transparent -> txt2img
@@ -433,11 +467,11 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    *
    * @returns The generation mode
    */
-  getGenerationMode(): GenerationMode {
+  getGenerationMode = async (): Promise<GenerationMode> => {
     const { rect } = this.manager.stateApi.getBbox();
 
-    const rasterAdapters = this.manager.compositor.getVisibleAdaptersOfType('raster_layer');
-    const compositeRasterLayerHash = this.getCompositeHash(rasterAdapters, { rect });
+    const rasterLayerAdapters = this.manager.compositor.getVisibleAdaptersOfType('raster_layer');
+    const compositeRasterLayerHash = this.getCompositeHash(rasterLayerAdapters, { rect });
 
     const inpaintMaskAdapters = this.manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
     const compositeInpaintMaskHash = this.getCompositeHash(inpaintMaskAdapters, { rect });
@@ -452,17 +486,17 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     this.log.debug({ rect }, 'Calculating generation mode');
 
-    const compositeInpaintMaskCanvas = this.getCompositeCanvas(inpaintMaskAdapters, rect);
-    this.$isProcessing.set(true);
-    const compositeInpaintMaskImageData = canvasToImageData(compositeInpaintMaskCanvas);
-    const compositeInpaintMaskTransparency = getImageDataTransparency(compositeInpaintMaskImageData);
-    this.$isProcessing.set(false);
+    const compositeRasterLayerTransparency = await this.getTransparency(
+      rasterLayerAdapters,
+      rect,
+      compositeRasterLayerHash
+    );
 
-    const compositeRasterLayerCanvas = this.getCompositeCanvas(rasterAdapters, rect);
-    this.$isProcessing.set(true);
-    const compositeRasterLayerImageData = canvasToImageData(compositeRasterLayerCanvas);
-    const compositeRasterLayerTransparency = getImageDataTransparency(compositeRasterLayerImageData);
-    this.$isProcessing.set(false);
+    const compositeInpaintMaskTransparency = await this.getTransparency(
+      inpaintMaskAdapters,
+      rect,
+      compositeInpaintMaskHash
+    );
 
     let generationMode: GenerationMode;
     if (compositeRasterLayerTransparency === 'FULLY_TRANSPARENT') {
@@ -482,7 +516,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     this.manager.cache.generationModeCache.set(hash, generationMode);
     return generationMode;
-  }
+  };
 
   repr = () => {
     return {

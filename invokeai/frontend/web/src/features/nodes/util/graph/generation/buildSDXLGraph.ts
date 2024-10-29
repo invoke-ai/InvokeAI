@@ -37,7 +37,7 @@ export const buildSDXLGraph = async (
   state: RootState,
   manager: CanvasManager
 ): Promise<{ g: Graph; noise: Invocation<'noise'>; posCond: Invocation<'sdxl_compel_prompt'> }> => {
-  const generationMode = manager.compositor.getGenerationMode();
+  const generationMode = await manager.compositor.getGenerationMode();
   log.debug({ generationMode }, 'Building SDXL graph');
 
   const params = selectParamsSlice(state);
