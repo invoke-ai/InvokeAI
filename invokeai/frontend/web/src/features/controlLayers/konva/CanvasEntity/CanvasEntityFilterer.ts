@@ -323,6 +323,12 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     }
     this.log.trace('Applying');
 
+    // Have the parent adopt the image module - this prevents a flash of the original layer content before the filtered
+    // image is rendered
+    if (this.imageModule) {
+      this.parent.renderer.adoptObjectRenderer(this.imageModule);
+    }
+
     // Rasterize the entity, replacing the objects with the masked image
     const rect = this.parent.transformer.getRelativeRect();
     this.manager.stateApi.rasterizeEntity({
@@ -392,7 +398,10 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       this.abortController.abort();
     }
     this.abortController = null;
-    if (this.imageModule) {
+
+    // If the image module exists, and is a child of the group, destroy it. It might not be a child of the group if
+    // the user has applied the filter and the image has been adopted by the parent entity.
+    if (this.imageModule && this.imageModule.konva.group.parent === this.konva.group) {
       this.imageModule.destroy();
       this.imageModule = null;
     }
