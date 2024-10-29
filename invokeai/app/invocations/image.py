@@ -1064,13 +1064,18 @@ class ImageAlphaToOutlineInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Finds the outline of the alpha channel of an image, expands it and returns just the outline."""
 
     image: ImageField = InputField(description="The input image. It should have some transparency.")
-    line_width_percent: float = InputField(
+    inner_line_width_percent: float = InputField(
         default=5,
-        ge=1,
+        ge=0,
         le=100,
-        description="The width of the outline as a percentage of image dimension",
+        description="The width of the inner outline as a percentage of image dimension",
     )
-    line_mode: Literal["inner", "outer", "both"] = InputField(default="both", description="Where to apply the mask")
+    outer_line_width_percent: float = InputField(
+        default=5,
+        ge=0,
+        le=100,
+        description="The width of the outer outline as a percentage of image dimension",
+    )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         img_pil = context.images.get_pil(self.image.image_name, mode="RGBA")
@@ -1082,35 +1087,40 @@ class ImageAlphaToOutlineInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Find contours in the binary mask - effectively the outline of the alpha channel
         contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Calculate line width based on smaller image dimension
+        # Calculate line widths based on smaller image dimension
         smaller_dim = min(img_pil.size)
-        line_width = int(smaller_dim * (self.line_width_percent / 100))
+        inner_line_width = int(smaller_dim * (self.inner_line_width_percent / 100))
+        outer_line_width = int(smaller_dim * (self.outer_line_width_percent / 100))
 
-        # Create an empty mask to draw the contours - this will be the alpha channel of the output image
+        # Create inner and outer contour masks
         contour_mask = numpy.zeros_like(binary_mask)
 
-        # Draw the contours on the mask at the calculated line width
-        cv2.drawContours(
-            image=contour_mask,
-            contours=contours,
-            contourIdx=-1,
-            color=(255,),
-            thickness=line_width,
-        )
-
-        # Limit drawing the outline
-        if self.line_mode == "inner":
+        if self.inner_line_width_percent > 0:
+            cv2.drawContours(
+                image=contour_mask,
+                contours=contours,
+                contourIdx=-1,
+                color=(255,),
+                thickness=inner_line_width,
+                lineType=cv2.LINE_8,
+            )
             contour_mask = numpy.minimum(contour_mask, binary_mask)
-        if self.line_mode == "outer":
-            inverted_binary_mask = cv2.bitwise_not(binary_mask)
-            contour_mask = cv2.bitwise_and(contour_mask, inverted_binary_mask)
-        if self.line_mode == "both":
-            pass
 
-        # Create our result image, fully transparent
+        if self.outer_line_width_percent > 0:
+            outer_contour_mask = numpy.zeros_like(binary_mask)
+            cv2.drawContours(
+                image=outer_contour_mask,
+                contours=contours,
+                contourIdx=-1,
+                color=(255,),
+                thickness=outer_line_width,
+                lineType=cv2.LINE_8,
+            )
+            outer_contour_mask = cv2.bitwise_and(outer_contour_mask, cv2.bitwise_not(binary_mask))
+            contour_mask = cv2.bitwise_or(contour_mask, outer_contour_mask)
+
+        # Create result image with contour mask as alpha channel
         result_rgba = numpy.zeros((contour_mask.shape[0], contour_mask.shape[1], 4), dtype=numpy.uint8)
-
-        # Set alpha channel from expanded line mask
         result_rgba[..., 3] = contour_mask
 
         result_img = Image.fromarray(result_rgba, "RGBA")

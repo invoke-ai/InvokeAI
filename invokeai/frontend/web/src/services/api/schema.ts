@@ -7906,18 +7906,17 @@ export type components = {
              */
             image?: components["schemas"]["ImageField"];
             /**
-             * Line Width Percent
-             * @description The width of the outline as a percentage of image dimension
+             * Inner Line Width Percent
+             * @description The width of the inner outline as a percentage of image dimension
              * @default 5
              */
-            line_width_percent?: number;
+            inner_line_width_percent?: number;
             /**
-             * Line Mode
-             * @description Where to apply the mask
-             * @default both
-             * @enum {string}
+             * Outer Line Width Percent
+             * @description The width of the outer outline as a percentage of image dimension
+             * @default 5
              */
-            line_mode?: "inner" | "outer" | "both";
+            outer_line_width_percent?: number;
             /**
              * type
              * @default img_alpha_to_outline

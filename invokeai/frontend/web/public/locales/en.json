@@ -1815,11 +1815,8 @@
             "alpha_to_outline": {
                 "label": "Alpha to Outline",
                 "description": "Outlines the opaque regions of the image with a line of the given width.",
-                "line_width_percent": "Line Width Percent",
-                "line_mode": "Line Mode",
-                "inner": "Inner",
-                "outer": "Outer",
-                "both": "Both"
+                "inner_line_width_percent": "Inner Line Width Percent",
+                "outer_line_width_percent": "Outer Line Width Percent"
             },
             "color_map": {
                 "label": "Color Map",
