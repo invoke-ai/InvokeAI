@@ -15,8 +15,8 @@ import {
 } from 'features/controlLayers/konva/util';
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type {
-  CanvasEntityType,
   CanvasImageState,
+  CanvasRenderableEntityType,
   Coordinate,
   RgbaColor,
   SAMPointLabel,
@@ -697,7 +697,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * Saves the segmented image as a new entity of the given type.
    * @param type The type of entity to save the segmented image as.
    */
-  saveAs = (type: Exclude<CanvasEntityType, 'reference_image'>) => {
+  saveAs = (type: CanvasRenderableEntityType) => {
     const imageState = this.$imageState.get();
     if (!imageState) {
       this.log.error('No image state to save as');

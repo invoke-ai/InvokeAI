@@ -9,7 +9,7 @@ import { addCoords, getKonvaNodeDebugAttrs, getPrefixedId } from 'features/contr
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { getFilterForModel, IMAGE_FILTERS } from 'features/controlLayers/store/filters';
-import type { CanvasEntityType, CanvasImageState } from 'features/controlLayers/store/types';
+import type { CanvasImageState, CanvasRenderableEntityType } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import Konva from 'konva';
 import { debounce } from 'lodash-es';
@@ -350,7 +350,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
    * Saves the filtered image as a new entity of the given type.
    * @param type The type of entity to save the filtered image as.
    */
-  saveAs = (type: Exclude<CanvasEntityType, 'reference_image'>) => {
+  saveAs = (type: CanvasRenderableEntityType) => {
     const imageState = this.$imageState.get();
     if (!imageState) {
       this.log.warn('No image state to apply filter to');
