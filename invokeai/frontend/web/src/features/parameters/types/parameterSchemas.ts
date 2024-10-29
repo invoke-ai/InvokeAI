@@ -144,15 +144,15 @@ export const isParameterStrength = (val: unknown): val is ParameterStrength =>
 // #region SeamlessX
 const zParameterSeamlessX = z.boolean();
 export type ParameterSeamlessX = z.infer<typeof zParameterSeamlessX>;
-export const isParameterSeamlessX = (val: unknown): val is boolean =>
-  zParameterSeamlessX.safeParse(val).success && val !== null && val !== undefined;
+export const isParameterSeamlessX = (val: unknown): val is ParameterSeamlessX =>
+  zParameterSeamlessX.safeParse(val).success;
 // #endregion
 
 // #region SeamlessY
 const zParameterSeamlessY = z.boolean();
 export type ParameterSeamlessY = z.infer<typeof zParameterSeamlessY>;
-export const isParameterSeamlessY = (val: unknown): val is boolean =>
-  zParameterSeamlessY.safeParse(val).success && val !== null && val !== undefined;
+export const isParameterSeamlessY = (val: unknown): val is ParameterSeamlessY =>
+  zParameterSeamlessY.safeParse(val).success;
 // #endregion
 
 // #region Precision
