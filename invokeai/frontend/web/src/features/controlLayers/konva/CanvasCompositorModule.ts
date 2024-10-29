@@ -26,6 +26,14 @@ import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
 
+type CompositingOptions = {
+  /**
+   * The global composite operation to use when compositing each entity.
+   * See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
+   */
+  globalCompositeOperation?: GlobalCompositeOperation;
+};
+
 /**
  * Handles compositing operations:
  * - Rasterizing and uploading the composite raster layer
@@ -128,9 +136,14 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    *
    * @param adapters The adapters for the canvas entities to composite, in the order they should be drawn
    * @param rect The region to include in the canvas
+   * @param compositingOptions Options for compositing the entities
    * @returns The composite canvas
    */
-  getCompositeCanvas = (adapters: CanvasEntityAdapter[], rect: Rect): HTMLCanvasElement => {
+  getCompositeCanvas = (
+    adapters: CanvasEntityAdapter[],
+    rect: Rect,
+    compositingOptions?: CompositingOptions
+  ): HTMLCanvasElement => {
     const entityIdentifiers = adapters.map((adapter) => adapter.entityIdentifier);
 
     const hash = this.getCompositeHash(adapters, { rect });
@@ -153,6 +166,10 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     ctx.imageSmoothingEnabled = false;
 
+    if (compositingOptions?.globalCompositeOperation) {
+      ctx.globalCompositeOperation = compositingOptions.globalCompositeOperation;
+    }
+
     for (const adapter of adapters) {
       this.log.debug({ entityIdentifier: adapter.entityIdentifier }, 'Drawing entity to composite canvas');
       const adapterCanvas = adapter.getCanvas(rect);
@@ -173,13 +190,15 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    *
    * @param adapters The adapters for the canvas entities to composite, in the order they should be drawn
    * @param rect The region to include in the rasterized image
-   * @param options Options for uploading the image
+   * @param uploadOptions Options for uploading the image
+   * @param compositingOptions Options for compositing the entities
    * @returns A promise that resolves to the image DTO
    */
   getCompositeImageDTO = async (
     adapters: CanvasEntityAdapter[],
     rect: Rect,
-    options: Pick<UploadOptions, 'is_intermediate' | 'metadata'>
+    uploadOptions: Pick<UploadOptions, 'is_intermediate' | 'metadata'>,
+    compositingOptions?: CompositingOptions
   ): Promise<ImageDTO> => {
     assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
 
@@ -197,7 +216,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       this.log.warn({ rect, imageName: cachedImageName }, 'Cached image name not found, recompositing');
     }
 
-    const canvas = this.getCompositeCanvas(adapters, rect);
+    const canvas = this.getCompositeCanvas(adapters, rect, compositingOptions);
 
     this.$isProcessing.set(true);
     const blobResult = await withResultAsync(() => canvasToBlob(canvas));
@@ -218,9 +237,9 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         blob,
         fileName: 'canvas-composite.png',
         image_category: 'general',
-        is_intermediate: options.is_intermediate,
-        board_id: options.is_intermediate ? undefined : selectAutoAddBoardId(this.manager.store.getState()),
-        metadata: options.metadata,
+        is_intermediate: uploadOptions.is_intermediate,
+        board_id: uploadOptions.is_intermediate ? undefined : selectAutoAddBoardId(this.manager.store.getState()),
+        metadata: uploadOptions.metadata,
       })
     );
     this.$isUploading.set(false);
