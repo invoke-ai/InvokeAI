@@ -95,6 +95,13 @@ class SubModelType(str, Enum):
     SafetyChecker = "safety_checker"
 
 
+class ClipVariantType(str, Enum):
+    """Variant type."""
+
+    L = "large"
+    G = "gigantic"
+
+
 class ModelVariantType(str, Enum):
     """Variant type."""
 
@@ -150,9 +157,13 @@ class ModelSourceType(str, Enum):
 DEFAULTS_PRECISION = Literal["fp16", "fp32"]
 
 
+AnyVariant: TypeAlias = Union[ModelRepoVariant, ClipVariantType, None]
+
+
 class SubmodelDefinition(BaseModel):
     path_or_prefix: str
     model_type: ModelType
+    variant: AnyVariant = None
 
 
 class MainModelDefaultSettings(BaseModel):
@@ -430,6 +441,7 @@ class CLIPEmbedDiffusersConfig(DiffusersConfigBase):
 
     type: Literal[ModelType.CLIPEmbed] = ModelType.CLIPEmbed
     format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
+    variant: ClipVariantType = ClipVariantType.L
 
     @staticmethod
     def get_tag() -> Tag:

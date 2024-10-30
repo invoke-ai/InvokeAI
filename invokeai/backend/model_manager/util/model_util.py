@@ -8,6 +8,7 @@ import safetensors
 import torch
 from picklescan.scanner import scan_file_path
 
+from invokeai.backend.model_manager.config import ClipVariantType
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 
 
@@ -165,3 +166,20 @@ def convert_bundle_to_flux_transformer_checkpoint(
         del transformer_state_dict[k]
 
     return original_state_dict
+
+
+def get_clip_variant_type(location: str) -> Optional[ClipVariantType]:
+    path = Path(location)
+    config_path = path / "config.json"
+    if not config_path.exists():
+        return None
+    with open(config_path) as file:
+        clip_conf = json.load(file)
+        hidden_size = clip_conf.get("hidden_size", -1)
+        match hidden_size:
+            case 1280:
+                return ClipVariantType.G
+            case 768:
+                return ClipVariantType.L
+            case _:
+                return None
