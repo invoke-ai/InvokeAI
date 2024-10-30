@@ -166,10 +166,15 @@ const singleImage = buildDndSourceApi<{ imageDTO: ImageDTO }>('SingleImage');
  * Dnd source API for multiple image source.
  */
 const multipleImage = buildDndSourceApi<{ imageDTOs: ImageDTO[]; boardId: BoardId }>('MultipleImage');
+/**
+ * Dnd source API for a single canvas entity.
+ */
+const singleCanvasEntity = buildDndSourceApi<{ entityIdentifier: CanvasEntityIdentifier }>('SingleCanvasEntity');
 
 const DndSource = {
   singleImage,
   multipleImage,
+  singleCanvasEntity,
 } as const;
 
 type SourceDataTypeMap = {
