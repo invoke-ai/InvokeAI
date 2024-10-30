@@ -1,15 +1,17 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { preserveOffsetOnSource } from '@atlaskit/pragmatic-drag-and-drop/element/preserve-offset-on-source';
-import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Heading, Image } from '@invoke-ai/ui-library';
+import { Box, Flex, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/listeners/galleryImageClicked';
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { Dnd } from 'features/dnd/dnd';
+import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
+import { createMultipleImageDragPreview, setMultipleImageDragPreview } from 'features/dnd/DndDragPreviewMultipleImage';
+import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
+import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { GalleryImageHoverIcons } from 'features/gallery/components/ImageGrid/GalleryImageHoverIcons';
 import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid/getGalleryImageDataTestId';
@@ -18,8 +20,6 @@ import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageVi
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useId, useMemo, useState } from 'react';
-import ReactDOM from 'react-dom';
-import { useTranslation } from 'react-i18next';
 import type { ImageDTO } from 'services/api/types';
 
 // This class name is used to calculate the number of images that fit in the gallery
@@ -83,16 +83,12 @@ interface Props {
   imageDTO: ImageDTO;
 }
 
-type MultiImageDragPreviewState = {
-  container: HTMLElement;
-  imageDTOs: ImageDTO[];
-  domRect: DOMRect;
-};
-
 export const GalleryImage = memo(({ imageDTO }: Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
-  const [dragPreviewState, setDragPreviewState] = useState<MultiImageDragPreviewState | null>(null);
+  const [dragPreviewState, setDragPreviewState] = useState<
+    DndDragPreviewSingleImageState | DndDragPreviewMultipleImageState | null
+  >(null);
   const [element, ref] = useState<HTMLImageElement | null>(null);
   const dndId = useId();
   const selectIsSelectedForCompare = useMemo(
@@ -144,25 +140,18 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
             return;
           }
         },
-        // See: https://atlassian.design/components/pragmatic-drag-and-drop/core-package/adapters/element/drag-previews
-        onGenerateDragPreview: ({ nativeSetDragImage, source, location }) => {
-          if (Dnd.Source.multipleImage.typeGuard(source.data)) {
-            const { imageDTOs } = source.data.payload;
-            const domRect = source.element.getBoundingClientRect();
-            setCustomNativeDragPreview({
-              render({ container }) {
-                // Cause a `react` re-render to create your portal synchronously
-                setDragPreviewState({ container, imageDTOs, domRect });
-                // In our cleanup function: cause a `react` re-render to create remove your portal
-                // Note: you can also remove the portal in `onDragStart`,
-                // which is when the cleanup function is called
-                return () => setDragPreviewState(null);
-              },
-              nativeSetDragImage,
-              getOffset: preserveOffsetOnSource({
-                element: source.element,
-                input: location.current.input,
-              }),
+        onGenerateDragPreview: (args) => {
+          if (Dnd.Source.multipleImage.typeGuard(args.source.data)) {
+            setMultipleImageDragPreview({
+              multipleImageDndData: args.source.data,
+              onGenerateDragPreviewArgs: args,
+              setDragPreviewState,
+            });
+          } else if (Dnd.Source.singleImage.typeGuard(args.source.data)) {
+            setSingleImageDragPreview({
+              singleImageDndData: args.source.data,
+              onGenerateDragPreviewArgs: args,
+              setDragPreviewState,
             });
           }
         },
@@ -243,32 +232,10 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           <GalleryImageHoverIcons imageDTO={imageDTO} isHovered={isHovered.isTrue} />
         </Flex>
       </Box>
-      {dragPreviewState !== null &&
-        ReactDOM.createPortal(
-          <MultiImagePreview imageDTOs={dragPreviewState.imageDTOs} domRect={dragPreviewState.domRect} />,
-          dragPreviewState.container
-        )}
+      {dragPreviewState?.type === 'multiple-image' ? createMultipleImageDragPreview(dragPreviewState) : null}
+      {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}
     </>
   );
 });
 
 GalleryImage.displayName = 'GalleryImage';
-
-const MultiImagePreview = memo(({ imageDTOs, domRect }: { imageDTOs: ImageDTO[]; domRect: DOMRect }) => {
-  const { t } = useTranslation();
-  return (
-    <Flex
-      w={domRect.width}
-      h={domRect.height}
-      alignItems="center"
-      justifyContent="center"
-      flexDir="column"
-      bg="base.900"
-    >
-      <Heading>{imageDTOs.length}</Heading>
-      <Heading size="sm">{t('parameters.images')}</Heading>
-    </Flex>
-  );
-});
-
-MultiImagePreview.displayName = 'MultiImagePreview';
