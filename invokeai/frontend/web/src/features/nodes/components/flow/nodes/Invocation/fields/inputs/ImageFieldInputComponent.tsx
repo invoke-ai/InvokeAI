@@ -59,6 +59,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
       className="nodrag"
       w="full"
       h="full"
+      minH={16}
       alignItems="center"
       justifyContent="center"
       borderColor="error.500"
