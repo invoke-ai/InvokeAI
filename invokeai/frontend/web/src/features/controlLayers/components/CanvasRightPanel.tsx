@@ -6,7 +6,7 @@ import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHook
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
-import type { Dnd } from 'features/dnd/dnd';
+import { Dnd } from 'features/dnd/dnd';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
@@ -195,11 +195,6 @@ const PanelTabs = memo(() => {
       }
     };
 
-    const canMonitor = () => {
-      // Only monitor if we are not already on the gallery tab
-      return selectActiveTabCanvasRightPanel(store.getState()) !== 'gallery';
-    };
-
     const onDragStart = () => {
       // Set the state to pending when a drag starts
       setGalleryTabDndState('potential');
@@ -212,7 +207,13 @@ const PanelTabs = memo(() => {
         onDragLeave,
       }),
       monitorForElements({
-        canMonitor,
+        canMonitor: ({ source }) => {
+          if (!Dnd.Source.singleImage.typeGuard(source.data) || !Dnd.Source.multipleImage.typeGuard(source.data)) {
+            return false;
+          }
+          // Only monitor if we are not already on the gallery tab
+          return selectActiveTabCanvasRightPanel(store.getState()) !== 'gallery';
+        },
         onDragStart,
       }),
       dropTargetForExternal({
@@ -221,7 +222,7 @@ const PanelTabs = memo(() => {
         onDragLeave,
       }),
       monitorForExternal({
-        canMonitor,
+        canMonitor: () => selectActiveTabCanvasRightPanel(store.getState()) !== 'gallery',
         onDragStart,
       })
     );

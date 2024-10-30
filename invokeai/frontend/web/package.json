@@ -54,6 +54,7 @@
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.4.0",
     "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^1.4.0",
+    "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.0.3",
     "@dagrejs/dagre": "^1.1.4",
     "@dagrejs/graphlib": "^2.2.4",
     "@fontsource-variable/inter": "^5.1.0",
