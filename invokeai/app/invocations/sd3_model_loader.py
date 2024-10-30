@@ -49,34 +49,45 @@ class Sd3ModelLoaderInvocation(BaseInvocation):
         default=None,
     )
 
-    # TODO(brandon): Setup UI updates to support selecting a clip l model.
-    # clip_l_model: ModelIdentifierField = InputField(
-    #     description=FieldDescriptions.clip_l_model,
-    #     ui_type=UIType.CLIPEmbedModel,
-    #     input=Input.Direct,
-    #     title="CLIP L Encoder",
-    # )
+    clip_l_model: Optional[ModelIdentifierField] = InputField(
+        description=FieldDescriptions.clip_embed_model,
+        ui_type=UIType.CLIPLEmbedModel,
+        input=Input.Direct,
+        title="CLIP L Encoder",
+        default=None,
+    )
 
-    # TODO(brandon): Setup UI updates to support selecting a clip g model.
-    # clip_g_model: ModelIdentifierField = InputField(
-    #     description=FieldDescriptions.clip_g_model,
-    #     ui_type=UIType.CLIPGModel,
-    #     input=Input.Direct,
-    #     title="CLIP G Encoder",
-    # )
+    clip_g_model: Optional[ModelIdentifierField] = InputField(
+        description=FieldDescriptions.clip_g_model,
+        ui_type=UIType.CLIPGEmbedModel,
+        input=Input.Direct,
+        title="CLIP G Encoder",
+        default=None,
+    )
 
-    # TODO(brandon): Setup UI updates to support selecting an SD3 vae model.
-    # vae_model: ModelIdentifierField = InputField(
-    #     description=FieldDescriptions.vae_model, ui_type=UIType.FluxVAEModel, title="VAE", default=None
-    # )
+    vae_model: Optional[ModelIdentifierField] = InputField(
+        description=FieldDescriptions.vae_model, ui_type=UIType.VAEModel, title="VAE", default=None
+    )
 
     def invoke(self, context: InvocationContext) -> Sd3ModelLoaderOutput:
         mmditx = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
-        vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
+        vae = (
+            self.vae_model.model_copy(update={"submodel_type": SubModelType.VAE})
+            if self.vae_model
+            else self.model.model_copy(update={"submodel_type": SubModelType.VAE})
+        )
         tokenizer_l = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-        clip_encoder_l = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        clip_encoder_l = (
+            self.clip_l_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+            if self.clip_l_model
+            else self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        )
         tokenizer_g = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
-        clip_encoder_g = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
+        clip_encoder_g = (
+            self.clip_g_model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
+            if self.clip_g_model
+            else self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
+        )
         tokenizer_t5 = (
             self.t5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer3})
             if self.t5_encoder_model

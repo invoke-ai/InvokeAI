@@ -53,6 +53,8 @@ class UIType(str, Enum, metaclass=MetaEnum):
     T2IAdapterModel = "T2IAdapterModelField"
     T5EncoderModel = "T5EncoderModelField"
     CLIPEmbedModel = "CLIPEmbedModelField"
+    CLIPLEmbedModel = "CLIPLEmbedModelField"
+    CLIPGEmbedModel = "CLIPGEmbedModelField"
     SpandrelImageToImageModel = "SpandrelImageToImageModelField"
     # endregion
 
@@ -132,6 +134,7 @@ class FieldDescriptions:
     clip = "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count"
     t5_encoder = "T5 tokenizer and text encoder"
     clip_embed_model = "CLIP Embed loader"
+    clip_g_model = "CLIP-G Embed loader"
     unet = "UNet (scheduler, LoRAs)"
     transformer = "Transformer"
     mmditx = "MMDiTX"

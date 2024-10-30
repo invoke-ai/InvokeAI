@@ -157,7 +157,7 @@ class ModelSourceType(str, Enum):
 DEFAULTS_PRECISION = Literal["fp16", "fp32"]
 
 
-AnyVariant: TypeAlias = Union[ModelRepoVariant, ClipVariantType, None]
+AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, None]
 
 
 class SubmodelDefinition(BaseModel):
@@ -357,7 +357,7 @@ class MainConfigBase(ModelConfigBase):
     default_settings: Optional[MainModelDefaultSettings] = Field(
         description="Default settings for this model", default=None
     )
-    variant: ModelVariantType = ModelVariantType.Normal
+    variant: AnyVariant = ModelVariantType.Normal
 
 
 class MainCheckpointConfig(CheckpointConfigBase, MainConfigBase):
@@ -448,6 +448,26 @@ class CLIPEmbedDiffusersConfig(DiffusersConfigBase):
         return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}")
 
 
+class CLIPGEmbedDiffusersConfig(CLIPEmbedDiffusersConfig):
+    """Model config for CLIP-G Embeddings."""
+
+    variant: ClipVariantType = ClipVariantType.G
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}.{ClipVariantType.G}")
+
+
+class CLIPLEmbedDiffusersConfig(CLIPEmbedDiffusersConfig):
+    """Model config for CLIP-L Embeddings."""
+
+    variant: ClipVariantType = ClipVariantType.L
+
+    @staticmethod
+    def get_tag() -> Tag:
+        return Tag(f"{ModelType.CLIPEmbed.value}.{ModelFormat.Diffusers.value}.{ClipVariantType.L}")
+
+
 class CLIPVisionDiffusersConfig(DiffusersConfigBase):
     """Model config for CLIPVision."""
 
@@ -524,6 +544,8 @@ AnyModelConfig = Annotated[
         Annotated[SpandrelImageToImageConfig, SpandrelImageToImageConfig.get_tag()],
         Annotated[CLIPVisionDiffusersConfig, CLIPVisionDiffusersConfig.get_tag()],
         Annotated[CLIPEmbedDiffusersConfig, CLIPEmbedDiffusersConfig.get_tag()],
+        Annotated[CLIPLEmbedDiffusersConfig, CLIPLEmbedDiffusersConfig.get_tag()],
+        Annotated[CLIPGEmbedDiffusersConfig, CLIPGEmbedDiffusersConfig.get_tag()],
     ],
     Discriminator(get_model_discriminator_value),
 ]
