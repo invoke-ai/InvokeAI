@@ -1691,11 +1691,11 @@
         "regionalGuidance": "Guida regionale",
         "opacity": "Opacità",
         "mergeVisible": "Fondi il visibile",
-        "mergeVisibleOk": "Livelli visibili uniti",
+        "mergeVisibleOk": "Livelli uniti",
         "deleteReferenceImage": "Elimina l'immagine di riferimento",
         "referenceImage": "Immagine di riferimento",
         "fitBboxToLayers": "Adatta il riquadro di delimitazione ai livelli",
-        "mergeVisibleError": "Errore durante l'unione dei livelli visibili",
+        "mergeVisibleError": "Errore durante l'unione dei livelli",
         "regionalReferenceImage": "Immagine di riferimento Regionale",
         "newLayerFromImage": "Nuovo livello da immagine",
         "newCanvasFromImage": "Nuova tela da immagine",
@@ -2024,7 +2024,8 @@
         "convertRegionalGuidanceTo": "Converti $t(controlLayers.regionalGuidance) in",
         "newControlLayer": "Nuovo $t(controlLayers.controlLayer)",
         "newInpaintMask": "Nuova $t(controlLayers.inpaintMask)",
-        "replaceCurrent": "Sostituisci corrente"
+        "replaceCurrent": "Sostituisci corrente",
+        "mergeDown": "Unire in basso"
     },
     "ui": {
         "tabs": {
