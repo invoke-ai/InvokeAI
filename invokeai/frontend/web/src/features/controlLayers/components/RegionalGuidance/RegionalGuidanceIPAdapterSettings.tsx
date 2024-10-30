@@ -94,10 +94,10 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
   const targetData = useMemo<Dnd.types['TargetDataTypeMap']['setRegionalGuidanceReferenceImage']>(
     () =>
       Dnd.Target.setRegionalGuidanceReferenceImage.getData(
-        { regionalGuidanceId: entityIdentifier.id, referenceImageId },
+        { entityIdentifier, referenceImageId },
         ipAdapter.image?.image_name
       ),
-    [entityIdentifier.id, ipAdapter.image?.image_name, referenceImageId]
+    [entityIdentifier, ipAdapter.image?.image_name, referenceImageId]
   );
 
   const postUploadAction = useMemo<RGIPAdapterImagePostUploadAction>(

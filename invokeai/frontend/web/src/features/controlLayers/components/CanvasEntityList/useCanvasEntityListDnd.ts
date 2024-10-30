@@ -13,7 +13,8 @@ import { useEffect, useState } from 'react';
 export const singleCanvasEntity = buildDndSourceApi<{ entityIdentifier: CanvasEntityIdentifier }>('SingleCanvasEntity');
 
 export const useCanvasEntityListDnd = (ref: RefObject<HTMLElement>, entityIdentifier: CanvasEntityIdentifier) => {
-  const [dndState, setDndState] = useState<DndListState>(idle);
+  const [dndListState, setDndListState] = useState<DndListState>(idle);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const element = ref.current;
@@ -27,10 +28,12 @@ export const useCanvasEntityListDnd = (ref: RefObject<HTMLElement>, entityIdenti
           return singleCanvasEntity.getData({ entityIdentifier });
         },
         onDragStart() {
-          setDndState({ type: 'is-dragging' });
+          setDndListState({ type: 'is-dragging' });
+          setIsDragging(true);
         },
         onDrop() {
-          setDndState(idle);
+          setDndListState(idle);
+          setIsDragging(false);
         },
       }),
       dropTargetForElements({
@@ -57,14 +60,14 @@ export const useCanvasEntityListDnd = (ref: RefObject<HTMLElement>, entityIdenti
         },
         onDragEnter({ self }) {
           const closestEdge = extractClosestEdge(self.data);
-          setDndState({ type: 'is-dragging-over', closestEdge });
+          setDndListState({ type: 'is-dragging-over', closestEdge });
         },
         onDrag({ self }) {
           const closestEdge = extractClosestEdge(self.data);
 
           // Only need to update react state if nothing has changed.
           // Prevents re-rendering.
-          setDndState((current) => {
+          setDndListState((current) => {
             if (current.type === 'is-dragging-over' && current.closestEdge === closestEdge) {
               return current;
             }
@@ -72,14 +75,14 @@ export const useCanvasEntityListDnd = (ref: RefObject<HTMLElement>, entityIdenti
           });
         },
         onDragLeave() {
-          setDndState(idle);
+          setDndListState(idle);
         },
         onDrop() {
-          setDndState(idle);
+          setDndListState(idle);
         },
       })
     );
   }, [entityIdentifier, ref]);
 
-  return dndState;
+  return [dndListState, isDragging] as const;
 };

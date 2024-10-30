@@ -1,3 +1,4 @@
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Circle, Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { DndListDropIndicator } from 'features/dnd/DndListDropIndicator';
@@ -20,6 +21,19 @@ type Props = {
   fieldIdentifier: FieldIdentifier;
 };
 
+const sx = {
+  layerStyle: 'second',
+  alignItems: 'center',
+  position: 'relative',
+  borderRadius: 'base',
+  w: 'full',
+  p: 2,
+  '&[data-is-dragging=true]': {
+    opacity: 0.3,
+  },
+  transitionProperty: 'common',
+} satisfies SystemStyleObject;
+
 const LinearViewFieldInternal = ({ fieldIdentifier }: Props) => {
   const dispatch = useAppDispatch();
   const { isValueChanged, onReset } = useFieldOriginalValue(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
@@ -31,7 +45,7 @@ const LinearViewFieldInternal = ({ fieldIdentifier }: Props) => {
   }, [dispatch, fieldIdentifier]);
 
   const ref = useRef<HTMLDivElement>(null);
-  const dndState = useLinearViewFieldDnd(ref, fieldIdentifier);
+  const [dndListState, isDragging] = useLinearViewFieldDnd(ref, fieldIdentifier);
 
   return (
     <Box position="relative" w="full">
@@ -39,14 +53,10 @@ const LinearViewFieldInternal = ({ fieldIdentifier }: Props) => {
         ref={ref}
         // This is used to trigger the post-move flash animation
         data-field-name={fieldIdentifier.fieldName}
+        data-is-dragging={isDragging}
         onMouseEnter={handleMouseOver}
         onMouseLeave={handleMouseOut}
-        layerStyle="second"
-        alignItems="center"
-        position="relative"
-        borderRadius="base"
-        w="full"
-        p={2}
+        sx={sx}
       >
         <Flex flexDir="column" w="full">
           <Flex alignItems="center" gap={2}>
@@ -90,7 +100,7 @@ const LinearViewFieldInternal = ({ fieldIdentifier }: Props) => {
           <InputFieldRenderer nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
         </Flex>
       </Flex>
-      <DndListDropIndicator dndState={dndState} />
+      <DndListDropIndicator dndState={dndListState} />
     </Box>
   );
 };

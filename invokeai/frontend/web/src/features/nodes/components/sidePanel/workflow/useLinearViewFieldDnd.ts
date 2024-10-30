@@ -13,7 +13,8 @@ import { useEffect, useState } from 'react';
 export const singleWorkflowField = buildDndSourceApi<{ fieldIdentifier: FieldIdentifier }>('SingleWorkflowField');
 
 export const useLinearViewFieldDnd = (ref: RefObject<HTMLElement>, fieldIdentifier: FieldIdentifier) => {
-  const [dndState, setDndState] = useState<DndListState>(idle);
+  const [dndListState, setListDndState] = useState<DndListState>(idle);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const element = ref.current;
@@ -27,10 +28,12 @@ export const useLinearViewFieldDnd = (ref: RefObject<HTMLElement>, fieldIdentifi
           return singleWorkflowField.getData({ fieldIdentifier });
         },
         onDragStart() {
-          setDndState({ type: 'is-dragging' });
+          setListDndState({ type: 'is-dragging' });
+          setIsDragging(true);
         },
         onDrop() {
-          setDndState(idle);
+          setListDndState(idle);
+          setIsDragging(false);
         },
       }),
       dropTargetForElements({
@@ -54,14 +57,14 @@ export const useLinearViewFieldDnd = (ref: RefObject<HTMLElement>, fieldIdentifi
         },
         onDragEnter({ self }) {
           const closestEdge = extractClosestEdge(self.data);
-          setDndState({ type: 'is-dragging-over', closestEdge });
+          setListDndState({ type: 'is-dragging-over', closestEdge });
         },
         onDrag({ self }) {
           const closestEdge = extractClosestEdge(self.data);
 
           // Only need to update react state if nothing has changed.
           // Prevents re-rendering.
-          setDndState((current) => {
+          setListDndState((current) => {
             if (current.type === 'is-dragging-over' && current.closestEdge === closestEdge) {
               return current;
             }
@@ -69,14 +72,14 @@ export const useLinearViewFieldDnd = (ref: RefObject<HTMLElement>, fieldIdentifi
           });
         },
         onDragLeave() {
-          setDndState(idle);
+          setListDndState(idle);
         },
         onDrop() {
-          setDndState(idle);
+          setListDndState(idle);
         },
       })
     );
   }, [fieldIdentifier, ref]);
 
-  return dndState;
+  return [dndListState, isDragging] as const;
 };
