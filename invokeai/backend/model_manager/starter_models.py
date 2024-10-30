@@ -140,7 +140,7 @@ flux_dev = StarterModel(
     type=ModelType.Main,
     dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
 )
-sd35_medium  = StarterModel(
+sd35_medium = StarterModel(
     name="SD3.5 Medium",
     base=BaseModelType.StableDiffusion3,
     source="stabilityai/stable-diffusion-3.5-medium",
@@ -148,7 +148,7 @@ sd35_medium  = StarterModel(
     type=ModelType.Main,
     dependencies=[],
 )
-sd35_large  = StarterModel(
+sd35_large = StarterModel(
     name="SD3.5 Large",
     base=BaseModelType.StableDiffusion3,
     source="stabilityai/stable-diffusion-3.5-large",
