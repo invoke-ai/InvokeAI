@@ -5,7 +5,6 @@ import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/exter
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
-import { dndDropped } from 'app/store/middleware/listenerMiddleware/listeners/dnd';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { Dnd } from 'features/dnd/dnd';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
@@ -103,13 +102,13 @@ export const DndDropTarget = memo((props: Props) => {
           setDndState('potential');
         },
         getData: () => targetData,
-        onDrop: (args) => {
-          const sourceData = args.source.data;
-          if (!Dnd.Util.isDndSourceData(sourceData)) {
-            return;
-          }
-          dispatch(dndDropped({ sourceData, targetData }));
-        },
+        // onDrop: (args) => {
+        //   const sourceData = args.source.data;
+        //   if (!Dnd.Util.isDndSourceData(sourceData)) {
+        //     return;
+        //   }
+        //   dispatch(dndDropped({ sourceData, targetData }));
+        // },
       }),
       monitorForElements({
         canMonitor: (args) => {
@@ -174,12 +173,7 @@ export const DndDropTarget = memo((props: Props) => {
               image_category: 'user',
               is_intermediate: false,
             });
-            dispatch(
-              dndDropped({
-                sourceData: Dnd.Source.singleImage.getData({ imageDTO }),
-                targetData,
-              })
-            );
+            Dnd.Util.handleDrop(Dnd.Source.singleImage.getData({ imageDTO }), targetData);
           }
         },
       }),

@@ -2,6 +2,7 @@
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
+import type { DndListState } from 'features/dnd/dnd';
 import type { CSSProperties } from 'react';
 
 /**
@@ -88,7 +89,7 @@ const edgeStyles: Record<Edge, SystemStyleObject> = {
  *
  * A drop indicator is used to communicate the intended resting place of the draggable item. The orientation of the drop indicator should always match the direction of the content flow.
  */
-export function DndDropIndicator({ edge, gap = '0px' }: DropIndicatorProps) {
+function DndDropIndicatorInternal({ edge, gap = '0px' }: DropIndicatorProps) {
   /**
    * To clearly communicate the resting place of a draggable item during a drag operation,
    * the drop indicator should be positioned half way between draggable items.
@@ -104,3 +105,21 @@ export function DndDropIndicator({ edge, gap = '0px' }: DropIndicatorProps) {
     />
   );
 }
+
+export const DndListDropIndicator = ({ dndState }: { dndState: DndListState }) => {
+  if (dndState.type !== 'is-dragging-over') {
+    return null;
+  }
+
+  if (!dndState.closestEdge) {
+    return null;
+  }
+
+  return (
+    <DndDropIndicatorInternal
+      edge={dndState.closestEdge}
+      // This is the gap between items in the list, used to calculate the position of the drop indicator
+      gap="var(--invoke-space-2)"
+    />
+  );
+};

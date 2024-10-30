@@ -451,6 +451,7 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;
   position: Coordinate;
   replaceObjects: boolean;
+  isSelected?: boolean;
 }>;
 
 /**

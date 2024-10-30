@@ -1213,7 +1213,7 @@ export const canvasSlice = createSlice({
       }
     },
     entityRasterized: (state, action: PayloadAction<EntityRasterizedPayload>) => {
-      const { entityIdentifier, imageObject, position, replaceObjects } = action.payload;
+      const { entityIdentifier, imageObject, position, replaceObjects, isSelected } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
@@ -1224,6 +1224,10 @@ export const canvasSlice = createSlice({
           entity.objects = [imageObject];
           entity.position = position;
         }
+      }
+
+      if (isSelected) {
+        state.selectedEntityIdentifier = entityIdentifier;
       }
     },
     entityBrushLineAdded: (state, action: PayloadAction<EntityBrushLineAddedPayload>) => {

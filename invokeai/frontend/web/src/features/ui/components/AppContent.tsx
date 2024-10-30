@@ -2,6 +2,7 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasMainPanelContent } from 'features/controlLayers/components/CanvasMainPanelContent';
 import { CanvasRightPanel } from 'features/controlLayers/components/CanvasRightPanel';
+import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { ImageViewer } from 'features/gallery/components/ImageViewer/ImageViewer';
 import NodeEditorPanelGroup from 'features/nodes/components/sidePanel/NodeEditorPanelGroup';
@@ -40,6 +41,7 @@ const onRightPanelCollapse = (isCollapsed: boolean) => $isRightPanelOpen.set(!is
 
 export const AppContent = memo(() => {
   const imperativePanelGroupRef = useRef<ImperativePanelGroupHandle>(null);
+  useDndMonitor();
 
   const withLeftPanel = useAppSelector(selectWithLeftPanel);
   const leftPanelUsePanelOptions = useMemo<UsePanelOptions>(

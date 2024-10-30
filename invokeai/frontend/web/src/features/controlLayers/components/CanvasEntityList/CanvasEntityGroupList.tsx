@@ -1,13 +1,13 @@
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { reorderWithEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/reorder-with-edge';
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Collapse, Flex, Icon, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useBoolean } from 'common/hooks/useBoolean';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScrollStyles';
+import { singleCanvasEntity } from 'features/controlLayers/components/CanvasEntityList/useCanvasEntityListDnd';
 import { CanvasEntityAddOfTypeButton } from 'features/controlLayers/components/common/CanvasEntityAddOfTypeButton';
 import { CanvasEntityMergeVisibleButton } from 'features/controlLayers/components/common/CanvasEntityMergeVisibleButton';
 import { CanvasEntityTypeIsHiddenToggle } from 'features/controlLayers/components/common/CanvasEntityTypeIsHiddenToggle';
@@ -16,7 +16,7 @@ import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTi
 import { entitiesReordered } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { isRenderableEntityType } from 'features/controlLayers/store/types';
-import { Dnd, triggerPostMoveFlash } from 'features/dnd/dnd';
+import { triggerPostMoveFlash } from 'features/dnd/dnd';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect } from 'react';
 import { flushSync } from 'react-dom';
@@ -28,10 +28,6 @@ type Props = PropsWithChildren<{
   entityIdentifiers: CanvasEntityIdentifier[];
 }>;
 
-const _hover: SystemStyleObject = {
-  opacity: 1,
-};
-
 export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityIdentifiers }: Props) => {
   const title = useEntityTypeTitle(type);
   const informationalPopoverFeature = useEntityTypeInformationalPopover(type);
@@ -41,7 +37,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
   useEffect(() => {
     return monitorForElements({
       canMonitor({ source }) {
-        if (!Dnd.Source.singleCanvasEntity.typeGuard(source.data)) {
+        if (!singleCanvasEntity.typeGuard(source.data)) {
           return false;
         }
         if (source.data.payload.entityIdentifier.type !== type) {
@@ -58,10 +54,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
         const sourceData = source.data;
         const targetData = target.data;
 
-        if (
-          !Dnd.Source.singleCanvasEntity.typeGuard(sourceData) ||
-          !Dnd.Source.singleCanvasEntity.typeGuard(targetData)
-        ) {
+        if (!singleCanvasEntity.typeGuard(sourceData) || !singleCanvasEntity.typeGuard(targetData)) {
           return;
         }
 
