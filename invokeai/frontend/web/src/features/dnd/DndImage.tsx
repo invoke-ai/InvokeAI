@@ -3,6 +3,8 @@ import type { ImageProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
 import { Dnd } from 'features/dnd/dnd';
+import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
+import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
 import { memo, useEffect, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
@@ -26,6 +28,7 @@ export const DndImage = memo(({ imageDTO, ...rest }: Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [element, ref] = useState<HTMLImageElement | null>(null);
+  const [dragPreviewState, setDragPreviewState] = useState<DndDragPreviewSingleImageState | null>(null);
 
   useEffect(() => {
     if (!element) {
@@ -40,22 +43,34 @@ export const DndImage = memo(({ imageDTO, ...rest }: Props) => {
       onDrop: () => {
         setIsDragging(false);
       },
+      onGenerateDragPreview: (args) => {
+        if (Dnd.Source.singleImage.typeGuard(args.source.data)) {
+          setSingleImageDragPreview({
+            singleImageDndData: args.source.data,
+            onGenerateDragPreviewArgs: args,
+            setDragPreviewState,
+          });
+        }
+      },
     });
   }, [imageDTO, element, store]);
 
   useImageContextMenu(imageDTO, element);
 
   return (
-    <Image
-      role="button"
-      ref={ref}
-      src={imageDTO.image_url}
-      fallbackSrc={imageDTO.thumbnail_url}
-      w={imageDTO.width}
-      sx={sx}
-      data-is-dragging={isDragging}
-      {...rest}
-    />
+    <>
+      <Image
+        role="button"
+        ref={ref}
+        src={imageDTO.image_url}
+        fallbackSrc={imageDTO.thumbnail_url}
+        w={imageDTO.width}
+        sx={sx}
+        data-is-dragging={isDragging}
+        {...rest}
+      />
+      {dragPreviewState?.type === 'single-image' ? createSingleImageDragPreview(dragPreviewState) : null}
+    </>
   );
 });
 

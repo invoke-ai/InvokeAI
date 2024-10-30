@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-namespace */ // We will use namespaces to organize the Dnd types
 
+import type { Input } from '@atlaskit/pragmatic-drag-and-drop/dist/types/entry-point/types';
+import type { GetOffsetFn } from '@atlaskit/pragmatic-drag-and-drop/dist/types/public-utils/element/custom-native-drag-preview/types';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { BoardId } from 'features/gallery/store/types';
@@ -477,3 +480,35 @@ export const Dnd = {
     },
   },
 };
+
+/**
+ * The size of the image drag preview in theme units.
+ */
+export const DND_IMAGE_DRAG_PREVIEW_SIZE = 32 satisfies SystemStyleObject['w'];
+
+/**
+ * A drag preview offset function that works like the provided `preserveOffsetOnSource`, except when either the X or Y
+ * offset is outside the container, in which case it centers the preview in the container.
+ */
+export function preserveOffsetOnSourceFallbackCentered({
+  element,
+  input,
+}: {
+  element: HTMLElement;
+  input: Input;
+}): GetOffsetFn {
+  return ({ container }) => {
+    const sourceRect = element.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+
+    let offsetX = input.clientX - sourceRect.x;
+    let offsetY = input.clientY - sourceRect.y;
+
+    if (offsetY > containerRect.height || offsetX > containerRect.width) {
+      offsetX = containerRect.width / 2;
+      offsetY = containerRect.height / 2;
+    }
+
+    return { x: offsetX, y: offsetY };
+  };
+}
