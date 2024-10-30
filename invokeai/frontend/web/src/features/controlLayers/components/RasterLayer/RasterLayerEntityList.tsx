@@ -1,7 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { CanvasEntityGroupList } from 'features/controlLayers/components/common/CanvasEntityGroupList';
+import { CanvasEntityGroupList } from 'features/controlLayers/components/CanvasEntityList/CanvasEntityGroupList';
 import { RasterLayer } from 'features/controlLayers/components/RasterLayer/RasterLayer';
 import { selectCanvasSlice, selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { getEntityIdentifier } from 'features/controlLayers/store/types';

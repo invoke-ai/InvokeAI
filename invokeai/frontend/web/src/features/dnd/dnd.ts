@@ -4,11 +4,35 @@ import type { Input } from '@atlaskit/pragmatic-drag-and-drop/dist/types/entry-p
 import type { GetOffsetFn } from '@atlaskit/pragmatic-drag-and-drop/dist/types/public-utils/element/custom-native-drag-preview/types';
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/dist/types/closest-edge';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { getStore } from 'app/store/nanostores/store';
+import { selectDefaultControlAdapter, selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import {
+  controlLayerAdded,
+  entityRasterized,
+  inpaintMaskAdded,
+  rasterLayerAdded,
+  referenceImageAdded,
+  referenceImageIPAdapterImageChanged,
+  rgAdded,
+  rgIPAdapterImageChanged,
+} from 'features/controlLayers/store/canvasSlice';
+import { selectBboxRect } from 'features/controlLayers/store/selectors';
+import type {
+  CanvasControlLayerState,
+  CanvasEntityIdentifier,
+  CanvasInpaintMaskState,
+  CanvasRasterLayerState,
+  CanvasReferenceImageState,
+  CanvasRegionalGuidanceState,
+} from 'features/controlLayers/store/types';
+import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
-import type { FieldIdentifier } from 'features/nodes/types/field';
+import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
+import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import type { CSSProperties } from 'react';
+import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import type { ValueOf } from 'type-fest';
 import type { Jsonifiable } from 'type-fest/source/jsonifiable';
@@ -151,7 +175,7 @@ type DndSourceAPI<T extends DndData> = {
  * @template P The optional payload of the Dnd source.
  * @param type The type of the Dnd source.
  */
-const buildDndSourceApi = <P extends Jsonifiable | undefined = undefined>(type: string) => {
+export const buildDndSourceApi = <P extends Jsonifiable | undefined = undefined>(type: string) => {
   return {
     type,
     kind: 'source',
@@ -169,20 +193,10 @@ const singleImage = buildDndSourceApi<{ imageDTO: ImageDTO }>('SingleImage');
  * Dnd source API for multiple image source.
  */
 const multipleImage = buildDndSourceApi<{ imageDTOs: ImageDTO[]; boardId: BoardId }>('MultipleImage');
-/**
- * Dnd source API for a single canvas entity.
- */
-const singleCanvasEntity = buildDndSourceApi<{ entityIdentifier: CanvasEntityIdentifier }>('SingleCanvasEntity');
-/**
- * Dnd source API for a single workflow field.
- */
-const singleWorkflowField = buildDndSourceApi<{ fieldIdentifier: FieldIdentifier }>('SingleWorkflowField');
 
 const DndSource = {
   singleImage,
   multipleImage,
-  singleCanvasEntity,
-  singleWorkflowField,
 } as const;
 
 type SourceDataTypeMap = {
@@ -207,6 +221,7 @@ type DndTargetApi<T extends DndData> = DndSourceAPI<T> & {
    * @returns Whether the drop is valid.
    */
   validateDrop: (sourceData: DndData<string, 'source', Jsonifiable>, targetData: T) => boolean;
+  handleDrop: (sourceData: DndData<string, 'source', Jsonifiable>, targetData: T) => void;
 };
 
 /**
@@ -220,7 +235,11 @@ const buildDndTargetApi = <P extends Jsonifiable | undefined = undefined>(
   validateDrop: (
     sourceData: DndData<string, 'source', Jsonifiable>,
     targetData: DndData<typeof type, 'target', P>
-  ) => boolean
+  ) => boolean,
+  handleDrop: (
+    sourceData: DndData<string, 'source', Jsonifiable>,
+    targetData: DndData<typeof type, 'target', P>
+  ) => void
 ) => {
   return {
     type,
@@ -228,56 +247,172 @@ const buildDndTargetApi = <P extends Jsonifiable | undefined = undefined>(
     typeGuard: _buildDataTypeGuard<DndData<typeof type, 'target', P>>(type, 'target'),
     getData: _buildDataGetter<DndData<typeof type, 'target', P>>(type, 'target'),
     validateDrop,
+    handleDrop,
   } satisfies DndTargetApi<DndData<typeof type, 'target', P>>;
 };
 
 /**
  * Dnd target API for setting the image on an existing Global Reference Image layer.
  */
-const setGlobalReferenceImage = buildDndTargetApi<{ globalReferenceImageId: string }>(
+const setGlobalReferenceImage = buildDndTargetApi<{ entityIdentifier: CanvasEntityIdentifier<'reference_image'> }>(
   'SetGlobalReferenceImage',
-  singleImage.typeGuard
+  singleImage.typeGuard,
+  (sourceData, targetData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    const { dispatch } = getStore();
+    const { imageDTO } = sourceData.payload;
+    const { entityIdentifier } = targetData.payload;
+    dispatch(referenceImageIPAdapterImageChanged({ entityIdentifier, imageDTO }));
+  }
 );
 
 /**
  * Dnd target API for setting the image on an existing Regional Guidance layer's Reference Image.
  */
 const setRegionalGuidanceReferenceImage = buildDndTargetApi<{
-  regionalGuidanceId: string;
+  entityIdentifier: CanvasEntityIdentifier<'regional_guidance'>;
   referenceImageId: string;
-}>('SetRegionalGuidanceReferenceImage', singleImage.typeGuard);
+}>('SetRegionalGuidanceReferenceImage', singleImage.typeGuard, (sourceData, targetData) => {
+  if (!singleImage.typeGuard(sourceData)) {
+    return false;
+  }
+  const { dispatch } = getStore();
+  const { imageDTO } = sourceData.payload;
+  const { entityIdentifier, referenceImageId } = targetData.payload;
+  dispatch(rgIPAdapterImageChanged({ entityIdentifier, referenceImageId, imageDTO }));
+});
 
 /**
  * Dnd target API for creating a new a Raster Layer from an image.
  */
-const newRasterLayerFromImage = buildDndTargetApi('NewRasterLayerFromImage', singleImage.typeGuard);
+const newRasterLayerFromImage = buildDndTargetApi(
+  'NewRasterLayerFromImage',
+  singleImage.typeGuard,
+  (sourceData, _targetData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    const { dispatch, getState } = getStore();
+    const { imageDTO } = sourceData.payload;
+    const imageObject = imageDTOToImageObject(imageDTO);
+    const { x, y } = selectBboxRect(getState());
+    const overrides: Partial<CanvasRasterLayerState> = {
+      objects: [imageObject],
+      position: { x, y },
+    };
+    dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+  }
+);
 
 /**
  * Dnd target API for creating a new a Control Layer from an image.
  */
-const newControlLayerFromImage = buildDndTargetApi('NewControlLayerFromImage', singleImage.typeGuard);
+const newControlLayerFromImage = buildDndTargetApi(
+  'NewControlLayerFromImage',
+  singleImage.typeGuard,
+  (sourceData, _targetData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    const { imageDTO } = sourceData.payload;
+    const { dispatch, getState } = getStore();
+    const state = getState();
+    const imageObject = imageDTOToImageObject(imageDTO);
+    const { x, y } = selectBboxRect(state);
+    const controlAdapter = selectDefaultControlAdapter(state);
+    const overrides: Partial<CanvasControlLayerState> = {
+      objects: [imageObject],
+      position: { x, y },
+      controlAdapter,
+    };
+    dispatch(controlLayerAdded({ overrides, isSelected: true }));
+  }
+);
 
 /**
  * Dnd target API for adding an Inpaint Mask from an image.
  */
-const newInpaintMaskFromImage = buildDndTargetApi('NewInpaintMaskFromImage', singleImage.typeGuard);
+const newInpaintMaskFromImage = buildDndTargetApi(
+  'NewInpaintMaskFromImage',
+  singleImage.typeGuard,
+  (sourceData, _targetData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    const { dispatch, getState } = getStore();
+    const { imageDTO } = sourceData.payload;
+    const imageObject = imageDTOToImageObject(imageDTO);
+    const { x, y } = selectBboxRect(getState());
+    const overrides: Partial<CanvasInpaintMaskState> = {
+      objects: [imageObject],
+      position: { x, y },
+    };
+    dispatch(inpaintMaskAdded({ overrides, isSelected: true }));
+  }
+);
 
 /**
  * Dnd target API for adding a new Global Reference Image layer with a pre-set Reference Image from an image.
  */
-const newGlobalReferenceImageFromImage = buildDndTargetApi('NewGlobalReferenceImageFromImage', singleImage.typeGuard);
+const newGlobalReferenceImageFromImage = buildDndTargetApi(
+  'NewGlobalReferenceImageFromImage',
+  singleImage.typeGuard,
+  (sourceData, _targetData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    const { dispatch, getState } = getStore();
+    const { imageDTO } = sourceData.payload;
+    const ipAdapter = selectDefaultIPAdapter(getState());
+    ipAdapter.image = imageDTOToImageWithDims(imageDTO);
+    const overrides: Partial<CanvasReferenceImageState> = { ipAdapter };
+    dispatch(referenceImageAdded({ overrides, isSelected: true }));
+  }
+);
 
 /**
  * Dnd target API for adding a new Regional Guidance layer from an image.
  */
-const newRegionalGuidanceFromImage = buildDndTargetApi('NewRegionalGuidanceFromImage', singleImage.typeGuard);
+const newRegionalGuidanceFromImage = buildDndTargetApi(
+  'NewRegionalGuidanceFromImage',
+  singleImage.typeGuard,
+  (sourceData, _targetData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    const { dispatch, getState } = getStore();
+    const { imageDTO } = sourceData.payload;
+    const imageObject = imageDTOToImageObject(imageDTO);
+    const { x, y } = selectBboxRect(getState());
+    const overrides: Partial<CanvasRegionalGuidanceState> = {
+      objects: [imageObject],
+      position: { x, y },
+    };
+    dispatch(rgAdded({ overrides, isSelected: true }));
+  }
+);
 
 /**
  * Dnd target API for adding a new Regional Guidance layer with a pre-set Reference Image from an image.
  */
 const newRegionalGuidanceReferenceImageFromImage = buildDndTargetApi(
   'NewRegionalGuidanceReferenceImageFromImage',
-  singleImage.typeGuard
+  singleImage.typeGuard,
+  (sourceData, _targetData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    const { dispatch, getState } = getStore();
+    const { imageDTO } = sourceData.payload;
+    const ipAdapter = selectDefaultIPAdapter(getState());
+    ipAdapter.image = imageDTOToImageWithDims(imageDTO);
+    const overrides: Partial<CanvasRegionalGuidanceState> = {
+      referenceImages: [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }],
+    };
+    dispatch(rgAdded({ overrides, isSelected: true }));
+  }
 );
 
 /**
@@ -286,19 +421,57 @@ const newRegionalGuidanceReferenceImageFromImage = buildDndTargetApi(
  */
 const replaceLayerWithImage = buildDndTargetApi<{
   entityIdentifier: CanvasEntityIdentifier<'control_layer' | 'raster_layer' | 'inpaint_mask' | 'regional_guidance'>;
-}>('ReplaceLayerWithImage', singleImage.typeGuard);
+}>('ReplaceLayerWithImage', singleImage.typeGuard, (sourceData, targetData) => {
+  if (!singleImage.typeGuard(sourceData)) {
+    return false;
+  }
+  const { dispatch, getState } = getStore();
+  const { imageDTO } = sourceData.payload;
+  const { entityIdentifier } = targetData.payload;
+  const imageObject = imageDTOToImageObject(imageDTO);
+  const { x, y } = selectBboxRect(getState());
+  dispatch(
+    entityRasterized({
+      entityIdentifier,
+      imageObject,
+      position: { x, y },
+      replaceObjects: true,
+      isSelected: true,
+    })
+  );
+});
 
 /**
  * Dnd target API for setting the initial image on the upscaling tab.
  */
-const setUpscaleInitialImageFromImage = buildDndTargetApi('SetUpscaleInitialImageFromImage', singleImage.typeGuard);
+const setUpscaleInitialImageFromImage = buildDndTargetApi(
+  'SetUpscaleInitialImageFromImage',
+  singleImage.typeGuard,
+  (sourceData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    const { dispatch } = getStore();
+    const { imageDTO } = sourceData.payload;
+    dispatch(upscaleInitialImageChanged(imageDTO));
+  }
+);
 
 /**
  * Dnd target API for setting an image field on a node.
  */
 const setNodeImageField = buildDndTargetApi<{ nodeId: string; fieldName: string }>(
   'SetNodeImageField',
-  singleImage.typeGuard
+  singleImage.typeGuard,
+  (sourceData, targetData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    const { dispatch } = getStore();
+    const { imageDTO } = sourceData.payload;
+    const { fieldName, nodeId } = targetData.payload;
+    dispatch(fieldImageValueChanged({ nodeId, fieldName, value: imageDTO }));
+  }
 );
 
 /**
@@ -307,55 +480,104 @@ const setNodeImageField = buildDndTargetApi<{ nodeId: string; fieldName: string 
 const selectForCompare = buildDndTargetApi<{
   firstImageName?: string | null;
   secondImageName?: string | null;
-}>('SelectForCompare', (sourceData, targetData) => {
-  if (!singleImage.typeGuard(sourceData)) {
-    return false;
+}>(
+  'SelectForCompare',
+  (sourceData, targetData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    // Do not allow the same images to be selected for comparison
+    if (sourceData.payload.imageDTO.image_name === targetData.payload.firstImageName) {
+      return false;
+    }
+    if (sourceData.payload.imageDTO.image_name === targetData.payload.secondImageName) {
+      return false;
+    }
+    return true;
+  },
+  (sourceData) => {
+    if (!singleImage.typeGuard(sourceData)) {
+      return false;
+    }
+    const { dispatch } = getStore();
+    const { imageDTO } = sourceData.payload;
+    dispatch(imageToCompareChanged(imageDTO));
   }
-  // Do not allow the same images to be selected for comparison
-  if (sourceData.payload.imageDTO.image_name === targetData.payload.firstImageName) {
-    return false;
-  }
-  if (sourceData.payload.imageDTO.image_name === targetData.payload.secondImageName) {
-    return false;
-  }
-  return true;
-});
+);
 
 /**
  * Dnd target API for adding an image to a board.
  */
-const addToBoard = buildDndTargetApi<{ boardId: string }>('AddToBoard', (sourceData, targetData) => {
-  if (singleImage.typeGuard(sourceData)) {
-    const currentBoard = sourceData.payload.imageDTO.board_id ?? 'none';
-    const destinationBoard = targetData.payload.boardId;
-    return currentBoard !== destinationBoard;
-  }
+const addToBoard = buildDndTargetApi<{ boardId: string }>(
+  'AddToBoard',
+  (sourceData, targetData) => {
+    if (singleImage.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.imageDTO.board_id ?? 'none';
+      const destinationBoard = targetData.payload.boardId;
+      return currentBoard !== destinationBoard;
+    }
 
-  if (multipleImage.typeGuard(sourceData)) {
-    const currentBoard = sourceData.payload.boardId;
-    const destinationBoard = targetData.payload.boardId;
-    return currentBoard !== destinationBoard;
-  }
+    if (multipleImage.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.boardId;
+      const destinationBoard = targetData.payload.boardId;
+      return currentBoard !== destinationBoard;
+    }
 
-  return false;
-});
+    return false;
+  },
+  (sourceData, targetData) => {
+    if (singleImage.typeGuard(sourceData)) {
+      const { dispatch } = getStore();
+      const { imageDTO } = sourceData.payload;
+      const { boardId } = targetData.payload;
+      dispatch(imagesApi.endpoints.addImageToBoard.initiate({ imageDTO, board_id: boardId }, { track: false }));
+      dispatch(selectionChanged([]));
+    }
+
+    if (multipleImage.typeGuard(sourceData)) {
+      const { dispatch } = getStore();
+      const { imageDTOs } = sourceData.payload;
+      const { boardId } = targetData.payload;
+      dispatch(imagesApi.endpoints.addImagesToBoard.initiate({ imageDTOs, board_id: boardId }, { track: false }));
+      dispatch(selectionChanged([]));
+    }
+  }
+);
 
 /**
  * Dnd target API for removing an image from a board.
  */
-const removeFromBoard = buildDndTargetApi('RemoveFromBoard', (sourceData) => {
-  if (singleImage.typeGuard(sourceData)) {
-    const currentBoard = sourceData.payload.imageDTO.board_id ?? 'none';
-    return currentBoard !== 'none';
-  }
+const removeFromBoard = buildDndTargetApi(
+  'RemoveFromBoard',
+  (sourceData) => {
+    if (singleImage.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.imageDTO.board_id ?? 'none';
+      return currentBoard !== 'none';
+    }
 
-  if (multipleImage.typeGuard(sourceData)) {
-    const currentBoard = sourceData.payload.boardId;
-    return currentBoard !== 'none';
-  }
+    if (multipleImage.typeGuard(sourceData)) {
+      const currentBoard = sourceData.payload.boardId;
+      return currentBoard !== 'none';
+    }
 
-  return false;
-});
+    return false;
+  },
+  (sourceData) => {
+    if (singleImage.typeGuard(sourceData)) {
+      const { dispatch } = getStore();
+      const { imageDTO } = sourceData.payload;
+      dispatch(imagesApi.endpoints.removeImageFromBoard.initiate({ imageDTO }, { track: false }));
+      dispatch(selectionChanged([]));
+    }
+
+    if (multipleImage.typeGuard(sourceData)) {
+      const { dispatch } = getStore();
+      const { imageDTOs } = sourceData.payload;
+      dispatch(imagesApi.endpoints.removeImagesFromBoard.initiate({ imageDTOs }, { track: false }));
+      dispatch(selectionChanged([]));
+    }
+  }
+);
 
 const DndTarget = {
   /**
@@ -491,6 +713,25 @@ export const Dnd = {
       }
       return false;
     },
+    /**
+     * Validates whether a drop is valid.
+     * @param sourceData The data being dragged.
+     * @param targetData The data of the target being dragged onto.
+     * @returns Whether the drop is valid.
+     */
+    handleDrop: (sourceData: SourceDataUnion, targetData: TargetDataUnion): void => {
+      for (const targetApi of targetApisArray) {
+        if (targetApi.typeGuard(targetData)) {
+          /**
+           * TS cannot narrow the type of the targetApi and will error in the handleDrop call.
+           * We've just checked that targetData is of the right type, though, so this cast to `any` is safe.
+           */
+          /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+          targetApi.handleDrop(sourceData, targetData as any);
+          return;
+        }
+      }
+    },
   },
 };
 
@@ -536,7 +777,7 @@ export function triggerPostMoveFlash(element: HTMLElement, backgroundColor: CSSP
   });
 }
 
-export type DndState =
+export type DndListState =
   | {
       type: 'idle';
     }
@@ -551,4 +792,4 @@ export type DndState =
       type: 'is-dragging-over';
       closestEdge: Edge | null;
     };
-export const idle: DndState = { type: 'idle' };
+export const idle: DndListState = { type: 'idle' };

@@ -1,17 +1,14 @@
-import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
-import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { Box, Circle, Flex, Icon, IconButton, Spacer, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
-import type { DndState } from 'features/dnd/dnd';
-import { Dnd, idle } from 'features/dnd/dnd';
-import { DndDropIndicator } from 'features/dnd/DndDropIndicator';
+import { DndListDropIndicator } from 'features/dnd/DndListDropIndicator';
 import { InvocationInputFieldCheck } from 'features/nodes/components/flow/nodes/Invocation/fields/InvocationFieldCheck';
+import { useLinearViewFieldDnd } from 'features/nodes/components/sidePanel/workflow/useLinearViewFieldDnd';
 import { useFieldOriginalValue } from 'features/nodes/hooks/useFieldOriginalValue';
 import { useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import { workflowExposedFieldRemoved } from 'features/nodes/store/workflowSlice';
 import { HANDLE_TOOLTIP_OPEN_DELAY } from 'features/nodes/types/constants';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import type { FieldIdentifier } from 'features/nodes/types/field';
+import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiInfoBold, PiTrashSimpleBold } from 'react-icons/pi';
 
@@ -20,92 +17,28 @@ import FieldTooltipContent from './FieldTooltipContent';
 import InputFieldRenderer from './InputFieldRenderer';
 
 type Props = {
-  nodeId: string;
-  fieldName: string;
+  fieldIdentifier: FieldIdentifier;
 };
 
-const LinearViewFieldInternal = ({ nodeId, fieldName }: Props) => {
+const LinearViewFieldInternal = ({ fieldIdentifier }: Props) => {
   const dispatch = useAppDispatch();
-  const { isValueChanged, onReset } = useFieldOriginalValue(nodeId, fieldName);
-  const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(nodeId);
+  const { isValueChanged, onReset } = useFieldOriginalValue(fieldIdentifier.nodeId, fieldIdentifier.fieldName);
+  const { isMouseOverNode, handleMouseOut, handleMouseOver } = useMouseOverNode(fieldIdentifier.nodeId);
   const { t } = useTranslation();
 
   const handleRemoveField = useCallback(() => {
-    dispatch(workflowExposedFieldRemoved({ nodeId, fieldName }));
-  }, [dispatch, fieldName, nodeId]);
+    dispatch(workflowExposedFieldRemoved(fieldIdentifier));
+  }, [dispatch, fieldIdentifier]);
 
   const ref = useRef<HTMLDivElement>(null);
-  const [dndState, setDndState] = useState<DndState>(idle);
-
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) {
-      return;
-    }
-    return combine(
-      draggable({
-        element,
-        getInitialData() {
-          return Dnd.Source.singleWorkflowField.getData({ fieldIdentifier: { nodeId, fieldName } });
-        },
-        onDragStart() {
-          setDndState({ type: 'is-dragging' });
-        },
-        onDrop() {
-          setDndState(idle);
-        },
-      }),
-      dropTargetForElements({
-        element,
-        canDrop({ source }) {
-          if (!Dnd.Source.singleWorkflowField.typeGuard(source.data)) {
-            return false;
-          }
-          return true;
-        },
-        getData({ input }) {
-          const data = Dnd.Source.singleWorkflowField.getData({ fieldIdentifier: { nodeId, fieldName } });
-          return attachClosestEdge(data, {
-            element,
-            input,
-            allowedEdges: ['top', 'bottom'],
-          });
-        },
-        getIsSticky() {
-          return true;
-        },
-        onDragEnter({ self }) {
-          const closestEdge = extractClosestEdge(self.data);
-          setDndState({ type: 'is-dragging-over', closestEdge });
-        },
-        onDrag({ self }) {
-          const closestEdge = extractClosestEdge(self.data);
-
-          // Only need to update react state if nothing has changed.
-          // Prevents re-rendering.
-          setDndState((current) => {
-            if (current.type === 'is-dragging-over' && current.closestEdge === closestEdge) {
-              return current;
-            }
-            return { type: 'is-dragging-over', closestEdge };
-          });
-        },
-        onDragLeave() {
-          setDndState(idle);
-        },
-        onDrop() {
-          setDndState(idle);
-        },
-      })
-    );
-  }, [fieldName, nodeId]);
+  const dndState = useLinearViewFieldDnd(ref, fieldIdentifier);
 
   return (
     <Box position="relative" w="full">
       <Flex
         ref={ref}
         // This is used to trigger the post-move flash animation
-        data-field-name={fieldName}
+        data-field-name={fieldIdentifier.fieldName}
         onMouseEnter={handleMouseOver}
         onMouseLeave={handleMouseOut}
         layerStyle="second"
@@ -117,7 +50,7 @@ const LinearViewFieldInternal = ({ nodeId, fieldName }: Props) => {
       >
         <Flex flexDir="column" w="full">
           <Flex alignItems="center" gap={2}>
-            <EditableFieldTitle nodeId={nodeId} fieldName={fieldName} kind="inputs" />
+            <EditableFieldTitle nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} kind="inputs" />
             <Spacer />
             {isMouseOverNode && <Circle size={2} borderRadius="full" bg="invokeBlue.500" />}
             {isValueChanged && (
@@ -131,7 +64,13 @@ const LinearViewFieldInternal = ({ nodeId, fieldName }: Props) => {
               />
             )}
             <Tooltip
-              label={<FieldTooltipContent nodeId={nodeId} fieldName={fieldName} kind="inputs" />}
+              label={
+                <FieldTooltipContent
+                  nodeId={fieldIdentifier.nodeId}
+                  fieldName={fieldIdentifier.fieldName}
+                  kind="inputs"
+                />
+              }
               openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
               placement="top"
             >
@@ -148,24 +87,18 @@ const LinearViewFieldInternal = ({ nodeId, fieldName }: Props) => {
               icon={<PiTrashSimpleBold />}
             />
           </Flex>
-          <InputFieldRenderer nodeId={nodeId} fieldName={fieldName} />
+          <InputFieldRenderer nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} />
         </Flex>
       </Flex>
-      {dndState.type === 'is-dragging-over' && dndState.closestEdge ? (
-        <DndDropIndicator
-          edge={dndState.closestEdge}
-          // This is the gap between items in the list
-          gap="var(--invoke-space-2)"
-        />
-      ) : null}
+      <DndListDropIndicator dndState={dndState} />
     </Box>
   );
 };
 
-const LinearViewField = ({ nodeId, fieldName }: Props) => {
+const LinearViewField = ({ fieldIdentifier }: Props) => {
   return (
-    <InvocationInputFieldCheck nodeId={nodeId} fieldName={fieldName}>
-      <LinearViewFieldInternal nodeId={nodeId} fieldName={fieldName} />
+    <InvocationInputFieldCheck nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName}>
+      <LinearViewFieldInternal fieldIdentifier={fieldIdentifier} />
     </InvocationInputFieldCheck>
   );
 };
