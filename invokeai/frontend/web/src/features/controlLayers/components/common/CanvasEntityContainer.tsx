@@ -4,14 +4,14 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 // import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
-import { Flex } from '@invoke-ai/ui-library';
+import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsSelected } from 'features/controlLayers/hooks/useEntityIsSelected';
 import { useEntitySelectionColor } from 'features/controlLayers/hooks/useEntitySelectionColor';
 import { entitySelected } from 'features/controlLayers/store/canvasSlice';
 import { Dnd } from 'features/dnd/dnd';
-import DropIndicator from 'features/dnd/DndDropIndicator';
+import { DndDropIndicator } from 'features/dnd/DndDropIndicator';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
@@ -80,11 +80,6 @@ export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
       dropTargetForElements({
         element,
         canDrop({ source }) {
-          // not allowing dropping on yourself
-          if (source.element === element) {
-            return false;
-          }
-          // only allowing tasks to be dropped on me
           if (!Dnd.Source.singleCanvasEntity.typeGuard(source.data)) {
             return false;
           }
@@ -131,22 +126,29 @@ export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
   }, [entityIdentifier]);
 
   return (
-    <Flex
-      ref={ref}
-      position="relative"
-      flexDir="column"
-      w="full"
-      bg={isSelected ? 'base.800' : 'base.850'}
-      onClick={onClick}
-      borderInlineStartWidth={5}
-      borderColor={isSelected ? selectionColor : 'base.800'}
-      borderRadius="base"
-    >
-      {props.children}
+    <Box position="relative">
+      <Flex
+        data-entity-id={entityIdentifier.id}
+        ref={ref}
+        position="relative"
+        flexDir="column"
+        w="full"
+        bg={isSelected ? 'base.800' : 'base.850'}
+        onClick={onClick}
+        borderInlineStartWidth={5}
+        borderColor={isSelected ? selectionColor : 'base.800'}
+        borderRadius="base"
+      >
+        {props.children}
+      </Flex>
       {dndState.type === 'is-dragging-over' && dndState.closestEdge ? (
-        <DropIndicator edge={dndState.closestEdge} gap="8px" />
+        <DndDropIndicator
+          edge={dndState.closestEdge}
+          // This is the gap between items in the list
+          gap="var(--invoke-space-2)"
+        />
       ) : null}
-    </Flex>
+    </Box>
   );
 });
 

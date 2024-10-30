@@ -1,20 +1,17 @@
-/**
- * Spacing tokens don't make a lot of sense for this specific use case,
- * so disabling the linting rule.
- */
-
+// Adapted from https://github.com/alexreardon/pdnd-react-tailwind/blob/main/src/drop-indicator.tsx
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types';
-import { Box, type SystemStyleObject } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Box } from '@invoke-ai/ui-library';
 import type { CSSProperties } from 'react';
 
 /**
  * Design decisions for the drop indicator's main line
  */
 export const line = {
-  borderRadius: 0,
   thickness: 2,
-  backgroundColor: 'base.300',
+  backgroundColor: 'base.500',
 };
+
 export type DropIndicatorProps = {
   /**
    * The `edge` to draw a drop indicator on.
@@ -37,72 +34,30 @@ export type DropIndicatorProps = {
    */
   gap?: string;
 };
-const terminalSize = 8;
 
 const lineStyles: SystemStyleObject = {
   display: 'block',
   position: 'absolute',
   zIndex: 1,
+  borderRadius: 'full',
   // Blocking pointer events to prevent the line from triggering drag events
   // Dragging over the line should count as dragging over the element behind it
   pointerEvents: 'none',
   background: line.backgroundColor,
-
-  // Terminal
-  '::before': {
-    content: '""',
-    width: terminalSize,
-    height: terminalSize,
-    boxSizing: 'border-box',
-    position: 'absolute',
-    border: `${line.thickness}px solid ${line.backgroundColor}`,
-    borderRadius: '50%',
-  },
 };
-
-/**
- * By default, the edge of the terminal will be aligned to the edge of the line.
- *
- * Offsetting the terminal by half its size aligns the middle of the terminal
- * with the edge of the line.
- *
- * We must offset by half the line width in the opposite direction so that the
- * middle of the terminal aligns with the middle of the line.
- *
- * That is,
- *
- * offset = - (terminalSize / 2) + (line.thickness / 2)
- *
- * which simplifies to the following value.
- */
-const offsetToAlignTerminalWithLine = (line.thickness - terminalSize) / 2;
-
-/**
- * We inset the line by half the terminal size,
- * so that the terminal only half sticks out past the item.
- */
-const lineOffset = terminalSize / 2;
 
 type Orientation = 'horizontal' | 'vertical';
 
 const orientationStyles: Record<Orientation, SystemStyleObject> = {
   horizontal: {
-    height: line.thickness,
-    left: lineOffset,
-    right: 0,
-    '::before': {
-      // Horizontal indicators have the terminal on the left
-      left: -terminalSize,
-    },
+    height: `${line.thickness}px`,
+    left: 2,
+    right: 2,
   },
   vertical: {
-    width: line.thickness,
-    top: lineOffset,
-    bottom: 0,
-    '::before': {
-      // Vertical indicators have the terminal at the top
-      top: -terminalSize,
-    },
+    width: `${line.thickness}px`,
+    top: 2,
+    bottom: 2,
   },
 };
 
@@ -116,27 +71,15 @@ const edgeToOrientationMap: Record<Edge, Orientation> = {
 const edgeStyles: Record<Edge, SystemStyleObject> = {
   top: {
     top: 'var(--local-line-offset)',
-    '::before': {
-      top: offsetToAlignTerminalWithLine,
-    },
   },
   right: {
     right: 'var(--local-line-offset)',
-    '::before': {
-      right: offsetToAlignTerminalWithLine,
-    },
   },
   bottom: {
     bottom: 'var(--local-line-offset)',
-    '::before': {
-      bottom: offsetToAlignTerminalWithLine,
-    },
   },
   left: {
     left: 'var(--local-line-offset)',
-    '::before': {
-      left: offsetToAlignTerminalWithLine,
-    },
   },
 };
 
@@ -145,7 +88,7 @@ const edgeStyles: Record<Edge, SystemStyleObject> = {
  *
  * A drop indicator is used to communicate the intended resting place of the draggable item. The orientation of the drop indicator should always match the direction of the content flow.
  */
-export function DropIndicator({ edge, gap = '0px' }: DropIndicatorProps) {
+export function DndDropIndicator({ edge, gap = '0px' }: DropIndicatorProps) {
   /**
    * To clearly communicate the resting place of a draggable item during a drag operation,
    * the drop indicator should be positioned half way between draggable items.
@@ -161,6 +104,3 @@ export function DropIndicator({ edge, gap = '0px' }: DropIndicatorProps) {
     />
   );
 }
-
-// This default export is intended for usage with React.lazy
-export default DropIndicator;

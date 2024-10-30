@@ -6,6 +6,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { BoardId } from 'features/gallery/store/types';
+import type { CSSProperties } from 'react';
 import type { ImageDTO } from 'services/api/types';
 import type { ValueOf } from 'type-fest';
 import type { Jsonifiable } from 'type-fest/source/jsonifiable';
@@ -516,4 +517,14 @@ export function preserveOffsetOnSourceFallbackCentered({
 
     return { x: offsetX, y: offsetY };
   };
+}
+
+// Based on https://github.com/atlassian/pragmatic-drag-and-drop/blob/main/packages/flourish/src/trigger-post-move-flash.tsx
+// That package has a lot of extra deps so we just copied the function here
+export function triggerPostMoveFlash(element: HTMLElement, backgroundColor: CSSProperties['backgroundColor']) {
+  element.animate([{ backgroundColor }, {}], {
+    duration: 700,
+    easing: 'cubic-bezier(0.25, 0.1, 0.25, 1.0)',
+    iterations: 1,
+  });
 }

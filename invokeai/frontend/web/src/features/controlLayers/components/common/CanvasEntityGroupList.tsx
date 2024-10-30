@@ -6,6 +6,7 @@ import { Button, Collapse, Flex, Icon, Spacer, Text } from '@invoke-ai/ui-librar
 import { useAppDispatch } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useBoolean } from 'common/hooks/useBoolean';
+import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScrollStyles';
 import { CanvasEntityAddOfTypeButton } from 'features/controlLayers/components/common/CanvasEntityAddOfTypeButton';
 import { CanvasEntityMergeVisibleButton } from 'features/controlLayers/components/common/CanvasEntityMergeVisibleButton';
@@ -15,7 +16,7 @@ import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTi
 import { entitiesReordered } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { isRenderableEntityType } from 'features/controlLayers/store/types';
-import { Dnd } from 'features/dnd/dnd';
+import { Dnd, triggerPostMoveFlash } from 'features/dnd/dnd';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect } from 'react';
 import { flushSync } from 'react-dom';
@@ -75,7 +76,28 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
           return;
         }
 
+        // Don't move if the source and target are the same index, meaning same position in the list
+        if (indexOfSource === indexOfTarget) {
+          return;
+        }
+
         const closestEdgeOfTarget = extractClosestEdge(targetData);
+
+        // It's possible that the indices are different, but refer to the same position. For example, if the source is
+        // at 2 and the target is at 3, but the target edge is 'top', then the entity is already in the correct position.
+        // We should bail if this is the case.
+        let edgeIndexDelta = 0;
+
+        if (closestEdgeOfTarget === 'bottom') {
+          edgeIndexDelta = 1;
+        } else if (closestEdgeOfTarget === 'top') {
+          edgeIndexDelta = -1;
+        }
+
+        // If the source is already in the correct position, we don't need to move it.
+        if (indexOfSource === indexOfTarget + edgeIndexDelta) {
+          return;
+        }
 
         // Using `flushSync` so we can query the DOM straight after this line
         flushSync(() => {
@@ -92,14 +114,12 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
             })
           );
         });
-        // // Being simple and just querying for the task after the drop.
-        // // We could use react context to register the element in a lookup,
-        // // and then we could retrieve that element after the drop and use
-        // // `triggerPostMoveFlash`. But this gets the job done.
-        // const element = document.querySelector(`[data-task-id="${sourceData.taskId}"]`);
-        // if (element instanceof HTMLElement) {
-        //   triggerPostMoveFlash(element);
-        // }
+
+        // Flash the element that was moved
+        const element = document.querySelector(`[data-entity-id="${sourceData.payload.entityIdentifier.id}"]`);
+        if (element instanceof HTMLElement) {
+          triggerPostMoveFlash(element, colorTokenToCssVar('base.700'));
+        }
       },
     });
   }, [dispatch, entityIdentifiers, type]);

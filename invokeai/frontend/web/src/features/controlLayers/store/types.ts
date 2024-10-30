@@ -552,6 +552,10 @@ export const getEntityIdentifier = <T extends CanvasEntityType>(
   return { id: entity.id, type: entity.type };
 };
 
+export const entityIdentifierToString = (entityIdentifer: CanvasEntityIdentifier): string => {
+  return `${entityIdentifer.type}-${entityIdentifer.id}`;
+};
+
 export const isMaskEntityIdentifier = (
   entityIdentifier: CanvasEntityIdentifier
 ): entityIdentifier is CanvasEntityIdentifier<'inpaint_mask' | 'regional_guidance'> => {
