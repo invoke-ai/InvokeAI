@@ -431,7 +431,6 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       cache: this.manager.cache.transparencyCalculationCache,
       key: hash,
       getValue: async () => {
-        this.$isProcessing.set(true);
         const compositeInpaintMaskCanvas = this.getCompositeCanvas(adapters, rect);
 
         const compositeInpaintMaskImageData = await CanvasCacheModule.getWithFallback({
@@ -486,6 +485,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     this.log.debug({ rect }, 'Calculating generation mode');
 
+    this.$isProcessing.set(true);
     const compositeRasterLayerTransparency = await this.getTransparency(
       rasterLayerAdapters,
       rect,
@@ -497,6 +497,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       rect,
       compositeInpaintMaskHash
     );
+    this.$isProcessing.set(false);
 
     let generationMode: GenerationMode;
     if (compositeRasterLayerTransparency === 'FULLY_TRANSPARENT') {
