@@ -42,7 +42,7 @@ dependencies = [
   "gguf==0.10.0",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
   "mediapipe>=0.10.7",          # needed for "mediapipeface" controlnet model
-  "numpy==1.26.4",              # >1.24.0 is needed to use the 'strict' argument to np.testing.assert_array_equal()
+  "numpy<2.0.0",
   "onnx==1.16.1",
   "onnxruntime==1.19.2",
   "opencv-python==4.9.0.80",
@@ -52,10 +52,10 @@ dependencies = [
   "sentencepiece==0.2.0",
   "spandrel==0.3.4",
   "timm==0.6.13",               # needed to override timm latest in controlnet_aux, see  https://github.com/isl-org/ZoeDepth/issues/26
-  "torch==2.4.1",
-  "torchmetrics==0.11.4",
-  "torchsde==0.2.6",
-  "torchvision==0.19.1",
+  "torch",                      # torch and related dependencies are not pinned, resolved as dependency of `diffusers[torch]` and so forth
+  "torchmetrics",
+  "torchsde",
+  "torchvision",
   "transformers==4.41.1",
 
   # Core application dependencies, pinned for reproducible builds.
@@ -73,7 +73,7 @@ dependencies = [
   "click",
   "datasets",
   "Deprecated",
-  "dnspython~=2.4.0",
+  "dnspython",
   "dynamicprompts",
   "easing-functions",
   "einops",
@@ -85,23 +85,23 @@ dependencies = [
   "picklescan",
   "pillow",
   "prompt-toolkit",
-  "pympler~=1.0.1",
+  "pympler",
   "pypatchmatch",
-  'pyperclip',
+  "pyperclip",
   "pyreadline3",
   "python-multipart",
-  "requests~=2.28.2",
+  "requests",
   "rich~=13.3",
-  "scikit-image~=0.21.0",
+  "scikit-image",
   "semver~=3.0.1",
-  "test-tube~=0.7.5",
+  "test-tube",
   "windows-curses; sys_platform=='win32'",
 ]
 
 [project.optional-dependencies]
 "xformers" = [
   # Core generation dependencies, pinned for reproducible builds.
-  "xformers==0.0.28.post1; sys_platform!='darwin'",
+  "xformers>=0.0.28.post1; sys_platform!='darwin'",
   # Auxiliary dependencies, pinned only if necessary.
   "triton; sys_platform=='linux'",
 ]
