@@ -85,12 +85,8 @@ export const IPAdapterSettings = memo(() => {
     [entityIdentifier.id]
   );
   const targetData = useMemo<Dnd.types['TargetDataTypeMap']['setGlobalReferenceImage']>(
-    () =>
-      Dnd.Target.setGlobalReferenceImage.getData(
-        { globalReferenceImageId: entityIdentifier.id },
-        ipAdapter.image?.image_name
-      ),
-    [entityIdentifier.id, ipAdapter.image?.image_name]
+    () => Dnd.Target.setGlobalReferenceImage.getData({ entityIdentifier }, ipAdapter.image?.image_name),
+    [entityIdentifier, ipAdapter.image?.image_name]
   );
   const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);
   const isBusy = useCanvasIsBusy();

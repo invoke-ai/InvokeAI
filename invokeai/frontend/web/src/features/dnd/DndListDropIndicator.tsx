@@ -3,7 +3,6 @@ import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
 import type { DndListState } from 'features/dnd/dnd';
-import type { CSSProperties } from 'react';
 
 /**
  * Design decisions for the drop indicator's main line
@@ -100,8 +99,7 @@ function DndDropIndicatorInternal({ edge, gap = '0px' }: DropIndicatorProps) {
 
   return (
     <Box
-      sx={{ ...lineStyles, ...orientationStyles[orientation], ...edgeStyles[edge] }}
-      style={{ '--local-line-offset': lineOffset } as CSSProperties}
+      sx={{ ...lineStyles, ...orientationStyles[orientation], ...edgeStyles[edge], '--local-line-offset': lineOffset }}
     />
   );
 }
