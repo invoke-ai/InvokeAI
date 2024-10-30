@@ -53,6 +53,8 @@ export type ControlNetModelConfig = S['ControlNetDiffusersConfig'] | S['ControlN
 export type IPAdapterModelConfig = S['IPAdapterInvokeAIConfig'] | S['IPAdapterCheckpointConfig'];
 export type T2IAdapterModelConfig = S['T2IAdapterConfig'];
 export type CLIPEmbedModelConfig = S['CLIPEmbedDiffusersConfig'];
+export type CLIPLEmbedModelConfig = S['CLIPLEmbedDiffusersConfig'];
+export type CLIPGEmbedModelConfig = S['CLIPGEmbedDiffusersConfig'];
 export type T5EncoderModelConfig = S['T5EncoderConfig'];
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = S['T5EncoderBnbQuantizedLlmInt8bConfig'];
 export type SpandrelImageToImageModelConfig = S['SpandrelImageToImageConfig'];
@@ -101,16 +103,20 @@ export const isLoRAModelConfig = (config: AnyModelConfig): config is LoRAModelCo
   return config.type === 'lora';
 };
 
-export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig | MainModelConfig => {
-  return config.type === 'vae' || check_submodels(['vae'], config);
+export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return config.type === 'vae' || (config.type === 'main' && check_submodels(['vae'], config));
 };
 
-export const isNonFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig | MainModelConfig => {
-  return (config.type === 'vae' || check_submodels(['vae'], config)) && config.base !== 'flux';
+export const isNonFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (config.type === 'main' && check_submodels(['vae'], config))) && config.base !== 'flux'
+  );
 };
 
-export const isFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig | MainModelConfig => {
-  return (config.type === 'vae' || check_submodels(['vae'], config)) && config.base === 'flux';
+export const isFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (config.type === 'main' && check_submodels(['vae'], config))) && config.base === 'flux'
+  );
 };
 
 export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
@@ -131,23 +137,25 @@ export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAd
 
 export const isT5EncoderModelConfig = (
   config: AnyModelConfig
-): config is T5EncoderModelConfig | T5EncoderBnbQuantizedLlmInt8bModelConfig | MainModelConfig => {
-  return config.type === 't5_encoder' || check_submodels(['t5_encoder'], config);
+): config is T5EncoderModelConfig | T5EncoderBnbQuantizedLlmInt8bModelConfig => {
+  return config.type === 't5_encoder' || (config.type === 'main' && check_submodels(['t5_encoder'], config));
 };
 
-export const isCLIPEmbedModelConfig = (config: AnyModelConfig): config is CLIPEmbedModelConfig | MainModelConfig => {
-  return config.type === 'clip_embed' || check_submodels(['clip_embed'], config);
+export const isCLIPEmbedModelConfig = (config: AnyModelConfig): config is CLIPEmbedModelConfig => {
+  return config.type === 'clip_embed' || (config.type === 'main' && check_submodels(['clip_embed'], config));
 };
 
-export const isCLIPLEmbedModelConfig = (config: AnyModelConfig): config is CLIPEmbedModelConfig | MainModelConfig => {
+export const isCLIPLEmbedModelConfig = (config: AnyModelConfig): config is CLIPLEmbedModelConfig => {
   return (
-    (config.type === 'clip_embed' && config.variant === 'large') || check_submodels(['clip_embed', 'gigantic'], config)
+    (config.type === 'clip_embed' && config.variant === 'large') ||
+    (config.type === 'main' && check_submodels(['clip_embed', 'large'], config))
   );
 };
 
-export const isCLIPGEmbedModelConfig = (config: AnyModelConfig): config is CLIPEmbedModelConfig | MainModelConfig => {
+export const isCLIPGEmbedModelConfig = (config: AnyModelConfig): config is CLIPGEmbedModelConfig => {
   return (
-    (config.type === 'clip_embed' && config.variant === 'gigantic') || check_submodels(['clip_embed', 'large'], config)
+    (config.type === 'clip_embed' && config.variant === 'gigantic') ||
+    (config.type === 'main' && check_submodels(['clip_embed', 'gigantic'], config))
   );
 };
 

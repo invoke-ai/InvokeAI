@@ -6,7 +6,7 @@ import type { CLIPEmbedModelFieldInputInstance, CLIPEmbedModelFieldInputTemplate
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCLIPEmbedModels } from 'services/api/hooks/modelsByType';
-import type { CLIPEmbedModelConfig, MainModelConfig } from 'services/api/types';
+import type { CLIPEmbedModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -19,7 +19,7 @@ const CLIPEmbedModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useCLIPEmbedModels();
   const _onChange = useCallback(
-    (value: CLIPEmbedModelConfig | MainModelConfig | null) => {
+    (value: CLIPEmbedModelConfig | null) => {
       if (!value) {
         return;
       }

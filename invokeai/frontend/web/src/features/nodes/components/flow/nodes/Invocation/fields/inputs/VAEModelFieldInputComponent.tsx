@@ -5,7 +5,7 @@ import { fieldVaeModelValueChanged } from 'features/nodes/store/nodesSlice';
 import type { VAEModelFieldInputInstance, VAEModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useVAEModels } from 'services/api/hooks/modelsByType';
-import type { MainModelConfig, VAEModelConfig } from 'services/api/types';
+import type { VAEModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -16,7 +16,7 @@ const VAEModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useVAEModels();
   const _onChange = useCallback(
-    (value: VAEModelConfig | MainModelConfig | null) => {
+    (value: VAEModelConfig | null) => {
       if (!value) {
         return;
       }

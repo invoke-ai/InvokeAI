@@ -26,6 +26,8 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   T5EncoderModelField: undefined,
   FluxVAEModelField: undefined,
   CLIPEmbedModelField: undefined,
+  CLIPLEmbedModelField: undefined,
+  CLIPGEmbedModelField: undefined,
 };
 
 export const buildFieldInputInstance = (id: string, template: FieldInputTemplate): FieldInputInstance => {

@@ -7,11 +7,7 @@ import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useT5EncoderModels } from 'services/api/hooks/modelsByType';
-import type {
-  MainModelConfig,
-  T5EncoderBnbQuantizedLlmInt8bModelConfig,
-  T5EncoderModelConfig,
-} from 'services/api/types';
+import type { T5EncoderBnbQuantizedLlmInt8bModelConfig, T5EncoderModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
@@ -24,7 +20,7 @@ const T5EncoderModelFieldInputComponent = (props: Props) => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useT5EncoderModels();
   const _onChange = useCallback(
-    (value: T5EncoderBnbQuantizedLlmInt8bModelConfig | T5EncoderModelConfig | MainModelConfig | null) => {
+    (value: T5EncoderBnbQuantizedLlmInt8bModelConfig | T5EncoderModelConfig | null) => {
       if (!value) {
         return;
       }

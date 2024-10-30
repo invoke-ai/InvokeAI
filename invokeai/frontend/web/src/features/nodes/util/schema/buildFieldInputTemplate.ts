@@ -3,6 +3,8 @@ import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
   CLIPEmbedModelFieldInputTemplate,
+  CLIPGEmbedModelFieldInputTemplate,
+  CLIPLEmbedModelFieldInputTemplate,
   ColorFieldInputTemplate,
   ControlNetModelFieldInputTemplate,
   EnumFieldInputTemplate,
@@ -269,6 +271,34 @@ const buildCLIPEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPEmbed
   return template;
 };
 
+const buildCLIPLEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPLEmbedModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: CLIPLEmbedModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildCLIPGEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPGEmbedModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: CLIPGEmbedModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildFluxVAEModelFieldInputTemplate: FieldInputTemplateBuilder<FluxVAEModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -470,6 +500,8 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   VAEModelField: buildVAEModelFieldInputTemplate,
   T5EncoderModelField: buildT5EncoderModelFieldInputTemplate,
   CLIPEmbedModelField: buildCLIPEmbedModelFieldInputTemplate,
+  CLIPLEmbedModelField: buildCLIPLEmbedModelFieldInputTemplate,
+  CLIPGEmbedModelField: buildCLIPGEmbedModelFieldInputTemplate,
   FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
 } as const;
 

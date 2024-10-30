@@ -8,6 +8,10 @@ import {
   isBooleanFieldInputTemplate,
   isCLIPEmbedModelFieldInputInstance,
   isCLIPEmbedModelFieldInputTemplate,
+  isCLIPGEmbedModelFieldInputInstance,
+  isCLIPGEmbedModelFieldInputTemplate,
+  isCLIPLEmbedModelFieldInputInstance,
+  isCLIPLEmbedModelFieldInputTemplate,
   isColorFieldInputInstance,
   isColorFieldInputTemplate,
   isControlNetModelFieldInputInstance,
@@ -56,6 +60,8 @@ import { memo } from 'react';
 import BoardFieldInputComponent from './inputs/BoardFieldInputComponent';
 import BooleanFieldInputComponent from './inputs/BooleanFieldInputComponent';
 import CLIPEmbedModelFieldInputComponent from './inputs/CLIPEmbedModelFieldInputComponent';
+import CLIPGEmbedModelFieldInputComponent from './inputs/CLIPGEmbedModelFieldInputComponent';
+import CLIPLEmbedModelFieldInputComponent from './inputs/CLIPLEmbedModelFieldInputComponent';
 import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
 import ControlNetModelFieldInputComponent from './inputs/ControlNetModelFieldInputComponent';
 import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
@@ -133,6 +139,14 @@ const InputFieldRenderer = ({ nodeId, fieldName }: InputFieldProps) => {
   }
   if (isCLIPEmbedModelFieldInputInstance(fieldInstance) && isCLIPEmbedModelFieldInputTemplate(fieldTemplate)) {
     return <CLIPEmbedModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isCLIPLEmbedModelFieldInputInstance(fieldInstance) && isCLIPLEmbedModelFieldInputTemplate(fieldTemplate)) {
+    return <CLIPLEmbedModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
+  }
+
+  if (isCLIPGEmbedModelFieldInputInstance(fieldInstance) && isCLIPGEmbedModelFieldInputTemplate(fieldTemplate)) {
+    return <CLIPGEmbedModelFieldInputComponent nodeId={nodeId} field={fieldInstance} fieldTemplate={fieldTemplate} />;
   }
 
   if (isFluxVAEModelFieldInputInstance(fieldInstance) && isFluxVAEModelFieldInputTemplate(fieldTemplate)) {

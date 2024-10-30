@@ -159,6 +159,14 @@ const zCLIPEmbedModelFieldType = zFieldTypeBase.extend({
   name: z.literal('CLIPEmbedModelField'),
   originalType: zStatelessFieldType.optional(),
 });
+const zCLIPLEmbedModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('CLIPLEmbedModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
+const zCLIPGEmbedModelFieldType = zFieldTypeBase.extend({
+  name: z.literal('CLIPGEmbedModelField'),
+  originalType: zStatelessFieldType.optional(),
+});
 const zFluxVAEModelFieldType = zFieldTypeBase.extend({
   name: z.literal('FluxVAEModelField'),
   originalType: zStatelessFieldType.optional(),
@@ -189,6 +197,8 @@ const zStatefulFieldType = z.union([
   zSpandrelImageToImageModelFieldType,
   zT5EncoderModelFieldType,
   zCLIPEmbedModelFieldType,
+  zCLIPLEmbedModelFieldType,
+  zCLIPGEmbedModelFieldType,
   zFluxVAEModelFieldType,
   zColorFieldType,
   zSchedulerFieldType,
@@ -753,6 +763,52 @@ export const isCLIPEmbedModelFieldInputTemplate = (val: unknown): val is CLIPEmb
 
 // #endregion
 
+// #region CLIPLEmbedModelField
+
+export const zCLIPLEmbedModelFieldValue = zModelIdentifierField.optional();
+const zCLIPLEmbedModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zCLIPLEmbedModelFieldValue,
+});
+const zCLIPLEmbedModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zCLIPLEmbedModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zCLIPLEmbedModelFieldValue,
+});
+
+export type CLIPLEmbedModelFieldValue = z.infer<typeof zCLIPLEmbedModelFieldValue>;
+
+export type CLIPLEmbedModelFieldInputInstance = z.infer<typeof zCLIPLEmbedModelFieldInputInstance>;
+export type CLIPLEmbedModelFieldInputTemplate = z.infer<typeof zCLIPLEmbedModelFieldInputTemplate>;
+export const isCLIPLEmbedModelFieldInputInstance = (val: unknown): val is CLIPLEmbedModelFieldInputInstance =>
+  zCLIPLEmbedModelFieldInputInstance.safeParse(val).success;
+export const isCLIPLEmbedModelFieldInputTemplate = (val: unknown): val is CLIPLEmbedModelFieldInputTemplate =>
+  zCLIPLEmbedModelFieldInputTemplate.safeParse(val).success;
+
+// #endregion
+
+// #region CLIPGEmbedModelField
+
+export const zCLIPGEmbedModelFieldValue = zModelIdentifierField.optional();
+const zCLIPGEmbedModelFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zCLIPGEmbedModelFieldValue,
+});
+const zCLIPGEmbedModelFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zCLIPGEmbedModelFieldType,
+  originalType: zFieldType.optional(),
+  default: zCLIPGEmbedModelFieldValue,
+});
+
+export type CLIPGEmbedModelFieldValue = z.infer<typeof zCLIPLEmbedModelFieldValue>;
+
+export type CLIPGEmbedModelFieldInputInstance = z.infer<typeof zCLIPGEmbedModelFieldInputInstance>;
+export type CLIPGEmbedModelFieldInputTemplate = z.infer<typeof zCLIPGEmbedModelFieldInputTemplate>;
+export const isCLIPGEmbedModelFieldInputInstance = (val: unknown): val is CLIPGEmbedModelFieldInputInstance =>
+  zCLIPGEmbedModelFieldInputInstance.safeParse(val).success;
+export const isCLIPGEmbedModelFieldInputTemplate = (val: unknown): val is CLIPGEmbedModelFieldInputTemplate =>
+  zCLIPGEmbedModelFieldInputTemplate.safeParse(val).success;
+
+// #endregion
+
 // #region SchedulerField
 
 export const zSchedulerFieldValue = zSchedulerField.optional();
@@ -845,6 +901,8 @@ export const zStatefulFieldValue = z.union([
   zT5EncoderModelFieldValue,
   zFluxVAEModelFieldValue,
   zCLIPEmbedModelFieldValue,
+  zCLIPLEmbedModelFieldValue,
+  zCLIPGEmbedModelFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
 ]);
@@ -912,6 +970,8 @@ const zStatefulFieldInputTemplate = z.union([
   zT5EncoderModelFieldInputTemplate,
   zFluxVAEModelFieldInputTemplate,
   zCLIPEmbedModelFieldInputTemplate,
+  zCLIPLEmbedModelFieldInputTemplate,
+  zCLIPGEmbedModelFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
   zStatelessFieldInputTemplate,

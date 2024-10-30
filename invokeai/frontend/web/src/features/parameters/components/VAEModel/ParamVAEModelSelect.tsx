@@ -7,7 +7,7 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVAEModels } from 'services/api/hooks/modelsByType';
-import type { MainModelConfig, VAEModelConfig } from 'services/api/types';
+import type { VAEModelConfig } from 'services/api/types';
 
 const ParamVAEModelSelect = () => {
   const dispatch = useAppDispatch();
@@ -16,7 +16,7 @@ const ParamVAEModelSelect = () => {
   const vae = useAppSelector(selectVAE);
   const [modelConfigs, { isLoading }] = useVAEModels();
   const getIsDisabled = useCallback(
-    (vae: VAEModelConfig | MainModelConfig): boolean => {
+    (vae: VAEModelConfig): boolean => {
       const isCompatible = base === vae.base;
       const hasMainModel = Boolean(base);
       return !hasMainModel || !isCompatible;
@@ -24,7 +24,7 @@ const ParamVAEModelSelect = () => {
     [base]
   );
   const _onChange = useCallback(
-    (vae: VAEModelConfig | MainModelConfig | null) => {
+    (vae: VAEModelConfig | null) => {
       dispatch(vaeSelected(vae ? zModelIdentifierField.parse(vae) : null));
     },
     [dispatch]

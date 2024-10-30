@@ -1,30 +1,31 @@
 import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { fieldFluxVAEModelValueChanged } from 'features/nodes/store/nodesSlice';
-import type { FluxVAEModelFieldInputInstance, FluxVAEModelFieldInputTemplate } from 'features/nodes/types/field';
+import { fieldCLIPLEmbedValueChanged } from 'features/nodes/store/nodesSlice';
+import type { CLIPLEmbedModelFieldInputInstance, CLIPLEmbedModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFluxVAEModels } from 'services/api/hooks/modelsByType';
-import type { VAEModelConfig } from 'services/api/types';
+import { useCLIPEmbedModels } from 'services/api/hooks/modelsByType';
+import { type CLIPLEmbedModelConfig, isCLIPLEmbedModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
-type Props = FieldComponentProps<FluxVAEModelFieldInputInstance, FluxVAEModelFieldInputTemplate>;
+type Props = FieldComponentProps<CLIPLEmbedModelFieldInputInstance, CLIPLEmbedModelFieldInputTemplate>;
 
-const FluxVAEModelFieldInputComponent = (props: Props) => {
+const CLIPLEmbedModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const { t } = useTranslation();
   const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
   const dispatch = useAppDispatch();
-  const [modelConfigs, { isLoading }] = useFluxVAEModels();
+  const [modelConfigs, { isLoading }] = useCLIPEmbedModels();
+
   const _onChange = useCallback(
-    (value: VAEModelConfig | null) => {
+    (value: CLIPLEmbedModelConfig | null) => {
       if (!value) {
         return;
       }
       dispatch(
-        fieldFluxVAEModelValueChanged({
+        fieldCLIPLEmbedValueChanged({
           nodeId,
           fieldName: field.name,
           value,
@@ -34,7 +35,7 @@ const FluxVAEModelFieldInputComponent = (props: Props) => {
     [dispatch, field.name, nodeId]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelConfigs,
+    modelConfigs: modelConfigs.filter((config) => isCLIPLEmbedModelConfig(config)),
     onChange: _onChange,
     isLoading,
     selectedModel: field.value,
@@ -57,4 +58,4 @@ const FluxVAEModelFieldInputComponent = (props: Props) => {
   );
 };
 
-export default memo(FluxVAEModelFieldInputComponent);
+export default memo(CLIPLEmbedModelFieldInputComponent);

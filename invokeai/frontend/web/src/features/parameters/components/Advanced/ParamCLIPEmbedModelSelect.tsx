@@ -6,7 +6,7 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCLIPEmbedModels } from 'services/api/hooks/modelsByType';
-import type { CLIPEmbedModelConfig, MainModelConfig } from 'services/api/types';
+import type { CLIPEmbedModelConfig } from 'services/api/types';
 
 const ParamCLIPEmbedModelSelect = () => {
   const dispatch = useAppDispatch();
@@ -15,7 +15,7 @@ const ParamCLIPEmbedModelSelect = () => {
   const [modelConfigs, { isLoading }] = useCLIPEmbedModels();
 
   const _onChange = useCallback(
-    (clipEmbedModel: CLIPEmbedModelConfig | MainModelConfig | null) => {
+    (clipEmbedModel: CLIPEmbedModelConfig | null) => {
       if (clipEmbedModel) {
         dispatch(clipEmbedModelSelected(zModelIdentifierField.parse(clipEmbedModel)));
       }
