@@ -1,8 +1,5 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-// import { pointerOutsideOfPreview } from '@atlaskit/pragmatic-drag-and-drop/element/pointer-outside-of-preview';
-// import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
-import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { Box, Flex } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
@@ -10,28 +7,11 @@ import { useEntityIdentifierContext } from 'features/controlLayers/contexts/Enti
 import { useEntityIsSelected } from 'features/controlLayers/hooks/useEntityIsSelected';
 import { useEntitySelectionColor } from 'features/controlLayers/hooks/useEntitySelectionColor';
 import { entitySelected } from 'features/controlLayers/store/canvasSlice';
-import { Dnd } from 'features/dnd/dnd';
+import type { DndState } from 'features/dnd/dnd';
+import { Dnd, idle } from 'features/dnd/dnd';
 import { DndDropIndicator } from 'features/dnd/DndDropIndicator';
 import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-
-type DndState =
-  | {
-      type: 'idle';
-    }
-  | {
-      type: 'preview';
-      container: HTMLElement;
-    }
-  | {
-      type: 'is-dragging';
-    }
-  | {
-      type: 'is-dragging-over';
-      closestEdge: Edge | null;
-    };
-
-const idle: DndState = { type: 'idle' };
 
 export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
   const dispatch = useAppDispatch();
@@ -58,18 +38,6 @@ export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
         getInitialData() {
           return Dnd.Source.singleCanvasEntity.getData({ entityIdentifier });
         },
-        // onGenerateDragPreview({ nativeSetDragImage }) {
-        //   setCustomNativeDragPreview({
-        //     nativeSetDragImage,
-        //     getOffset: pointerOutsideOfPreview({
-        //       x: '16px',
-        //       y: '8px',
-        //     }),
-        //     render({ container }) {
-        //       setState({ type: 'preview', container });
-        //     },
-        //   });
-        // },
         onDragStart() {
           setDndState({ type: 'is-dragging' });
         },
@@ -128,6 +96,7 @@ export const CanvasEntityContainer = memo((props: PropsWithChildren) => {
   return (
     <Box position="relative">
       <Flex
+        // This is used to trigger the post-move flash animation
         data-entity-id={entityIdentifier.id}
         ref={ref}
         position="relative"

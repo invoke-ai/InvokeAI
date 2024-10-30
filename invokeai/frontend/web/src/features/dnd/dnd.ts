@@ -2,10 +2,12 @@
 
 import type { Input } from '@atlaskit/pragmatic-drag-and-drop/dist/types/entry-point/types';
 import type { GetOffsetFn } from '@atlaskit/pragmatic-drag-and-drop/dist/types/public-utils/element/custom-native-drag-preview/types';
+import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/dist/types/closest-edge';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import type { BoardId } from 'features/gallery/store/types';
+import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { CSSProperties } from 'react';
 import type { ImageDTO } from 'services/api/types';
 import type { ValueOf } from 'type-fest';
@@ -171,11 +173,16 @@ const multipleImage = buildDndSourceApi<{ imageDTOs: ImageDTO[]; boardId: BoardI
  * Dnd source API for a single canvas entity.
  */
 const singleCanvasEntity = buildDndSourceApi<{ entityIdentifier: CanvasEntityIdentifier }>('SingleCanvasEntity');
+/**
+ * Dnd source API for a single workflow field.
+ */
+const singleWorkflowField = buildDndSourceApi<{ fieldIdentifier: FieldIdentifier }>('SingleWorkflowField');
 
 const DndSource = {
   singleImage,
   multipleImage,
   singleCanvasEntity,
+  singleWorkflowField,
 } as const;
 
 type SourceDataTypeMap = {
@@ -528,3 +535,20 @@ export function triggerPostMoveFlash(element: HTMLElement, backgroundColor: CSSP
     iterations: 1,
   });
 }
+
+export type DndState =
+  | {
+      type: 'idle';
+    }
+  | {
+      type: 'preview';
+      container: HTMLElement;
+    }
+  | {
+      type: 'is-dragging';
+    }
+  | {
+      type: 'is-dragging-over';
+      closestEdge: Edge | null;
+    };
+export const idle: DndState = { type: 'idle' };
