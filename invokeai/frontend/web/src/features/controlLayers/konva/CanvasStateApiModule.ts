@@ -680,4 +680,20 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    * Whether the shift key is currently pressed.
    */
   $shiftKey = $shift;
+
+  repr = () => {
+    return {
+      id: this.id,
+      type: this.type,
+      path: this.path,
+      $filteringAdapter: this.$filteringAdapter.get()?.entityIdentifier,
+      $isFiltering: this.$isFiltering.get(),
+      $transformingAdapter: this.$transformingAdapter.get()?.entityIdentifier,
+      $isTransforming: this.$isTransforming.get(),
+      $rasterizingAdapter: this.$rasterizingAdapter.get()?.entityIdentifier,
+      $isRasterizing: this.$isRasterizing.get(),
+      $segmentingAdapter: this.$segmentingAdapter.get()?.entityIdentifier,
+      $isSegmenting: this.$isSegmenting.get(),
+    };
+  };
 }
