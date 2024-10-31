@@ -92,7 +92,9 @@
         "none": "Niente",
         "new": "Nuovo",
         "view": "Vista",
-        "close": "Chiudi"
+        "close": "Chiudi",
+        "clipboard": "Appunti",
+        "ok": "Ok"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -542,7 +544,6 @@
         "defaultSettingsSaved": "Impostazioni predefinite salvate",
         "defaultSettings": "Impostazioni predefinite",
         "metadata": "Metadati",
-        "useDefaultSettings": "Usa le impostazioni predefinite",
         "triggerPhrases": "Frasi Trigger",
         "deleteModelImage": "Elimina l'immagine del modello",
         "localOnly": "solo locale",
@@ -588,7 +589,15 @@
         "installingXModels_many": "Installazione di {{count}} modelli",
         "installingXModels_other": "Installazione di {{count}} modelli",
         "includesNModels": "Include {{n}} modelli e le loro dipendenze",
-        "starterBundleHelpText": "Installa facilmente tutti i modelli necessari per iniziare con un modello base, tra cui un modello principale, controlnet, adattatori IP e altro. Selezionando un pacchetto salterai tutti i modelli che hai già installato."
+        "starterBundleHelpText": "Installa facilmente tutti i modelli necessari per iniziare con un modello base, tra cui un modello principale, controlnet, adattatori IP e altro. Selezionando un pacchetto salterai tutti i modelli che hai già installato.",
+        "noDefaultSettings": "Nessuna impostazione predefinita configurata per questo modello. Visita Gestione Modelli per aggiungere impostazioni predefinite.",
+        "defaultSettingsOutOfSync": "Alcune impostazioni non corrispondono a quelle predefinite del modello:",
+        "restoreDefaultSettings": "Fare clic per utilizzare le impostazioni predefinite del modello.",
+        "usingDefaultSettings": "Utilizzo delle impostazioni predefinite del modello",
+        "huggingFace": "HuggingFace",
+        "huggingFaceRepoID": "HuggingFace Repository ID",
+        "clipEmbed": "CLIP Embed",
+        "t5Encoder": "T5 Encoder"
     },
     "parameters": {
         "images": "Immagini",
@@ -689,7 +698,8 @@
         "boxBlur": "Sfocatura Box",
         "staged": "Maschera espansa",
         "optimizedImageToImage": "Immagine-a-immagine ottimizzata",
-        "sendToCanvas": "Invia alla Tela"
+        "sendToCanvas": "Invia alla Tela",
+        "coherenceMinDenoise": "Riduzione minima del rumore"
     },
     "settings": {
         "models": "Modelli",
@@ -724,7 +734,10 @@
         "reloadingIn": "Ricaricando in",
         "informationalPopoversDisabled": "Testo informativo a comparsa disabilitato",
         "informationalPopoversDisabledDesc": "I testi informativi a comparsa sono disabilitati. Attivali nelle impostazioni.",
-        "confirmOnNewSession": "Conferma su nuova sessione"
+        "confirmOnNewSession": "Conferma su nuova sessione",
+        "enableModelDescriptions": "Abilita le descrizioni dei modelli nei menu a discesa",
+        "modelDescriptionsDisabled": "Descrizioni dei modelli nei menu a discesa disabilitate",
+        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disabilitate. Abilitale nelle Impostazioni."
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -1076,7 +1089,8 @@
         "noLoRAsInstalled": "Nessun LoRA installato",
         "addLora": "Aggiungi LoRA",
         "defaultVAE": "VAE predefinito",
-        "concepts": "Concetti"
+        "concepts": "Concetti",
+        "lora": "LoRA"
     },
     "invocationCache": {
         "disable": "Disabilita",
@@ -1133,7 +1147,8 @@
             "paragraphs": [
                 "Scegli quanti livelli del modello CLIP saltare.",
                 "Alcuni modelli funzionano meglio con determinate impostazioni di CLIP Skip."
-            ]
+            ],
+            "heading": "CLIP Skip"
         },
         "compositingCoherencePass": {
             "heading": "Passaggio di Coerenza",
@@ -1492,6 +1507,42 @@
                 "Controlla quanto il prompt influenza il processo di generazione.",
                 "Valori di guida elevati possono causare sovrasaturazione e una guida elevata o bassa può causare risultati di generazione distorti. La guida si applica solo ai modelli FLUX DEV."
             ]
+        },
+        "regionalReferenceImage": {
+            "paragraphs": [
+                "Pennello per applicare un'immagine di riferimento ad aree specifiche."
+            ],
+            "heading": "Immagine di riferimento Regionale"
+        },
+        "rasterLayer": {
+            "paragraphs": [
+                "Contenuto basato sui pixel della tua tela, utilizzato durante la generazione dell'immagine."
+            ],
+            "heading": "Livello Raster"
+        },
+        "regionalGuidance": {
+            "heading": "Guida Regionale",
+            "paragraphs": [
+                "Pennello per guidare la posizione in cui devono apparire gli elementi dei prompt globali."
+            ]
+        },
+        "regionalGuidanceAndReferenceImage": {
+            "heading": "Guida regionale e immagine di riferimento regionale",
+            "paragraphs": [
+                "Per la Guida Regionale, utilizzare il pennello per indicare dove devono apparire gli elementi dei prompt globali.",
+                "Per l'immagine di riferimento regionale, utilizzare il pennello per applicare un'immagine di riferimento ad aree specifiche."
+            ]
+        },
+        "globalReferenceImage": {
+            "heading": "Immagine di riferimento Globale",
+            "paragraphs": [
+                "Applica un'immagine di riferimento per influenzare l'intera generazione."
+            ]
+        },
+        "inpainting": {
+            "paragraphs": [
+                "Controlla quale area viene modificata, in base all'intensità di riduzione del rumore."
+            ]
         }
     },
     "sdxl": {
@@ -1513,7 +1564,6 @@
         "refinerSteps": "Passi Affinamento"
     },
     "metadata": {
-        "seamless": "Senza giunture",
         "positivePrompt": "Prompt positivo",
         "negativePrompt": "Prompt negativo",
         "generationMode": "Modalità generazione",
@@ -1541,7 +1591,10 @@
         "parsingFailed": "Analisi non riuscita",
         "recallParameter": "Richiama {{label}}",
         "canvasV2Metadata": "Tela",
-        "guidance": "Guida"
+        "guidance": "Guida",
+        "seamlessXAxis": "Asse X senza giunte",
+        "seamlessYAxis": "Asse Y senza giunte",
+        "vae": "VAE"
     },
     "hrf": {
         "enableHrf": "Abilita Correzione Alta Risoluzione",
@@ -1638,11 +1691,11 @@
         "regionalGuidance": "Guida regionale",
         "opacity": "Opacità",
         "mergeVisible": "Fondi il visibile",
-        "mergeVisibleOk": "Livelli visibili uniti",
+        "mergeVisibleOk": "Livelli uniti",
         "deleteReferenceImage": "Elimina l'immagine di riferimento",
         "referenceImage": "Immagine di riferimento",
         "fitBboxToLayers": "Adatta il riquadro di delimitazione ai livelli",
-        "mergeVisibleError": "Errore durante l'unione dei livelli visibili",
+        "mergeVisibleError": "Errore durante l'unione dei livelli",
         "regionalReferenceImage": "Immagine di riferimento Regionale",
         "newLayerFromImage": "Nuovo livello da immagine",
         "newCanvasFromImage": "Nuova tela da immagine",
@@ -1734,7 +1787,7 @@
             "composition": "Solo Composizione",
             "ipAdapterMethod": "Metodo Adattatore IP"
         },
-        "showingType": "Mostrare {{type}}",
+        "showingType": "Mostra {{type}}",
         "dynamicGrid": "Griglia dinamica",
         "tool": {
             "view": "Muovi",
@@ -1862,8 +1915,6 @@
         "layer_withCount_one": "Livello ({{count}})",
         "layer_withCount_many": "Livelli ({{count}})",
         "layer_withCount_other": "Livelli ({{count}})",
-        "convertToControlLayer": "Converti in livello di controllo",
-        "convertToRasterLayer": "Converti in livello raster",
         "unlocked": "Sbloccato",
         "enableTransparencyEffect": "Abilita l'effetto trasparenza",
         "replaceLayer": "Sostituisci livello",
@@ -1876,9 +1927,7 @@
         "newCanvasSession": "Nuova sessione Tela",
         "deleteSelected": "Elimina selezione",
         "settings": {
-            "isolatedFilteringPreview": "Anteprima del filtraggio isolata",
             "isolatedStagingPreview": "Anteprima di generazione isolata",
-            "isolatedTransformingPreview": "Anteprima di trasformazione isolata",
             "isolatedPreview": "Anteprima isolata",
             "invertBrushSizeScrollDirection": "Inverti scorrimento per dimensione pennello",
             "snapToGrid": {
@@ -1890,7 +1939,9 @@
             "preserveMask": {
                 "alert": "Preservare la regione mascherata",
                 "label": "Preserva la regione mascherata"
-            }
+            },
+            "isolatedLayerPreview": "Anteprima livello isolato",
+            "isolatedLayerPreviewDesc": "Se visualizzare solo questo livello quando si eseguono operazioni come il filtraggio o la trasformazione."
         },
         "transform": {
             "reset": "Reimposta",
@@ -1935,9 +1986,46 @@
             "canvasGroup": "Tela",
             "newRasterLayer": "Nuovo Livello Raster",
             "saveCanvasToGallery": "Salva la Tela nella Galleria",
-            "saveToGalleryGroup": "Salva nella Galleria"
+            "saveToGalleryGroup": "Salva nella Galleria",
+            "newInpaintMask": "Nuova maschera Inpaint",
+            "newRegionalGuidance": "Nuova Guida Regionale"
         },
-        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine"
+        "newImg2ImgCanvasFromImage": "Nuova Immagine da immagine",
+        "copyRasterLayerTo": "Copia $t(controlLayers.rasterLayer) in",
+        "copyControlLayerTo": "Copia $t(controlLayers.controlLayer) in",
+        "copyInpaintMaskTo": "Copia $t(controlLayers.inpaintMask) in",
+        "selectObject": {
+            "dragToMove": "Trascina un punto per spostarlo",
+            "clickToAdd": "Fare clic sul livello per aggiungere un punto",
+            "clickToRemove": "Clicca su un punto per rimuoverlo",
+            "help3": "Inverte la selezione per selezionare tutto tranne l'oggetto di destinazione.",
+            "pointType": "Tipo punto",
+            "apply": "Applica",
+            "reset": "Reimposta",
+            "cancel": "Annulla",
+            "selectObject": "Seleziona oggetto",
+            "invertSelection": "Inverti selezione",
+            "exclude": "Escludi",
+            "include": "Includi",
+            "neutral": "Neutro",
+            "saveAs": "Salva come",
+            "process": "Elabora",
+            "help1": "Seleziona un singolo oggetto di destinazione. Aggiungi i punti <Bold>Includi</Bold> e <Bold>Escludi</Bold> per indicare quali parti del livello fanno parte dell'oggetto di destinazione.",
+            "help2": "Inizia con un punto <Bold>Include</Bold> all'interno dell'oggetto di destinazione. Aggiungi altri punti per perfezionare la selezione. Meno punti in genere producono risultati migliori."
+        },
+        "convertControlLayerTo": "Converti $t(controlLayers.controlLayer) in",
+        "newRasterLayer": "Nuovo $t(controlLayers.rasterLayer)",
+        "newRegionalGuidance": "Nuova $t(controlLayers.regionalGuidance)",
+        "canvasAsRasterLayer": "$t(controlLayers.canvas) come $t(controlLayers.rasterLayer)",
+        "canvasAsControlLayer": "$t(controlLayers.canvas) come $t(controlLayers.controlLayer)",
+        "convertInpaintMaskTo": "Converti $t(controlLayers.inpaintMask) in",
+        "copyRegionalGuidanceTo": "Copia $t(controlLayers.regionalGuidance) in",
+        "convertRasterLayerTo": "Converti $t(controlLayers.rasterLayer) in",
+        "convertRegionalGuidanceTo": "Converti $t(controlLayers.regionalGuidance) in",
+        "newControlLayer": "Nuovo $t(controlLayers.controlLayer)",
+        "newInpaintMask": "Nuova $t(controlLayers.inpaintMask)",
+        "replaceCurrent": "Sostituisci corrente",
+        "mergeDown": "Unire in basso"
     },
     "ui": {
         "tabs": {
@@ -2030,15 +2118,13 @@
         "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>."
     },
     "whatsNew": {
-        "canvasV2Announcement": {
-            "readReleaseNotes": "Leggi le Note di Rilascio",
-            "fluxSupport": "Supporto per la famiglia di modelli Flux",
-            "newCanvas": "Una nuova potente tela di controllo",
-            "watchReleaseVideo": "Guarda il video di rilascio",
-            "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia",
-            "newLayerTypes": "Nuovi tipi di livello per un miglior controllo"
-        },
-        "whatsNewInInvoke": "Novità in Invoke"
+        "whatsNewInInvoke": "Novità in Invoke",
+        "line2": "Supporto Flux esteso, ora con immagini di riferimento globali",
+        "line3": "Tooltip e menu contestuali migliorati",
+        "readReleaseNotes": "Leggi le note di rilascio",
+        "watchRecentReleaseVideos": "Guarda i video su questa versione",
+        "line1": "Strumento <ItalicComponent>Seleziona oggetto</ItalicComponent> per la selezione e la modifica precise degli oggetti",
+        "watchUiUpdatesOverview": "Guarda le novità dell'interfaccia"
     },
     "system": {
         "logLevel": {

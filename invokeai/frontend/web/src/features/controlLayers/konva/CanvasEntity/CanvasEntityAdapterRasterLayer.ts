@@ -71,7 +71,7 @@ export class CanvasEntityAdapterRasterLayer extends CanvasEntityAdapterBase<
   };
 
   getHashableState = (): SerializableObject => {
-    const keysToOmit: (keyof CanvasRasterLayerState)[] = ['name'];
+    const keysToOmit: (keyof CanvasRasterLayerState)[] = ['name', 'isLocked'];
     return omit(this.state, keysToOmit);
   };
 }

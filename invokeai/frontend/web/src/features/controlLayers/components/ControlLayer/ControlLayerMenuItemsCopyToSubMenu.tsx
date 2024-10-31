@@ -3,7 +3,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { CanvasEntityMenuItemsCopyToClipboard } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCopyToClipboard';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useIsEntityInteractable } from 'features/controlLayers/hooks/useEntityIsInteractable';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   controlLayerConvertedToInpaintMask,
   controlLayerConvertedToRasterLayer,
@@ -18,7 +18,7 @@ export const ControlLayerMenuItemsCopyToSubMenu = memo(() => {
   const subMenu = useSubMenu();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('control_layer');
-  const isInteractable = useIsEntityInteractable(entityIdentifier);
+  const isBusy = useCanvasIsBusy();
 
   const copyToInpaintMask = useCallback(() => {
     dispatch(controlLayerConvertedToInpaintMask({ entityIdentifier }));
@@ -33,20 +33,20 @@ export const ControlLayerMenuItemsCopyToSubMenu = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   return (
-    <MenuItem {...subMenu.parentMenuItemProps} icon={<PiCopyBold />}>
+    <MenuItem {...subMenu.parentMenuItemProps} icon={<PiCopyBold />} isDisabled={isBusy}>
       <Menu {...subMenu.menuProps}>
         <MenuButton {...subMenu.menuButtonProps}>
           <SubMenuButtonContent label={t('controlLayers.copyControlLayerTo')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
           <CanvasEntityMenuItemsCopyToClipboard />
-          <MenuItem onClick={copyToInpaintMask} icon={<PiCopyBold />} isDisabled={!isInteractable}>
+          <MenuItem onClick={copyToInpaintMask} icon={<PiCopyBold />} isDisabled={isBusy}>
             {t('controlLayers.newInpaintMask')}
           </MenuItem>
-          <MenuItem onClick={copyToRegionalGuidance} icon={<PiCopyBold />} isDisabled={!isInteractable}>
+          <MenuItem onClick={copyToRegionalGuidance} icon={<PiCopyBold />} isDisabled={isBusy}>
             {t('controlLayers.newRegionalGuidance')}
           </MenuItem>
-          <MenuItem onClick={copyToRasterLayer} icon={<PiCopyBold />} isDisabled={!isInteractable}>
+          <MenuItem onClick={copyToRasterLayer} icon={<PiCopyBold />} isDisabled={isBusy}>
             {t('controlLayers.newRasterLayer')}
           </MenuItem>
         </MenuList>

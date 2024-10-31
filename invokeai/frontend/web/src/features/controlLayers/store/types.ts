@@ -332,6 +332,7 @@ const zCanvasRenderableEntityState = z.discriminatedUnion('type', [
   zCanvasInpaintMaskState,
 ]);
 export type CanvasRenderableEntityState = z.infer<typeof zCanvasRenderableEntityState>;
+export type CanvasRenderableEntityType = CanvasRenderableEntityState['type'];
 
 const zCanvasEntityType = z.union([
   zCanvasRasterLayerState.shape.type,
@@ -347,7 +348,7 @@ export const zCanvasEntityIdentifer = z.object({
   type: zCanvasEntityType,
 });
 export type CanvasEntityIdentifier<T extends CanvasEntityType = CanvasEntityType> = { id: string; type: T };
-
+export type CanvasRenderableEntityIdentifier = CanvasEntityIdentifier<CanvasRenderableEntityType>;
 export type LoRA = {
   id: string;
   isEnabled: boolean;
@@ -465,7 +466,7 @@ export type EntityRasterizedPayload = EntityIdentifierPayload<{
 
 export type GenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
-function isRenderableEntityType(
+export function isRenderableEntityType(
   entityType: CanvasEntityState['type']
 ): entityType is CanvasRenderableEntityState['type'] {
   return (
@@ -535,6 +536,12 @@ export function isSaveableEntityIdentifier(
 
 export function isRenderableEntity(entity: CanvasEntityState): entity is CanvasRenderableEntityState {
   return isRenderableEntityType(entity.type);
+}
+
+export function isRenderableEntityIdentifier(
+  entityIdentifier: CanvasEntityIdentifier
+): entityIdentifier is CanvasRenderableEntityIdentifier {
+  return isRenderableEntityType(entityIdentifier.type);
 }
 
 export const getEntityIdentifier = <T extends CanvasEntityType>(

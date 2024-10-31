@@ -5,6 +5,7 @@ import { CanvasEntityMenuItemsCropToBbox } from 'features/controlLayers/componen
 import { CanvasEntityMenuItemsDelete } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDelete';
 import { CanvasEntityMenuItemsDuplicate } from 'features/controlLayers/components/common/CanvasEntityMenuItemsDuplicate';
 import { CanvasEntityMenuItemsFilter } from 'features/controlLayers/components/common/CanvasEntityMenuItemsFilter';
+import { CanvasEntityMenuItemsMergeDown } from 'features/controlLayers/components/common/CanvasEntityMenuItemsMergeDown';
 import { CanvasEntityMenuItemsSave } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSave';
 import { CanvasEntityMenuItemsSelectObject } from 'features/controlLayers/components/common/CanvasEntityMenuItemsSelectObject';
 import { CanvasEntityMenuItemsTransform } from 'features/controlLayers/components/common/CanvasEntityMenuItemsTransform';
@@ -27,6 +28,7 @@ export const ControlLayerMenuItems = memo(() => {
       <CanvasEntityMenuItemsSelectObject />
       <ControlLayerMenuItemsTransparencyEffect />
       <MenuDivider />
+      <CanvasEntityMenuItemsMergeDown />
       <ControlLayerMenuItemsCopyToSubMenu />
       <ControlLayerMenuItemsConvertToSubMenu />
       <CanvasEntityMenuItemsCropToBbox />

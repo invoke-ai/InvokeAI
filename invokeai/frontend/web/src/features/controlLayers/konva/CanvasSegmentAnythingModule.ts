@@ -15,8 +15,8 @@ import {
 } from 'features/controlLayers/konva/util';
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type {
-  CanvasEntityType,
   CanvasImageState,
+  CanvasRenderableEntityType,
   Coordinate,
   RgbaColor,
   SAMPointLabel,
@@ -114,7 +114,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   subscriptions = new Set<() => void>();
 
   /**
-   * The AbortController used to cancel the filter processing.
+   * The AbortController used to cancel the segment processing.
    */
   abortController: AbortController | null = null;
 
@@ -178,16 +178,16 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   $invert = atom<boolean>(false);
 
   /**
-   * The masked image object, if it exists.
+   * The masked image object module, if it exists.
    */
-  maskedImage: CanvasObjectImage | null = null;
+  imageModule: CanvasObjectImage | null = null;
 
   /**
    * The Konva nodes for the module.
    */
   konva: {
     /**
-     * The main Konva group node for the module.
+     * The main Konva group node for the module. This is added to the parent layer on start, and removed on teardown.
      */
     group: Konva.Group;
     /**
@@ -488,7 +488,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   };
 
   /**
-   * Adds event listeners needed while segmenting the entity.
+   * Removes event listeners used while segmenting the entity.
    */
   unsubscribe = () => {
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
@@ -607,18 +607,18 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     this.$imageState.set(imageState);
 
     // Destroy any existing masked image and create a new one
-    if (this.maskedImage) {
-      this.maskedImage.destroy();
+    if (this.imageModule) {
+      this.imageModule.destroy();
     }
     if (this.konva.maskTween) {
       this.konva.maskTween.destroy();
       this.konva.maskTween = null;
     }
 
-    this.maskedImage = new CanvasObjectImage(imageState, this);
+    this.imageModule = new CanvasObjectImage(imageState, this);
 
     // Force update the masked image - after awaiting, the image will be rendered (in memory)
-    await this.maskedImage.update(imageState, true);
+    await this.imageModule.update(imageState, true);
 
     // Update the compositing rect to match the image size
     this.konva.compositingRect.setAttrs({
@@ -629,7 +629,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
 
     // Now we can add the masked image to the mask group. It will be rendered above the compositing rect, but should be
     // under it, so we will move the compositing rect to the top
-    this.konva.maskGroup.add(this.maskedImage.konva.group);
+    this.konva.maskGroup.add(this.imageModule.konva.group);
     this.konva.compositingRect.moveToTop();
 
     // Cache the group to ensure the mask is rendered correctly w/ opacity
@@ -666,7 +666,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   process = debounce(this.processImmediate, this.config.PROCESS_DEBOUNCE_MS);
 
   /**
-   * Applies the segmented image to the entity.
+   * Applies the segmented image to the entity, replacing the entity's objects with the masked image.
    */
   apply = () => {
     const imageState = this.$imageState.get();
@@ -676,10 +676,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
     this.log.trace('Applying');
 
-    // Commit the buffer, which will move the buffer to from the layers' buffer renderer to its main renderer
-    this.parent.bufferRenderer.commitBuffer();
-
-    // Rasterize the entity, this time replacing the objects with the masked image
+    // Rasterize the entity, replacing the objects with the masked image
     const rect = this.parent.transformer.getRelativeRect();
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.entityIdentifier,
@@ -697,9 +694,10 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   };
 
   /**
-   * Applies the segmented image to the entity.
+   * Saves the segmented image as a new entity of the given type.
+   * @param type The type of entity to save the segmented image as.
    */
-  saveAs = (type: Exclude<CanvasEntityType, 'reference_image'>) => {
+  saveAs = (type: CanvasRenderableEntityType) => {
     const imageState = this.$imageState.get();
     if (!imageState) {
       this.log.error('No image state to save as');
@@ -707,8 +705,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     }
     this.log.trace(`Saving as ${type}`);
 
-    // Clear the buffer - we are creating a new entity, so we don't want to keep the old one
-    this.parent.bufferRenderer.clearBuffer();
+    // Have the parent adopt the image module - this prevents a flash of the original layer content before the
+    // segmented image is rendered
+    if (this.imageModule) {
+      this.parent.renderer.adoptObjectRenderer(this.imageModule);
+    }
 
     // Create the new entity with the masked image as its only object
     const rect = this.parent.transformer.getRelativeRect();
@@ -739,10 +740,6 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       default:
         assert<Equals<typeof type, never>>(false);
     }
-
-    // Final cleanup and teardown, returning user to main canvas UI
-    this.resetEphemeralState();
-    this.teardown();
   };
 
   /**
@@ -801,8 +798,12 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     for (const point of this.$points.get()) {
       point.konva.circle.destroy();
     }
-    if (this.maskedImage) {
-      this.maskedImage.destroy();
+
+    // If the image module exists, and is a child of the group, destroy it. It might not be a child of the group if
+    // the user has applied the segmented image and the image has been adopted by the parent entity.
+    if (this.imageModule && this.imageModule.konva.group.parent === this.konva.group) {
+      this.imageModule.destroy();
+      this.imageModule = null;
     }
     if (this.konva.maskTween) {
       this.konva.maskTween.destroy();
@@ -820,10 +821,6 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     // Reset non-ephemeral konva nodes
     this.konva.compositingRect.visible(false);
     this.konva.maskGroup.clearCache();
-
-    // The parent module's buffer should be reset & forcibly sync the cache
-    this.parent.bufferRenderer.clearBuffer();
-    this.parent.renderer.syncKonvaCache(true);
   };
 
   /**
@@ -888,7 +885,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         circle: getKonvaNodeDebugAttrs(konva.circle),
       })),
       imageState: deepClone(this.$imageState.get()),
-      maskedImage: this.maskedImage?.repr(),
+      imageModule: this.imageModule?.repr(),
       config: deepClone(this.config),
       $isSegmenting: this.$isSegmenting.get(),
       $lastProcessedHash: this.$lastProcessedHash.get(),
