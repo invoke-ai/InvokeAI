@@ -106,7 +106,7 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiPlusBold />}>
       <Menu {...subMenu.menuProps}>
         <MenuButton {...subMenu.menuButtonProps}>
-          <SubMenuButtonContent label="New from Image" />
+          <SubMenuButtonContent label={t('controlLayers.newFromImage')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
           <MenuItem icon={<PiFileBold />} onClickCapture={onClickNewCanvasWithRasterLayerFromImage} isDisabled={isBusy}>
