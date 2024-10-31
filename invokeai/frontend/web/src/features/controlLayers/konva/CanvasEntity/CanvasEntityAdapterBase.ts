@@ -285,6 +285,10 @@ export abstract class CanvasEntityAdapterBase<
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectIsolatedLayerPreview, this.syncVisibility)
     );
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectIsolatedStagingPreview, this.syncVisibility)
+    );
+    this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectIsStaging, this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.$filteringAdapter.listen(this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.$transformingAdapter.listen(this.syncVisibility));
     this.subscriptions.add(this.manager.stateApi.$segmentingAdapter.listen(this.syncVisibility));
