@@ -129,8 +129,10 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
 
             # Some special handling is needed here if there is not an exact match and if we cannot infer the variant
             # from the file name. In this case, we only give this file a point if the requested variant is FP32 or DEFAULT.
-            if candidate_variant_label and candidate_variant_label.startswith(f".{variant}") or (
-                not candidate_variant_label and variant in [ModelRepoVariant.FP32, ModelRepoVariant.Default]
+            if (
+                candidate_variant_label
+                and candidate_variant_label.startswith(f".{variant.value}")
+                or (not candidate_variant_label and variant in [ModelRepoVariant.FP32, ModelRepoVariant.Default])
             ):
                 score += 1
 
@@ -162,7 +164,16 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
         # candidate.
         highest_score_candidate = max(candidate_list, key=lambda candidate: candidate.score)
         if highest_score_candidate:
-            result.add(highest_score_candidate.path)
+            pattern = r"^(.*?)-\d+-of-\d+(\.\w+)$"
+            match = re.match(pattern, highest_score_candidate.path.as_posix())
+            if match:
+                for candidate in candidate_list:
+                    if candidate.path.as_posix().startswith(match.group(1)) and candidate.path.as_posix().endswith(
+                        match.group(2)
+                    ):
+                        result.add(candidate.path)
+            else:
+                result.add(highest_score_candidate.path)
 
     # If one of the architecture-related variants was specified and no files matched other than
     # config and text files then we return an empty list
