@@ -715,3 +715,20 @@ def test_graph_can_generate_schema():
     # Not throwing on this line is sufficient
     # NOTE: if this test fails, it's PROBABLY because a new invocation type is breaking schema generation
     models_json_schema([(Graph, "serialization")])
+
+
+def test_nodes_must_implement_invoke_method():
+    with pytest.raises(ValueError, match='must implement the "invoke" method'):
+
+        @invocation("test_no_invoke_method", version="1.0.0")
+        class NoInvokeMethodInvocation(BaseInvocation):
+            pass
+
+
+def test_nodes_must_return_invocation_output():
+    with pytest.raises(ValueError, match="must have a return annotation of a subclass of BaseInvocationOutput"):
+
+        @invocation("test_no_output", version="1.0.0")
+        class NoOutputInvocation(BaseInvocation):
+            def invoke(self) -> str:
+                return "foo"
