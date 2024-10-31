@@ -1,8 +1,8 @@
-import { useStore } from '@nanostores/react';
-import { $false } from 'app/store/nanostores/util';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useEntityIsEmpty } from 'features/controlLayers/hooks/useEntityIsEmpty';
+import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { isSegmentableEntityIdentifier } from 'features/controlLayers/store/types';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
@@ -13,8 +13,8 @@ export const useEntitySegmentAnything = (entityIdentifier: CanvasEntityIdentifie
   const adapter = useEntityAdapterSafe(entityIdentifier);
   const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusy();
-  const isInteractable = useStore(adapter?.$isInteractable ?? $false);
-  const isEmpty = useStore(adapter?.$isEmpty ?? $false);
+  const isLocked = useEntityIsLocked(entityIdentifier);
+  const isEmpty = useEntityIsEmpty(entityIdentifier);
 
   const isDisabled = useMemo(() => {
     if (!entityIdentifier) {
@@ -29,14 +29,14 @@ export const useEntitySegmentAnything = (entityIdentifier: CanvasEntityIdentifie
     if (isBusy) {
       return true;
     }
-    if (!isInteractable) {
+    if (isLocked) {
       return true;
     }
     if (isEmpty) {
       return true;
     }
     return false;
-  }, [entityIdentifier, adapter, isBusy, isInteractable, isEmpty]);
+  }, [entityIdentifier, adapter, isBusy, isLocked, isEmpty]);
 
   const start = useCallback(() => {
     if (isDisabled) {

@@ -640,6 +640,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       return;
     }
 
+    if (this.parent.$isLocked.get()) {
+      // The layer is locked, it should not be interactable
+      this.parent.konva.layer.listening(false);
+      this._setInteractionMode('off');
+      return;
+    }
+
     if (!this.$isTransforming.get() && tool === 'move') {
       // We are moving this layer, it must be listening
       this.parent.konva.layer.listening(true);

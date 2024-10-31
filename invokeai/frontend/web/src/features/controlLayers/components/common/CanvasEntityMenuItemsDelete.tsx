@@ -2,7 +2,7 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { IconMenuItem } from 'common/components/IconMenuItem';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { useIsEntityInteractable } from 'features/controlLayers/hooks/useEntityIsInteractable';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +16,7 @@ export const CanvasEntityMenuItemsDelete = memo(({ asIcon = false }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext();
-  const isInteractable = useIsEntityInteractable(entityIdentifier);
+  const isBusy = useCanvasIsBusy();
 
   const deleteEntity = useCallback(() => {
     dispatch(entityDeleted({ entityIdentifier }));
@@ -30,13 +30,13 @@ export const CanvasEntityMenuItemsDelete = memo(({ asIcon = false }: Props) => {
         onClick={deleteEntity}
         icon={<PiTrashSimpleBold />}
         isDestructive
-        isDisabled={!isInteractable}
+        isDisabled={isBusy}
       />
     );
   }
 
   return (
-    <MenuItem onClick={deleteEntity} icon={<PiTrashSimpleBold />} isDestructive isDisabled={!isInteractable}>
+    <MenuItem onClick={deleteEntity} icon={<PiTrashSimpleBold />} isDestructive isDisabled={isBusy}>
       {t('common.delete')}
     </MenuItem>
   );
