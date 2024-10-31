@@ -8,17 +8,10 @@ import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
-import type { PostUploadAction } from 'services/api/types';
 
 export const UpscaleInitialImage = () => {
   const dispatch = useAppDispatch();
   const imageDTO = useAppSelector(selectUpscaleInitialImage);
-  const postUploadAction = useMemo<PostUploadAction>(
-    () => ({
-      type: 'SET_UPSCALE_INITIAL_IMAGE',
-    }),
-    []
-  );
   const targetData = useMemo<Dnd.types['TargetDataTypeMap']['setUpscaleInitialImageFromImage']>(
     () => Dnd.Target.setUpscaleInitialImageFromImage.getData(),
     []

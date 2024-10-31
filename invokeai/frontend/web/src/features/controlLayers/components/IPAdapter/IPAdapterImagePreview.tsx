@@ -11,7 +11,7 @@ import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import type { ImageDTO, PostUploadAction } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
 const sx = {
@@ -32,10 +32,9 @@ type Props = {
   image: ImageWithDims | null;
   onChangeImage: (imageDTO: ImageDTO | null) => void;
   targetData: Dnd.types['TargetDataUnion'];
-  postUploadAction: PostUploadAction;
 };
 
-export const IPAdapterImagePreview = memo(({ image, onChangeImage, targetData, postUploadAction }: Props) => {
+export const IPAdapterImagePreview = memo(({ image, onChangeImage, targetData }: Props) => {
   const { t } = useTranslation();
   const isConnected = useStore($isConnected);
   const { currentData: imageDTO, isError } = useGetImageDTOQuery(image?.image_name ?? skipToken);

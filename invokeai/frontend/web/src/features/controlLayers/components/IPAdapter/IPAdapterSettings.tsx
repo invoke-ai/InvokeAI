@@ -23,7 +23,7 @@ import { Dnd } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold } from 'react-icons/pi';
-import type { ImageDTO, IPAdapterModelConfig, IPALayerImagePostUploadAction } from 'services/api/types';
+import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 
 import { IPAdapterImagePreview } from './IPAdapterImagePreview';
 import { IPAdapterModel } from './IPAdapterModel';
@@ -80,10 +80,6 @@ export const IPAdapterSettings = memo(() => {
     [dispatch, entityIdentifier]
   );
 
-  const postUploadAction = useMemo<IPALayerImagePostUploadAction>(
-    () => ({ type: 'SET_IPA_IMAGE', id: entityIdentifier.id }),
-    [entityIdentifier.id]
-  );
   const targetData = useMemo<Dnd.types['TargetDataTypeMap']['setGlobalReferenceImage']>(
     () => Dnd.Target.setGlobalReferenceImage.getData({ entityIdentifier }, ipAdapter.image?.image_name),
     [entityIdentifier, ipAdapter.image?.image_name]
@@ -121,12 +117,7 @@ export const IPAdapterSettings = memo(() => {
             <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
-            <IPAdapterImagePreview
-              image={ipAdapter.image}
-              onChangeImage={onChangeImage}
-              targetData={targetData}
-              postUploadAction={postUploadAction}
-            />
+            <IPAdapterImagePreview image={ipAdapter.image} onChangeImage={onChangeImage} targetData={targetData} />
           </Flex>
         </Flex>
       </Flex>
