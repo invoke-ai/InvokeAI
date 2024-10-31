@@ -58,15 +58,16 @@ const zUploadFile = z
   );
 
 type Props = {
-  label: string;
   targetData: Dnd.types['TargetDataUnion'];
-  elementDropEnabled?: boolean;
-  externalDropEnabled?: boolean;
+  label: string;
+  externalLabel?: string;
+  isDisabled?: boolean;
 };
 
 export const DndDropTarget = memo((props: Props) => {
-  const { label, targetData, elementDropEnabled = true, externalDropEnabled = true } = props;
+  const { targetData, label, externalLabel = label, isDisabled } = props;
   const [dndState, setDndState] = useState<Dnd.types['DndState']>('idle');
+  const [dndOrigin, setDndOrigin] = useState<'element' | 'external' | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
 
@@ -74,8 +75,7 @@ export const DndDropTarget = memo((props: Props) => {
     if (!ref.current) {
       return;
     }
-
-    if (!elementDropEnabled) {
+    if (isDisabled) {
       return;
     }
 
@@ -83,9 +83,6 @@ export const DndDropTarget = memo((props: Props) => {
       dropTargetForElements({
         element: ref.current,
         canDrop: (args) => {
-          if (!elementDropEnabled) {
-            return false;
-          }
           const sourceData = args.source.data;
           if (!Dnd.Util.isDndSourceData(sourceData)) {
             return false;
@@ -102,13 +99,6 @@ export const DndDropTarget = memo((props: Props) => {
           setDndState('potential');
         },
         getData: () => targetData,
-        // onDrop: (args) => {
-        //   const sourceData = args.source.data;
-        //   if (!Dnd.Util.isDndSourceData(sourceData)) {
-        //     return;
-        //   }
-        //   dispatch(dndDropped({ sourceData, targetData }));
-        // },
       }),
       monitorForElements({
         canMonitor: (args) => {
@@ -122,21 +112,23 @@ export const DndDropTarget = memo((props: Props) => {
           return Dnd.Util.isValidDrop(sourceData, targetData);
         },
         onDragStart: () => {
+          setDndOrigin('element');
           setDndState('potential');
         },
         onDrop: () => {
+          setDndOrigin(null);
           setDndState('idle');
         },
       })
     );
-  }, [targetData, dispatch, elementDropEnabled]);
+  }, [targetData, dispatch, isDisabled]);
 
   useEffect(() => {
     if (!ref.current) {
       return;
     }
 
-    if (!externalDropEnabled) {
+    if (isDisabled) {
       return;
     }
 
@@ -144,9 +136,6 @@ export const DndDropTarget = memo((props: Props) => {
       dropTargetForExternal({
         element: ref.current,
         canDrop: (args) => {
-          if (!externalDropEnabled) {
-            return false;
-          }
           if (!containsFiles(args)) {
             return false;
           }
@@ -185,20 +174,25 @@ export const DndDropTarget = memo((props: Props) => {
           return true;
         },
         onDragStart: () => {
+          setDndOrigin('external');
           setDndState('potential');
           preventUnhandled.start();
         },
         onDrop: () => {
+          setDndOrigin(null);
           setDndState('idle');
           preventUnhandled.stop();
         },
       })
     );
-  }, [targetData, dispatch, externalDropEnabled]);
+  }, [targetData, dispatch, isDisabled]);
 
   return (
     <Box ref={ref} sx={sx} data-dnd-state={dndState}>
-      <DndDropOverlay dndState={dndState} label={label} />
+      <DndDropOverlay
+        dndState={dndState}
+        label={dndOrigin === 'element' ? label : dndOrigin === 'external' ? externalLabel : undefined}
+      />
     </Box>
   );
 });

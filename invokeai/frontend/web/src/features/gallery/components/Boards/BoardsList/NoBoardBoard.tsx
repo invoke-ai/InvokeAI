@@ -99,7 +99,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
           </Tooltip>
         )}
       </NoBoardBoardContextMenu>
-      <DndDropTarget targetData={targetData} label={t('gallery.move')} />
+      <DndDropTarget targetData={targetData} label={t('gallery.move')} externalLabel={t('common.upload')} />
     </Box>
   );
 });

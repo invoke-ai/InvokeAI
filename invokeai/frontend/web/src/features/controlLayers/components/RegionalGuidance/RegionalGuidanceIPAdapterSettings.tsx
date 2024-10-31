@@ -24,7 +24,7 @@ import { Dnd } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiTrashSimpleFill } from 'react-icons/pi';
-import type { ImageDTO, IPAdapterModelConfig, RGIPAdapterImagePostUploadAction } from 'services/api/types';
+import type { ImageDTO, IPAdapterModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 type Props = {
@@ -100,10 +100,6 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
     [entityIdentifier, ipAdapter.image?.image_name, referenceImageId]
   );
 
-  const postUploadAction = useMemo<RGIPAdapterImagePostUploadAction>(
-    () => ({ type: 'SET_RG_IP_ADAPTER_IMAGE', id: entityIdentifier.id, referenceImageId: referenceImageId }),
-    [entityIdentifier.id, referenceImageId]
-  );
   const pullBboxIntoIPAdapter = usePullBboxIntoRegionalGuidanceReferenceImage(entityIdentifier, referenceImageId);
   const isBusy = useCanvasIsBusy();
 
@@ -151,12 +147,7 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
             <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
-            <IPAdapterImagePreview
-              image={ipAdapter.image}
-              onChangeImage={onChangeImage}
-              targetData={targetData}
-              postUploadAction={postUploadAction}
-            />
+            <IPAdapterImagePreview image={ipAdapter.image} onChangeImage={onChangeImage} targetData={targetData} />
           </Flex>
         </Flex>
       </Flex>

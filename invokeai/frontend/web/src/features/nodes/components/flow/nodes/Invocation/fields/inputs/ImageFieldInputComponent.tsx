@@ -12,7 +12,6 @@ import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
-import type { PostUploadAction } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
 import type { FieldComponentProps } from './types';
@@ -36,15 +35,6 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   const targetData = useMemo<Dnd.types['TargetDataTypeMap']['setNodeImageField']>(
     () => Dnd.Target.setNodeImageField.getData({ nodeId, fieldName: field.name }, field.value?.image_name),
     [field.name, field.value?.image_name, nodeId]
-  );
-
-  const postUploadAction = useMemo<PostUploadAction>(
-    () => ({
-      type: 'SET_NODES_IMAGE',
-      nodeId,
-      fieldName: field.name,
-    }),
-    [nodeId, field.name]
   );
 
   useEffect(() => {

@@ -9,6 +9,7 @@ import { ControlLayerBadges } from 'features/controlLayers/components/ControlLay
 import { ControlLayerSettings } from 'features/controlLayers/components/ControlLayer/ControlLayerSettings';
 import { ControlLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { Dnd } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -21,6 +22,7 @@ type Props = {
 
 export const ControlLayer = memo(({ id }: Props) => {
   const { t } = useTranslation();
+  const isBusy = useCanvasIsBusy();
   const entityIdentifier = useMemo<CanvasEntityIdentifier<'control_layer'>>(
     () => ({ id, type: 'control_layer' }),
     [id]
@@ -44,7 +46,7 @@ export const ControlLayer = memo(({ id }: Props) => {
           <CanvasEntitySettingsWrapper>
             <ControlLayerSettings />
           </CanvasEntitySettingsWrapper>
-          <DndDropTarget targetData={targetData} label={t('controlLayers.replaceLayer')} />
+          <DndDropTarget targetData={targetData} label={t('controlLayers.replaceLayer')} isDisabled={isBusy} />
         </CanvasEntityContainer>
       </ControlLayerAdapterGate>
     </EntityIdentifierContext.Provider>

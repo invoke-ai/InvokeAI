@@ -1,4 +1,5 @@
 import { Grid, GridItem } from '@invoke-ai/ui-library';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { Dnd } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
@@ -14,6 +15,7 @@ const addGlobalReferenceImageFromImageDndTargetData = Dnd.Target.newGlobalRefere
 export const CanvasDropArea = memo(() => {
   const { t } = useTranslation();
   const imageViewer = useImageViewer();
+  const isBusy = useCanvasIsBusy();
 
   if (imageViewer.isOpen) {
     return null;
@@ -33,27 +35,31 @@ export const CanvasDropArea = memo(() => {
       >
         <GridItem position="relative">
           <DndDropTarget
-            label={t('controlLayers.canvasContextMenu.newRasterLayer')}
             targetData={addRasterLayerFromImageDndTargetData}
+            label={t('controlLayers.canvasContextMenu.newRasterLayer')}
+            isDisabled={isBusy}
           />
         </GridItem>
         <GridItem position="relative">
           <DndDropTarget
-            label={t('controlLayers.canvasContextMenu.newControlLayer')}
             targetData={addControlLayerFromImageDndTargetData}
+            label={t('controlLayers.canvasContextMenu.newControlLayer')}
+            isDisabled={isBusy}
           />
         </GridItem>
 
         <GridItem position="relative">
           <DndDropTarget
-            label={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
             targetData={addRegionalGuidanceReferenceImageFromImageDndTargetData}
+            label={t('controlLayers.canvasContextMenu.newRegionalReferenceImage')}
+            isDisabled={isBusy}
           />
         </GridItem>
         <GridItem position="relative">
           <DndDropTarget
-            label={t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
             targetData={addGlobalReferenceImageFromImageDndTargetData}
+            label={t('controlLayers.canvasContextMenu.newGlobalReferenceImage')}
+            isDisabled={isBusy}
           />
         </GridItem>
       </Grid>
