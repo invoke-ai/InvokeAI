@@ -59,7 +59,9 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
           this.hasActiveGeneration = true;
         } else {
           this.hasActiveGeneration = false;
-          this.$lastProgressEvent.set(null);
+          if (!this.manager.stagingArea.$isStaging.get()) {
+            this.$lastProgressEvent.set(null);
+          }
         }
       })
     );
