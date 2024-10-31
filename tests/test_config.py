@@ -293,3 +293,7 @@ def test_deny_nodes(patch_rootdir):
     assert has_integer
     assert has_string
     assert not has_float
+
+    # Reset the config so that it doesn't affect other tests
+    get_config.cache_clear()
+    BaseInvocation.invalidate_typeadapter()
