@@ -70,7 +70,7 @@ export class CanvasEntityAdapterInpaintMask extends CanvasEntityAdapterBase<
   };
 
   getHashableState = (): SerializableObject => {
-    const keysToOmit: (keyof CanvasInpaintMaskState)[] = ['fill', 'name', 'opacity'];
+    const keysToOmit: (keyof CanvasInpaintMaskState)[] = ['fill', 'name', 'opacity', 'isLocked'];
     return omit(this.state, keysToOmit);
   };
 

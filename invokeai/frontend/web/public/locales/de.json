@@ -95,7 +95,8 @@
         "none": "Keine",
         "new": "Neu",
         "ok": "OK",
-        "close": "Schließen"
+        "close": "Schließen",
+        "clipboard": "Zwischenablage"
     },
     "gallery": {
         "galleryImageSize": "Bildgröße",
@@ -535,14 +536,12 @@
         "addModels": "Model hinzufügen",
         "deleteModelImage": "Lösche Model Bild",
         "huggingFaceRepoID": "HuggingFace Repo ID",
-        "hfToken": "HuggingFace Schlüssel",
         "huggingFacePlaceholder": "besitzer/model-name",
         "modelSettings": "Modelleinstellungen",
         "typePhraseHere": "Phrase hier eingeben",
         "spandrelImageToImage": "Bild zu Bild (Spandrel)",
         "starterModels": "Einstiegsmodelle",
         "t5Encoder": "T5-Kodierer",
-        "useDefaultSettings": "Standardeinstellungen verwenden",
         "uploadImage": "Bild hochladen",
         "urlOrLocalPath": "URL oder lokaler Pfad",
         "install": "Installieren",
@@ -678,10 +677,41 @@
     "toast": {
         "uploadFailed": "Hochladen fehlgeschlagen",
         "imageCopied": "Bild kopiert",
-        "parametersNotSet": "Parameter nicht festgelegt",
+        "parametersNotSet": "Parameter nicht zurückgerufen",
         "addedToBoard": "Dem Board hinzugefügt",
         "loadedWithWarnings": "Workflow mit Warnungen geladen",
-        "imageSaved": "Bild gespeichert"
+        "imageSaved": "Bild gespeichert",
+        "linkCopied": "Link kopiert",
+        "problemCopyingLayer": "Ebene kann nicht kopiert werden",
+        "problemSavingLayer": "Ebene kann nicht gespeichert werden",
+        "parameterSetDesc": "{{parameter}} zurückgerufen",
+        "imageUploaded": "Bild hochgeladen",
+        "problemCopyingImage": "Bild kann nicht kopiert werden",
+        "parameterNotSetDesc": "{{parameter}} kann nicht zurückgerufen werden",
+        "prunedQueue": "Warteschlange bereinigt",
+        "modelAddedSimple": "Modell zur Warteschlange hinzugefügt",
+        "parametersSet": "Parameter zurückgerufen",
+        "imageNotLoadedDesc": "Bild konnte nicht gefunden werden",
+        "setControlImage": "Als Kontrollbild festlegen",
+        "sentToUpscale": "An Vergrößerung gesendet",
+        "parameterNotSetDescWithMessage": "{{parameter}} kann nicht zurückgerufen werden: {{message}}",
+        "unableToLoadImageMetadata": "Bildmetadaten können nicht geladen werden",
+        "unableToLoadImage": "Bild kann nicht geladen werden",
+        "serverError": "Serverfehler",
+        "parameterNotSet": "Parameter nicht zurückgerufen",
+        "sessionRef": "Sitzung: {{sessionId}}",
+        "problemDownloadingImage": "Bild kann nicht heruntergeladen werden",
+        "parameters": "Parameter",
+        "parameterSet": "Parameter zurückgerufen",
+        "importFailed": "Import fehlgeschlagen",
+        "importSuccessful": "Import erfolgreich",
+        "setNodeField": "Als Knotenfeld festlegen",
+        "somethingWentWrong": "Etwas ist schief gelaufen",
+        "workflowLoaded": "Arbeitsablauf geladen",
+        "workflowDeleted": "Arbeitsablauf gelöscht",
+        "errorCopied": "Fehler kopiert",
+        "layerCopiedToClipboard": "Ebene in die Zwischenablage kopiert",
+        "sentToCanvas": "An Leinwand gesendet"
     },
     "accessibility": {
         "uploadImage": "Bild hochladen",
@@ -825,7 +855,6 @@
         "width": "Breite",
         "createdBy": "Erstellt von",
         "steps": "Schritte",
-        "seamless": "Nahtlos",
         "positivePrompt": "Positiver Prompt",
         "generationMode": "Generierungsmodus",
         "Threshold": "Rauschen-Schwelle",
@@ -1170,7 +1199,19 @@
         "workflowVersion": "Version",
         "saveToGallery": "In Galerie speichern",
         "noWorkflows": "Keine Arbeitsabläufe",
-        "noMatchingWorkflows": "Keine passenden Arbeitsabläufe"
+        "noMatchingWorkflows": "Keine passenden Arbeitsabläufe",
+        "unknownErrorValidatingWorkflow": "Unbekannter Fehler beim Validieren des Arbeitsablaufes",
+        "inputFieldTypeParseError": "Typ des Eingabefelds {{node}}.{{field}} kann nicht analysiert werden ({{message}})",
+        "workflowSettings": "Arbeitsablauf Editor Einstellungen",
+        "unableToLoadWorkflow": "Arbeitsablauf kann nicht geladen werden",
+        "viewMode": "In linearen Ansicht verwenden",
+        "unableToValidateWorkflow": "Arbeitsablauf kann nicht validiert werden",
+        "outputFieldTypeParseError": "Typ des Ausgabefelds {{node}}.{{field}} kann nicht analysiert werden ({{message}})",
+        "unableToGetWorkflowVersion": "Version des Arbeitsablaufschemas kann nicht bestimmt werden",
+        "unknownFieldType": "$t(nodes.unknownField) Typ: {{type}}",
+        "unknownField": "Unbekanntes Feld",
+        "unableToUpdateNodes_one": "{{count}} Knoten kann nicht aktualisiert werden",
+        "unableToUpdateNodes_other": "{{count}} Knoten können nicht aktualisiert werden"
     },
     "hrf": {
         "enableHrf": "Korrektur für hohe Auflösungen",
@@ -1300,15 +1341,7 @@
         "enableLogging": "Protokollierung aktivieren"
     },
     "whatsNew": {
-        "whatsNewInInvoke": "Was gibt's Neues",
-        "canvasV2Announcement": {
-            "fluxSupport": "Unterstützung für Flux-Modelle",
-            "newCanvas": "Eine leistungsstarke neue Kontrollfläche",
-            "newLayerTypes": "Neue Ebenentypen für noch mehr Kontrolle",
-            "readReleaseNotes": "Anmerkungen zu dieser Version lesen",
-            "watchReleaseVideo": "Video über diese Version anzeigen",
-            "watchUiUpdatesOverview": "Interface-Updates Übersicht"
-        }
+        "whatsNewInInvoke": "Was gibt's Neues"
     },
     "stylePresets": {
         "name": "Name",

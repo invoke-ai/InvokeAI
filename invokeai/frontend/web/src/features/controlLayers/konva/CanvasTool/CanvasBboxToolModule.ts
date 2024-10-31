@@ -390,7 +390,7 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
   };
 
   fitToLayers = (): void => {
-    const visibleRect = this.manager.stage.getVisibleRect();
+    const visibleRect = this.manager.compositor.getVisibleRectOfType();
 
     // Can't fit the bbox to nothing
     if (visibleRect.height === 0 || visibleRect.width === 0) {

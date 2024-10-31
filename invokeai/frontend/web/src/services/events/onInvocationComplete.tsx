@@ -6,6 +6,7 @@ import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagi
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
+import { CANVAS_OUTPUT_PREFIX } from 'features/nodes/util/graph/graphBuilderUtils';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
@@ -15,7 +16,7 @@ import { $lastProgressEvent } from 'services/events/stores';
 const log = logger('events');
 
 const isCanvasOutputNode = (data: S['InvocationCompleteEvent']) => {
-  return data.invocation_source_id.split(':')[0] === 'canvas_output';
+  return data.invocation_source_id.split(':')[0] === CANVAS_OUTPUT_PREFIX;
 };
 
 const nodeTypeDenylist = ['load_image', 'image'];

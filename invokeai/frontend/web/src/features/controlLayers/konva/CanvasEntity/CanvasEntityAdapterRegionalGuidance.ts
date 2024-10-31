@@ -70,7 +70,16 @@ export class CanvasEntityAdapterRegionalGuidance extends CanvasEntityAdapterBase
   };
 
   getHashableState = (): SerializableObject => {
-    const keysToOmit: (keyof CanvasRegionalGuidanceState)[] = ['fill', 'name', 'opacity'];
+    const keysToOmit: (keyof CanvasRegionalGuidanceState)[] = [
+      'fill',
+      'name',
+      'opacity',
+      'isLocked',
+      'autoNegative',
+      'positivePrompt',
+      'negativePrompt',
+      'referenceImages',
+    ];
     return omit(this.state, keysToOmit);
   };
 

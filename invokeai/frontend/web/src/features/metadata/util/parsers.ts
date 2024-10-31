@@ -41,6 +41,8 @@ import type {
   ParameterSDXLRefinerNegativeAestheticScore,
   ParameterSDXLRefinerPositiveAestheticScore,
   ParameterSDXLRefinerStart,
+  ParameterSeamlessX,
+  ParameterSeamlessY,
   ParameterSeed,
   ParameterSteps,
   ParameterStrength,
@@ -63,6 +65,8 @@ import {
   isParameterSDXLRefinerNegativeAestheticScore,
   isParameterSDXLRefinerPositiveAestheticScore,
   isParameterSDXLRefinerStart,
+  isParameterSeamlessX,
+  isParameterSeamlessY,
   isParameterSeed,
   isParameterSteps,
   isParameterStrength,
@@ -159,6 +163,12 @@ const parseSteps: MetadataParseFunc<ParameterSteps> = (metadata) => getProperty(
 
 const parseStrength: MetadataParseFunc<ParameterStrength> = (metadata) =>
   getProperty(metadata, 'strength', isParameterStrength);
+
+const parseSeamlessX: MetadataParseFunc<ParameterSeamlessX> = (metadata) =>
+  getProperty(metadata, 'seamless_x', isParameterSeamlessX);
+
+const parseSeamlessY: MetadataParseFunc<ParameterSeamlessY> = (metadata) =>
+  getProperty(metadata, 'seamless_y', isParameterSeamlessY);
 
 const parseHRFEnabled: MetadataParseFunc<ParameterHRFEnabled> = async (metadata) => {
   try {
@@ -647,6 +657,8 @@ export const parsers = {
   height: parseHeight,
   steps: parseSteps,
   strength: parseStrength,
+  seamlessX: parseSeamlessX,
+  seamlessY: parseSeamlessY,
   hrfEnabled: parseHRFEnabled,
   hrfStrength: parseHRFStrength,
   hrfMethod: parseHRFMethod,
