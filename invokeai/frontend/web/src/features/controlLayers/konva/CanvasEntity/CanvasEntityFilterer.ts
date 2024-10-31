@@ -386,10 +386,6 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       default:
         assert<Equals<typeof type, never>>(false);
     }
-
-    // Final cleanup and teardown, returning user to main canvas UI
-    this.resetEphemeralState();
-    this.teardown();
   };
 
   resetEphemeralState = () => {
