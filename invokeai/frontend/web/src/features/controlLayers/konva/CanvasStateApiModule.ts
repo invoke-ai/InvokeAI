@@ -36,7 +36,6 @@ import {
   selectGridSize,
 } from 'features/controlLayers/store/selectors';
 import type {
-  CanvasEntityType,
   CanvasState,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
@@ -544,24 +543,6 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   getIsSelected = (id: string): boolean => {
     return this.getCanvasState().selectedEntityIdentifier?.id === id;
-  };
-
-  /**
-   * Checks if an entity type is hidden. Individual entities are not hidden; the entire entity type is hidden.
-   */
-  getIsTypeHidden = (type: CanvasEntityType): boolean => {
-    switch (type) {
-      case 'raster_layer':
-        return this.getRasterLayersState().isHidden;
-      case 'control_layer':
-        return this.getControlLayersState().isHidden;
-      case 'inpaint_mask':
-        return this.getInpaintMasksState().isHidden;
-      case 'regional_guidance':
-        return this.getRegionsState().isHidden;
-      default:
-        assert(false, 'Unhandled entity type');
-    }
   };
 
   /**

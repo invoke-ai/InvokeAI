@@ -1,23 +1,21 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import { selectIsolatedStagingPreview } from 'features/controlLayers/store/canvasSettingsSlice';
-import { selectIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type {
   CanvasControlLayerState,
   CanvasEntityIdentifier,
   CanvasEntityState,
-  CanvasEntityType,
   CanvasInpaintMaskState,
   CanvasMetadata,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasRenderableEntityIdentifier,
   CanvasRenderableEntityState,
+  CanvasRenderableEntityType,
   CanvasState,
 } from 'features/controlLayers/store/types';
-import { isRasterLayerEntityIdentifier } from 'features/controlLayers/store/types';
 import { getGridSize, getOptimalDimension } from 'features/parameters/util/optimalDimension';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 /**
@@ -325,15 +323,18 @@ export const selectSelectedEntityFill = createSelector(
   }
 );
 
-const selectRasterLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.rasterLayers.isHidden);
-const selectControlLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.controlLayers.isHidden);
-const selectInpaintMasksIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.inpaintMasks.isHidden);
-const selectRegionalGuidanceIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.regionalGuidance.isHidden);
+export const selectRasterLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.rasterLayers.isHidden);
+export const selectControlLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.controlLayers.isHidden);
+export const selectInpaintMasksIsHidden = createSelector(selectCanvasSlice, (canvas) => canvas.inpaintMasks.isHidden);
+export const selectRegionalGuidanceIsHidden = createSelector(
+  selectCanvasSlice,
+  (canvas) => canvas.regionalGuidance.isHidden
+);
 
 /**
  * Returns the hidden selector for the given entity type.
  */
-const getSelectIsTypeHidden = (type: CanvasEntityType) => {
+export const getSelectIsTypeHidden = (type: CanvasRenderableEntityType) => {
   switch (type) {
     case 'raster_layer':
       return selectRasterLayersIsHidden;
@@ -344,42 +345,8 @@ const getSelectIsTypeHidden = (type: CanvasEntityType) => {
     case 'regional_guidance':
       return selectRegionalGuidanceIsHidden;
     default:
-      assert(false, 'Unhandled entity type');
+      assert<Equals<typeof type, never>>(false, 'Unhandled entity type');
   }
-};
-
-/**
- * Builds a selector taht selects if the entity is hidden.
- */
-export const buildSelectIsHidden = (entityIdentifier: CanvasEntityIdentifier) => {
-  const selectIsTypeHidden = getSelectIsTypeHidden(entityIdentifier.type);
-  return createSelector(
-    [selectCanvasSlice, selectIsTypeHidden, selectIsStaging, selectIsolatedStagingPreview],
-    (canvas, isTypeHidden, isStaging, isolatedStagingPreview) => {
-      const entity = selectEntity(canvas, entityIdentifier);
-
-      // An entity is hidden if:
-      // - The entity type is hidden
-      // - The entity is disabled
-      // - The entity is not a raster layer and we are staging and the option to show only raster layers is enabled
-      if (!entity) {
-        return true;
-      }
-      if (isTypeHidden) {
-        return true;
-      }
-      if (!entity.isEnabled) {
-        return true;
-      }
-      if (isStaging && isolatedStagingPreview) {
-        // When staging, we only show raster layers. This allows the user to easily see how the new generation fits in
-        // with the rest of the canvas without the masks and control layers getting in the way.
-        return !isRasterLayerEntityIdentifier(entityIdentifier);
-      }
-
-      return false;
-    }
-  );
 };
 
 /**

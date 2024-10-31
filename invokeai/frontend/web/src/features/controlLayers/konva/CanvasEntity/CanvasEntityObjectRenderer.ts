@@ -219,6 +219,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       return;
     }
 
+    if (!this.parent.konva.layer.visible()) {
+      return;
+    }
+
     this.log.trace('Updating compositing rect fill');
 
     assert(this.konva.compositing, 'Missing compositing rect');
@@ -244,6 +248,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       return;
     }
 
+    if (!this.parent.konva.layer.visible()) {
+      return;
+    }
+
     this.log.trace('Updating compositing rect size');
 
     assert(this.konva.compositing, 'Missing compositing rect');
@@ -262,6 +270,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       return;
     }
 
+    if (!this.parent.konva.layer.visible()) {
+      return;
+    }
+
     this.log.trace('Updating compositing rect position');
 
     assert(this.konva.compositing, 'Missing compositing rect');
@@ -272,6 +284,10 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   };
 
   updateOpacity = throttle(() => {
+    if (!this.parent.konva.layer.visible()) {
+      return;
+    }
+
     this.log.trace('Updating opacity');
 
     const opacity = this.parent.state.opacity;
