@@ -495,16 +495,12 @@ def invocation(
         invoke_return_annotation = signature(cls.invoke).return_annotation
 
         try:
+            # TODO(psyche): If `invoke()` is not defined, `return_annotation` ends up as the string "BaseInvocationOutput"
+            # instead of the class `BaseInvocationOutput`. This may be a pydantic bug: https://github.com/pydantic/pydantic/issues/7978
             if isinstance(invoke_return_annotation, str):
                 invoke_return_annotation = getattr(sys.modules[cls.__module__], invoke_return_annotation)
 
             assert invoke_return_annotation is not BaseInvocationOutput
-            # TODO(psyche): If `invoke()` is not defined, `return_annotation` ends up as the string
-            # "BaseInvocationOutput". This may be a pydantic bug: https://github.com/pydantic/pydantic/issues/7978
-            # I cannot reproduce this in a simple test case, so I'm not sure how to fix it.
-            #
-            # This check should be in a try block, not a conditional, because `issubclass` errors if the first arg is
-            # not a class (e.g. the string "BaseInvocationOutput").
             assert issubclass(invoke_return_annotation, BaseInvocationOutput)
         except Exception:
             raise ValueError(
