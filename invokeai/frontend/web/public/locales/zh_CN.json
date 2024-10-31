@@ -360,6 +360,120 @@
             "copySelection": {
                 "desc": "复制选定的节点和边。",
                 "title": "复制"
+            },
+            "pasteSelectionWithEdges": {
+                "title": "带边缘的粘贴",
+                "desc": "粘贴复制的节点、边，以及与复制的节点连接的所有边。"
+            },
+            "selectAll": {
+                "title": "全选",
+                "desc": "选择所有节点和边。"
+            },
+            "deleteSelection": {
+                "title": "删除",
+                "desc": "删除选定的节点和边。"
+            },
+            "undo": {
+                "title": "撤销",
+                "desc": "撤销上一个工作流操作。"
+            },
+            "redo": {
+                "desc": "重做上一个工作流操作。",
+                "title": "重做"
+            }
+        },
+        "gallery": {
+            "title": "画廊",
+            "galleryNavUp": {
+                "title": "向上导航",
+                "desc": "在图库网格中向上导航，选择该图像。如果在页面顶部，则转到上一页。"
+            },
+            "galleryNavUpAlt": {
+                "title": "向上导航（比较图像）",
+                "desc": "与向上导航相同，但选择比较图像，如果比较模式尚未打开，则将其打开。"
+            },
+            "selectAllOnPage": {
+                "desc": "选择当前页面上的所有图像。",
+                "title": "选页面上的所有内容"
+            },
+            "galleryNavDownAlt": {
+                "title": "向下导航（比较图像）",
+                "desc": "与向下导航相同，但选择比较图像，如果比较模式尚未打开，则将其打开。"
+            },
+            "galleryNavLeftAlt": {
+                "title": "向左导航（比较图像）",
+                "desc": "与向左导航相同，但选择比较图像，如果比较模式尚未打开，则将其打开。"
+            },
+            "clearSelection": {
+                "title": "清除选择",
+                "desc": "清除当前的选择（如果有的话）。"
+            },
+            "deleteSelection": {
+                "title": "删除",
+                "desc": "删除所有选定的图像。默认情况下，系统会提示您确认删除。如果这些图像当前在应用中使用，系统将发出警告。"
+            },
+            "galleryNavLeft": {
+                "title": "向左导航",
+                "desc": "在图库网格中向左导航，选择该图像。如果处于行的第一张图像，转到上一行。如果处于页面的第一张图像，转到上一页。"
+            },
+            "galleryNavRight": {
+                "title": "向右导航",
+                "desc": "在图库网格中向右导航，选择该图像。如果在行的最后一张图像，转到下一行。如果在页面的最后一张图像，转到下一页。"
+            },
+            "galleryNavDown": {
+                "desc": "在图库网格中向下导航，选择该图像。如果在页面底部，则转到下一页。",
+                "title": "向下导航"
+            },
+            "galleryNavRightAlt": {
+                "title": "向右导航（比较图像）",
+                "desc": "与向右导航相同，但选择比较图像，如果比较模式尚未打开，则将其打开。"
+            }
+        },
+        "viewer": {
+            "toggleMetadata": {
+                "desc": "显示或隐藏当前图像的元数据覆盖。",
+                "title": "显示/隐藏元数据"
+            },
+            "recallPrompts": {
+                "desc": "召回当前图像的正面和负面提示。",
+                "title": "召回提示"
+            },
+            "toggleViewer": {
+                "title": "显示/隐藏图像查看器",
+                "desc": "显示或隐藏图像查看器。仅在画布选项卡上可用。"
+            },
+            "recallAll": {
+                "desc": "召回当前图像的所有元数据。",
+                "title": "召回所有元数据"
+            },
+            "recallSeed": {
+                "title": "召回种子",
+                "desc": "召回当前图像的种子。"
+            },
+            "swapImages": {
+                "title": "交换比较图像",
+                "desc": "交换正在比较的图像。"
+            },
+            "nextComparisonMode": {
+                "title": "下一个比较模式",
+                "desc": "环浏览比较模式。"
+            },
+            "loadWorkflow": {
+                "title": "加载工作流",
+                "desc": "加载当前图像的保存工作流程（如果有的话）。"
+            },
+            "title": "图像查看器",
+            "remix": {
+                "title": "混合",
+                "desc": "召回当前图像的所有元数据，除了种子。"
+            },
+            "useSize": {
+                "title": "使用尺寸",
+                "desc": "使用当前图像的尺寸作为边界框尺寸。"
+            },
+            "runPostprocessing": {
+                "title": "行后处理",
+                "desc": "对当前图像运行所选的后处理。"
             }
         }
     },
@@ -786,7 +900,7 @@
         "cancelSucceeded": "项目已取消",
         "queue": "队列",
         "batch": "批处理",
-        "clearQueueAlertDialog": "清除队列时会立即取消所有处理中的项目并且会完全清除队列。",
+        "clearQueueAlertDialog": "清空队列将立即取消所有正在处理的项目，并完全清空队列。待处理的过滤器将被取消。",
         "pending": "待定",
         "completedIn": "完成于",
         "resumeFailed": "恢复处理器时出现问题",
@@ -882,7 +996,10 @@
         "parsingFailed": "解析失败",
         "recallParameter": "调用{{label}}",
         "imageDimensions": "图像尺寸",
-        "parameterSet": "已设置参数{{parameter}}"
+        "parameterSet": "已设置参数{{parameter}}",
+        "guidance": "指导",
+        "seamlessXAxis": "无缝 X 轴",
+        "seamlessYAxis": "无缝 Y 轴"
     },
     "models": {
         "noMatchingModels": "无相匹配的模型",
