@@ -572,7 +572,6 @@
         "simpleModelPlaceholder": "URL или путь к локальному файлу или папке diffusers",
         "urlOrLocalPath": "URL или локальный путь",
         "urlOrLocalPathHelper": "URL-адреса должны указывать на один файл. Локальные пути могут указывать на один файл или папку для одной модели диффузоров.",
-        "hfToken": "Токен HuggingFace",
         "starterModels": "Стартовые модели",
         "textualInversions": "Текстовые инверсии",
         "loraModels": "LoRAs",
