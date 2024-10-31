@@ -22,7 +22,7 @@ export const HFToken = () => {
   const isHFTokenEnabled = useFeatureStatus('hfToken');
   const [token, setToken] = useState('');
   const { currentData } = useGetHFTokenStatusQuery(isHFTokenEnabled ? undefined : skipToken);
-  const [trigger, { isLoading }] = useSetHFTokenMutation();
+  const [trigger, { isLoading, isUninitialized }] = useSetHFTokenMutation();
   const toast = useToast();
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setToken(e.target.value);
@@ -44,17 +44,17 @@ export const HFToken = () => {
   }, [t, toast, token, trigger]);
 
   const error = useMemo(() => {
-    if (!currentData || isLoading) {
+    if (!currentData || isUninitialized || isLoading) {
       return null;
     }
-    if (token.length && currentData === 'invalid') {
+    if (currentData === 'invalid') {
       return t('modelManager.hfTokenInvalidErrorMessage');
     }
-    if (token.length && currentData === 'unknown') {
+    if (currentData === 'unknown') {
       return t('modelManager.hfTokenUnableToVerifyErrorMessage');
     }
     return null;
-  }, [currentData, isLoading, t, token.length]);
+  }, [currentData, isLoading, isUninitialized, t]);
 
   if (!currentData || currentData === 'valid') {
     return null;
@@ -62,7 +62,7 @@ export const HFToken = () => {
 
   return (
     <Flex borderRadius="base" w="full">
-      <FormControl isInvalid={Boolean(error)} orientation="vertical">
+      <FormControl isInvalid={!isUninitialized && Boolean(error)} orientation="vertical">
         <FormLabel>{t('modelManager.hfTokenLabel')}</FormLabel>
         <Flex gap={3} alignItems="center" w="full">
           <Input type="password" value={token} onChange={onChange} />
