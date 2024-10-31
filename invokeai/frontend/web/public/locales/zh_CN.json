@@ -578,7 +578,16 @@
         "loraTriggerPhrases": "LoRA 触发词",
         "ipAdapters": "IP适配器",
         "spandrelImageToImage": "图生图(Spandrel)",
-        "starterModelsInModelManager": "您可以在模型管理器中找到初始模型"
+        "starterModelsInModelManager": "您可以在模型管理器中找到初始模型",
+        "noDefaultSettings": "此模型没有配置默认设置。请访问模型管理器添加默认设置。",
+        "clipEmbed": "CLIP 嵌入",
+        "defaultSettingsOutOfSync": "某些设置与模型的默认值不匹配：",
+        "restoreDefaultSettings": "点击以使用模型的默认设置。",
+        "usingDefaultSettings": "使用模型的默认设置",
+        "huggingFace": "HuggingFace",
+        "hfTokenInvalid": "HF 令牌无效或缺失",
+        "hfTokenLabel": "HuggingFace 令牌（某些模型所需）",
+        "hfTokenHelperText": "使用某些模型需要 HF 令牌。点击这里创建或获取你的令牌。"
     },
     "parameters": {
         "images": "图像",
@@ -696,7 +705,7 @@
         "uploadFailed": "上传失败",
         "imageCopied": "图像已复制",
         "parametersNotSet": "参数未恢复",
-        "uploadFailedInvalidUploadDesc": "必须是单张的 PNG 或 JPEG 图片",
+        "uploadFailedInvalidUploadDesc": "必须是单个 PNG 或 JPEG 图像。",
         "connected": "服务器连接",
         "parameterSet": "参数已恢复",
         "parameterNotSet": "参数未恢复",
@@ -708,7 +717,7 @@
         "setControlImage": "设为控制图像",
         "setNodeField": "设为节点字段",
         "imageUploaded": "图像已上传",
-        "addedToBoard": "已添加到面板",
+        "addedToBoard": "添加到{{name}}的资产中",
         "workflowLoaded": "工作流已加载",
         "imageUploadFailed": "图像上传失败",
         "baseModelChangedCleared_other": "已清除或禁用{{count}}个不兼容的子模型",
@@ -999,7 +1008,8 @@
         "parameterSet": "已设置参数{{parameter}}",
         "guidance": "指导",
         "seamlessXAxis": "无缝 X 轴",
-        "seamlessYAxis": "无缝 Y 轴"
+        "seamlessYAxis": "无缝 Y 轴",
+        "canvasV2Metadata": "画布"
     },
     "models": {
         "noMatchingModels": "无相匹配的模型",
@@ -1529,8 +1539,8 @@
         "moveToFront": "移动到前面",
         "addLayer": "添加层",
         "deletePrompt": "删除提示词",
-        "addPositivePrompt": "添加 $t(common.positivePrompt)",
-        "addNegativePrompt": "添加 $t(common.negativePrompt)",
+        "addPositivePrompt": "添加 $t(controlLayers.prompt)",
+        "addNegativePrompt": "添加 $t(controlLayers.negativePrompt)",
         "rectangle": "矩形",
         "opacity": "透明度"
     },
