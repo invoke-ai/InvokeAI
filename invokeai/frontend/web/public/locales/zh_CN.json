@@ -92,7 +92,11 @@
         "close": "关闭",
         "reset": "重设",
         "none": "无",
-        "new": "新建"
+        "new": "新建",
+        "view": "视图",
+        "alpha": "透明度通道",
+        "openInViewer": "在查看器中打开",
+        "clipboard": "剪贴板"
     },
     "gallery": {
         "galleryImageSize": "预览大小",
@@ -134,7 +138,7 @@
         "selectAllOnPage": "选择本页全部",
         "swapImages": "交换图像",
         "exitBoardSearch": "退出面板搜索",
-        "exitSearch": "退出搜索",
+        "exitSearch": "退出图像搜索",
         "oldestFirst": "最旧在前",
         "sortDirection": "排序方向",
         "showStarredImagesFirst": "优先显示收藏的图片",
@@ -145,8 +149,8 @@
         "searchImages": "按元数据搜索",
         "jump": "跳过",
         "compareHelp2": "按 <Kbd>M</Kbd> 键切换不同的比较模式。",
-        "displayBoardSearch": "显示面板搜索",
-        "displaySearch": "显示搜索",
+        "displayBoardSearch": "板块搜索",
+        "displaySearch": "图像搜索",
         "stretchToFit": "拉伸以适应",
         "exitCompare": "退出对比",
         "compareHelp1": "在点击图库中的图片或使用箭头键切换比较图片时，请按住<Kbd>Alt</Kbd> 键。",
@@ -155,7 +159,10 @@
         "imagesSettings": "画廊图片设置",
         "gallery": "画廊",
         "move": "移动",
-        "imagesTab": "您在Invoke中创建和保存的图片。"
+        "imagesTab": "您在Invoke中创建和保存的图片。",
+        "openViewer": "打开查看器",
+        "closeViewer": "关闭查看器",
+        "assetsTab": "您已上传用于项目的文件。"
     },
     "hotkeys": {
         "searchHotkeys": "检索快捷键",
@@ -163,7 +170,8 @@
         "clearSearch": "清除检索项",
         "app": {
             "cancelQueueItem": {
-                "title": "取消"
+                "title": "取消",
+                "desc": "取消当前正在处理的队列项目。"
             },
             "selectQueueTab": {
                 "title": "选择队列标签",
@@ -174,7 +182,8 @@
                 "title": "开关左侧面板"
             },
             "resetPanelLayout": {
-                "title": "重设面板布局"
+                "title": "重设面板布局",
+                "desc": "将左侧和右侧面板重置为默认大小和布局。"
             },
             "togglePanels": {
                 "title": "开关面板",
@@ -199,6 +208,23 @@
             "selectCanvasTab": {
                 "title": "选择画布标签",
                 "desc": "选择画布标签。"
+            },
+            "invokeFront": {
+                "desc": "将生成请求排队，添加到队列的前面。",
+                "title": "调用（前台）"
+            },
+            "selectUpscalingTab": {
+                "title": "选择放大选项卡",
+                "desc": "选择高清放大选项卡。"
+            },
+            "focusPrompt": {
+                "title": "聚焦提示",
+                "desc": "将光标焦点移动到正向提示。"
+            },
+            "title": "应用程序",
+            "invoke": {
+                "title": "调用",
+                "desc": "将生成请求排队，添加到队列的末尾。"
             }
         },
         "canvas": {
@@ -207,15 +233,135 @@
                 "desc": "选择画笔工具。"
             },
             "selectEraserTool": {
-                "title": "橡皮擦工具"
+                "title": "橡皮擦工具",
+                "desc": "选择橡皮擦工具。"
             },
             "title": "画布",
             "selectColorPickerTool": {
                 "title": "拾色器工具",
                 "desc": "选择拾色器工具。"
+            },
+            "fitBboxToCanvas": {
+                "title": "使边界框适应画布",
+                "desc": "缩放并调整视图以适应边界框。"
+            },
+            "setZoomTo400Percent": {
+                "title": "缩放到400%",
+                "desc": "将画布的缩放设置为400%。"
+            },
+            "setZoomTo800Percent": {
+                "desc": "将画布的缩放设置为800%。",
+                "title": "缩放到800%"
+            },
+            "redo": {
+                "desc": "重做上一次画布操作。",
+                "title": "重做"
+            },
+            "nextEntity": {
+                "title": "下一层",
+                "desc": "在列表中选择下一层。"
+            },
+            "selectRectTool": {
+                "title": "矩形工具",
+                "desc": "选择矩形工具。"
+            },
+            "selectViewTool": {
+                "title": "视图工具",
+                "desc": "选择视图工具。"
+            },
+            "prevEntity": {
+                "desc": "在列表中选择上一层。",
+                "title": "上一层"
+            },
+            "transformSelected": {
+                "desc": "变换所选图层。",
+                "title": "变换"
+            },
+            "selectBboxTool": {
+                "title": "边界框工具",
+                "desc": "选择边界框工具。"
+            },
+            "setZoomTo200Percent": {
+                "title": "缩放到200%",
+                "desc": "将画布的缩放设置为200%。"
+            },
+            "applyFilter": {
+                "title": "应用过滤器",
+                "desc": "将待处理的过滤器应用于所选图层。"
+            },
+            "filterSelected": {
+                "title": "过滤器",
+                "desc": "对所选图层进行过滤。仅适用于栅格层和控制层。"
+            },
+            "cancelFilter": {
+                "title": "取消过滤器",
+                "desc": "取消待处理的过滤器。"
+            },
+            "incrementToolWidth": {
+                "title": "增加工具宽度",
+                "desc": "增加所选的画笔或橡皮擦工具的宽度。"
+            },
+            "decrementToolWidth": {
+                "desc": "减少所选的画笔或橡皮擦工具的宽度。",
+                "title": "减少工具宽度"
+            },
+            "selectMoveTool": {
+                "title": "移动工具",
+                "desc": "选择移动工具。"
+            },
+            "setFillToWhite": {
+                "title": "将颜色设置为白色",
+                "desc": "将当前工具的颜色设置为白色。"
+            },
+            "cancelTransform": {
+                "desc": "取消待处理的变换。",
+                "title": "取消变换"
+            },
+            "applyTransform": {
+                "title": "应用变换",
+                "desc": "将待处理的变换应用于所选图层。"
+            },
+            "setZoomTo100Percent": {
+                "title": "缩放到100%",
+                "desc": "将画布的缩放设置为100%。"
+            },
+            "resetSelected": {
+                "title": "重置图层",
+                "desc": "重置选定的图层。仅适用于修复蒙版和区域指导。"
+            },
+            "undo": {
+                "title": "撤消",
+                "desc": "撤消上一次画布操作。"
+            },
+            "quickSwitch": {
+                "title": "图层快速切换",
+                "desc": "在最后两个选定的图层之间切换。如果某个图层被书签标记，则始终在该图层和最后一个未标记的图层之间切换。"
+            },
+            "fitLayersToCanvas": {
+                "title": "使图层适应画布",
+                "desc": "缩放并调整视图以适应所有可见图层。"
+            },
+            "deleteSelected": {
+                "title": "删除图层",
+                "desc": "删除选定的图层。"
             }
         },
-        "hotkeys": "快捷键"
+        "hotkeys": "快捷键",
+        "workflows": {
+            "pasteSelection": {
+                "title": "粘贴",
+                "desc": "粘贴复制的节点和边。"
+            },
+            "title": "工作流",
+            "addNode": {
+                "title": "添加节点",
+                "desc": "打开添加节点菜单。"
+            },
+            "copySelection": {
+                "desc": "复制选定的节点和边。",
+                "title": "复制"
+            }
+        }
     },
     "modelManager": {
         "modelManager": "模型管理器",
@@ -686,7 +832,10 @@
         "workflows": "工作流",
         "generation": "生成",
         "other": "其他",
-        "gallery": "画廊"
+        "gallery": "画廊",
+        "destination": "目标存储",
+        "upscaling": "高清放大",
+        "origin": "来源"
     },
     "sdxl": {
         "refinerStart": "Refiner 开始作用时机",
@@ -1251,7 +1400,8 @@
     },
     "prompt": {
         "addPromptTrigger": "添加提示词触发器",
-        "noMatchingTriggers": "没有匹配的触发器"
+        "noMatchingTriggers": "没有匹配的触发器",
+        "compatibleEmbeddings": "兼容的嵌入"
     },
     "controlLayers": {
         "autoNegative": "自动反向",
