@@ -223,10 +223,14 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       return;
     }
 
-    this.log.trace('Updating compositing rect fill');
+    if (
+      !this.konva.compositing ||
+      (this.parent.state.type !== 'inpaint_mask' && this.parent.state.type !== 'regional_guidance')
+    ) {
+      return;
+    }
 
-    assert(this.konva.compositing, 'Missing compositing rect');
-    assert(this.parent.state.type === 'inpaint_mask' || this.parent.state.type === 'regional_guidance');
+    this.log.trace('Updating compositing rect fill');
 
     const fill = this.parent.state.fill;
 
@@ -252,9 +256,14 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       return;
     }
 
-    this.log.trace('Updating compositing rect size');
+    if (
+      !this.konva.compositing ||
+      (this.parent.state.type !== 'inpaint_mask' && this.parent.state.type !== 'regional_guidance')
+    ) {
+      return;
+    }
 
-    assert(this.konva.compositing, 'Missing compositing rect');
+    this.log.trace('Updating compositing rect size');
 
     const scale = this.manager.stage.unscale(1);
 
@@ -274,9 +283,14 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       return;
     }
 
-    this.log.trace('Updating compositing rect position');
+    if (
+      !this.konva.compositing ||
+      (this.parent.state.type !== 'inpaint_mask' && this.parent.state.type !== 'regional_guidance')
+    ) {
+      return;
+    }
 
-    assert(this.konva.compositing, 'Missing compositing rect');
+    this.log.trace('Updating compositing rect position');
 
     this.konva.compositing.rect.setAttrs({
       ...this.manager.stage.getScaledStageRect(),
