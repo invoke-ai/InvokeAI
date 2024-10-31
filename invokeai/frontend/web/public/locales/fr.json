@@ -220,7 +220,6 @@
         "typePhraseHere": "Écrire une phrase ici",
         "cancel": "Annuler",
         "defaultSettingsSaved": "Paramètres par défaut enregistrés",
-        "hfToken": "Token HuggingFace",
         "imageEncoderModelId": "ID du modèle d'encodeur d'image",
         "path": "Chemin sur le disque",
         "repoVariant": "Variante de dépôt",

@@ -536,7 +536,6 @@
         "addModels": "Model hinzufügen",
         "deleteModelImage": "Lösche Model Bild",
         "huggingFaceRepoID": "HuggingFace Repo ID",
-        "hfToken": "HuggingFace Schlüssel",
         "huggingFacePlaceholder": "besitzer/model-name",
         "modelSettings": "Modelleinstellungen",
         "typePhraseHere": "Phrase hier eingeben",
