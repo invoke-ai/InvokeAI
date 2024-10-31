@@ -529,6 +529,22 @@ export abstract class CanvasEntityAdapterBase<
     }
     this.log.trace(isVisible ? 'Showing' : 'Hiding');
     this.konva.layer.visible(isVisible);
+    if (isVisible) {
+      /**
+       * When a layer is created and initially not visible, its compositing rect won't be set up properly. Then, when
+       * we show it in this method, it the layer will not render as it should.
+       *
+       * For example, if an inpaint mask is created via select-object while the isolated layer preview feature is
+       * enabled, it will be hidden on its first render, and the compositing rect will not be sized/positioned/filled.
+       * When next show the layer, the its underlying objects will be rendered directly, without the compositing rect
+       * providing the correct fill.
+       *
+       * The simplest way to ensure this doesn't happen is to always update the compositing rect when showing the layer.
+       */
+      this.renderer.updateCompositingRectSize();
+      this.renderer.updateCompositingRectPosition();
+      this.renderer.updateCompositingRectFill();
+    }
     this.renderer.syncKonvaCache();
   };
 
