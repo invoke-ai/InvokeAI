@@ -296,6 +296,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.syncInteractionState();
   };
 
+  syncCursorStyle = () => {
+    if (!this.parent.renderer.hasObjects()) {
+      this.manager.stage.setCursor('not-allowed');
+    } else {
+      this.manager.stage.setCursor('default');
+    }
+  };
+
   anchorStyleFunc = (anchor: Konva.Rect): void => {
     // Give the rotater special styling
     if (anchor.hasName('rotater')) {
