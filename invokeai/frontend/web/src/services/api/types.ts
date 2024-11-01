@@ -103,19 +103,24 @@ export const isLoRAModelConfig = (config: AnyModelConfig): config is LoRAModelCo
   return config.type === 'lora';
 };
 
-export const isVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
-  return config.type === 'vae' || (config.type === 'main' && check_submodels(['vae'], config));
+export const isVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+  return config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && check_submodels(['vae'], config));
 };
 
-export const isNonFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+export const isNonFluxVAEModelConfig = (
+  config: AnyModelConfig,
+  excludeSubmodels?: boolean
+): config is VAEModelConfig => {
   return (
-    (config.type === 'vae' || (config.type === 'main' && check_submodels(['vae'], config))) && config.base !== 'flux'
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && check_submodels(['vae'], config))) &&
+    config.base !== 'flux'
   );
 };
 
-export const isFluxVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+export const isFluxVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
   return (
-    (config.type === 'vae' || (config.type === 'main' && check_submodels(['vae'], config))) && config.base === 'flux'
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && check_submodels(['vae'], config))) &&
+    config.base === 'flux'
   );
 };
 
@@ -136,26 +141,42 @@ export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAd
 };
 
 export const isT5EncoderModelConfig = (
-  config: AnyModelConfig
+  config: AnyModelConfig,
+  excludeSubmodels?: boolean
 ): config is T5EncoderModelConfig | T5EncoderBnbQuantizedLlmInt8bModelConfig => {
-  return config.type === 't5_encoder' || (config.type === 'main' && check_submodels(['t5_encoder'], config));
-};
-
-export const isCLIPEmbedModelConfig = (config: AnyModelConfig): config is CLIPEmbedModelConfig => {
-  return config.type === 'clip_embed' || (config.type === 'main' && check_submodels(['clip_embed'], config));
-};
-
-export const isCLIPLEmbedModelConfig = (config: AnyModelConfig): config is CLIPLEmbedModelConfig => {
   return (
-    (config.type === 'clip_embed' && config.variant === 'large') ||
-    (config.type === 'main' && check_submodels(['clip_embed', 'large'], config))
+    config.type === 't5_encoder' ||
+    (!excludeSubmodels && config.type === 'main' && check_submodels(['t5_encoder'], config))
   );
 };
 
-export const isCLIPGEmbedModelConfig = (config: AnyModelConfig): config is CLIPGEmbedModelConfig => {
+export const isCLIPEmbedModelConfig = (
+  config: AnyModelConfig,
+  excludeSubmodels?: boolean
+): config is CLIPEmbedModelConfig => {
+  return (
+    config.type === 'clip_embed' ||
+    (!excludeSubmodels && config.type === 'main' && check_submodels(['clip_embed'], config))
+  );
+};
+
+export const isCLIPLEmbedModelConfig = (
+  config: AnyModelConfig,
+  excludeSubmodels?: boolean
+): config is CLIPLEmbedModelConfig => {
+  return (
+    (config.type === 'clip_embed' && config.variant === 'large') ||
+    (!excludeSubmodels && config.type === 'main' && check_submodels(['clip_embed', 'large'], config))
+  );
+};
+
+export const isCLIPGEmbedModelConfig = (
+  config: AnyModelConfig,
+  excludeSubmodels?: boolean
+): config is CLIPGEmbedModelConfig => {
   return (
     (config.type === 'clip_embed' && config.variant === 'gigantic') ||
-    (config.type === 'main' && check_submodels(['clip_embed', 'gigantic'], config))
+    (!excludeSubmodels && config.type === 'main' && check_submodels(['clip_embed', 'gigantic'], config))
   );
 };
 

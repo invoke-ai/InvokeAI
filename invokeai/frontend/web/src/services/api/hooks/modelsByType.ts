@@ -30,8 +30,13 @@ import {
   isVAEModelConfig,
 } from 'services/api/types';
 
+type ModelHookArgs = { excludeSubmodels?: boolean };
+
 const buildModelsHook =
-  <T extends AnyModelConfig>(typeGuard: (config: AnyModelConfig) => config is T) =>
+  <T extends AnyModelConfig>(
+    typeGuard: (config: AnyModelConfig, excludeSubmodels?: boolean) => config is T,
+    excludeSubmodels?: boolean
+  ) =>
   () => {
     const result = useGetModelConfigsQuery(undefined);
     const modelConfigs = useMemo(() => {
@@ -39,7 +44,9 @@ const buildModelsHook =
         return EMPTY_ARRAY;
       }
 
-      return modelConfigsAdapterSelectors.selectAll(result.data).filter(typeGuard);
+      return modelConfigsAdapterSelectors
+        .selectAll(result.data)
+        .filter((config) => typeGuard(config, excludeSubmodels));
     }, [result]);
 
     return [modelConfigs, result] as const;
@@ -56,13 +63,16 @@ export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlNetAndT2IAdapterModels = buildModelsHook(isControlNetOrT2IAdapterModelConfig);
 export const useControlNetModels = buildModelsHook(isControlNetModelConfig);
 export const useT2IAdapterModels = buildModelsHook(isT2IAdapterModelConfig);
-export const useT5EncoderModels = buildModelsHook(isT5EncoderModelConfig);
-export const useCLIPEmbedModels = buildModelsHook(isCLIPEmbedModelConfig);
+export const useT5EncoderModels = (args?: ModelHookArgs) =>
+  buildModelsHook(isT5EncoderModelConfig, args?.excludeSubmodels)();
+export const useCLIPEmbedModels = (args?: ModelHookArgs) =>
+  buildModelsHook(isCLIPEmbedModelConfig, args?.excludeSubmodels)();
 export const useSpandrelImageToImageModels = buildModelsHook(isSpandrelImageToImageModelConfig);
 export const useIPAdapterModels = buildModelsHook(isIPAdapterModelConfig);
 export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
-export const useVAEModels = buildModelsHook(isVAEModelConfig);
-export const useFluxVAEModels = buildModelsHook(isFluxVAEModelConfig);
+export const useVAEModels = (args?: ModelHookArgs) => buildModelsHook(isVAEModelConfig, args?.excludeSubmodels)();
+export const useFluxVAEModels = (args?: ModelHookArgs) =>
+  buildModelsHook(isFluxVAEModelConfig, args?.excludeSubmodels)();
 export const useCLIPVisionModels = buildModelsHook(isCLIPVisionModelConfig);
 
 // const buildModelsSelector =
