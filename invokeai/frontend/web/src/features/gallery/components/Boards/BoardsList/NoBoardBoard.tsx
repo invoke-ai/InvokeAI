@@ -1,7 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { Dnd } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
@@ -12,6 +11,8 @@ import {
   selectBoardSearchText,
 } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
+import type { RemoveImageFromBoardActionData} from 'features/imageActions/actions';
+import {removeImageFromBoardActionApi } from 'features/imageActions/actions';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
@@ -43,10 +44,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     }
   }, [dispatch, autoAssignBoardOnClick]);
 
-  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['removeFromBoard']>(
-    () => Dnd.Target.removeFromBoard.getData(),
-    []
-  );
+  const targetData = useMemo<RemoveImageFromBoardActionData>(() => removeImageFromBoardActionApi.getData(), []);
 
   const { t } = useTranslation();
 

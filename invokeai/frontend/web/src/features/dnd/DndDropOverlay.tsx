@@ -1,10 +1,10 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Text } from '@invoke-ai/ui-library';
-import type { Dnd } from 'features/dnd/dnd';
+import type { DndTargetState } from 'features/dnd/types';
 import { memo } from 'react';
 
 type Props = {
-  dndState: Dnd.types['DndState'];
+  dndState: DndTargetState;
   label?: string;
   withBackdrop?: boolean;
 };

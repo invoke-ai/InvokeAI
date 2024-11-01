@@ -19,7 +19,8 @@ import {
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import { Dnd } from 'features/dnd/dnd';
+import type { SetGlobalReferenceImageActionData} from 'features/imageActions/actions';
+import {setGlobalReferenceImageActionApi } from 'features/imageActions/actions';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold } from 'react-icons/pi';
@@ -80,8 +81,8 @@ export const IPAdapterSettings = memo(() => {
     [dispatch, entityIdentifier]
   );
 
-  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['setGlobalReferenceImage']>(
-    () => Dnd.Target.setGlobalReferenceImage.getData({ entityIdentifier }, ipAdapter.image?.image_name),
+  const targetData = useMemo<SetGlobalReferenceImageActionData>(
+    () => setGlobalReferenceImageActionApi.getData({ entityIdentifier }, ipAdapter.image?.image_name),
     [entityIdentifier, ipAdapter.image?.image_name]
   );
   const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);

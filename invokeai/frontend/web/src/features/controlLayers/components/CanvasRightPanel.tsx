@@ -6,10 +6,11 @@ import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHook
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
-import { Dnd } from 'features/dnd/dnd';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
+import type { DndTargetState } from 'features/dnd/types';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { multipleImageSourceApi, singleImageSourceApi } from 'features/imageActions/actions';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
 import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
@@ -84,8 +85,8 @@ const PanelTabs = memo(() => {
   const { t } = useTranslation();
   const store = useAppStore();
   const activeEntityCount = useAppSelector(selectEntityCountActive);
-  const [layersTabDndState, setLayersTabDndState] = useState<Dnd.types['DndState']>('idle');
-  const [galleryTabDndState, setGalleryTabDndState] = useState<Dnd.types['DndState']>('idle');
+  const [layersTabDndState, setLayersTabDndState] = useState<DndTargetState>('idle');
+  const [galleryTabDndState, setGalleryTabDndState] = useState<DndTargetState>('idle');
   const layersTabRef = useRef<HTMLDivElement>(null);
   const galleryTabRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<number | null>(null);
@@ -208,7 +209,7 @@ const PanelTabs = memo(() => {
       }),
       monitorForElements({
         canMonitor: ({ source }) => {
-          if (!Dnd.Source.singleImage.typeGuard(source.data) || !Dnd.Source.multipleImage.typeGuard(source.data)) {
+          if (!singleImageSourceApi.typeGuard(source.data) || !multipleImageSourceApi.typeGuard(source.data)) {
             return false;
           }
           // Only monitor if we are not already on the gallery tab

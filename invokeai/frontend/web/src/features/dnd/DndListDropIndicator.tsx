@@ -2,7 +2,7 @@
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
-import type { DndListState } from 'features/dnd/dnd';
+import type { DndListTargetState } from 'features/dnd/types';
 
 /**
  * Design decisions for the drop indicator's main line
@@ -104,7 +104,7 @@ function DndDropIndicatorInternal({ edge, gap = '0px' }: DropIndicatorProps) {
   );
 }
 
-export const DndListDropIndicator = ({ dndState }: { dndState: DndListState }) => {
+export const DndListDropIndicator = ({ dndState }: { dndState: DndListTargetState }) => {
   if (dndState.type !== 'is-dragging-over') {
     return null;
   }
