@@ -106,7 +106,7 @@
         "type": "invocation",
         "data": {
           "id": "9eb72af0-dd9e-4ec5-ad87-d65e3c01f48b",
-          "type": "l2i",
+          "type": "sd3_l2i",
           "version": "1.3.0",
           "label": "",
           "notes": "",
@@ -130,21 +130,6 @@
             "vae": {
               "name": "vae",
               "label": ""
-            },
-            "tiled": {
-              "name": "tiled",
-              "label": "",
-              "value": false
-            },
-            "tile_size": {
-              "name": "tile_size",
-              "label": "",
-              "value": 0
-            },
-            "fp32": {
-              "name": "fp32",
-              "label": "",
-              "value": false
             }
           }
         },
