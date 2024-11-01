@@ -4898,7 +4898,7 @@ export type components = {
             /**
              * Fp32
              * @description Whether or not to use full float32 precision
-             * @default false
+             * @default true
              */
             fp32?: boolean;
             /**
@@ -4981,7 +4981,7 @@ export type components = {
             /**
              * Fp32
              * @description Whether or not to use full float32 precision
-             * @default false
+             * @default true
              */
             fp32?: boolean;
             /**
@@ -9254,7 +9254,7 @@ export type components = {
             /**
              * Fp32
              * @description Whether or not to use full float32 precision
-             * @default false
+             * @default true
              */
             fp32?: boolean;
             /**
@@ -10542,7 +10542,7 @@ export type components = {
             /**
              * Fp32
              * @description Whether or not to use full float32 precision
-             * @default false
+             * @default true
              */
             fp32?: boolean;
             /**
@@ -14380,12 +14380,12 @@ export type components = {
              * @description Positive conditioning tensor
              * @default null
              */
-            positive_text_conditioning?: components["schemas"]["SD3ConditioningField"];
+            positive_conditioning?: components["schemas"]["SD3ConditioningField"];
             /**
              * @description Negative conditioning tensor
              * @default null
              */
-            negative_text_conditioning?: components["schemas"]["SD3ConditioningField"];
+            negative_conditioning?: components["schemas"]["SD3ConditioningField"];
             /**
              * CFG Scale
              * @description Classifier-Free Guidance scale
@@ -14405,11 +14405,11 @@ export type components = {
              */
             height?: number;
             /**
-             * Num Steps
+             * Steps
              * @description Number of steps to run
              * @default 10
              */
-            num_steps?: number;
+            steps?: number;
             /**
              * Seed
              * @description Randomness seed for reproducibility.
@@ -15081,10 +15081,10 @@ export type components = {
          */
         Sd3ModelLoaderOutput: {
             /**
-             * MMDiTX
-             * @description MMDiTX
+             * Transformer
+             * @description Transformer
              */
-            mmditx: components["schemas"]["TransformerField"];
+            transformer: components["schemas"]["TransformerField"];
             /**
              * CLIP L
              * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
