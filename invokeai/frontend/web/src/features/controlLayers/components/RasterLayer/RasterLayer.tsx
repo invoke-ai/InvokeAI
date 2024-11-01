@@ -8,8 +8,9 @@ import { RasterLayerAdapterGate } from 'features/controlLayers/contexts/EntityAd
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
-import { Dnd } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
+import type { ReplaceCanvasEntityObjectsWithImageActionData} from 'features/imageActions/actions';
+import {replaceCanvasEntityObjectsWithImageActionApi } from 'features/imageActions/actions';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,8 +22,8 @@ export const RasterLayer = memo(({ id }: Props) => {
   const { t } = useTranslation();
   const isBusy = useCanvasIsBusy();
   const entityIdentifier = useMemo<CanvasEntityIdentifier<'raster_layer'>>(() => ({ id, type: 'raster_layer' }), [id]);
-  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['replaceLayerWithImage']>(
-    () => Dnd.Target.replaceLayerWithImage.getData({ entityIdentifier }, entityIdentifier.id),
+  const targetData = useMemo<ReplaceCanvasEntityObjectsWithImageActionData>(
+    () => replaceCanvasEntityObjectsWithImageActionApi.getData({ entityIdentifier }, entityIdentifier.id),
     [entityIdentifier]
   );
 

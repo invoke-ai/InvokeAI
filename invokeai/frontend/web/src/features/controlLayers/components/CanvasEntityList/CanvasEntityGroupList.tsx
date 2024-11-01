@@ -16,7 +16,7 @@ import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTi
 import { entitiesReordered } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { isRenderableEntityType } from 'features/controlLayers/store/types';
-import { triggerPostMoveFlash } from 'features/dnd/dnd';
+import { triggerPostMoveFlash } from 'features/dnd/util';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect } from 'react';
 import { flushSync } from 'react-dom';

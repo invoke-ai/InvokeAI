@@ -2,7 +2,6 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { Dnd } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
@@ -14,6 +13,8 @@ import {
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
+import type { AddImageToBoardActionData} from 'features/imageActions/actions';
+import {addImageToBoardActionApi } from 'features/imageActions/actions';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiImageSquare } from 'react-icons/pi';
@@ -44,10 +45,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     }
   }, [selectedBoardId, board.board_id, autoAssignBoardOnClick, autoAddBoardId, dispatch]);
 
-  const targetData = useMemo<Dnd.types['TargetDataTypeMap']['addToBoard']>(
-    () => Dnd.Target.addToBoard.getData({ boardId: board.board_id }),
-    [board.board_id]
-  );
+  const targetData = useMemo<AddImageToBoardActionData>(() => addImageToBoardActionApi.getData({ boardId: board.board_id }), [board.board_id]);
 
   return (
     <Box position="relative" w="full" h={12}>

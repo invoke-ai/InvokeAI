@@ -7,7 +7,6 @@ import { galleryImageClicked } from 'app/store/middleware/listenerMiddleware/lis
 import { useAppStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { useBoolean } from 'common/hooks/useBoolean';
-import { Dnd } from 'features/dnd/dnd';
 import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
 import { createMultipleImageDragPreview, setMultipleImageDragPreview } from 'features/dnd/DndDragPreviewMultipleImage';
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
@@ -18,6 +17,7 @@ import { getGalleryImageDataTestId } from 'features/gallery/components/ImageGrid
 import { SizedSkeletonLoader } from 'features/gallery/components/ImageGrid/SizedSkeletonLoader';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { imageToCompareChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
+import { multipleImageSourceApi, singleImageSourceApi } from 'features/imageActions/actions';
 import type { MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
@@ -122,32 +122,32 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           // When we have multiple images selected, and the dragged image is part of the selection, initiate a
           // multi-image drag.
           if (gallery.selection.length > 1 && gallery.selection.includes(imageDTO)) {
-            return Dnd.Source.multipleImage.getData({
+            return multipleImageSourceApi.getData({
               imageDTOs: gallery.selection,
               boardId: gallery.selectedBoardId,
             });
           }
 
           // Otherwise, initiate a single-image drag
-          return Dnd.Source.singleImage.getData({ imageDTO }, imageDTO.image_name);
+          return singleImageSourceApi.getData({ imageDTO }, imageDTO.image_name);
         },
         // This is a "local" drag start event, meaning that it is only called when this specific image is dragged.
         onDragStart: ({ source }) => {
           // When we start dragging a single image, set the dragging state to true. This is only called when this
           // specific image is dragged.
-          if (Dnd.Source.singleImage.typeGuard(source.data)) {
+          if (singleImageSourceApi.typeGuard(source.data)) {
             setIsDragging(true);
             return;
           }
         },
         onGenerateDragPreview: (args) => {
-          if (Dnd.Source.multipleImage.typeGuard(args.source.data)) {
+          if (multipleImageSourceApi.typeGuard(args.source.data)) {
             setMultipleImageDragPreview({
               multipleImageDndData: args.source.data,
               onGenerateDragPreviewArgs: args,
               setDragPreviewState,
             });
-          } else if (Dnd.Source.singleImage.typeGuard(args.source.data)) {
+          } else if (singleImageSourceApi.typeGuard(args.source.data)) {
             setSingleImageDragPreview({
               singleImageDndData: args.source.data,
               onGenerateDragPreviewArgs: args,
@@ -161,7 +161,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         onDragStart: ({ source }) => {
           // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
           // selection. This is called for all drag events.
-          if (Dnd.Source.multipleImage.typeGuard(source.data) && source.data.payload.imageDTOs.includes(imageDTO)) {
+          if (multipleImageSourceApi.typeGuard(source.data) && source.data.payload.imageDTOs.includes(imageDTO)) {
             setIsDragging(true);
           }
         },

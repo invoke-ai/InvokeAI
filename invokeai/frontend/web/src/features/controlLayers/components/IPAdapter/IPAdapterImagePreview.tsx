@@ -3,10 +3,10 @@ import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
-import type { Dnd } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
+import type { SetGlobalReferenceImageActionData, SetRegionalGuidanceReferenceImageActionData } from 'features/imageActions/actions';
 import { memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
@@ -31,7 +31,7 @@ const sx = {
 type Props = {
   image: ImageWithDims | null;
   onChangeImage: (imageDTO: ImageDTO | null) => void;
-  targetData: Dnd.types['TargetDataUnion'];
+  targetData: SetGlobalReferenceImageActionData | SetRegionalGuidanceReferenceImageActionData;
 };
 
 export const IPAdapterImagePreview = memo(({ image, onChangeImage, targetData }: Props) => {

@@ -5,9 +5,17 @@ import { containsFiles, getFiles } from '@atlaskit/pragmatic-drag-and-drop/exter
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
+import { getStore } from 'app/store/nanostores/store';
 import { useAppDispatch } from 'app/store/storeHooks';
-import { Dnd } from 'features/dnd/dnd';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
+import type { DndTargetState } from 'features/dnd/types';
+import type { MultipleImageAction, RecordUnknown, SingleImageAction } from 'features/imageActions/actions';
+import {
+  multipleImageActions,
+  multipleImageSourceApi,
+  singleImageActions,
+  singleImageSourceApi,
+} from 'features/imageActions/actions';
 import { memo, useEffect, useRef, useState } from 'react';
 import { uploadImage } from 'services/api/endpoints/images';
 import { z } from 'zod';
@@ -58,7 +66,7 @@ const zUploadFile = z
   );
 
 type Props = {
-  targetData: Dnd.types['TargetDataUnion'];
+  targetData: SingleImageAction | MultipleImageAction;
   label: string;
   externalLabel?: string;
   isDisabled?: boolean;
@@ -66,31 +74,59 @@ type Props = {
 
 export const DndDropTarget = memo((props: Props) => {
   const { targetData, label, externalLabel = label, isDisabled } = props;
-  const [dndState, setDndState] = useState<Dnd.types['DndState']>('idle');
+  const [dndState, setDndState] = useState<DndTargetState>('idle');
   const [dndOrigin, setDndOrigin] = useState<'element' | 'external' | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    if (!ref.current) {
+    const element = ref.current;
+    if (!element) {
       return;
     }
     if (isDisabled) {
       return;
     }
 
+    const { dispatch, getState } = getStore();
+
+    const isValidDrop = (sourceData: RecordUnknown, targetData: RecordUnknown) => {
+      if (singleImageSourceApi.typeGuard(sourceData)) {
+        for (const target of singleImageActions) {
+          if (target.typeGuard(targetData)) {
+            // TS cannot infer `targetData` but we've just checked it. This is safe.
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            if (target.isValid(sourceData, targetData as any, dispatch, getState)) {
+              return true;
+            }
+          }
+        }
+      }
+
+      if (multipleImageSourceApi.typeGuard(sourceData)) {
+        for (const target of multipleImageActions) {
+          if (target.typeGuard(targetData)) {
+            // TS cannot infer `targetData` but we've just checked it. This is safe.
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            if (target.isValid(sourceData, targetData as any, dispatch, getState)) {
+              return true;
+            }
+          }
+        }
+      }
+
+      return false;
+    };
+
     return combine(
       dropTargetForElements({
-        element: ref.current,
-        canDrop: (args) => {
-          const sourceData = args.source.data;
-          if (!Dnd.Util.isDndSourceData(sourceData)) {
+        element,
+        canDrop: ({ source }) => {
+          const sourceData = source.data;
+          if (sourceData.id === targetData.id) {
             return false;
           }
-          if (Dnd.Util.getDndId(targetData) === Dnd.Util.getDndId(sourceData)) {
-            return false;
-          }
-          return Dnd.Util.isValidDrop(sourceData, targetData);
+          return isValidDrop(sourceData, targetData);
         },
         onDragEnter: () => {
           setDndState('over');
@@ -101,15 +137,12 @@ export const DndDropTarget = memo((props: Props) => {
         getData: () => targetData,
       }),
       monitorForElements({
-        canMonitor: (args) => {
-          const sourceData = args.source.data;
-          if (!Dnd.Util.isDndSourceData(sourceData)) {
+        canMonitor: ({ source }) => {
+          const sourceData = source.data;
+          if (sourceData.id === targetData.id) {
             return false;
           }
-          if (Dnd.Util.getDndId(targetData) === Dnd.Util.getDndId(sourceData)) {
-            return false;
-          }
-          return Dnd.Util.isValidDrop(sourceData, targetData);
+          return isValidDrop(sourceData, targetData);
         },
         onDragStart: () => {
           setDndOrigin('element');
@@ -124,17 +157,17 @@ export const DndDropTarget = memo((props: Props) => {
   }, [targetData, dispatch, isDisabled]);
 
   useEffect(() => {
-    if (!ref.current) {
+    const element = ref.current;
+    if (!element) {
       return;
     }
-
     if (isDisabled) {
       return;
     }
 
     return combine(
       dropTargetForExternal({
-        element: ref.current,
+        element,
         canDrop: (args) => {
           if (!containsFiles(args)) {
             return false;
@@ -162,7 +195,7 @@ export const DndDropTarget = memo((props: Props) => {
               image_category: 'user',
               is_intermediate: false,
             });
-            Dnd.Util.handleDrop(Dnd.Source.singleImage.getData({ imageDTO }), targetData);
+            // Dnd.Util.handleDrop(Dnd.Source.singleImage.getData({ imageDTO }), targetData);
           }
         },
       }),

@@ -1,16 +1,17 @@
 import { Grid, GridItem } from '@invoke-ai/ui-library';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
-import { Dnd } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
+import { newCanvasEntityFromImageActionApi } from 'features/imageActions/actions';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const addRasterLayerFromImageDndTargetData = Dnd.Target.newRasterLayerFromImage.getData();
-const addControlLayerFromImageDndTargetData = Dnd.Target.newControlLayerFromImage.getData();
-const addRegionalGuidanceReferenceImageFromImageDndTargetData =
-  Dnd.Target.newRegionalGuidanceReferenceImageFromImage.getData();
-const addGlobalReferenceImageFromImageDndTargetData = Dnd.Target.newGlobalReferenceImageFromImage.getData();
+const addRasterLayerFromImageDndTargetData = newCanvasEntityFromImageActionApi.getData({ type: 'raster_layer' });
+const addControlLayerFromImageDndTargetData = newCanvasEntityFromImageActionApi.getData({ type: 'control_layer' });
+const addRegionalGuidanceReferenceImageFromImageDndTargetData = newCanvasEntityFromImageActionApi.getData({
+  type: 'regional_guidance_with_reference_image',
+});
+const addGlobalReferenceImageFromImageDndTargetData = newCanvasEntityFromImageActionApi.getData({ type: 'reference_image' });
 
 export const CanvasDropArea = memo(() => {
   const { t } = useTranslation();

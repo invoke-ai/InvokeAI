@@ -4,8 +4,10 @@ import { monitorForExternal } from '@atlaskit/pragmatic-drag-and-drop/external/a
 import { containsFiles } from '@atlaskit/pragmatic-drag-and-drop/external/file';
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import { logger } from 'app/logging/logger';
+import { getStore } from 'app/store/nanostores/store';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
-import { Dnd } from 'features/dnd/dnd';
+import { parseify } from 'common/util/serialize';
+import { multipleImageSourceApi, multipleImageActions, singleImageSourceApi, singleImageActions } from 'features/imageActions/actions';
 import { useEffect } from 'react';
 
 const log = logger('dnd');
@@ -20,7 +22,7 @@ export const useDndMonitor = () => {
           const sourceData = source.data;
 
           // Check for allowed sources
-          if (!Dnd.Source.singleImage.typeGuard(sourceData) && !Dnd.Source.multipleImage.typeGuard(sourceData)) {
+          if (!singleImageSourceApi.typeGuard(sourceData) && !multipleImageSourceApi.typeGuard(sourceData)) {
             return false;
           }
 
@@ -35,19 +37,40 @@ export const useDndMonitor = () => {
           const sourceData = source.data;
           const targetData = target.data;
 
+          const { dispatch, getState } = getStore();
+
           // Check for allowed sources
-          if (!Dnd.Source.singleImage.typeGuard(sourceData) && !Dnd.Source.multipleImage.typeGuard(sourceData)) {
-            return;
+          if (singleImageSourceApi.typeGuard(sourceData)) {
+            for (const target of singleImageActions) {
+              if (target.typeGuard(targetData)) {
+                // TS cannot infer `targetData` but we've just checked it. This is safe.
+                /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+                if (target.isValid(sourceData, targetData as any, dispatch, getState)) {
+                  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+                  target.handler(sourceData, targetData as any, dispatch, getState);
+                  log.debug(parseify({ sourceData, targetData }), 'Dropped single image');
+                  return;
+                }
+              }
+            }
           }
 
-          // Check for allowed targets
-          if (!Dnd.Util.isDndTargetData(targetData)) {
-            return;
+          if (multipleImageSourceApi.typeGuard(sourceData)) {
+            for (const target of multipleImageActions) {
+              if (target.typeGuard(targetData)) {
+                // TS cannot infer `targetData` but we've just checked it. This is safe.
+                /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+                if (target.isValid(sourceData, targetData as any, dispatch, getState)) {
+                  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+                  target.handler(sourceData, targetData as any, dispatch, getState);
+                  log.debug(parseify({ sourceData, targetData }), 'Dropped multiple images');
+                  return;
+                }
+              }
+            }
           }
 
-          log.debug({ sourceData, targetData }, 'Dropped image');
-
-          Dnd.Util.handleDrop(sourceData, targetData);
+          log.warn(parseify({ sourceData, targetData }), 'Invalid image drop');
         },
       }),
       monitorForExternal({

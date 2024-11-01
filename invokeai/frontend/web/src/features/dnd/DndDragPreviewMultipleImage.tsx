@@ -1,8 +1,8 @@
 import type { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { setCustomNativeDragPreview } from '@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview';
 import { Flex, Heading } from '@invoke-ai/ui-library';
-import type { Dnd } from 'features/dnd/dnd';
-import { DND_IMAGE_DRAG_PREVIEW_SIZE, preserveOffsetOnSourceFallbackCentered } from 'features/dnd/dnd';
+import { DND_IMAGE_DRAG_PREVIEW_SIZE, preserveOffsetOnSourceFallbackCentered } from 'features/dnd/util';
+import type { MultipleImageSourceData } from 'features/imageActions/actions';
 import { memo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -39,7 +39,7 @@ export const createMultipleImageDragPreview = (arg: DndDragPreviewMultipleImageS
   createPortal(<DndDragPreviewMultipleImage imageDTOs={arg.imageDTOs} />, arg.container);
 
 type SetMultipleDragPreviewArg = {
-  multipleImageDndData: Dnd.types['SourceDataTypeMap']['multipleImage'];
+  multipleImageDndData: MultipleImageSourceData;
   setDragPreviewState: (dragPreviewState: DndDragPreviewMultipleImageState | null) => void;
   onGenerateDragPreviewArgs: Param0<Param0<typeof draggable>['onGenerateDragPreview']>;
 };

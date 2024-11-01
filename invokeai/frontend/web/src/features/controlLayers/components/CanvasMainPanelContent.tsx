@@ -109,7 +109,9 @@ export const CanvasMainPanelContent = memo(() => {
           <SelectObject />
         </CanvasManagerProviderGate>
       </Flex>
-      <CanvasDropArea />
+      <CanvasManagerProviderGate>
+        <CanvasDropArea />
+      </CanvasManagerProviderGate>
       <GatedImageViewer />
     </Flex>
   );
