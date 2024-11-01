@@ -41,16 +41,16 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         input=Input.Connection,
         title="Transformer",
     )
-    positive_text_conditioning: SD3ConditioningField = InputField(
+    positive_conditioning: SD3ConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
-    negative_text_conditioning: SD3ConditioningField = InputField(
+    negative_conditioning: SD3ConditioningField = InputField(
         description=FieldDescriptions.negative_cond, input=Input.Connection
     )
     cfg_scale: float | list[float] = InputField(default=3.5, description=FieldDescriptions.cfg_scale, title="CFG Scale")
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
-    num_steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
+    steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
     @torch.no_grad()
@@ -154,14 +154,14 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         do_classifier_free_guidance = True
         pos_prompt_embeds, pos_pooled_prompt_embeds = self._load_text_conditioning(
             context=context,
-            conditioning_name=self.positive_text_conditioning.conditioning_name,
+            conditioning_name=self.positive_conditioning.conditioning_name,
             joint_attention_dim=transformer_info.model.config.joint_attention_dim,
             dtype=inference_dtype,
             device=device,
         )
         neg_prompt_embeds, neg_pooled_prompt_embeds = self._load_text_conditioning(
             context=context,
-            conditioning_name=self.negative_text_conditioning.conditioning_name,
+            conditioning_name=self.negative_conditioning.conditioning_name,
             joint_attention_dim=transformer_info.model.config.joint_attention_dim,
             dtype=inference_dtype,
             device=device,
@@ -172,7 +172,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Prepare the scheduler.
         scheduler = FlowMatchEulerDiscreteScheduler()
-        scheduler.set_timesteps(num_inference_steps=self.num_steps, device=device)
+        scheduler.set_timesteps(num_inference_steps=self.steps, device=device)
         timesteps = scheduler.timesteps
         assert isinstance(timesteps, torch.Tensor)
 

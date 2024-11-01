@@ -17,7 +17,7 @@ from invokeai.backend.model_manager.config import SubModelType
 class Sd3ModelLoaderOutput(BaseInvocationOutput):
     """SD3 base model loader output."""
 
-    mmditx: TransformerField = OutputField(description=FieldDescriptions.mmditx, title="MMDiTX")
+    transformer: TransformerField = OutputField(description=FieldDescriptions.transformer, title="Transformer")
     clip_l: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP L")
     clip_g: CLIPField = OutputField(description=FieldDescriptions.clip, title="CLIP G")
     t5_encoder: T5EncoderField = OutputField(description=FieldDescriptions.t5_encoder, title="T5 Encoder")
@@ -70,7 +70,7 @@ class Sd3ModelLoaderInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> Sd3ModelLoaderOutput:
-        mmditx = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+        transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
         vae = (
             self.vae_model.model_copy(update={"submodel_type": SubModelType.VAE})
             if self.vae_model
@@ -100,7 +100,7 @@ class Sd3ModelLoaderInvocation(BaseInvocation):
         )
 
         return Sd3ModelLoaderOutput(
-            mmditx=TransformerField(transformer=mmditx, loras=[]),
+            transformer=TransformerField(transformer=transformer, loras=[]),
             clip_l=CLIPField(tokenizer=tokenizer_l, text_encoder=clip_encoder_l, loras=[], skipped_layers=0),
             clip_g=CLIPField(tokenizer=tokenizer_g, text_encoder=clip_encoder_g, loras=[], skipped_layers=0),
             t5_encoder=T5EncoderField(tokenizer=tokenizer_t5, text_encoder=t5_encoder),

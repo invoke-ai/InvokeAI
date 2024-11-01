@@ -255,12 +255,12 @@
               "name": "transformer",
               "label": ""
             },
-            "positive_text_conditioning": {
-              "name": "positive_text_conditioning",
+            "positive_conditioning": {
+              "name": "positive_conditioning",
               "label": ""
             },
-            "negative_text_conditioning": {
-              "name": "negative_text_conditioning",
+            "negative_conditioning": {
+              "name": "negative_conditioning",
               "label": ""
             },
             "cfg_scale": {
@@ -278,8 +278,8 @@
               "label": "",
               "value": 1024
             },
-            "num_steps": {
-              "name": "num_steps",
+            "steps": {
+              "name": "steps",
               "label": "",
               "value": 30
             },
@@ -354,11 +354,11 @@
         "targetHandle": "clip_l"
       },
       {
-        "id": "reactflow__edge-3f22f668-0e02-4fde-a2bb-c339586ceb4cmmditx-c7539f7b-7ac5-49b9-93eb-87ede611409ftransformer",
+        "id": "reactflow__edge-3f22f668-0e02-4fde-a2bb-c339586ceb4ctransformer-c7539f7b-7ac5-49b9-93eb-87ede611409ftransformer",
         "type": "default",
         "source": "3f22f668-0e02-4fde-a2bb-c339586ceb4c",
         "target": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
-        "sourceHandle": "mmditx",
+        "sourceHandle": "transformer",
         "targetHandle": "transformer"
       },
       {
@@ -378,20 +378,20 @@
         "targetHandle": "latents"
       },
       {
-        "id": "reactflow__edge-e17d34e7-6ed1-493c-9a85-4fcd291cb084conditioning-c7539f7b-7ac5-49b9-93eb-87ede611409fpositive_text_conditioning",
+        "id": "reactflow__edge-e17d34e7-6ed1-493c-9a85-4fcd291cb084conditioning-c7539f7b-7ac5-49b9-93eb-87ede611409fpositive_conditioning",
         "type": "default",
         "source": "e17d34e7-6ed1-493c-9a85-4fcd291cb084",
         "target": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
         "sourceHandle": "conditioning",
-        "targetHandle": "positive_text_conditioning"
+        "targetHandle": "positive_conditioning"
       },
       {
-        "id": "reactflow__edge-3b4f7f27-cfc0-4373-a009-99c5290d0cd6conditioning-c7539f7b-7ac5-49b9-93eb-87ede611409fnegative_text_conditioning",
+        "id": "reactflow__edge-3b4f7f27-cfc0-4373-a009-99c5290d0cd6conditioning-c7539f7b-7ac5-49b9-93eb-87ede611409fnegative_conditioning",
         "type": "default",
         "source": "3b4f7f27-cfc0-4373-a009-99c5290d0cd6",
         "target": "c7539f7b-7ac5-49b9-93eb-87ede611409f",
         "sourceHandle": "conditioning",
-        "targetHandle": "negative_text_conditioning"
+        "targetHandle": "negative_conditioning"
       }
     ]
   }
