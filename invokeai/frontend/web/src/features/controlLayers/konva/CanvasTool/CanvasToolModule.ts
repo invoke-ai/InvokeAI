@@ -170,7 +170,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     } else if (segmentingAdapter) {
       segmentingAdapter.segmentAnything.syncCursorStyle();
     } else if (transformingAdapter) {
-      // The transformer handles cursor style via events
+      transformingAdapter.transformer.syncCursorStyle();
     } else if (this.manager.stateApi.$isFiltering.get()) {
       stage.setCursor('not-allowed');
     } else if (this.manager.stagingArea.$isStaging.get()) {

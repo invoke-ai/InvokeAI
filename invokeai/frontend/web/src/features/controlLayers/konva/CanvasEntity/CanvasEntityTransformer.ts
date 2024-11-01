@@ -296,6 +296,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.syncInteractionState();
   };
 
+  syncCursorStyle = () => {
+    if (!this.parent.renderer.hasObjects()) {
+      this.manager.stage.setCursor('not-allowed');
+    } else {
+      this.manager.stage.setCursor('default');
+    }
+  };
+
   anchorStyleFunc = (anchor: Konva.Rect): void => {
     // Give the rotater special styling
     if (anchor.hasName('rotater')) {
@@ -590,6 +598,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   syncInteractionState = () => {
     this.log.trace('Syncing interaction state');
+
+    if (this.manager.stagingArea.$isStaging.get()) {
+      // While staging, the layer should not be interactable
+      this.parent.konva.layer.listening(false);
+      this._setInteractionMode('off');
+      return;
+    }
 
     if (this.parent.segmentAnything?.$isSegmenting.get()) {
       // When segmenting, the layer should listen but the transformer should not be interactable

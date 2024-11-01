@@ -2,7 +2,6 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { noop } from 'lodash-es';
 import type { Logger } from 'roarr';
 
 export class CanvasMoveToolModule extends CanvasModuleBase {
@@ -24,8 +23,13 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
     this.log.debug('Creating module');
   }
 
-  /**
-   * This is a noop. Entity transformers handle cursor style when the move tool is active.
-   */
-  syncCursorStyle = noop;
+  syncCursorStyle = () => {
+    const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
+    if (!selectedEntity) {
+      this.manager.stage.setCursor('not-allowed');
+    } else {
+      // The cursor is on an entity, defer to transformer to handle the cursor
+      selectedEntity.transformer.syncCursorStyle();
+    }
+  };
 }
