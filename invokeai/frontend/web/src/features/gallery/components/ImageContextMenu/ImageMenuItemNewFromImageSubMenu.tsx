@@ -1,18 +1,17 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { useAppStore } from 'app/store/nanostores/store';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
-import {
-  useNewCanvasFromImage,
-  useNewControlLayerFromImage,
-  useNewInpaintMaskFromImage,
-  useNewRasterLayerFromImage,
-  useNewRegionalGuidanceFromImage,
-} from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
+import {
+  newCanvasEntityFromImageActionApi,
+  newCanvasFromImageActionApi,
+  singleImageSourceApi,
+} from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
 import { setActiveTab } from 'features/ui/store/uiSlice';
 import { memo, useCallback } from 'react';
@@ -22,18 +21,16 @@ import { PiFileBold, PiPlusBold } from 'react-icons/pi';
 export const ImageMenuItemNewFromImageSubMenu = memo(() => {
   const { t } = useTranslation();
   const subMenu = useSubMenu();
+  const store = useAppStore();
   const dispatch = useAppDispatch();
   const imageDTO = useImageDTOContext();
   const imageViewer = useImageViewer();
   const isBusy = useCanvasIsBusy();
-  const newRasterLayerFromImage = useNewRasterLayerFromImage();
-  const newControlLayerFromImage = useNewControlLayerFromImage();
-  const newInpaintMaskFromImage = useNewInpaintMaskFromImage();
-  const newRegionalGuidanceFromImage = useNewRegionalGuidanceFromImage();
-  const newCanvasFromImage = useNewCanvasFromImage();
 
   const onClickNewCanvasWithRasterLayerFromImage = useCallback(() => {
-    newCanvasFromImage(imageDTO, 'raster_layer');
+    const targetData = newCanvasFromImageActionApi.getData({ type: 'raster_layer' });
+    const sourceData = singleImageSourceApi.getData({ imageDTO });
+    newCanvasFromImageActionApi.handler(sourceData, targetData, store.dispatch, store.getState);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -41,10 +38,12 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newCanvasFromImage, t]);
+  }, [dispatch, imageDTO, imageViewer, store.dispatch, store.getState, t]);
 
   const onClickNewCanvasWithControlLayerFromImage = useCallback(() => {
-    newCanvasFromImage(imageDTO, 'control_layer');
+    const targetData = newCanvasFromImageActionApi.getData({ type: 'control_layer' });
+    const sourceData = singleImageSourceApi.getData({ imageDTO });
+    newCanvasFromImageActionApi.handler(sourceData, targetData, store.dispatch, store.getState);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -52,11 +51,13 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newCanvasFromImage, t]);
+  }, [dispatch, imageDTO, imageViewer, store.dispatch, store.getState, t]);
 
   const onClickNewRasterLayerFromImage = useCallback(() => {
+    const targetData = newCanvasEntityFromImageActionApi.getData({ type: 'raster_layer' });
+    const sourceData = singleImageSourceApi.getData({ imageDTO });
+    newCanvasEntityFromImageActionApi.handler(sourceData, targetData, store.dispatch, store.getState);
     dispatch(sentImageToCanvas());
-    newRasterLayerFromImage(imageDTO);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -64,11 +65,13 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newRasterLayerFromImage, t]);
+  }, [dispatch, imageDTO, imageViewer, store.dispatch, store.getState, t]);
 
   const onClickNewControlLayerFromImage = useCallback(() => {
+    const targetData = newCanvasEntityFromImageActionApi.getData({ type: 'control_layer' });
+    const sourceData = singleImageSourceApi.getData({ imageDTO });
+    newCanvasEntityFromImageActionApi.handler(sourceData, targetData, store.dispatch, store.getState);
     dispatch(sentImageToCanvas());
-    newControlLayerFromImage(imageDTO);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -76,11 +79,13 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newControlLayerFromImage, t]);
+  }, [dispatch, imageDTO, imageViewer, store.dispatch, store.getState, t]);
 
   const onClickNewInpaintMaskFromImage = useCallback(() => {
+    const targetData = newCanvasEntityFromImageActionApi.getData({ type: 'inpaint_mask' });
+    const sourceData = singleImageSourceApi.getData({ imageDTO });
+    newCanvasEntityFromImageActionApi.handler(sourceData, targetData, store.dispatch, store.getState);
     dispatch(sentImageToCanvas());
-    newInpaintMaskFromImage(imageDTO);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -88,11 +93,13 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newInpaintMaskFromImage, t]);
+  }, [dispatch, imageDTO, imageViewer, store.dispatch, store.getState, t]);
 
   const onClickNewRegionalGuidanceFromImage = useCallback(() => {
+    const targetData = newCanvasEntityFromImageActionApi.getData({ type: 'regional_guidance' });
+    const sourceData = singleImageSourceApi.getData({ imageDTO });
+    newCanvasEntityFromImageActionApi.handler(sourceData, targetData, store.dispatch, store.getState);
     dispatch(sentImageToCanvas());
-    newRegionalGuidanceFromImage(imageDTO);
     dispatch(setActiveTab('canvas'));
     imageViewer.close();
     toast({
@@ -100,7 +107,7 @@ export const ImageMenuItemNewFromImageSubMenu = memo(() => {
       title: t('toast.sentToCanvas'),
       status: 'success',
     });
-  }, [dispatch, imageDTO, imageViewer, newRegionalGuidanceFromImage, t]);
+  }, [dispatch, imageDTO, imageViewer, store.dispatch, store.getState, t]);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiPlusBold />}>
