@@ -1,7 +1,10 @@
 import type { AppDispatch, RootState } from 'app/store/store';
 import { selectDefaultControlAdapter, selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
+import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { canvasReset } from 'features/controlLayers/store/actions';
 import {
+  bboxChangedFromCanvas,
   controlLayerAdded,
   entityRasterized,
   inpaintMaskAdded,
@@ -11,21 +14,29 @@ import {
   rgAdded,
   rgIPAdapterImageChanged,
 } from 'features/controlLayers/store/canvasSlice';
-import { selectBboxRect } from 'features/controlLayers/store/selectors';
+import { selectBboxModelBase, selectBboxRect } from 'features/controlLayers/store/selectors';
 import type {
+  CanvasControlLayerState,
   CanvasEntityIdentifier,
   CanvasEntityType,
+  CanvasInpaintMaskState,
+  CanvasRasterLayerState,
+  CanvasRegionalGuidanceState,
   CanvasRenderableEntityIdentifier,
 } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { selectComparisonImages } from 'features/gallery/components/ImageViewer/common';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
+import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import type { Equals } from 'tsafe';
+import { assert } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
 export type RecordUnknown = Record<string | symbol, unknown>;
@@ -250,8 +261,8 @@ export const setComparisonImageActionApi: ActionTargetApi<SetComparisonImageActi
 };
 //#endregion
 
-//#region New Canvas Entity
-const _newCanvasEntity = buildTypeAndKey('new-canvas-entity');
+//#region New Canvas Entity from Image
+const _newCanvasEntity = buildTypeAndKey('new-canvas-entity-from-image');
 export type NewCanvasEntityFromImageActionData = ActionData<
   typeof _newCanvasEntity.type,
   typeof _newCanvasEntity.key,
@@ -309,7 +320,139 @@ export const newCanvasEntityFromImageActionApi: ActionTargetApi<
         ipAdapter.image = imageDTOToImageWithDims(imageDTO);
         const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }];
         dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
+        break;
       }
+    }
+  },
+};
+//#endregion
+
+//#region New Canvas from Image
+const _newCanvasFromImage = buildTypeAndKey('new-canvas-from-image');
+export type NewCanvasFromImageActionData = ActionData<
+  typeof _newCanvasFromImage.type,
+  typeof _newCanvasFromImage.key,
+  { type: CanvasEntityType | 'regional_guidance_with_reference_image' }
+>;
+/**
+ * Returns a function that adds a new canvas with the given image as the initial image, replicating the img2img flow:
+ * - Reset the canvas
+ * - Resize the bbox to the image's aspect ratio at the optimal size for the selected model
+ * - Add the image as a raster layer
+ * - Resizes the layer to fit the bbox using the 'fill' strategy
+ *
+ * This allows the user to immediately generate a new image from the given image without any additional steps.
+ */
+export const newCanvasFromImageActionApi: ActionTargetApi<NewCanvasFromImageActionData, SingleImageSourceData> = {
+  ..._newCanvasFromImage,
+  typeGuard: buildTypeGuard(_newCanvasFromImage.key),
+  getData: buildGetData(_newCanvasFromImage.key, _newCanvasFromImage.type),
+  isValid: (sourceData, _targetData, _dispatch, _getState) => {
+    if (!singleImageSourceApi.typeGuard(sourceData)) {
+      return false;
+    }
+    return true;
+  },
+  handler: (sourceData, targetData, dispatch, getState) => {
+    const { type } = targetData.payload;
+    const { imageDTO } = sourceData.payload;
+    const state = getState();
+
+    const base = selectBboxModelBase(state);
+    // Calculate the new bbox dimensions to fit the image's aspect ratio at the optimal size
+    const ratio = imageDTO.width / imageDTO.height;
+    const optimalDimension = getOptimalDimension(base);
+    const { width, height } = calculateNewSize(ratio, optimalDimension ** 2, base);
+
+    const imageObject = imageDTOToImageObject(imageDTO);
+    const { x, y } = selectBboxRect(state);
+
+    const addInitCallback = (id: string) => {
+      CanvasEntityAdapterBase.registerInitCallback(async (adapter) => {
+        // Skip the callback if the adapter is not the one we are creating
+        if (adapter.id !== id) {
+          return false;
+        }
+        // Fit the layer to the bbox w/ fill strategy
+        await adapter.transformer.startTransform({ silent: true });
+        adapter.transformer.fitToBboxFill();
+        await adapter.transformer.applyTransform();
+        return true;
+      });
+    };
+
+    switch (type) {
+      case 'raster_layer': {
+        const overrides = {
+          id: getPrefixedId('raster_layer'),
+          objects: [imageObject],
+          position: { x, y },
+        } satisfies Partial<CanvasRasterLayerState>;
+        addInitCallback(overrides.id);
+        dispatch(canvasReset());
+        // The `bboxChangedFromCanvas` reducer does no validation! Careful!
+        dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
+        dispatch(rasterLayerAdded({ overrides, isSelected: true }));
+        break;
+      }
+      case 'control_layer': {
+        const controlAdapter = selectDefaultControlAdapter(state);
+        const overrides = {
+          id: getPrefixedId('control_layer'),
+          objects: [imageObject],
+          position: { x, y },
+          controlAdapter,
+        } satisfies Partial<CanvasControlLayerState>;
+        addInitCallback(overrides.id);
+        dispatch(canvasReset());
+        // The `bboxChangedFromCanvas` reducer does no validation! Careful!
+        dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
+        dispatch(controlLayerAdded({ overrides, isSelected: true }));
+        break;
+      }
+      case 'inpaint_mask': {
+        const overrides = {
+          id: getPrefixedId('inpaint_mask'),
+          objects: [imageObject],
+          position: { x, y },
+        } satisfies Partial<CanvasInpaintMaskState>;
+        addInitCallback(overrides.id);
+        dispatch(canvasReset());
+        // The `bboxChangedFromCanvas` reducer does no validation! Careful!
+        dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
+        dispatch(inpaintMaskAdded({ overrides, isSelected: true }));
+        break;
+      }
+      case 'regional_guidance': {
+        const overrides = {
+          id: getPrefixedId('regional_guidance'),
+          objects: [imageObject],
+          position: { x, y },
+        } satisfies Partial<CanvasRegionalGuidanceState>;
+        addInitCallback(overrides.id);
+        dispatch(canvasReset());
+        // The `bboxChangedFromCanvas` reducer does no validation! Careful!
+        dispatch(bboxChangedFromCanvas({ x: 0, y: 0, width, height }));
+        dispatch(rgAdded({ overrides, isSelected: true }));
+        break;
+      }
+      case 'reference_image': {
+        const ipAdapter = selectDefaultIPAdapter(getState());
+        ipAdapter.image = imageDTOToImageWithDims(imageDTO);
+        dispatch(canvasReset());
+        dispatch(referenceImageAdded({ overrides: { ipAdapter }, isSelected: true }));
+        break;
+      }
+      case 'regional_guidance_with_reference_image': {
+        const ipAdapter = selectDefaultIPAdapter(getState());
+        ipAdapter.image = imageDTOToImageWithDims(imageDTO);
+        const referenceImages = [{ id: getPrefixedId('regional_guidance_reference_image'), ipAdapter }];
+        dispatch(canvasReset());
+        dispatch(rgAdded({ overrides: { referenceImages }, isSelected: true }));
+        break;
+      }
+      default:
+        assert<Equals<typeof type, never>>(false);
     }
   },
 };
