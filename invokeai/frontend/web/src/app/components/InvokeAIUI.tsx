@@ -2,6 +2,7 @@ import 'i18n';
 
 import type { Middleware } from '@reduxjs/toolkit';
 import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
+import { fillStudioInitAction } from 'app/hooks/useStudioInitAction';
 import type { LoggingOverrides } from 'app/logging/logger';
 import { $loggingOverrides, configureLogging } from 'app/logging/logger';
 import { $authToken } from 'app/store/nanostores/authToken';
@@ -70,6 +71,8 @@ const InvokeAIUI = ({
   workflowCategories,
   loggingOverrides,
 }: Props) => {
+  studioInitAction = fillStudioInitAction();
+
   useLayoutEffect(() => {
     /*
      * We need to configure logging before anything else happens - useLayoutEffect ensures we set this at the first

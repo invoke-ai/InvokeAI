@@ -14,11 +14,13 @@ import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/st
 import { toast } from 'features/toast/toast';
 import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
+import { t } from 'i18next';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getImageDTO, getImageMetadata } from 'services/api/endpoints/images';
 import { getStylePreset } from 'services/api/endpoints/stylePresets';
 import { z } from 'zod';
+import { fromZodError } from 'zod-validation-error';
 
 const zLoadWorkflowAction = z.object({
   type: z.literal('loadWorkflow'),
@@ -52,7 +54,7 @@ const zStudioDestinationAction = z.object({
 });
 type StudioDestinationAction = z.infer<typeof zStudioDestinationAction>;
 
-const zStudioInitAction = z.discriminatedUnion('type', [
+export const zStudioInitAction = z.discriminatedUnion('type', [
   zLoadWorkflowAction,
   zSelectStylePresetAction,
   zSendToCanvasAction,
@@ -60,7 +62,69 @@ const zStudioInitAction = z.discriminatedUnion('type', [
   zStudioDestinationAction,
 ]);
 
-export type StudioInitAction =  z.infer<typeof zStudioInitAction>;
+export type StudioInitAction = z.infer<typeof zStudioInitAction>;
+
+/**
+ * Converts a given hashbang string to a valid StudioInitAction
+ * @param {string} hashBang
+ * @returns {StudioInitAction}
+ * @throws {z.ZodError | Error} If there is a validation error.
+ */
+export const genHashBangStudioInitAction = (hashBang: string): StudioInitAction => {
+  if (!hashBang.startsWith('#!')) {
+    throw new Error("The given string isn't a valid hashbang");
+  }
+  const parts = hashBang.substring(2).split('&');
+  return zStudioInitAction.parse({
+    type: parts.shift(),
+    data: Object.fromEntries(new URLSearchParams(parts.join('&'))),
+  });
+};
+
+export const fillStudioInitAction = (studioInitAction?: StudioInitAction): StudioInitAction | undefined => {
+  if (studioInitAction !== undefined) {
+    return studioInitAction;
+  }
+  if (!location.hash.startsWith('#!')) {
+    return undefined;
+  }
+
+  try {
+    studioInitAction = genHashBangStudioInitAction(location.hash);
+    location.hash = '';
+  } catch (e) {
+    const err = {
+      id: 'UNABLE_TO_VALIDATE_HASHBANG_ACTION',
+      title: t('nodes.unableToValidateHashBangAction'),
+    };
+
+    setTimeout(() => {
+      if (e instanceof z.ZodError) {
+        const { message } = fromZodError(e, {
+          prefix: t('nodes.hashbangActionValidation'),
+        });
+        toast({
+          ...err,
+          status: 'error',
+          description: message,
+        });
+      } else if (e instanceof Error) {
+        toast({
+          ...err,
+          status: 'error',
+          description: e.message,
+        });
+      } else {
+        toast({
+          ...err,
+          status: 'error',
+          description: t('nodes.unknownErrorValidateHashBangAction'),
+        });
+      }
+    }, 1500);
+  }
+  return studioInitAction;
+};
 
 /**
  * A hook that performs an action when the studio is initialized. This is useful for deep linking into the studio.

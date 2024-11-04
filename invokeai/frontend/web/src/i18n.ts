@@ -32,7 +32,8 @@ if (import.meta.env.MODE === 'package') {
       fallbackLng: 'en',
       debug: false,
       backend: {
-        loadPath: `${window.location.href.replace(/\/$/, '')}/locales/{{lng}}.json`,
+        // loadPath: `${window.location.href.replace(/\/$/, '')}/locales/{{lng}}.json`,
+        loadPath: '/locales/{{lng}}.json',
       },
       interpolation: {
         escapeValue: false,
