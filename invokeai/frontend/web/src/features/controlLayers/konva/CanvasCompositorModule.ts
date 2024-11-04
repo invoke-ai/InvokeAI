@@ -253,18 +253,20 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * @param rect The region to include in the rasterized image
    * @param uploadOptions Options for uploading the image
    * @param compositingOptions Options for compositing the entities
+   * @param forceUpload If true, the image is always re-uploaded, returning a new image DTO
    * @returns A promise that resolves to the image DTO
    */
   getCompositeImageDTO = async (
     adapters: CanvasEntityAdapter[],
     rect: Rect,
     uploadOptions: Pick<UploadOptions, 'is_intermediate' | 'metadata'>,
-    compositingOptions?: CompositingOptions
+    compositingOptions?: CompositingOptions,
+    forceUpload?: boolean
   ): Promise<ImageDTO> => {
     assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
 
     const hash = this.getCompositeHash(adapters, { rect });
-    const cachedImageName = this.manager.cache.imageNameCache.get(hash);
+    const cachedImageName = forceUpload ? undefined : this.manager.cache.imageNameCache.get(hash);
 
     let imageDTO: ImageDTO | null = null;
 
