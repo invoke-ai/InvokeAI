@@ -130,10 +130,10 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
             # Some special handling is needed here if there is not an exact match and if we cannot infer the variant
             # from the file name. In this case, we only give this file a point if the requested variant is FP32 or DEFAULT.
             if (
-                candidate_variant_label
+                variant is not ModelRepoVariant.Default
+                and candidate_variant_label
                 and candidate_variant_label.startswith(f".{variant.value}")
-                or (not candidate_variant_label and variant in [ModelRepoVariant.FP32, ModelRepoVariant.Default])
-            ):
+            ) or (not candidate_variant_label and variant in [ModelRepoVariant.FP32, ModelRepoVariant.Default]):
                 score += 1
 
             if parent not in subfolder_weights:
