@@ -72,10 +72,16 @@ const useSaveCanvas = ({ region, saveToGallery, toastOk, toastError, onSave, wit
 
     const result = await withResultAsync(() => {
       const rasterAdapters = canvasManager.compositor.getVisibleAdaptersOfType('raster_layer');
-      return canvasManager.compositor.getCompositeImageDTO(rasterAdapters, rect, {
-        is_intermediate: !saveToGallery,
-        metadata,
-      });
+      return canvasManager.compositor.getCompositeImageDTO(
+        rasterAdapters,
+        rect,
+        {
+          is_intermediate: !saveToGallery,
+          metadata,
+        },
+        undefined,
+        true // force upload the image to ensure it gets added to the gallery
+      );
     });
 
     if (result.isOk()) {
