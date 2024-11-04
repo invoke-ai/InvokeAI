@@ -60,9 +60,6 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
           this.$hasActiveGeneration.set(true);
         } else {
           this.$hasActiveGeneration.set(false);
-          if (!this.manager.stagingArea.$isStaging.get()) {
-            this.$lastProgressEvent.set(null);
-          }
         }
       })
     );
@@ -83,17 +80,30 @@ export class CanvasProgressImageModule extends CanvasModuleBase {
       this.$lastProgressEvent.set(data);
     };
 
+    // Handle a canceled or failed canvas generation. We should clear the progress image in this case.
+    const queueItemStatusChangedListener = (data: S['QueueItemStatusChangedEvent']) => {
+      if (data.destination !== 'canvas') {
+        return;
+      }
+      if (data.status === 'failed' || data.status === 'canceled') {
+        this.$lastProgressEvent.set(null);
+        this.$hasActiveGeneration.set(false);
+      }
+    };
+
     const clearProgress = () => {
       this.$lastProgressEvent.set(null);
     };
 
     this.manager.socket.on('invocation_progress', progressListener);
+    this.manager.socket.on('queue_item_status_changed', queueItemStatusChangedListener);
     this.manager.socket.on('connect', clearProgress);
     this.manager.socket.on('connect_error', clearProgress);
     this.manager.socket.on('disconnect', clearProgress);
 
     return () => {
       this.manager.socket.off('invocation_progress', progressListener);
+      this.manager.socket.off('queue_item_status_changed', queueItemStatusChangedListener);
       this.manager.socket.off('connect', clearProgress);
       this.manager.socket.off('connect_error', clearProgress);
       this.manager.socket.off('disconnect', clearProgress);
