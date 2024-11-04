@@ -155,7 +155,6 @@
         "path": "Pad",
         "triggerPhrases": "Triggerzinnen",
         "typePhraseHere": "Typ zin hier in",
-        "useDefaultSettings": "Gebruik standaardinstellingen",
         "modelImageDeleteFailed": "Fout bij verwijderen modelafbeelding",
         "modelImageUpdated": "Modelafbeelding bijgewerkt",
         "modelImageUpdateFailed": "Fout bij bijwerken modelafbeelding",
@@ -666,7 +665,6 @@
         }
     },
     "metadata": {
-        "seamless": "Naadloos",
         "positivePrompt": "Positieve prompt",
         "negativePrompt": "Negatieve prompt",
         "generationMode": "Genereermodus",

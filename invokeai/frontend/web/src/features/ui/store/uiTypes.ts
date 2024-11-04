@@ -31,7 +31,7 @@ export interface UIState {
    */
   expanders: Record<string, boolean>;
   /**
-   * Whether or not to show the user the open notification.
+   * Whether or not to show the user the open notification. Bump version to reset users who may have closed previous version.
    */
-  shouldShowNotification: boolean;
+  shouldShowNotificationV2: boolean;
 }

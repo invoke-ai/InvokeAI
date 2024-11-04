@@ -13,6 +13,7 @@ from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from diffusers.schedulers.scheduling_dpmsolver_sde import DPMSolverSDEScheduler
 from diffusers.schedulers.scheduling_tcd import TCDScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin as Scheduler
+from PIL import Image
 from pydantic import field_validator
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
@@ -510,6 +511,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         context: InvocationContext,
         t2i_adapters: Optional[Union[T2IAdapterField, list[T2IAdapterField]]],
         ext_manager: ExtensionsManager,
+        bgr_mode: bool = False,
     ) -> None:
         if t2i_adapters is None:
             return
@@ -519,6 +521,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
             t2i_adapters = [t2i_adapters]
 
         for t2i_adapter_field in t2i_adapters:
+            image = context.images.get_pil(t2i_adapter_field.image.image_name)
+            if bgr_mode:  # SDXL t2i trained on cv2's BGR outputs, but PIL won't convert straight to BGR
+                r, g, b = image.split()
+                image = Image.merge("RGB", (b, g, r))
             ext_manager.add_extension(
                 T2IAdapterExt(
                     node_context=context,
@@ -616,13 +622,17 @@ class DenoiseLatentsInvocation(BaseInvocation):
         for t2i_adapter_field in t2i_adapter:
             t2i_adapter_model_config = context.models.get_config(t2i_adapter_field.t2i_adapter_model.key)
             t2i_adapter_loaded_model = context.models.load(t2i_adapter_field.t2i_adapter_model)
-            image = context.images.get_pil(t2i_adapter_field.image.image_name)
+            image = context.images.get_pil(t2i_adapter_field.image.image_name, mode="RGB")
 
             # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.
             if t2i_adapter_model_config.base == BaseModelType.StableDiffusion1:
                 max_unet_downscale = 8
             elif t2i_adapter_model_config.base == BaseModelType.StableDiffusionXL:
                 max_unet_downscale = 4
+
+                # SDXL adapters are trained on cv2's BGR outputs
+                r, g, b = image.split()
+                image = Image.merge("RGB", (b, g, r))
             else:
                 raise ValueError(f"Unexpected T2I-Adapter base model type: '{t2i_adapter_model_config.base}'.")
 
@@ -630,28 +640,38 @@ class DenoiseLatentsInvocation(BaseInvocation):
             with t2i_adapter_loaded_model as t2i_adapter_model:
                 total_downscale_factor = t2i_adapter_model.total_downscale_factor
 
-                # Resize the T2I-Adapter input image.
-                # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
-                # result will match the latent image's dimensions after max_unet_downscale is applied.
-                t2i_input_height = latents_shape[2] // max_unet_downscale * total_downscale_factor
-                t2i_input_width = latents_shape[3] // max_unet_downscale * total_downscale_factor
-
                 # Note: We have hard-coded `do_classifier_free_guidance=False`. This is because we only want to prepare
                 # a single image. If CFG is enabled, we will duplicate the resultant tensor after applying the
                 # T2I-Adapter model.
                 #
                 # Note: We re-use the `prepare_control_image(...)` from ControlNet for T2I-Adapter, because it has many
                 # of the same requirements (e.g. preserving binary masks during resize).
+
+                # Assuming fixed dimensional scaling of LATENT_SCALE_FACTOR.
+                _, _, latent_height, latent_width = latents_shape
+                control_height_resize = latent_height * LATENT_SCALE_FACTOR
+                control_width_resize = latent_width * LATENT_SCALE_FACTOR
                 t2i_image = prepare_control_image(
                     image=image,
                     do_classifier_free_guidance=False,
-                    width=t2i_input_width,
-                    height=t2i_input_height,
+                    width=control_width_resize,
+                    height=control_height_resize,
                     num_channels=t2i_adapter_model.config["in_channels"],  # mypy treats this as a FrozenDict
                     device=t2i_adapter_model.device,
                     dtype=t2i_adapter_model.dtype,
                     resize_mode=t2i_adapter_field.resize_mode,
                 )
+
+                # Resize the T2I-Adapter input image.
+                # We select the resize dimensions so that after the T2I-Adapter's total_downscale_factor is applied, the
+                # result will match the latent image's dimensions after max_unet_downscale is applied.
+                # We crop the image to this size so that the positions match the input image on non-standard resolutions
+                t2i_input_height = latents_shape[2] // max_unet_downscale * total_downscale_factor
+                t2i_input_width = latents_shape[3] // max_unet_downscale * total_downscale_factor
+                if t2i_image.shape[2] > t2i_input_height or t2i_image.shape[3] > t2i_input_width:
+                    t2i_image = t2i_image[
+                        :, :, : min(t2i_image.shape[2], t2i_input_height), : min(t2i_image.shape[3], t2i_input_width)
+                    ]
 
                 adapter_state = t2i_adapter_model(t2i_image)
 
@@ -900,7 +920,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
             #    ext = extension_field.to_extension(exit_stack, context, ext_manager)
             #    ext_manager.add_extension(ext)
             self.parse_controlnet_field(exit_stack, context, self.control, ext_manager)
-            self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager)
+            bgr_mode = self.unet.unet.base == BaseModelType.StableDiffusionXL
+            self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager, bgr_mode)
 
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)

@@ -20,7 +20,7 @@ from typing import Optional
 
 import requests
 from huggingface_hub import HfApi, configure_http_backend, hf_hub_url
-from huggingface_hub.utils._errors import RepositoryNotFoundError, RevisionNotFoundError
+from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 

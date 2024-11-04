@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import sys
 import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -192,11 +193,18 @@ class BaseInvocation(ABC, BaseModel):
         """Gets a pydantc TypeAdapter for the union of all invocation types."""
         if not cls._typeadapter or cls._typeadapter_needs_update:
             AnyInvocation = TypeAliasType(
-                "AnyInvocation", Annotated[Union[tuple(cls._invocation_classes)], Field(discriminator="type")]
+                "AnyInvocation", Annotated[Union[tuple(cls.get_invocations())], Field(discriminator="type")]
             )
             cls._typeadapter = TypeAdapter(AnyInvocation)
             cls._typeadapter_needs_update = False
         return cls._typeadapter
+
+    @classmethod
+    def invalidate_typeadapter(cls) -> None:
+        """Invalidates the typeadapter, forcing it to be rebuilt on next access. If the invocation allowlist or
+        denylist is changed, this should be called to ensure the typeadapter is updated and validation respects
+        the updated allowlist and denylist."""
+        cls._typeadapter_needs_update = True
 
     @classmethod
     def get_invocations(cls) -> Iterable[BaseInvocation]:
@@ -478,6 +486,26 @@ def invocation(
         invocation_type_field = Field(
             title="type", default=invocation_type, json_schema_extra={"field_kind": FieldKind.NodeAttribute}
         )
+
+        # Validate the `invoke()` method is implemented
+        if "invoke" in cls.__abstractmethods__:
+            raise ValueError(f'Invocation "{invocation_type}" must implement the "invoke" method')
+
+        # And validate that `invoke()` returns a subclass of `BaseInvocationOutput
+        invoke_return_annotation = signature(cls.invoke).return_annotation
+
+        try:
+            # TODO(psyche): If `invoke()` is not defined, `return_annotation` ends up as the string "BaseInvocationOutput"
+            # instead of the class `BaseInvocationOutput`. This may be a pydantic bug: https://github.com/pydantic/pydantic/issues/7978
+            if isinstance(invoke_return_annotation, str):
+                invoke_return_annotation = getattr(sys.modules[cls.__module__], invoke_return_annotation)
+
+            assert invoke_return_annotation is not BaseInvocationOutput
+            assert issubclass(invoke_return_annotation, BaseInvocationOutput)
+        except Exception:
+            raise ValueError(
+                f'Invocation "{invocation_type}" must have a return annotation of a subclass of BaseInvocationOutput (got "{invoke_return_annotation}")'
+            )
 
         docstring = cls.__doc__
         cls = create_model(

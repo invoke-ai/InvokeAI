@@ -129,3 +129,5 @@ export const addImageToLatents = (g: Graph, isFlux: boolean, fp32: boolean, imag
     return g.addNode({ id: 'i2l', type: 'i2l', fp32, image: image_name ? { image_name } : undefined });
   }
 };
+
+export const CANVAS_OUTPUT_PREFIX = 'canvas_output';

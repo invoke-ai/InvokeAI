@@ -7,6 +7,8 @@ import { $queueId } from 'app/store/nanostores/queueId';
 import type { AppStore } from 'app/store/store';
 import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
+import { $isHFForbiddenToastOpen } from 'features/modelManagerV2/hooks/useHFForbiddenToast';
+import { $isHFLoginToastOpen } from 'features/modelManagerV2/hooks/useHFLoginToast';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import ErrorToastDescription, { getTitleFromErrorType } from 'features/toast/ErrorToastDescription';
@@ -294,6 +296,14 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     const { id, error, error_type } = data;
     const installs = selectModelInstalls(getState()).data;
+
+    if (error === 'Unauthorized') {
+      $isHFLoginToastOpen.set(true);
+    }
+
+    if (error === 'Forbidden') {
+      $isHFForbiddenToastOpen.set({ isEnabled: true, source: data.source });
+    }
 
     if (!installs?.find((install) => install.id === id)) {
       dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));

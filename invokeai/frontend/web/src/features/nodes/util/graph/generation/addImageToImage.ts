@@ -6,21 +6,34 @@ import { addImageToLatents } from 'features/nodes/util/graph/graphBuilderUtils';
 import { isEqual } from 'lodash-es';
 import type { Invocation } from 'services/api/types';
 
-export const addImageToImage = async (
-  g: Graph,
-  manager: CanvasManager,
-  l2i: Invocation<'l2i' | 'flux_vae_decode'>,
-  denoise: Invocation<'denoise_latents' | 'flux_denoise'>,
-  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader' | 'seamless' | 'vae_loader'>,
-  originalSize: Dimensions,
-  scaledSize: Dimensions,
-  bbox: CanvasState['bbox'],
-  denoising_start: number,
-  fp32: boolean
-): Promise<Invocation<'img_resize' | 'l2i' | 'flux_vae_decode'>> => {
-  denoise.denoising_start = denoising_start;
+type AddImageToImageArg = {
+  g: Graph;
+  manager: CanvasManager;
+  l2i: Invocation<'l2i' | 'flux_vae_decode'>;
+  denoise: Invocation<'denoise_latents' | 'flux_denoise'>;
+  vaeSource: Invocation<'main_model_loader' | 'sdxl_model_loader' | 'flux_model_loader' | 'seamless' | 'vae_loader'>;
+  originalSize: Dimensions;
+  scaledSize: Dimensions;
+  bbox: CanvasState['bbox'];
+  denoising_start: number;
+  fp32: boolean;
+};
 
-  const { image_name } = await manager.compositor.getCompositeRasterLayerImageDTO(bbox.rect);
+export const addImageToImage = async ({
+  g,
+  manager,
+  l2i,
+  denoise,
+  vaeSource,
+  originalSize,
+  scaledSize,
+  bbox,
+  denoising_start,
+  fp32,
+}: AddImageToImageArg): Promise<Invocation<'img_resize' | 'l2i' | 'flux_vae_decode'>> => {
+  denoise.denoising_start = denoising_start;
+  const adapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
+  const { image_name } = await manager.compositor.getCompositeImageDTO(adapters, bbox.rect, { is_intermediate: true });
 
   if (!isEqual(scaledSize, originalSize)) {
     // Resize the initial image to the scaled size, denoise, then resize back to the original size

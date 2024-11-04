@@ -229,7 +229,6 @@
         "submitSupportTicket": "サポート依頼を送信する"
     },
     "metadata": {
-        "seamless": "シームレス",
         "Threshold": "ノイズ閾値",
         "seed": "シード",
         "width": "幅",
