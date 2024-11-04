@@ -210,6 +210,10 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
    * Processes the filter, updating the module's state and rendering the filtered image.
    */
   processImmediate = async () => {
+    if (!this.$isFiltering.get()) {
+      this.log.warn('Cannot process filter when not initialized');
+      return;
+    }
     const config = this.$filterConfig.get();
     const filterData = IMAGE_FILTERS[config.type];
 
@@ -342,7 +346,6 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     });
 
     // Final cleanup and teardown, returning user to main canvas UI
-    this.resetEphemeralState();
     this.teardown();
   };
 
@@ -409,9 +412,11 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
   };
 
   teardown = () => {
-    this.$initialFilterConfig.set(null);
-    this.konva.group.remove();
     this.unsubscribe();
+    this.konva.group.remove();
+    // The reset must be done _after_ unsubscribing from listeners, in case the listeners would otherwise react to
+    // the reset. For example, if auto-processing is enabled and we reset the state, it may trigger processing.
+    this.resetEphemeralState();
     this.$isFiltering.set(false);
     this.manager.stateApi.$filteringAdapter.set(null);
   };
@@ -428,7 +433,6 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
   cancel = () => {
     this.log.trace('Canceling');
-    this.resetEphemeralState();
     this.teardown();
   };
 
