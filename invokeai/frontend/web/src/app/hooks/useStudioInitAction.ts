@@ -18,24 +18,49 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getImageDTO, getImageMetadata } from 'services/api/endpoints/images';
 import { getStylePreset } from 'services/api/endpoints/stylePresets';
+import { z } from 'zod';
 
-type _StudioInitAction<T extends string, U> = { type: T; data: U };
+const zLoadWorkflowAction = z.object({
+  type: z.literal('loadWorkflow'),
+  data: z.object({ workflowId: z.string() }),
+});
+// type LoadWorkflowAction = z.infer<typeof zLoadWorkflowAction>;
 
-type LoadWorkflowAction = _StudioInitAction<'loadWorkflow', { workflowId: string }>;
-type SelectStylePresetAction = _StudioInitAction<'selectStylePreset', { stylePresetId: string }>;
-type SendToCanvasAction = _StudioInitAction<'sendToCanvas', { imageName: string }>;
-type UseAllParametersAction = _StudioInitAction<'useAllParameters', { imageName: string }>;
-type StudioDestinationAction = _StudioInitAction<
-  'goToDestination',
-  { destination: 'generation' | 'canvas' | 'workflows' | 'upscaling' | 'viewAllWorkflows' | 'viewAllStylePresets' }
->;
+const zSelectStylePresetAction = z.object({
+  type: z.literal('selectStylePreset'),
+  data: z.object({ stylePresetId: z.string() }),
+});
+// type SelectStylePresetAction = z.infer<typeof zSelectStylePresetAction>;
 
-export type StudioInitAction =
-  | LoadWorkflowAction
-  | SelectStylePresetAction
-  | SendToCanvasAction
-  | UseAllParametersAction
-  | StudioDestinationAction;
+const zSendToCanvasAction = z.object({
+  type: z.literal('sendToCanvas'),
+  data: z.object({ imageName: z.string() }),
+});
+// type SendToCanvasAction = z.infer<typeof zSendToCanvasAction>;
+
+const zUseAllParametersAction = z.object({
+  type: z.literal('useAllParameters'),
+  data: z.object({ imageName: z.string() }),
+});
+// type UseAllParametersAction = z.infer<typeof zUseAllParametersAction>;
+
+const zStudioDestinationAction = z.object({
+  type: z.literal('goToDestination'),
+  data: z.object({
+    destination: z.enum(['generation', 'canvas', 'workflows', 'upscaling', 'viewAllWorkflows', 'viewAllStylePresets']),
+  }),
+});
+type StudioDestinationAction = z.infer<typeof zStudioDestinationAction>;
+
+const zStudioInitAction = z.discriminatedUnion('type', [
+  zLoadWorkflowAction,
+  zSelectStylePresetAction,
+  zSendToCanvasAction,
+  zUseAllParametersAction,
+  zStudioDestinationAction,
+]);
+
+export type StudioInitAction =  z.infer<typeof zStudioInitAction>;
 
 /**
  * A hook that performs an action when the studio is initialized. This is useful for deep linking into the studio.
