@@ -41,7 +41,7 @@ dependencies = [
   "diffusers[torch]==0.31.0",
   "gguf==0.10.0",
   "invisible-watermark==0.2.0", # needed to install SDXL base and refiner using their repo_ids
-  "mediapipe>=0.10.7",          # needed for "mediapipeface" controlnet model
+  "mediapipe==0.10.14",         # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
   "onnx==1.16.1",
   "onnxruntime==1.19.2",
