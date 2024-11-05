@@ -1,7 +1,6 @@
-
-const WavyLine = ({ waviness, isDisabled }: {waviness: number, isDisabled: boolean}) => {
-  const width = 60; // Width of the SVG
-  const height = 28; // Height of the SVG
+const WavyLine = ({ waviness }: { waviness: number }) => {
+  const width = 40; // Width of the SVG
+  const height = 14; // Height of the SVG
   const segments = 5; // Number of segments in the line (more segments = smoother wave)
 
   // Calculate the path dynamically based on waviness
@@ -26,8 +25,8 @@ const WavyLine = ({ waviness, isDisabled }: {waviness: number, isDisabled: boole
   };
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} xmlns="http://www.w3.org/2000/svg" opacity={isDisabled ? 0.5 : 1}>
-      <path d={generatePath()} fill="none" stroke="#4299e1" strokeWidth="6" />
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} xmlns="http://www.w3.org/2000/svg">
+      <path d={generatePath()} fill="none" stroke="#4299e1" strokeWidth="3" />
     </svg>
   );
 };
