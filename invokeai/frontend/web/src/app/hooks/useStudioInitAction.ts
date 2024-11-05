@@ -1,3 +1,4 @@
+import { logger } from 'app/logging/logger';
 import { useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { withResultAsync } from 'common/util/result';
@@ -14,13 +15,12 @@ import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/st
 import { toast } from 'features/toast/toast';
 import { activeTabCanvasRightPanelChanged, setActiveTab } from 'features/ui/store/uiSlice';
 import { useGetAndLoadLibraryWorkflow } from 'features/workflowLibrary/hooks/useGetAndLoadLibraryWorkflow';
-import { t } from 'i18next';
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { serializeError } from 'serialize-error';
 import { getImageDTO, getImageMetadata } from 'services/api/endpoints/images';
 import { getStylePreset } from 'services/api/endpoints/stylePresets';
 import { z } from 'zod';
-import { fromZodError } from 'zod-validation-error';
 
 const zLoadWorkflowAction = z.object({
   type: z.literal('loadWorkflow'),
@@ -81,6 +81,13 @@ export const genHashBangStudioInitAction = (hashBang: string): StudioInitAction 
   });
 };
 
+/**
+ * Uses the HashBang fragment to populate an unset StudioInitAction
+ * If any studioInitAction is given, it will early bail with it.
+ * this will interpret and validate the hashbang as an studioInitAction
+ * @param {StudioInitAction} studioInitAction
+ * @returns {StudioInitAction | undefined}
+ */
 export const fillStudioInitAction = (studioInitAction?: StudioInitAction): StudioInitAction | undefined => {
   if (studioInitAction !== undefined) {
     return studioInitAction;
@@ -92,36 +99,15 @@ export const fillStudioInitAction = (studioInitAction?: StudioInitAction): Studi
   try {
     studioInitAction = genHashBangStudioInitAction(location.hash);
     location.hash = '';
-  } catch (e) {
-    const err = {
-      id: 'UNABLE_TO_VALIDATE_HASHBANG_ACTION',
-      title: t('nodes.unableToValidateHashBangAction'),
-    };
-
-    setTimeout(() => {
-      if (e instanceof z.ZodError) {
-        const { message } = fromZodError(e, {
-          prefix: t('nodes.hashbangActionValidation'),
-        });
-        toast({
-          ...err,
-          status: 'error',
-          description: message,
-        });
-      } else if (e instanceof Error) {
-        toast({
-          ...err,
-          status: 'error',
-          description: e.message,
-        });
-      } else {
-        toast({
-          ...err,
-          status: 'error',
-          description: t('nodes.unknownErrorValidateHashBangAction'),
-        });
-      }
-    }, 1500);
+  } catch (err) {
+    const log = logger('system');
+    if (err instanceof z.ZodError) {
+      log.error({ error: serializeError(err) }, 'Problem persisting the studioInitAction from the given hashbang');
+    } else if (err instanceof Error) {
+      log.error({ error: serializeError(err) }, 'Problem interpreting the hashbang');
+    } else {
+      log.error({ error: serializeError(err) }, 'Problem while filling StudioInitAction');
+    }
   }
   return studioInitAction;
 };
