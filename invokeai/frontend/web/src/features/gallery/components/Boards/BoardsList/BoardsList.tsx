@@ -106,7 +106,7 @@ export const BoardsList = ({ isPrivate }: Props) => {
         <AddBoardButton isPrivateBoard={isPrivate} />
       </Flex>
       <Collapse in={isOpen} style={fixTooltipCloseOnScrollStyles}>
-        <Flex direction="column" gap={1} overflowY="scroll">
+        <Flex direction="column" gap={1}>
           {boardElements.length ? (
             boardElements
           ) : (
