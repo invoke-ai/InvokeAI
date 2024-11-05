@@ -183,6 +183,6 @@ def get_clip_variant_type(location: str) -> Optional[ClipVariantType]:
                 case 768:
                     return ClipVariantType.L
                 case _:
-                    return None
+                    return ClipVariantType.L
     except Exception:
-        return None
+        return ClipVariantType.L
