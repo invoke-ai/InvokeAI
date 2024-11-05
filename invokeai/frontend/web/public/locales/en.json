@@ -1413,8 +1413,7 @@
         "paramDenoisingStrength": {
             "heading": "Denoising Strength",
             "paragraphs": [
-                "How much noise is added to the input image.",
-                "0 will result in an identical image, while 1 will result in a completely new image."
+                "Controls how much the generated image varies from the raster layer. Lower strength stays closer to the enabled raster layer."
             ]
         },
         "paramHeight": {
