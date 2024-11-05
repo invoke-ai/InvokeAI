@@ -26,12 +26,18 @@ export const WhatsNew = () => {
               <Trans
                 i18nKey="whatsNew.line1"
                 components={{
-                  ItalicComponent: <Text as="span" color="white" fontSize="sm" fontStyle="italic" />,
+                  StrongComponent: <Text as="span" color="white" fontSize="sm" fontWeight="semibold" />,
                 }}
               />
             </ListItem>
-            <ListItem>{t('whatsNew.line2')}</ListItem>
-            <ListItem>{t('whatsNew.line3')}</ListItem>
+            <ListItem>
+              <Trans
+                i18nKey="whatsNew.line1"
+                components={{
+                  StrongComponent: <Text as="span" color="white" fontSize="sm" fontWeight="semibold" />,
+                }}
+              />
+            </ListItem>
           </>
         )}
       </UnorderedList>
