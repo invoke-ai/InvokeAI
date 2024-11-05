@@ -42,7 +42,7 @@ export const WhatsNew = () => {
           label={t('whatsNew.readReleaseNotes')}
           href={
             isLocal
-              ? `https://github.com/invoke-ai/InvokeAI/releases/tag/v${data.version}`
+              ? `https://github.com/invoke-ai/InvokeAI/releases/tag/v${data?.version}`
               : 'https://support.invoke.ai/support/solutions/articles/151000178246'
           }
         />
