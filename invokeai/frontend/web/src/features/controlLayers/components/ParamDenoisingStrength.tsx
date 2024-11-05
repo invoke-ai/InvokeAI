@@ -62,7 +62,7 @@ export const ParamDenoisingStrength = memo(() => {
           />
         </>
       ) : (
-        <Flex justifySelf="flex-end">
+        <Flex justifySelf="flex-end" h="28px" alignItems="center">
           <Badge opacity="0.6">
             {t('common.disabled')} - {t('parameters.noRasterLayers')}
           </Badge>
