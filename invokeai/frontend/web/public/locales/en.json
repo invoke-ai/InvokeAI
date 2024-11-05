@@ -1662,6 +1662,7 @@
         "mergeDown": "Merge Down",
         "mergeVisibleOk": "Merged layers",
         "mergeVisibleError": "Error merging layers",
+        "mergingLayers": "Merging layers",
         "clearHistory": "Clear History",
         "bboxOverlay": "Show Bbox Overlay",
         "resetCanvas": "Reset Canvas",

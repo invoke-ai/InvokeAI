@@ -329,6 +329,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     entityIdentifiers: T[],
     deleteMergedEntities: boolean
   ): Promise<ImageDTO | null> => {
+    toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergingLayers'), withCount: false });
     if (entityIdentifiers.length <= 1) {
       this.log.warn({ entityIdentifiers }, 'Cannot merge less than 2 entities');
       return null;
@@ -351,7 +352,12 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     if (result.isErr()) {
       this.log.error({ error: serializeError(result.error) }, 'Failed to merge selected entities');
-      toast({ title: t('controlLayers.mergeVisibleError'), status: 'error' });
+      toast({
+        id: 'MERGE_LAYERS_TOAST',
+        title: t('controlLayers.mergeVisibleError'),
+        status: 'error',
+        withCount: false,
+      });
       return null;
     }
 
@@ -383,7 +389,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         assert<Equals<typeof type, never>>(false, 'Unsupported type for merge');
     }
 
-    toast({ title: t('controlLayers.mergeVisibleOk') });
+    toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergeVisibleOk'), status: 'success', withCount: false });
 
     return result.value;
   };
