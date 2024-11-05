@@ -1687,6 +1687,11 @@ export type components = {
              * @description App version
              */
             version: string;
+            /**
+             * Highlights
+             * @description Highlights of release
+             */
+            highlights?: string[] | null;
         };
         /**
          * Apply Tensor Mask to Image
