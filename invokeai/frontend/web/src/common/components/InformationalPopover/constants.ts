@@ -125,7 +125,7 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
     href: 'https://support.invoke.ai/support/solutions/articles/151000158838-compositing-settings',
   },
   infillMethod: {
-    href: 'https://support.invoke.ai/support/solutions/articles/151000158841-infill-and-scaling',
+    href: 'https://support.invoke.ai/support/solutions/articles/151000158838-compositing-settings',
   },
   scaleBeforeProcessing: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000158841',
