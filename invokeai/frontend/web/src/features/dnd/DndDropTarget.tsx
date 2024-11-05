@@ -89,7 +89,11 @@ export const DndDropTarget = memo(<T extends AnyDndTarget>(props: Props<T>) => {
       dropTargetForElements({
         element,
         canDrop: ({ source }) => {
-          return dndTarget.isValid({ sourceData: source.data, targetData: dndTargetData, dispatch, getState });
+          // TS cannot infer `dndTargetData` but we've just checked it.
+          // TODO(psyche): Figure out how to satisfy TS.
+          /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+          const arg = { sourceData: source.data, targetData: dndTargetData, dispatch, getState } as any;
+          return dndTarget.isValid(arg);
         },
         onDragEnter: () => {
           setDndState('over');
@@ -101,7 +105,11 @@ export const DndDropTarget = memo(<T extends AnyDndTarget>(props: Props<T>) => {
       }),
       monitorForElements({
         canMonitor: ({ source }) => {
-          return dndTarget.isValid({ sourceData: source.data, targetData: dndTargetData, dispatch, getState });
+          // TS cannot infer `dndTargetData` but we've just checked it.
+          // TODO(psyche): Figure out how to satisfy TS.
+          /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+          const arg = { sourceData: source.data, targetData: dndTargetData, dispatch, getState } as any;
+          return dndTarget.isValid(arg);
         },
         onDragStart: () => {
           setDndOrigin('element');
