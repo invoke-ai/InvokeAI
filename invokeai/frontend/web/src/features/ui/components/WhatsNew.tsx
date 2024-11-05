@@ -13,16 +13,26 @@ export const WhatsNew = () => {
   return (
     <Flex gap={4} flexDir="column">
       <UnorderedList fontSize="sm">
-        <ListItem>
-          <Trans
-            i18nKey="whatsNew.line1"
-            components={{
-              ItalicComponent: <Text as="span" color="white" fontSize="sm" fontStyle="italic" />,
-            }}
-          />
-        </ListItem>
-        <ListItem>{t('whatsNew.line2')}</ListItem>
-        <ListItem>{t('whatsNew.line3')}</ListItem>
+        
+          <>
+            <ListItem>
+              <Trans
+                i18nKey="whatsNew.line1"
+                components={{
+                  StrongComponent: <Text as="span" color="white" fontSize="sm" fontWeight="semibold" />,
+                }}
+              />
+            </ListItem>
+            <ListItem>
+              <Trans
+                i18nKey="whatsNew.line2"
+                components={{
+                  StrongComponent: <Text as="span" color="white" fontSize="sm" fontWeight="semibold" />,
+                }}
+              />
+            </ListItem>
+          </>
+     
       </UnorderedList>
       <Flex flexDir="column" gap={1}>
         <ExternalLink

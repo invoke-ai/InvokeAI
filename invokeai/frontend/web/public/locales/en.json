@@ -2096,9 +2096,8 @@
     },
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
-        "line1": "<ItalicComponent>Select Object</ItalicComponent> tool for precise object selection and editing",
-        "line2": "Expanded Flux support, now with Global Reference Images",
-        "line3": "Improved tooltips and context menus",
+        "line1": "<StrongComponent>Layer Merging</StrongComponent>: New <StrongComponent>Merge Down</StrongComponent> and improved <StrongComponent>Merge Visible</StrongComponent> for all layers, with special handling for Regional Guidance and Control Layers.",
+        "line2": "<StrongComponent>HF Token Support</StrongComponent>: Upload models that require Hugging Face authentication.",
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
         "watchUiUpdatesOverview": "Watch UI Updates Overview"
