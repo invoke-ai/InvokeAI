@@ -7,9 +7,9 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
+import { singleWorkflowFieldDndSource } from 'features/dnd/dnd';
 import { triggerPostMoveFlash } from 'features/dnd/util';
 import LinearViewFieldInternal from 'features/nodes/components/flow/nodes/Invocation/fields/LinearViewField';
-import { singleWorkflowField } from 'features/nodes/components/sidePanel/workflow/useLinearViewFieldDnd';
 import { selectWorkflowSlice, workflowExposedFieldsReordered } from 'features/nodes/store/workflowSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import { memo, useEffect } from 'react';
@@ -57,7 +57,7 @@ const FieldListInnerContent = memo(({ fields }: { fields: FieldIdentifier[] }) =
   useEffect(() => {
     return monitorForElements({
       canMonitor({ source }) {
-        if (!singleWorkflowField.typeGuard(source.data)) {
+        if (!singleWorkflowFieldDndSource.typeGuard(source.data)) {
           return false;
         }
         return true;
@@ -71,7 +71,10 @@ const FieldListInnerContent = memo(({ fields }: { fields: FieldIdentifier[] }) =
         const sourceData = source.data;
         const targetData = target.data;
 
-        if (!singleWorkflowField.typeGuard(sourceData) || !singleWorkflowField.typeGuard(targetData)) {
+        if (
+          !singleWorkflowFieldDndSource.typeGuard(sourceData) ||
+          !singleWorkflowFieldDndSource.typeGuard(targetData)
+        ) {
           return;
         }
 

@@ -7,15 +7,9 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box } from '@invoke-ai/ui-library';
 import { getStore } from 'app/store/nanostores/store';
 import { useAppDispatch } from 'app/store/storeHooks';
+import type { AnyDndTarget } from 'features/dnd/dnd';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
 import type { DndTargetState } from 'features/dnd/types';
-import type { MultipleImageAction, RecordUnknown, SingleImageAction } from 'features/imageActions/actions';
-import {
-  multipleImageActions,
-  multipleImageSourceApi,
-  singleImageActions,
-  singleImageSourceApi,
-} from 'features/imageActions/actions';
 import { memo, useEffect, useRef, useState } from 'react';
 import { uploadImage } from 'services/api/endpoints/images';
 import { z } from 'zod';
@@ -65,15 +59,16 @@ const zUploadFile = z
     (file) => ({ message: `File extension .${file.name.split('.').at(-1)} is not supported` })
   );
 
-type Props = {
-  targetData: SingleImageAction | MultipleImageAction;
+type Props<T extends AnyDndTarget> = {
+  dndTarget: T;
+  dndTargetData: ReturnType<T['getData']>;
   label: string;
   externalLabel?: string;
   isDisabled?: boolean;
 };
 
-export const DndDropTarget = memo((props: Props) => {
-  const { targetData, label, externalLabel = label, isDisabled } = props;
+export const DndDropTarget = memo(<T extends AnyDndTarget>(props: Props<T>) => {
+  const { dndTarget, dndTargetData, label, externalLabel = label, isDisabled } = props;
   const [dndState, setDndState] = useState<DndTargetState>('idle');
   const [dndOrigin, setDndOrigin] = useState<'element' | 'external' | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -90,43 +85,11 @@ export const DndDropTarget = memo((props: Props) => {
 
     const { dispatch, getState } = getStore();
 
-    const isValidDrop = (sourceData: RecordUnknown, targetData: RecordUnknown) => {
-      if (singleImageSourceApi.typeGuard(sourceData)) {
-        for (const target of singleImageActions) {
-          if (target.typeGuard(targetData)) {
-            // TS cannot infer `targetData` but we've just checked it. This is safe.
-            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-            if (target.isValid(sourceData, targetData as any, dispatch, getState)) {
-              return true;
-            }
-          }
-        }
-      }
-
-      if (multipleImageSourceApi.typeGuard(sourceData)) {
-        for (const target of multipleImageActions) {
-          if (target.typeGuard(targetData)) {
-            // TS cannot infer `targetData` but we've just checked it. This is safe.
-            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-            if (target.isValid(sourceData, targetData as any, dispatch, getState)) {
-              return true;
-            }
-          }
-        }
-      }
-
-      return false;
-    };
-
     return combine(
       dropTargetForElements({
         element,
         canDrop: ({ source }) => {
-          const sourceData = source.data;
-          if (sourceData.id === targetData.id) {
-            return false;
-          }
-          return isValidDrop(sourceData, targetData);
+          return dndTarget.isValid({ sourceData: source.data, targetData: dndTargetData, dispatch, getState });
         },
         onDragEnter: () => {
           setDndState('over');
@@ -134,15 +97,11 @@ export const DndDropTarget = memo((props: Props) => {
         onDragLeave: () => {
           setDndState('potential');
         },
-        getData: () => targetData,
+        getData: () => dndTargetData,
       }),
       monitorForElements({
         canMonitor: ({ source }) => {
-          const sourceData = source.data;
-          if (sourceData.id === targetData.id) {
-            return false;
-          }
-          return isValidDrop(sourceData, targetData);
+          return dndTarget.isValid({ sourceData: source.data, targetData: dndTargetData, dispatch, getState });
         },
         onDragStart: () => {
           setDndOrigin('element');
@@ -154,7 +113,7 @@ export const DndDropTarget = memo((props: Props) => {
         },
       })
     );
-  }, [targetData, dispatch, isDisabled]);
+  }, [dispatch, isDisabled, dndTarget, dndTargetData]);
 
   useEffect(() => {
     const element = ref.current;
@@ -218,7 +177,7 @@ export const DndDropTarget = memo((props: Props) => {
         },
       })
     );
-  }, [targetData, dispatch, isDisabled]);
+  }, [dispatch, isDisabled]);
 
   return (
     <Box ref={ref} sx={sx} data-dnd-state={dndState}>

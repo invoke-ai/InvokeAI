@@ -11,9 +11,9 @@ import { ControlLayerAdapterGate } from 'features/controlLayers/contexts/EntityA
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import type { ReplaceCanvasEntityObjectsWithImageDndTargetData } from 'features/dnd/dnd';
+import { replaceCanvasEntityObjectsWithImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
-import type { ReplaceCanvasEntityObjectsWithImageActionData} from 'features/imageActions/actions';
-import {replaceCanvasEntityObjectsWithImageActionApi } from 'features/imageActions/actions';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -28,8 +28,8 @@ export const ControlLayer = memo(({ id }: Props) => {
     () => ({ id, type: 'control_layer' }),
     [id]
   );
-  const targetData = useMemo<ReplaceCanvasEntityObjectsWithImageActionData>(
-    () => replaceCanvasEntityObjectsWithImageActionApi.getData({ entityIdentifier }, entityIdentifier.id),
+  const dndTargetData = useMemo<ReplaceCanvasEntityObjectsWithImageDndTargetData>(
+    () => replaceCanvasEntityObjectsWithImageDndTarget.getData({ entityIdentifier }, entityIdentifier.id),
     [entityIdentifier]
   );
 
@@ -47,7 +47,12 @@ export const ControlLayer = memo(({ id }: Props) => {
           <CanvasEntitySettingsWrapper>
             <ControlLayerSettings />
           </CanvasEntitySettingsWrapper>
-          <DndDropTarget targetData={targetData} label={t('controlLayers.replaceLayer')} isDisabled={isBusy} />
+          <DndDropTarget
+            dndTarget={replaceCanvasEntityObjectsWithImageDndTarget}
+            dndTargetData={dndTargetData}
+            label={t('controlLayers.replaceLayer')}
+            isDisabled={isBusy}
+          />
         </CanvasEntityContainer>
       </ControlLayerAdapterGate>
     </EntityIdentifierContext.Provider>
