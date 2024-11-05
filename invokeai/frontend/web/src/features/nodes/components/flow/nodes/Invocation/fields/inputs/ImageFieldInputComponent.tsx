@@ -2,11 +2,11 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch } from 'app/store/storeHooks';
+import type { SetNodeImageFieldImageDndTargetData } from 'features/dnd/dnd';
+import { setNodeImageFieldImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import type { SetNodeImageFieldImageActionData } from 'features/imageActions/actions';
-import { setNodeImageFieldImageActionApi } from 'features/imageActions/actions';
 import { fieldImageValueChanged } from 'features/nodes/store/nodesSlice';
 import type { ImageFieldInputInstance, ImageFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useEffect, useMemo } from 'react';
@@ -33,9 +33,12 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
     );
   }, [dispatch, field.name, nodeId]);
 
-  const targetData = useMemo<SetNodeImageFieldImageActionData>(
+  const dndTargetData = useMemo<SetNodeImageFieldImageDndTargetData>(
     () =>
-      setNodeImageFieldImageActionApi.getData({ fieldIdentifer: { nodeId, fieldName: field.name } }, field.value?.image_name),
+      setNodeImageFieldImageDndTarget.getData(
+        { fieldIdentifer: { nodeId, fieldName: field.name } },
+        field.value?.image_name
+      ),
     [field, nodeId]
   );
 
@@ -71,7 +74,11 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
           </Flex>
         </>
       )}
-      <DndDropTarget targetData={targetData} label={t('gallery.drop')} />
+      <DndDropTarget
+        dndTarget={setNodeImageFieldImageDndTarget}
+        dndTargetData={dndTargetData}
+        label={t('gallery.drop')}
+      />
     </Flex>
   );
 };

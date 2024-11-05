@@ -1,10 +1,10 @@
 import { Flex, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import type { SetUpscaleInitialImageDndTargetData } from 'features/dnd/dnd';
+import { setUpscaleInitialImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
-import type { SetUpscaleInitialImageActionData } from 'features/imageActions/actions';
-import { setUpscaleInitialImageActionApi } from 'features/imageActions/actions';
 import { selectUpscaleInitialImage, upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { t } from 'i18next';
 import { useCallback, useMemo } from 'react';
@@ -13,7 +13,10 @@ import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 export const UpscaleInitialImage = () => {
   const dispatch = useAppDispatch();
   const imageDTO = useAppSelector(selectUpscaleInitialImage);
-  const targetData = useMemo<SetUpscaleInitialImageActionData>(() => setUpscaleInitialImageActionApi.getData(), []);
+  const dndTargetData = useMemo<SetUpscaleInitialImageDndTargetData>(
+    () => setUpscaleInitialImageDndTarget.getData(),
+    []
+  );
 
   const onReset = useCallback(() => {
     dispatch(upscaleInitialImageChanged(null));
@@ -49,7 +52,11 @@ export const UpscaleInitialImage = () => {
             >{`${imageDTO.width}x${imageDTO.height}`}</Text>
           </>
         )}
-        <DndDropTarget targetData={targetData} label={t('gallery.drop')} />
+        <DndDropTarget
+          dndTarget={setUpscaleInitialImageDndTarget}
+          dndTargetData={dndTargetData}
+          label={t('gallery.drop')}
+        />
       </Flex>
     </Flex>
   );

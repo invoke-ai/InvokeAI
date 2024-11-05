@@ -20,8 +20,8 @@ import {
 } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice, selectRegionalGuidanceReferenceImage } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import type { SetRegionalGuidanceReferenceImageActionData} from 'features/imageActions/actions';
-import {setRegionalGuidanceReferenceImageActionApi } from 'features/imageActions/actions';
+import type { SetRegionalGuidanceReferenceImageDndTargetData } from 'features/dnd/dnd';
+import { setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiTrashSimpleFill } from 'react-icons/pi';
@@ -92,9 +92,12 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
     [dispatch, entityIdentifier, referenceImageId]
   );
 
-  const targetData = useMemo<SetRegionalGuidanceReferenceImageActionData>(
+  const dndTargetData = useMemo<SetRegionalGuidanceReferenceImageDndTargetData>(
     () =>
-      setRegionalGuidanceReferenceImageActionApi.getData({ entityIdentifier, referenceImageId }, ipAdapter.image?.image_name),
+      setRegionalGuidanceReferenceImageDndTarget.getData(
+        { entityIdentifier, referenceImageId },
+        ipAdapter.image?.image_name
+      ),
     [entityIdentifier, ipAdapter.image?.image_name, referenceImageId]
   );
 
@@ -145,7 +148,12 @@ export const RegionalGuidanceIPAdapterSettings = memo(({ referenceImageId }: Pro
             <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
-            <IPAdapterImagePreview image={ipAdapter.image} onChangeImage={onChangeImage} targetData={targetData} />
+            <IPAdapterImagePreview
+              image={ipAdapter.image}
+              onChangeImage={onChangeImage}
+              dndTarget={setRegionalGuidanceReferenceImageDndTarget}
+              dndTargetData={dndTargetData}
+            />
           </Flex>
         </Flex>
       </Flex>

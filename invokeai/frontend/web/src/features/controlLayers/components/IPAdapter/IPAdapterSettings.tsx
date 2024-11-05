@@ -19,8 +19,8 @@ import {
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CLIPVisionModelV2, IPMethodV2 } from 'features/controlLayers/store/types';
-import type { SetGlobalReferenceImageActionData} from 'features/imageActions/actions';
-import {setGlobalReferenceImageActionApi } from 'features/imageActions/actions';
+import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
+import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold } from 'react-icons/pi';
@@ -81,8 +81,8 @@ export const IPAdapterSettings = memo(() => {
     [dispatch, entityIdentifier]
   );
 
-  const targetData = useMemo<SetGlobalReferenceImageActionData>(
-    () => setGlobalReferenceImageActionApi.getData({ entityIdentifier }, ipAdapter.image?.image_name),
+  const dndTargetData = useMemo<SetGlobalReferenceImageDndTargetData>(
+    () => setGlobalReferenceImageDndTarget.getData({ entityIdentifier }, ipAdapter.image?.image_name),
     [entityIdentifier, ipAdapter.image?.image_name]
   );
   const pullBboxIntoIPAdapter = usePullBboxIntoGlobalReferenceImage(entityIdentifier);
@@ -118,7 +118,12 @@ export const IPAdapterSettings = memo(() => {
             <BeginEndStepPct beginEndStepPct={ipAdapter.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
           </Flex>
           <Flex alignItems="center" justifyContent="center" h={32} w={32} aspectRatio="1/1">
-            <IPAdapterImagePreview image={ipAdapter.image} onChangeImage={onChangeImage} targetData={targetData} />
+            <IPAdapterImagePreview
+              image={ipAdapter.image}
+              onChangeImage={onChangeImage}
+              dndTarget={setGlobalReferenceImageDndTarget}
+              dndTargetData={dndTargetData}
+            />
           </Flex>
         </Flex>
       </Flex>

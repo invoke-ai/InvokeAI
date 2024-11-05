@@ -1,25 +1,12 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+import { singleWorkflowFieldDndSource } from 'features/dnd/dnd';
 import type { DndListTargetState } from 'features/dnd/types';
 import { idle } from 'features/dnd/types';
-import type { ActionData, ActionSourceApi } from 'features/imageActions/actions';
-import { buildGetData, buildTypeAndKey, buildTypeGuard } from 'features/imageActions/actions';
 import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
-
-const _singleWorkflowField = buildTypeAndKey('single-workflow-field');
-type SingleWorkflowFieldSourceData = ActionData<
-  typeof _singleWorkflowField.type,
-  typeof _singleWorkflowField.key,
-  { fieldIdentifier: FieldIdentifier }
->;
-export const singleWorkflowField: ActionSourceApi<SingleWorkflowFieldSourceData> = {
-  ..._singleWorkflowField,
-  typeGuard: buildTypeGuard(_singleWorkflowField.key),
-  getData: buildGetData(_singleWorkflowField.key, _singleWorkflowField.type),
-};
 
 export const useLinearViewFieldDnd = (ref: RefObject<HTMLElement>, fieldIdentifier: FieldIdentifier) => {
   const [dndListState, setListDndState] = useState<DndListTargetState>(idle);
@@ -34,7 +21,7 @@ export const useLinearViewFieldDnd = (ref: RefObject<HTMLElement>, fieldIdentifi
       draggable({
         element,
         getInitialData() {
-          return singleWorkflowField.getData({ fieldIdentifier });
+          return singleWorkflowFieldDndSource.getData({ fieldIdentifier });
         },
         onDragStart() {
           setListDndState({ type: 'is-dragging' });
@@ -48,13 +35,13 @@ export const useLinearViewFieldDnd = (ref: RefObject<HTMLElement>, fieldIdentifi
       dropTargetForElements({
         element,
         canDrop({ source }) {
-          if (!singleWorkflowField.typeGuard(source.data)) {
+          if (!singleWorkflowFieldDndSource.typeGuard(source.data)) {
             return false;
           }
           return true;
         },
         getData({ input }) {
-          const data = singleWorkflowField.getData({ fieldIdentifier });
+          const data = singleWorkflowFieldDndSource.getData({ fieldIdentifier });
           return attachClosestEdge(data, {
             element,
             input,

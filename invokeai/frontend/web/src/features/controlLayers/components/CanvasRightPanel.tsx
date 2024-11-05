@@ -6,11 +6,11 @@ import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHook
 import { CanvasLayersPanelContent } from 'features/controlLayers/components/CanvasLayersPanelContent';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectEntityCountActive } from 'features/controlLayers/store/selectors';
+import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
 import type { DndTargetState } from 'features/dnd/types';
 import GalleryPanelContent from 'features/gallery/components/GalleryPanelContent';
 import { useImageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
-import { multipleImageSourceApi, singleImageSourceApi } from 'features/imageActions/actions';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { selectActiveTabCanvasRightPanel } from 'features/ui/store/uiSelectors';
 import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
@@ -103,9 +103,11 @@ const PanelTabs = memo(() => {
       return;
     }
 
+    const getIsOnLayersTab = () => selectActiveTabCanvasRightPanel(store.getState()) === 'layers';
+
     const onDragEnter = () => {
       // If we are already on the layers tab, do nothing
-      if (selectActiveTabCanvasRightPanel(store.getState()) === 'layers') {
+      if (getIsOnLayersTab()) {
         return;
       }
 
@@ -121,7 +123,7 @@ const PanelTabs = memo(() => {
     };
     const onDragLeave = () => {
       // Set the state to idle or pending depending on the current tab
-      if (selectActiveTabCanvasRightPanel(store.getState()) === 'layers') {
+      if (getIsOnLayersTab()) {
         setLayersTabDndState('idle');
       } else {
         setLayersTabDndState('potential');
@@ -130,10 +132,6 @@ const PanelTabs = memo(() => {
       if (timeoutRef.current !== null) {
         clearTimeout(timeoutRef.current);
       }
-    };
-    const canMonitor = () => {
-      // Only monitor if we are not already on the layers tab
-      return selectActiveTabCanvasRightPanel(store.getState()) !== 'layers';
     };
     const onDragStart = () => {
       // Set the state to pending when a drag starts
@@ -146,7 +144,13 @@ const PanelTabs = memo(() => {
         onDragLeave,
       }),
       monitorForElements({
-        canMonitor,
+        canMonitor: ({ source }) => {
+          if (!singleImageDndSource.typeGuard(source.data) && !multipleImageDndSource.typeGuard(source.data)) {
+            return false;
+          }
+          // Only monitor if we are not already on the gallery tab
+          return !getIsOnLayersTab();
+        },
         onDragStart,
       }),
       dropTargetForExternal({
@@ -155,7 +159,7 @@ const PanelTabs = memo(() => {
         onDragLeave,
       }),
       monitorForExternal({
-        canMonitor,
+        canMonitor: () => !getIsOnLayersTab(),
         onDragStart,
       })
     );
@@ -166,9 +170,11 @@ const PanelTabs = memo(() => {
       return;
     }
 
+    const getIsOnGalleryTab = () => selectActiveTabCanvasRightPanel(store.getState()) === 'gallery';
+
     const onDragEnter = () => {
       // If we are already on the gallery tab, do nothing
-      if (selectActiveTabCanvasRightPanel(store.getState()) === 'gallery') {
+      if (getIsOnGalleryTab()) {
         return;
       }
 
@@ -185,7 +191,7 @@ const PanelTabs = memo(() => {
 
     const onDragLeave = () => {
       // Set the state to idle or pending depending on the current tab
-      if (selectActiveTabCanvasRightPanel(store.getState()) === 'gallery') {
+      if (getIsOnGalleryTab()) {
         setGalleryTabDndState('idle');
       } else {
         setGalleryTabDndState('potential');
@@ -209,11 +215,11 @@ const PanelTabs = memo(() => {
       }),
       monitorForElements({
         canMonitor: ({ source }) => {
-          if (!singleImageSourceApi.typeGuard(source.data) || !multipleImageSourceApi.typeGuard(source.data)) {
+          if (!singleImageDndSource.typeGuard(source.data) && !multipleImageDndSource.typeGuard(source.data)) {
             return false;
           }
           // Only monitor if we are not already on the gallery tab
-          return selectActiveTabCanvasRightPanel(store.getState()) !== 'gallery';
+          return !getIsOnGalleryTab();
         },
         onDragStart,
       }),
@@ -223,7 +229,7 @@ const PanelTabs = memo(() => {
         onDragLeave,
       }),
       monitorForExternal({
-        canMonitor: () => selectActiveTabCanvasRightPanel(store.getState()) !== 'gallery',
+        canMonitor: () => !getIsOnGalleryTab(),
         onDragStart,
       })
     );

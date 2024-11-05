@@ -7,7 +7,6 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import { useBoolean } from 'common/hooks/useBoolean';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScrollStyles';
-import { singleCanvasEntity } from 'features/controlLayers/components/CanvasEntityList/useCanvasEntityListDnd';
 import { CanvasEntityAddOfTypeButton } from 'features/controlLayers/components/common/CanvasEntityAddOfTypeButton';
 import { CanvasEntityMergeVisibleButton } from 'features/controlLayers/components/common/CanvasEntityMergeVisibleButton';
 import { CanvasEntityTypeIsHiddenToggle } from 'features/controlLayers/components/common/CanvasEntityTypeIsHiddenToggle';
@@ -16,6 +15,7 @@ import { useEntityTypeTitle } from 'features/controlLayers/hooks/useEntityTypeTi
 import { entitiesReordered } from 'features/controlLayers/store/canvasSlice';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { isRenderableEntityType } from 'features/controlLayers/store/types';
+import { singleCanvasEntityDndSource } from 'features/dnd/dnd';
 import { triggerPostMoveFlash } from 'features/dnd/util';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect } from 'react';
@@ -37,7 +37,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
   useEffect(() => {
     return monitorForElements({
       canMonitor({ source }) {
-        if (!singleCanvasEntity.typeGuard(source.data)) {
+        if (!singleCanvasEntityDndSource.typeGuard(source.data)) {
           return false;
         }
         if (source.data.payload.entityIdentifier.type !== type) {
@@ -54,7 +54,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
         const sourceData = source.data;
         const targetData = target.data;
 
-        if (!singleCanvasEntity.typeGuard(sourceData) || !singleCanvasEntity.typeGuard(targetData)) {
+        if (!singleCanvasEntityDndSource.typeGuard(sourceData) || !singleCanvasEntityDndSource.typeGuard(targetData)) {
           return;
         }
 

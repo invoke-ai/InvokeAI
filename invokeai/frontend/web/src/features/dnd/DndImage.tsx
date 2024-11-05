@@ -2,10 +2,10 @@ import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { ImageProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Image } from '@invoke-ai/ui-library';
 import { useAppStore } from 'app/store/nanostores/store';
+import { singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
 import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
 import { useImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
-import { singleImageSourceApi } from 'features/imageActions/actions';
 import { memo, useEffect, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
@@ -36,7 +36,7 @@ export const DndImage = memo(({ imageDTO, ...rest }: Props) => {
     }
     return draggable({
       element,
-      getInitialData: () => singleImageSourceApi.getData({ imageDTO }, imageDTO.image_name),
+      getInitialData: () => singleImageDndSource.getData({ imageDTO }, imageDTO.image_name),
       onDragStart: () => {
         setIsDragging(true);
       },
@@ -44,7 +44,7 @@ export const DndImage = memo(({ imageDTO, ...rest }: Props) => {
         setIsDragging(false);
       },
       onGenerateDragPreview: (args) => {
-        if (singleImageSourceApi.typeGuard(args.source.data)) {
+        if (singleImageDndSource.typeGuard(args.source.data)) {
           setSingleImageDragPreview({
             singleImageDndData: args.source.data,
             onGenerateDragPreviewArgs: args,

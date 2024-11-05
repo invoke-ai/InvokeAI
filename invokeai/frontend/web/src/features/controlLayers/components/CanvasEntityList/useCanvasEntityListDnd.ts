@@ -2,23 +2,10 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
+import { singleCanvasEntityDndSource } from 'features/dnd/dnd';
 import { type DndListTargetState, idle } from 'features/dnd/types';
-import type { ActionData, ActionSourceApi } from 'features/imageActions/actions';
-import { buildGetData, buildTypeAndKey, buildTypeGuard } from 'features/imageActions/actions';
 import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
-
-const _singleCanvasEntity = buildTypeAndKey('single-canvas-entity');
-type SingleCanvasEntitySourceData = ActionData<
-  typeof _singleCanvasEntity.type,
-  typeof _singleCanvasEntity.key,
-  { entityIdentifier: CanvasEntityIdentifier }
->;
-export const singleCanvasEntity: ActionSourceApi<SingleCanvasEntitySourceData> = {
-  ..._singleCanvasEntity,
-  typeGuard: buildTypeGuard(_singleCanvasEntity.key),
-  getData: buildGetData(_singleCanvasEntity.key, _singleCanvasEntity.type),
-};
 
 export const useCanvasEntityListDnd = (ref: RefObject<HTMLElement>, entityIdentifier: CanvasEntityIdentifier) => {
   const [dndListState, setDndListState] = useState<DndListTargetState>(idle);
@@ -33,7 +20,7 @@ export const useCanvasEntityListDnd = (ref: RefObject<HTMLElement>, entityIdenti
       draggable({
         element,
         getInitialData() {
-          return singleCanvasEntity.getData({ entityIdentifier });
+          return singleCanvasEntityDndSource.getData({ entityIdentifier });
         },
         onDragStart() {
           setDndListState({ type: 'is-dragging' });
@@ -47,7 +34,7 @@ export const useCanvasEntityListDnd = (ref: RefObject<HTMLElement>, entityIdenti
       dropTargetForElements({
         element,
         canDrop({ source }) {
-          if (!singleCanvasEntity.typeGuard(source.data)) {
+          if (!singleCanvasEntityDndSource.typeGuard(source.data)) {
             return false;
           }
           if (source.data.payload.entityIdentifier.type !== entityIdentifier.type) {
@@ -56,7 +43,7 @@ export const useCanvasEntityListDnd = (ref: RefObject<HTMLElement>, entityIdenti
           return true;
         },
         getData({ input }) {
-          const data = singleCanvasEntity.getData({ entityIdentifier });
+          const data = singleCanvasEntityDndSource.getData({ entityIdentifier });
           return attachClosestEdge(data, {
             element,
             input,
