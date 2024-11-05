@@ -59,7 +59,6 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
     (typeof args === 'string' && args.includes('openapi.json'));
 
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
-    // baseUrl: baseUrl || window.location.href.replace(/\/$/, ''),
     baseUrl: baseUrl ?? window.location.origin,
   };
 
