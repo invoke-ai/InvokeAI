@@ -66,6 +66,7 @@ export type StudioInitAction = z.infer<typeof zStudioInitAction>;
 
 /**
  * Converts a given hashbang string to a valid StudioInitAction
+ * @see fillStudioInitAction
  * @param {string} hashBang
  * @returns {StudioInitAction}
  * @throws {z.ZodError | Error} If there is a validation error.
@@ -82,11 +83,11 @@ export const genHashBangStudioInitAction = (hashBang: string): StudioInitAction 
 };
 
 /**
- * Uses the HashBang fragment to populate an unset StudioInitAction
+ * Uses the HashBang fragment to populate an unset StudioInitAction in case the user tries to execute a StudioInitAction on startup via a location.hash fragment
  * If any studioInitAction is given, it will early bail with it.
  * this will interpret and validate the hashbang as an studioInitAction
  * @param {StudioInitAction} studioInitAction
- * @returns {StudioInitAction | undefined}
+ * @returns {StudioInitAction | undefined} undefined if nothing can be resolved
  */
 export const fillStudioInitAction = (studioInitAction?: StudioInitAction): StudioInitAction | undefined => {
   if (studioInitAction !== undefined) {
