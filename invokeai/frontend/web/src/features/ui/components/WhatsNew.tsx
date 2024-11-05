@@ -32,7 +32,7 @@ export const WhatsNew = () => {
             </ListItem>
             <ListItem>
               <Trans
-                i18nKey="whatsNew.line1"
+                i18nKey="whatsNew.line2"
                 components={{
                   StrongComponent: <Text as="span" color="white" fontSize="sm" fontWeight="semibold" />,
                 }}
