@@ -1,8 +1,9 @@
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 
 import torch
 from diffusers.models.transformers.transformer_sd3 import SD3Transformer2DModel
 from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
+from diffusers.utils.torch_utils import randn_tensor
 from tqdm import tqdm
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
@@ -14,6 +15,7 @@ from invokeai.app.invocations.fields import (
     SD3ConditioningField,
     WithBoard,
     WithMetadata,
+    LatentsField,
 )
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
@@ -52,6 +54,13 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
     steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
+
+    # If latents is provided, this means we are doing image-to-image.
+    latents: Optional[LatentsField] = InputField(
+        default=None,
+        description=FieldDescriptions.latents,
+        input=Input.Connection,
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
@@ -170,6 +179,11 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         prompt_embeds = torch.cat([neg_prompt_embeds, pos_prompt_embeds], dim=0)
         pooled_prompt_embeds = torch.cat([neg_pooled_prompt_embeds, pos_pooled_prompt_embeds], dim=0)
 
+        # Load the input latents, if provided.
+        init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
+        if init_latents is not None:
+            init_latents = init_latents.to(device=TorchDevice.choose_torch_device(), dtype=inference_dtype)
+
         # Prepare the scheduler.
         scheduler = FlowMatchEulerDiscreteScheduler()
         scheduler.set_timesteps(num_inference_steps=self.steps, device=device)
@@ -178,7 +192,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Prepare the CFG scale list.
         cfg_scale = self._prepare_cfg_scale(len(timesteps))
-
+        seed =  self.latents.seed if self.latents is not None and self.latents.seed else self.seed
         # Generate initial latent noise.
         num_channels_latents = transformer_info.model.config.in_channels
         assert isinstance(num_channels_latents, int)
@@ -189,9 +203,18 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             width=self.width,
             dtype=inference_dtype,
             device=device,
-            seed=self.seed,
+            seed=seed,
         )
-        latents: torch.Tensor = noise
+        latents: torch.Tensor
+        # Prepare input latent image.
+        if init_latents is not None:
+            # Noise the orig_latents by the appropriate amount for the first timestep.
+            # latents = self.add_noise(init_latents, noise, init_timestep, scheduler=scheduler)
+            # t_0 = timesteps[0].float()
+            latents = .7 * noise + .1 * init_latents
+            # latents =  + noise
+        else:        
+            latents = noise
 
         total_steps = len(timesteps)
         step_callback = self._build_step_callback(context)
@@ -233,7 +256,8 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # Compute the previous noisy sample x_t -> x_t-1.
                 latents_dtype = latents.dtype
                 latents = scheduler.step(model_output=noise_pred, timestep=t, sample=latents, return_dict=False)[0]
-
+                # if scheduler.begin_index is None:
+                #     scheduler.set_begin_index(step_idx)
                 # TODO(ryand): This MPS dtype handling was copied from diffusers, I haven't tested to see if it's
                 # needed.
                 if latents.dtype != latents_dtype:
@@ -252,6 +276,42 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
 
         return latents
+
+    def add_noise(
+        self,
+        original_samples: torch.Tensor,
+        noise: torch.Tensor,
+        timesteps: torch.Tensor,
+        scheduler: FlowMatchEulerDiscreteScheduler,
+    ) -> torch.Tensor:
+        # Make sure sigmas and timesteps have the same device and dtype as original_samples
+        sigmas = scheduler.sigmas.to(device=original_samples.device, dtype=original_samples.dtype)
+        if original_samples.device.type == "mps" and torch.is_floating_point(timesteps):
+            # mps does not support float64
+            schedule_timesteps = scheduler.timesteps.to(original_samples.device, dtype=torch.float32)
+            timesteps = timesteps.to(original_samples.device, dtype=torch.float32)
+        else:
+            schedule_timesteps = scheduler.timesteps.to(original_samples.device)
+            timesteps = timesteps.to(original_samples.device)
+
+        # begin_index is None when the scheduler is used for training or pipeline does not implement set_begin_index
+        if scheduler.begin_index is None:
+            step_indices = [scheduler.index_for_timestep(t, schedule_timesteps) for t in timesteps]
+        elif scheduler.step_index is not None:
+            # add_noise is called after first denoising step (for inpainting)
+            step_indices = [scheduler.step_index] * timesteps.shape[0]
+        else:
+            # add noise is called before first denoising step to create initial latent(img2img)
+            step_indices = [scheduler.begin_index] * timesteps.shape[0]
+
+        sigma = sigmas[step_indices].flatten()
+        while len(sigma.shape) < len(original_samples.shape):
+            sigma = sigma.unsqueeze(-1)
+
+        alpha_t = 1 / ((sigma**2 + 1) ** 0.5)
+        sigma_t = sigma * alpha_t
+        noisy_samples = alpha_t * original_samples + sigma_t * noise
+        return noisy_samples
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

@@ -10,3 +10,4 @@ def run_app() -> None:
     from invokeai.app.api_app import invoke_api
 
     invoke_api()
+run_app()
