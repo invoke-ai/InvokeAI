@@ -44,15 +44,20 @@ export const useDndMonitor = () => {
             if (!dndTarget.typeGuard(targetData)) {
               continue;
             }
-            // TS cannot infer `targetData` but we've just checked it. This is safe.
+            const arg = { sourceData, targetData, dispatch, getState };
+            // TS cannot infer `arg.targetData` but we've just checked it.
+            // TODO(psyche): Figure out how to satisfy TS.
             /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-            const arg = { sourceData, targetData: targetData as any, dispatch, getState };
-            if (!dndTarget.isValid(arg)) {
+            if (!dndTarget.isValid(arg as any)) {
               continue;
             }
 
             log.debug(parseify({ sourceData, targetData }), 'Handling dnd drop');
-            dndTarget.handler(arg);
+
+            // TS cannot infer `arg.targetData` but we've just checked it.
+            // TODO(psyche): Figure out how to satisfy TS.
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+            dndTarget.handler(arg as any);
             return;
           }
 

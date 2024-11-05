@@ -475,9 +475,10 @@ export const isValidDrop = (arg: {
     if (!dndTarget.typeGuard(arg.targetData)) {
       continue;
     }
-    // TS cannot infer `targetData` but we've just checked it. This is safe.
+    // TS cannot infer `arg.targetData` but we've just checked it.
+    // TODO(psyche): Figure out how to satisfy TS.
     /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    if (!dndTarget.isValid(arg)) {
+    if (!dndTarget.isValid(arg as any)) {
       return true;
     }
   }
