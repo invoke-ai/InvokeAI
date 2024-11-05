@@ -2,11 +2,9 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { UploadImageButton } from 'common/hooks/useImageUploadButton';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
-import type {
-  setGlobalReferenceImageDndTarget,
-  setRegionalGuidanceReferenceImageDndTarget,
-} from 'features/dnd/dnd';
+import type { setGlobalReferenceImageDndTarget, setRegionalGuidanceReferenceImageDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { DndImage } from 'features/dnd/DndImage';
 import { DndImageIcon } from 'features/dnd/DndImageIcon';
@@ -58,8 +56,16 @@ export const IPAdapterImagePreview = memo(
       }
     }, [handleResetControlImage, isError, isConnected]);
 
+    const onUpload = useCallback(
+      (imageDTO: ImageDTO) => {
+        onChangeImage(imageDTO);
+      },
+      [onChangeImage]
+    );
+
     return (
       <Flex sx={sx} data-error={!imageDTO && !image?.image_name}>
+        {!imageDTO && <UploadImageButton allowMultiple={false} onUpload={onUpload} />}
         {imageDTO && (
           <>
             <DndImage imageDTO={imageDTO} />

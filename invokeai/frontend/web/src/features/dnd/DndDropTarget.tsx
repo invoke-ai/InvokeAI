@@ -157,12 +157,11 @@ export const DndDropTarget = memo(<T extends AnyDndTarget>(props: Props<T>) => {
               continue;
             }
             const imageDTO = await uploadImage({
-              blob: file,
-              fileName: file.name,
+              type: 'file',
+              file: file,
               image_category: 'user',
               is_intermediate: false,
             });
-            // Dnd.Util.handleDrop(Dnd.Source.singleImage.getData({ imageDTO }), targetData);
           }
         },
       }),

@@ -1,3 +1,4 @@
+import { Flex, Icon, type SystemStyleObject } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
@@ -7,14 +8,22 @@ import { useCallback } from 'react';
 import type { FileRejection } from 'react-dropzone';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { useUploadImageMutation } from 'services/api/endpoints/images';
-import type { PostUploadAction } from 'services/api/types';
+import { PiUploadSimpleBold } from 'react-icons/pi';
+import { uploadImages, useUploadImageMutation } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
+import { assert } from 'tsafe';
 
-type UseImageUploadButtonArgs = {
-  postUploadAction?: PostUploadAction;
-  isDisabled?: boolean;
-  allowMultiple?: boolean;
-};
+type UseImageUploadButtonArgs =
+  | {
+      isDisabled?: boolean;
+      allowMultiple: false;
+      onUpload?: (imageDTO: ImageDTO) => void;
+    }
+  | {
+      isDisabled?: boolean;
+      allowMultiple: true;
+      onUpload?: (imageDTOs: ImageDTO[]) => void;
+    };
 
 const log = logger('gallery');
 
@@ -37,30 +46,46 @@ const log = logger('gallery');
  * <Button {...getUploadButtonProps()} /> // will open the file dialog on click
  * <input {...getUploadInputProps()} /> // hidden, handles native upload functionality
  */
-export const useImageUploadButton = ({
-  postUploadAction,
-  isDisabled,
-  allowMultiple = false,
-}: UseImageUploadButtonArgs) => {
+export const useImageUploadButton = ({ onUpload, isDisabled, allowMultiple }: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const [uploadImage] = useUploadImageMutation();
   const maxImageUploadCount = useAppSelector(selectMaxImageUploadCount);
   const { t } = useTranslation();
 
   const onDropAccepted = useCallback(
-    (files: File[]) => {
-      for (const [i, file] of files.entries()) {
-        uploadImage({
+    async (files: File[]) => {
+      if (!allowMultiple) {
+        if (files.length > 1) {
+          log.warn('Multiple files dropped but only one allowed');
+          return;
+        }
+        const file = files[0];
+        assert(file !== undefined); // should never happen
+        const imageDTO = await uploadImage({
           file,
           image_category: 'user',
           is_intermediate: false,
-          postUploadAction: postUploadAction ?? { type: 'TOAST' },
           board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-          isFirstUploadOfBatch: i === 0,
-        });
+        }).unwrap();
+        if (onUpload) {
+          onUpload(imageDTO);
+        }
+      } else {
+        //
+        const imageDTOs = await uploadImages(
+          files.map((file) => ({
+            file,
+            image_category: 'user',
+            is_intermediate: false,
+            board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+          }))
+        );
+        if (onUpload) {
+          onUpload(imageDTOs);
+        }
       }
     },
-    [autoAddBoardId, postUploadAction, uploadImage]
+    [allowMultiple, autoAddBoardId, onUpload, uploadImage]
   );
 
   const onDropRejected = useCallback(
@@ -104,4 +129,35 @@ export const useImageUploadButton = ({
   });
 
   return { getUploadButtonProps, getUploadInputProps, openUploader };
+};
+
+const sx = {
+  w: 'full',
+  h: 'full',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 'base',
+  transitionProperty: 'common',
+  transitionDuration: '0.1s',
+  '&[data-disabled=false]': {
+    color: 'base.500',
+  },
+  '&[data-disabled=true]': {
+    cursor: 'pointer',
+    bg: 'base.700',
+    _hover: {
+      bg: 'base.650',
+      color: 'base.300',
+    },
+  },
+} satisfies SystemStyleObject;
+
+export const UploadImageButton = (props: UseImageUploadButtonArgs) => {
+  const uploadApi = useImageUploadButton(props);
+  return (
+    <Flex sx={sx} {...uploadApi.getUploadButtonProps()}>
+      <Icon as={PiUploadSimpleBold} boxSize={16} />
+      <input {...uploadApi.getUploadInputProps()} />
+    </Flex>
+  );
 };

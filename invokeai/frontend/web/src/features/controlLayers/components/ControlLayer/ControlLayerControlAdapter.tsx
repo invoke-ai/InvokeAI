@@ -1,6 +1,7 @@
 import { Flex, IconButton } from '@invoke-ai/ui-library';
 import { createMemoizedAppSelector } from 'app/store/createMemoizedSelector';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/nanostores/store';
+import { useAppSelector } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginEndStepPct';
 import { Weight } from 'features/controlLayers/components/common/Weight';
@@ -21,10 +22,11 @@ import { getFilterForModel } from 'features/controlLayers/store/filters';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, ControlModeV2 } from 'features/controlLayers/store/types';
+import { replaceCanvasEntityObjectsWithImage } from 'features/imageActions/actions';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiShootingStarFill, PiUploadBold } from 'react-icons/pi';
-import type { ControlNetModelConfig, PostUploadAction, T2IAdapterModelConfig } from 'services/api/types';
+import type { ControlNetModelConfig, ImageDTO, T2IAdapterModelConfig } from 'services/api/types';
 
 const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<'control_layer'>) => {
   const selectControlAdapter = useMemo(
@@ -41,7 +43,7 @@ const useControlLayerControlAdapter = (entityIdentifier: CanvasEntityIdentifier<
 
 export const ControlLayerControlAdapter = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
+  const { dispatch, getState } = useAppStore();
   const entityIdentifier = useEntityIdentifierContext('control_layer');
   const controlAdapter = useControlLayerControlAdapter(entityIdentifier);
   const filter = useEntityFilter(entityIdentifier);
@@ -113,11 +115,17 @@ export const ControlLayerControlAdapter = memo(() => {
 
   const pullBboxIntoLayer = usePullBboxIntoLayer(entityIdentifier);
   const isBusy = useCanvasIsBusy();
-  const postUploadAction = useMemo<PostUploadAction>(
-    () => ({ type: 'REPLACE_LAYER_WITH_IMAGE', entityIdentifier }),
-    [entityIdentifier]
+  const uploadOptions = useMemo(
+    () =>
+      ({
+        onUpload: (imageDTO: ImageDTO) => {
+          replaceCanvasEntityObjectsWithImage({ entityIdentifier, imageDTO, dispatch, getState });
+        },
+        allowMultiple: false,
+      }) as const,
+    [dispatch, entityIdentifier, getState]
   );
-  const uploadApi = useImageUploadButton({ postUploadAction });
+  const uploadApi = useImageUploadButton(uploadOptions);
 
   return (
     <Flex flexDir="column" gap={3} position="relative" w="full">

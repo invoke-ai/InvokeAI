@@ -11,9 +11,9 @@ import type {
   ImageDTO,
   ListImagesArgs,
   ListImagesResponse,
-  PostUploadAction,
 } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
+import type { JsonObject } from 'type-fest';
 
 import type { ApiTagDescription } from '..';
 import { api, buildV1Url, LIST_TAG } from '..';
@@ -267,7 +267,6 @@ export const imagesApi = api.injectEndpoints({
         file: File;
         image_category: ImageCategory;
         is_intermediate: boolean;
-        postUploadAction?: PostUploadAction;
         session_id?: string;
         board_id?: string;
         crop_visible?: boolean;
@@ -623,30 +622,60 @@ export const getImageMetadata = (
   return req.unwrap();
 };
 
-export type UploadOptions = {
-  blob: Blob;
-  fileName: string;
+export type UploadImageArg = {
+  file: File;
   image_category: ImageCategory;
   is_intermediate: boolean;
+  session_id?: string;
+  board_id?: string;
   crop_visible?: boolean;
-  board_id?: BoardId;
-  metadata?: SerializableObject;
+  metadata?: JsonObject;
 };
-export const uploadImage = (arg: UploadOptions): Promise<ImageDTO> => {
-  const { blob, fileName, image_category, is_intermediate, crop_visible = false, board_id, metadata } = arg;
+
+export const uploadImage = (arg: UploadImageArg): Promise<ImageDTO> => {
+  const { file, image_category, is_intermediate, crop_visible = false, board_id, metadata, session_id } = arg;
 
   const { dispatch } = getStore();
-  const file = new File([blob], fileName, { type: 'image/png' });
+
   const req = dispatch(
-    imagesApi.endpoints.uploadImage.initiate({
-      file,
-      image_category,
-      is_intermediate,
-      crop_visible,
-      board_id,
-      metadata,
+    imagesApi.endpoints.uploadImage.initiate(
+      {
+        file,
+        image_category,
+        is_intermediate,
+        crop_visible,
+        board_id,
+        metadata,
+        session_id,
+      },
+      { track: false }
+    )
+  );
+  return req.unwrap();
+};
+
+export const uploadImages = async (args: UploadImageArg[]): Promise<ImageDTO[]> => {
+  const { dispatch } = getStore();
+  const results = await Promise.allSettled(
+    args.map((arg, i) => {
+      const { file, image_category, is_intermediate, crop_visible = false, board_id, metadata, session_id } = arg;
+      const req = dispatch(
+        imagesApi.endpoints.uploadImage.initiate(
+          {
+            file,
+            image_category,
+            is_intermediate,
+            crop_visible,
+            board_id,
+            metadata,
+            session_id,
+            isFirstUploadOfBatch: i === 0,
+          },
+          { track: false }
+        )
+      );
+      return req.unwrap();
     })
   );
-  req.reset();
-  return req.unwrap();
+  return results.filter((r): r is PromiseFulfilledResult<ImageDTO> => r.status === 'fulfilled').map((r) => r.value);
 };
