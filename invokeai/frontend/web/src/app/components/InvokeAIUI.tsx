@@ -71,7 +71,7 @@ const InvokeAIUI = ({
   workflowCategories,
   loggingOverrides,
 }: Props) => {
-  studioInitAction = fillStudioInitAction();
+  studioInitAction = fillStudioInitAction(studioInitAction);
 
   useLayoutEffect(() => {
     /*

@@ -9,6 +9,7 @@ import type { CanvasRasterLayerState } from 'features/controlLayers/store/types'
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { $imageViewer } from 'features/gallery/components/ImageViewer/useImageViewer';
 import { sentImageToCanvas } from 'features/gallery/store/actions';
+import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { parseAndRecallAllMetadata } from 'features/metadata/util/handlers';
 import { $isWorkflowListMenuIsOpen } from 'features/nodes/store/workflowListMenu';
 import { $isStylePresetsMenuOpen, activeStylePresetIdChanged } from 'features/stylePresets/store/stylePresetSlice';
@@ -27,6 +28,18 @@ const zLoadWorkflowAction = z.object({
   data: z.object({ workflowId: z.string() }),
 });
 // type LoadWorkflowAction = z.infer<typeof zLoadWorkflowAction>;
+
+const zSelectBoardAction = z.object({
+  type: z.literal('selectBoard'),
+  data: z.object({ boardId: z.string() }),
+});
+// type SelectBoardAction = z.infer<typeof zSelectBoardAction>;
+
+const zSelectImageAction = z.object({
+  type: z.literal('selectImage'),
+  data: z.object({ imageName: z.string() }),
+});
+// type SelectImageAction = z.infer<typeof zSelectImageAction>;
 
 const zSelectStylePresetAction = z.object({
   type: z.literal('selectStylePreset'),
@@ -56,6 +69,8 @@ type StudioDestinationAction = z.infer<typeof zStudioDestinationAction>;
 
 export const zStudioInitAction = z.discriminatedUnion('type', [
   zLoadWorkflowAction,
+  zSelectBoardAction,
+  zSelectImageAction,
   zSelectStylePresetAction,
   zSendToCanvasAction,
   zUseAllParametersAction,
@@ -73,7 +88,7 @@ export type StudioInitAction = z.infer<typeof zStudioInitAction>;
  */
 export const genHashBangStudioInitAction = (hashBang: string): StudioInitAction => {
   if (!hashBang.startsWith('#!')) {
-    throw new Error("The given string isn't a valid hashbang");
+    throw new Error("The given string isn't a valid hashbang action");
   }
   const parts = hashBang.substring(2).split('&');
   return zStudioInitAction.parse({
@@ -86,10 +101,12 @@ export const genHashBangStudioInitAction = (hashBang: string): StudioInitAction 
  * Uses the HashBang fragment to populate an unset StudioInitAction in case the user tries to execute a StudioInitAction on startup via a location.hash fragment
  * If any studioInitAction is given, it will early bail with it.
  * this will interpret and validate the hashbang as an studioInitAction
- * @param {StudioInitAction} studioInitAction
  * @returns {StudioInitAction | undefined} undefined if nothing can be resolved
  */
-export const fillStudioInitAction = (studioInitAction?: StudioInitAction): StudioInitAction | undefined => {
+export const fillStudioInitAction = (
+  studioInitAction?: StudioInitAction,
+  clearHashBang: boolean = false
+): StudioInitAction | undefined => {
   if (studioInitAction !== undefined) {
     return studioInitAction;
   }
@@ -99,7 +116,9 @@ export const fillStudioInitAction = (studioInitAction?: StudioInitAction): Studi
 
   try {
     studioInitAction = genHashBangStudioInitAction(location.hash);
-    location.hash = '';
+    if (clearHashBang) {
+      location.hash = '';  //reset the hash to "acknowledge" the initAction (and push the history forward)
+    }
   } catch (err) {
     const log = logger('system');
     if (err instanceof z.ZodError) {
@@ -120,7 +139,7 @@ export const fillStudioInitAction = (studioInitAction?: StudioInitAction): Studi
  *
  * In this hook, we prefer to use imperative APIs over hooks to avoid re-rendering the parent component. For example:
  * - Use `getImageDTO` helper instead of `useGetImageDTO`
- * - Usee the `$imageViewer` atom instead of `useImageViewer`
+ * - Use the `$imageViewer` atom instead of `useImageViewer`
  */
 export const useStudioInitAction = (action?: StudioInitAction) => {
   useAssertSingleton('useStudioInitAction');
@@ -188,6 +207,15 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       store.dispatch(setActiveTab('workflows'));
     },
     [getAndLoadWorkflow, store]
+  );
+
+  const handleSelectBoard = useCallback(
+    (boardId: string) => {
+      //TODO: validate given boardID
+      store.dispatch(boardIdSelected({ boardId: boardId }));
+      //TODO: scroll into view
+    },
+    [store]
   );
 
   const handleSelectStylePreset = useCallback(
@@ -260,6 +288,9 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
       case 'loadWorkflow':
         handleLoadWorkflow(action.data.workflowId);
         break;
+      case 'selectBoard':
+        handleSelectBoard(action.data.boardId);
+        break;
       case 'selectStylePreset':
         handleSelectStylePreset(action.data.stylePresetId);
         break;
@@ -278,6 +309,7 @@ export const useStudioInitAction = (action?: StudioInitAction) => {
     handleUseAllMetadata,
     action,
     handleLoadWorkflow,
+    handleSelectBoard,
     handleSelectStylePreset,
     handleGoToDestination,
   ]);
