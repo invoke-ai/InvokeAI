@@ -1,6 +1,5 @@
 import {
   Badge,
-  Box,
   CompositeNumberInput,
   CompositeSlider,
   Flex,
@@ -8,23 +7,22 @@ import {
   FormLabel,
   useToken,
 } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import WavyLine from 'common/components/WavyLine';
 import { selectImg2imgStrength, setImg2imgStrength } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { selectActiveRasterLayerEntities } from 'features/controlLayers/store/selectors';
 import { selectImg2imgStrengthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const selectIsEnabled = createSelector(selectActiveRasterLayerEntities, (entities) => entities.length > 0);
+
 export const ParamDenoisingStrength = memo(() => {
   const img2imgStrength = useAppSelector(selectImg2imgStrength);
   const dispatch = useAppDispatch();
-  const isEnabled = useAppSelector(
-    (s) =>
-      selectCanvasSlice(s).rasterLayers.entities.length > 0 &&
-      selectCanvasSlice(s).rasterLayers.entities.some((layer) => layer.isEnabled)
-  );
+  const isEnabled = useAppSelector(selectIsEnabled);
 
   const onChange = useCallback(
     (v: number) => {
@@ -45,7 +43,7 @@ export const ParamDenoisingStrength = memo(() => {
           <FormLabel mr={0}>{`${t('parameters.denoisingStrength')}`}</FormLabel>
         </InformationalPopover>
         {isEnabled && (
-            <WavyLine amplitude={img2imgStrength * 10} stroke={invokeBlue300} strokeWidth={1} width={40} height={14} />
+          <WavyLine amplitude={img2imgStrength * 10} stroke={invokeBlue300} strokeWidth={1} width={40} height={14} />
         )}
       </Flex>
       {isEnabled ? (
