@@ -92,11 +92,10 @@ export const selectDefaultIPAdapter = createSelector(
 
 export const useAddControlLayer = () => {
   const dispatch = useAppDispatch();
-  const defaultControlAdapter = useAppSelector(selectDefaultControlAdapter);
   const func = useCallback(() => {
-    const overrides = { controlAdapter: defaultControlAdapter };
+    const overrides = { controlAdapter: deepClone(initialControlNet) };
     dispatch(controlLayerAdded({ isSelected: true, overrides }));
-  }, [defaultControlAdapter, dispatch]);
+  }, [dispatch]);
 
   return func;
 };

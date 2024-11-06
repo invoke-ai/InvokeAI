@@ -4,7 +4,7 @@ import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { withResultAsync } from 'common/util/result';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
-import { selectDefaultControlAdapter, selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
+import { selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
@@ -25,7 +25,7 @@ import type {
   Rect,
   RegionalGuidanceReferenceImageState,
 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -229,13 +229,12 @@ export const useNewRasterLayerFromBbox = () => {
 export const useNewControlLayerFromBbox = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const defaultControlAdapter = useAppSelector(selectDefaultControlAdapter);
 
   const arg = useMemo<UseSaveCanvasArg>(() => {
     const onSave = (imageDTO: ImageDTO, rect: Rect) => {
       const overrides: Partial<CanvasControlLayerState> = {
         objects: [imageDTOToImageObject(imageDTO)],
-        controlAdapter: deepClone(defaultControlAdapter),
+        controlAdapter: deepClone(initialControlNet),
         position: { x: rect.x, y: rect.y },
       };
       dispatch(controlLayerAdded({ overrides, isSelected: true }));
@@ -248,7 +247,7 @@ export const useNewControlLayerFromBbox = () => {
       toastOk: t('controlLayers.newControlLayerOk'),
       toastError: t('controlLayers.newControlLayerError'),
     };
-  }, [defaultControlAdapter, dispatch, t]);
+  }, [dispatch, t]);
   const func = useSaveCanvas(arg);
   return func;
 };

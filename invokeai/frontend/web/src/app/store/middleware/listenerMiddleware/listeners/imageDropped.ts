@@ -2,7 +2,7 @@ import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import { deepClone } from 'common/util/deepClone';
-import { selectDefaultControlAdapter, selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
+import { selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
   controlLayerAdded,
@@ -23,7 +23,7 @@ import type {
   CanvasReferenceImageState,
   CanvasRegionalGuidanceState,
 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
 import type { TypesafeDraggableData, TypesafeDroppableData } from 'features/dnd/types';
 import { isValidDrop } from 'features/dnd/util/isValidDrop';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
@@ -163,11 +163,10 @@ export const addImageDroppedListener = (startAppListening: AppStartListening) =>
         const state = getState();
         const imageObject = imageDTOToImageObject(activeData.payload.imageDTO);
         const { x, y } = selectCanvasSlice(state).bbox.rect;
-        const defaultControlAdapter = selectDefaultControlAdapter(state);
         const overrides: Partial<CanvasControlLayerState> = {
           objects: [imageObject],
           position: { x, y },
-          controlAdapter: defaultControlAdapter,
+          controlAdapter: deepClone(initialControlNet),
         };
         dispatch(controlLayerAdded({ overrides, isSelected: true }));
         return;
