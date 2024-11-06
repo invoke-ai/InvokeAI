@@ -49,7 +49,7 @@ class ModelLoadService(ModelLoadServiceBase):
         """Return the RAM cache used by this loader."""
         return self._ram_cache
 
-    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load_model(self, model_config: AnyModelConfig, queue_id: str, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
         Given a model's configuration, load it and return the LoadedModel object.
 
@@ -60,7 +60,7 @@ class ModelLoadService(ModelLoadServiceBase):
         # We don't have an invoker during testing
         # TODO(psyche): Mock this method on the invoker in the tests
         if hasattr(self, "_invoker"):
-            self._invoker.services.events.emit_model_load_started(model_config, submodel_type)
+            self._invoker.services.events.emit_model_load_started(model_config, queue_id, submodel_type)
 
         implementation, model_config, submodel_type = self._registry.get_implementation(model_config, submodel_type)  # type: ignore
         loaded_model: LoadedModel = implementation(
@@ -70,12 +70,12 @@ class ModelLoadService(ModelLoadServiceBase):
         ).load_model(model_config, submodel_type)
 
         if hasattr(self, "_invoker"):
-            self._invoker.services.events.emit_model_load_complete(model_config, submodel_type)
+            self._invoker.services.events.emit_model_load_complete(model_config, queue_id, submodel_type)
 
         return loaded_model
 
     def load_model_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
+        self, model_path: Path, queue_id: str, loader: Optional[Callable[[Path], AnyModel]] = None
     ) -> LoadedModelWithoutConfig:
         cache_key = str(model_path)
         ram_cache = self.ram_cache

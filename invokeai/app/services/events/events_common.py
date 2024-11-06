@@ -384,7 +384,9 @@ class DownloadErrorEvent(DownloadEventBase):
 
 
 class ModelEventBase(EventBase):
-    """Base class for events associated with a model"""
+    """Base class for queue events"""
+
+    queue_id: str = Field(description="The ID of the queue")
 
 
 @payload_schema.register
@@ -394,11 +396,12 @@ class ModelLoadStartedEvent(ModelEventBase):
     __event_name__ = "model_load_started"
 
     config: AnyModelConfig = Field(description="The model's config")
+    queue_id: str = Field(description="Queue ID to emit to")
     submodel_type: Optional[SubModelType] = Field(default=None, description="The submodel type, if any")
 
     @classmethod
-    def build(cls, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> "ModelLoadStartedEvent":
-        return cls(config=config, submodel_type=submodel_type)
+    def build(cls, config: AnyModelConfig, queue_id: str, submodel_type: Optional[SubModelType] = None) -> "ModelLoadStartedEvent":
+        return cls(config=config, queue_id=queue_id, submodel_type=submodel_type)
 
 
 @payload_schema.register
@@ -408,11 +411,12 @@ class ModelLoadCompleteEvent(ModelEventBase):
     __event_name__ = "model_load_complete"
 
     config: AnyModelConfig = Field(description="The model's config")
+    queue_id: str = Field(description="Queue ID to emit to")
     submodel_type: Optional[SubModelType] = Field(default=None, description="The submodel type, if any")
 
     @classmethod
-    def build(cls, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> "ModelLoadCompleteEvent":
-        return cls(config=config, submodel_type=submodel_type)
+    def build(cls, config: AnyModelConfig, queue_id: str, submodel_type: Optional[SubModelType] = None) -> "ModelLoadCompleteEvent":
+        return cls(config=config, queue_id=queue_id, submodel_type=submodel_type)
 
 
 @payload_schema.register

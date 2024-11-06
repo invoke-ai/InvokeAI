@@ -751,7 +751,7 @@ async def convert_model(
 
     with TemporaryDirectory(dir=ApiDependencies.invoker.services.configuration.models_path) as tmpdir:
         convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
-        converted_model = loader.load_model(model_config)
+        converted_model = loader.load_model(model_config, queue_id="default")
         # write the converted file to the convert path
         raw_model = converted_model.model
         assert hasattr(raw_model, "save_pretrained")

@@ -43,14 +43,14 @@ def test_load_from_path(mock_context: InvocationContext, embedding_file: Path) -
     downloaded_path = mock_context.models.download_and_cache_model(
         "https://www.test.foo/download/test_embedding.safetensors"
     )
-    loaded_model_1 = mock_context.models.load_local_model(downloaded_path)
+    loaded_model_1 = mock_context.models.load_local_model(downloaded_path, mock_context.util.get_queue_id())
     assert isinstance(loaded_model_1, LoadedModelWithoutConfig)
 
-    loaded_model_2 = mock_context.models.load_local_model(downloaded_path)
+    loaded_model_2 = mock_context.models.load_local_model(downloaded_path, mock_context.util.get_queue_id())
     assert isinstance(loaded_model_2, LoadedModelWithoutConfig)
     assert loaded_model_1.model is loaded_model_2.model
 
-    loaded_model_3 = mock_context.models.load_local_model(embedding_file)
+    loaded_model_3 = mock_context.models.load_local_model(embedding_file, mock_context.util.get_queue_id())
     assert isinstance(loaded_model_3, LoadedModelWithoutConfig)
     assert loaded_model_1.model is not loaded_model_3.model
     assert isinstance(loaded_model_1.model, dict)
@@ -60,16 +60,16 @@ def test_load_from_path(mock_context: InvocationContext, embedding_file: Path) -
 
 @pytest.mark.skip(reason="This requires a test model to load")
 def test_load_from_dir(mock_context: InvocationContext, vae_directory: Path) -> None:
-    loaded_model = mock_context.models.load_local_model(vae_directory)
+    loaded_model = mock_context.models.load_local_model(vae_directory, mock_context.util.get_queue_id())
     assert isinstance(loaded_model, LoadedModelWithoutConfig)
     assert isinstance(loaded_model.model, AutoencoderTiny)
 
 
 def test_download_and_load(mock_context: InvocationContext) -> None:
-    loaded_model_1 = mock_context.models.load_remote_model("https://www.test.foo/download/test_embedding.safetensors")
+    loaded_model_1 = mock_context.models.load_remote_model("https://www.test.foo/download/test_embedding.safetensors", mock_context.util.get_queue_id())
     assert isinstance(loaded_model_1, LoadedModelWithoutConfig)
 
-    loaded_model_2 = mock_context.models.load_remote_model("https://www.test.foo/download/test_embedding.safetensors")
+    loaded_model_2 = mock_context.models.load_remote_model("https://www.test.foo/download/test_embedding.safetensors", mock_context.util.get_queue_id())
     assert isinstance(loaded_model_2, LoadedModelWithoutConfig)
     assert loaded_model_1.model is loaded_model_2.model  # should be cached copy
 

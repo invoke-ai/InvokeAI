@@ -131,15 +131,15 @@ class EventServiceBase:
 
     # region Model loading
 
-    def emit_model_load_started(self, config: "AnyModelConfig", submodel_type: Optional["SubModelType"] = None) -> None:
+    def emit_model_load_started(self, config: "AnyModelConfig", queue_id: str, submodel_type: Optional["SubModelType"] = None) -> None:
         """Emitted when a model load is started."""
-        self.dispatch(ModelLoadStartedEvent.build(config, submodel_type))
+        self.dispatch(ModelLoadStartedEvent.build(config, queue_id, submodel_type))
 
     def emit_model_load_complete(
-        self, config: "AnyModelConfig", submodel_type: Optional["SubModelType"] = None
+        self, config: "AnyModelConfig", queue_id: str,  submodel_type: Optional["SubModelType"] = None
     ) -> None:
         """Emitted when a model load is complete."""
-        self.dispatch(ModelLoadCompleteEvent.build(config, submodel_type))
+        self.dispatch(ModelLoadCompleteEvent.build(config,  queue_id,submodel_type))
 
     # endregion
 

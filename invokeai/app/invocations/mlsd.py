@@ -28,7 +28,7 @@ class MLSDDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name, "RGB")
-        loaded_model = context.models.load_remote_model(MLSDDetector.get_model_url(), MLSDDetector.load_model)
+        loaded_model = context.models.load_remote_model(MLSDDetector.get_model_url(),context.util.get_queue_id(),  MLSDDetector.load_model)
 
         with loaded_model as model:
             assert isinstance(model, MobileV2_MLSD_Large)

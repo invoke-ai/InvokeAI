@@ -94,7 +94,7 @@ class GroundingDinoInvocation(BaseInvocation):
         labels = [label if label.endswith(".") else label + "." for label in labels]
 
         with context.models.load_remote_model(
-            source=GROUNDING_DINO_MODEL_IDS[self.model], loader=GroundingDinoInvocation._load_grounding_dino
+            source=GROUNDING_DINO_MODEL_IDS[self.model], queue_id=context.util.get_queue_id(), loader=GroundingDinoInvocation._load_grounding_dino
         ) as detector:
             assert isinstance(detector, GroundingDinoPipeline)
             return detector.detect(image=image, candidate_labels=labels, threshold=threshold)

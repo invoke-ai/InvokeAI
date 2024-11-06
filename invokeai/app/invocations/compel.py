@@ -63,12 +63,12 @@ class CompelInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        tokenizer_info = context.models.load(self.clip.tokenizer)
-        text_encoder_info = context.models.load(self.clip.text_encoder)
+        tokenizer_info = context.models.load(self.clip.tokenizer, queue_id=context.util.get_queue_id())
+        text_encoder_info = context.models.load(self.clip.text_encoder, queue_id=context.util.get_queue_id())
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.clip.loras:
-                lora_info = context.models.load(lora.lora)
+                lora_info = context.models.load(lora.lora, queue_id=context.util.get_queue_id())
                 assert isinstance(lora_info.model, LoRAModelRaw)
                 yield (lora_info.model, lora.weight)
                 del lora_info
@@ -137,8 +137,8 @@ class SDXLPromptInvocationBase:
         lora_prefix: str,
         zero_on_empty: bool,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-        tokenizer_info = context.models.load(clip_field.tokenizer)
-        text_encoder_info = context.models.load(clip_field.text_encoder)
+        tokenizer_info = context.models.load(clip_field.tokenizer, queue_id=context.util.get_queue_id())
+        text_encoder_info = context.models.load(clip_field.text_encoder, queue_id=context.util.get_queue_id())
 
         # return zero on empty
         if prompt == "" and zero_on_empty:

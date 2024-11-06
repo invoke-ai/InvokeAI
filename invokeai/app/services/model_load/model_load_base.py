@@ -14,7 +14,7 @@ class ModelLoadServiceBase(ABC):
     """Wrapper around AnyModelLoader."""
 
     @abstractmethod
-    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load_model(self, model_config: AnyModelConfig, queue_id: str, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
         """
         Given a model's configuration, load it and return the LoadedModel object.
 
@@ -29,7 +29,7 @@ class ModelLoadServiceBase(ABC):
 
     @abstractmethod
     def load_model_from_path(
-        self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None
+        self, model_path: Path, queue_id: str, loader: Optional[Callable[[Path], AnyModel]] = None
     ) -> LoadedModelWithoutConfig:
         """
         Load the model file or directory located at the indicated Path.

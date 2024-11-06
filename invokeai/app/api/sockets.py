@@ -52,6 +52,12 @@ class BulkDownloadSubscriptionEvent(BaseModel):
 
     bulk_download_id: str
 
+class ModelLoadSubscriptionEvent(BaseModel):
+    """Event data for subscribing to the socket.io model loading room.
+    This is a pydantic model to ensure the data is in the correct format."""
+
+    queue_id: str
+
 
 QUEUE_EVENTS = {
     InvocationStartedEvent,
@@ -69,14 +75,17 @@ MODEL_EVENTS = {
     DownloadErrorEvent,
     DownloadProgressEvent,
     DownloadStartedEvent,
-    ModelLoadStartedEvent,
-    ModelLoadCompleteEvent,
     ModelInstallDownloadProgressEvent,
     ModelInstallDownloadsCompleteEvent,
     ModelInstallStartedEvent,
     ModelInstallCompleteEvent,
     ModelInstallCancelledEvent,
     ModelInstallErrorEvent,
+}
+
+MODEL_LOAD_EVENTS = {
+    ModelLoadStartedEvent,
+    ModelLoadCompleteEvent,
 }
 
 BULK_DOWNLOAD_EVENTS = {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, BulkDownloadErrorEvent}
@@ -101,6 +110,7 @@ class SocketIO:
 
         register_events(QUEUE_EVENTS, self._handle_queue_event)
         register_events(MODEL_EVENTS, self._handle_model_event)
+        register_events(MODEL_LOAD_EVENTS, self._handle_model_load_event)
         register_events(BULK_DOWNLOAD_EVENTS, self._handle_bulk_image_download_event)
 
     async def _handle_sub_queue(self, sid: str, data: Any) -> None:
@@ -115,7 +125,16 @@ class SocketIO:
     async def _handle_unsub_bulk_download(self, sid: str, data: Any) -> None:
         await self._sio.leave_room(sid, BulkDownloadSubscriptionEvent(**data).bulk_download_id)
 
+    async def _handle_sub_model_load(self, sid: str, data: Any) -> None:
+        await self._sio.enter_room(sid, ModelLoadSubscriptionEvent(**data).queue_id)
+
+    async def _handle_unsub_model_load(self, sid: str, data: Any) -> None:
+        await self._sio.leave_room(sid, ModelLoadSubscriptionEvent(**data).queue_id)
+
     async def _handle_queue_event(self, event: FastAPIEvent[QueueEventBase]):
+        await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"), room=event[1].queue_id)
+
+    async def _handle_model_load_event(self, event: FastAPIEvent[ModelEventBase]) -> None:
         await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"), room=event[1].queue_id)
 
     async def _handle_model_event(self, event: FastAPIEvent[ModelEventBase | DownloadEventBase]) -> None:
