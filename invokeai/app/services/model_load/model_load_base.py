@@ -14,7 +14,9 @@ class ModelLoadServiceBase(ABC):
     """Wrapper around AnyModelLoader."""
 
     @abstractmethod
-    def load_model(self, model_config: AnyModelConfig, queue_id: str, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+    def load_model(
+        self, model_config: AnyModelConfig, queue_id: str, submodel_type: Optional[SubModelType] = None
+    ) -> LoadedModel:
         """
         Given a model's configuration, load it and return the LoadedModel object.
 

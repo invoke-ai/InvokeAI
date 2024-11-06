@@ -35,7 +35,9 @@ class DepthAnythingDepthEstimationInvocation(BaseInvocation, WithMetadata, WithB
         model_url = DEPTH_ANYTHING_MODELS[self.model_size]
         image = context.images.get_pil(self.image.image_name, "RGB")
 
-        loaded_model = context.models.load_remote_model(model_url, context.util.get_queue_id(), DepthAnythingPipeline.load_model)
+        loaded_model = context.models.load_remote_model(
+            model_url, context.util.get_queue_id(), DepthAnythingPipeline.load_model
+        )
 
         with loaded_model as depth_anything_detector:
             assert isinstance(depth_anything_detector, DepthAnythingPipeline)

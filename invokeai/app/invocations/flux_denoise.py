@@ -468,7 +468,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # minimize peak memory.
 
         # First, load the ControlNet models so that we can determine the ControlNet types.
-        controlnet_models = [context.models.load(controlnet.control_model, context.util.get_queue_id()) for controlnet in controlnets]
+        controlnet_models = [
+            context.models.load(controlnet.control_model, context.util.get_queue_id()) for controlnet in controlnets
+        ]
 
         # Calculate the controlnet conditioning tensors.
         # We do this before loading the ControlNet models because it may require running the VAE, and we are trying to
@@ -590,7 +592,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 pos_images.append(pos_image)
                 neg_images.append(neg_image)
 
-            with context.models.load(ip_adapter_field.image_encoder_model, context.util.get_queue_id()) as image_encoder_model:
+            with context.models.load(
+                ip_adapter_field.image_encoder_model, context.util.get_queue_id()
+            ) as image_encoder_model:
                 assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
 
                 clip_image: torch.Tensor = clip_image_processor(images=pos_images, return_tensors="pt").pixel_values
@@ -620,7 +624,9 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         for ip_adapter_field, pos_image_prompt_clip_embed, neg_image_prompt_clip_embed in zip(
             ip_adapter_fields, pos_image_prompt_clip_embeds, neg_image_prompt_clip_embeds, strict=True
         ):
-            ip_adapter_model = exit_stack.enter_context(context.models.load(ip_adapter_field.ip_adapter_model, context.util.get_queue_id()))
+            ip_adapter_model = exit_stack.enter_context(
+                context.models.load(ip_adapter_field.ip_adapter_model, context.util.get_queue_id())
+            )
             assert isinstance(ip_adapter_model, XlabsIpAdapterFlux)
             ip_adapter_model = ip_adapter_model.to(dtype=dtype)
             if ip_adapter_field.mask is not None:

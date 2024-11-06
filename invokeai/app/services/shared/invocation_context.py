@@ -351,7 +351,10 @@ class ModelsInterface(InvocationContextInterface):
             return self._services.model_manager.store.exists(identifier.key)
 
     def load(
-        self, identifier: Union[str, "ModelIdentifierField"], queue_id: str, submodel_type: Optional[SubModelType] = None
+        self,
+        identifier: Union[str, "ModelIdentifierField"],
+        queue_id: str,
+        submodel_type: Optional[SubModelType] = None,
     ) -> LoadedModel:
         """Load a model.
 
@@ -375,7 +378,12 @@ class ModelsInterface(InvocationContextInterface):
             return self._services.model_manager.load.load_model(model, queue_id, _submodel_type)
 
     def load_by_attrs(
-        self, name: str, base: BaseModelType, type: ModelType,queue_id: str,  submodel_type: Optional[SubModelType] = None
+        self,
+        name: str,
+        base: BaseModelType,
+        type: ModelType,
+        queue_id: str,
+        submodel_type: Optional[SubModelType] = None,
     ) -> LoadedModel:
         """Load a model by its attributes.
 
@@ -472,7 +480,7 @@ class ModelsInterface(InvocationContextInterface):
     def load_local_model(
         self,
         model_path: Path,
-        queue_id: str, 
+        queue_id: str,
         loader: Optional[Callable[[Path], AnyModel]] = None,
     ) -> LoadedModelWithoutConfig:
         """
@@ -490,12 +498,14 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
             A LoadedModelWithoutConfig object.
         """
-        return self._services.model_manager.load.load_model_from_path(model_path=model_path,queue_id=queue_id, loader=loader)
+        return self._services.model_manager.load.load_model_from_path(
+            model_path=model_path, queue_id=queue_id, loader=loader
+        )
 
     def load_remote_model(
         self,
         source: str | AnyHttpUrl,
-        queue_id: str, 
+        queue_id: str,
         loader: Optional[Callable[[Path], AnyModel]] = None,
     ) -> LoadedModelWithoutConfig:
         """
@@ -516,7 +526,9 @@ class ModelsInterface(InvocationContextInterface):
             A LoadedModelWithoutConfig object.
         """
         model_path = self._services.model_manager.install.download_and_cache_model(source=str(source))
-        return self._services.model_manager.load.load_model_from_path(model_path=model_path, queue_id=queue_id, loader=loader)
+        return self._services.model_manager.load.load_model_from_path(
+            model_path=model_path, queue_id=queue_id, loader=loader
+        )
 
 
 class ConfigInterface(InvocationContextInterface):
@@ -544,7 +556,7 @@ class UtilInterface(InvocationContextInterface):
             True if the current session has been canceled, False if not.
         """
         return self._data.queue_item.queue_id
-    
+
     def is_canceled(self) -> bool:
         """Checks if the current session has been canceled.
 

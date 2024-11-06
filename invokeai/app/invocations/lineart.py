@@ -23,7 +23,9 @@ class LineartEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name, "RGB")
         model_url = LineartEdgeDetector.get_model_url(self.coarse)
-        loaded_model = context.models.load_remote_model(model_url, context.util.get_queue_id(), LineartEdgeDetector.load_model)
+        loaded_model = context.models.load_remote_model(
+            model_url, context.util.get_queue_id(), LineartEdgeDetector.load_model
+        )
 
         with loaded_model as model:
             assert isinstance(model, Generator)

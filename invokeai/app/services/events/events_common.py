@@ -399,7 +399,9 @@ class ModelLoadStartedEvent(ModelLoadEventBase):
     submodel_type: Optional[SubModelType] = Field(default=None, description="The submodel type, if any")
 
     @classmethod
-    def build(cls, config: AnyModelConfig, queue_id: str, submodel_type: Optional[SubModelType] = None) -> "ModelLoadStartedEvent":
+    def build(
+        cls, config: AnyModelConfig, queue_id: str, submodel_type: Optional[SubModelType] = None
+    ) -> "ModelLoadStartedEvent":
         return cls(config=config, queue_id=queue_id, submodel_type=submodel_type)
 
 
@@ -413,13 +415,16 @@ class ModelLoadCompleteEvent(ModelLoadEventBase):
     submodel_type: Optional[SubModelType] = Field(default=None, description="The submodel type, if any")
 
     @classmethod
-    def build(cls, config: AnyModelConfig, queue_id: str, submodel_type: Optional[SubModelType] = None) -> "ModelLoadCompleteEvent":
+    def build(
+        cls, config: AnyModelConfig, queue_id: str, submodel_type: Optional[SubModelType] = None
+    ) -> "ModelLoadCompleteEvent":
         return cls(config=config, queue_id=queue_id, submodel_type=submodel_type)
 
 
 class ModelEventBase(EventBase):
     """Base class for model events"""
-    
+
+
 @payload_schema.register
 class ModelInstallDownloadStartedEvent(ModelEventBase):
     """Event model for model_install_download_started"""

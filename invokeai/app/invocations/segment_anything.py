@@ -125,7 +125,9 @@ class SegmentAnythingInvocation(BaseInvocation):
 
         with (
             context.models.load_remote_model(
-                source=SEGMENT_ANYTHING_MODEL_IDS[self.model],queue_id=context.util.get_queue_id(), loader=SegmentAnythingInvocation._load_sam_model
+                source=SEGMENT_ANYTHING_MODEL_IDS[self.model],
+                queue_id=context.util.get_queue_id(),
+                loader=SegmentAnythingInvocation._load_sam_model,
             ) as sam_pipeline,
         ):
             assert isinstance(sam_pipeline, SegmentAnythingPipeline)

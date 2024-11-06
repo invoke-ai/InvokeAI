@@ -66,10 +66,14 @@ def test_load_from_dir(mock_context: InvocationContext, vae_directory: Path) -> 
 
 
 def test_download_and_load(mock_context: InvocationContext) -> None:
-    loaded_model_1 = mock_context.models.load_remote_model("https://www.test.foo/download/test_embedding.safetensors", mock_context.util.get_queue_id())
+    loaded_model_1 = mock_context.models.load_remote_model(
+        "https://www.test.foo/download/test_embedding.safetensors", mock_context.util.get_queue_id()
+    )
     assert isinstance(loaded_model_1, LoadedModelWithoutConfig)
 
-    loaded_model_2 = mock_context.models.load_remote_model("https://www.test.foo/download/test_embedding.safetensors", mock_context.util.get_queue_id())
+    loaded_model_2 = mock_context.models.load_remote_model(
+        "https://www.test.foo/download/test_embedding.safetensors", mock_context.util.get_queue_id()
+    )
     assert isinstance(loaded_model_2, LoadedModelWithoutConfig)
     assert loaded_model_1.model is loaded_model_2.model  # should be cached copy
 

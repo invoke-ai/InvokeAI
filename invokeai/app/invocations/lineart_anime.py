@@ -20,7 +20,9 @@ class LineartAnimeEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoar
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name, "RGB")
         model_url = LineartAnimeEdgeDetector.get_model_url()
-        loaded_model = context.models.load_remote_model(model_url, context.util.get_queue_id(), LineartAnimeEdgeDetector.load_model)
+        loaded_model = context.models.load_remote_model(
+            model_url, context.util.get_queue_id(), LineartAnimeEdgeDetector.load_model
+        )
 
         with loaded_model as model:
             assert isinstance(model, UnetGenerator)

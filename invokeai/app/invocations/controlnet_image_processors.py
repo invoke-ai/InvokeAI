@@ -649,7 +649,9 @@ class DepthAnythingImageProcessorInvocation(ImageProcessorInvocation):
             return DepthAnythingPipeline(depth_anything_pipeline)
 
         with self._context.models.load_remote_model(
-            source=DEPTH_ANYTHING_MODELS[self.model_size], queue_id=self._context.util.get_queue_id(), loader=load_depth_anything
+            source=DEPTH_ANYTHING_MODELS[self.model_size],
+            queue_id=self._context.util.get_queue_id(),
+            loader=load_depth_anything,
         ) as depth_anything_detector:
             assert isinstance(depth_anything_detector, DepthAnythingPipeline)
             depth_map = depth_anything_detector.generate_depth(image)

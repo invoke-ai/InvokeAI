@@ -435,7 +435,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         controlnet_data: list[ControlNetData] = []
         for control_info in control_list:
-            control_model = exit_stack.enter_context(context.models.load(control_info.control_model, context.util.get_queue_id()))
+            control_model = exit_stack.enter_context(
+                context.models.load(control_info.control_model, context.util.get_queue_id())
+            )
             assert isinstance(control_model, ControlNetModel)
 
             control_image_field = control_info.image
@@ -492,7 +494,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
             raise ValueError(f"Unexpected control_input type: {type(control_input)}")
 
         for control_info in control_list:
-            model = exit_stack.enter_context(context.models.load(control_info.control_model, context.util.get_queue_id()))
+            model = exit_stack.enter_context(
+                context.models.load(control_info.control_model, context.util.get_queue_id())
+            )
             ext_manager.add_extension(
                 ControlNetExt(
                     model=model,
@@ -545,9 +549,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
         """Run the IPAdapter CLIPVisionModel, returning image prompt embeddings."""
         image_prompts = []
         for single_ip_adapter in ip_adapters:
-            with context.models.load(single_ip_adapter.ip_adapter_model, context.util.get_queue_id()) as ip_adapter_model:
+            with context.models.load(
+                single_ip_adapter.ip_adapter_model, context.util.get_queue_id()
+            ) as ip_adapter_model:
                 assert isinstance(ip_adapter_model, IPAdapter)
-                image_encoder_model_info = context.models.load(single_ip_adapter.image_encoder_model, context.util.get_queue_id())
+                image_encoder_model_info = context.models.load(
+                    single_ip_adapter.image_encoder_model, context.util.get_queue_id()
+                )
                 # `single_ip_adapter.image` could be a list or a single ImageField. Normalize to a list here.
                 single_ipa_image_fields = single_ip_adapter.image
                 if not isinstance(single_ipa_image_fields, list):
@@ -581,7 +589,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         for single_ip_adapter, (image_prompt_embeds, uncond_image_prompt_embeds) in zip(
             ip_adapters, image_prompts, strict=True
         ):
-            ip_adapter_model = exit_stack.enter_context(context.models.load(single_ip_adapter.ip_adapter_model, context.util.get_queue_id()))
+            ip_adapter_model = exit_stack.enter_context(
+                context.models.load(single_ip_adapter.ip_adapter_model, context.util.get_queue_id())
+            )
 
             mask_field = single_ip_adapter.mask
             mask = context.tensors.load(mask_field.tensor_name) if mask_field is not None else None
@@ -621,7 +631,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
         t2i_adapter_data = []
         for t2i_adapter_field in t2i_adapter:
             t2i_adapter_model_config = context.models.get_config(t2i_adapter_field.t2i_adapter_model.key)
-            t2i_adapter_loaded_model = context.models.load(t2i_adapter_field.t2i_adapter_model, context.util.get_queue_id())
+            t2i_adapter_loaded_model = context.models.load(
+                t2i_adapter_field.t2i_adapter_model, context.util.get_queue_id()
+            )
             image = context.images.get_pil(t2i_adapter_field.image.image_name, mode="RGB")
 
             # The max_unet_downscale is the maximum amount that the UNet model downscales the latent image internally.

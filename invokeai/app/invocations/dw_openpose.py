@@ -32,7 +32,7 @@ class DWOpenposeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
             onnx_det_path, context.util.get_queue_id(), DWOpenposeDetector2.create_onnx_inference_session
         )
         loaded_session_pose = context.models.load_local_model(
-            onnx_pose_path, context.util.get_queue_id(),DWOpenposeDetector2.create_onnx_inference_session
+            onnx_pose_path, context.util.get_queue_id(), DWOpenposeDetector2.create_onnx_inference_session
         )
 
         with loaded_session_det as session_det, loaded_session_pose as session_pose:

@@ -53,6 +53,7 @@ class BulkDownloadSubscriptionEvent(BaseModel):
 
     bulk_download_id: str
 
+
 class ModelLoadSubscriptionEvent(BaseModel):
     """Event data for subscribing to the socket.io model loading room.
     This is a pydantic model to ensure the data is in the correct format."""
