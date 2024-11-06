@@ -1819,6 +1819,9 @@
             "process": "Process",
             "apply": "Apply",
             "cancel": "Cancel",
+            "advanced": "Advanced",
+            "processingLayerWith": "Processing layer with the {{type}} filter.",
+            "forMoreControl": "For more control, click Advanced below.",
             "spandrel_filter": {
                 "label": "Image-to-Image Model",
                 "description": "Run an image-to-image model on the selected layer.",

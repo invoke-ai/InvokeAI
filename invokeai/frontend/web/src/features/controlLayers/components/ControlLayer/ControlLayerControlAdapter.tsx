@@ -6,6 +6,7 @@ import { BeginEndStepPct } from 'features/controlLayers/components/common/BeginE
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { ControlLayerControlAdapterControlMode } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterControlMode';
 import { ControlLayerControlAdapterModel } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapterModel';
+import { useEntityAdapterContext } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { usePullBboxIntoLayer } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
@@ -16,6 +17,7 @@ import {
   controlLayerModelChanged,
   controlLayerWeightChanged,
 } from 'features/controlLayers/store/canvasSlice';
+import { getFilterForModel } from 'features/controlLayers/store/filters';
 import { selectIsFLUX } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/store/selectors';
 import type { CanvasEntityIdentifier, ControlModeV2 } from 'features/controlLayers/store/types';
@@ -44,6 +46,7 @@ export const ControlLayerControlAdapter = memo(() => {
   const controlAdapter = useControlLayerControlAdapter(entityIdentifier);
   const filter = useEntityFilter(entityIdentifier);
   const isFLUX = useAppSelector(selectIsFLUX);
+  const adapter = useEntityAdapterContext('control_layer');
 
   const onChangeBeginEndStepPct = useCallback(
     (beginEndStepPct: [number, number]) => {
@@ -69,8 +72,43 @@ export const ControlLayerControlAdapter = memo(() => {
   const onChangeModel = useCallback(
     (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig) => {
       dispatch(controlLayerModelChanged({ entityIdentifier, modelConfig }));
+      // When we change the model, we need may need to start filtering w/ the simplified filter mode, and/or change the
+      // filter config.
+      const isFiltering = adapter.filterer.$isFiltering.get();
+      const isSimple = adapter.filterer.$simple.get();
+      // If we are filtering and _not_ in simple mode, that means the user has clicked Advanced. They want to be in control
+      // of the settings. Bail early without doing anything else.
+      if (isFiltering && !isSimple) {
+        return;
+      }
+
+      // Else, we are in simple mode and will take care of some things for the user.
+
+      // First, check if the newly-selected model has a default filter. It may not - for example, Tile controlnet models
+      // don't have a default filter.
+      const defaultFilterForNewModel = getFilterForModel(modelConfig);
+
+      if (!defaultFilterForNewModel) {
+        // The user has chosen a model that doesn't have a default filter - cancel any in-progress filtering and bail.
+        if (isFiltering) {
+          adapter.filterer.cancel();
+        }
+        return;
+      }
+
+      // At this point, we know the user has selected a model that has a default filter. We need to either start filtering
+      // with that default filter, or update the existing filter config to match the new model's default filter.
+      const filterConfig = defaultFilterForNewModel.buildDefaults();
+      if (isFiltering) {
+        adapter.filterer.$filterConfig.set(filterConfig);
+      } else {
+        adapter.filterer.start(filterConfig);
+      }
+      // The user may have disabled auto-processing, so we should process the filter manually. This is essentially a
+      // no-op if auto-processing is already enabled, because the process method is debounced.
+      adapter.filterer.process();
     },
-    [dispatch, entityIdentifier]
+    [adapter.filterer, dispatch, entityIdentifier]
   );
 
   const pullBboxIntoLayer = usePullBboxIntoLayer(entityIdentifier);

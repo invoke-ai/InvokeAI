@@ -83,6 +83,13 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
    * Whether the module has an image state. This is a computed value based on $imageState.
    */
   $hasImageState = computed(this.$imageState, (imageState) => imageState !== null);
+
+  /**
+   * Whether the filter is in simple mode. In simple mode, the filter is started with a default filter config and the
+   * user is not presented with filter settings.
+   */
+  $simple = atom<boolean>(false);
+
   /**
    * The filtered image object module, if it exists.
    */
@@ -147,7 +154,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
   /**
    * Starts the filter module.
-   * @param config The filter config to start with. If omitted, the default filter config is used.
+   * @param config The filter config to use. If omitted, the default filter config is used.
    */
   start = (config?: FilterConfig) => {
     const filteringAdapter = this.manager.stateApi.$filteringAdapter.get();
@@ -174,11 +181,13 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       // If a config is provided, use it
       this.$filterConfig.set(config);
       this.$initialFilterConfig.set(config);
+      this.$simple.set(true);
     } else {
-      this.$filterConfig.set(this.createInitialFilterConfig());
+      const initialConfig = this.createInitialFilterConfig();
+      this.$filterConfig.set(initialConfig);
+      this.$initialFilterConfig.set(initialConfig);
+      this.$simple.set(false);
     }
-
-    this.$initialFilterConfig.set(this.$filterConfig.get());
 
     this.subscribe();
 
@@ -198,7 +207,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       );
       const modelConfig = this.manager.stateApi.runSelector(selectModelConfig);
       // This always returns a filter
-      const filter = getFilterForModel(modelConfig);
+      const filter = getFilterForModel(modelConfig) ?? IMAGE_FILTERS.canny_edge_detection;
       return filter.buildDefaults();
     } else {
       // Otherwise, used the default filter
@@ -404,7 +413,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
       this.imageModule.destroy();
       this.imageModule = null;
     }
-    const initialFilterConfig = this.$initialFilterConfig.get() ?? this.createInitialFilterConfig();
+    const initialFilterConfig = deepClone(this.$initialFilterConfig.get() ?? this.createInitialFilterConfig());
     this.$filterConfig.set(initialFilterConfig);
     this.$imageState.set(null);
     this.$lastProcessedHash.set('');
