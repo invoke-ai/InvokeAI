@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import { enqueueRequested } from 'app/store/actions';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import type { SerializableObject } from 'common/types';
 import type { Result } from 'common/util/result';
 import { withResult, withResultAsync } from 'common/util/result';
 import { $canvasManager } from 'features/controlLayers/store/ephemeral';
@@ -14,6 +13,7 @@ import { serializeError } from 'serialize-error';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { Invocation } from 'services/api/types';
 import { assert } from 'tsafe';
+import type { JsonObject } from 'type-fest';
 
 const log = logger('generation');
 
@@ -88,7 +88,7 @@ export const addEnqueueRequestedLinear = (startAppListening: AppStartListening) 
         return;
       }
 
-      log.debug({ batchConfig: prepareBatchResult.value } as SerializableObject, 'Enqueued batch');
+      log.debug({ batchConfig: prepareBatchResult.value } as JsonObject, 'Enqueued batch');
     },
   });
 };

@@ -1,7 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
 import type { AppDispatch, RootState } from 'app/store/store';
-import type { SerializableObject } from 'common/types';
 import {
   controlLayerModelChanged,
   referenceImageIPAdapterModelChanged,
@@ -41,6 +40,7 @@ import {
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfig,
 } from 'services/api/types';
+import type { JsonObject } from 'type-fest';
 
 const log = logger('models');
 
@@ -85,7 +85,7 @@ type ModelHandler = (
   models: AnyModelConfig[],
   state: RootState,
   dispatch: AppDispatch,
-  log: Logger<SerializableObject>
+  log: Logger<JsonObject>
 ) => undefined;
 
 const handleMainModels: ModelHandler = (models, state, dispatch, log) => {

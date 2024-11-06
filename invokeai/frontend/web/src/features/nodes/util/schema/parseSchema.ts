@@ -1,5 +1,4 @@
 import { logger } from 'app/logging/logger';
-import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { parseify } from 'common/util/serialize';
 import type { Templates } from 'features/nodes/store/types';
@@ -21,6 +20,7 @@ import { t } from 'i18next';
 import { isEqual, reduce } from 'lodash-es';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import { serializeError } from 'serialize-error';
+import type { JsonObject } from 'type-fest';
 
 import { buildFieldInputTemplate } from './buildFieldInputTemplate';
 import { buildFieldOutputTemplate } from './buildFieldOutputTemplate';
@@ -89,7 +89,7 @@ export const parseSchema = (
       (inputsAccumulator: Record<string, FieldInputTemplate>, property, propertyName) => {
         if (isReservedInputField(type, propertyName)) {
           log.trace(
-            { node: type, field: propertyName, schema: property } as SerializableObject,
+            { node: type, field: propertyName, schema: property } as JsonObject,
             'Skipped reserved input field'
           );
           return inputsAccumulator;

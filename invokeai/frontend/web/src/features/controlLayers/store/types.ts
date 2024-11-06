@@ -1,4 +1,3 @@
-import type { SerializableObject } from 'common/types';
 import { fetchModelConfigByIdentifier } from 'features/metadata/util/modelFetchingHelpers';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import type { ParameterLoRAModel } from 'features/parameters/types/parameterSchemas';
@@ -9,6 +8,7 @@ import {
 } from 'features/parameters/types/parameterSchemas';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import type { JsonObject } from 'type-fest';
 import { z } from 'zod';
 
 const zId = z.string().min(1);
@@ -429,7 +429,7 @@ export type StageAttrs = {
 };
 
 export type EntityIdentifierPayload<
-  T extends SerializableObject | void = void,
+  T extends JsonObject | void = void,
   U extends CanvasEntityType = CanvasEntityType,
 > = T extends void
   ? {

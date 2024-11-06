@@ -1,4 +1,3 @@
-import type { SerializableObject } from 'common/types';
 import { withResultAsync } from 'common/util/result';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import type { CanvasEntityAdapter, CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
@@ -41,6 +40,7 @@ import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
+import type { JsonObject } from 'type-fest';
 
 type CompositingOptions = {
   /**
@@ -173,14 +173,14 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     return adapters as CanvasEntityAdapterFromType<T>[];
   };
 
-  getCompositeHash = (adapters: CanvasEntityAdapter[], extra: SerializableObject): string => {
-    const adapterHashes: SerializableObject[] = [];
+  getCompositeHash = (adapters: CanvasEntityAdapter[], extra: JsonObject): string => {
+    const adapterHashes: JsonObject[] = [];
 
     for (const adapter of adapters) {
       adapterHashes.push(adapter.getHashableState());
     }
 
-    const data: SerializableObject = {
+    const data: JsonObject = {
       extra,
       adapterHashes,
     };
