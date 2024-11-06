@@ -173,6 +173,8 @@ def get_clip_variant_type(location: str) -> Optional[ClipVariantType]:
         path = Path(location)
         config_path = path / "config.json"
         if not config_path.exists():
+            config_path = path / "text_encoder" / "config.json"
+        if not config_path.exists():
             return ClipVariantType.L
         with open(config_path) as file:
             clip_conf = json.load(file)
