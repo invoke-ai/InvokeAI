@@ -22,8 +22,10 @@ export const ViewerToolbar = memo(({ closeButton }: Props) => {
       <Flex flex={1} justifyContent="center" alignItems="center">
         <CurrentImageButtons />
       </Flex>
-      <Flex flex={1} justifyContent="center" alignItems="center">
-        <Flex marginInlineStart="auto">{closeButton}</Flex>
+      <Flex flex={1} justifyContent="center">
+        <Flex marginInlineStart="auto" alignItems="center">
+          {closeButton}
+        </Flex>
       </Flex>
     </Flex>
   );
