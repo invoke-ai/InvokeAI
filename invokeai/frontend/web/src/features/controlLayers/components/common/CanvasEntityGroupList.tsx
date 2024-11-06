@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Collapse, Flex, Icon, Spacer, Text } from '@invoke-ai/ui-library';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useBoolean } from 'common/hooks/useBoolean';
+import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScrollStyles';
 import { CanvasEntityAddOfTypeButton } from 'features/controlLayers/components/common/CanvasEntityAddOfTypeButton';
 import { CanvasEntityMergeVisibleButton } from 'features/controlLayers/components/common/CanvasEntityMergeVisibleButton';
 import { CanvasEntityTypeIsHiddenToggle } from 'features/controlLayers/components/common/CanvasEntityTypeIsHiddenToggle';
@@ -78,7 +79,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children }: Props
         {isRenderableEntityType(type) && <CanvasEntityTypeIsHiddenToggle type={type} />}
         <CanvasEntityAddOfTypeButton type={type} />
       </Flex>
-      <Collapse in={collapse.isTrue}>
+      <Collapse in={collapse.isTrue} style={fixTooltipCloseOnScrollStyles}>
         <Flex flexDir="column" gap={2} pt={2}>
           {children}
         </Flex>
