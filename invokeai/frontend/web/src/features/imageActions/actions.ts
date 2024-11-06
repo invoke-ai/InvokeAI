@@ -1,5 +1,6 @@
 import type { AppDispatch, RootState } from 'app/store/store';
-import { selectDefaultControlAdapter, selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
+import { deepClone } from 'common/util/deepClone';
+import { selectDefaultIPAdapter } from 'features/controlLayers/hooks/addLayerHooks';
 import { CanvasEntityAdapterBase } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterBase';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
@@ -24,7 +25,7 @@ import type {
   CanvasRegionalGuidanceState,
   CanvasRenderableEntityIdentifier,
 } from 'features/controlLayers/store/types';
-import { imageDTOToImageObject, imageDTOToImageWithDims } from 'features/controlLayers/store/util';
+import { imageDTOToImageObject, imageDTOToImageWithDims, initialControlNet } from 'features/controlLayers/store/util';
 import { calculateNewSize } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import type { BoardId } from 'features/gallery/store/types';
@@ -95,8 +96,12 @@ export const createNewCanvasEntityFromImage = (arg: {
       break;
     }
     case 'control_layer': {
-      const controlAdapter = selectDefaultControlAdapter(state);
-      dispatch(controlLayerAdded({ overrides: { ...overrides, controlAdapter }, isSelected: true }));
+      dispatch(
+        controlLayerAdded({
+          overrides: { ...overrides, controlAdapter: deepClone(initialControlNet) },
+          isSelected: true,
+        })
+      );
       break;
     }
     case 'inpaint_mask': {
@@ -179,12 +184,11 @@ export const newCanvasFromImage = (arg: {
       break;
     }
     case 'control_layer': {
-      const controlAdapter = selectDefaultControlAdapter(state);
       const overrides = {
         id: getPrefixedId('control_layer'),
         objects: [imageObject],
         position: { x, y },
-        controlAdapter,
+        controlAdapter: deepClone(initialControlNet),
       } satisfies Partial<CanvasControlLayerState>;
       addInitCallback(overrides.id);
       dispatch(canvasReset());
