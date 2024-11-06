@@ -129,9 +129,11 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
 
             # Some special handling is needed here if there is not an exact match and if we cannot infer the variant
             # from the file name. In this case, we only give this file a point if the requested variant is FP32 or DEFAULT.
-            if candidate_variant_label == f".{variant}" or (
-                not candidate_variant_label and variant in [ModelRepoVariant.FP32, ModelRepoVariant.Default]
-            ):
+            if (
+                variant is not ModelRepoVariant.Default
+                and candidate_variant_label
+                and candidate_variant_label.startswith(f".{variant.value}")
+            ) or (not candidate_variant_label and variant in [ModelRepoVariant.FP32, ModelRepoVariant.Default]):
                 score += 1
 
             if parent not in subfolder_weights:
@@ -146,7 +148,7 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
         # Check if at least one of the files has the explicit fp16 variant.
         at_least_one_fp16 = False
         for candidate in candidate_list:
-            if len(candidate.path.suffixes) == 2 and candidate.path.suffixes[0] == ".fp16":
+            if len(candidate.path.suffixes) == 2 and candidate.path.suffixes[0].startswith(".fp16"):
                 at_least_one_fp16 = True
                 break
 
@@ -162,7 +164,16 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
         # candidate.
         highest_score_candidate = max(candidate_list, key=lambda candidate: candidate.score)
         if highest_score_candidate:
-            result.add(highest_score_candidate.path)
+            pattern = r"^(.*?)-\d+-of-\d+(\.\w+)$"
+            match = re.match(pattern, highest_score_candidate.path.as_posix())
+            if match:
+                for candidate in candidate_list:
+                    if candidate.path.as_posix().startswith(match.group(1)) and candidate.path.as_posix().endswith(
+                        match.group(2)
+                    ):
+                        result.add(candidate.path)
+            else:
+                result.add(highest_score_candidate.path)
 
     # If one of the architecture-related variants was specified and no files matched other than
     # config and text files then we return an empty list

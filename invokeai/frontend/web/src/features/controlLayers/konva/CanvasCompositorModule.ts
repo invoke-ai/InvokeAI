@@ -253,18 +253,20 @@ export class CanvasCompositorModule extends CanvasModuleBase {
    * @param rect The region to include in the rasterized image
    * @param uploadOptions Options for uploading the image
    * @param compositingOptions Options for compositing the entities
+   * @param forceUpload If true, the image is always re-uploaded, returning a new image DTO
    * @returns A promise that resolves to the image DTO
    */
   getCompositeImageDTO = async (
     adapters: CanvasEntityAdapter[],
     rect: Rect,
     uploadOptions: Pick<UploadOptions, 'is_intermediate' | 'metadata'>,
-    compositingOptions?: CompositingOptions
+    compositingOptions?: CompositingOptions,
+    forceUpload?: boolean
   ): Promise<ImageDTO> => {
     assert(rect.width > 0 && rect.height > 0, 'Unable to rasterize empty rect');
 
     const hash = this.getCompositeHash(adapters, { rect });
-    const cachedImageName = this.manager.cache.imageNameCache.get(hash);
+    const cachedImageName = forceUpload ? undefined : this.manager.cache.imageNameCache.get(hash);
 
     let imageDTO: ImageDTO | null = null;
 
@@ -327,6 +329,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     entityIdentifiers: T[],
     deleteMergedEntities: boolean
   ): Promise<ImageDTO | null> => {
+    toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergingLayers'), withCount: false });
     if (entityIdentifiers.length <= 1) {
       this.log.warn({ entityIdentifiers }, 'Cannot merge less than 2 entities');
       return null;
@@ -349,7 +352,12 @@ export class CanvasCompositorModule extends CanvasModuleBase {
 
     if (result.isErr()) {
       this.log.error({ error: serializeError(result.error) }, 'Failed to merge selected entities');
-      toast({ title: t('controlLayers.mergeVisibleError'), status: 'error' });
+      toast({
+        id: 'MERGE_LAYERS_TOAST',
+        title: t('controlLayers.mergeVisibleError'),
+        status: 'error',
+        withCount: false,
+      });
       return null;
     }
 
@@ -381,7 +389,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
         assert<Equals<typeof type, never>>(false, 'Unsupported type for merge');
     }
 
-    toast({ title: t('controlLayers.mergeVisibleOk') });
+    toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergeVisibleOk'), status: 'success', withCount: false });
 
     return result.value;
   };

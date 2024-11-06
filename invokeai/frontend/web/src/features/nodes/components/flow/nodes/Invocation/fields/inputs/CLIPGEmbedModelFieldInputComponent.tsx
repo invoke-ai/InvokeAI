@@ -1,31 +1,31 @@
 import { Combobox, Flex, FormControl, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
-import { fieldT5EncoderValueChanged } from 'features/nodes/store/nodesSlice';
-import type { T5EncoderModelFieldInputInstance, T5EncoderModelFieldInputTemplate } from 'features/nodes/types/field';
-import { selectIsModelsTabDisabled } from 'features/system/store/configSlice';
+import { fieldCLIPGEmbedValueChanged } from 'features/nodes/store/nodesSlice';
+import type { CLIPGEmbedModelFieldInputInstance, CLIPGEmbedModelFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useT5EncoderModels } from 'services/api/hooks/modelsByType';
-import type { T5EncoderBnbQuantizedLlmInt8bModelConfig, T5EncoderModelConfig } from 'services/api/types';
+import { useCLIPEmbedModels } from 'services/api/hooks/modelsByType';
+import { type CLIPGEmbedModelConfig, isCLIPGEmbedModelConfig } from 'services/api/types';
 
 import type { FieldComponentProps } from './types';
 
-type Props = FieldComponentProps<T5EncoderModelFieldInputInstance, T5EncoderModelFieldInputTemplate>;
+type Props = FieldComponentProps<CLIPGEmbedModelFieldInputInstance, CLIPGEmbedModelFieldInputTemplate>;
 
-const T5EncoderModelFieldInputComponent = (props: Props) => {
+const CLIPGEmbedModelFieldInputComponent = (props: Props) => {
   const { nodeId, field } = props;
   const { t } = useTranslation();
-  const isModelsTabDisabled = useAppSelector(selectIsModelsTabDisabled);
+  const disabledTabs = useAppSelector((s) => s.config.disabledTabs);
   const dispatch = useAppDispatch();
-  const [modelConfigs, { isLoading }] = useT5EncoderModels();
+  const [modelConfigs, { isLoading }] = useCLIPEmbedModels();
+
   const _onChange = useCallback(
-    (value: T5EncoderBnbQuantizedLlmInt8bModelConfig | T5EncoderModelConfig | null) => {
+    (value: CLIPGEmbedModelConfig | null) => {
       if (!value) {
         return;
       }
       dispatch(
-        fieldT5EncoderValueChanged({
+        fieldCLIPGEmbedValueChanged({
           nodeId,
           fieldName: field.name,
           value,
@@ -35,15 +35,16 @@ const T5EncoderModelFieldInputComponent = (props: Props) => {
     [dispatch, field.name, nodeId]
   );
   const { options, value, onChange, placeholder, noOptionsMessage } = useGroupedModelCombobox({
-    modelConfigs,
+    modelConfigs: modelConfigs.filter((config) => isCLIPGEmbedModelConfig(config)),
     onChange: _onChange,
     isLoading,
     selectedModel: field.value,
   });
   const required = props.fieldTemplate.required;
+
   return (
     <Flex w="full" alignItems="center" gap={2}>
-      <Tooltip label={!isModelsTabDisabled && t('modelManager.starterModelsInModelManager')}>
+      <Tooltip label={!disabledTabs.includes('models') && t('modelManager.starterModelsInModelManager')}>
         <FormControl className="nowheel nodrag" isDisabled={!options.length} isInvalid={!value && required}>
           <Combobox
             value={value}
@@ -58,4 +59,4 @@ const T5EncoderModelFieldInputComponent = (props: Props) => {
   );
 };
 
-export default memo(T5EncoderModelFieldInputComponent);
+export default memo(CLIPGEmbedModelFieldInputComponent);
