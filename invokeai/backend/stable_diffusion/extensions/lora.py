@@ -29,7 +29,7 @@ class LoRAExt(ExtensionBase):
 
     @contextmanager
     def patch_unet(self, unet: UNet2DConditionModel, original_weights: OriginalWeightsStorage):
-        lora_model = self._node_context.models.load(self._model_id).model
+        lora_model = self._node_context.models.load(self._model_id, self._node_context.util.get_queue_id()).model
         assert isinstance(lora_model, LoRAModelRaw)
         LoRAPatcher.apply_lora_patch(
             model=unet,

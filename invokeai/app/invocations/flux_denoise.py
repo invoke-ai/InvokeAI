@@ -183,7 +183,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             seed=self.seed,
         )
 
-        transformer_info = context.models.load(self.transformer.transformer)
+        transformer_info = context.models.load(self.transformer.transformer, context.util.get_queue_id())
         is_schnell = "schnell" in transformer_info.config.config_path
 
         # Calculate the timestep schedule.
@@ -468,7 +468,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # minimize peak memory.
 
         # First, load the ControlNet models so that we can determine the ControlNet types.
-        controlnet_models = [context.models.load(controlnet.control_model) for controlnet in controlnets]
+        controlnet_models = [context.models.load(controlnet.control_model, context.util.get_queue_id()) for controlnet in controlnets]
 
         # Calculate the controlnet conditioning tensors.
         # We do this before loading the ControlNet models because it may require running the VAE, and we are trying to
@@ -479,7 +479,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             if isinstance(controlnet_model.model, InstantXControlNetFlux):
                 if self.controlnet_vae is None:
                     raise ValueError("A ControlNet VAE is required when using an InstantX FLUX ControlNet.")
-                vae_info = context.models.load(self.controlnet_vae.vae)
+                vae_info = context.models.load(self.controlnet_vae.vae, context.util.get_queue_id())
                 controlnet_conds.append(
                     InstantXControlNetExtension.prepare_controlnet_cond(
                         controlnet_image=image,
@@ -590,7 +590,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 pos_images.append(pos_image)
                 neg_images.append(neg_image)
 
-            with context.models.load(ip_adapter_field.image_encoder_model) as image_encoder_model:
+            with context.models.load(ip_adapter_field.image_encoder_model, context.util.get_queue_id()) as image_encoder_model:
                 assert isinstance(image_encoder_model, CLIPVisionModelWithProjection)
 
                 clip_image: torch.Tensor = clip_image_processor(images=pos_images, return_tensors="pt").pixel_values
@@ -620,7 +620,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         for ip_adapter_field, pos_image_prompt_clip_embed, neg_image_prompt_clip_embed in zip(
             ip_adapter_fields, pos_image_prompt_clip_embeds, neg_image_prompt_clip_embeds, strict=True
         ):
-            ip_adapter_model = exit_stack.enter_context(context.models.load(ip_adapter_field.ip_adapter_model))
+            ip_adapter_model = exit_stack.enter_context(context.models.load(ip_adapter_field.ip_adapter_model, context.util.get_queue_id()))
             assert isinstance(ip_adapter_model, XlabsIpAdapterFlux)
             ip_adapter_model = ip_adapter_model.to(dtype=dtype)
             if ip_adapter_field.mask is not None:
@@ -649,7 +649,7 @@ class FluxDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[LoRAModelRaw, float]]:
         for lora in self.transformer.loras:
-            lora_info = context.models.load(lora.lora)
+            lora_info = context.models.load(lora.lora, context.util.get_queue_id())
             assert isinstance(lora_info.model, LoRAModelRaw)
             yield (lora_info.model, lora.weight)
             del lora_info

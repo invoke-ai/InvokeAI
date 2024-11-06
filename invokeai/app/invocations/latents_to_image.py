@@ -57,7 +57,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
-        vae_info = context.models.load(self.vae.vae)
+        vae_info = context.models.load(self.vae.vae, context.util.get_queue_id())
         assert isinstance(vae_info.model, (AutoencoderKL, AutoencoderTiny))
         with SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes), vae_info as vae:
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))

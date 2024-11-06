@@ -54,7 +54,7 @@ class FluxVaeEncodeInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         image = context.images.get_pil(self.image.image_name)
 
-        vae_info = context.models.load(self.vae.vae)
+        vae_info = context.models.load(self.vae.vae, context.util.get_queue_id())
 
         image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
         if image_tensor.dim() == 3:

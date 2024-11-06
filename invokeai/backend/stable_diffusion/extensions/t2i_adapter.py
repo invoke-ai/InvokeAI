@@ -54,7 +54,7 @@ class T2IAdapterExt(ExtensionBase):
     @callback(ExtensionCallbackType.SETUP)
     def setup(self, ctx: DenoiseContext):
         t2i_model: T2IAdapter
-        with self._node_context.models.load(self._model_id) as t2i_model:
+        with self._node_context.models.load(self._model_id, self._node_context.util.get_queue_id()) as t2i_model:
             _, _, latents_height, latents_width = ctx.inputs.orig_latents.shape
 
             self._adapter_state = self._run_model(

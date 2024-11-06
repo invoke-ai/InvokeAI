@@ -158,7 +158,7 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         image = context.images.get_pil(self.image.image_name, mode="RGB")
 
         # Load the model.
-        spandrel_model_info = context.models.load(self.image_to_image_model)
+        spandrel_model_info = context.models.load(self.image_to_image_model, context.util.get_queue_id())
 
         def step_callback(step: int, total_steps: int) -> None:
             context.util.signal_progress(
@@ -207,7 +207,7 @@ class SpandrelImageToImageAutoscaleInvocation(SpandrelImageToImageInvocation):
         image = context.images.get_pil(self.image.image_name, mode="RGB")
 
         # Load the model.
-        spandrel_model_info = context.models.load(self.image_to_image_model)
+        spandrel_model_info = context.models.load(self.image_to_image_model, context.util.get_queue_id())
 
         # The target size of the image, determined by the provided scale. We'll run the upscaler until we hit this size.
         # Later, we may mutate this value if the model doesn't upscale the image or if the user requested a multiple of 8.

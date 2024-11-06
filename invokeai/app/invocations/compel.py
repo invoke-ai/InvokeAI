@@ -163,7 +163,7 @@ class SDXLPromptInvocationBase:
 
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in clip_field.loras:
-                lora_info = context.models.load(lora.lora)
+                lora_info = context.models.load(lora.lora, context.util.get_queue_id())
                 lora_model = lora_info.model
                 assert isinstance(lora_model, LoRAModelRaw)
                 yield (lora_model, lora.weight)

@@ -90,7 +90,7 @@ class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
             raise ValueError(msg)
 
         loadnet = context.models.load_remote_model(
-            source=ESRGAN_MODEL_URLS[self.model_name],
+            source=ESRGAN_MODEL_URLS[self.model_name], queue_id=context.util.get_queue_id()
         )
 
         with loadnet as loadnet_model:

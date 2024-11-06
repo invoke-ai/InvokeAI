@@ -60,7 +60,7 @@ class CreateDenoiseMaskInvocation(BaseInvocation):
         )
 
         if image_tensor is not None:
-            vae_info = context.models.load(self.vae.vae)
+            vae_info = context.models.load(self.vae.vae, context.util.get_queue_id())
 
             img_mask = tv_resize(mask, image_tensor.shape[-2:], T.InterpolationMode.BILINEAR, antialias=False)
             masked_image = image_tensor * torch.where(img_mask < 0.5, 0.0, 1.0)

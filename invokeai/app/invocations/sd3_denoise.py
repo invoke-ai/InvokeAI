@@ -147,7 +147,7 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         inference_dtype = TorchDevice.choose_torch_dtype()
         device = TorchDevice.choose_torch_device()
 
-        transformer_info = context.models.load(self.transformer.transformer)
+        transformer_info = context.models.load(self.transformer.transformer, context.util.get_queue_id())
 
         # Load/process the conditioning data.
         # TODO(ryand): Make CFG optional.

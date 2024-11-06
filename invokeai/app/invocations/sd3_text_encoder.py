@@ -86,8 +86,8 @@ class Sd3TextEncoderInvocation(BaseInvocation):
 
     def _t5_encode(self, context: InvocationContext, max_seq_len: int) -> torch.Tensor:
         assert self.t5_encoder is not None
-        t5_tokenizer_info = context.models.load(self.t5_encoder.tokenizer)
-        t5_text_encoder_info = context.models.load(self.t5_encoder.text_encoder)
+        t5_tokenizer_info = context.models.load(self.t5_encoder.tokenizer, context.util.get_queue_id())
+        t5_text_encoder_info = context.models.load(self.t5_encoder.text_encoder, context.util.get_queue_id())
 
         prompt = [self.prompt]
 
@@ -127,8 +127,8 @@ class Sd3TextEncoderInvocation(BaseInvocation):
     def _clip_encode(
         self, context: InvocationContext, clip_model: CLIPField, tokenizer_max_length: int = 77
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        clip_tokenizer_info = context.models.load(clip_model.tokenizer)
-        clip_text_encoder_info = context.models.load(clip_model.text_encoder)
+        clip_tokenizer_info = context.models.load(clip_model.tokenizer, context.util.get_queue_id())
+        clip_text_encoder_info = context.models.load(clip_model.text_encoder, context.util.get_queue_id())
 
         prompt = [self.prompt]
 
@@ -193,7 +193,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         self, context: InvocationContext, clip_model: CLIPField
     ) -> Iterator[Tuple[LoRAModelRaw, float]]:
         for lora in clip_model.loras:
-            lora_info = context.models.load(lora.lora)
+            lora_info = context.models.load(lora.lora, context.util.get_queue_id())
             assert isinstance(lora_info.model, LoRAModelRaw)
             yield (lora_info.model, lora.weight)
             del lora_info

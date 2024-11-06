@@ -196,13 +196,13 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         # Prepare an iterator that yields the UNet's LoRA models and their weights.
         def _lora_loader() -> Iterator[Tuple[LoRAModelRaw, float]]:
             for lora in self.unet.loras:
-                lora_info = context.models.load(lora.lora)
+                lora_info = context.models.load(lora.lora, context.util.get_queue_id())
                 assert isinstance(lora_info.model, LoRAModelRaw)
                 yield (lora_info.model, lora.weight)
                 del lora_info
 
         # Load the UNet model.
-        unet_info = context.models.load(self.unet.unet)
+        unet_info = context.models.load(self.unet.unet, context.util.get_queue_id())
 
         with (
             ExitStack() as exit_stack,
