@@ -1,22 +1,25 @@
 import { Button, Flex, Text } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppStore } from 'app/store/nanostores/store';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { replaceCanvasEntityObjectsWithImage } from 'features/imageActions/actions';
 import { activeTabCanvasRightPanelChanged } from 'features/ui/store/uiSlice';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { Trans } from 'react-i18next';
-import type { PostUploadAction } from 'services/api/types';
+import type { ImageDTO } from 'services/api/types';
 
 export const ControlLayerSettingsEmptyState = memo(() => {
   const entityIdentifier = useEntityIdentifierContext('control_layer');
-  const dispatch = useAppDispatch();
+  const { dispatch, getState } = useAppStore();
   const isBusy = useCanvasIsBusy();
-  const postUploadAction = useMemo<PostUploadAction>(
-    () => ({ type: 'REPLACE_LAYER_WITH_IMAGE', entityIdentifier }),
-    [entityIdentifier]
+  const onUpload = useCallback(
+    (imageDTO: ImageDTO) => {
+      replaceCanvasEntityObjectsWithImage({ imageDTO, entityIdentifier, dispatch, getState });
+    },
+    [dispatch, entityIdentifier, getState]
   );
-  const uploadApi = useImageUploadButton({ postUploadAction });
+  const uploadApi = useImageUploadButton({ onUpload, allowMultiple: false });
   const onClickGalleryButton = useCallback(() => {
     dispatch(activeTabCanvasRightPanelChanged('gallery'));
   }, [dispatch]);
