@@ -49,6 +49,7 @@ import { isControlNetOrT2IAdapterModelConfig, isIPAdapterModelConfig } from 'ser
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
+/** @knipignore */
 export const selectDefaultControlAdapter = createSelector(
   selectModelConfigsQuery,
   selectBase,

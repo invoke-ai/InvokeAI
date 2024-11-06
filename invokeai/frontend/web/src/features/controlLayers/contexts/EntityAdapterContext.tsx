@@ -5,10 +5,7 @@ import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konv
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRegionalGuidance';
 import type { CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
-import type {
-  CanvasEntityIdentifier,
-  CanvasRenderableEntityType,
-} from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier, CanvasRenderableEntityType } from 'features/controlLayers/store/types';
 import type { PropsWithChildren } from 'react';
 import { createContext, memo, useContext, useMemo, useSyncExternalStore } from 'react';
 import { assert } from 'tsafe';
