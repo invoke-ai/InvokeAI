@@ -1,15 +1,16 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
+import { deepClone } from 'common/util/deepClone';
 import { CanvasEntityMenuItemsCopyToClipboard } from 'features/controlLayers/components/common/CanvasEntityMenuItemsCopyToClipboard';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectDefaultControlAdapter } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   rasterLayerConvertedToControlLayer,
   rasterLayerConvertedToInpaintMask,
   rasterLayerConvertedToRegionalGuidance,
 } from 'features/controlLayers/store/canvasSlice';
+import { initialControlNet } from 'features/controlLayers/store/util';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCopyBold } from 'react-icons/pi';
@@ -20,7 +21,6 @@ export const RasterLayerMenuItemsCopyToSubMenu = memo(() => {
 
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('raster_layer');
-  const defaultControlAdapter = useAppSelector(selectDefaultControlAdapter);
   const isBusy = useCanvasIsBusy();
 
   const copyToInpaintMask = useCallback(() => {
@@ -35,10 +35,10 @@ export const RasterLayerMenuItemsCopyToSubMenu = memo(() => {
     dispatch(
       rasterLayerConvertedToControlLayer({
         entityIdentifier,
-        overrides: { controlAdapter: defaultControlAdapter },
+        overrides: { controlAdapter: deepClone(initialControlNet) },
       })
     );
-  }, [defaultControlAdapter, dispatch, entityIdentifier]);
+  }, [dispatch, entityIdentifier]);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiCopyBold />} isDisabled={isBusy}>
