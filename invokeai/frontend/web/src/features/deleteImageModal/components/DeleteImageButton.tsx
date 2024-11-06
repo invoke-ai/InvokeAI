@@ -27,6 +27,8 @@ export const DeleteImageButton = memo((props: DeleteImageButtonProps) => {
       aria-label={labelMessage}
       isDisabled={isDisabled || !isConnected}
       colorScheme="error"
+      variant="link"
+      alignSelf="stretch"
     />
   );
 });
