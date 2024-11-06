@@ -79,7 +79,7 @@ export const initialControlNet: ControlNetConfig = {
   type: 'controlnet',
   model: null,
   weight: 0.75,
-  beginEndStepPct: [0, 1],
+  beginEndStepPct: [0, 0.75],
   controlMode: 'balanced',
 };
 
