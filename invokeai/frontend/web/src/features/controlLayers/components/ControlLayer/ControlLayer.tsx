@@ -7,7 +7,7 @@ import { CanvasEntityPreviewImage } from 'features/controlLayers/components/comm
 import { CanvasEntitySettingsWrapper } from 'features/controlLayers/components/common/CanvasEntitySettingsWrapper';
 import { CanvasEntityEditableTitle } from 'features/controlLayers/components/common/CanvasEntityTitleEdit';
 import { ControlLayerBadges } from 'features/controlLayers/components/ControlLayer/ControlLayerBadges';
-import { ControlLayerControlAdapter } from 'features/controlLayers/components/ControlLayer/ControlLayerControlAdapter';
+import { ControlLayerSettings } from 'features/controlLayers/components/ControlLayer/ControlLayerSettings';
 import { ControlLayerAdapterGate } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { EntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
@@ -41,7 +41,7 @@ export const ControlLayer = memo(({ id }: Props) => {
             <CanvasEntityHeaderCommonActions />
           </CanvasEntityHeader>
           <CanvasEntitySettingsWrapper>
-            <ControlLayerControlAdapter />
+            <ControlLayerSettings />
           </CanvasEntitySettingsWrapper>
           <IAIDroppable data={dropData} dropLabel={t('controlLayers.replaceLayer')} />
         </CanvasEntityContainer>
