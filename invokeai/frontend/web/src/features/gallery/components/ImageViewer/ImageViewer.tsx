@@ -37,7 +37,6 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
       ref={ref}
       tabIndex={-1}
       layerStyle="first"
-      p={2}
       borderRadius="base"
       position="absolute"
       flexDirection="column"
@@ -51,7 +50,7 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
     >
       {hasImageToCompare && <CompareToolbar />}
       {!hasImageToCompare && <ViewerToolbar closeButton={closeButton} />}
-      <Box ref={containerRef} w="full" h="full">
+      <Box ref={containerRef} w="full" h="full" p={2}>
         {!hasImageToCompare && <CurrentImagePreview />}
         {hasImageToCompare && <ImageComparison containerDims={containerDims} />}
       </Box>
@@ -84,7 +83,8 @@ const ImageViewerCloseButton = memo(() => {
       tooltip={t('gallery.closeViewer')}
       aria-label={t('gallery.closeViewer')}
       icon={<PiXBold />}
-      variant="ghost"
+      variant="link"
+      alignSelf="stretch"
       onClick={imageViewer.close}
     />
   );

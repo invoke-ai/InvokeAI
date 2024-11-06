@@ -49,6 +49,7 @@ import { isControlNetOrT2IAdapterModelConfig, isIPAdapterModelConfig } from 'ser
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
+/** @knipignore */
 export const selectDefaultControlAdapter = createSelector(
   selectModelConfigsQuery,
   selectBase,
@@ -92,11 +93,10 @@ export const selectDefaultIPAdapter = createSelector(
 
 export const useAddControlLayer = () => {
   const dispatch = useAppDispatch();
-  const defaultControlAdapter = useAppSelector(selectDefaultControlAdapter);
   const func = useCallback(() => {
-    const overrides = { controlAdapter: defaultControlAdapter };
+    const overrides = { controlAdapter: deepClone(initialControlNet) };
     dispatch(controlLayerAdded({ isSelected: true, overrides }));
-  }, [defaultControlAdapter, dispatch]);
+  }, [dispatch]);
 
   return func;
 };

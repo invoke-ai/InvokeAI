@@ -1,5 +1,6 @@
 import type { PopoverProps } from '@invoke-ai/ui-library';
 import commercialLicenseBg from 'public/assets/images/commercial-license-bg.png';
+import denoisingStrength from 'public/assets/images/denoising-strength.png';
 
 export type Feature =
   | 'clipSkip'
@@ -138,6 +139,7 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   paramDenoisingStrength: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000094998-image-to-image',
+    image: denoisingStrength,
   },
   paramHrf: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000096700-how-can-i-get-larger-images-what-does-upscaling-do-',

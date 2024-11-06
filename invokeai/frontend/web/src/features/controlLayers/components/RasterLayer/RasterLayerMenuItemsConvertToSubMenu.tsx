@@ -1,8 +1,8 @@
 import { Menu, MenuButton, MenuItem, MenuList } from '@invoke-ai/ui-library';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
+import { deepClone } from 'common/util/deepClone';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { selectDefaultControlAdapter } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
 import {
@@ -10,6 +10,7 @@ import {
   rasterLayerConvertedToInpaintMask,
   rasterLayerConvertedToRegionalGuidance,
 } from 'features/controlLayers/store/canvasSlice';
+import { initialControlNet } from 'features/controlLayers/store/util';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSwapBold } from 'react-icons/pi';
@@ -20,7 +21,6 @@ export const RasterLayerMenuItemsConvertToSubMenu = memo(() => {
 
   const dispatch = useAppDispatch();
   const entityIdentifier = useEntityIdentifierContext('raster_layer');
-  const defaultControlAdapter = useAppSelector(selectDefaultControlAdapter);
   const isBusy = useCanvasIsBusy();
   const isLocked = useEntityIsLocked(entityIdentifier);
 
@@ -37,10 +37,10 @@ export const RasterLayerMenuItemsConvertToSubMenu = memo(() => {
       rasterLayerConvertedToControlLayer({
         entityIdentifier,
         replace: true,
-        overrides: { controlAdapter: defaultControlAdapter },
+        overrides: { controlAdapter: deepClone(initialControlNet) },
       })
     );
-  }, [defaultControlAdapter, dispatch, entityIdentifier]);
+  }, [dispatch, entityIdentifier]);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiSwapBold />} isDisabled={isBusy || isLocked}>

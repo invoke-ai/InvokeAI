@@ -1,4 +1,4 @@
-import { Box, chakra, Flex } from '@invoke-ai/ui-library';
+import { Box, chakra, Flex, Tooltip } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
@@ -87,12 +87,62 @@ export const CanvasEntityPreviewImage = memo(() => {
   useEffect(updatePreview, [updatePreview, canvasCache, nodeRect, pixelRect]);
 
   return (
+    <Tooltip label={<TooltipContent canvasRef={canvasRef} />} p={2} closeOnScroll>
+      <Flex
+        position="relative"
+        alignItems="center"
+        justifyContent="center"
+        w={CONTAINER_WIDTH_PX}
+        h={CONTAINER_WIDTH_PX}
+        borderRadius="sm"
+        borderWidth={1}
+        bg="base.900"
+        flexShrink={0}
+      >
+        <Box
+          position="absolute"
+          top={0}
+          right={0}
+          bottom={0}
+          left={0}
+          bgImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL}
+          bgSize="5px"
+        />
+        <ChakraCanvas position="relative" ref={canvasRef} objectFit="contain" maxW="full" maxH="full" />
+      </Flex>
+    </Tooltip>
+  );
+});
+
+CanvasEntityPreviewImage.displayName = 'CanvasEntityPreviewImage';
+
+const TooltipContent = ({ canvasRef }: { canvasRef: React.RefObject<HTMLCanvasElement> }) => {
+  const canvasRef2 = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef2.current || !canvasRef.current) {
+      return;
+    }
+
+    const ctx = canvasRef2.current.getContext('2d');
+
+    if (!ctx) {
+      return;
+    }
+
+    canvasRef2.current.width = canvasRef.current.width;
+    canvasRef2.current.height = canvasRef.current.height;
+    ctx.clearRect(0, 0, canvasRef2.current.width, canvasRef2.current.height);
+    ctx.drawImage(canvasRef.current, 0, 0);
+  }, [canvasRef]);
+
+  return (
     <Flex
       position="relative"
       alignItems="center"
       justifyContent="center"
-      w={CONTAINER_WIDTH_PX}
-      h={CONTAINER_WIDTH_PX}
+      w={150}
+      h={150}
       borderRadius="sm"
       borderWidth={1}
       bg="base.900"
@@ -105,11 +155,9 @@ export const CanvasEntityPreviewImage = memo(() => {
         bottom={0}
         left={0}
         bgImage={TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL}
-        bgSize="5px"
+        bgSize="8px"
       />
-      <ChakraCanvas position="relative" ref={canvasRef} objectFit="contain" maxW="full" maxH="full" />
+      <ChakraCanvas position="relative" ref={canvasRef2} objectFit="contain" maxW="full" maxH="full" />
     </Flex>
   );
-});
-
-CanvasEntityPreviewImage.displayName = 'CanvasEntityPreviewImage';
+};

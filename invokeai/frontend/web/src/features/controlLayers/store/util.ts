@@ -78,8 +78,8 @@ export const initialT2IAdapter: T2IAdapterConfig = {
 export const initialControlNet: ControlNetConfig = {
   type: 'controlnet',
   model: null,
-  weight: 1,
-  beginEndStepPct: [0, 1],
+  weight: 0.75,
+  beginEndStepPct: [0, 0.75],
   controlMode: 'balanced',
 };
 

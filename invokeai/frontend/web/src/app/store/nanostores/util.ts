@@ -4,8 +4,10 @@ import { atom } from 'nanostores';
 /**
  * A fallback non-writable atom that always returns `false`, used when a nanostores atom is only conditionally available
  * in a hook or component.
+ *
+ * @knipignore
  */
-// export const $false: ReadableAtom<boolean> = atom(false);
+export const $false: ReadableAtom<boolean> = atom(false);
 /**
  * A fallback non-writable atom that always returns `true`, used when a nanostores atom is only conditionally available
  * in a hook or component.

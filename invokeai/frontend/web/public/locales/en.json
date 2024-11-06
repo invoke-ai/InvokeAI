@@ -997,6 +997,7 @@
         "controlNetControlMode": "Control Mode",
         "copyImage": "Copy Image",
         "denoisingStrength": "Denoising Strength",
+        "noRasterLayers": "No Raster Layers",
         "downloadImage": "Download Image",
         "general": "General",
         "guidance": "Guidance",
@@ -1412,8 +1413,9 @@
         "paramDenoisingStrength": {
             "heading": "Denoising Strength",
             "paragraphs": [
-                "How much noise is added to the input image.",
-                "0 will result in an identical image, while 1 will result in a completely new image."
+                "Controls how much the generated image varies from the raster layer(s).",
+                "Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt.",
+                "When there are no raster layers with visible content, this setting is ignored."
             ]
         },
         "paramHeight": {
@@ -1775,9 +1777,10 @@
         "newCanvasSession": "New Canvas Session",
         "newCanvasSessionDesc": "This will clear the canvas and all settings except for your model selection. Generations will be staged on the canvas.",
         "replaceCurrent": "Replace Current",
+        "controlLayerEmptyState": "<UploadButton>Upload an image</UploadButton>, drag an image from the <GalleryButton>gallery</GalleryButton> onto this layer, or draw on the canvas to get started.",
         "controlMode": {
             "controlMode": "Control Mode",
-            "balanced": "Balanced",
+            "balanced": "Balanced (recommended)",
             "prompt": "Prompt",
             "control": "Control",
             "megaControl": "Mega Control"
@@ -1816,6 +1819,9 @@
             "process": "Process",
             "apply": "Apply",
             "cancel": "Cancel",
+            "advanced": "Advanced",
+            "processingLayerWith": "Processing layer with the {{type}} filter.",
+            "forMoreControl": "For more control, click Advanced below.",
             "spandrel_filter": {
                 "label": "Image-to-Image Model",
                 "description": "Run an image-to-image model on the selected layer.",
