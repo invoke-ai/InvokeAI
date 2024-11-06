@@ -1779,7 +1779,7 @@
         "replaceCurrent": "Replace Current",
         "controlMode": {
             "controlMode": "Control Mode",
-            "balanced": "Balanced",
+            "balanced": "Balanced (recommended)",
             "prompt": "Prompt",
             "control": "Control",
             "megaControl": "Mega Control"
