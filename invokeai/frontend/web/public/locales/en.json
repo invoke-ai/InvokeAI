@@ -1413,7 +1413,9 @@
         "paramDenoisingStrength": {
             "heading": "Denoising Strength",
             "paragraphs": [
-                "Controls how much the generated image varies from the raster layer(s). Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt."
+                "Controls how much the generated image varies from the raster layer(s).",
+                "Lower strength stays closer to the combined visible raster layers. Higher strength relies more on the global prompt.",
+                "When there are no raster layers with visible content, this setting is ignored."
             ]
         },
         "paramHeight": {
