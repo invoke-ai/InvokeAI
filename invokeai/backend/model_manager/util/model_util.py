@@ -173,7 +173,7 @@ def get_clip_variant_type(location: str) -> Optional[ClipVariantType]:
         path = Path(location)
         config_path = path / "config.json"
         if not config_path.exists():
-            return None
+            return ClipVariantType.L
         with open(config_path) as file:
             clip_conf = json.load(file)
             hidden_size = clip_conf.get("hidden_size", -1)
