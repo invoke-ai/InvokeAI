@@ -456,14 +456,14 @@ const PROCESSOR_TO_FILTER_MAP: Record<string, FilterType> = {
  */
 export const getFilterForModel = (modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | null) => {
   if (!modelConfig) {
-    // No model, use the default filter
-    return IMAGE_FILTERS.canny_edge_detection;
+    // No model
+    return null;
   }
 
   const preprocessor = modelConfig?.default_settings?.preprocessor;
   if (!preprocessor) {
-    // No preprocessor, use the default filter
-    return IMAGE_FILTERS.canny_edge_detection;
+    // No preprocessor
+    return null;
   }
 
   if (isFilterType(preprocessor)) {
@@ -473,8 +473,8 @@ export const getFilterForModel = (modelConfig: ControlNetModelConfig | T2IAdapte
 
   const filterName = PROCESSOR_TO_FILTER_MAP[preprocessor];
   if (!filterName) {
-    // No filter found, use the default filter
-    return IMAGE_FILTERS.canny_edge_detection;
+    // No filter found
+    return null;
   }
 
   // Found a filter, use it
