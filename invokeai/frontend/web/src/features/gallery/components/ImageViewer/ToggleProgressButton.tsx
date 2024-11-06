@@ -21,7 +21,8 @@ export const ToggleProgressButton = memo(() => {
       tooltip={t('settings.displayInProgress')}
       icon={<PiHourglassHighBold />}
       onClick={onClick}
-      variant="outline"
+      variant="link"
+      alignSelf="stretch"
       colorScheme={shouldShowProgressInViewer ? 'invokeBlue' : 'base'}
       data-testid="toggle-show-progress-button"
     />

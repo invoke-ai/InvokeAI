@@ -38,7 +38,8 @@ export const ToggleMetadataViewerButton = memo(() => {
       aria-label={`${t('parameters.info')} (I)`}
       onClick={toggleMetadataViewer}
       isDisabled={!imageDTO}
-      variant="outline"
+      variant="link"
+      alignSelf="stretch"
       colorScheme={shouldShowImageDetails ? 'invokeBlue' : 'base'}
       data-testid="toggle-show-metadata-button"
     />
