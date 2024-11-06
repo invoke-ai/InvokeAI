@@ -1,4 +1,13 @@
-import { Badge, Box, CompositeNumberInput, CompositeSlider, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import {
+  Badge,
+  Box,
+  CompositeNumberInput,
+  CompositeSlider,
+  Flex,
+  FormControl,
+  FormLabel,
+  useToken,
+} from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import WavyLine from 'common/components/WavyLine';
@@ -7,8 +16,6 @@ import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { selectImg2imgStrengthConfig } from 'features/system/store/configSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const marks = [0, 0.5, 1];
 
 export const ParamDenoisingStrength = memo(() => {
   const img2imgStrength = useAppSelector(selectImg2imgStrength);
@@ -29,15 +36,17 @@ export const ParamDenoisingStrength = memo(() => {
   const config = useAppSelector(selectImg2imgStrengthConfig);
   const { t } = useTranslation();
 
+  const [invokeBlue300] = useToken('colors', ['invokeBlue.300']);
+
   return (
-    <FormControl isDisabled={!isEnabled} py={2} justifyContent="space-between">
+    <FormControl isDisabled={!isEnabled} p={1} justifyContent="space-between" h={8}>
       <Flex gap={3} alignItems="center">
         <InformationalPopover feature="paramDenoisingStrength">
           <FormLabel mr={0}>{`${t('parameters.denoisingStrength')}`}</FormLabel>
         </InformationalPopover>
-        <Box position="relative" opacity={!isEnabled ? 0.5 : 1}>
-          <WavyLine waviness={img2imgStrength * 10} />
-        </Box>
+        {isEnabled && (
+            <WavyLine amplitude={img2imgStrength * 10} stroke={invokeBlue300} strokeWidth={1} width={40} height={14} />
+        )}
       </Flex>
       {isEnabled ? (
         <>
@@ -49,7 +58,6 @@ export const ParamDenoisingStrength = memo(() => {
             defaultValue={config.initial}
             onChange={onChange}
             value={img2imgStrength}
-            marks={marks}
           />
           <CompositeNumberInput
             step={config.coarseStep}
@@ -59,10 +67,11 @@ export const ParamDenoisingStrength = memo(() => {
             defaultValue={config.initial}
             onChange={onChange}
             value={img2imgStrength}
+            variant="outline"
           />
         </>
       ) : (
-        <Flex justifySelf="flex-end" h="28px" alignItems="center">
+        <Flex alignItems="center">
           <Badge opacity="0.6">
             {t('common.disabled')} - {t('parameters.noRasterLayers')}
           </Badge>
