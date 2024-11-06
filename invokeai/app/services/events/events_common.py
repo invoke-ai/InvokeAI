@@ -383,20 +383,19 @@ class DownloadErrorEvent(DownloadEventBase):
         return cls(source=str(job.source), error_type=job.error_type, error=job.error)
 
 
-class ModelEventBase(EventBase):
+class ModelLoadEventBase(EventBase):
     """Base class for queue events"""
 
     queue_id: str = Field(description="The ID of the queue")
 
 
 @payload_schema.register
-class ModelLoadStartedEvent(ModelEventBase):
+class ModelLoadStartedEvent(ModelLoadEventBase):
     """Event model for model_load_started"""
 
     __event_name__ = "model_load_started"
 
     config: AnyModelConfig = Field(description="The model's config")
-    queue_id: str = Field(description="Queue ID to emit to")
     submodel_type: Optional[SubModelType] = Field(default=None, description="The submodel type, if any")
 
     @classmethod
@@ -405,13 +404,12 @@ class ModelLoadStartedEvent(ModelEventBase):
 
 
 @payload_schema.register
-class ModelLoadCompleteEvent(ModelEventBase):
+class ModelLoadCompleteEvent(ModelLoadEventBase):
     """Event model for model_load_complete"""
 
     __event_name__ = "model_load_complete"
 
     config: AnyModelConfig = Field(description="The model's config")
-    queue_id: str = Field(description="Queue ID to emit to")
     submodel_type: Optional[SubModelType] = Field(default=None, description="The submodel type, if any")
 
     @classmethod
@@ -419,6 +417,9 @@ class ModelLoadCompleteEvent(ModelEventBase):
         return cls(config=config, queue_id=queue_id, submodel_type=submodel_type)
 
 
+class ModelEventBase(EventBase):
+    """Base class for model events"""
+    
 @payload_schema.register
 class ModelInstallDownloadStartedEvent(ModelEventBase):
     """Event model for model_install_download_started"""
