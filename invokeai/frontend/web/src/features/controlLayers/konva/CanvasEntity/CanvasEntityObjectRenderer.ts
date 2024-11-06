@@ -490,8 +490,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       previewBlob(blob, 'Rasterized entity');
     }
     imageDTO = await uploadImage({
-      blob,
-      fileName: `${this.id}_rasterized.png`,
+      file: new File([blob], `${this.id}_rasterized.png`, { type: 'image/png' }),
       image_category: 'other',
       is_intermediate: true,
     });

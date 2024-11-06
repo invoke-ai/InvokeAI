@@ -35,7 +35,7 @@ import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
-import type { UploadOptions } from 'services/api/endpoints/images';
+import type { UploadImageArg } from 'services/api/endpoints/images';
 import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
@@ -259,7 +259,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   getCompositeImageDTO = async (
     adapters: CanvasEntityAdapter[],
     rect: Rect,
-    uploadOptions: Pick<UploadOptions, 'is_intermediate' | 'metadata'>,
+    uploadOptions: Pick<UploadImageArg, 'is_intermediate' | 'metadata'>,
     compositingOptions?: CompositingOptions,
     forceUpload?: boolean
   ): Promise<ImageDTO> => {
@@ -297,8 +297,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
     this.$isUploading.set(true);
     const uploadResult = await withResultAsync(() =>
       uploadImage({
-        blob,
-        fileName: 'canvas-composite.png',
+        file: new File([blob], 'canvas-composite.png', { type: 'image/png' }),
         image_category: 'general',
         is_intermediate: uploadOptions.is_intermediate,
         board_id: uploadOptions.is_intermediate ? undefined : selectAutoAddBoardId(this.manager.store.getState()),
