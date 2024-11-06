@@ -1,6 +1,7 @@
 import { Button, Collapse, Flex, Icon, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
+import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScrollStyles';
 import {
   selectBoardSearchText,
   selectListBoardsQueryArgs,
@@ -104,7 +105,7 @@ export const BoardsList = ({ isPrivate }: Props) => {
         )}
         <AddBoardButton isPrivateBoard={isPrivate} />
       </Flex>
-      <Collapse in={isOpen}>
+      <Collapse in={isOpen} style={fixTooltipCloseOnScrollStyles}>
         <Flex direction="column" gap={1}>
           {boardElements.length ? (
             boardElements

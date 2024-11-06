@@ -3,6 +3,8 @@ import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
   CLIPEmbedModelFieldInputTemplate,
+  CLIPGEmbedModelFieldInputTemplate,
+  CLIPLEmbedModelFieldInputTemplate,
   ColorFieldInputTemplate,
   ControlNetModelFieldInputTemplate,
   EnumFieldInputTemplate,
@@ -18,6 +20,7 @@ import type {
   MainModelFieldInputTemplate,
   ModelIdentifierFieldInputTemplate,
   SchedulerFieldInputTemplate,
+  SD3MainModelFieldInputTemplate,
   SDXLMainModelFieldInputTemplate,
   SDXLRefinerModelFieldInputTemplate,
   SpandrelImageToImageModelFieldInputTemplate,
@@ -198,6 +201,20 @@ const buildFluxMainModelFieldInputTemplate: FieldInputTemplateBuilder<FluxMainMo
   return template;
 };
 
+const buildSD3MainModelFieldInputTemplate: FieldInputTemplateBuilder<SD3MainModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SD3MainModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildRefinerModelFieldInputTemplate: FieldInputTemplateBuilder<SDXLRefinerModelFieldInputTemplate> = ({
   schemaObject,
   baseField,
@@ -246,6 +263,34 @@ const buildCLIPEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPEmbed
   fieldType,
 }) => {
   const template: CLIPEmbedModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildCLIPLEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPLEmbedModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: CLIPLEmbedModelFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildCLIPGEmbedModelFieldInputTemplate: FieldInputTemplateBuilder<CLIPGEmbedModelFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: CLIPGEmbedModelFieldInputTemplate = {
     ...baseField,
     type: fieldType,
     default: schemaObject.default ?? undefined,
@@ -446,6 +491,7 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   MainModelField: buildMainModelFieldInputTemplate,
   SchedulerField: buildSchedulerFieldInputTemplate,
   SDXLMainModelField: buildSDXLMainModelFieldInputTemplate,
+  SD3MainModelField: buildSD3MainModelFieldInputTemplate,
   FluxMainModelField: buildFluxMainModelFieldInputTemplate,
   SDXLRefinerModelField: buildRefinerModelFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
@@ -454,6 +500,8 @@ export const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputT
   VAEModelField: buildVAEModelFieldInputTemplate,
   T5EncoderModelField: buildT5EncoderModelFieldInputTemplate,
   CLIPEmbedModelField: buildCLIPEmbedModelFieldInputTemplate,
+  CLIPLEmbedModelField: buildCLIPLEmbedModelFieldInputTemplate,
+  CLIPGEmbedModelField: buildCLIPGEmbedModelFieldInputTemplate,
   FluxVAEModelField: buildFluxVAEModelFieldInputTemplate,
 } as const;
 

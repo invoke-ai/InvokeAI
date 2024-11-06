@@ -535,6 +535,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * Processes the SAM points to segment the entity, updating the module's state and rendering the mask.
    */
   processImmediate = async () => {
+    if (!this.$isSegmenting.get()) {
+      this.log.warn('Cannot process segmentation when not initialized');
+      return;
+    }
+
     if (this.$isProcessing.get()) {
       this.log.warn('Already processing');
       return;
@@ -689,7 +694,6 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
     });
 
     // Final cleanup and teardown, returning user to main canvas UI
-    this.resetEphemeralState();
     this.teardown();
   };
 
@@ -758,7 +762,6 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
   cancel = () => {
     this.log.trace('Canceling');
     // Reset the module's state and tear down, returning user to main canvas UI
-    this.resetEphemeralState();
     this.teardown();
   };
 
@@ -773,8 +776,11 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
    * - Resets the global segmenting adapter
    */
   teardown = () => {
-    this.konva.group.remove();
     this.unsubscribe();
+    this.konva.group.remove();
+    // The reset must be done _after_ unsubscribing from listeners, in case the listeners would otherwise react to
+    // the reset. For example, if auto-processing is enabled and we reset the state, it may trigger processing.
+    this.resetEphemeralState();
     this.$isSegmenting.set(false);
     this.manager.stateApi.$segmentingAdapter.set(null);
   };

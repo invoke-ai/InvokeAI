@@ -8,6 +8,8 @@ import type {
   BoardFieldValue,
   BooleanFieldValue,
   CLIPEmbedModelFieldValue,
+  CLIPGEmbedModelFieldValue,
+  CLIPLEmbedModelFieldValue,
   ColorFieldValue,
   ControlNetModelFieldValue,
   EnumFieldValue,
@@ -33,6 +35,8 @@ import {
   zBoardFieldValue,
   zBooleanFieldValue,
   zCLIPEmbedModelFieldValue,
+  zCLIPGEmbedModelFieldValue,
+  zCLIPLEmbedModelFieldValue,
   zColorFieldValue,
   zControlNetModelFieldValue,
   zEnumFieldValue,
@@ -354,6 +358,12 @@ export const nodesSlice = createSlice({
     fieldCLIPEmbedValueChanged: (state, action: FieldValueAction<CLIPEmbedModelFieldValue>) => {
       fieldValueReducer(state, action, zCLIPEmbedModelFieldValue);
     },
+    fieldCLIPLEmbedValueChanged: (state, action: FieldValueAction<CLIPLEmbedModelFieldValue>) => {
+      fieldValueReducer(state, action, zCLIPLEmbedModelFieldValue);
+    },
+    fieldCLIPGEmbedValueChanged: (state, action: FieldValueAction<CLIPGEmbedModelFieldValue>) => {
+      fieldValueReducer(state, action, zCLIPGEmbedModelFieldValue);
+    },
     fieldFluxVAEModelValueChanged: (state, action: FieldValueAction<FluxVAEModelFieldValue>) => {
       fieldValueReducer(state, action, zFluxVAEModelFieldValue);
     },
@@ -420,6 +430,8 @@ export const {
   fieldVaeModelValueChanged,
   fieldT5EncoderValueChanged,
   fieldCLIPEmbedValueChanged,
+  fieldCLIPLEmbedValueChanged,
+  fieldCLIPGEmbedValueChanged,
   fieldFluxVAEModelValueChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
@@ -527,6 +539,8 @@ export const isAnyNodeOrEdgeMutation = isAnyOf(
   fieldVaeModelValueChanged,
   fieldT5EncoderValueChanged,
   fieldCLIPEmbedValueChanged,
+  fieldCLIPLEmbedValueChanged,
+  fieldCLIPGEmbedValueChanged,
   fieldFluxVAEModelValueChanged,
   // The `nodesChanged` has extra logic and is handled in its own extra reducer
   // nodesChanged,

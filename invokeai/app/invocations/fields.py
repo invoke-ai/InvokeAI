@@ -41,6 +41,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     # region Model Field Types
     MainModel = "MainModelField"
     FluxMainModel = "FluxMainModelField"
+    SD3MainModel = "SD3MainModelField"
     SDXLMainModel = "SDXLMainModelField"
     SDXLRefinerModel = "SDXLRefinerModelField"
     ONNXModel = "ONNXModelField"
@@ -52,6 +53,8 @@ class UIType(str, Enum, metaclass=MetaEnum):
     T2IAdapterModel = "T2IAdapterModelField"
     T5EncoderModel = "T5EncoderModelField"
     CLIPEmbedModel = "CLIPEmbedModelField"
+    CLIPLEmbedModel = "CLIPLEmbedModelField"
+    CLIPGEmbedModel = "CLIPGEmbedModelField"
     SpandrelImageToImageModel = "SpandrelImageToImageModelField"
     # endregion
 
@@ -131,8 +134,10 @@ class FieldDescriptions:
     clip = "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count"
     t5_encoder = "T5 tokenizer and text encoder"
     clip_embed_model = "CLIP Embed loader"
+    clip_g_model = "CLIP-G Embed loader"
     unet = "UNet (scheduler, LoRAs)"
     transformer = "Transformer"
+    mmditx = "MMDiTX"
     vae = "VAE"
     cond = "Conditioning tensor"
     controlnet_model = "ControlNet model to load"
@@ -140,6 +145,7 @@ class FieldDescriptions:
     lora_model = "LoRA model to load"
     main_model = "Main model (UNet, VAE, CLIP) to load"
     flux_model = "Flux model (Transformer) to load"
+    sd3_model = "SD3 model (MMDiTX) to load"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -241,6 +247,12 @@ class ColorField(BaseModel):
 
 
 class FluxConditioningField(BaseModel):
+    """A conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class SD3ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
