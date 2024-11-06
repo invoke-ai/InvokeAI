@@ -1,7 +1,6 @@
 import type { Selector } from '@reduxjs/toolkit';
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
-import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityBufferObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer';
 import type { CanvasEntityFilterer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer';
@@ -37,6 +36,7 @@ import type { Logger } from 'roarr';
 import type { ImageDTO } from 'services/api/types';
 import stableHash from 'stable-hash';
 import { assert } from 'tsafe';
+import type { Jsonifiable, JsonObject } from 'type-fest';
 
 // Ideally, we'd type `adapter` as `CanvasEntityAdapterBase`, but the generics make this tricky. `CanvasEntityAdapter`
 // is a union of all entity adapters and is functionally identical to `CanvasEntityAdapterBase`. We'll need to do a
@@ -111,7 +111,7 @@ export abstract class CanvasEntityAdapterBase<
    *
    * This is used for caching.
    */
-  abstract getHashableState: () => SerializableObject;
+  abstract getHashableState: () => JsonObject;
 
   /**
    * Callbacks that are executed when the module is initialized.
@@ -566,7 +566,7 @@ export abstract class CanvasEntityAdapterBase<
    * Gets a hash of the entity's state, as provided by `getHashableState`. If `extra` is provided, it will be included in
    * the hash.
    */
-  hash = (extra?: SerializableObject): string => {
+  hash = (extra?: Jsonifiable): string => {
     const arg = {
       state: this.getHashableState(),
       extra,
@@ -614,8 +614,8 @@ export abstract class CanvasEntityAdapterBase<
       transformer: this.transformer.repr(),
       renderer: this.renderer.repr(),
       bufferRenderer: this.bufferRenderer.repr(),
-      segmentAnything: this.segmentAnything?.repr(),
-      filterer: this.filterer?.repr(),
+      segmentAnything: this.segmentAnything?.repr() ?? null,
+      filterer: this.filterer?.repr() ?? null,
       hasCache: this.$canvasCache.get() !== null,
       isLocked: this.$isLocked.get(),
       isDisabled: this.$isDisabled.get(),

@@ -260,7 +260,7 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
       path: this.path,
       parent: this.parent.id,
       bufferState: deepClone(this.state),
-      bufferRenderer: this.renderer?.repr(),
+      bufferRenderer: this.renderer?.repr() ?? null,
     };
   };
 }

@@ -3,7 +3,6 @@ import { autoBatchEnhancer, combineReducers, configureStore } from '@reduxjs/too
 import { logger } from 'app/logging/logger';
 import { idbKeyValDriver } from 'app/store/enhancers/reduxRemember/driver';
 import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
-import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { changeBoardModalSlice } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsPersistConfig, canvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
@@ -37,6 +36,7 @@ import undoable from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import { authToastMiddleware } from 'services/api/authToastMiddleware';
+import type { JsonObject } from 'type-fest';
 
 import { STORAGE_PREFIX } from './constants';
 import { actionSanitizer } from './middleware/devtools/actionSanitizer';
@@ -139,7 +139,7 @@ const unserialize: UnserializeFunction = (data, key) => {
       {
         persistedData: parsed,
         rehydratedData: transformed,
-        diff: diff(parsed, transformed) as SerializableObject, // this is always serializable
+        diff: diff(parsed, transformed) as JsonObject, // this is always serializable
       },
       `Rehydrated slice "${key}"`
     );

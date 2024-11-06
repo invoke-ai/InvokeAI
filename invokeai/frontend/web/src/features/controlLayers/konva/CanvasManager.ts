@@ -1,6 +1,5 @@
 import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
-import type { SerializableObject } from 'common/types';
 import { SyncableMap } from 'common/util/SyncableMap/SyncableMap';
 import { CanvasCacheModule } from 'features/controlLayers/konva/CanvasCacheModule';
 import { CanvasCompositorModule } from 'features/controlLayers/konva/CanvasCompositorModule';
@@ -35,6 +34,7 @@ import { computed } from 'nanostores';
 import type { Logger } from 'roarr';
 import type { AppSocket } from 'services/events/types';
 import { assert } from 'tsafe';
+import type { JsonObject } from 'type-fest';
 
 import { CanvasBackgroundModule } from './CanvasBackgroundModule';
 import { CanvasStateApiModule } from './CanvasStateApiModule';
@@ -294,7 +294,7 @@ export class CanvasManager extends CanvasModuleBase {
     };
   };
 
-  getLoggingContext = (): SerializableObject => ({ path: this.path });
+  getLoggingContext = (): JsonObject => ({ path: this.path });
 
   buildPath = (canvasModule: CanvasModuleBase): string[] => {
     return canvasModule.parent.path.concat(canvasModule.id);

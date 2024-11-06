@@ -686,13 +686,13 @@ export class CanvasStateApiModule extends CanvasModuleBase {
       id: this.id,
       type: this.type,
       path: this.path,
-      $filteringAdapter: this.$filteringAdapter.get()?.entityIdentifier,
+      $filteringAdapter: this.$filteringAdapter.get()?.entityIdentifier ?? null,
       $isFiltering: this.$isFiltering.get(),
-      $transformingAdapter: this.$transformingAdapter.get()?.entityIdentifier,
+      $transformingAdapter: this.$transformingAdapter.get()?.entityIdentifier ?? null,
       $isTransforming: this.$isTransforming.get(),
-      $rasterizingAdapter: this.$rasterizingAdapter.get()?.entityIdentifier,
+      $rasterizingAdapter: this.$rasterizingAdapter.get()?.entityIdentifier ?? null,
       $isRasterizing: this.$isRasterizing.get(),
-      $segmentingAdapter: this.$segmentingAdapter.get()?.entityIdentifier,
+      $segmentingAdapter: this.$segmentingAdapter.get()?.entityIdentifier ?? null,
       $isSegmenting: this.$isSegmenting.get(),
     };
   };

@@ -891,7 +891,7 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
         circle: getKonvaNodeDebugAttrs(konva.circle),
       })),
       imageState: deepClone(this.$imageState.get()),
-      imageModule: this.imageModule?.repr(),
+      imageModule: this.imageModule?.repr() ?? null,
       config: deepClone(this.config),
       $isSegmenting: this.$isSegmenting.get(),
       $lastProcessedHash: this.$lastProcessedHash.get(),

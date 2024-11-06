@@ -1,12 +1,12 @@
 import { createAction } from '@reduxjs/toolkit';
 import { logger } from 'app/logging/logger';
 import type { AppStartListening } from 'app/store/middleware/listenerMiddleware';
-import type { SerializableObject } from 'common/types';
 import { buildAdHocPostProcessingGraph } from 'features/nodes/util/graph/buildAdHocPostProcessingGraph';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { queueApi } from 'services/api/endpoints/queue';
 import type { BatchConfig, ImageDTO } from 'services/api/types';
+import type { JsonObject } from 'type-fest';
 
 const log = logger('queue');
 
@@ -39,9 +39,9 @@ export const addAdHocPostProcessingRequestedListener = (startAppListening: AppSt
 
         const enqueueResult = await req.unwrap();
         req.reset();
-        log.debug({ enqueueResult } as SerializableObject, t('queue.graphQueued'));
+        log.debug({ enqueueResult } as JsonObject, t('queue.graphQueued'));
       } catch (error) {
-        log.error({ enqueueBatchArg } as SerializableObject, t('queue.graphFailedToQueue'));
+        log.error({ enqueueBatchArg } as JsonObject, t('queue.graphFailedToQueue'));
 
         if (error instanceof Object && 'status' in error && error.status === 403) {
           return;

@@ -1,6 +1,5 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, RootState } from 'app/store/store';
-import type { SerializableObject } from 'common/types';
 import { deepClone } from 'common/util/deepClone';
 import { stagingAreaImageStaged } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { boardIdSelected, galleryViewChanged, imageSelected, offsetChanged } from 'features/gallery/store/gallerySlice';
@@ -12,6 +11,7 @@ import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories, getListImagesUrl } from 'services/api/util';
 import { $lastProgressEvent } from 'services/events/stores';
+import type { JsonObject } from 'type-fest';
 
 const log = logger('events');
 
@@ -145,7 +145,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
 
   return async (data: S['InvocationCompleteEvent']) => {
     log.debug(
-      { data } as SerializableObject,
+      { data } as JsonObject,
       `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
     );
 
