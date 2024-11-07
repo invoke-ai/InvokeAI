@@ -1,11 +1,13 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Text } from '@invoke-ai/ui-library';
 import type { DndTargetState } from 'features/dnd/types';
+import { isNil, isString } from 'lodash-es';
+import type { ReactNode } from 'react';
 import { memo } from 'react';
 
 type Props = {
   dndState: DndTargetState;
-  label?: string;
+  label?: string | ReactNode;
   withBackdrop?: boolean;
 };
 
@@ -74,7 +76,8 @@ export const DndDropOverlay = memo((props: Props) => {
     <Flex className="dnd-drop-overlay" data-dnd-state={dndState} sx={sx}>
       {withBackdrop && <Flex className="dnd-drop-overlay-backdrop" />}
       <Flex className="dnd-drop-overlay-content">
-        {label && <Text className="dnd-drop-overlay-label">{label}</Text>}
+        {isString(label) && <Text className="dnd-drop-overlay-label">{label}</Text>}
+        {!isNil(label) && !isString(label) && label}
       </Flex>
     </Flex>
   );
