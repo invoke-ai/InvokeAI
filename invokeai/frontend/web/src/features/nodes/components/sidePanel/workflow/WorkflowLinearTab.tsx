@@ -7,11 +7,13 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
+import { deepClone } from 'common/util/deepClone';
 import { singleWorkflowFieldDndSource } from 'features/dnd/dnd';
 import { triggerPostMoveFlash } from 'features/dnd/util';
 import LinearViewFieldInternal from 'features/nodes/components/flow/nodes/Invocation/fields/LinearViewField';
 import { selectWorkflowSlice, workflowExposedFieldsReordered } from 'features/nodes/store/workflowSlice';
 import type { FieldIdentifier } from 'features/nodes/types/field';
+import { isEqual } from 'lodash-es';
 import { memo, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -78,11 +80,13 @@ const FieldListInnerContent = memo(({ fields }: { fields: FieldIdentifier[] }) =
           return;
         }
 
-        const indexOfSource = fields.findIndex(
-          (fieldIdentifier) => fieldIdentifier.fieldName === sourceData.payload.fieldIdentifier.fieldName
+        const fieldsClone = deepClone(fields);
+
+        const indexOfSource = fieldsClone.findIndex((fieldIdentifier) =>
+          isEqual(fieldIdentifier, sourceData.payload.fieldIdentifier)
         );
-        const indexOfTarget = fields.findIndex(
-          (fieldIdentifier) => fieldIdentifier.fieldName === targetData.payload.fieldIdentifier.fieldName
+        const indexOfTarget = fieldsClone.findIndex((fieldIdentifier) =>
+          isEqual(fieldIdentifier, targetData.payload.fieldIdentifier)
         );
 
         if (indexOfTarget < 0 || indexOfSource < 0) {
@@ -113,7 +117,7 @@ const FieldListInnerContent = memo(({ fields }: { fields: FieldIdentifier[] }) =
         }
 
         const reorderedFields = reorderWithEdge({
-          list: fields,
+          list: fieldsClone,
           startIndex: indexOfSource,
           indexOfTarget,
           closestEdgeOfTarget,
@@ -126,7 +130,9 @@ const FieldListInnerContent = memo(({ fields }: { fields: FieldIdentifier[] }) =
         });
 
         // Flash the element that was moved
-        const element = document.querySelector(`[data-field-name="${sourceData.payload.fieldIdentifier.fieldName}"]`);
+        const element = document.querySelector(
+          `[data-field-name="${sourceData.payload.fieldIdentifier.nodeId}-${sourceData.payload.fieldIdentifier.fieldName}"]`
+        );
         if (element instanceof HTMLElement) {
           triggerPostMoveFlash(element, colorTokenToCssVar('base.700'));
         }
