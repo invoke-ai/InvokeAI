@@ -10,7 +10,6 @@ import type { BoardId } from 'features/gallery/store/types';
 import {
   addImagesToBoard,
   createNewCanvasEntityFromImage,
-  newCanvasFromImage,
   removeImagesFromBoard,
   replaceCanvasEntityObjectsWithImage,
   setComparisonImage,
@@ -23,9 +22,9 @@ import type { FieldIdentifier } from 'features/nodes/types/field';
 import type { ImageDTO } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
-export type RecordUnknown = Record<string | symbol, unknown>;
+type RecordUnknown = Record<string | symbol, unknown>;
 
-export type DndData<
+type DndData<
   Type extends string = string,
   PrivateKey extends symbol = symbol,
   Payload extends JsonObject | void = JsonObject | void,
@@ -37,17 +36,17 @@ export type DndData<
   payload: Payload;
 };
 
-export const buildTypeAndKey = <T extends string>(type: T) => {
+const buildTypeAndKey = <T extends string>(type: T) => {
   const key = Symbol(type);
   return { type, key } as const;
 };
 
-export const buildTypeGuard = <T extends DndData>(key: symbol) => {
+const buildTypeGuard = <T extends DndData>(key: symbol) => {
   const typeGuard = (val: RecordUnknown): val is T => Boolean(val[key]);
   return typeGuard;
 };
 
-export const buildGetData = <T extends DndData>(key: symbol, type: T['type']) => {
+const buildGetData = <T extends DndData>(key: symbol, type: T['type']) => {
   const getData = (payload: T['payload'] extends undefined ? void : T['payload'], id?: string): T =>
     ({
       [key]: true,
@@ -58,7 +57,7 @@ export const buildGetData = <T extends DndData>(key: symbol, type: T['type']) =>
   return getData;
 };
 
-export type DndSource<SourceData extends DndData> = {
+type DndSource<SourceData extends DndData> = {
   key: symbol;
   type: SourceData['type'];
   typeGuard: ReturnType<typeof buildTypeGuard<SourceData>>;
@@ -276,7 +275,7 @@ export const setComparisonImageDndTarget: DndTarget<SetComparisonImageDndTargetD
 
 //#region New Canvas Entity from Image
 const _newCanvasEntity = buildTypeAndKey('new-canvas-entity-from-image');
-export type NewCanvasEntityFromImageDndTargetData = DndData<
+type NewCanvasEntityFromImageDndTargetData = DndData<
   typeof _newCanvasEntity.type,
   typeof _newCanvasEntity.key,
   { type: CanvasEntityType | 'regional_guidance_with_reference_image' }
@@ -298,33 +297,6 @@ export const newCanvasEntityFromImageDndTarget: DndTarget<
     const { type } = targetData.payload;
     const { imageDTO } = sourceData.payload;
     createNewCanvasEntityFromImage({ type, imageDTO, dispatch, getState });
-  },
-};
-
-//#endregion
-
-//#region New Canvas from Image
-const _newCanvasFromImage = buildTypeAndKey('new-canvas-from-image');
-export type NewCanvasFromImageDndTargetData = DndData<
-  typeof _newCanvasFromImage.type,
-  typeof _newCanvasFromImage.key,
-  { type: CanvasEntityType | 'regional_guidance_with_reference_image' }
->;
-
-export const newCanvasFromImageDndTarget: DndTarget<NewCanvasFromImageDndTargetData, SingleImageDndSourceData> = {
-  ..._newCanvasFromImage,
-  typeGuard: buildTypeGuard(_newCanvasFromImage.key),
-  getData: buildGetData(_newCanvasFromImage.key, _newCanvasFromImage.type),
-  isValid: ({ sourceData }) => {
-    if (!singleImageDndSource.typeGuard(sourceData)) {
-      return false;
-    }
-    return true;
-  },
-  handler: ({ sourceData, targetData, dispatch, getState }) => {
-    const { type } = targetData.payload;
-    const { imageDTO } = sourceData.payload;
-    newCanvasFromImage({ type, imageDTO, dispatch, getState });
   },
 };
 
@@ -461,26 +433,3 @@ export const dndTargets = [
 ] as const;
 
 export type AnyDndTarget = (typeof dndTargets)[number];
-
-export const isValidDrop = (arg: {
-  sourceData: RecordUnknown;
-  targetData: RecordUnknown;
-  dispatch: AppDispatch;
-  getState: () => RootState;
-}) => {
-  if (arg.sourceData.id === arg.targetData.id) {
-    return false;
-  }
-  for (const dndTarget of dndTargets) {
-    if (!dndTarget.typeGuard(arg.targetData)) {
-      continue;
-    }
-    // TS cannot infer `arg.targetData` but we've just checked it.
-    // TODO(psyche): Figure out how to satisfy TS.
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-    if (!dndTarget.isValid(arg as any)) {
-      return true;
-    }
-  }
-  return false;
-};

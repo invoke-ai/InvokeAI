@@ -144,10 +144,7 @@ export const buildOnInvocationComplete = (getState: () => RootState, dispatch: A
   };
 
   return async (data: S['InvocationCompleteEvent']) => {
-    log.debug(
-      { data } as JsonObject,
-      `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
-    );
+    log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
     if (data.origin === 'workflows') {
       await handleOriginWorkflows(data);
