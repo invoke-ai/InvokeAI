@@ -21,6 +21,8 @@ import { GatedImageViewer } from 'features/gallery/components/ImageViewer/ImageV
 import { memo, useCallback, useRef } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
+import { CanvasAlertsInvocationProgress } from './CanvasAlerts/CanvasAlertsInvocationProgress';
+
 const MenuContent = () => {
   return (
     <CanvasManagerProviderGate>
@@ -83,6 +85,7 @@ export const CanvasMainPanelContent = memo(() => {
                 {showHUD && <CanvasHUD />}
                 <CanvasAlertsSelectedEntityStatus />
                 <CanvasAlertsPreserveMask />
+                <CanvasAlertsInvocationProgress />
                 <CanvasAlertsSendingToGallery />
               </Flex>
               <Flex position="absolute" top={1} insetInlineEnd={1}>
