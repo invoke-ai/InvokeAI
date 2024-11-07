@@ -62,7 +62,7 @@ const LinearViewFieldInternal = ({ fieldIdentifier }: Props) => {
           <Flex alignItems="center" gap={2}>
             <EditableFieldTitle nodeId={fieldIdentifier.nodeId} fieldName={fieldIdentifier.fieldName} kind="inputs" />
             <Spacer />
-            {isMouseOverNode && <Circle size={2} borderRadius="full" bg="invokeBlue.500" />}
+            {isMouseOverNode && <Circle me={2} size={2} borderRadius="full" bg="invokeBlue.500" />}
             {isValueChanged && (
               <IconButton
                 aria-label={t('nodes.resetToDefaultValue')}
