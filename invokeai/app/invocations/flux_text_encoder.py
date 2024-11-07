@@ -71,6 +71,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
 
             t5_encoder = HFEncoder(t5_text_encoder, t5_tokenizer, False, self.t5_max_seq_len)
 
+            context.util.signal_progress("Running T5 encoder")
             prompt_embeds = t5_encoder(prompt)
 
         assert isinstance(prompt_embeds, torch.Tensor)
@@ -111,6 +112,7 @@ class FluxTextEncoderInvocation(BaseInvocation):
 
             clip_encoder = HFEncoder(clip_text_encoder, clip_tokenizer, True, 77)
 
+            context.util.signal_progress("Running CLIP encoder")
             pooled_prompt_embeds = clip_encoder(prompt)
 
         assert isinstance(pooled_prompt_embeds, torch.Tensor)

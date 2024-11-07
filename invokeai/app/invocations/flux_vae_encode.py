@@ -59,6 +59,7 @@ class FluxVaeEncodeInvocation(BaseInvocation):
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
+        context.util.signal_progress("Running VAE")
         latents = self.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
 
         latents = latents.to("cpu")

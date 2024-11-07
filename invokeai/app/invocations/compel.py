@@ -95,6 +95,7 @@ class CompelInvocation(BaseInvocation):
                 ti_manager,
             ),
         ):
+            context.util.signal_progress("Building conditioning")
             assert isinstance(text_encoder, CLIPTextModel)
             assert isinstance(tokenizer, CLIPTokenizer)
             compel = Compel(
@@ -191,6 +192,7 @@ class SDXLPromptInvocationBase:
                 ti_manager,
             ),
         ):
+            context.util.signal_progress("Building conditioning")
             assert isinstance(text_encoder, (CLIPTextModel, CLIPTextModelWithProjection))
             assert isinstance(tokenizer, CLIPTokenizer)
 

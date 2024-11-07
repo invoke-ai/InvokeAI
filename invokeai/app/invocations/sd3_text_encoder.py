@@ -95,6 +95,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
             t5_text_encoder_info as t5_text_encoder,
             t5_tokenizer_info as t5_tokenizer,
         ):
+            context.util.signal_progress("Running T5 encoder")
             assert isinstance(t5_text_encoder, T5EncoderModel)
             assert isinstance(t5_tokenizer, (T5Tokenizer, T5TokenizerFast))
 
@@ -137,6 +138,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
             clip_tokenizer_info as clip_tokenizer,
             ExitStack() as exit_stack,
         ):
+            context.util.signal_progress("Running CLIP encoder")
             assert isinstance(clip_text_encoder, (CLIPTextModel, CLIPTextModelWithProjection))
             assert isinstance(clip_tokenizer, CLIPTokenizer)
 
