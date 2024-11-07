@@ -1,10 +1,10 @@
-import { Box, Button, Flex, Icon, IconButton, Image, Tooltip } from '@invoke-ai/ui-library';
+import { Box, IconButton, Image } from '@invoke-ai/ui-library';
 import { typedMemo } from 'common/util/typedMemo';
 import { toast } from 'features/toast/toast';
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
-import { PiArrowCounterClockwiseBold, PiUploadSimpleBold } from 'react-icons/pi';
+import { PiArrowCounterClockwiseBold, PiUploadBold } from 'react-icons/pi';
 import { useDeleteModelImageMutation, useUpdateModelImageMutation } from 'services/api/endpoints/models';
 
 type Props = {
@@ -16,7 +16,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
   const [image, setImage] = useState<string | null>(model_image || null);
   const { t } = useTranslation();
 
-  const [updateModelImage] = useUpdateModelImageMutation();
+  const [updateModelImage, request] = useUpdateModelImageMutation();
   const [deleteModelImage] = useDeleteModelImageMutation();
 
   const onDropAccepted = useCallback(
@@ -107,21 +107,17 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
 
   return (
     <>
-      <Tooltip label={t('modelManager.uploadImage')}>
-        <Flex
-          as={Button}
-          w={108}
-          h={108}
-          opacity={0.3}
-          borderRadius="base"
-          alignItems="center"
-          justifyContent="center"
-          flexShrink={0}
-          {...getRootProps()}
-        >
-          <Icon as={PiUploadSimpleBold} w={16} h={16} />
-        </Flex>
-      </Tooltip>
+      <IconButton
+        variant="ghost"
+        aria-label={t('modelManager.uploadImage')}
+        tooltip={t('modelManager.uploadImage')}
+        w={108}
+        h={108}
+        fontSize={36}
+        icon={<PiUploadBold />}
+        isLoading={request.isLoading}
+        {...getRootProps()}
+      />
       <input {...getInputProps()} />
     </>
   );

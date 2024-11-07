@@ -6,10 +6,9 @@ import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers
 import { canvasToBlob } from 'features/controlLayers/konva/util';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { useCallback } from 'react';
-import { useUploadImageMutation } from 'services/api/endpoints/images';
+import { uploadImage } from 'services/api/endpoints/images';
 
 export const useSaveLayerToAssets = () => {
-  const [uploadImage] = useUploadImageMutation();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
 
   const saveLayerToAssets = useCallback(
@@ -34,7 +33,7 @@ export const useSaveLayerToAssets = () => {
         board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
       });
     },
-    [autoAddBoardId, uploadImage]
+    [autoAddBoardId]
   );
 
   return saveLayerToAssets;

@@ -22,9 +22,10 @@ const sx = {
 
 type Props = ImageProps & {
   imageDTO: ImageDTO;
+  asThumbnail?: boolean;
 };
 
-export const DndImage = memo(({ imageDTO, ...rest }: Props) => {
+export const DndImage = memo(({ imageDTO, asThumbnail, ...rest }: Props) => {
   const store = useAppStore();
   const [isDragging, setIsDragging] = useState(false);
   const [element, ref] = useState<HTMLImageElement | null>(null);
@@ -62,8 +63,8 @@ export const DndImage = memo(({ imageDTO, ...rest }: Props) => {
       <Image
         role="button"
         ref={ref}
-        src={imageDTO.image_url}
-        fallbackSrc={imageDTO.thumbnail_url}
+        src={asThumbnail ? imageDTO.thumbnail_url : imageDTO.image_url}
+        fallbackSrc={asThumbnail ? undefined : imageDTO.thumbnail_url}
         w={imageDTO.width}
         sx={sx}
         data-is-dragging={isDragging}
