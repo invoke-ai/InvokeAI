@@ -21,11 +21,23 @@ const BoardsListWrapper = () => {
   const allowPrivateBoards = useAppSelector(selectAllowPrivateBoards);
   const [os, osRef] = useState<OverlayScrollbarsComponentRef | null>(null);
   useEffect(() => {
-    const element = os?.osInstance()?.elements().viewport;
-    if (!element) {
+    const osInstance = os?.osInstance();
+
+    if (!osInstance) {
       return;
     }
-    return combine(autoScrollForElements({ element }), autoScrollForExternal({ element }));
+
+    const element = osInstance.elements().viewport;
+
+    // `pragmatic-drag-and-drop-auto-scroll` requires the element to have `overflow-y: scroll` or `overflow-y: auto`
+    // else it logs an ugly warning. In our case, using a custom scrollbar library, it will be 'hidden' by default.
+    // To prevent the erroneous warning, we temporarily set the overflow-y to 'scroll' and then revert it back.
+    const overflowY = element.style.overflowY; // starts 'hidden'
+    element.style.setProperty('overflow-y', 'scroll', 'important');
+    const cleanup = combine(autoScrollForElements({ element }), autoScrollForExternal({ element }));
+    element.style.setProperty('overflow-y', overflowY);
+
+    return cleanup;
   }, [os]);
 
   return (
