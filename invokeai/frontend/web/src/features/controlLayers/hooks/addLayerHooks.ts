@@ -66,6 +66,9 @@ export const selectDefaultIPAdapter = createSelector(
     const ipAdapter = deepClone(initialIPAdapter);
     if (model) {
       ipAdapter.model = zModelIdentifierField.parse(model);
+      if (model.base === 'flux') {
+        ipAdapter.clipVisionModel = 'ViT-L';
+      }
     }
     return ipAdapter;
   }
