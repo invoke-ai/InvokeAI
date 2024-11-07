@@ -25,7 +25,7 @@ const WorkflowLinearTab = () => {
   return (
     <Box position="relative" w="full" h="full">
       <ScrollableContent>
-        <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} gap={2} h="full" w="full">
+        <Flex position="relative" flexDir="column" alignItems="flex-start" p={1} py={2} gap={2} h="full" w="full">
           <FieldListContent />
         </Flex>
       </ScrollableContent>
