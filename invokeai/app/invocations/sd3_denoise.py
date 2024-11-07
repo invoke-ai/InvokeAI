@@ -1,13 +1,16 @@
 from typing import Callable, Optional, Tuple
 
 import torch
+import torchvision.transforms as tv_transforms
 from diffusers.models.transformers.transformer_sd3 import SD3Transformer2DModel
 from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
+from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
+    DenoiseMaskField,
     FieldDescriptions,
     Input,
     InputField,
@@ -21,6 +24,7 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd3_text_encoder import SD3_T5_MAX_SEQ_LEN
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.config import BaseModelType
+from invokeai.backend.sd3.extensions.inpaint_extension import InpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -41,10 +45,10 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     latents: Optional[LatentsField] = InputField(
         default=None, description=FieldDescriptions.latents, input=Input.Connection
     )
-    # # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
-    # denoise_mask: Optional[DenoiseMaskField] = InputField(
-    #     default=None, description=FieldDescriptions.denoise_mask, input=Input.Connection
-    # )
+    # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
+    denoise_mask: Optional[DenoiseMaskField] = InputField(
+        default=None, description=FieldDescriptions.denoise_mask, input=Input.Connection
+    )
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
     transformer: TransformerField = InputField(
@@ -108,6 +112,41 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         init_timestep = timesteps[t_start_idx : t_start_idx + 1]
         timesteps = timesteps[t_start_idx : t_start_idx + t_end_idx]
         return timesteps, init_timestep
+
+    def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
+        """Prepare the inpaint mask.
+        - Loads the mask
+        - Resizes if necessary
+        - Casts to same device/dtype as latents
+
+        Args:
+            context (InvocationContext): The invocation context, for loading the inpaint mask.
+            latents (torch.Tensor): A latent image tensor. Used to determine the target shape, device, and dtype for the
+                inpaint mask.
+
+        Returns:
+            torch.Tensor | None: Inpaint mask. Values of 0.0 represent the regions to be fully denoised, and 1.0
+                represent the regions to be preserved.
+        """
+        if self.denoise_mask is None:
+            return None
+        mask = context.tensors.load(self.denoise_mask.mask_name)
+
+        # The input denoise_mask contains values in [0, 1], where 0.0 represents the regions to be fully denoised, and
+        # 1.0 represents the regions to be preserved.
+        # We invert the mask so that the regions to be preserved are 0.0 and the regions to be denoised are 1.0.
+        mask = 1.0 - mask
+
+        _, _, latent_height, latent_width = latents.shape
+        mask = tv_resize(
+            img=mask,
+            size=[latent_height, latent_width],
+            interpolation=tv_transforms.InterpolationMode.BILINEAR,
+            antialias=False,
+        )
+
+        mask = mask.to(device=latents.device, dtype=latents.dtype)
+        return mask
 
     def _load_text_conditioning(
         self,
@@ -257,6 +296,17 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             # init_latents are not provided, so we are not doing image-to-image (i.e. we are starting from pure noise).
             latents = noise
 
+        # Prepare inpaint extension.
+        inpaint_mask = self._prep_inpaint_mask(context, latents)
+        inpaint_extension: InpaintExtension | None = None
+        if inpaint_mask is not None:
+            assert init_latents is not None
+            inpaint_extension = InpaintExtension(
+                init_latents=init_latents,
+                inpaint_mask=inpaint_mask,
+                noise=noise,
+            )
+
         total_steps = len(timesteps)
         step_callback = self._build_step_callback(context)
 
@@ -304,6 +354,12 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     if torch.backends.mps.is_available():
                         # some platforms (eg. apple mps) misbehave due to a pytorch bug: https://github.com/pytorch/pytorch/pull/99272
                         latents = latents.to(latents_dtype)
+
+                if inpaint_extension is not None:
+                    t_prev = timesteps[step_idx + 1] if step_idx < len(timesteps) - 1 else 0.0
+                    latents = inpaint_extension.merge_intermediate_latents_with_init_latents(
+                        latents, scheduler, t_prev=torch.tensor([t_prev], device=device)
+                    )
 
                 step_callback(
                     PipelineIntermediateState(
