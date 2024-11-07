@@ -493,6 +493,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       file: new File([blob], `${this.id}_rasterized.png`, { type: 'image/png' }),
       image_category: 'other',
       is_intermediate: true,
+      withToast: false,
     });
     const imageObject = imageDTOToImageObject(imageDTO);
     if (replaceObjects) {
