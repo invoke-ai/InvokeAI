@@ -17,6 +17,7 @@ import {
   NewGallerySessionDialog,
 } from 'features/controlLayers/components/NewSessionConfirmationAlertDialog';
 import DeleteImageModal from 'features/deleteImageModal/components/DeleteImageModal';
+import { FullscreenDropzone } from 'features/dnd/FullscreenDropzone';
 import { DynamicPromptsModal } from 'features/dynamicPrompts/components/DynamicPromptsPreviewModal';
 import DeleteBoardModal from 'features/gallery/components/Boards/DeleteBoardModal';
 import { ImageContextMenu } from 'features/gallery/components/ImageContextMenu/ImageContextMenu';
@@ -106,6 +107,7 @@ const App = ({ config = DEFAULT_CONFIG, studioInitAction }: Props) => {
       <NewGallerySessionDialog />
       <NewCanvasSessionDialog />
       <ImageContextMenu />
+      <FullscreenDropzone />
     </ErrorBoundary>
   );
 };
