@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 import torch
 from diffusers.models.transformers.transformer_sd3 import SD3Transformer2DModel
@@ -11,6 +11,7 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
     InputField,
+    LatentsField,
     SD3ConditioningField,
     WithBoard,
     WithMetadata,
@@ -30,16 +31,24 @@ from invokeai.backend.util.devices import TorchDevice
     title="SD3 Denoise",
     tags=["image", "sd3"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run denoising process with a SD3 model."""
 
+    # If latents is provided, this means we are doing image-to-image.
+    latents: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    # # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
+    # denoise_mask: Optional[DenoiseMaskField] = InputField(
+    #     default=None, description=FieldDescriptions.denoise_mask, input=Input.Connection
+    # )
+    denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
+    denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
     transformer: TransformerField = InputField(
-        description=FieldDescriptions.sd3_model,
-        input=Input.Connection,
-        title="Transformer",
+        description=FieldDescriptions.sd3_model, input=Input.Connection, title="Transformer"
     )
     positive_conditioning: SD3ConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
@@ -60,6 +69,45 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         name = context.tensors.save(tensor=latents)
         return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+
+    # TODO(ryand): Write unit tests for _init_scheduler(). I had to fix a bug in the original implementation.
+    @staticmethod
+    def _init_scheduler(
+        scheduler: FlowMatchEulerDiscreteScheduler,
+        steps: int,
+        denoising_start: float,
+        denoising_end: float,
+        device: torch.device,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Helper function to initialize the scheduler and prepare the timesteps.
+
+        Based on DenoiseLatentsInvocation.init_scheduler(), but simplified since we currently only support
+        FlowMatchEulerDiscreteScheduler for SD3.
+        """
+        scheduler.set_timesteps(num_inference_steps=steps, device=device)
+        timesteps = scheduler.timesteps
+        assert isinstance(timesteps, torch.Tensor)
+
+        # Skip greater order timesteps.
+        _timesteps = timesteps[:: scheduler.order]
+
+        # Get the start timestep index.
+        eps = 1e-6
+        t_start_val = int(round(scheduler.config["num_train_timesteps"] * (1 - denoising_start)))
+        t_start_idx = len(list(filter(lambda ts: ts >= t_start_val - eps, _timesteps)))
+
+        # Get the end timestep index.
+        t_end_val = int(round(scheduler.config["num_train_timesteps"] * (1 - denoising_end)))
+        t_end_idx = len(list(filter(lambda ts: ts >= t_end_val - eps, _timesteps[t_start_idx:])))
+
+        # Apply the order to the indexes.
+        t_start_idx *= scheduler.order
+        t_end_idx *= scheduler.order
+
+        # Note that the returned timesteps list could be empty, but we still return an init_timestep value.
+        init_timestep = timesteps[t_start_idx : t_start_idx + 1]
+        timesteps = timesteps[t_start_idx : t_start_idx + t_end_idx]
+        return timesteps, init_timestep
 
     def _load_text_conditioning(
         self,
@@ -172,12 +220,21 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Prepare the scheduler.
         scheduler = FlowMatchEulerDiscreteScheduler()
-        scheduler.set_timesteps(num_inference_steps=self.steps, device=device)
-        timesteps = scheduler.timesteps
-        assert isinstance(timesteps, torch.Tensor)
+        timesteps, init_timestep = self._init_scheduler(
+            scheduler=scheduler,
+            steps=self.steps,
+            denoising_start=self.denoising_start,
+            denoising_end=self.denoising_end,
+            device=device,
+        )
 
         # Prepare the CFG scale list.
         cfg_scale = self._prepare_cfg_scale(len(timesteps))
+
+        # Load the input latents, if provided.
+        init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
+        if init_latents is not None:
+            init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
         # Generate initial latent noise.
         num_channels_latents = transformer_info.model.config.in_channels
@@ -191,7 +248,14 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             device=device,
             seed=self.seed,
         )
-        latents: torch.Tensor = noise
+
+        # Prepare input latent image.
+        if init_latents is not None:
+            # Noise the init_latents by the appropriate amount for the first timestep.
+            latents = scheduler.scale_noise(init_latents, init_timestep, noise)
+        else:
+            # init_latents are not provided, so we are not doing image-to-image (i.e. we are starting from pure noise).
+            latents = noise
 
         total_steps = len(timesteps)
         step_callback = self._build_step_callback(context)
