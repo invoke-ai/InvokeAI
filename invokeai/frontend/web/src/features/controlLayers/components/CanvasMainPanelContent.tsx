@@ -85,8 +85,8 @@ export const CanvasMainPanelContent = memo(() => {
                 {showHUD && <CanvasHUD />}
                 <CanvasAlertsSelectedEntityStatus />
                 <CanvasAlertsPreserveMask />
-                <CanvasAlertsInvocationProgress />
                 <CanvasAlertsSendingToGallery />
+                <CanvasAlertsInvocationProgress />
               </Flex>
               <Flex position="absolute" top={1} insetInlineEnd={1}>
                 <Menu>

@@ -174,7 +174,8 @@
         "placeholderSelectAModel": "Select a model",
         "reset": "Reset",
         "none": "None",
-        "new": "New"
+        "new": "New",
+        "generating": "Generating"
     },
     "hrf": {
         "hrf": "High Resolution Fix",
