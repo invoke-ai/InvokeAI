@@ -1,5 +1,4 @@
 import torch
-from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
 
 class InpaintExtension:
@@ -26,7 +25,7 @@ class InpaintExtension:
     # `InpaintExtension._apply_mask_gradient_adjustment()`.
 
     def merge_intermediate_latents_with_init_latents(
-        self, intermediate_latents: torch.Tensor, scheduler: FlowMatchEulerDiscreteScheduler, t_prev: torch.Tensor
+        self, intermediate_latents: torch.Tensor, t_prev: float
     ) -> torch.Tensor:
         """Merge the intermediate latents with the initial latents for the current timestep using the inpaint mask. I.e.
         update the intermediate latents to keep the regions that are not being inpainted on the correct noise
@@ -38,10 +37,8 @@ class InpaintExtension:
         # Noise the init latents for the current timestep.
         noised_init_latents = self._init_latents
 
-        # Note: scheduler.timesteps does not include the final timestep of 0.0. So, if we are in the final timestep, we
-        # simply use self._init_latents directly.
-        if t_prev[0] > 1e-6:
-            noised_init_latents = scheduler.scale_noise(sample=self._init_latents, timestep=t_prev, noise=self._noise)
+        # Noise the init latents for the current timestep.
+        noised_init_latents = self._noise * t_prev + (1.0 - t_prev) * self._init_latents
 
         # Merge the intermediate latents with the noised_init_latents using the inpaint_mask.
         return intermediate_latents * self._inpaint_mask + noised_init_latents * (1.0 - self._inpaint_mask)
