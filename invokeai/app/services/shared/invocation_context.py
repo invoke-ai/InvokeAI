@@ -483,7 +483,15 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
             Path to the downloaded model
         """
-        return self._services.model_manager.install.download_and_cache_model(source=source)
+        try:
+            self._services.events.emit_invocation_progress(
+                self._data.queue_item, self._data.invocation, f"Downloading model {source}..."
+            )
+            return self._services.model_manager.install.download_and_cache_model(source=source)
+        finally:
+            self._services.events.emit_invocation_progress(
+                self._data.queue_item, self._data.invocation, f"Finished downloading model {source}."
+            )
 
     def load_local_model(
         self,
