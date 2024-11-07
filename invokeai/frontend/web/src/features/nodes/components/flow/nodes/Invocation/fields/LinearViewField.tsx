@@ -52,7 +52,7 @@ const LinearViewFieldInternal = ({ fieldIdentifier }: Props) => {
       <Flex
         ref={ref}
         // This is used to trigger the post-move flash animation
-        data-field-name={fieldIdentifier.fieldName}
+        data-field-name={`${fieldIdentifier.nodeId}-${fieldIdentifier.fieldName}`}
         data-is-dragging={isDragging}
         onMouseEnter={handleMouseOver}
         onMouseLeave={handleMouseOut}
