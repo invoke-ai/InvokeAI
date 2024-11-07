@@ -85,6 +85,7 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
     """Select the proper variant files from a list of HuggingFace repo_id paths."""
     result: set[Path] = set()
     subfolder_weights: dict[Path, list[SubfolderCandidate]] = {}
+    safetensors_detected = False
     for path in files:
         if path.suffix in [".onnx", ".pb", ".onnx_data"]:
             if variant == ModelRepoVariant.ONNX:
@@ -119,10 +120,16 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
             # We prefer safetensors over other file formats and an exact variant match. We'll score each file based on
             # variant and format and select the best one.
 
+            if safetensors_detected and path.suffix == ".bin":
+                continue
+
             parent = path.parent
             score = 0
 
             if path.suffix == ".safetensors":
+                safetensors_detected = True
+                if parent in subfolder_weights:
+                    subfolder_weights[parent] = [sfc for sfc in subfolder_weights[parent] if sfc.path.suffix != ".bin"]
                 score += 1
 
             candidate_variant_label = path.suffixes[0] if len(path.suffixes) == 2 else None
