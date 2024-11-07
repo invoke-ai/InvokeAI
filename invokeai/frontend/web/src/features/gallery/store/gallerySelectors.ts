@@ -53,7 +53,6 @@ export const selectBoardsListOrderDir = createSelector(selectGallerySlice, (gall
 
 export const selectSelectionCount = createSelector(selectGallerySlice, (gallery) => gallery.selection.length);
 export const selectSelection = createSelector(selectGallerySlice, (gallery) => gallery.selection);
-export const selectHasMultipleImagesSelected = createSelector(selectSelectionCount, (count) => count > 1);
 export const selectGalleryImageMinimumWidth = createSelector(
   selectGallerySlice,
   (gallery) => gallery.galleryImageMinimumWidth

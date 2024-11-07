@@ -101,7 +101,6 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
         dndTarget={removeImageFromBoardDndTarget}
         dndTargetData={dndTargetData}
         label={t('gallery.move')}
-        externalLabel={t('common.upload')}
       />
     </Box>
   );

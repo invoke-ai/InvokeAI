@@ -81,12 +81,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
           </Tooltip>
         )}
       </BoardContextMenu>
-      <DndDropTarget
-        dndTarget={addImageToBoardDndTarget}
-        dndTargetData={dndTargetData}
-        label={t('gallery.move')}
-        externalLabel={t('common.upload')}
-      />
+      <DndDropTarget dndTarget={addImageToBoardDndTarget} dndTargetData={dndTargetData} label={t('gallery.move')} />
     </Box>
   );
 };

@@ -7,12 +7,12 @@ import type { DndListTargetState } from 'features/dnd/types';
 /**
  * Design decisions for the drop indicator's main line
  */
-export const line = {
+const line = {
   thickness: 2,
   backgroundColor: 'base.500',
 };
 
-export type DropIndicatorProps = {
+type DropIndicatorProps = {
   /**
    * The `edge` to draw a drop indicator on.
    *

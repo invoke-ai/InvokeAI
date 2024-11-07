@@ -59,8 +59,7 @@ const getImageDTOFromMap = (target: Node): ImageDTO | undefined => {
  * @param imageDTO The image DTO to register the context menu for.
  * @param targetRef The ref of the target element that should trigger the context menu.
  */
-export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: HTMLDivElement | null
-) => {
+export const useImageContextMenu = (imageDTO: ImageDTO | undefined, targetRef: HTMLDivElement | null) => {
   useEffect(() => {
     if (!targetRef || !imageDTO) {
       return;
