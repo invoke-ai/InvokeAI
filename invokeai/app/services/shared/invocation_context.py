@@ -368,11 +368,19 @@ class ModelsInterface(InvocationContextInterface):
 
         if isinstance(identifier, str):
             model = self._services.model_manager.store.get_model(identifier)
-            return self._services.model_manager.load.load_model(model, submodel_type)
         else:
-            _submodel_type = submodel_type or identifier.submodel_type
+            submodel_type = submodel_type or identifier.submodel_type
             model = self._services.model_manager.store.get_model(identifier.key)
-            return self._services.model_manager.load.load_model(model, _submodel_type)
+
+        try:
+            self._services.events.emit_invocation_progress(
+                self._data.queue_item, self._data.invocation, f"Loading model {model.name}..."
+            )
+            return self._services.model_manager.load.load_model(model, submodel_type)
+        finally:
+            self._services.events.emit_invocation_progress(
+                self._data.queue_item, self._data.invocation, f"Finished loading model {model.name}."
+            )
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
@@ -397,7 +405,15 @@ class ModelsInterface(InvocationContextInterface):
         if len(configs) > 1:
             raise ValueError(f"More than one model found with name {name}, base {base}, and type {type}")
 
-        return self._services.model_manager.load.load_model(configs[0], submodel_type)
+        try:
+            self._services.events.emit_invocation_progress(
+                self._data.queue_item, self._data.invocation, f"Loading model {name}..."
+            )
+            return self._services.model_manager.load.load_model(configs[0], submodel_type)
+        finally:
+            self._services.events.emit_invocation_progress(
+                self._data.queue_item, self._data.invocation, f"Finished loading model {name}."
+            )
 
     def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
         """Get a model's config.
@@ -489,7 +505,16 @@ class ModelsInterface(InvocationContextInterface):
         Returns:
             A LoadedModelWithoutConfig object.
         """
-        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+
+        try:
+            self._services.events.emit_invocation_progress(
+                self._data.queue_item, self._data.invocation, "Loading model..."
+            )
+            return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+        finally:
+            self._services.events.emit_invocation_progress(
+                self._data.queue_item, self._data.invocation, "Finished loading model."
+            )
 
     def load_remote_model(
         self,
@@ -514,7 +539,16 @@ class ModelsInterface(InvocationContextInterface):
             A LoadedModelWithoutConfig object.
         """
         model_path = self._services.model_manager.install.download_and_cache_model(source=str(source))
-        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+
+        try:
+            self._services.events.emit_invocation_progress(
+                self._data.queue_item, self._data.invocation, "Loading model..."
+            )
+            return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+        finally:
+            self._services.events.emit_invocation_progress(
+                self._data.queue_item, self._data.invocation, "Finished loading model."
+            )
 
 
 class ConfigInterface(InvocationContextInterface):
