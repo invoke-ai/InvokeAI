@@ -117,6 +117,7 @@ class ImageToLatentsInvocation(BaseInvocation):
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
+        context.util.signal_progress("Running VAE encoder")
         latents = self.vae_encode(
             vae_info=vae_info, upcast=self.fp32, tiled=self.tiled, image_tensor=image_tensor, tile_size=self.tile_size
         )

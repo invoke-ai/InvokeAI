@@ -47,6 +47,7 @@ class SD3LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         vae_info = context.models.load(self.vae.vae)
         assert isinstance(vae_info.model, (AutoencoderKL))
         with SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes), vae_info as vae:
+            context.util.signal_progress("Running VAE")
             assert isinstance(vae, (AutoencoderKL))
             latents = latents.to(vae.device)
 

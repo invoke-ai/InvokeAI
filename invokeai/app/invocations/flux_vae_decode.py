@@ -54,6 +54,7 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
         vae_info = context.models.load(self.vae.vae)
+        context.util.signal_progress("Running VAE")
         image = self._vae_decode(vae_info=vae_info, latents=latents)
 
         TorchDevice.empty_cache()
