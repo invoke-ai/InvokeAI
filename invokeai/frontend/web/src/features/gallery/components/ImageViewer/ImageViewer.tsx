@@ -44,7 +44,6 @@ export const ImageViewer = memo(({ closeButton }: Props) => {
       right={0}
       bottom={0}
       left={0}
-      rowGap={2}
       alignItems="center"
       justifyContent="center"
     >

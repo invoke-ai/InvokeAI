@@ -49,10 +49,19 @@ const CurrentImagePreview = () => {
       position="relative"
     >
       <ImageContent imageDTO={imageDTO} />
-      <Box position="absolute" top={0} insetInlineStart={0}>
+      <Flex
+        flexDir="column"
+        gap={2}
+        position="absolute"
+        top={0}
+        insetInlineStart={0}
+        pointerEvents="none"
+        alignItems="flex-start"
+      >
         <CanvasAlertsInvocationProgress />
         <CanvasAlertsSendingToCanvas />
-      </Box>
+        <CanvasAlertsInvocationProgress />
+      </Flex>
       {shouldShowImageDetails && imageDTO && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
           <ImageMetadataViewer image={imageDTO} />
